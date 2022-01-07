@@ -87,11 +87,10 @@ func main() {
 		err               error
 
 		// epoch qc contract client
-		machineAccountInfo  *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs   []*common.FlowClientConfig
-		insecureAccessAPI   bool
-		accessNodeIDS       []string
-		accessNodeAddresses []string
+		machineAccountInfo *bootstrap.NodeMachineAccountInfo
+		flowClientConfigs  []*common.FlowClientConfig
+		insecureAccessAPI  bool
+		accessNodeIDS      []string
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
@@ -148,7 +147,6 @@ func main() {
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
-		flags.StringSliceVar(&accessNodeAddresses, "access-node-addresses", []string{}, fmt.Sprintf("custom list of access node full addresses. Minimum length %d. This flag can only be used on non-mainnet networks.", common.DefaultAccessNodeIDSMinimum))
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -205,38 +203,20 @@ func main() {
 			return err
 		}).
 		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			// access node addresses can be set explicitly for testing networks
-			if len(accessNodeAddresses) > 0 {
-				if node.RootChainID == flow.Mainnet {
-					return fmt.Errorf("invalid flag usage --access-node-addresses flag is not allowed on chain with root ID %s", flow.Mainnet)
-				}
-
-				for _, address := range accessNodeAddresses {
-					config, err := common.NewFlowClientConfig(address, "", true)
-					if err != nil {
-						return fmt.Errorf("failed create flow client configs using flag --access-node-addresses: %w", err)
-					}
-					flowClientConfigs = append(flowClientConfigs, config)
-				}
-
-				return nil
+			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
+			if err != nil {
+				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
 			}
 
-			//anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
-			//if err != nil {
-			//	return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
-			//}
-			//
-			//flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
-			//if err != nil {
-			//	return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
-			//}
+			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
+			if err != nil {
+				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
+			}
 
 			return nil
 		}).
 		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			node.Logger.Warn().Interface("client-config", flowClientConfigs[0]).Msg("client config")
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)

@@ -509,7 +509,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		Name: networkConf.Name,
 	})
 
-	// create a temporary directory to store all bootstrapping files 
+	// create a temporary directory to store all bootstrapping files
 	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
@@ -550,16 +550,18 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	for _, nodeConf := range confs {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
+	}
 
+	for _, nodeConf := range confs {
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 		if nodeConf.Role == flow.RoleConsensus || nodeConf.Role == flow.RoleCollection {
 			// ghost containers don't participate in the network skip any SN/LN ghost containers
 			if !nodeConf.Ghost {
 				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
+				nodeContainer.AddFlag("insecure-access-api", "true")
 				for _, an := range flowNetwork.ContainersByRole(flow.RoleAccess) {
 					if !an.Config.Ghost {
-						port := flowNetwork.AccessPortsByContainerName[an.Name()]
-						nodeContainer.AddFlag("access-node-addresses", fmt.Sprintf("%s:%s", an.Name(), port))
+						nodeContainer.AddFlag("access-node-ids", an.Config.NodeID.String())
 						break
 					}
 				}

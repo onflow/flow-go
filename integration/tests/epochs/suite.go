@@ -608,12 +608,11 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 		// ghost containers don't participate in the network skip any SN/LN ghost containers
 		if !testContainerConfig.Ghost {
 			nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
-			nodeContainer.AddFlag("insecure-access-api", "false")
+			nodeContainer.AddFlag("insecure-access-api", "true")
 
 			for _, an := range s.net.ContainersByRole(flow.RoleAccess) {
 				if !an.Config.Ghost {
-					port := s.net.AccessPortsByContainerName[an.Name()]
-					nodeContainer.AddFlag("access-node-addresses", fmt.Sprintf("%s:%s", an.Name(), port))
+					nodeContainer.AddFlag("access-node-ids", an.Config.NodeID.String())
 					break
 				}
 			}
