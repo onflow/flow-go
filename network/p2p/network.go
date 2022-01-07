@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
@@ -40,18 +40,18 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	identityProvider              id.IdentityProvider
-	logger                        zerolog.Logger
-	codec                         network.Codec
-	me                            module.Local
-	mw                            network.Middleware
-	top                           network.Topology // used to determine fanout connections
-	metrics                       module.NetworkMetrics
-	rcache                        *RcvCache // used to deduplicate incoming messages
-	queue                         network.MessageQueue
-	subMngr                       network.SubscriptionManager // used to keep track of subscribed channels
-	registerEngineRequests        chan *registerEngineRequest
-	registerBlockExchangeRequests chan *registerBlockExchangeRequest
+	identityProvider            id.IdentityProvider
+	logger                      zerolog.Logger
+	codec                       network.Codec
+	me                          module.Local
+	mw                          network.Middleware
+	top                         network.Topology // used to determine fanout connections
+	metrics                     module.NetworkMetrics
+	rcache                      *RcvCache // used to deduplicate incoming messages
+	queue                       network.MessageQueue
+	subMngr                     network.SubscriptionManager // used to keep track of subscribed channels
+	registerEngineRequests      chan *registerEngineRequest
+	registerBlobServiceRequests chan *registerBlobServiceRequest
 	*component.ComponentManager
 }
 
@@ -68,15 +68,15 @@ type registerEngineResp struct {
 	err     error
 }
 
-type registerBlockExchangeRequest struct {
+type registerBlobServiceRequest struct {
 	channel  network.Channel
-	bstore   blockstore.Blockstore
-	respChan chan *registerBlockExchangeResp
+	ds       datastore.Batching
+	respChan chan *registerBlobServiceResp
 }
 
-type registerBlockExchangeResp struct {
-	blockExchange network.BlockExchange
-	err           error
+type registerBlobServiceResp struct {
+	blobService network.BlobService
+	err         error
 }
 
 var ErrNetworkShutdown = errors.New("network has already shutdown")
@@ -108,17 +108,17 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:                        log,
-		codec:                         codec,
-		me:                            me,
-		mw:                            mw,
-		rcache:                        rcache,
-		top:                           top,
-		metrics:                       metrics,
-		subMngr:                       sm,
-		identityProvider:              identityProvider,
-		registerEngineRequests:        make(chan *registerEngineRequest),
-		registerBlockExchangeRequests: make(chan *registerBlockExchangeRequest),
+		logger:                      log,
+		codec:                       codec,
+		me:                          me,
+		mw:                          mw,
+		rcache:                      rcache,
+		top:                         top,
+		metrics:                     metrics,
+		subMngr:                     sm,
+		identityProvider:            identityProvider,
+		registerEngineRequests:      make(chan *registerEngineRequest),
+		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 	}
 
 	o.mw.SetOverlay(o)
@@ -126,7 +126,7 @@ func NewNetwork(
 	o.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(o.runMiddleware).
 		AddWorker(o.processRegisterEngineRequests).
-		AddWorker(o.processRegisterBlockExchangeRequests).Build()
+		AddWorker(o.processRegisterBlobServiceRequests).Build()
 
 	return o, nil
 }
@@ -155,17 +155,17 @@ func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerCon
 	}
 }
 
-func (n *Network) processRegisterBlockExchangeRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	<-n.mw.Ready()
 	ready()
 
 	for {
 		select {
-		case req := <-n.registerBlockExchangeRequests:
-			blockExchange, err := n.handleRegisterBlockExchangeRequest(parent, req.channel, req.bstore)
-			resp := &registerBlockExchangeResp{
-				blockExchange: blockExchange,
-				err:           err,
+		case req := <-n.registerBlobServiceRequests:
+			blobService, err := n.handleRegisterBlobServiceRequest(parent, req.channel, req.ds)
+			resp := &registerBlobServiceResp{
+				blobService: blobService,
+				err:         err,
 			}
 
 			select {
@@ -227,17 +227,22 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 	return conduit, nil
 }
 
-func (n *Network) handleRegisterBlockExchangeRequest(parent irrecoverable.SignalerContext, channel network.Channel, bstore blockstore.Blockstore) (network.BlockExchange, error) {
+func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
 	// TODO: this is a hack, we should not rely on knowing the underlying implementation
 	mw, ok := n.mw.(*Middleware)
 	if !ok {
 		return nil, errors.New("middleware was of unexpected type")
 	}
 	if mw.libP2PNode.dht == nil {
-		return nil, errors.New("block exchange is disabled because content routing is not configured")
+		return nil, errors.New("blob exchange is disabled because content routing is not configured")
 	}
 
-	return NewBlockExchange(parent, mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), bstore), nil
+	bs := network.NewBlobService(mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), ds)
+
+	// start the blob service using the network's context
+	bs.Start(parent)
+
+	return bs, nil
 }
 
 // Register will register the given engine with the given unique engine engineID,
@@ -263,24 +268,24 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 	}
 }
 
-// RegisterBlockExchange registers a BlockExchange network on the given channel.
-// The returned BlockExchange can be used to request blocks from the network.
-func (n *Network) RegisterBlockExchange(channel network.Channel, bstore blockstore.Blockstore) (network.BlockExchange, error) {
-	respChan := make(chan *registerBlockExchangeResp)
+// RegisterBlobService registers a BlobService on the given channel.
+// The returned BlobService can be used to request blobs from the network.
+func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
+	respChan := make(chan *registerBlobServiceResp)
 
 	select {
 	case <-n.ComponentManager.ShutdownSignal():
 		return nil, ErrNetworkShutdown
-	case n.registerBlockExchangeRequests <- &registerBlockExchangeRequest{
+	case n.registerBlobServiceRequests <- &registerBlobServiceRequest{
 		channel:  channel,
-		bstore:   bstore,
+		ds:       ds,
 		respChan: respChan,
 	}:
 		select {
 		case <-n.ComponentManager.ShutdownSignal():
 			return nil, ErrNetworkShutdown
 		case resp := <-respChan:
-			return resp.blockExchange, resp.err
+			return resp.blobService, resp.err
 		}
 	}
 }

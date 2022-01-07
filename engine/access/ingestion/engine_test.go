@@ -518,13 +518,42 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 
-	suite.Run("missing collections are requested", func() {
+	suite.Run("missing collections are requested when count exceeds defaultMissingCollsForBlkThreshold", func() {
+		// root block is the last complete block
+		rtnErr = nil
+		lastFullBlockHeight = rootBlkHeight
+
+		// lower the block threshold to request missing collections
+		defaultMissingCollsForBlkThreshold = 2
+
+		// mark all blocks beyond the root block as incomplete
+		for i := 1; i < blkCnt; i++ {
+			blkMissingColl[i] = true
+			// setup receive engine expectations
+			for _, cg := range blocks[i].Payload.Guarantees {
+				suite.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
+			}
+		}
+
+		suite.eng.updateLastFullBlockReceivedIndex()
+
+		// assert that missing collections are requested
+		suite.request.AssertExpectations(suite.T())
+
+		// last full blk index is not advanced
+		suite.blocks.AssertExpectations(suite.T()) // no new call to UpdateLastFullBlockHeight should be made
+	})
+
+	suite.Run("missing collections are requested when count exceeds defaultMissingCollsForAgeThreshold", func() {
 		// root block is the last complete block
 		rtnErr = nil
 		lastFullBlockHeight = rootBlkHeight
 
 		// lower the height threshold to request missing collections
-		defaultMissingCollsForBlkThreshold = 2
+		defaultMissingCollsForAgeThreshold = 1
+
+		// raise the block threshold to ensure it does not trigger missing collection request
+		defaultMissingCollsForBlkThreshold = blkCnt + 1
 
 		// mark all blocks beyond the root block as incomplete
 		for i := 1; i < blkCnt; i++ {
@@ -543,12 +572,14 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		// last full blk index is not advanced
 		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
-	suite.Run("missing collections are not requested if threshold not reached", func() {
+
+	suite.Run("missing collections are not requested if defaultMissingCollsForBlkThreshold not reached", func() {
 		// root block is the last complete block
 		rtnErr = nil
 		lastFullBlockHeight = rootBlkHeight
 
-		// raise the height threshold to avoid requesting missing collections
+		// raise the thresholds to avoid requesting missing collections
+		defaultMissingCollsForAgeThreshold = 3
 		defaultMissingCollsForBlkThreshold = 3
 
 		// mark all blocks beyond the root block as incomplete

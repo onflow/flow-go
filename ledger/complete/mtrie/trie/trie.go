@@ -295,17 +295,19 @@ func update(
 	}
 
 	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
-	// payload is re-written at a register.
-	if lChild == lchildParent && rChild == rchildParent {
+	// payload is re-written at a register. CAUTION: we only check that the children are
+	// unchanged. This is only sufficient for interim nodes (for leaf nodes, the children
+	// might be unachged, i.e. both nil, but the payload could have changed).
+	if !parentNode.IsLeaf() && lChild == lchildParent && rChild == rchildParent {
 		return parentNode
 	}
 
-	n := node.NewInterimNode(nodeHeight, lChild, rChild)
-
+	// In case the parent node was a leaf, we _cannot reuse_ it, because we potentially
+	// updated registers in the sub-trie
 	if prune {
-		return n.Compactify()
+		return node.NewInterimCompactifiedNode(nodeHeight, lChild, rChild)
 	}
-	return n
+	return node.NewInterimNode(nodeHeight, lChild, rChild)
 }
 
 // UnsafeProofs provides proofs for the given paths.

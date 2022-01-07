@@ -7,6 +7,8 @@ import (
 	gohash "hash"
 	"io"
 
+	"github.com/onflow/flow-go/model/encodable"
+
 	"golang.org/x/crypto/hkdf"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -223,6 +225,30 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func WriteMachineAccountFile(
+	chainID flow.ChainID,
+	nodeID flow.Identifier,
+	accountAddress flow.Address,
+	accountKey encodable.MachineAccountPrivKey,
+	write WriteJSONFileFunc) error {
+
+	info := bootstrap.NodeMachineAccountInfo{
+		Address:           accountAddress.HexWithPrefix(),
+		EncodedPrivateKey: accountKey.Encode(),
+		KeyIndex:          0,
+		SigningAlgorithm:  accountKey.Algorithm(),
+		HashAlgorithm:     sdkcrypto.SHA3_256,
+	}
+
+	path := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeID)
+	err := write(path, info)
+	if err != nil {
+		return err
 	}
 
 	return nil

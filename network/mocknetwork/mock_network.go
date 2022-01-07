@@ -6,7 +6,7 @@ package mocknetwork
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	go_ipfs_blockstore "github.com/ipfs/go-ipfs-blockstore"
+	go_datastore "github.com/ipfs/go-datastore"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	network "github.com/onflow/flow-go/network"
 	reflect "reflect"
@@ -78,19 +78,19 @@ func (mr *MockNetworkMockRecorder) Register(arg0, arg1 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockNetwork)(nil).Register), arg0, arg1)
 }
 
-// RegisterBlockExchange mocks base method
-func (m *MockNetwork) RegisterBlockExchange(arg0 network.Channel, arg1 go_ipfs_blockstore.Blockstore) (network.BlockExchange, error) {
+// RegisterBlobService mocks base method
+func (m *MockNetwork) RegisterBlobService(arg0 network.Channel, arg1 go_datastore.Batching) (network.BlobService, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RegisterBlockExchange", arg0, arg1)
-	ret0, _ := ret[0].(network.BlockExchange)
+	ret := m.ctrl.Call(m, "RegisterBlobService", arg0, arg1)
+	ret0, _ := ret[0].(network.BlobService)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// RegisterBlockExchange indicates an expected call of RegisterBlockExchange
-func (mr *MockNetworkMockRecorder) RegisterBlockExchange(arg0, arg1 interface{}) *gomock.Call {
+// RegisterBlobService indicates an expected call of RegisterBlobService
+func (mr *MockNetworkMockRecorder) RegisterBlobService(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterBlockExchange", reflect.TypeOf((*MockNetwork)(nil).RegisterBlockExchange), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterBlobService", reflect.TypeOf((*MockNetwork)(nil).RegisterBlobService), arg0, arg1)
 }
 
 // Start mocks base method

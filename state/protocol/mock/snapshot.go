@@ -145,6 +145,22 @@ func (_m *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return r0, r1
 }
 
+// Params provides a mock function with given fields:
+func (_m *Snapshot) Params() protocol.GlobalParams {
+	ret := _m.Called()
+
+	var r0 protocol.GlobalParams
+	if rf, ok := ret.Get(0).(func() protocol.GlobalParams); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.GlobalParams)
+		}
+	}
+
+	return r0
+}
+
 // Phase provides a mock function with given fields:
 func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
 	ret := _m.Called()
@@ -222,15 +238,15 @@ func (_m *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 }
 
 // SealingSegment provides a mock function with given fields:
-func (_m *Snapshot) SealingSegment() ([]*flow.Block, error) {
+func (_m *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	ret := _m.Called()
 
-	var r0 []*flow.Block
-	if rf, ok := ret.Get(0).(func() []*flow.Block); ok {
+	var r0 *flow.SealingSegment
+	if rf, ok := ret.Get(0).(func() *flow.SealingSegment); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.Block)
+			r0 = ret.Get(0).(*flow.SealingSegment)
 		}
 	}
 

@@ -163,7 +163,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		Logger()
 	initialState, finalState, err := getStartAndEndStates(receipt)
 	if err != nil {
-		if errors.Is(err, flow.NoChunksError) {
+		if errors.Is(err, flow.ErrNoChunks) {
 			log.Error().Err(err).Msg("discarding malformed receipt")
 			return false, nil
 		}
@@ -383,7 +383,7 @@ func (c *Core) OnBlockFinalization() error {
 
 // getStartAndEndStates returns the pair: (start state commitment; final state commitment)
 // Error returns:
-//  * NoChunksError: if there are no chunks, i.e. the ExecutionResult is malformed
+//  * ErrNoChunks: if there are no chunks, i.e. the ExecutionResult is malformed
 //  * all other errors are unexpected and symptoms of node-internal problems
 func getStartAndEndStates(receipt *flow.ExecutionReceipt) (initialState flow.StateCommitment, finalState flow.StateCommitment, err error) {
 	initialState, err = receipt.ExecutionResult.InitialStateCommit()

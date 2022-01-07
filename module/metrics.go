@@ -82,6 +82,7 @@ type ComplianceMetrics interface {
 	CurrentDKGPhase1FinalView(view uint64)
 	CurrentDKGPhase2FinalView(view uint64)
 	CurrentDKGPhase3FinalView(view uint64)
+	EpochEmergencyFallbackTriggered()
 }
 
 type CleanerMetrics interface {
@@ -311,6 +312,16 @@ type LedgerMetrics interface {
 type WALMetrics interface {
 	// DiskSize records the amount of disk space used by the storage (in bytes)
 	DiskSize(uint64)
+}
+
+type ExecutionDataServiceMetrics interface {
+	ExecutionDataAddStarted()
+
+	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeNodes int)
+
+	ExecutionDataGetStarted()
+
+	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeNodes int)
 }
 
 type RuntimeMetrics interface {

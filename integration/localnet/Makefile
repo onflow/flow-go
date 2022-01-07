@@ -47,16 +47,16 @@ init-short-epochs:
 
 .PHONY: start
 start:
-	docker-compose -f docker-compose.metrics.yml up -d
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up --build -d
 
 .PHONY: logs
 logs:
-	docker-compose -f docker-compose.nodes.yml logs -f
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml logs -f
 
 .PHONY: stop
 stop:
-	docker-compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml -f docker-compose.logs.yml down -v
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml -f docker-compose.nodes.yml -f docker-compose.logs.yml down -v
 
 .PHONY: load
 load:

@@ -108,7 +108,7 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 		go func() {
 			for p := range payloadChan {
 				var id flow.RegisterID
-				id, err = keyToRegisterID(p.Payload.Key)
+				id, err = KeyToRegisterID(p.Payload.Key)
 				if err != nil {
 					log.Error().Err(err).Msg("error converting key to register ID")
 				}
@@ -168,7 +168,7 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 			return nil, fmt.Errorf(errStr)
 		}
 
-		id, err := keyToRegisterID(p.Key)
+		id, err := KeyToRegisterID(p.Key)
 		if err != nil {
 			log.Error().Err(err).Msg("error converting key to register ID")
 			return nil, err

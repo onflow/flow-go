@@ -200,7 +200,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		return false, blockHeight, nil
 	}
 
-	err = e.requestChunkDataPack(chunkID, result.ID(), chunk.BlockID)
+	err = e.requestChunkDataPack(chunk.Index, chunkID, result.ID(), chunk.BlockID)
 	if err != nil {
 		return false, blockHeight, fmt.Errorf("could not request chunk data pack: %w", err)
 	}
@@ -218,17 +218,16 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 // HandleChunkDataPack is called by the chunk requester module everytime a new requested chunk data pack arrives.
 // The chunks are supposed to be deduplicated by the requester.
 // So invocation of this method indicates arrival of a distinct requested chunk.
-func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
-
+func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verification.ChunkDataPackResponse) {
 	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
-		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+		Hex("chunk_id", logging.ID(response.Cdp.ChunkID)).
 		Logger()
 
-	if chunkDataPack.Collection != nil {
+	if response.Cdp.Collection != nil {
 		// non-system chunk data packs have non-nil collection
 		lg = lg.With().
-			Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
+			Hex("collection_id", logging.ID(response.Cdp.Collection.ID())).
 			Logger()
 		lg.Info().Msg("chunk data pack arrived")
 	} else {
@@ -238,7 +237,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	e.metrics.OnChunkDataPackArrivedAtFetcher()
 
 	// make sure we still need it
-	status, exists := e.pendingChunks.ByID(chunkDataPack.ChunkID)
+	status, exists := e.pendingChunks.Get(response.Index, response.ResultID)
 	if !exists {
 		lg.Debug().Msg("could not fetch pending status from mempool, dropping chunk data")
 		return
@@ -256,13 +255,14 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
 	defer span.Finish()
 
-	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, chunkDataPack)
+	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, response.Cdp)
 	if IsChunkDataPackValidationError(err) {
 		lg.Error().Err(err).Msg("could not validate chunk data pack")
 		return
 	}
 
 	if err != nil {
+		// TODO: byzantine fault
 		lg.Fatal().Err(err).Msg("could not handle chunk data pack")
 		return
 	}
@@ -289,24 +289,24 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack) (bool, error) {
 
-	var ferr error
-	processed := false
-
 	// make sure the chunk data pack is valid
 	err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, status.ExecutionResult)
 	if err != nil {
-		// TODO: this can be due to a byzantine behavio
-		ferr = NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.Collection.ID(), err)
-		return processed, ferr
+		return false, NewChunkDataPackValidationError(originID,
+			status.ExecutionResult.ID(),
+			status.ChunkIndex,
+			chunkDataPack.ID(),
+			chunkDataPack.ChunkID,
+			chunkDataPack.Collection.ID(),
+			err)
 	}
 
-	processed, err = e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
+	processed, err := e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
 	if err != nil {
-		ferr = fmt.Errorf("could not handle validated chunk data pack: %w", err)
-		return processed, ferr
+		return processed, fmt.Errorf("could not handle validated chunk data pack: %w", err)
 	}
 
-	return processed, ferr
+	return processed, nil
 }
 
 // handleValidatedChunkDataPack receives a validated chunk data pack, removes its status from the memory, and pushes a verifiable chunk for it to
@@ -316,9 +316,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack) (bool, error) {
 
-	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
-	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
-
+	removed := e.pendingChunks.Rem(status.ChunkIndex, status.ExecutionResult.ID())
 	if !removed {
 		// we deduplicate the chunk data responses at this point, reaching here means a
 		// duplicate chunk data response is under process concurrently, so we give up
@@ -327,6 +325,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 	}
 
 	// pushes chunk data pack to verifier, and waits for it to be verified.
+	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
 	err := e.pushToVerifierWithTracing(ctx, chunk, status.ExecutionResult, chunkDataPack)
 	if err != nil {
 		return false, fmt.Errorf("could not push the chunk to verifier engine")
@@ -361,8 +360,14 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	result *flow.ExecutionResult) error {
 
 	chunk := result.Chunks[chunkIndex]
+	// 1. chunk ID of chunk data pack should map the chunk ID on execution result
+	expectedChunkID := chunk.ID()
+	if chunkDataPack.ChunkID != expectedChunkID {
+		return fmt.Errorf("chunk ID of chunk data pack does not match corresponding chunk on execution result, expected: %x, got:%x",
+			expectedChunkID, chunkDataPack.ChunkID)
+	}
 
-	// 1. sender must be a staked execution node at that block
+	// 2. sender must be a staked execution node at that block
 	blockID := chunk.BlockID
 	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
 	if !staked {
@@ -372,7 +377,7 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 			chunk.ID())
 	}
 
-	// 2. start state must match
+	// 3. start state must match
 	if chunkDataPack.StartState != chunk.ChunkBody.StartState {
 		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x, block ID: %x, resultID: %x, chunk ID: %x",
 			chunk.ChunkBody.StartState,
@@ -453,29 +458,32 @@ func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, b
 	return valid
 }
 
-// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler (i.e.,
-// this fetcher engine) that the chunk ID has been sealed and hence the requester will no longer request it.
+// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler that the specified chunk
+// has been sealed and hence the requester will no longer request it.
 //
-// When the requester calls this callback method, it will never returns a chunk data pack for this chunk ID to the handler (i.e.,
+// When the requester calls this callback method, it will never return a chunk data pack for this specified chunk to the handler (i.e.,
 // through HandleChunkDataPack).
-func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
+func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Identifier) {
 	lg := e.log.With().
-		Hex("chunk_id", logging.ID(chunkID)).
+		Uint64("chunk_index", chunkIndex).
+		Hex("result_id", logging.ID(resultID)).
 		Logger()
+
 	// we need to report that the job has been finished eventually
-	status, exists := e.pendingChunks.ByID(chunkID)
+	status, exists := e.pendingChunks.Get(chunkIndex, resultID)
 	if !exists {
 		lg.Debug().
 			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
 		return
 	}
 
+	chunkLocatorID := status.ChunkLocatorID()
 	lg = lg.With().
 		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
-	removed := e.pendingChunks.Rem(chunkID)
+	removed := e.pendingChunks.Rem(chunkIndex, resultID)
 
-	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
+	e.chunkConsumerNotifier.Notify(chunkLocatorID)
 	lg.Info().
 		Bool("removed", removed).
 		Msg("discards fetching chunk of an already sealed block and notified consumer")
@@ -556,7 +564,7 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 }
 
 // requestChunkDataPack creates and dispatches a chunk data pack request to the requester engine.
-func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Identifier, blockID flow.Identifier) error {
+func (e *Engine) requestChunkDataPack(chunkIndex uint64, chunkID flow.Identifier, resultID flow.Identifier, blockID flow.Identifier) error {
 	agrees, disagrees, err := e.getAgreeAndDisagreeExecutors(blockID, resultID)
 	if err != nil {
 		return fmt.Errorf("could not segregate the agree and disagree executors for result: %x of block: %x", resultID, blockID)
@@ -573,11 +581,17 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 	}
 
 	request := &verification.ChunkDataPackRequest{
-		ChunkID:   chunkID,
-		Height:    header.Height,
-		Agrees:    agrees,
-		Disagrees: disagrees,
-		Targets:   allExecutors,
+		Locator: chunks.Locator{
+			ResultID: resultID,
+			Index:    chunkIndex,
+		},
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+			ChunkID:   chunkID,
+			Height:    header.Height,
+			Agrees:    agrees,
+			Disagrees: disagrees,
+			Targets:   allExecutors,
+		},
 	}
 
 	e.requester.Request(request)
@@ -654,7 +668,7 @@ func EndStateCommitment(result *flow.ExecutionResult, chunkIndex uint64, systemC
 	return endState, nil
 }
 
-//TransactionOffsetForChunk calculates transaction offset for a given chunk which is the index of the first
+// TransactionOffsetForChunk calculates transaction offset for a given chunk which is the index of the first
 // transaction of this chunk within the whole block
 func TransactionOffsetForChunk(chunks flow.ChunkList, chunkIndex uint64) (uint32, error) {
 	if int(chunkIndex) > len(chunks)-1 {

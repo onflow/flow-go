@@ -4,12 +4,12 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	modmocks "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -17,28 +17,57 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestGetThresholdSignerWithNilPrivateKey tests that without a random beacon private key
-// the signer always returns a invalid BLS signature
-func TestGetThresholdSignerWithNilPrivateKey(t *testing.T) {
+// TestGetThresholdSigner tests that without a valid random beacon private key
+// the signer always returns an invalid BLS signature
+func TestGetThresholdSigner(t *testing.T) {
 
-	// epoch counter
-	epoch := uint64(1)
-
+	epochCounter := uint64(1)
 	// build epoch lookup mock
 	epochLookup := new(modmocks.EpochLookup)
-	epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(epoch, nil)
+	epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(epochCounter, nil)
 
-	unittest.RunWithTypedBadgerDB(t, storage.InitSecret, func(db *badger.DB) {
+	t.Run("without key - failed dkg", func(t *testing.T) {
+		unittest.RunWithTypedBadgerDB(t, storage.InitSecret, func(db *badger.DB) {
+			metrics := metrics.NewNoopCollector()
+			dkgState, err := storage.NewDKGState(metrics, db)
+			require.NoError(t, err)
+			dkgKeys := storage.NewSafeBeaconPrivateKeys(dkgState)
 
-		dkgKeys, err := storage.NewDKGKeys(metrics.NewNoopCollector(), db)
-		assert.NoError(t, err)
-		signerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeys)
+			err = dkgState.SetDKGEndState(epochCounter, flow.DKGEndStateDKGFailure)
+			require.NoError(t, err)
 
-		signer, err := signerStore.GetThresholdSigner(uint64(1))
-		require.NoError(t, err)
+			signerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeys)
 
-		signed, err := signer.Sign([]byte{})
-		require.NoError(t, err)
-		assert.Equal(t, signed, crypto.BLSInvalidSignature())
+			signer, err := signerStore.GetThresholdSigner(uint64(1))
+			require.NoError(t, err)
+
+			signed, err := signer.Sign([]byte{})
+			require.NoError(t, err)
+			assert.Equal(t, signed, crypto.BLSInvalidSignature())
+		})
+	})
+
+	t.Run("key not marked valid", func(t *testing.T) {
+		unittest.RunWithTypedBadgerDB(t, storage.InitSecret, func(db *badger.DB) {
+			metrics := metrics.NewNoopCollector()
+			dkgState, err := storage.NewDKGState(metrics, db)
+			require.NoError(t, err)
+			dkgKeys := storage.NewSafeBeaconPrivateKeys(dkgState)
+
+			// store a key, mark the DKG as failed
+			err = dkgState.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv().PrivateKey)
+			require.NoError(t, err)
+			err = dkgState.SetDKGEndState(epochCounter, flow.DKGEndStateInconsistentKey)
+			require.NoError(t, err)
+
+			signerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeys)
+
+			signer, err := signerStore.GetThresholdSigner(uint64(1))
+			require.NoError(t, err)
+
+			signed, err := signer.Sign([]byte{})
+			require.NoError(t, err)
+			assert.Equal(t, signed, crypto.BLSInvalidSignature())
+		})
 	})
 }

@@ -22,6 +22,28 @@ func (p *Params) ChainID() (flow.ChainID, error) {
 	return root.ChainID, nil
 }
 
+func (p *Params) SporkID() (flow.Identifier, error) {
+
+	var sporkID flow.Identifier
+	err := p.state.db.View(operation.RetrieveSporkID(&sporkID))
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not get spork id: %w", err)
+	}
+
+	return sporkID, nil
+}
+
+func (p *Params) ProtocolVersion() (uint, error) {
+
+	var version uint
+	err := p.state.db.View(operation.RetrieveProtocolVersion(&version))
+	if err != nil {
+		return 0, fmt.Errorf("could not get protocol version: %w", err)
+	}
+
+	return version, nil
+}
+
 func (p *Params) Root() (*flow.Header, error) {
 
 	// retrieve the root height

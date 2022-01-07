@@ -197,11 +197,11 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  prevResults,
 		Seals:    sealsForPrev,
 	})
-	builder.addBlock(&B)
+	builder.addBlock(B)
 
 	// create a receipt for block B, to be included in block C
 	// the receipt for B contains the EpochSetup event
-	receiptB := ReceiptForBlockFixture(&B)
+	receiptB := ReceiptForBlockFixture(B)
 	receiptB.ExecutionResult.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent()}
 
 	// insert block C with a receipt for block B, and a seal for the receipt in
@@ -218,9 +218,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
 		Seals:    sealsForA,
 	})
-	builder.addBlock(&C)
+	builder.addBlock(C)
 	// create a receipt for block C, to be included in block D
-	receiptC := ReceiptForBlockFixture(&C)
+	receiptC := ReceiptForBlockFixture(C)
 
 	// build block D
 	// D contains a seal for block B and a receipt for block C
@@ -233,7 +233,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  []*flow.ExecutionResult{&receiptC.ExecutionResult},
 		Seals:    []*flow.Seal{sealForB},
 	})
-	builder.addBlock(&D)
+	builder.addBlock(D)
 
 	// defaults for the EpochCommit event
 	commitDefaults := []func(*flow.EpochCommit){
@@ -245,7 +245,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// create receipt for block D, to be included in block E
 	// the receipt for block D contains the EpochCommit event
-	receiptD := ReceiptForBlockFixture(&D)
+	receiptD := ReceiptForBlockFixture(D)
 	receiptD.ExecutionResult.ServiceEvents = []flow.ServiceEvent{commit.ServiceEvent()}
 
 	// build block E
@@ -259,9 +259,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  []*flow.ExecutionResult{&receiptD.ExecutionResult},
 		Seals:    []*flow.Seal{sealForC},
 	})
-	builder.addBlock(&E)
+	builder.addBlock(E)
 	// create receipt for block E
-	receiptE := ReceiptForBlockFixture(&E)
+	receiptE := ReceiptForBlockFixture(E)
 
 	// build block F
 	// F contains a seal for block D and the EpochCommit event, as well as a
@@ -275,9 +275,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  []*flow.ExecutionResult{&receiptE.ExecutionResult},
 		Seals:    []*flow.Seal{sealForD},
 	})
-	builder.addBlock(&F)
+	builder.addBlock(F)
 	// create receipt for block F
-	receiptF := ReceiptForBlockFixture(&F)
+	receiptF := ReceiptForBlockFixture(F)
 
 	// build block G
 	// G contains a seal for block E and a receipt for block F
@@ -291,7 +291,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seals:    []*flow.Seal{sealForE},
 	})
 
-	builder.addBlock(&G)
+	builder.addBlock(G)
 
 	// cache information about the built epoch
 	builder.built[counter] = EpochHeights{
@@ -341,7 +341,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 			),
 		},
 	})
-	builder.addBlock(&A)
+	builder.addBlock(A)
 
 	return builder
 }
@@ -354,7 +354,7 @@ func (builder *EpochBuilder) BuildBlocks(n uint) {
 	require.NoError(builder.t, err)
 	for i := uint(0); i < n; i++ {
 		next := BlockWithParentFixture(head)
-		builder.addBlock(&next)
+		builder.addBlock(next)
 		head = next.Header
 	}
 }

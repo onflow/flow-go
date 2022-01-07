@@ -50,6 +50,7 @@ func (v *Views) BlockFinalized(block *flow.Header) {
 
 	v.lastFinalizedView = block.View
 
+	// TODO index queued callbacks by ordered view to avoid this linear iteration on each block
 	finalizedViews := []int{}
 	for view := range v.callbacks {
 		if view <= block.View {

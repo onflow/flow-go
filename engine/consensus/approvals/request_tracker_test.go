@@ -123,7 +123,7 @@ func (s *RequestTrackerTestSuite) TestPruneUpToHeight_Pruning() {
 	s.headers.On("ByBlockID", nextExecutedBlock.ID()).Return(nextExecutedBlock.Header, nil)
 
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(&executedBlock))
-	nextResult := unittest.ExecutionResultFixture(unittest.WithBlock(&nextExecutedBlock))
+	nextResult := unittest.ExecutionResultFixture(unittest.WithBlock(nextExecutedBlock))
 
 	for _, r := range []*flow.ExecutionResult{result, nextResult} {
 		_, updated, err := s.tracker.TryUpdate(r, executedBlock.ID(), uint64(0))

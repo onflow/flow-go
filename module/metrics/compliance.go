@@ -10,22 +10,23 @@ import (
 )
 
 type ComplianceCollector struct {
-	finalizedHeight           prometheus.Gauge
-	sealedHeight              prometheus.Gauge
-	finalizedBlocks           *prometheus.CounterVec
-	sealedBlocks              prometheus.Counter
-	blockProposalDuration     prometheus.Counter
-	finalizedPayload          *prometheus.CounterVec
-	sealedPayload             *prometheus.CounterVec
-	lastBlockFinalizedAt      time.Time
-	finalizedBlocksPerSecond  prometheus.Summary
-	committedEpochFinalView   prometheus.Gauge
-	currentEpochCounter       prometheus.Gauge
-	currentEpochPhase         prometheus.Gauge
-	currentEpochFinalView     prometheus.Gauge
-	currentDKGPhase1FinalView prometheus.Gauge
-	currentDKGPhase2FinalView prometheus.Gauge
-	currentDKGPhase3FinalView prometheus.Gauge
+	finalizedHeight                 prometheus.Gauge
+	sealedHeight                    prometheus.Gauge
+	finalizedBlocks                 *prometheus.CounterVec
+	sealedBlocks                    prometheus.Counter
+	blockProposalDuration           prometheus.Counter
+	finalizedPayload                *prometheus.CounterVec
+	sealedPayload                   *prometheus.CounterVec
+	lastBlockFinalizedAt            time.Time
+	finalizedBlocksPerSecond        prometheus.Summary
+	committedEpochFinalView         prometheus.Gauge
+	currentEpochCounter             prometheus.Gauge
+	currentEpochPhase               prometheus.Gauge
+	currentEpochFinalView           prometheus.Gauge
+	currentDKGPhase1FinalView       prometheus.Gauge
+	currentDKGPhase2FinalView       prometheus.Gauge
+	currentDKGPhase3FinalView       prometheus.Gauge
+	epochEmergencyFallbackTriggered prometheus.Gauge
 }
 
 func NewComplianceCollector() *ComplianceCollector {
@@ -145,6 +146,13 @@ func NewComplianceCollector() *ComplianceCollector {
 			AgeBuckets: 5,
 			BufCap:     500,
 		}),
+
+		epochEmergencyFallbackTriggered: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "epoch_fallback_triggered",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "indicates whether epoch emergency fallback is triggered; if >0, the fallback is triggered",
+		}),
 	}
 
 	return cc
@@ -210,4 +218,8 @@ func (cc *ComplianceCollector) CurrentDKGPhase2FinalView(view uint64) {
 
 func (cc *ComplianceCollector) CurrentDKGPhase3FinalView(view uint64) {
 	cc.currentDKGPhase3FinalView.Set(float64(view))
+}
+
+func (cc *ComplianceCollector) EpochEmergencyFallbackTriggered() {
+	cc.epochEmergencyFallbackTriggered.Set(float64(1))
 }

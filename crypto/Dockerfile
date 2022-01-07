@@ -1,6 +1,6 @@
 # gcr.io/dl-flow/golang-cmake
 
-FROM golang:1.15-buster
+FROM golang:1.17-buster
 RUN apt-get update
 RUN apt-get -y install cmake zip sudo
 RUN go get github.com/axw/gocov/gocov

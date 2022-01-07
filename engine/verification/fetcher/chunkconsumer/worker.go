@@ -31,7 +31,7 @@ func (w *Worker) Run(job module.Job) error {
 	return nil
 }
 
-func (w *Worker) Notify(locatorID flow.Identifier) {
-	jobID := locatorIDToJobID(locatorID)
+func (w *Worker) Notify(chunkLocatorID flow.Identifier) {
+	jobID := locatorIDToJobID(chunkLocatorID)
 	w.consumer.NotifyJobIsDone(jobID)
 }

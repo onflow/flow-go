@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,16 +20,21 @@ import (
 	"github.com/onflow/flow-go/utils/io"
 )
 
-const resetArgsFileName = "reset-epoch-args.json"
+// rootSnapshotBucketURL is a format string for the location of the root snapshot file in GCP.
+const rootSnapshotBucketURL = "https://storage.googleapis.com/flow-genesis-bootstrap/%s/public-root-information/root-protocol-state-snapshot.json"
 
-// resetCmd represents a command to generate `reset_epoch` transaction arguments and writes it to the
-// working directory this command was run.
+// resetCmd represents a command to generate transaction arguments for the resetEpoch
+// transaction used when resetting the FlowEpoch smart contract during the sporking process.
+//
+// When we perform a spork, the network is instantiated with a new protocol state which
+// in general is inconsistent with the state in the FlowEpoch smart contract. The resetEpoch
+// transaction is the mechanism for re-synchronizing these two states.
+//
 var resetCmd = &cobra.Command{
 	Use:   "reset-tx-args",
 	Short: "Generates `resetEpoch` JSON transaction arguments",
-	Long: "Generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to a JSON file." +
-		"If the epoch setup phase fails (either the DKG, QC voting, or smart contract bug)," +
-		"manual intervention is needed to transition to the next epoch.",
+	Long: "Generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to STDOUT." +
+		"For use during the sporking process.",
 	Run: resetRun,
 }
 
@@ -37,60 +45,53 @@ func init() {
 
 func addResetCmdFlags() {
 	resetCmd.Flags().StringVar(&flagPayout, "payout", "", "the payout eg. 10000.0")
+	resetCmd.Flags().StringVar(&flagBucketNetworkName, "bucket-network-name", "", "when retrieving the root snapshot from a GCP bucket, the network name portion of the URL (eg. \"mainnet-13\")")
 }
 
 // resetRun generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to a JSON file
 func resetRun(cmd *cobra.Command, args []string) {
 
-	// path to the root protocol snapshot json file
-	snapshotPath := filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot)
+	stdout := cmd.OutOrStdout()
 
-	// check if root-protocol-snapshot.json file exists under the dir provided
-	exists, err := pathExists(snapshotPath)
-	if err != nil {
-		log.Fatal().Err(err).Str("path", snapshotPath).Msgf("could not check if root protocol-snapshot.json exists")
-	}
-	if !exists {
-		log.Error().Str("path", snapshotPath).Msgf("root-protocol-snapshot.json file does not exists in the --boot-dir given")
-		return
-	}
+	// determine the source we will use for retrieving the root state snapshot,
+	// prioritizing downloading from a GCP bucket
+	var (
+		snapshot *inmem.Snapshot
+		err      error
+	)
 
-	// path to the JSON encoded cadence arguments for the `resetEpoch` transaction
-	path, err := os.Getwd()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get working directory path")
-	}
-	argsPath := filepath.Join(path, resetArgsFileName)
-
-	// read root protocol-snapshot.json
-	bz, err := io.ReadFile(snapshotPath)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not read root snapshot file")
-	}
-	log.Info().Str("snapshot_path", snapshotPath).Msg("read in root-protocol-snapshot.json")
-
-	// unmarshal bytes to inmem protocol snapshot
-	snapshot, err := convert.BytesToInmemSnapshot(bz)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not convert array of bytes to snapshot")
+	if flagBucketNetworkName != "" {
+		url := fmt.Sprintf(rootSnapshotBucketURL, flagBucketNetworkName)
+		snapshot, err = getSnapshotFromBucket(url)
+		if err != nil {
+			log.Error().Err(err).Str("url", url).Msg("failed to retrieve root snapshot from bucket")
+			return
+		}
+	} else if flagBootDir != "" {
+		path := filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot)
+		snapshot, err = getSnapshotFromLocalBootstrapDir(path)
+		if err != nil {
+			log.Error().Err(err).Str("path", path).Msg("failed to retrieve root snapshot from local bootstrap directory")
+			return
+		}
+	} else {
+		log.Fatal().Msg("must provide a source for root snapshot (specify either --boot-dir or --bucket-network-name)")
 	}
 
 	// extract arguments from reset epoch tx from snapshot
 	txArgs := extractResetEpochArgs(snapshot)
-	log.Info().Msg("extracted resetEpoch transaction arguments from snapshot")
 
 	// encode to JSON
-	enc, err := epochcmdutil.EncodeArgs(txArgs)
+	encodedTxArgs, err := epochcmdutil.EncodeArgs(txArgs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not encode epoch transaction arguments")
 	}
 
-	// write JSON args to file
-	err = io.WriteFile(argsPath, enc)
+	// write JSON args to stdout
+	_, err = stdout.Write(encodedTxArgs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
 	}
-	log.Info().Str("path", argsPath).Msg("wrote resetEpoch transaction arguments")
 }
 
 // extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction
@@ -169,6 +170,59 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 	args = append(args, cadence.NewUInt64(finalView))
 
 	return args
+}
+
+// getSnapshotFromBucket downloads the root snapshot file from the given URL,
+// decodes it, and returns the Snapshot object.
+func getSnapshotFromBucket(url string) (*inmem.Snapshot, error) {
+
+	// download root snapshot from provided URL
+	res, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("could not download root snapshot (url=%s): %w", url, err)
+	}
+	defer res.Body.Close()
+
+	bz, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("could not read from response body (url=%s): %w", url, err)
+	}
+
+	// unmarshal bytes to inmem protocol snapshot
+	snapshot, err := convert.BytesToInmemSnapshot(bz)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode root snapshot: %w", err)
+	}
+
+	return snapshot, nil
+}
+
+// getSnapshotFromLocalBootstrapDir reads the root snapshot file from the given local path,
+// decodes it, and returns the Snapshot object.
+func getSnapshotFromLocalBootstrapDir(path string) (*inmem.Snapshot, error) {
+
+	// check if root-protocol-snapshot.json file exists under the dir provided
+	exists, err := pathExists(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not check that root snapshot exists (path=%s): %w", path, err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("root snapshot file does not exist in local bootstrap dir (path=%s)", path)
+	}
+
+	// read root protocol-snapshot.json
+	bz, err := io.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not read root snapshot file: %w", err)
+	}
+
+	// unmarshal bytes to inmem protocol snapshot
+	snapshot, err := convert.BytesToInmemSnapshot(bz)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode root snapshot: %w", err)
+	}
+
+	return snapshot, nil
 }
 
 // TODO: unify methods from transit, bootstrap and here
