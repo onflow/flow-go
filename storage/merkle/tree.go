@@ -437,7 +437,6 @@ func merge(p *short, c *short) {
 	for i := 0; i < p.count; i++ {
 		bitutils.SetBit(totalPath, i, bitutils.Bit(p.path, i))
 	}
-	//childPath := bitset.Bytes(c.path)
 	for i := 0; i < c.count; i++ {
 		bitutils.SetBit(totalPath, i+p.count, bitutils.Bit(c.path, i))
 	}

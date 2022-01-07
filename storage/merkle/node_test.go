@@ -18,7 +18,7 @@ var payload2, _ = hex.DecodeString("bab02e6213dfad3546aa473922bba0")
 // at build time, but avoid runtime-checks for performance reasons.
 // Context: The blake2b MAC key should be less than 64 bytes. Constructor blake2b.New256(m) checks
 // this condition and errors, but we ignore its error return at runtime.
-func TestBlakeMac(t *testing.T) {
+func TestBlakeMAC(t *testing.T) {
 	var e error
 
 	// leaf nodes
