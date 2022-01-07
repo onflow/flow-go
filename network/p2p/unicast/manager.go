@@ -87,6 +87,12 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 			errs = multierror.Append(errs, err)
 			continue
 		}
+		
+		s, err = m.unicasts[i].NewStream(s)
+		if err != nil {
+			errs = multierror.Append(errs, fmt.Errorf("could not upgrade stream: %w", err))
+			continue
+		}
 
 		// return first successful stream
 		return s, addrs, nil
