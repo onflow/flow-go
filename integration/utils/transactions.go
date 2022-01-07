@@ -50,6 +50,52 @@ func MakeCreateStakingCollectionTx(
 	return tx, nil
 }
 
+// MakeCreateMachineAccountTx submits transaction stakingCollection/setup_staking_collection.cdc
+// which will setup the staking collection object for the account
+func MakeCreateMachineAccountTx(
+	env templates.Environment,
+	nodeID flow.Identifier,
+	machineKey string,
+	stakingAccount *sdk.Account,
+	stakingAccountKeyID int,
+	stakingSigner crypto.Signer,
+	payerAddress sdk.Address,
+	latestBlockID sdk.Identifier,
+) (*sdk.Transaction, error) {
+	accountKey := stakingAccount.Keys[stakingAccountKeyID]
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateCollectionCreateMachineAccountForNodeScript(env)).
+		SetGasLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(stakingAccount.Address, stakingAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(payerAddress).
+		AddAuthorizer(stakingAccount.Address)
+
+	id, _ := cadence.NewString(nodeID.String())
+	err := tx.AddArgument(id)
+	if err != nil {
+		return nil, err
+	}
+
+	machineKeyCDC, _ := cadence.NewString(machineKey)
+	publicKeys := make([]cadence.Value, 1)
+	publicKeys[0] = machineKeyCDC
+	publicKeysCDC := cadence.NewArray(publicKeys)
+
+	err = tx.AddArgument(publicKeysCDC)
+	if err != nil {
+		return nil, err
+	}
+
+	//signing the payload as used AddAuthorizer
+	err = tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign payload: %w", err)
+	}
+
+	return tx, nil
+}
+
 func MakeStakingCollectionRegisterNodeTx(
 	env templates.Environment,
 	stakingAccount *sdk.Account,

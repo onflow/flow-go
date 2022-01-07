@@ -168,7 +168,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), err)
 
 	// create staking collection
-	result, machineAccountAddr, err := s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount)
+	result, err = s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
@@ -182,7 +182,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	containerName := s.getTestContainerName(role)
 
 	// register node using staking collection
-	result, err = s.SubmitStakingCollectionRegisterNodeTx(
+	result, machineAccountAddr, err := s.SubmitStakingCollectionRegisterNodeTx(
 		ctx,
 		env,
 		stakingAccountKey,
@@ -195,7 +195,6 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		fmt.Sprintf("%f", stakeAmount),
 		hex.EncodeToString(encMachinePubKey),
 	)
-
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
@@ -308,7 +307,7 @@ func (s *Suite) createAccount(ctx context.Context,
 }
 
 // creates a staking collection for the given node
-func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, sdk.Address, error) {
+func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -330,14 +329,55 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 	require.NoError(s.T(), err)
 	stakingAccount.Keys[0].SequenceNumber++
 
+	return result, nil
+}
+
+func (s *Suite) createMachineAccount(
+	ctx context.Context,
+	env templates.Environment,
+	accountKey sdkcrypto.PrivateKey,
+	stakingAccount *sdk.Account,
+	nodeID flow.Identifier,
+	machineKey string,
+) (*sdk.TransactionResult, sdk.Address, error) {
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+
+	createMachineAccountTx, err := utils.MakeCreateMachineAccountTx(
+		env,
+		nodeID,
+		machineKey,
+		stakingAccount,
+		0,
+		signer,
+		s.client.SDKServiceAddress(),
+		sdk.Identifier(latestBlockID),
+	)
+	require.NoError(s.T(), err)
+
+	err = s.client.SignAndSendTransaction(ctx, createMachineAccountTx)
+	require.NoError(s.T(), err)
+
+	result, err := s.client.WaitForSealed(ctx, createMachineAccountTx.ID())
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), result.Error)
+
+	stakingAccount.Keys[0].SequenceNumber++
+
 	var machineAccountAddr sdk.Address
+	fmt.Printf("\n\nRESULT: %v\n\n", result)
 	for _, event := range result.Events {
+		fmt.Printf("\n\nEVENT HERE: %s\n\n", event.String())
 		if event.Type == sdk.EventAccountCreated { // assume only one account created (safe because we control the transaction)
 			accountCreatedEvent := sdk.AccountCreatedEvent(event)
 			machineAccountAddr = accountCreatedEvent.Address()
 			break
 		}
 	}
+
+	require.NotZerof(s.T(), machineAccountAddr, "failed to create the machine account: %s", machineAccountAddr)
 
 	return result, machineAccountAddr, nil
 }
@@ -355,7 +395,7 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	stakingKey string,
 	amount string,
 	machineKey string,
-) (*sdk.TransactionResult, error) {
+) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -384,7 +424,20 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	result, err := s.client.WaitForSealed(ctx, registerNodeTx.ID())
 	require.NoError(s.T(), err)
 	stakingAccount.Keys[0].SequenceNumber++
-	return result, nil
+
+	var machineAccountAddr sdk.Address
+	fmt.Printf("\n\nRESULT: %v\n\n", result)
+	for _, event := range result.Events {
+		fmt.Printf("\n\nEVENT HERE: %s\n\n", event.String())
+		if event.Type == sdk.EventAccountCreated { // assume only one account created (safe because we control the transaction)
+			accountCreatedEvent := sdk.AccountCreatedEvent(event)
+			machineAccountAddr = accountCreatedEvent.Address()
+			break
+		}
+	}
+
+	require.NotZerof(s.T(), machineAccountAddr, "failed to create the machine account: %s", machineAccountAddr)
+	return result, machineAccountAddr, nil
 }
 
 // SubmitStakingCollectionCloseStakeTx submits tx that calls StakingCollection.closeStake
