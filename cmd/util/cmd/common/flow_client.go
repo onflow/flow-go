@@ -76,7 +76,6 @@ func insecureFlowClient(accessAddress string) (*client.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create flow client %w", err)
 	}
-
 	return flowClient, nil
 }
 
