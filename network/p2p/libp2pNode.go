@@ -247,7 +247,7 @@ func (n *Node) Publish(ctx context.Context, topic flownet.Topic, data []byte) er
 	}
 	err := ps.Publish(ctx, data)
 	if err != nil {
-		return fmt.Errorf("could not publish top topic (%s): %w", topic, err)
+		return fmt.Errorf("could not publish to topic (%s): %w", topic, err)
 	}
 	return nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -132,13 +133,21 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan peer.ID, count)
+
+	msg := &message.Message{
+		Payload: []byte("hello"),
+	}
+
+	data, err := msg.Marshal()
+	require.NoError(t, err)
+
 	for _, n := range nodes {
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
 			msg, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, msg)
-			assert.Equal(t, []byte("hello"), msg.Data)
+			assert.Equal(t, data, msg.Data)
 			ch <- n.host.ID()
 		}
 
@@ -166,11 +175,13 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	require.Eventually(t, fullyConnectedGraph, time.Second*5, ticksForAssertEventually, "nodes failed to discover each other")
 
 	// Step 4: publish a message to the topic
-	require.NoError(t, dhtServerNode.Publish(ctx, topic, []byte("hello")))
+	require.NoError(t, dhtServerNode.Publish(ctx, topic, data))
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
 	recv := make(map[peer.ID]bool, count)
+
+loop:
 	for i := 0; i < count; i++ {
 		select {
 		case res := <-ch:
@@ -183,7 +194,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 				}
 			}
 			assert.Fail(t, "messages not received by some nodes", "%v", missing)
-			break
+			break loop
 		}
 	}
 
