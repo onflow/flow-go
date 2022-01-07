@@ -355,7 +355,7 @@ func TestOneToOneComm(t *testing.T) {
 
 	// Create the handler function
 	streamHandler := func(s network.Stream) {
-		rw :=  bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 		str, err := rw.ReadString('\n')
 		require.NoError(t, err)
 		ch <- str
@@ -395,8 +395,8 @@ func TestOneToOneComm(t *testing.T) {
 	select {
 	case rcv := <-ch:
 		require.Equal(t, msg, rcv)
-		//case <-time.After(1 * time.Second):
-		//	require.Fail(t, "message not received")
+	case <-time.After(1 * time.Second):
+		require.Fail(t, "message not received")
 	}
 
 	// Create stream from node 2 to node 1
