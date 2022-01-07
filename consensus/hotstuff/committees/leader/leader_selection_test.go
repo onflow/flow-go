@@ -3,6 +3,7 @@ package leader
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,35 @@ func TestSingleConsensusNode(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, identity.NodeID, leaderID)
 	}
+}
+
+// compare this binary search method with sort.Search()
+func TestBsearchVSsortSearch(t *testing.T) {
+	stakes := []uint64{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
+	stakes2 := []int{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
+	var sum uint64
+	var sum2 int
+	sums := make([]uint64, 0)
+	sums2 := make([]int, 0)
+	for i := 0; i < len(stakes); i++ {
+		sum += stakes[i]
+		sum2 += stakes2[i]
+		sums = append(sums, sum)
+		sums2 = append(sums2, sum2)
+	}
+	sel := make([]int, 0, 10)
+	for i := 0; i < 10; i++ {
+		index := binarySearch(uint64(i), sums)
+		sel = append(sel, index)
+	}
+
+	sel2 := make([]int, 0, 10)
+	for i2 := 1; i2 < 11; i2++ {
+		index := sort.SearchInts(sums2, i2)
+		sel2 = append(sel2, index)
+	}
+
+	require.Equal(t, sel, sel2)
 }
 
 // Test binary search implementation
