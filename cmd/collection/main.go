@@ -218,6 +218,8 @@ func main() {
 					}
 					flowClientConfigs = append(flowClientConfigs, config)
 				}
+
+				return nil
 			}
 
 			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
