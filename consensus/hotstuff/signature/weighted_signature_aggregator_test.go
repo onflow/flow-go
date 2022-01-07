@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -146,13 +145,11 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		assert.ElementsMatch(t, signers, identifiers)
 	})
 
-	duplicate := engine.NewDuplicatedEntryErrorf("some error")
-
 	// Unhappy paths
 	t.Run("invalid signer ID", func(t *testing.T) {
 		aggregator, _, _, sigs, _, _ := createAggregationData(t, signersNum)
 		// generate an ID that is not in the node ID list
-		invalidId := unittest.IdentityFixture().NodeID
+		invalidId := unittest.IdentifierFixture()
 
 		err := aggregator.Verify(invalidId, sigs[0])
 		assert.ErrorIs(t, err, model.ErrInvalidSigner)
@@ -160,8 +157,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		weight, err := aggregator.TrustedAdd(invalidId, sigs[0])
 		assert.Equal(t, uint64(0), weight)
 		assert.Equal(t, uint64(0), aggregator.TotalWeight())
-		assert.Error(t, err)
-		assert.True(t, engine.IsInvalidInputError(err))
+		assert.ErrorIs(t, err, model.ErrInvalidSigner)
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
@@ -184,13 +180,11 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 				weight, err := aggregator.TrustedAdd(ids[i].NodeID, sigs[i]) // same signature for same index
 				// weight should not change
 				assert.Equal(t, expectedWeight, weight)
-				assert.Error(t, err)
-				assert.IsType(t, duplicate, err)
+				assert.True(t, model.IsDuplicatedSignerError(err))
 				weight, err = aggregator.TrustedAdd(ids[i].NodeID, sigs[(i+1)%signersNum]) // different signature for same index
 				// weight should not change
 				assert.Equal(t, expectedWeight, weight)
-				assert.Error(t, err)
-				assert.IsType(t, duplicate, err)
+				assert.True(t, model.IsDuplicatedSignerError(err))
 			}(i, sig)
 		}
 		wg.Wait()
@@ -213,10 +207,34 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			assert.Equal(t, expectedWeight, weight)
 		}
 		signers, agg, err := aggregator.Aggregate()
-		assert.Error(t, err)
+		assert.True(t, model.IsInvalidSignatureIncludedError(err))
 		assert.Nil(t, agg)
 		assert.Nil(t, signers)
 		// fix sigs[0]
 		sigs[0][4] ^= 1
 	})
+
+	t.Run("aggregating empty set of signatures", func(t *testing.T) {
+		aggregator, _, _, _, _, _ := createAggregationData(t, signersNum)
+
+		// no signatures were added => aggregate should error with
+		signers, agg, err := aggregator.Aggregate()
+		assert.True(t, model.IsInsufficientSignaturesError(err))
+		assert.Nil(t, agg)
+		assert.Nil(t, signers)
+
+		// Also, _after_ attempting to add a signature from unknown `signerID`:
+		// calling `Aggregate()` should error with `model.InsufficientSignaturesError`,
+		// as still zero signatures are stored.
+		_, err = aggregator.TrustedAdd(unittest.IdentifierFixture(), unittest.SignatureFixture())
+		assert.ErrorIs(t, err, model.ErrInvalidSigner)
+		_, err = aggregator.TrustedAdd(unittest.IdentifierFixture(), unittest.SignatureFixture())
+		assert.ErrorIs(t, err, model.ErrInvalidSigner)
+
+		signers, agg, err = aggregator.Aggregate()
+		assert.True(t, model.IsInsufficientSignaturesError(err))
+		assert.Nil(t, agg)
+		assert.Nil(t, signers)
+	})
+
 }

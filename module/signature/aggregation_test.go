@@ -132,27 +132,27 @@ func TestAggregatorSameMessage(t *testing.T) {
 		for _, index := range []int{-1, signersNum} {
 			ok, err := aggregator.Verify(index, sigs[0])
 			assert.False(t, ok)
-			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
+			assert.True(t, IsInvalidSignerIdxError(err))
 
 			ok, err = aggregator.VerifyAndAdd(index, sigs[0])
 			assert.False(t, ok)
-			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
+			assert.True(t, IsInvalidSignerIdxError(err))
 
 			err = aggregator.TrustedAdd(index, sigs[0])
-			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
+			assert.True(t, IsInvalidSignerIdxError(err))
 
 			ok, err = aggregator.HasSignature(index)
 			assert.False(t, ok)
-			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
+			assert.True(t, IsInvalidSignerIdxError(err))
 
 			ok, err = aggregator.VerifyAggregate([]int{index}, sigs[0])
 			assert.False(t, ok)
-			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
+			assert.True(t, IsInvalidSignerIdxError(err))
 		}
 		// empty list
 		ok, err := aggregator.VerifyAggregate([]int{}, sigs[0])
 		assert.False(t, ok)
-		assert.ErrorIs(t, err, ErrInvalidSignerIdx)
+		assert.True(t, IsInsufficientSignaturesError(err))
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
@@ -164,15 +164,15 @@ func TestAggregatorSameMessage(t *testing.T) {
 		// TrustedAdd
 		for i := range sigs {
 			err := aggregator.TrustedAdd(i, sigs[i]) // same signature for same index
-			assert.ErrorIs(t, err, ErrDuplicatedSigner)
+			assert.True(t, IsDuplicatedSignerIdxError(err))
 			err = aggregator.TrustedAdd(i, sigs[(i+1)%signersNum]) // different signature for same index
-			assert.ErrorIs(t, err, ErrDuplicatedSigner)
+			assert.True(t, IsDuplicatedSignerIdxError(err))
 			ok, err := aggregator.VerifyAndAdd(i, sigs[i]) // same signature for same index
 			assert.False(t, ok)
-			assert.ErrorIs(t, err, ErrDuplicatedSigner)
+			assert.True(t, IsDuplicatedSignerIdxError(err))
 			ok, err = aggregator.VerifyAndAdd(i, sigs[(i+1)%signersNum]) // different signature for same index
 			assert.False(t, ok)
-			assert.ErrorIs(t, err, ErrDuplicatedSigner)
+			assert.True(t, IsDuplicatedSignerIdxError(err))
 		}
 	})
 

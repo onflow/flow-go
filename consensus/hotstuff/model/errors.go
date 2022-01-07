@@ -7,6 +7,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var (
+	ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
+	ErrInvalidFormat     = errors.New("invalid signature format")
+	ErrInvalidSigner     = errors.New("invalid signer(s)")
+	ErrInvalidSignature  = errors.New("invalid signature")
+)
+
+/* ****************************** NoVoteError ****************************** */
+
 // NoVoteError contains the reason of why the voter didn't vote for a block proposal.
 type NoVoteError struct {
 	Msg string
@@ -20,10 +29,7 @@ func IsNoVoteError(err error) bool {
 	return errors.As(err, &e)
 }
 
-var ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
-var ErrInvalidFormat = errors.New("invalid signature format")
-var ErrInvalidSigner = errors.New("invalid signer(s)")
-var ErrInvalidSignature = errors.New("invalid signature")
+/* *************************** ConfigurationError ************************** */
 
 type ConfigurationError struct {
 	Msg string
@@ -36,6 +42,8 @@ type MissingBlockError struct {
 	BlockID flow.Identifier
 }
 
+/* *************************** MissingBlockError *************************** */
+
 func (e MissingBlockError) Error() string {
 	return fmt.Sprintf("missing Block at view %d with ID %v", e.View, e.BlockID)
 }
@@ -45,6 +53,8 @@ func IsMissingBlockError(err error) bool {
 	var e MissingBlockError
 	return errors.As(err, &e)
 }
+
+/* *************************** InvalidBlockError *************************** */
 
 type InvalidBlockError struct {
 	BlockID flow.Identifier
@@ -65,6 +75,8 @@ func IsInvalidBlockError(err error) bool {
 func (e InvalidBlockError) Unwrap() error {
 	return e.Err
 }
+
+/* *************************** InvalidVoteError **************************** */
 
 type InvalidVoteError struct {
 	VoteID flow.Identifier
@@ -94,6 +106,8 @@ func NewInvalidVoteErrorf(vote *Vote, msg string, args ...interface{}) error {
 	}
 }
 
+/* ****************** ByzantineThresholdExceededError ********************** */
+
 // ByzantineThresholdExceededError is raised if HotStuff detects malicious conditions which
 // prove a Byzantine threshold of consensus replicas has been exceeded.
 // Per definition, the byzantine threshold is exceeded is there are byzantine consensus
@@ -105,6 +119,8 @@ type ByzantineThresholdExceededError struct {
 func (e ByzantineThresholdExceededError) Error() string {
 	return e.Evidence
 }
+
+/* **************************** DoubleVoteError **************************** */
 
 type DoubleVoteError struct {
 	FirstVote       *Vote
@@ -143,4 +159,74 @@ func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...i
 		ConflictingVote: conflictingVote,
 		err:             fmt.Errorf(msg, args...),
 	}
+}
+
+/* ************************* DuplicatedSignerError ************************* */
+
+// DuplicatedSignerError indicates that a signature from the same node ID has already been added
+type DuplicatedSignerError struct {
+	err error
+}
+
+func NewDuplicatedSignerErrorf(msg string, args ...interface{}) error {
+	return DuplicatedSignerError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e DuplicatedSignerError) Error() string { return e.err.Error() }
+func (e DuplicatedSignerError) Unwrap() error { return e.err }
+
+// IsDuplicatedSignerError returns whether err is an DuplicatedSignerError
+func IsDuplicatedSignerError(err error) bool {
+	var e DuplicatedSignerError
+	return errors.As(err, &e)
+}
+
+/* ********************* InvalidSignatureIncludedError ********************* */
+
+// InvalidSignatureIncludedError indicates that some signatures, included via TrustedAdd, are invalid
+type InvalidSignatureIncludedError struct {
+	err error
+}
+
+func NewInvalidSignatureIncludedError(err error) error {
+	return InvalidSignatureIncludedError{err}
+}
+
+func NewInvalidSignatureIncludedErrorf(msg string, args ...interface{}) error {
+	return InvalidSignatureIncludedError{fmt.Errorf(msg, args...)}
+}
+
+func (e InvalidSignatureIncludedError) Error() string { return e.err.Error() }
+func (e InvalidSignatureIncludedError) Unwrap() error { return e.err }
+
+// IsInvalidSignatureIncludedError returns whether err is an InvalidSignatureIncludedError
+func IsInvalidSignatureIncludedError(err error) bool {
+	var e InvalidSignatureIncludedError
+	return errors.As(err, &e)
+}
+
+/* ********************** InsufficientSignaturesError ********************** */
+
+// InsufficientSignaturesError indicates that not enough signatures have been stored to complete the operation.
+type InsufficientSignaturesError struct {
+	err error
+}
+
+func NewInsufficientSignaturesError(err error) error {
+	return InsufficientSignaturesError{err}
+}
+
+func NewInsufficientSignaturesErrorf(msg string, args ...interface{}) error {
+	return InsufficientSignaturesError{fmt.Errorf(msg, args...)}
+}
+
+func (e InsufficientSignaturesError) Error() string { return e.err.Error() }
+func (e InsufficientSignaturesError) Unwrap() error { return e.err }
+
+// IsInsufficientSignaturesError returns whether err is an InsufficientSignaturesError
+func IsInsufficientSignaturesError(err error) bool {
+	var e InsufficientSignaturesError
+	return errors.As(err, &e)
 }

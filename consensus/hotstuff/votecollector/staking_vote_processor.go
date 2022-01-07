@@ -130,7 +130,9 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	}
 	totalWeight, err := p.stakingSigAggtor.TrustedAdd(vote.SignerID, vote.SigData)
 	if err != nil {
-		return fmt.Errorf("adding the signature to staking aggregator failed: %w", err)
+		// we don't expect any errors here during normal operation, as we previously checked
+		// for duplicated votes from the same signer and verified the signer+signature
+		return fmt.Errorf("unexpected exception adding signature from vote %x to staking aggregator: %w", vote.ID(), err)
 	}
 
 	// checking of conditions for building QC are satisfied

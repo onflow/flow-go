@@ -3,11 +3,18 @@ package signature
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/encoding"
 )
+
+// TODO: would be great to move this to package `module/signature`.
+//       In package signature, we work with the signers on an index basis -- same as here.
+//       NOTE: with the intention of moving this file to `module/signature`, I am already
+//       using the errors from the signature package.
 
 // randomBeaconInspector implements hotstuff.RandomBeaconInspector interface.
 // All methods of this structure are concurrency-safe.
@@ -32,7 +39,7 @@ func NewRandomBeaconInspector(
 		message,
 		encoding.RandomBeaconTag)
 	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("create a new Random Beacon inspector failed: %w", err)
+		return nil, fmt.Errorf("creating BSL Threshold Signature Inspector failed: %w", err)
 	}
 
 	return &randomBeaconInspector{
@@ -52,7 +59,7 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 	verif, err := r.inspector.VerifyShare(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			return engine.NewInvalidInputErrorf("verify beacon share from %d failed: %w", signerIndex, err)
+			return signature.NewInvalidSignerIdxErrorf("index %d does not correspond to an authorized random beacon participant: %w", signerIndex, err)
 		}
 		return fmt.Errorf("unexpected error verifying beacon signature from %d: %w", signerIndex, err)
 	}

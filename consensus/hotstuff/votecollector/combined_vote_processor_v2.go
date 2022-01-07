@@ -151,6 +151,7 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 // * VoteForIncompatibleBlockError - submitted vote for incompatible block
 // * VoteForIncompatibleViewError - submitted vote for incompatible view
 // * model.InvalidVoteError - submitted vote with invalid signature
+// * model.DuplicatedSignerError if the signer has been already added
 // All other errors should be treated as exceptions.
 func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
@@ -207,13 +208,17 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	// aggregate staking sig
 	_, err = p.stakingSigAggtor.TrustedAdd(vote.SignerID, stakingSig)
 	if err != nil {
-		return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
+		// we don't expect any errors here during normal operation, as we previously checked
+		// for duplicated votes from the same signer and verified the signer+signature
+		return fmt.Errorf("unexpected exception adding signature from vote %v to staking aggregator: %w", vote.ID(), err)
 	}
 	// aggregate random beacon sig
 	if randomBeaconSig != nil {
 		_, err = p.rbRector.TrustedAdd(vote.SignerID, randomBeaconSig)
 		if err != nil {
-			return fmt.Errorf("adding the signature to random beacon reconstructor failed for vote %v: %w", vote.ID(), err)
+			// we don't expect any errors here during normal operation, as we previously checked
+			// for duplicated votes from the same signer and verified the signer+signature
+			return fmt.Errorf("unexpected exception adding signature from vote %v to random beacon reconstructor: %w", vote.ID(), err)
 		}
 	}
 
@@ -264,7 +269,6 @@ func (p *CombinedVoteProcessorV2) buildQC() (*flow.QuorumCertificate, error) {
 	}
 
 	blockSigData := buildBlockSignatureDataForV2(stakingSigners, aggregatedStakingSig, reconstructedBeaconSig)
-
 	qc, err := buildQCWithPackerAndSigData(p.packer, p.block, blockSigData)
 	if err != nil {
 		return nil, err
@@ -279,7 +283,8 @@ func (p *CombinedVoteProcessorV2) buildQC() (*flow.QuorumCertificate, error) {
 func buildBlockSignatureDataForV2(
 	stakingSigners []flow.Identifier,
 	aggregatedStakingSig []byte,
-	reconstructedBeaconSig crypto.Signature) *hotstuff.BlockSignatureData {
+	reconstructedBeaconSig crypto.Signature,
+) *hotstuff.BlockSignatureData {
 	return &hotstuff.BlockSignatureData{
 		StakingSigners:               stakingSigners,
 		AggregatedStakingSig:         aggregatedStakingSig,
@@ -291,7 +296,8 @@ func buildBlockSignatureDataForV2(
 func buildQCWithPackerAndSigData(
 	packer hotstuff.Packer,
 	block *model.Block,
-	blockSigData *hotstuff.BlockSignatureData) (*flow.QuorumCertificate, error) {
+	blockSigData *hotstuff.BlockSignatureData,
+) (*flow.QuorumCertificate, error) {
 	signerIDs, sigData, err := packer.Pack(block.BlockID, blockSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)

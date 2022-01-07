@@ -180,6 +180,8 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		}
 		_, err = p.stakingSigAggtor.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
+			// we don't expect any errors here during normal operation, as we previously checked
+			// for duplicated votes from the same signer and verified the signer+signature
 			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
 		}
 
@@ -202,11 +204,15 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		}
 		_, err = p.rbSigAggtor.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
-			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
+			// we don't expect any errors here during normal operation, as we previously checked
+			// for duplicated votes from the same signer and verified the signer+signature
+			return fmt.Errorf("unexpected exception adding signature from vote %v to random beacon aggregator: %w", vote.ID(), err)
 		}
 		_, err = p.rbRector.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
-			return fmt.Errorf("adding the signature to random beacon reconstructor failed for vote %v: %w", vote.ID(), err)
+			// we don't expect any errors here during normal operation, as we previously checked
+			// for duplicated votes from the same signer and verified the signer+signature
+			return fmt.Errorf("unexpected exception adding signature from vote %v to random beacon reconstructor: %w", vote.ID(), err)
 		}
 
 	default:

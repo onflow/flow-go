@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -23,12 +22,11 @@ type signerInfo struct {
 // mapping from node IDs (as used by HotStuff) to index-based addressing of authorized
 // signers (as used by SignatureAggregatorSameMessage).
 type WeightedSignatureAggregator struct {
-	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
-	ids          flow.IdentityList                         // all possible ids (only gets updated by constructor)
-	idToInfo     map[flow.Identifier]signerInfo            // auxiliary map to lookup signer weight and index by ID (only gets updated by constructor)
-	totalWeight  uint64                                    // weight collected (gets updated)
-	collectedIDs map[flow.Identifier]struct{}              // map of collected IDs (gets updated)
-	lock         sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
+	aggregator  *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
+	ids         flow.IdentityList                         // all possible ids (only gets updated by constructor)
+	idToInfo    map[flow.Identifier]signerInfo            // auxiliary map to lookup signer weight and index by ID (only gets updated by constructor)
+	totalWeight uint64                                    // weight collected (gets updated)
+	lock        sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
 }
 
 var _ hotstuff.WeightedSignatureAggregator = (*WeightedSignatureAggregator)(nil)
@@ -63,17 +61,16 @@ func NewWeightedSignatureAggregator(
 		}
 	}
 
-	// instantiate low-level crypto aggregator, that works based on signer indices instead of nodeIDs
+	// instantiate low-level crypto aggregator, which works based on signer indices instead of nodeIDs
 	agg, err := signature.NewSignatureAggregatorSameMessage(message, dsTag, pks)
 	if err != nil {
 		return nil, fmt.Errorf("instantiating index-based signature aggregator failed: %w", err)
 	}
 
 	return &WeightedSignatureAggregator{
-		aggregator:   agg,
-		ids:          ids,
-		idToInfo:     idToInfo,
-		collectedIDs: make(map[flow.Identifier]struct{}),
+		aggregator: agg,
+		ids:        ids,
+		idToInfo:   idToInfo,
 	}, nil
 }
 
@@ -86,7 +83,7 @@ func NewWeightedSignatureAggregator(
 func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	info, ok := w.idToInfo[signerID]
 	if !ok {
-		return fmt.Errorf("couldn't find signerID %s in the index map: %w", signerID, model.ErrInvalidSigner)
+		return fmt.Errorf("id %s is not an authorized signer: %w", signerID, model.ErrInvalidSigner)
 	}
 
 	ok, err := w.aggregator.Verify(info.index, sig) // no error expected during normal operation
@@ -99,33 +96,19 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 	return nil
 }
 
-// hasSignature returns true if the input ID already included a signature
-// and false otherwise.
-// The function is thread safe.
-func (w *WeightedSignatureAggregator) hasSignature(signerID flow.Identifier) bool {
-	w.lock.RLock()
-	defer w.lock.RUnlock()
-	_, ok := w.collectedIDs[signerID]
-	return ok
-}
-
 // TrustedAdd adds a signature to the internal set of signatures and adds the signer's
 // weight to the total collected weight, iff the signature is _not_ a duplicate.
 //
 // The total weight of all collected signatures (excluding duplicates) is returned regardless
 // of any returned error.
-// The function errors
-//  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
-//  - engine.DuplicatedEntryError if the signer has been already added
+// The function errors with:
+//  - model.ErrInvalidSigner if signerID is invalid (not a consensus participant)
+//  - model.DuplicatedSignerError if the signer has been already added
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 	info, found := w.idToInfo[signerID]
 	if !found {
-		return w.TotalWeight(), engine.NewInvalidInputErrorf("couldn't find signerID %s in the map", signerID)
-	}
-
-	if w.hasSignature(signerID) {
-		return w.TotalWeight(), engine.NewDuplicatedEntryErrorf("SigneID %s was already added", signerID)
+		return w.TotalWeight(), fmt.Errorf("id %v is not an authorized signer: %w", signerID, model.ErrInvalidSigner)
 	}
 
 	// atomically update the signatures pool and the total weight
@@ -134,16 +117,20 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 
 	err := w.aggregator.TrustedAdd(info.index, sig)
 	if err != nil {
-		return w.totalWeight, fmt.Errorf("Trusted add has failed: %w", err)
+		// During normal operations, signature.InvalidSignerIdxError should never occur. But adding signatures
+		// from the same signer repeatedly could happen; hence we expect signature.DuplicatedSignerIdxError.
+		if signature.IsDuplicatedSignerIdxError(err) {
+			return w.totalWeight, model.NewDuplicatedSignerErrorf("signature from %v was already added: %w", signerID, err)
+		}
+		// for duplicated votes from the same signer and verified the signer+signature
+		return w.totalWeight, fmt.Errorf("trusted add of signature from %v failed: %w", signerID, err)
 	}
-
-	w.collectedIDs[signerID] = struct{}{}
 	w.totalWeight += info.weight
+
 	return w.totalWeight, nil
 }
 
 // TotalWeight returns the total weight presented by the collected signatures.
-//
 // The function is thread-safe
 func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 	w.lock.RLock()
@@ -152,14 +139,15 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 }
 
 // Aggregate aggregates the signatures and returns the aggregated signature.
-//
-// The function is thread-safe.
-// Aggregate attempts to aggregate the internal signatures and returns the resulting signature data.
 // The function performs a final verification and errors if the aggregated signature is not valid. This is
 // required for the function safety since "TrustedAdd" allows adding invalid signatures.
+// The function errors with:
+//  - model.InsufficientSignaturesError if no signatures have been added yet
+//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
+// The function is thread-safe.
 //
 // TODO : When compacting the list of signers, update the return from []flow.Identifier
-// to a compact bit vector.
+//        to a compact bit vector.
 func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -167,7 +155,13 @@ func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, er
 	// Aggregate includes the safety check of the aggregated signature
 	indices, aggSignature, err := w.aggregator.Aggregate()
 	if err != nil {
-		return nil, nil, fmt.Errorf("aggregate has failed: %w", err)
+		if signature.IsInsufficientSignaturesError(err) {
+			return nil, nil, model.NewInsufficientSignaturesError(err)
+		}
+		if signature.IsInvalidSignatureIncludedError(err) {
+			return nil, nil, model.NewInvalidSignatureIncludedError(err)
+		}
+		return nil, nil, fmt.Errorf("unexpected error during signature aggregation: %w", err)
 	}
 	signerIDs := make([]flow.Identifier, 0, len(indices))
 	for _, index := range indices {

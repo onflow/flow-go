@@ -89,19 +89,20 @@ type WeightedSignatureAggregator interface {
 	//
 	// The total weight of all collected signatures (excluding duplicates) is returned regardless
 	// of any returned error.
-	// The function errors
-	//  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
-	//  - engine.DuplicatedEntryError if the signer has been already added
+	// The function errors with:
+	//  - model.ErrInvalidSigner if signerID is invalid (not a consensus participant)
+	//  - model.DuplicatedSignerError if the signer has been already added
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error)
 
 	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
 
 	// Aggregate aggregates the signatures and returns the aggregated signature.
-	//
-	// Aggregate attempts to aggregate the internal signatures and returns the resulting signature data.
 	// The function performs a final verification and errors if the aggregated signature is not valid. This is
 	// required for the function safety since "TrustedAdd" allows adding invalid signatures.
+	// The function errors with:
+	//  - model.InsufficientSignaturesError if no signatures have been added yet
+	//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 	Aggregate() ([]flow.Identifier, []byte, error)
 }
 
