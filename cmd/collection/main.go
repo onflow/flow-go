@@ -206,7 +206,7 @@ func main() {
 		}).
 		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// access node addresses can be set explicitly for testing networks
-			if len(accessNodeAddresses) >= common.DefaultAccessNodeIDSMinimumMainnet {
+			if len(accessNodeAddresses) > 0 {
 				if node.RootChainID == flow.Mainnet {
 					return fmt.Errorf("invalid flag usage --access-node-addresses flag is not allowed on chain with root ID %s", flow.Mainnet)
 				}
@@ -219,7 +219,7 @@ func main() {
 					flowClientConfigs = append(flowClientConfigs, config)
 				}
 			}
-			
+
 			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)

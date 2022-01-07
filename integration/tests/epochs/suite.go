@@ -609,7 +609,14 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 		if !testContainerConfig.Ghost {
 			nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
 			nodeContainer.AddFlag("insecure-access-api", "false")
-			nodeContainer.AddFlag("access-node-ids", "*")
+
+			for _, an := range s.net.ContainersByRole(flow.RoleAccess) {
+				if !an.Config.Ghost {
+					port := s.net.AccessPortsByContainerName[an.Name()]
+					nodeContainer.AddFlag("access-node-addresses", fmt.Sprintf("[%s:%s]", an.Name(), port))
+					break
+				}
+			}
 		}
 	}
 
