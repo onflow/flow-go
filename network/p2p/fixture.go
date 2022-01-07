@@ -119,6 +119,11 @@ func nodeFixture(
 			return NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkId.String()+"/"+dhtPrefix), parameters.dhtOptions...)
 		})
 
+	if parameters.peerFilter != nil {
+		connGater := NewConnGater(logger, parameters.peerFilter)
+		builder.SetConnectionGater(connGater)
+	}
+
 	n, err := builder.Build(ctx)
 	require.NoError(t, err)
 

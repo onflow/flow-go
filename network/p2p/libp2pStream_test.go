@@ -525,15 +525,17 @@ func TestConnectionGating(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	sporkID := unittest.IdentifierFixture()
+
 	// create 2 nodes
 	node1Peers := make(map[peer.ID]struct{})
-	node1, node1Id := nodeFixture(t, ctx, unittest.IdentifierFixture(), "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
+	node1, node1Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
 		_, ok := node1Peers[p]
 		return ok
 	}))
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, node2Id := nodeFixture(t, ctx, unittest.IdentifierFixture(), "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
+	node2, node2Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
 		_, ok := node2Peers[p]
 		return ok
 	}))
