@@ -15,8 +15,8 @@ func (p PlainStream) NewStream(s libp2pnet.Stream) (libp2pnet.Stream, error) {
 	return s, nil
 }
 
-func (p PlainStream) Handler() libp2pnet.StreamHandler {
-	return p.handler
+func (p PlainStream) Handler(s libp2pnet.Stream) {
+	p.handler(s)
 }
 
 func (p PlainStream) ProtocolId() protocol.ID {

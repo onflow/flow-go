@@ -70,7 +70,7 @@ func (m *Manager) Register(unicast ProtocolName) error {
 	u := factory(m.logger, m.sporkId, m.defaultHandler)
 
 	m.unicasts = append(m.unicasts, u)
-	m.streamFactory.SetStreamHandler(u.ProtocolId(), u.Handler())
+	m.streamFactory.SetStreamHandler(u.ProtocolId(), u.Handler)
 
 	return nil
 }

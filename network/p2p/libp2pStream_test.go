@@ -349,17 +349,16 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 func TestOneToOneComm(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	msg := "hello\n"
+	msg := "helloooooooo\n"
 	count := 2
 	ch := make(chan string, count)
 
 	// Create the handler function
 	streamHandler := func(s network.Stream) {
-		r := bufio.NewReader(s)
-		b := make([]byte, len(msg))
-		_, err := r.Read(b)
+		rw :=  bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		str, err := rw.ReadString('\n')
 		require.NoError(t, err)
-		ch <- string(b)
+		ch <- str
 	}
 
 	// Creates nodes
