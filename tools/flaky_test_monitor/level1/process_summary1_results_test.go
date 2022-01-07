@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
+	"flaky-test-monitor/common"
 )
 
 // data driven table test

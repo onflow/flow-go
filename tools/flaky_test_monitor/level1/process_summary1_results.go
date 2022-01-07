@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
+	"flaky-test-monitor/common"
 )
 
 // this interface gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for testing)

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
+	"flaky-test-monitor/common"
 )
 
 const failuresDir = "./failures/"
