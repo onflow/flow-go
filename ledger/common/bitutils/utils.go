@@ -23,7 +23,7 @@ func SetBit(b []byte, idx int, value int) {
 	}
 }
 
-// MakeBitVector allocates a bite slice of minimal size that can hold numberBits.
+// MakeBitVector allocates a byte slice of minimal size that can hold numberBits.
 func MakeBitVector(numberBits int) []byte {
 	return make([]byte, (numberBits+7)>>3)
 }
