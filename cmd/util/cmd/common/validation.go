@@ -25,7 +25,7 @@ func ValidateAccessNodeIDSFlag(accessNodeIDS []string, chainID flow.ChainID, sna
 // 1. If * (all flag) is used return IDs of all AN's in the identity table
 // 2. Ensure minimum number of AN IDs DefaultAccessNodeIDSMinimum provided
 func validateFlags(accessNodeIDS []string, snapshot protocol.Snapshot) ([]flow.Identifier, error) {
-	
+
 	if len(accessNodeIDS) < DefaultAccessNodeIDSMinimum {
 		return nil, fmt.Errorf("invalid flag --access-node-ids expected atleast %d IDs got %d", DefaultAccessNodeIDSMinimum, len(accessNodeIDS))
 	}

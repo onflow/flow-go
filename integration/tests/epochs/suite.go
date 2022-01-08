@@ -563,12 +563,13 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 			nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
 			nodeContainer.AddFlag("insecure-access-api", "true")
 
-			for _, an := range s.net.ContainersByRole(flow.RoleAccess) {
-				if !an.Config.Ghost {
-					nodeContainer.AddFlag("access-node-ids", an.Config.NodeID.String())
-					break
+			accessNodeIDS := make([]string, 0)
+			for _, c := range s.net.ContainersByRole(flow.RoleAccess) {
+				if c.Config.Role == flow.RoleAccess && !c.Config.Ghost {
+					accessNodeIDS = append(accessNodeIDS, c.Config.NodeID.String())
 				}
 			}
+			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
 	}
 
@@ -619,6 +620,20 @@ func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) 
 	actualCounter, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
 	require.Equalf(s.T(), expectedCounter, actualCounter, "expected to be in epoch %d got %d", expectedCounter, actualCounter)
+}
+
+// assertQCVotingSuccessful asserts that the QC has completed successfully
+func (s *Suite) assertQCVotingSuccessful(ctx context.Context, env templates.Environment) {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetVotingCompletedScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected qc voting to have completed successfully")
+}
+
+// assertDKGSuccessful asserts that the DKG has completed successfully
+func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environment) {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetDKGCompletedScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")
 }
 
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
