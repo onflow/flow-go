@@ -1,7 +1,6 @@
 package gadgets
 
 import (
-	"sort"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -18,13 +17,15 @@ type Views struct {
 	sync.Mutex
 	events.Noop
 	callbacks         map[uint64][]events.OnViewCallback
+	orderedViews      []uint64
 	lastFinalizedView uint64
 }
 
 // NewViews returns a new Views events gadget.
 func NewViews() *Views {
 	views := &Views{
-		callbacks: make(map[uint64][]events.OnViewCallback),
+		callbacks:    make(map[uint64][]events.OnViewCallback),
+		orderedViews: make([]uint64, 0),
 	}
 	return views
 }
@@ -39,7 +40,35 @@ func (v *Views) OnView(view uint64, callback events.OnViewCallback) {
 		return
 	}
 
-	v.callbacks[view] = append(v.callbacks[view], callback)
+	// index a view the first time we see it
+	callbacks := v.callbacks[view]
+	if len(callbacks) == 0 {
+		v.indexView(view)
+	}
+	v.callbacks[view] = append(callbacks, callback)
+}
+
+func (v *Views) indexView(view uint64) {
+	// no indexed views
+	if len(v.orderedViews) == 0 {
+		v.orderedViews = append(v.orderedViews, view)
+		return
+	}
+
+	// find the insertion index in the ordered list of views
+	// start with higher views to match typical usage patterns
+	insertAt := 0
+	for i := len(v.orderedViews) - 1; i >= 0; i-- {
+		viewI := v.orderedViews[i]
+		if view > viewI {
+			insertAt = i + 1
+			break
+		}
+	}
+	// shift the list right, insert the new view
+	v.orderedViews = append(v.orderedViews, 0)                   // add capacity (will be overwritten)
+	copy(v.orderedViews[insertAt+1:], v.orderedViews[insertAt:]) // shift larger views right
+	v.orderedViews[insertAt] = view                              // insert new view
 }
 
 // BlockFinalized handles block finalized protocol events, triggering view
@@ -48,22 +77,28 @@ func (v *Views) BlockFinalized(block *flow.Header) {
 	v.Lock()
 	defer v.Unlock()
 
-	v.lastFinalizedView = block.View
+	blockView := block.View
+	v.lastFinalizedView = blockView
 
-	// TODO index queued callbacks by ordered view to avoid this linear iteration on each block
-	finalizedViews := []int{}
-	for view := range v.callbacks {
-		if view <= block.View {
-			finalizedViews = append(finalizedViews, int(view))
+	// the index (inclusive) of the lowest view which should be kept
+	cutoff := 0
+	for i, view := range v.orderedViews {
+		if view > blockView {
+			break
 		}
-	}
-
-	sort.Ints(finalizedViews)
-
-	for _, view := range finalizedViews {
-		for _, callback := range v.callbacks[uint64(view)] {
+		for _, callback := range v.callbacks[view] {
 			callback(block)
 		}
-		delete(v.callbacks, uint64(view))
+		delete(v.callbacks, view)
+		cutoff = i + 1
 	}
+
+	// we have no other queued view callbacks
+	if cutoff >= len(v.orderedViews) {
+		if len(v.orderedViews) > 0 {
+			v.orderedViews = []uint64{}
+		}
+	}
+	// remove view callbacks which have been invoked
+	v.orderedViews = v.orderedViews[cutoff:]
 }
