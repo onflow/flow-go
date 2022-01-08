@@ -167,10 +167,12 @@ type DuplicatedSignerError struct {
 	err error
 }
 
+func NewDuplicatedSignerError(err error) error {
+	return DuplicatedSignerError{err}
+}
+
 func NewDuplicatedSignerErrorf(msg string, args ...interface{}) error {
-	return DuplicatedSignerError{
-		err: fmt.Errorf(msg, args...),
-	}
+	return DuplicatedSignerError{err: fmt.Errorf(msg, args...)}
 }
 
 func (e DuplicatedSignerError) Error() string { return e.err.Error() }

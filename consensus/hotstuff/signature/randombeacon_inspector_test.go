@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -140,11 +139,11 @@ func (rs *randomBeaconSuite) TestDuplicateSigner() {
 	// TrustedAdd
 	enough, err = follower.TrustedAdd(i, share)
 	assert.Error(rs.T(), err)
-	assert.True(rs.T(), engine.IsDuplicatedEntryError(err))
+	assert.True(rs.T(), model.IsDuplicatedSignerError(err))
 	assert.False(rs.T(), enough)
 }
 
-func (rs *randomBeaconSuite) TestInvalidIndex() {
+func (rs *randomBeaconSuite) TestInvalidSignerIndex() {
 	follower, err := NewRandomBeaconInspector(rs.pkGroup, rs.pkShares, rs.threshold, rs.thresholdSignatureMessage)
 	require.NoError(rs.T(), err)
 
@@ -155,11 +154,11 @@ func (rs *randomBeaconSuite) TestInvalidIndex() {
 		// Verify
 		err = follower.Verify(invalidIndex, share)
 		assert.Error(rs.T(), err)
-		assert.True(rs.T(), engine.IsInvalidInputError(err))
+		assert.True(rs.T(), model.IsInvalidSignerError(err))
 		// TrustedAdd
 		enough, err := follower.TrustedAdd(invalidIndex, share)
 		assert.Error(rs.T(), err)
-		assert.True(rs.T(), engine.IsInvalidInputError(err))
+		assert.True(rs.T(), model.IsInvalidSignerError(err))
 		assert.False(rs.T(), enough)
 	}
 }
@@ -176,7 +175,7 @@ func (rs *randomBeaconSuite) TestInvalidSignature() {
 	// Verify
 	err = follower.Verify(index, share)
 	assert.Error(rs.T(), err)
-	assert.True(rs.T(), errors.Is(err, model.ErrInvalidFormat))
+	assert.True(rs.T(), errors.Is(err, model.ErrInvalidSignature))
 	// restore share
 	share[4] ^= 1
 
@@ -185,7 +184,7 @@ func (rs *randomBeaconSuite) TestInvalidSignature() {
 	// VerifyShare
 	err = follower.Verify(otherIndex, share)
 	assert.Error(rs.T(), err)
-	assert.True(rs.T(), errors.Is(err, model.ErrInvalidFormat))
+	assert.True(rs.T(), errors.Is(err, model.ErrInvalidSignature))
 }
 
 func (rs *randomBeaconSuite) TestConstructorErrors() {
@@ -193,11 +192,11 @@ func (rs *randomBeaconSuite) TestConstructorErrors() {
 	pkSharesInvalid := make([]crypto.PublicKey, crypto.ThresholdSignMaxSize+1)
 	follower, err := NewRandomBeaconInspector(rs.pkGroup, pkSharesInvalid, rs.threshold, rs.thresholdSignatureMessage)
 	assert.Error(rs.T(), err)
-	assert.True(rs.T(), engine.IsInvalidInputError(err))
+	assert.True(rs.T(), crypto.IsInvalidInputsError(err))
 	assert.Nil(rs.T(), follower)
 	// invalid threshold
 	follower, err = NewRandomBeaconInspector(rs.pkGroup, rs.pkShares, len(rs.pkShares)+1, rs.thresholdSignatureMessage)
 	assert.Error(rs.T(), err)
-	assert.True(rs.T(), engine.IsInvalidInputError(err))
+	assert.True(rs.T(), crypto.IsInvalidInputsError(err))
 	assert.Nil(rs.T(), follower)
 }

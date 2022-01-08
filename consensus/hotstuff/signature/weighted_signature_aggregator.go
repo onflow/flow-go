@@ -82,7 +82,7 @@ func NewWeightedSignatureAggregator(
 func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	info, ok := w.idToInfo[signerID]
 	if !ok {
-		return model.NewInvalidSignerErrorf("id %v is not an authorized signer", signerID)
+		return model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
 	}
 
 	ok, err := w.aggregator.Verify(info.index, sig) // no error expected during normal operation
@@ -107,7 +107,7 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 	info, found := w.idToInfo[signerID]
 	if !found {
-		return w.TotalWeight(), model.NewInvalidSignerErrorf("id %v is not an authorized signer", signerID)
+		return w.TotalWeight(), model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
 	}
 
 	// atomically update the signatures pool and the total weight

@@ -3,18 +3,10 @@ package signature
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/module/signature"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/encoding"
 )
-
-// TODO: would be great to move this to package `module/signature`.
-//       In package signature, we work with the signers on an index basis -- same as here.
-//       NOTE: with the intention of moving this file to `module/signature`, I am already
-//       using the errors from the signature package.
 
 // randomBeaconInspector implements hotstuff.RandomBeaconInspector interface.
 // All methods of this structure are concurrency-safe.
@@ -55,20 +47,20 @@ func NewRandomBeaconInspector(
 // execute the business logic, without interfering with each other).
 // It allows concurrent verification of the given signature.
 // Returns :
-//  - signature.InvalidSignerIdxError if signerIndex is invalid
-//  - model.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+//  - model.InvalidSignerError if signerIndex is invalid
+//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 //  - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) error {
 	valid, err := r.inspector.VerifyShare(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			return signature.NewInvalidSignerIdxErrorf("index %d does not correspond to an authorized random beacon participant: %w", signerIndex, err)
+			return model.NewInvalidSignerError(err)
 		}
 		return fmt.Errorf("unexpected error verifying beacon signature from %d: %w", signerIndex, err)
 	}
 
 	if !valid { // invalid signature
-		return fmt.Errorf("invalid beacon share from %d: %w", signerIndex, model.ErrInvalidFormat)
+		return model.ErrInvalidSignature
 	}
 	return nil
 }
@@ -85,18 +77,18 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 //  - (true, nil) if the signature has been added, and enough shares have been collected.
 //  - (false, nil) if the signature has been added, but not enough shares were collected.
 //  - (false, error) if there is any exception adding the signature share.
-//      - engine.InvalidInputError if signerIndex is invalid (out of the valid range)
-//  	- engine.DuplicatedEntryError if the signer has been already added
+//      - model.InvalidSignerError if signerIndex is invalid (out of the valid range)
+//  	- model.DuplicatedSignerError if the signer has been already added
 //      - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
 	// Trusted add to the crypto layer
 	enough, err := r.inspector.TrustedAdd(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			return false, engine.NewInvalidInputErrorf("trusted add from %d failed: %w", signerIndex, err)
+			return false, model.NewInvalidSignerError(err)
 		}
 		if crypto.IsDuplicatedSignerError(err) {
-			return false, engine.NewDuplicatedEntryErrorf("trusted add from %d failed: %w", signerIndex, err)
+			return false, model.NewDuplicatedSignerError(err)
 		}
 		return false, fmt.Errorf("unexpected error while adding share from %d: %w", signerIndex, err)
 	}
@@ -116,11 +108,21 @@ func (r *randomBeaconInspector) EnoughShares() bool {
 //
 // Returns:
 // - (signature, nil) if no error occurred
-// - (nil, crypto.notEnoughSharesError) if not enough shares were collected
-// - (nil, crypto.invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
+// - (nil, model.InsufficientSignaturesError) if not enough shares were collected
+// - (nil, model.InvalidSignatureIncluded) if at least one collected share does not serialize to a valid BLS signature,
 //    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
 //    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
 // - (nil, error) for any other unexpected error.
 func (r *randomBeaconInspector) Reconstruct() (crypto.Signature, error) {
-	return r.inspector.ThresholdSignature()
+	sig, err := r.inspector.ThresholdSignature()
+	if err != nil {
+		if crypto.IsInvalidInputsError(err) {
+			return nil, model.NewInvalidSignatureIncludedError(err)
+		}
+		if crypto.IsNotEnoughSharesError(err) {
+			return nil, model.NewInsufficientSignaturesError(err)
+		}
+		return nil, fmt.Errorf("unexpected error random beacon sig reconstruction: %w", err)
+	}
+	return sig, nil
 }

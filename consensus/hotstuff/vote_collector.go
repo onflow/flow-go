@@ -92,6 +92,7 @@ type VoteProcessor interface {
 	// * VoteForIncompatibleBlockError - submitted vote for incompatible block
 	// * VoteForIncompatibleViewError - submitted vote for incompatible view
 	// * model.InvalidVoteError - submitted vote with invalid signature
+	// * model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
 	// All other errors should be treated as exceptions.
 	Process(vote *model.Vote) error
 

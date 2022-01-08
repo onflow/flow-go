@@ -111,7 +111,7 @@ type CombinedVoteProcessorV2 struct {
 	done             atomic.Bool
 }
 
-var _ hotstuff.VoteProcessor = (*CombinedVoteProcessorV2)(nil)
+var _ hotstuff.VerifyingVoteProcessor = (*CombinedVoteProcessorV2)(nil)
 
 func NewCombinedVoteProcessor(log zerolog.Logger,
 	block *model.Block,
@@ -175,7 +175,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	err = p.stakingSigAggtor.Verify(vote.SignerID, stakingSig)
 	if err != nil {
 		if model.IsInvalidSignerError(err) {
-			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
+			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not from an authorized consensus participant: %w",
 				vote.ID(), vote.View, err)
 		}
 		if errors.Is(err, model.ErrInvalidSignature) {
@@ -193,7 +193,12 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if randomBeaconSig != nil {
 		err = p.rbRector.Verify(vote.SignerID, randomBeaconSig)
 		if err != nil {
-			if errors.Is(err, model.ErrInvalidFormat) {
+			// InvalidSignerError is possible in case we have consensus participants that are _not_ part of the random beacon committee.
+			if model.IsInvalidSignerError(err) {
+				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not from an authorized random beacon participant: %w",
+					vote.ID(), vote.View, err)
+			}
+			if errors.Is(err, model.ErrInvalidSignature) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid random beacon signature: %w",
 					vote.ID(), vote.View, err)
 			}

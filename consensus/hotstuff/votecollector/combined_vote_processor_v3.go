@@ -121,7 +121,7 @@ type CombinedVoteProcessorV3 struct {
 	done             atomic.Bool
 }
 
-var _ hotstuff.VoteProcessor = (*CombinedVoteProcessorV3)(nil)
+var _ hotstuff.VerifyingVoteProcessor = (*CombinedVoteProcessorV3)(nil)
 
 // Block returns block that is part of proposal that we are processing votes for.
 func (p *CombinedVoteProcessorV3) Block() *model.Block {
@@ -141,6 +141,7 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // * VoteForIncompatibleBlockError - submitted vote for incompatible block
 // * VoteForIncompatibleViewError - submitted vote for incompatible view
 // * model.InvalidVoteError - submitted vote with invalid signature
+// * model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
 // All other errors should be treated as exceptions.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
@@ -189,7 +190,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
 			if model.IsInvalidSignerError(err) {
-				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
+				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not from an authorized random beacon participant: %w",
 					vote.ID(), vote.View, err)
 			}
 			if errors.Is(err, model.ErrInvalidSignature) {
@@ -202,16 +203,14 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		if p.done.Load() {
 			return nil
 		}
+		// Add signatures to `rbSigAggtor` and `rbRector`: we don't expect any errors during normal operation,
+		// as we previously checked for duplicated votes from the same signer and verified the signer+signature
 		_, err = p.rbSigAggtor.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
-			// we don't expect any errors here during normal operation, as we previously checked
-			// for duplicated votes from the same signer and verified the signer+signature
 			return fmt.Errorf("unexpected exception adding signature from vote %v to random beacon aggregator: %w", vote.ID(), err)
 		}
 		_, err = p.rbRector.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
-			// we don't expect any errors here during normal operation, as we previously checked
-			// for duplicated votes from the same signer and verified the signer+signature
 			return fmt.Errorf("unexpected exception adding signature from vote %v to random beacon reconstructor: %w", vote.ID(), err)
 		}
 
