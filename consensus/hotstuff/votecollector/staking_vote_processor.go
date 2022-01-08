@@ -114,7 +114,7 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	}
 	err = p.stakingSigAggtor.Verify(vote.SignerID, vote.SigData)
 	if err != nil {
-		if errors.Is(err, model.ErrInvalidSigner) {
+		if model.IsInvalidSignerError(err) {
 			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
 				vote.ID(), vote.View, err)
 		}

@@ -23,8 +23,11 @@ type randomBeaconInspector struct {
 }
 
 // NewRandomBeaconInspector instantiates a new randomBeaconInspector.
-//
-// It errors with engine.InvalidInputError if any input is not valid.
+// The constructor errors if:
+//  - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`,
+//    for n the number of participants `n := len(publicKeyShares)`
+//  - threshold value is not between 0 and n-1
+//  - any input public key is not a BLS key
 func NewRandomBeaconInspector(
 	groupPublicKey crypto.PublicKey,
 	publicKeyShares []crypto.PublicKey,
@@ -52,11 +55,11 @@ func NewRandomBeaconInspector(
 // execute the business logic, without interfering with each other).
 // It allows concurrent verification of the given signature.
 // Returns :
-//  - engine.InvalidInputError if signerIndex is invalid
+//  - signature.InvalidSignerIdxError if signerIndex is invalid
 //  - model.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) error {
-	verif, err := r.inspector.VerifyShare(signerIndex, share)
+	valid, err := r.inspector.VerifyShare(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
 			return signature.NewInvalidSignerIdxErrorf("index %d does not correspond to an authorized random beacon participant: %w", signerIndex, err)
@@ -64,7 +67,7 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 		return fmt.Errorf("unexpected error verifying beacon signature from %d: %w", signerIndex, err)
 	}
 
-	if !verif { // invalid signature
+	if !valid { // invalid signature
 		return fmt.Errorf("invalid beacon share from %d: %w", signerIndex, model.ErrInvalidFormat)
 	}
 	return nil

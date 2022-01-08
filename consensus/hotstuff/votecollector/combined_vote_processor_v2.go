@@ -174,7 +174,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	// verify staking sig
 	err = p.stakingSigAggtor.Verify(vote.SignerID, stakingSig)
 	if err != nil {
-		if errors.Is(err, model.ErrInvalidSigner) {
+		if model.IsInvalidSignerError(err) {
 			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
 				vote.ID(), vote.View, err)
 		}

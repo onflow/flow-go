@@ -142,13 +142,13 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() 
 //  * `SignerID` is valid consensus participant but the signature is cryptographically invalid
 func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 	s.Run("vote with staking-sig", func() {
-		// sentinel error from `ErrInvalidSigner` should be wrapped as `InvalidVoteError`
+		// sentinel error from `InvalidSignerError` should be wrapped as `InvalidVoteError`
 		voteA := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
-		s.stakingAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.ErrInvalidSigner).Once()
+		s.stakingAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Once()
 		err := s.processor.Process(voteA)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &model.ErrInvalidSigner)
+		require.True(s.T(), model.IsInvalidSignerError(err))
 
 		// sentinel error from `ErrInvalidSignature` should be wrapped as `InvalidVoteError`
 		voteB := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
@@ -162,13 +162,13 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 	})
 
 	s.Run("vote with beacon-sig", func() {
-		// sentinel error from `ErrInvalidSigner` should be wrapped as `InvalidVoteError`
+		// sentinel error from `InvalidSignerError` should be wrapped as `InvalidVoteError`
 		voteA := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
-		s.rbSigAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.ErrInvalidSigner).Once()
+		s.rbSigAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Once()
 		err := s.processor.Process(voteA)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &model.ErrInvalidSigner)
+		require.True(s.T(), model.IsInvalidSignerError(err))
 
 		// sentinel error from `ErrInvalidSignature` should be wrapped as `InvalidVoteError`
 		voteB := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())

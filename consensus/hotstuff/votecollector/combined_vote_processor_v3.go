@@ -165,7 +165,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	case hotstuff.SigTypeStaking:
 		err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
-			if errors.Is(err, model.ErrInvalidSigner) {
+			if model.IsInvalidSignerError(err) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
 					vote.ID(), vote.View, err)
 			}
@@ -188,7 +188,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	case hotstuff.SigTypeRandomBeacon:
 		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
-			if errors.Is(err, model.ErrInvalidSigner) {
+			if model.IsInvalidSignerError(err) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
 					vote.ID(), vote.View, err)
 			}

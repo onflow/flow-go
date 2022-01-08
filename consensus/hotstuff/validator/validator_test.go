@@ -313,13 +313,27 @@ func (vs *VoteSuite) TestVoteSignatureError() {
 	assert.False(vs.T(), model.IsInvalidVoteError(err), "internal exception should not be interpreted as invalid vote")
 }
 
+func (vs *VoteSuite) TestVoteInvalidSignerID() {
+
+	// make sure the signer ID  is treated as invalid
+	*vs.committee = mocks.Committee{}
+	vs.committee.On("Identity", vs.block.BlockID, vs.vote.SignerID).Return(nil, model.NewInvalidSignerErrorf(""))
+
+	// A `model.InvalidSignerError` from the committee should be interpreted as
+	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
+	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	assert.Error(vs.T(), err, "a vote with an invalid signature should be rejected")
+	assert.True(vs.T(), model.IsInvalidVoteError(err), "a vote with an invalid signature should be rejected")
+}
+
 func (vs *VoteSuite) TestVoteSignatureInvalid() {
 
 	// make sure the signature is treated as invalid
 	*vs.verifier = mocks.Verifier{}
 	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(fmt.Errorf("staking sig is invalid: %w", model.ErrInvalidSignature))
 
-	// check that the vote is no longer validated
+	// A `model.ErrInvalidSignature` from the committee should be interpreted as
+	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
 	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
 	assert.Error(vs.T(), err, "a vote with an invalid signature should be rejected")
 	assert.True(vs.T(), model.IsInvalidVoteError(err), "a vote with an invalid signature should be rejected")

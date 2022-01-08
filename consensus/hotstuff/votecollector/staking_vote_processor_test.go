@@ -72,13 +72,13 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 func (s *StakingVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 	exception := errors.New("unexpected-exception")
 
-	// sentinel error from `ErrInvalidSigner` should be wrapped as `InvalidVoteError`
+	// sentinel error from `InvalidSignerError` should be wrapped as `InvalidVoteError`
 	voteA := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
-	s.stakingAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.ErrInvalidSigner).Once()
+	s.stakingAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Once()
 	err := s.processor.Process(voteA)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorAs(s.T(), err, &model.ErrInvalidSigner)
+	require.True(s.T(), model.IsInvalidSignerError(err))
 
 	// sentinel error from `ErrInvalidSignature` should be wrapped as `InvalidVoteError`
 	voteB := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())

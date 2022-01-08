@@ -138,24 +138,24 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 // and return an InvalidVoteError.
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignature() {
 	// Scenario 1) vote where `SignerID` is not a valid consensus participant;
-	// sentinel error `ErrInvalidSigner` from WeightedSignatureAggregator should be wrapped as `InvalidVoteError`
+	// sentinel error `InvalidSignerError` from WeightedSignatureAggregator should be wrapped as `InvalidVoteError`
 	s.Run("vote with invalid signerID", func() {
 		// vote with only a staking signature
 		stakingOnlyVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
-		s.stakingAggregator.On("Verify", stakingOnlyVote.SignerID, mock.Anything).Return(model.ErrInvalidSigner).Once()
+		s.stakingAggregator.On("Verify", stakingOnlyVote.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Once()
 		err := s.processor.Process(stakingOnlyVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &model.ErrInvalidSigner)
+		require.True(s.T(), model.IsInvalidSignerError(err))
 
 		// vote with staking+beacon signatures
 		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
-		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, mock.Anything).Return(model.ErrInvalidSigner).Maybe()
-		s.reconstructor.On("Verify", doubleSigVote.SignerID, mock.Anything).Return(model.ErrInvalidSigner).Maybe()
+		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Maybe()
+		s.reconstructor.On("Verify", doubleSigVote.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Maybe()
 		err = s.processor.Process(doubleSigVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &model.ErrInvalidSigner)
+		require.True(s.T(), model.IsInvalidSignerError(err))
 
 		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")

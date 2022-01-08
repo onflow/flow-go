@@ -50,7 +50,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
 	if len(signers) != len(qc.SignerIDs) {
-		return newInvalidBlockError(block, fmt.Errorf("some qc signers are duplicated or invalid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner))
+		return newInvalidBlockError(block, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at block %x", block.BlockID))
 	}
 
 	// determine whether signers reach minimally required stake threshold for consensus
@@ -136,7 +136,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	}
 
 	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
-	if errors.Is(err, model.ErrInvalidSigner) {
+	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)
 	}
 	if err != nil {

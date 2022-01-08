@@ -34,7 +34,6 @@ var _ hotstuff.WeightedSignatureAggregator = (*WeightedSignatureAggregator)(nil)
 // NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
 // identities, their respective public keys, a message and a domain separation tag. The identities
 // represent the list of all possible signers.
-//
 // The constructor errors if:
 // - the list of identities is empty
 // - if the length of keys does not match the length of identities
@@ -76,14 +75,14 @@ func NewWeightedSignatureAggregator(
 
 // Verify verifies the signature under the stored public keys and message.
 // Error returns:
-//  - model.ErrInvalidSigner if signerID is invalid (not a consensus participant)
+//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 //  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 //  - generic error in case of unexpected runtime failures
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	info, ok := w.idToInfo[signerID]
 	if !ok {
-		return fmt.Errorf("id %s is not an authorized signer: %w", signerID, model.ErrInvalidSigner)
+		return model.NewInvalidSignerErrorf("id %v is not an authorized signer", signerID)
 	}
 
 	ok, err := w.aggregator.Verify(info.index, sig) // no error expected during normal operation
@@ -102,13 +101,13 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 // The total weight of all collected signatures (excluding duplicates) is returned regardless
 // of any returned error.
 // The function errors with:
-//  - model.ErrInvalidSigner if signerID is invalid (not a consensus participant)
+//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 //  - model.DuplicatedSignerError if the signer has been already added
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 	info, found := w.idToInfo[signerID]
 	if !found {
-		return w.TotalWeight(), fmt.Errorf("id %v is not an authorized signer: %w", signerID, model.ErrInvalidSigner)
+		return w.TotalWeight(), model.NewInvalidSignerErrorf("id %v is not an authorized signer", signerID)
 	}
 
 	// atomically update the signatures pool and the total weight

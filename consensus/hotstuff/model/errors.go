@@ -10,7 +10,6 @@ import (
 var (
 	ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
 	ErrInvalidFormat     = errors.New("invalid signature format")
-	ErrInvalidSigner     = errors.New("invalid signer(s)")
 	ErrInvalidSignature  = errors.New("invalid signature")
 )
 
@@ -228,5 +227,29 @@ func (e InsufficientSignaturesError) Unwrap() error { return e.err }
 // IsInsufficientSignaturesError returns whether err is an InsufficientSignaturesError
 func IsInsufficientSignaturesError(err error) bool {
 	var e InsufficientSignaturesError
+	return errors.As(err, &e)
+}
+
+/* ********************** InsufficientSignaturesError ********************** */
+
+// InvalidSignerError indicates that the signer is not authorized or unknown
+type InvalidSignerError struct {
+	err error
+}
+
+func NewInvalidSignerError(err error) error {
+	return InvalidSignerError{err}
+}
+
+func NewInvalidSignerErrorf(msg string, args ...interface{}) error {
+	return InvalidSignerError{fmt.Errorf(msg, args...)}
+}
+
+func (e InvalidSignerError) Error() string { return e.err.Error() }
+func (e InvalidSignerError) Unwrap() error { return e.err }
+
+// IsInvalidSignerError returns whether err is an InvalidSignerError
+func IsInvalidSignerError(err error) bool {
+	var e InvalidSignerError
 	return errors.As(err, &e)
 }

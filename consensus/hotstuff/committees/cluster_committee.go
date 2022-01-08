@@ -31,6 +31,8 @@ type Cluster struct {
 	initialClusterMembers flow.IdentityList
 }
 
+var _ hotstuff.Committee = (*Cluster)(nil)
+
 func NewClusterCommittee(
 	state protocol.State,
 	payloads storage.ClusterPayloads,
@@ -94,7 +96,7 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 	if isRootBlock {
 		identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
 		if !ok {
-			return nil, model.ErrInvalidSigner
+			return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
 		}
 		return identity, nil
 	}
@@ -102,13 +104,13 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 	// otherwise use the snapshot given by the reference block
 	identity, err := c.state.AtBlockID(payload.ReferenceBlockID).Identity(nodeID)
 	if protocol.IsIdentityNotFound(err) {
-		return nil, model.ErrInvalidSigner
+		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id: %w", nodeID, err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, err)
 	}
 	if !c.clusterMemberFilter(identity) {
-		return nil, model.ErrInvalidSigner
+		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
 	}
 	return identity, nil
 }

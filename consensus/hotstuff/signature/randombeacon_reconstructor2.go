@@ -3,27 +3,23 @@ package signature
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/state/protocol"
-
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// RandomBeaconReconstructor implements hotstuff.RandomBeaconReconstructor.
+// RandomBeaconReconstructor2 implements hotstuff.RandomBeaconReconstructor2.
 // The implementation wraps the hotstuff.RandomBeaconInspector and translates the signer identity into signer index.
 // It has knowledge about DKG to be able to map signerID to signerIndex
-type RandomBeaconReconstructor struct {
+type RandomBeaconReconstructor2 struct {
 	hotstuff.RandomBeaconInspector              // a stateful object for this epoch. It's used for both verifying all sig shares and reconstructing the threshold signature.
 	dkg                            hotstuff.DKG // to lookup signer index by signer ID
 }
 
-var _ hotstuff.RandomBeaconReconstructor = (*RandomBeaconReconstructor)(nil)
+var _ hotstuff.RandomBeaconReconstructor = (*RandomBeaconReconstructor2)(nil)
 
-func NewRandomBeaconReconstructor(dkg hotstuff.DKG, randomBeaconInspector hotstuff.RandomBeaconInspector) *RandomBeaconReconstructor {
-	return &RandomBeaconReconstructor{
+func NewRandomBeaconReconstructor2(dkg hotstuff.DKG, randomBeaconInspector hotstuff.RandomBeaconInspector) *RandomBeaconReconstructor2 {
+	return &RandomBeaconReconstructor2{
 		RandomBeaconInspector: randomBeaconInspector,
 		dkg:                   dkg,
 	}
@@ -37,13 +33,10 @@ func NewRandomBeaconReconstructor(dkg hotstuff.DKG, randomBeaconInspector hotstu
 //  - engine.InvalidInputError if signerIndex is invalid
 //  - model.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - other error if there is an unexpected exception.
-func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.Signature) error {
+func (r *RandomBeaconReconstructor2) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	signerIndex, err := r.dkg.Index(signerID)
 	if err != nil {
-		if protocol.IsIdentityNotFound(err) {
-			return model.NewInvalidSignerErrorf("signer %v is not a valid random beacon participant: %w", signerID, err)
-		}
-		return fmt.Errorf("internal error retrieving DKG index for %v: %w", signerID, err)
+		return fmt.Errorf("could not map signerID %v to signerIndex: %w", signerID, err)
 	}
 	return r.RandomBeaconInspector.Verify(int(signerIndex), sig)
 }
@@ -63,13 +56,10 @@ func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.
 //      - engine.InvalidInputError if signerIndex is invalid
 //  	- engine.DuplicatedEntryError if the signer has been already added
 //      - other error if there is an unexpected exception.
-func (r *RandomBeaconReconstructor) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
+func (r *RandomBeaconReconstructor2) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
 	signerIndex, err := r.dkg.Index(signerID)
 	if err != nil {
-		if protocol.IsIdentityNotFound(err) {
-			return false, model.NewInvalidSignerErrorf("signer %v is not a valid random beacon participant: %w", signerID, err)
-		}
-		return false, fmt.Errorf("internal error retrieving DKG index for %v: %w", signerID, err)
+		return false, fmt.Errorf("could not map signerID %v to signerIndex: %w", signerID, err)
 	}
 	return r.RandomBeaconInspector.TrustedAdd(int(signerIndex), sig)
 }

@@ -1,7 +1,6 @@
 package voter
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -58,7 +57,7 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 	// HotStuff will ask for a vote for the first block of the next epoch, even if we
 	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
 	_, err := v.committee.Identity(block.BlockID, v.committee.Self())
-	if errors.Is(model.ErrInvalidSigner, err) {
+	if model.IsInvalidSignerError(err) {
 		return nil, model.NoVoteError{Msg: "not voting committee member for block"}
 	}
 	if err != nil {

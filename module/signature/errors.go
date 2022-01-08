@@ -7,10 +7,6 @@ import (
 
 var ErrInsufficientShares = errors.New("insufficient threshold signature shares")
 
-//ErrInvalidSignerIdx   = errors.New("invalid signer index")
-//ErrDuplicatedSigner = errors.New("duplicated signer")
-//ErrNoSignaturesToAggregate = errors.New("signers list is empty")
-
 /* ********************* InvalidSignatureIncludedError ********************* */
 
 // InvalidSignatureIncludedError indicates that some signatures, included via TrustedAdd, are invalid

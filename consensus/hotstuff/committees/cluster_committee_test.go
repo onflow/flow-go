@@ -1,7 +1,6 @@
 package committees
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -70,7 +69,7 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.Require().NoError(err)
 }
 
-// TestInvalidSigner tests that the ErrInvalidSigner sentinel is
+// TestInvalidSigner tests that the InvalidSignerError sentinel is
 // returned under the appropriate conditions.
 func (suite *ClusterSuite) TestInvalidSigner() {
 
@@ -94,25 +93,25 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	suite.snap.On("Identity", realNonCommitteeIdentity.NodeID).Return(realNonCommitteeIdentity, nil)
 	suite.snap.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
 
-	suite.Run("should return ErrInvalidSigner for non-existent signer", func() {
+	suite.Run("should return InvalidSignerError for non-existent signer", func() {
 		suite.Run("root block", func() {
 			_, err := suite.com.Identity(rootBlockID, fakeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, fakeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 	})
 
-	suite.Run("should return ErrInvalidSigner for existent non-cluster-member", func() {
+	suite.Run("should return InvalidSignerError for existent non-cluster-member", func() {
 		suite.Run("root block", func() {
 			_, err := suite.com.Identity(rootBlockID, realNonCommitteeIdentity.NodeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, realNonCommitteeIdentity.NodeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 	})
 

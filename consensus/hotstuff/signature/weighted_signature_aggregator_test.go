@@ -152,12 +152,12 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		invalidId := unittest.IdentifierFixture()
 
 		err := aggregator.Verify(invalidId, sigs[0])
-		assert.ErrorIs(t, err, model.ErrInvalidSigner)
+		assert.True(t, model.IsInvalidSignerError(err))
 
 		weight, err := aggregator.TrustedAdd(invalidId, sigs[0])
 		assert.Equal(t, uint64(0), weight)
 		assert.Equal(t, uint64(0), aggregator.TotalWeight())
-		assert.ErrorIs(t, err, model.ErrInvalidSigner)
+		assert.True(t, model.IsInvalidSignerError(err))
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
@@ -227,9 +227,9 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		// calling `Aggregate()` should error with `model.InsufficientSignaturesError`,
 		// as still zero signatures are stored.
 		_, err = aggregator.TrustedAdd(unittest.IdentifierFixture(), unittest.SignatureFixture())
-		assert.ErrorIs(t, err, model.ErrInvalidSigner)
+		assert.True(t, model.IsInvalidSignerError(err))
 		_, err = aggregator.TrustedAdd(unittest.IdentifierFixture(), unittest.SignatureFixture())
-		assert.ErrorIs(t, err, model.ErrInvalidSigner)
+		assert.True(t, model.IsInvalidSignerError(err))
 
 		signers, agg, err = aggregator.Aggregate()
 		assert.True(t, model.IsInsufficientSignaturesError(err))

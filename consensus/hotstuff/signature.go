@@ -71,15 +71,17 @@ func (t SigType) Valid() bool {
 	return t == SigTypeStaking || t == SigTypeRandomBeacon
 }
 
-// WeightedSignatureAggregator aggregates signatures of the same signature scheme and the same message from different signers.
-// The public keys and message are aggreed upon upfront.
-// It is also recommended to only aggregate signatures generated with keys representing equivalent security-bit level.
-// The module is aware of weights assigned to each signer, as well as a total weight threshold.
-// Implementation of SignatureAggregator must be concurrent safe.
+// WeightedSignatureAggregator aggregates signatures of the same signature scheme and the
+// same message from different signers. The public keys and message are agreed upon upfront.
+// It is also recommended to only aggregate signatures generated with keys representing
+// equivalent security-bit level.
+// Furthermore, a weight [unsigned int64] is assigned to each signer ID. The
+// WeightedSignatureAggregator internally tracks the total weight of all collected signatures.
+// Implementations must be concurrency safe.
 type WeightedSignatureAggregator interface {
 	// Verify verifies the signature under the stored public keys and message.
 	// Error returns:
-	//  - model.ErrInvalidSigner if signerID is invalid (not a consensus participant)
+	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 	//  - generic error in case of unexpected runtime failures
 	Verify(signerID flow.Identifier, sig crypto.Signature) error
@@ -90,7 +92,7 @@ type WeightedSignatureAggregator interface {
 	// The total weight of all collected signatures (excluding duplicates) is returned regardless
 	// of any returned error.
 	// The function errors with:
-	//  - model.ErrInvalidSigner if signerID is invalid (not a consensus participant)
+	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 	//  - model.DuplicatedSignerError if the signer has been already added
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error)
 
