@@ -1,6 +1,7 @@
 package gadgets
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -34,11 +35,6 @@ func NewViews() *Views {
 func (v *Views) OnView(view uint64, callback events.OnViewCallback) {
 	v.Lock()
 	defer v.Unlock()
-
-	// do not subscribe to a view that has already been finalized
-	if view <= v.lastFinalizedView {
-		return
-	}
 
 	// index a view the first time we see it
 	callbacks := v.callbacks[view]
@@ -78,7 +74,10 @@ func (v *Views) BlockFinalized(block *flow.Header) {
 	defer v.Unlock()
 
 	blockView := block.View
-	v.lastFinalizedView = blockView
+
+	fmt.Println("BlockFinalized")
+	fmt.Println(v.orderedViews)
+	fmt.Println(v.callbacks)
 
 	// the index (inclusive) of the lowest view which should be kept
 	cutoff := 0
@@ -97,6 +96,7 @@ func (v *Views) BlockFinalized(block *flow.Header) {
 	if cutoff >= len(v.orderedViews) {
 		if len(v.orderedViews) > 0 {
 			v.orderedViews = []uint64{}
+			return
 		}
 	}
 	// remove view callbacks which have been invoked
