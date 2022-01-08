@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"flaky-test-monitor/common"
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
 type TestData struct {

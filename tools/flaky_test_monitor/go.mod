@@ -1,4 +1,4 @@
-module github.com/onflow/flow-go/tools/flaky-test-monitor
+module github.com/onflow/flow-go/tools/flaky_test_monitor
 
 go 1.16
 
