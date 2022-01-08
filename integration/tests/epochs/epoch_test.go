@@ -128,9 +128,9 @@ func TestEpochs(t *testing.T) {
 //specific to that node type are made to ensure the network is healthy.
 //
 //TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions related to the node change
-//func (s *Suite) TestEpochJoinAndLeaveAN() {
-//	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
-//}
+func (s *Suite) TestEpochJoinAndLeaveAN() {
+	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
+}
 
 // TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions related to the node change
 //func (s *Suite) TestEpochJoinAndLeaveVN() {
@@ -139,10 +139,10 @@ func TestEpochs(t *testing.T) {
 //}
 
 // TestEpochJoinAndLeaveLN should update collection nodes and assert healthy network conditions related to the node change
-func (s *Suite) TestEpochJoinAndLeaveLN() {
-	//unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs VN tests should be run on an machine with adequate resources")
-	s.runTestEpochJoinAndLeave(flow.RoleCollection, s.assertNetworkHealthyAfterLNChange)
-}
+//func (s *Suite) TestEpochJoinAndLeaveLN() {
+//	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs VN tests should be run on an machine with adequate resources")
+//	s.runTestEpochJoinAndLeave(flow.RoleCollection, s.assertNetworkHealthyAfterLNChange)
+//}
 
 func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth nodeUpdateValidation) {
 	ctx, cancel := context.WithCancel(context.Background())
