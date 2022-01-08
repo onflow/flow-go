@@ -126,7 +126,7 @@ type StakedNodeOperationInfo struct {
 	StakingAccountKey       sdkcrypto.PrivateKey
 	NetworkingKey           sdkcrypto.PrivateKey
 	StakingKey              sdkcrypto.PrivateKey
-	MachineAccountAddress   flow.Address
+	MachineAccountAddress   sdk.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
 	MachineAccountPublicKey flow.AccountPublicKey
 	ContainerName           string
@@ -182,7 +182,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	containerName := s.getTestContainerName(role)
 
 	// register node using staking collection
-	result, err = s.SubmitStakingCollectionRegisterNodeTx(
+	result, machineAccountAddr, err := s.SubmitStakingCollectionRegisterNodeTx(
 		ctx,
 		env,
 		stakingAccountKey,
@@ -215,6 +215,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		NetworkingKey:           networkingKey,
 		MachineAccountKey:       machineAccountKey,
 		MachineAccountPublicKey: machineAccountPubKey,
+		MachineAccountAddress: machineAccountAddr,
 		ContainerName:           containerName,
 	}
 }
@@ -345,7 +346,7 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	stakingKey string,
 	amount string,
 	machineKey string,
-) (*sdk.TransactionResult, error) {
+) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -374,7 +375,22 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	result, err := s.client.WaitForSealed(ctx, registerNodeTx.ID())
 	require.NoError(s.T(), err)
 	stakingAccount.Keys[0].SequenceNumber++
-	return result, nil
+
+	if role == flow.RoleCollection || role == flow.RoleConsensus {
+		var machineAccountAddr sdk.Address
+		for _, event := range result.Events {
+			if event.Type == sdk.EventAccountCreated { // assume only one account created (safe because we control the transaction)
+				accountCreatedEvent := sdk.AccountCreatedEvent(event)
+				machineAccountAddr = accountCreatedEvent.Address()
+				break
+			}
+		}
+
+		require.NotZerof(s.T(), machineAccountAddr, "failed to create the machine account: %s", machineAccountAddr)
+		return result, machineAccountAddr, nil
+	}
+
+	return result, sdk.Address{}, nil
 }
 
 // SubmitStakingCollectionCloseStakeTx submits tx that calls StakingCollection.closeStake
@@ -533,12 +549,29 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
 	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
-	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
+	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
 	//add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
+
+	// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
+	if role == flow.RoleConsensus || role == flow.RoleCollection {
+		// ghost containers don't participate in the network skip any SN/LN ghost containers
+		if !testContainerConfig.Ghost {
+			nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
+			nodeContainer.AddFlag("insecure-access-api", "true")
+
+			for _, an := range s.net.ContainersByRole(flow.RoleAccess) {
+				if !an.Config.Ghost {
+					nodeContainer.AddFlag("access-node-ids", an.Config.NodeID.String())
+					break
+				}
+			}
+		}
+	}
+
 	return s.net.ContainerByID(info.NodeID)
 }
 
@@ -631,4 +664,34 @@ func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templat
 
 	// head should now be at-least 20 blocks higher from when we started
 	require.True(s.T(), header.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
+}
+
+// assertNetworkHealthyAfterLNChange after an collection node is removed or added to the network
+// this func can be used to perform sanity.
+// 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
+// is after the first epoch starts.
+// 2. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
+func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	bootstrapHead, err := rootSnapshot.Head()
+	require.NoError(s.T(), err)
+
+	header, err := s.client.GetLatestSealedBlockHeader(ctx)
+	require.NoError(s.T(), err)
+
+	// head should now be at-least 20 blocks higher from when we started
+	require.Truef(s.T(), header.Height-bootstrapHead.Height >= 20, "expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height)
+
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	// submit transaction to create account
+	_, err = s.createAccount(
+		ctx,
+		fullAccountKey,
+		s.client.Account(),
+		s.client.SDKServiceAddress(),
+	)
+	require.NoError(s.T(), err)
 }
