@@ -133,6 +133,7 @@ func (s *Suite) TestViewsProgress() {
 //
 //TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions related to the node change
 func (s *Suite) TestEpochJoinAndLeaveAN() {
+	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs AN tests should be run on an machine with adequate resources")
 	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
 }
 
