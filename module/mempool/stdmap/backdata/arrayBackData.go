@@ -40,7 +40,7 @@ type sIndex uint64
 type sha32of256 uint32
 
 type key struct {
-	keyIndex      uint64          // slot age.
+	slotAge       uint64          // age of this key.
 	entityIndex   heropool.EIndex // link to actual entity.
 	keySha32of256 sha32of256      // 32-bits prefix of entity identifier.
 }
@@ -223,7 +223,7 @@ func (a *ArrayBackData) put(entityId flow.Identifier, entity flow.Entity) bool {
 
 	a.keyCount++
 	entityIndex := a.entities.Add(entityId, entity, a.ownerIndexOf(bucketIndex, slotToUse))
-	a.buckets[bucketIndex][slotToUse].keyIndex = a.keyCount
+	a.buckets[bucketIndex][slotToUse].slotAge = a.keyCount
 	a.buckets[bucketIndex][slotToUse].entityIndex = entityIndex
 	a.buckets[bucketIndex][slotToUse].keySha32of256 = idPref
 	return true
@@ -288,13 +288,13 @@ func (a *ArrayBackData) slotInBucket(bucketIndex bIndex, idPref sha32of256, enti
 	oldestKeyInBucket := a.keyCount + 1 // initializes oldest key to current max.
 
 	for s := sIndex(0); s < sIndex(bucketSize); s++ {
-		if a.buckets[bucketIndex][s].keyIndex < oldestKeyInBucket {
+		if a.buckets[bucketIndex][s].slotAge < oldestKeyInBucket {
 			// record slot s as oldest slot
-			oldestKeyInBucket = a.buckets[bucketIndex][s].keyIndex
+			oldestKeyInBucket = a.buckets[bucketIndex][s].slotAge
 			slotToUse = s
 		}
 
-		if a.buckets[bucketIndex][s].keyIndex <= expiryThreshold {
+		if a.buckets[bucketIndex][s].slotAge <= expiryThreshold {
 			// slot technically expired or never assigned
 			availableSlotCount++
 			continue
@@ -340,7 +340,7 @@ func (a ArrayBackData) ownerIndexOf(bucketIndex bIndex, slotIndex sIndex) uint64
 // By a linked entity, we mean if the entity has an owner index matching to (bucketIndex, slotIndex).
 // The bool return value corresponds to whether there is a linked entity to this (bucketIndex, slotIndex) or not.
 func (a *ArrayBackData) linkedEntityOf(bucketIndex bIndex, slotIndex sIndex) (flow.Identifier, flow.Entity, bool) {
-	if a.buckets[bucketIndex][slotIndex].keyIndex == 0 {
+	if a.buckets[bucketIndex][slotIndex].slotAge == 0 {
 		// slotIndex never used, or recently invalidated, hence
 		// does not have any linked entity
 		return flow.Identifier{}, nil, false
@@ -351,7 +351,7 @@ func (a *ArrayBackData) linkedEntityOf(bucketIndex bIndex, slotIndex sIndex) (fl
 	id, entity, owner := a.entities.Get(valueIndex)
 	if a.ownerIndexOf(bucketIndex, slotIndex) != owner {
 		// entity is not linked to this (bucketIndex, slotIndex)
-		a.buckets[bucketIndex][slotIndex].keyIndex = 0
+		a.buckets[bucketIndex][slotIndex].slotAge = 0
 		return flow.Identifier{}, nil, false
 	}
 
@@ -390,7 +390,7 @@ func (a *ArrayBackData) logTelemetry() {
 // invalidateKey sets the key index of specified slot in the bucket to zero, so the key
 // is free to take.
 func (a *ArrayBackData) invalidateKey(bucketIndex bIndex, slotIndex sIndex) {
-	a.buckets[bucketIndex][slotIndex].keyIndex = 0
+	a.buckets[bucketIndex][slotIndex].slotAge = 0
 }
 
 // invalidateEntity removes the entity linked to the specified slot from the underlying entities

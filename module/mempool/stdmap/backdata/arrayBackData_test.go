@@ -33,7 +33,7 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 		// since we are below limit, elements should be added sequentially at bucket 0.
 		// the ith added element has a key index of i+1,
 		// since 0 means unused key index in implementation.
-		require.Equal(t, bd.buckets[0][i].keyIndex, uint64(i+1))
+		require.Equal(t, bd.buckets[0][i].slotAge, uint64(i+1))
 		// also, since we have not yet over-limited,
 		// entities are assigned their entityIndex in the same order they are added.
 		require.Equal(t, bd.buckets[0][i].entityIndex, i)
