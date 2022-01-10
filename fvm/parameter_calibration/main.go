@@ -39,15 +39,19 @@ import (
 var filenameFlag string
 var blocksFlag int
 var workersFlag int
+var desiredMaxTimeFlag float64
 
 func init() {
 	flag.StringVar(&filenameFlag, "file", "data.csv", "output data file")
 	flag.IntVar(&blocksFlag, "blocks", 1000, "Total blocks to go through")
 	flag.IntVar(&workersFlag, "workers", 2, "Number of concurrent threads")
+	flag.Float64Var(&desiredMaxTimeFlag, "max_time", 500., "Desired max time per tx")
 }
 
 func main() {
 	flag.Parse()
+
+	desiredMaxTime = desiredMaxTimeFlag
 
 	numWorkers := workersFlag
 	workersWG := &sync.WaitGroup{}
@@ -150,17 +154,50 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 	}
 	err = accounts[0].DeployContract(blockExecutor, "TestContract", `
 			access(all) contract TestContract {
+				pub var totalSupply: UInt64
+				pub var nfts: @[NFT]
+
 				access(all) event SomeEvent()
 				access(all) fun empty() {
 				}
 				access(all) fun emit() {
 					emit SomeEvent()
 				}
+
+				access(all) fun mintNFT() {
+					var newNFT <- create NFT(
+						id: TestContract.totalSupply,
+						data: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					)
+					self.nfts.append( <- newNFT)
+
+					TestContract.totalSupply = TestContract.totalSupply + UInt64(1)
+				}
+
+				pub resource NFT {
+					pub let id: UInt64
+					pub let data: String
+			
+					init(
+						id: UInt64,
+						data: String,
+					) {
+						self.id = id
+						self.data = data
+					}
+				}
+
+				init() {
+					self.totalSupply = 0
+					self.nfts <- []
+				}
 			}
 			`)
 	if err != nil {
 		panic(err)
 	}
+
+	err = accounts[0].MintTokens(blockExecutor, 100_0000_0000)
 
 	err = serviceAccount.AddArrayToStorage(blockExecutor, []string{longString, longString, longString, longString, longString})
 	if err != nil {
@@ -262,6 +299,68 @@ func (account *TestBenchAccount) DeployContract(blockExec TestBenchBlockExecutor
 		return err
 	}
 
+	if len(computationResult.TransactionResults[0].ErrorMessage) > 0 {
+		return fmt.Errorf(computationResult.TransactionResults[0].ErrorMessage)
+	}
+	return nil
+}
+
+func (account *TestBenchAccount) MintTokens(blockExec TestBenchBlockExecutor, tokens uint64) (err error) {
+	serviceAccount := blockExec.ServiceAccount()
+	txBody := flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`
+			import FungibleToken from 0x%s
+			import FlowToken from 0x%s
+			
+			transaction(recipient: Address, amount: UFix64) {
+				let tokenAdmin: &FlowToken.Administrator
+				let tokenReceiver: &{FungibleToken.Receiver}
+			
+				prepare(signer: AuthAccount) {
+					self.tokenAdmin = signer
+						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)
+						?? panic("Signer is not the token admin")
+			
+					self.tokenReceiver = getAccount(recipient)
+						.getCapability(/public/flowTokenReceiver)
+						.borrow<&{FungibleToken.Receiver}>()
+						?? panic("Unable to borrow receiver reference")
+				}
+			
+				execute {
+					let minter <- self.tokenAdmin.createNewMinter(allowedAmount: amount)
+					let mintedVault <- minter.mintTokens(amount: amount)
+			
+					self.tokenReceiver.deposit(from: <-mintedVault)
+			
+					destroy minter
+				}
+			}
+		`, fvm.FungibleTokenAddress(blockExec.Chain()), fvm.FlowTokenAddress(blockExec.Chain())))).
+		AddAuthorizer(blockExec.ServiceAccount().Address)
+
+	txBody.AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Address.Bytes())))
+	txBody.AddArgument(jsoncdc.MustEncode(cadence.UFix64(tokens)))
+
+	txBody.SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber())
+	txBody.SetPayer(serviceAccount.Address)
+
+	if account.Address != serviceAccount.Address {
+		err = testutil.SignPayload(txBody, account.Address, account.PrivateKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	computationResult, err := blockExec.ExecuteCollections([][]*flow.TransactionBody{{txBody}})
+	if err != nil {
+		return err
+	}
 	if len(computationResult.TransactionResults[0].ErrorMessage) > 0 {
 		return fmt.Errorf(computationResult.TransactionResults[0].ErrorMessage)
 	}

@@ -981,11 +981,13 @@ func (e *TransactionEnv) ProgramInterpreted(location common.Location, duration t
 
 func (e *TransactionEnv) ValueEncoded(duration time.Duration) {
 	e.RecordTrace("encodeValue", nil, duration, nil)
+	e.computationHandler.AddUsed(1, "ValueEncoded")
 	e.metrics.ValueEncoded(duration)
 }
 
 func (e *TransactionEnv) ValueDecoded(duration time.Duration) {
 	e.RecordTrace("decodeValue", nil, duration, nil)
+	e.computationHandler.AddUsed(1, "ValueDecoded")
 	e.metrics.ValueDecoded(duration)
 }
 
