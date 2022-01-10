@@ -1,4 +1,4 @@
-package backdata
+package heroCache
 
 import (
 	"encoding/binary"
@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/heropool"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/heroCache/pool"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -40,27 +40,27 @@ type sIndex uint64
 type sha32of256 uint32
 
 type key struct {
-	slotAge       uint64          // age of this key.
-	entityIndex   heropool.EIndex // link to actual entity.
-	keySha32of256 sha32of256      // 32-bits prefix of entity identifier.
+	slotAge       uint64      // age of this key.
+	entityIndex   pool.EIndex // link to actual entity.
+	keySha32of256 sha32of256  // 32-bits prefix of entity identifier.
 }
 
 // keyBucket represents a bucket of keys.
 type keyBucket [bucketSize]key
 
-// ArrayBackData implements an array-based generic memory pool backed by a fixed total array.
-type ArrayBackData struct {
+// Cache implements an array-based generic memory pool backed by a fixed total array.
+type Cache struct {
 	logger zerolog.Logger
-	// NOTE: as a BackData implementation, ArrayBackData must be non-blocking.
+	// NOTE: as a BackData implementation, Cache must be non-blocking.
 	// Concurrency management is done by overlay Backend.
 	limit        uint32
 	keyCount     uint64 // total number of non-expired key-values
 	bucketNum    uint64 // total number of buckets (i.e., total of buckets)
-	ejectionMode heropool.EjectionMode
+	ejectionMode pool.EjectionMode
 	// buckets keeps the keys (i.e., entityId) of the (entityId, entity) pairs that are maintained in this BackData.
 	buckets []keyBucket
 	// entities keeps the values (i.e., entity) of the (entityId, entity) pairs that are maintained in this BackData.
-	entities *heropool.Pool
+	entities *pool.HeroPool
 
 	// telemetry
 	//
@@ -68,7 +68,7 @@ type ArrayBackData struct {
 	// available (i.e., empty) slots to take.
 	availableSlotHistogram []uint64
 	// interactionCounter keeps track of interactions made with
-	// ArrayBackData. Invoking any methods of this BackData is considered
+	// Cache. Invoking any methods of this BackData is considered
 	// towards an interaction. The interaction counter is set to zero whenever
 	// it reaches a predefined limit. Its purpose is to manage the speed at which
 	// telemetry logs are printed.
@@ -78,7 +78,7 @@ type ArrayBackData struct {
 	lastTelemetryDump int64
 }
 
-func NewArrayBackData(limit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, logger zerolog.Logger) *ArrayBackData {
+func NewCache(limit uint32, oversizeFactor uint32, ejectionMode pool.EjectionMode, logger zerolog.Logger) *Cache {
 	// total buckets.
 	capacity := uint64(limit * oversizeFactor)
 	bucketNum := capacity / bucketSize
@@ -87,13 +87,13 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, ejectionMode heropool
 		bucketNum++
 	}
 
-	bd := &ArrayBackData{
+	bd := &Cache{
 		logger:                 logger,
 		bucketNum:              bucketNum,
 		limit:                  limit,
 		buckets:                make([]keyBucket, bucketNum),
 		ejectionMode:           ejectionMode,
-		entities:               heropool.NewPool(limit, ejectionMode),
+		entities:               pool.NewPool(limit, ejectionMode),
 		availableSlotHistogram: make([]uint64, bucketSize+1), // +1 is to account for empty buckets as well.
 	}
 
@@ -101,7 +101,7 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, ejectionMode heropool
 }
 
 // Has checks if we already contain the entity with the given identifier.
-func (a *ArrayBackData) Has(entityID flow.Identifier) bool {
+func (a *Cache) Has(entityID flow.Identifier) bool {
 	defer a.logTelemetry()
 
 	_, _, _, ok := a.get(entityID)
@@ -109,14 +109,14 @@ func (a *ArrayBackData) Has(entityID flow.Identifier) bool {
 }
 
 // Add adds the given item to the BackData.
-func (a *ArrayBackData) Add(entityID flow.Identifier, entity flow.Entity) bool {
+func (a *Cache) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	defer a.logTelemetry()
 
 	return a.put(entityID, entity)
 }
 
 // Rem will remove the item with the given identity.
-func (a *ArrayBackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
+func (a *Cache) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 	defer a.logTelemetry()
 
 	entity, bucketIndex, sliceIndex, exists := a.get(entityID)
@@ -134,7 +134,7 @@ func (a *ArrayBackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value.
-func (a *ArrayBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
+func (a *Cache) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
 	defer a.logTelemetry()
 
 	entity, removed := a.Rem(entityID)
@@ -151,7 +151,7 @@ func (a *ArrayBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flo
 }
 
 // ByID returns the given entity from the BackData.
-func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
+func (a *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	defer a.logTelemetry()
 
 	entity, _, _, ok := a.get(entityID)
@@ -159,14 +159,14 @@ func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Size will return the total size of BackData, i.e., total number of valid (entityId, entity) pairs.
-func (a ArrayBackData) Size() uint {
+func (a Cache) Size() uint {
 	defer a.logTelemetry()
 
 	return uint(a.entities.Size())
 }
 
 // All returns all entities from the BackData.
-func (a ArrayBackData) All() map[flow.Identifier]flow.Entity {
+func (a Cache) All() map[flow.Identifier]flow.Entity {
 	defer a.logTelemetry()
 
 	all := make(map[flow.Identifier]flow.Entity)
@@ -186,11 +186,11 @@ func (a ArrayBackData) All() map[flow.Identifier]flow.Entity {
 }
 
 // Clear removes all entities from the BackData.
-func (a *ArrayBackData) Clear() {
+func (a *Cache) Clear() {
 	defer a.logTelemetry()
 
 	a.buckets = make([]keyBucket, a.bucketNum)
-	a.entities = heropool.NewPool(a.limit, a.ejectionMode)
+	a.entities = pool.NewPool(a.limit, a.ejectionMode)
 	a.availableSlotHistogram = make([]uint64, bucketSize+1)
 	a.interactionCounter = 0
 	a.lastTelemetryDump = 0
@@ -198,7 +198,7 @@ func (a *ArrayBackData) Clear() {
 }
 
 // Hash will use a merkle root hash to hash all items.
-func (a *ArrayBackData) Hash() flow.Identifier {
+func (a *Cache) Hash() flow.Identifier {
 	defer a.logTelemetry()
 
 	return flow.MerkleRoot(flow.GetIDs(a.All())...)
@@ -207,7 +207,7 @@ func (a *ArrayBackData) Hash() flow.Identifier {
 // put writes the (entityId, entity) pair into this BackData. Boolean return value
 // determines whether the write operation was successful. A write operation fails when there is already
 // a duplicate entityId exists in the BackData, and that entityId is linked to a valid entity.
-func (a *ArrayBackData) put(entityId flow.Identifier, entity flow.Entity) bool {
+func (a *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	idPref, bucketIndex := a.idPrefixAndBucketIndex(entityId)
 	slotToUse, unique := a.slotInBucket(bucketIndex, idPref, entityId)
 	if !unique {
@@ -231,7 +231,7 @@ func (a *ArrayBackData) put(entityId flow.Identifier, entity flow.Entity) bool {
 
 // get retrieves the entity corresponding to given identifier from underlying entities list.
 // The boolean return value determines whether an entity with given id exists in the BackData.
-func (a *ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool) {
+func (a *Cache) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool) {
 	idPref, bucketIndex := a.idPrefixAndBucketIndex(entityID)
 	for slotIndex := sIndex(0); slotIndex < sIndex(bucketSize); slotIndex++ {
 		if a.buckets[bucketIndex][slotIndex].keySha32of256 != idPref {
@@ -257,7 +257,7 @@ func (a *ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bIndex, sInd
 
 // idPrefixAndBucketIndex determines the id prefix as well as the bucket index corresponding to the
 // given identifier.
-func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (sha32of256, bIndex) {
+func (a Cache) idPrefixAndBucketIndex(id flow.Identifier) (sha32of256, bIndex) {
 	// uint64(id[0:8]) used to compute bucket index for which this key (i.e., id) belongs to
 	bucketIndex := binary.LittleEndian.Uint64(id[0:8]) % a.bucketNum
 
@@ -268,7 +268,7 @@ func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (sha32of256, b
 }
 
 // expiryThreshold returns the threshold for which all keys with index below threshold are considered old enough for eviction.
-func (a ArrayBackData) expiryThreshold() uint64 {
+func (a Cache) expiryThreshold() uint64 {
 	var expiryThreshold uint64 = 0
 	if a.keyCount > uint64(a.limit) {
 		// total number of keys written are above the predefined limit
@@ -280,7 +280,7 @@ func (a ArrayBackData) expiryThreshold() uint64 {
 
 // slotInBucket returns a free slot for this entityId in the bucket. In case the bucket is full, it invalidates the oldest (unlinked) key,
 // and returns its index as free slot. It returns false if the entityId already exists in this bucket.
-func (a *ArrayBackData) slotInBucket(bucketIndex bIndex, idPref sha32of256, entityId flow.Identifier) (sIndex, bool) {
+func (a *Cache) slotInBucket(bucketIndex bIndex, idPref sha32of256, entityId flow.Identifier) (sIndex, bool) {
 	slotToUse := sIndex(0)
 	expiryThreshold := a.expiryThreshold()
 	availableSlotCount := uint64(0) // for telemetry logs.
@@ -332,14 +332,14 @@ func (a *ArrayBackData) slotInBucket(bucketIndex bIndex, idPref sha32of256, enti
 // ownerIndexOf maps the (bucketIndex, slotIndex) pair to a canonical unique (scalar) index.
 // This scalar index is used to represent this (bucketIndex, slotIndex) pair in the underlying
 // entities list.
-func (a ArrayBackData) ownerIndexOf(bucketIndex bIndex, slotIndex sIndex) uint64 {
+func (a Cache) ownerIndexOf(bucketIndex bIndex, slotIndex sIndex) uint64 {
 	return (uint64(bucketIndex) * bucketSize) + uint64(slotIndex)
 }
 
 // linkedEntityOf returns the entity linked to this (bucketIndex, slotIndex) pair from the underlying entities list.
 // By a linked entity, we mean if the entity has an owner index matching to (bucketIndex, slotIndex).
 // The bool return value corresponds to whether there is a linked entity to this (bucketIndex, slotIndex) or not.
-func (a *ArrayBackData) linkedEntityOf(bucketIndex bIndex, slotIndex sIndex) (flow.Identifier, flow.Entity, bool) {
+func (a *Cache) linkedEntityOf(bucketIndex bIndex, slotIndex sIndex) (flow.Identifier, flow.Entity, bool) {
 	if a.buckets[bucketIndex][slotIndex].slotAge == 0 {
 		// slotIndex never used, or recently invalidated, hence
 		// does not have any linked entity
@@ -360,7 +360,7 @@ func (a *ArrayBackData) linkedEntityOf(bucketIndex bIndex, slotIndex sIndex) (fl
 
 // logTelemetry prints telemetry logs depending on number of interactions and
 // last time telemetry has been logged.
-func (a *ArrayBackData) logTelemetry() {
+func (a *Cache) logTelemetry() {
 	a.interactionCounter++
 	if a.interactionCounter < telemetryCounterInterval {
 		// not enough interactions to log.
@@ -389,12 +389,12 @@ func (a *ArrayBackData) logTelemetry() {
 
 // invalidateKey sets the key index of specified slot in the bucket to zero, so the key
 // is free to take.
-func (a *ArrayBackData) invalidateKey(bucketIndex bIndex, slotIndex sIndex) {
+func (a *Cache) invalidateKey(bucketIndex bIndex, slotIndex sIndex) {
 	a.buckets[bucketIndex][slotIndex].slotAge = 0
 }
 
 // invalidateEntity removes the entity linked to the specified slot from the underlying entities
 // list. So that entity slot is made available to take if needed.
-func (a *ArrayBackData) invalidateEntity(bucketIndex bIndex, slotIndex sIndex) {
+func (a *Cache) invalidateEntity(bucketIndex bIndex, slotIndex sIndex) {
 	a.entities.Rem(a.buckets[bucketIndex][slotIndex].entityIndex)
 }
