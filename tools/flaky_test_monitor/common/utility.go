@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"os"
 	"strconv"
-	"strings"
 )
 
 // AssertNoError checks that the passed in error is nil and panics
@@ -21,18 +20,8 @@ func AssertNoError(err error, panicMessage string) {
 	}
 }
 
-// AddTrailingSlash adds a trailing slash to the supplied string, if required.
-// If path doesn't have trailing slash, appends one.
-// If path has trailing slash, doesn't change it.
-func AddTrailingSlash(path string) string {
-	if strings.HasSuffix(path, "/") {
-		return path
-	}
-	return path + "/"
-}
-
 // ConvertToNDecimalPlaces2 converts the supplied numerator and denominator fraction into
-// a decimal with n decimla places. Works the same way as ConvertToNDecimalPlaces()
+// a decimal with n decimal places. Works the same way as ConvertToNDecimalPlaces()
 // but has a float for the numerator.
 func ConvertToNDecimalPlaces2(n int, numerator float32, denominator int) float32 {
 	return convertToNDecimalPlacesInternal(n, numerator, float32(denominator))
