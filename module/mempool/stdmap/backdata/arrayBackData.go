@@ -35,14 +35,14 @@ type bIndex uint64
 // sIndex is data type representing a slot index in a bucket.
 type sIndex uint64
 
-// idPrefix is a 32-bits prefix flow.Identifier used to determine the bIndex of the entity
+// sha32of256 is a 32-bits prefix flow.Identifier used to determine the bIndex of the entity
 // it represents.
-type idPrefix uint32
+type sha32of256 uint32
 
 type key struct {
-	keyIndex    uint64          // slot age.
-	entityIndex heropool.EIndex // link to actual entity.
-	idPref      idPrefix        // 32-bits prefix of entity identifier.
+	keyIndex      uint64          // slot age.
+	entityIndex   heropool.EIndex // link to actual entity.
+	keySha32of256 sha32of256      // 32-bits prefix of entity identifier.
 }
 
 // keyBucket represents a bucket of keys.
@@ -225,7 +225,7 @@ func (a *ArrayBackData) put(entityId flow.Identifier, entity flow.Entity) bool {
 	entityIndex := a.entities.Add(entityId, entity, a.ownerIndexOf(bucketIndex, slotToUse))
 	a.buckets[bucketIndex][slotToUse].keyIndex = a.keyCount
 	a.buckets[bucketIndex][slotToUse].entityIndex = entityIndex
-	a.buckets[bucketIndex][slotToUse].idPref = idPref
+	a.buckets[bucketIndex][slotToUse].keySha32of256 = idPref
 	return true
 }
 
@@ -234,7 +234,7 @@ func (a *ArrayBackData) put(entityId flow.Identifier, entity flow.Entity) bool {
 func (a *ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool) {
 	idPref, bucketIndex := a.idPrefixAndBucketIndex(entityID)
 	for slotIndex := sIndex(0); slotIndex < sIndex(bucketSize); slotIndex++ {
-		if a.buckets[bucketIndex][slotIndex].idPref != idPref {
+		if a.buckets[bucketIndex][slotIndex].keySha32of256 != idPref {
 			continue
 		}
 
@@ -257,14 +257,14 @@ func (a *ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bIndex, sInd
 
 // idPrefixAndBucketIndex determines the id prefix as well as the bucket index corresponding to the
 // given identifier.
-func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (idPrefix, bIndex) {
+func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (sha32of256, bIndex) {
 	// uint64(id[0:8]) used to compute bucket index for which this key (i.e., id) belongs to
 	bucketIndex := binary.LittleEndian.Uint64(id[0:8]) % a.bucketNum
 
 	// uint32(id[8:12]) used to compute a shorter key for this id to represent in memory.
 	idPref := binary.LittleEndian.Uint32(id[8:12])
 
-	return idPrefix(idPref), bIndex(bucketIndex)
+	return sha32of256(idPref), bIndex(bucketIndex)
 }
 
 // expiryThreshold returns the threshold for which all keys with index below threshold are considered old enough for eviction.
@@ -280,7 +280,7 @@ func (a ArrayBackData) expiryThreshold() uint64 {
 
 // slotInBucket returns a free slot for this entityId in the bucket. In case the bucket is full, it invalidates the oldest (unlinked) key,
 // and returns its index as free slot. It returns false if the entityId already exists in this bucket.
-func (a *ArrayBackData) slotInBucket(bucketIndex bIndex, idPref idPrefix, entityId flow.Identifier) (sIndex, bool) {
+func (a *ArrayBackData) slotInBucket(bucketIndex bIndex, idPref sha32of256, entityId flow.Identifier) (sIndex, bool) {
 	slotToUse := sIndex(0)
 	expiryThreshold := a.expiryThreshold()
 	availableSlotCount := uint64(0) // for telemetry logs.
@@ -300,7 +300,7 @@ func (a *ArrayBackData) slotInBucket(bucketIndex bIndex, idPref idPrefix, entity
 			continue
 		}
 
-		if a.buckets[bucketIndex][s].idPref != idPref {
+		if a.buckets[bucketIndex][s].keySha32of256 != idPref {
 			// key is distinct and fresh, and hence move to next key.
 			continue
 		}
