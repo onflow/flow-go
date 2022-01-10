@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"flaky-test-monitor/common"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
 const failuresDir = "./failures/"
