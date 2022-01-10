@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/url"
 	"strings"
@@ -132,7 +133,8 @@ func TestGetBlocks(t *testing.T) {
 	}
 
 	for _, tv := range testVectors {
-		responseRec := executeRequest(tv.request, backend)
+		responseRec, err := executeRequest(tv.request, backend)
+		assert.NoError(t, err)
 		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
 		actualResp := responseRec.Body.String()
 		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
