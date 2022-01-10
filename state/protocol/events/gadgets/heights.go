@@ -35,7 +35,7 @@ func (g *Heights) BlockFinalized(block *flow.Header) {
 	final := block.Height
 	g.finalizedHeight = final
 
-	callbacks, hasCallbacks := g.heights[final]
+	callbacks := g.heights[final]
 	for _, callback := range callbacks { // safe when callbacks is nil
 		callback()
 	}
@@ -47,9 +47,7 @@ func (g *Heights) BlockFinalized(block *flow.Header) {
 	// typical case, we are finalized the child of the last observed - we
 	// only need to clear the callbacks for the current height
 	if final == lastFinalizedHeight+1 {
-		if hasCallbacks {
-			delete(g.heights, final)
-		}
+		delete(g.heights, final)
 		return
 	}
 
