@@ -17,9 +17,8 @@ import (
 type Views struct {
 	sync.Mutex
 	events.Noop
-	callbacks         map[uint64][]events.OnViewCallback
-	orderedViews      []uint64
-	lastFinalizedView uint64
+	callbacks    map[uint64][]events.OnViewCallback
+	orderedViews []uint64
 }
 
 // NewViews returns a new Views events gadget.
