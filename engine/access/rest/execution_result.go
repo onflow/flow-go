@@ -14,16 +14,19 @@ func getExecutionResultsByBlockIDs(r *request.Request, backend access.API, link 
 	}
 
 	// for each block ID we retrieve execution result
-	results := make([]*models.ExecutionResult, len(req.BlockIDs))
+	results := make([]models.ExecutionResult, len(req.BlockIDs))
 	for i, id := range req.BlockIDs {
 		res, err := backend.GetExecutionResultForBlockID(r.Context(), id)
 		if err != nil {
 			return nil, err
 		}
-		results[i], err = executionResultResponse(res, link)
+
+		var response models.ExecutionResult
+		err = response.Build(res, link)
 		if err != nil {
 			return nil, err
 		}
+		results[i] = response
 	}
 
 	return results, nil
@@ -41,5 +44,11 @@ func getExecutionResultByID(r *request.Request, backend access.API, link LinkGen
 		return nil, err
 	}
 
-	return executionResultResponse(res, link)
+	var response models.ExecutionResult
+	err = response.Build(res, link)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
