@@ -1,7 +1,6 @@
 package gadgets
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -73,10 +72,6 @@ func (v *Views) BlockFinalized(block *flow.Header) {
 	defer v.Unlock()
 
 	blockView := block.View
-
-	fmt.Println("BlockFinalized")
-	fmt.Println(v.orderedViews)
-	fmt.Println(v.callbacks)
 
 	// the index (inclusive) of the lowest view which should be kept
 	cutoff := 0
