@@ -2,6 +2,7 @@ package request
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -9,14 +10,7 @@ const signatureLength = 64
 
 type TransactionSignature flow.TransactionSignature
 
-type transactionSignatureBody struct {
-	Address     string `json:"address"`
-	SignerIndex string `json:"signer_index"`
-	KeyIndex    string `json:"key_index"`
-	Signature   string `json:"signature"`
-}
-
-func (s *TransactionSignature) Parse(sig transactionSignatureBody) error {
+func (s *TransactionSignature) Parse(sig models.TransactionSignature) error {
 	var address Address
 	err := address.Parse(sig.Address)
 	if err != nil {
@@ -55,7 +49,7 @@ func (s TransactionSignature) Flow() flow.TransactionSignature {
 
 type TransactionSignatures []TransactionSignature
 
-func (t *TransactionSignatures) Parse(rawSigs []transactionSignatureBody) error {
+func (t *TransactionSignatures) Parse(rawSigs []models.TransactionSignature) error {
 	signatures := make([]TransactionSignature, len(rawSigs))
 	for i, sig := range rawSigs {
 		var signature TransactionSignature

@@ -2,8 +2,7 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
-	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 )
 
 // getExecutionResultByID gets Execution Result payload by block IDs.
@@ -14,7 +13,7 @@ func getExecutionResultsByBlockIDs(r *request.Request, backend access.API, link 
 	}
 
 	// for each block ID we retrieve execution result
-	results := make([]*generated.ExecutionResult, len(req.BlockIDs))
+	results := make([]*models.ExecutionResult, len(req.BlockIDs))
 	for i, id := range req.BlockIDs {
 		res, err := backend.GetExecutionResultForBlockID(r.Context(), id)
 		if err != nil {

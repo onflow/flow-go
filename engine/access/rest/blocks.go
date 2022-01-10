@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"net/http"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
 // getBlocksByID gets blocks by provided ID or list of IDs.
@@ -22,7 +22,7 @@ func getBlocksByIDs(r *request.Request, backend access.API, link LinkGenerator) 
 		return nil, NewBadRequestError(err)
 	}
 
-	blocks := make([]*generated.Block, len(req.IDs))
+	blocks := make([]*models.Block, len(req.IDs))
 	for i, id := range req.IDs {
 		block, err := getBlock(forID(&id), r, backend, link)
 		if err != nil {
@@ -46,12 +46,12 @@ func getBlocksByHeight(r *request.Request, backend access.API, link LinkGenerato
 			return nil, err
 		}
 
-		return []*generated.Block{block}, nil
+		return []*models.Block{block}, nil
 	}
 
 	// if the query is /blocks/height=1000,1008,1049...
 	if req.HasHeights() {
-		blocks := make([]*generated.Block, len(req.Heights))
+		blocks := make([]*models.Block, len(req.Heights))
 		for i, h := range req.Heights {
 			block, err := getBlock(forHeight(h), r, backend, link)
 			if err != nil {
@@ -73,7 +73,7 @@ func getBlocksByHeight(r *request.Request, backend access.API, link LinkGenerato
 		req.EndHeight = latest.Header.Height // overwrite special value height with fetched
 	}
 
-	blocks := make([]*generated.Block, 0)
+	blocks := make([]*models.Block, 0)
 	// start and end height inclusive
 	for i := req.StartHeight; i <= req.EndHeight; i++ {
 		block, err := getBlock(forHeight(i), r, backend, link)
@@ -105,7 +105,7 @@ func getBlockPayloadByID(r *request.Request, backend access.API, _ LinkGenerator
 	return payload, nil
 }
 
-func getBlock(option blockProviderOption, req *request.Request, backend access.API, link LinkGenerator) (*generated.Block, error) {
+func getBlock(option blockProviderOption, req *request.Request, backend access.API, link LinkGenerator) (*models.Block, error) {
 	// lookup block
 	blkProvider := NewBlockProvider(backend, option)
 	blk, err := blkProvider.getBlock(req.Context())

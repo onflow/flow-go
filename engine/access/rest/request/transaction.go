@@ -2,6 +2,7 @@ package request
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/model/flow"
 	"io"
 )
@@ -9,22 +10,10 @@ import (
 const maxAuthorizers = 100
 const maxAllowedScriptArguments = 100
 
-type transactionBody struct {
-	Script             string                     `json:"script"`
-	Arguments          []string                   `json:"arguments"`
-	ReferenceBlockId   string                     `json:"reference_block_id"`
-	GasLimit           string                     `json:"gas_limit"`
-	Payer              string                     `json:"payer"`
-	ProposalKey        *proposalKeyBody           `json:"proposal_key"`
-	Authorizers        []string                   `json:"authorizers"`
-	PayloadSignatures  []transactionSignatureBody `json:"payload_signatures"`
-	EnvelopeSignatures []transactionSignatureBody `json:"envelope_signatures"`
-}
-
 type Transaction flow.TransactionBody
 
 func (t *Transaction) Parse(raw io.Reader) error {
-	var tx transactionBody
+	var tx models.TransactionsBody
 	err := parseBody(raw, &tx)
 	if err != nil {
 		return err

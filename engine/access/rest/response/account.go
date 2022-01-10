@@ -2,31 +2,28 @@ package response
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type AccountResponse struct {
-	Address    string                    `json:"address"`
-	Balance    string                    `json:"balance"`
-	Keys       AccountPublicKeysResponse `json:"keys,omitempty"`
-	Contracts  map[string]string         `json:"contracts,omitempty"`
-	Expandable AccountExpandableResponse `json:"_expandable"`
-	Links      LinkResponse              `json:"_links,omitempty"`
+type Account struct {
+	models.Account
 }
 
-func (a *AccountResponse) Build(flowAccount *flow.Account, link rest.LinkGenerator, expand map[string]bool) error {
-	account := AccountResponse{
+// todo I believe I need to convert this build methods to factory methods (NewAccount) and avoid defining new type
+func (a *Account) Build(flowAccount *flow.Account, link rest.LinkGenerator, expand map[string]bool) error {
+	account := models.Account{
 		Address: flowAccount.Address.String(),
 		Balance: fromUint64(flowAccount.Balance),
 	}
 
-	a.Expandable = AccountExpandableResponse{
+	a.Expandable = &models.AccountExpandable{
 		Keys:      "keys",
 		Contracts: "contracts",
 	}
 
 	if expand[a.Expandable.Keys] {
-		var keys AccountPublicKeysResponse
+		var keys AccountPublicKeys
 		keys.Build(flowAccount.Keys)
 		a.Keys = keys
 
@@ -42,28 +39,22 @@ func (a *AccountResponse) Build(flowAccount *flow.Account, link rest.LinkGenerat
 		a.Expandable.Contracts = ""
 	}
 
-	var self LinkResponse
+	var self Links
 	err := self.Build(link.AccountLink(account.Address))
 	if err != nil {
 		return err
 	}
 
+	a.Links = self
+
 	return nil
 }
 
-type AccountPublicKeyResponse struct {
-	Index            string                    `json:"index"`
-	PublicKey        string                    `json:"public_key"`
-	SigningAlgorithm *SigningAlgorithmResponse `json:"signing_algorithm"`
-	HashingAlgorithm *HashingAlgorithmResponse `json:"hashing_algorithm"`
-	SequenceNumber   string                    `json:"sequence_number"`
-	Weight           string                    `json:"weight"`
-	Revoked          bool                      `json:"revoked"`
-}
+type AccountPublicKey models.AccountPublicKey
 
-func (a *AccountPublicKeyResponse) Build(k flow.AccountPublicKey) {
-	sigAlgo := SigningAlgorithmResponse(k.SignAlgo.String())
-	hashAlgo := HashingAlgorithmResponse(k.HashAlgo.String())
+func (a *AccountPublicKey) Build(k flow.AccountPublicKey) {
+	sigAlgo := models.SigningAlgorithm(k.SignAlgo.String())
+	hashAlgo := models.HashingAlgorithm(k.HashAlgo.String())
 
 	a.Index = fromUint64(uint64(k.Index))
 	a.PublicKey = k.PublicKey.String()
@@ -74,20 +65,15 @@ func (a *AccountPublicKeyResponse) Build(k flow.AccountPublicKey) {
 	a.Revoked = k.Revoked
 }
 
-type AccountPublicKeysResponse []AccountPublicKeyResponse
+type AccountPublicKeys []AccountPublicKey
 
-func (a *AccountPublicKeysResponse) Build(accountKeys []flow.AccountPublicKey) {
-	keys := make([]AccountPublicKeyResponse, len(accountKeys))
+func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
+	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
-		var key AccountPublicKeyResponse
+		var key AccountPublicKey
 		key.Build(k)
 		keys[i] = key
 	}
 
 	*a = keys
-}
-
-type AccountExpandableResponse struct {
-	Keys      string `json:"keys,omitempty"`
-	Contracts string `json:"contracts,omitempty"`
 }

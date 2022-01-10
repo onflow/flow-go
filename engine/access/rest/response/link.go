@@ -1,10 +1,10 @@
 package response
 
-type LinkResponse struct {
-	Self string `json:"_self,omitempty"`
-}
+import "github.com/onflow/flow-go/engine/access/rest/models"
 
-func (l *LinkResponse) Build(link string, err error) error {
+type Links models.Links
+
+func (l *Links) Build(link string, err error) error {
 	if err != nil {
 		return err
 	}

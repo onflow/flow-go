@@ -3,13 +3,12 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
 func TestSelectFilter(t *testing.T) {
@@ -77,7 +76,7 @@ func testFilter(t *testing.T, inputJson, exepectedJson string, description strin
 
 func ExampleSelectFilter() {
 
-	blocks := make([]generated.Block, 2)
+	blocks := make([]models.Block, 2)
 	for i := range blocks {
 		block, err := generateBlock()
 		if err != nil {
@@ -188,7 +187,7 @@ func ExampleSelectFilter() {
 	//]
 }
 
-func generateBlock() (generated.Block, error) {
+func generateBlock() (models.Block, error) {
 
 	dummySignature := "abcdef0123456789"
 	multipleDummySignatures := []string{dummySignature, dummySignature}
@@ -196,31 +195,31 @@ func generateBlock() (generated.Block, error) {
 	dateString := "2021-11-20T11:45:26.371Z"
 	time, err := time.Parse(time.RFC3339, dateString)
 	if err != nil {
-		return generated.Block{}, err
+		return models.Block{}, err
 	}
 
-	return generated.Block{
-		Header: &generated.BlockHeader{
+	return models.Block{
+		Header: &models.BlockHeader{
 			Id:                   dummyID,
 			ParentId:             dummyID,
 			Height:               "100",
 			Timestamp:            time,
 			ParentVoterSignature: dummySignature,
 		},
-		Payload: &generated.BlockPayload{
-			CollectionGuarantees: []generated.CollectionGuarantee{
+		Payload: &models.BlockPayload{
+			CollectionGuarantees: []models.CollectionGuarantee{
 				{
 					CollectionId: "abcdef0123456789",
 					SignerIds:    multipleDummySignatures,
 					Signature:    dummySignature,
 				},
 			},
-			BlockSeals: []generated.BlockSeal{
+			BlockSeals: []models.BlockSeal{
 				{
 					BlockId:    dummyID,
 					ResultId:   dummyID,
 					FinalState: "final",
-					AggregatedApprovalSignatures: []generated.AggregatedSignature{
+					AggregatedApprovalSignatures: []models.AggregatedSignature{
 						{
 							VerifierSignatures: multipleDummySignatures,
 							SignerIds:          multipleDummySignatures,
@@ -229,10 +228,10 @@ func generateBlock() (generated.Block, error) {
 				},
 			},
 		},
-		ExecutionResult: &generated.ExecutionResult{
+		ExecutionResult: &models.ExecutionResult{
 			Id:      dummyID,
 			BlockId: dummyID,
-			Events: []generated.Event{
+			Events: []models.Event{
 				{
 					Type_:            "type",
 					TransactionId:    dummyID,
@@ -248,7 +247,7 @@ func generateBlock() (generated.Block, error) {
 					Payload:          "payload",
 				},
 			},
-			Links: &generated.Links{
+			Links: &models.Links{
 				Self: "link",
 			},
 		},

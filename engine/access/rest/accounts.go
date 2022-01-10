@@ -21,10 +21,13 @@ func getAccount(r *request.Request, backend access.API, link LinkGenerator) (int
 		req.Height = header.Height
 	}
 
-	account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height)
+	//account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height)
 	if err != nil {
 		return nil, err
 	}
 
-	return accountResponse(account, link, r.ExpandFields)
+	//var response models.Account
+	//err = response.Build(account, link, r.ExpandFields)
+	//return response, err
+	return nil, nil
 }

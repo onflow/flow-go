@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -31,19 +31,19 @@ func fromUint64(number uint64) string {
 // all methods names in this section are appended with 'response'
 //
 
-func proposalKeyResponse(key *flow.ProposalKey) *generated.ProposalKey {
+func proposalKeyResponse(key *flow.ProposalKey) *models.ProposalKey {
 
-	return &generated.ProposalKey{
+	return &models.ProposalKey{
 		Address:        key.Address.String(),
 		KeyIndex:       fromUint64(key.KeyIndex),
 		SequenceNumber: fromUint64(key.SequenceNumber),
 	}
 }
 
-func transactionSignatureResponse(signatures []flow.TransactionSignature) []generated.TransactionSignature {
-	sigs := make([]generated.TransactionSignature, len(signatures))
+func transactionSignatureResponse(signatures []flow.TransactionSignature) []models.TransactionSignature {
+	sigs := make([]models.TransactionSignature, len(signatures))
 	for i, sig := range signatures {
-		sigs[i] = generated.TransactionSignature{
+		sigs[i] = models.TransactionSignature{
 			Address:     sig.Address.String(),
 			SignerIndex: fromUint64(uint64(sig.SignerIndex)),
 			KeyIndex:    fromUint64(sig.KeyIndex),
@@ -54,7 +54,7 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 	return sigs
 }
 
-func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator) *generated.Transaction {
+func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator) *models.Transaction {
 	args := make([]string, len(tx.Arguments))
 	for i, arg := range tx.Arguments {
 		args[i] = toBase64(arg)
@@ -65,8 +65,8 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		auths[i] = auth.String()
 	}
 
-	var result *generated.TransactionResult
-	expandable := new(generated.TransactionExpandable)
+	var result *models.TransactionResult
+	expandable := new(models.TransactionExpandable)
 	// if transaction result is provided then add that to the response, else add the result link to the expandable
 	if txr != nil {
 		result = transactionResultResponse(txr, tx.ID(), link)
@@ -77,7 +77,7 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 
 	self, _ := selfLink(tx.ID(), link.TransactionLink)
 
-	return &generated.Transaction{
+	return &models.Transaction{
 		Id:                 tx.ID().String(),
 		Script:             toBase64(tx.Script),
 		Arguments:          args,
@@ -94,8 +94,8 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 	}
 }
 
-func eventResponse(event flow.Event) generated.Event {
-	return generated.Event{
+func eventResponse(event flow.Event) models.Event {
+	return models.Event{
 		Type_:            string(event.Type),
 		TransactionId:    event.TransactionID.String(),
 		TransactionIndex: fromUint64(uint64(event.TransactionIndex)),
@@ -104,8 +104,8 @@ func eventResponse(event flow.Event) generated.Event {
 	}
 }
 
-func eventsResponse(events []flow.Event) []generated.Event {
-	eventsRes := make([]generated.Event, len(events))
+func eventsResponse(events []flow.Event) []models.Event {
+	eventsRes := make([]models.Event, len(events))
 	for i, e := range events {
 		eventsRes[i] = eventResponse(e)
 	}
@@ -113,29 +113,29 @@ func eventsResponse(events []flow.Event) []generated.Event {
 	return eventsRes
 }
 
-func statusResponse(status flow.TransactionStatus) generated.TransactionStatus {
+func statusResponse(status flow.TransactionStatus) models.TransactionStatus {
 	switch status {
 	case flow.TransactionStatusExpired:
-		return generated.EXPIRED
+		return models.EXPIRED
 	case flow.TransactionStatusExecuted:
-		return generated.EXECUTED
+		return models.EXECUTED
 	case flow.TransactionStatusFinalized:
-		return generated.FINALIZED
+		return models.FINALIZED
 	case flow.TransactionStatusSealed:
-		return generated.SEALED
+		return models.SEALED
 	case flow.TransactionStatusPending:
-		return generated.PENDING
+		return models.PENDING
 	default:
 		return ""
 	}
 }
 
-func transactionResultResponse(txr *access.TransactionResult, txID flow.Identifier, link LinkGenerator) *generated.TransactionResult {
+func transactionResultResponse(txr *access.TransactionResult, txID flow.Identifier, link LinkGenerator) *models.TransactionResult {
 	status := statusResponse(txr.Status)
 
 	self, _ := selfLink(txID, link.TransactionResultLink)
 
-	return &generated.TransactionResult{
+	return &models.TransactionResult{
 		BlockId:         txr.BlockID.String(),
 		Status:          &status,
 		ErrorMessage:    txr.ErrorMessage,
@@ -145,8 +145,8 @@ func transactionResultResponse(txr *access.TransactionResult, txID flow.Identifi
 	}
 }
 
-func blockHeaderResponse(flowHeader *flow.Header) *generated.BlockHeader {
-	return &generated.BlockHeader{
+func blockHeaderResponse(flowHeader *flow.Header) *models.BlockHeader {
+	return &models.BlockHeader{
 		Id:                   flowHeader.ID().String(),
 		ParentId:             flowHeader.ParentID.String(),
 		Height:               fromUint64(flowHeader.Height),
@@ -155,39 +155,39 @@ func blockHeaderResponse(flowHeader *flow.Header) *generated.BlockHeader {
 	}
 }
 
-func blockPayloadResponse(flowPayload *flow.Payload) (*generated.BlockPayload, error) {
+func blockPayloadResponse(flowPayload *flow.Payload) (*models.BlockPayload, error) {
 	blockSealResp, err := blockSealsResponse(flowPayload.Seals)
 	if err != nil {
 		return nil, err
 	}
-	return &generated.BlockPayload{
+	return &models.BlockPayload{
 		CollectionGuarantees: collectionGuaranteesResponse(flowPayload.Guarantees),
 		BlockSeals:           blockSealResp,
 	}, nil
 }
 
-func collectionGuaranteesResponse(flowCollGuarantee []*flow.CollectionGuarantee) []generated.CollectionGuarantee {
-	collectionGuarantees := make([]generated.CollectionGuarantee, len(flowCollGuarantee))
+func collectionGuaranteesResponse(flowCollGuarantee []*flow.CollectionGuarantee) []models.CollectionGuarantee {
+	collectionGuarantees := make([]models.CollectionGuarantee, len(flowCollGuarantee))
 	for i, flowCollGuarantee := range flowCollGuarantee {
 		collectionGuarantees[i] = collectionGuaranteeResponse(flowCollGuarantee)
 	}
 	return collectionGuarantees
 }
 
-func collectionGuaranteeResponse(flowCollGuarantee *flow.CollectionGuarantee) generated.CollectionGuarantee {
+func collectionGuaranteeResponse(flowCollGuarantee *flow.CollectionGuarantee) models.CollectionGuarantee {
 	signerIDs := make([]string, len(flowCollGuarantee.SignerIDs))
 	for i, signerID := range flowCollGuarantee.SignerIDs {
 		signerIDs[i] = signerID.String()
 	}
-	return generated.CollectionGuarantee{
+	return models.CollectionGuarantee{
 		CollectionId: flowCollGuarantee.CollectionID.String(),
 		SignerIds:    signerIDs,
 		Signature:    toBase64(flowCollGuarantee.Signature.Bytes()),
 	}
 }
 
-func blockSealsResponse(flowSeals []*flow.Seal) ([]generated.BlockSeal, error) {
-	seals := make([]generated.BlockSeal, len(flowSeals))
+func blockSealsResponse(flowSeals []*flow.Seal) ([]models.BlockSeal, error) {
+	seals := make([]models.BlockSeal, len(flowSeals))
 	for i, seal := range flowSeals {
 		sealResp, err := blockSealResponse(seal)
 		if err != nil {
@@ -198,8 +198,8 @@ func blockSealsResponse(flowSeals []*flow.Seal) ([]generated.BlockSeal, error) {
 	return seals, nil
 }
 
-func aggregatedApprovalSignaturesResponse(signatures []flow.AggregatedSignature) []generated.AggregatedSignature {
-	response := make([]generated.AggregatedSignature, len(signatures))
+func aggregatedApprovalSignaturesResponse(signatures []flow.AggregatedSignature) []models.AggregatedSignature {
+	response := make([]models.AggregatedSignature, len(signatures))
 	for i, signature := range signatures {
 
 		verifierSignatures := make([]string, len(signature.VerifierSignatures))
@@ -212,7 +212,7 @@ func aggregatedApprovalSignaturesResponse(signatures []flow.AggregatedSignature)
 			signerIDs[j] = signerID.String()
 		}
 
-		response[i] = generated.AggregatedSignature{
+		response[i] = response.AggregatedSignature{
 			VerifierSignatures: verifierSignatures,
 			SignerIds:          signerIDs,
 		}
@@ -221,17 +221,17 @@ func aggregatedApprovalSignaturesResponse(signatures []flow.AggregatedSignature)
 	return response
 }
 
-func blockSealResponse(flowSeal *flow.Seal) (generated.BlockSeal, error) {
+func blockSealResponse(flowSeal *flow.Seal) (models.BlockSeal, error) {
 	finalState := ""
 	if len(flowSeal.FinalState) > 0 { // todo(sideninja) this is always true?
 		finalStateBytes, err := flowSeal.FinalState.MarshalJSON()
 		if err != nil {
-			return generated.BlockSeal{}, err
+			return models.BlockSeal{}, err
 		}
 		finalState = string(finalStateBytes)
 	}
 
-	return generated.BlockSeal{
+	return models.BlockSeal{
 		BlockId:                      flowSeal.BlockID.String(),
 		ResultId:                     flowSeal.ResultID.String(),
 		FinalState:                   finalState,
@@ -244,16 +244,16 @@ func collectionResponse(
 	txs []*flow.TransactionBody,
 	link LinkGenerator,
 	expand map[string]bool,
-) (generated.Collection, error) {
+) (models.Collection, error) {
 
-	expandable := &generated.CollectionExpandable{}
+	expandable := &models.CollectionExpandable{}
 
 	self, err := selfLink(collection.ID(), link.CollectionLink)
 	if err != nil {
-		return generated.Collection{}, err
+		return models.Collection{}, err
 	}
 
-	var transactions []generated.Transaction
+	var transactions []models.Transaction
 	if expand[transactionsExpandable] {
 		for _, t := range txs {
 			transactions = append(transactions, *transactionResponse(t, nil, link))
@@ -263,12 +263,12 @@ func collectionResponse(
 		for i, tx := range collection.Transactions {
 			expandable.Transactions[i], err = link.TransactionLink(tx)
 			if err != nil {
-				return generated.Collection{}, err
+				return models.Collection{}, err
 			}
 		}
 	}
 
-	return generated.Collection{
+	return models.Collection{
 		Id:           collection.ID().String(),
 		Transactions: transactions,
 		Links:        self,
@@ -276,23 +276,23 @@ func collectionResponse(
 	}, nil
 }
 
-func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event {
-	events := make([]generated.Event, len(eventList))
+func serviceEventListResponse(eventList flow.ServiceEventList) []models.Event {
+	events := make([]models.Event, len(eventList))
 	for i, e := range eventList {
-		events[i] = generated.Event{
+		events[i] = models.Event{
 			Type_: e.Type,
 		}
 	}
 	return events
 }
 
-func executionResultResponse(exeResult *flow.ExecutionResult, link LinkGenerator) (*generated.ExecutionResult, error) {
+func executionResultResponse(exeResult *flow.ExecutionResult, link LinkGenerator) (*models.ExecutionResult, error) {
 	self, err := selfLink(exeResult.ID(), link.ExecutionResultLink)
 	if err != nil {
 		return nil, err
 	}
 
-	return &generated.ExecutionResult{
+	return &models.ExecutionResult{
 		Id:      exeResult.ID().String(),
 		BlockId: exeResult.BlockID.String(),
 		Events:  serviceEventListResponse(exeResult.ServiceEvents),
@@ -300,13 +300,13 @@ func executionResultResponse(exeResult *flow.ExecutionResult, link LinkGenerator
 	}, nil
 }
 
-func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublicKey {
-	keysResponse := make([]generated.AccountPublicKey, len(keys))
+func accountKeysResponse(keys []flow.AccountPublicKey) []models.AccountPublicKey {
+	keysResponse := make([]models.AccountPublicKey, len(keys))
 	for i, k := range keys {
-		sigAlgo := generated.SigningAlgorithm(k.SignAlgo.String())
-		hashAlgo := generated.HashingAlgorithm(k.HashAlgo.String())
+		sigAlgo := models.SigningAlgorithm(k.SignAlgo.String())
+		hashAlgo := models.HashingAlgorithm(k.HashAlgo.String())
 
-		keysResponse[i] = generated.AccountPublicKey{
+		keysResponse[i] = models.AccountPublicKey{
 			Index:            fromUint64(uint64(k.Index)),
 			PublicKey:        k.PublicKey.String(),
 			SigningAlgorithm: &sigAlgo,
@@ -320,15 +320,15 @@ func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublic
 	return keysResponse
 }
 
-func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[string]bool) (generated.Account, error) {
+func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[string]bool) (models.Account, error) {
 
-	account := generated.Account{
+	account := models.Account{
 		Address: flowAccount.Address.String(),
 		Balance: fromUint64(flowAccount.Balance),
 	}
 
 	// TODO: change spec to include default values (so that this doesn't need to be done)
-	expandable := generated.AccountExpandable{
+	expandable := models.AccountExpandable{
 		Keys:      "keys",
 		Contracts: "contracts",
 	}
@@ -351,25 +351,25 @@ func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[s
 
 	selfLink, err := link.AccountLink(account.Address)
 	if err != nil {
-		return generated.Account{}, nil
+		return models.Account{}, nil
 	}
-	account.Links = &generated.Links{
+	account.Links = &models.Links{
 		Self: selfLink,
 	}
 
 	return account, nil
 }
 
-func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkGenerator, expand map[string]bool) (*generated.Block, error) {
+func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkGenerator, expand map[string]bool) (*models.Block, error) {
 	self, err := selfLink(blk.ID(), link.BlockLink)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &generated.Block{
+	response := &models.Block{
 		Header:     blockHeaderResponse(blk.Header),
 		Links:      self,
-		Expandable: &generated.BlockExpandable{},
+		Expandable: &models.BlockExpandable{},
 	}
 
 	// add the payload to the response if it is specified as an expandable field

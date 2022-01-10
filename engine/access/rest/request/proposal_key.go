@@ -1,16 +1,13 @@
 package request
 
-import "github.com/onflow/flow-go/model/flow"
-
-type proposalKeyBody struct {
-	Address        string `json:"address"`
-	KeyIndex       string `json:"key_index"`
-	SequenceNumber string `json:"sequence_number"`
-}
+import (
+	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/model/flow"
+)
 
 type ProposalKey flow.ProposalKey
 
-func (p *ProposalKey) Parse(raw proposalKeyBody) error {
+func (p *ProposalKey) Parse(raw models.ProposalKey) error {
 	var address Address
 	err := address.Parse(raw.Address)
 	if err != nil {

@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"net/http"
 
@@ -11,7 +12,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
 // Validator provides validation for http requests
@@ -148,7 +148,7 @@ func (h *Handler) errorResponse(
 	w.WriteHeader(returnCode)
 
 	// create error response model
-	modelError := generated.ModelError{
+	modelError := models.ModelError{
 		Code:    int32(returnCode),
 		Message: responseMessage,
 	}

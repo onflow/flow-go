@@ -13,6 +13,7 @@ require (
 	github.com/btcsuite/btcd v0.22.0-beta
 	github.com/dapperlabs/testingdock v0.4.2
 	github.com/davecgh/go-spew v1.1.1
+	github.com/deepmap/oapi-codegen v1.9.0 // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
@@ -94,7 +95,7 @@ require (
 	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881 // indirect
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/api v0.58.0
 	google.golang.org/genproto v0.0.0-20211007155348-82e027067bd4
 	google.golang.org/grpc v1.40.0
