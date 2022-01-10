@@ -1,6 +1,6 @@
 package request
 
-const expandsTransactions = "transactions"
+const ExpandsTransactions = "transactions"
 
 type GetCollection struct {
 	GetByIDRequest
@@ -9,7 +9,7 @@ type GetCollection struct {
 
 func (g *GetCollection) Build(r *Request) error {
 	err := g.GetByIDRequest.Build(r)
-	g.ExpandsTransactions = r.Expands(expandsTransactions)
+	g.ExpandsTransactions = r.Expands(ExpandsTransactions)
 
 	return err
 }
