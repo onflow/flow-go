@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"flaky-test-monitor/common"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
 type TestData struct {
