@@ -2,6 +2,7 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
@@ -26,7 +27,9 @@ func getTransactionByID(r *request.Request, backend access.API, link LinkGenerat
 		}
 	}
 
-	return transactionResponse(tx, txr, link), nil
+	var response models.Transaction
+	response.Build(tx, txr, link)
+	return response, nil
 }
 
 // getTransactionResultByID retrieves transaction result by the transaction ID.
@@ -41,7 +44,9 @@ func getTransactionResultByID(r *request.Request, backend access.API, link LinkG
 		return nil, err
 	}
 
-	return transactionResultResponse(txr, req.ID, link), nil
+	var response models.TransactionResult
+	response.Build(txr, req.ID, link)
+	return response, nil
 }
 
 // createTransaction creates a new transaction from provided payload.
@@ -56,5 +61,7 @@ func createTransaction(r *request.Request, backend access.API, link LinkGenerato
 		return nil, err
 	}
 
-	return transactionResponse(&req.Transaction, nil, link), nil
+	var response models.Transaction
+	response.Build(&req.Transaction, nil, link)
+	return response, nil
 }

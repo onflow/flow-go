@@ -2,6 +2,7 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -31,5 +32,11 @@ func getCollectionByID(r *request.Request, backend access.API, link LinkGenerato
 		}
 	}
 
-	return collectionResponse(collection, transactions, link, r.ExpandFields)
+	var response models.Collection
+	err = response.Build(collection, transactions, link, r.ExpandFields)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
