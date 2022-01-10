@@ -14,8 +14,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	herocache "github.com/onflow/flow-go/module/mempool/stdmap/backdata/heroCache"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/heroCache/pool"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/pool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
