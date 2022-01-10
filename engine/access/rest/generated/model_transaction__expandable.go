@@ -9,13 +9,5 @@
 package generated
 
 type TransactionExpandable struct {
-	ProposalKey string `json:"proposal_key,omitempty"`
-
-	Authorizers string `json:"authorizers,omitempty"`
-
-	PayloadSignatures string `json:"payload_signatures,omitempty"`
-
-	EnvelopeSignatures string `json:"envelope_signatures,omitempty"`
-
 	Result string `json:"result,omitempty"`
 }
