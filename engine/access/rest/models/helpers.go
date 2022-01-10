@@ -1,4 +1,4 @@
-package response
+package models
 
 import (
 	"encoding/base64"

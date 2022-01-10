@@ -2,6 +2,7 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
@@ -21,13 +22,12 @@ func getAccount(r *request.Request, backend access.API, link LinkGenerator) (int
 		req.Height = header.Height
 	}
 
-	//account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height)
+	account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height)
 	if err != nil {
 		return nil, err
 	}
 
-	//var response models.Account
-	//err = response.Build(account, link, r.ExpandFields)
-	//return response, err
-	return nil, nil
+	var response models.Account
+	err = response.Build(account, link, r.ExpandFields)
+	return response, err
 }

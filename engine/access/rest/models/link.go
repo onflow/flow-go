@@ -1,8 +1,6 @@
-package response
+package models
 
-import "github.com/onflow/flow-go/engine/access/rest/models"
-
-type Links models.Links
+type Links Links
 
 func (l *Links) Build(link string, err error) error {
 	if err != nil {

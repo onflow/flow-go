@@ -62,11 +62,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// create a logger
 	errLog := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
-	err := h.validator.Validate(r)
-	if err != nil {
-		h.errorResponse(w, http.StatusBadRequest, err.Error(), errLog) // todo(sideninja) limit message
-		return
-	}
+	/*
+		err := h.validator.Validate(r)
+		if err != nil {
+			h.errorResponse(w, http.StatusBadRequest, err.Error(), errLog) // todo(sideninja) limit message
+			return
+		}*/
 
 	// create request decorator with parsed values
 	decoratedRequest := request.Decorate(r)

@@ -1,23 +1,17 @@
-package response
+package models
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type Account struct {
-	models.Account
-}
-
-// todo I believe I need to convert this build methods to factory methods (NewAccount) and avoid defining new type
 func (a *Account) Build(flowAccount *flow.Account, link rest.LinkGenerator, expand map[string]bool) error {
-	account := models.Account{
+	account := Account{
 		Address: flowAccount.Address.String(),
 		Balance: fromUint64(flowAccount.Balance),
 	}
 
-	a.Expandable = &models.AccountExpandable{
+	a.Expandable = &AccountExpandable{
 		Keys:      "keys",
 		Contracts: "contracts",
 	}
@@ -50,11 +44,9 @@ func (a *Account) Build(flowAccount *flow.Account, link rest.LinkGenerator, expa
 	return nil
 }
 
-type AccountPublicKey models.AccountPublicKey
-
 func (a *AccountPublicKey) Build(k flow.AccountPublicKey) {
-	sigAlgo := models.SigningAlgorithm(k.SignAlgo.String())
-	hashAlgo := models.HashingAlgorithm(k.HashAlgo.String())
+	sigAlgo := SigningAlgorithm(k.SignAlgo.String())
+	hashAlgo := HashingAlgorithm(k.HashAlgo.String())
 
 	a.Index = fromUint64(uint64(k.Index))
 	a.PublicKey = k.PublicKey.String()

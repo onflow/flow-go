@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"context"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers"
@@ -31,10 +30,10 @@ func newSchemaValidation() (*SchemaValidation, error) {
 	}
 
 	// validate open API schema
-	err = schema.Validate(context.Background())
-	if err != nil {
-		return nil, err
-	}
+	//err = schema.Validate(context.Background())
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	router, err := gorillamux.NewRouter(schema)
 	if err != nil {
