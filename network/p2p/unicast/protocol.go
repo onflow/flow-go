@@ -48,7 +48,7 @@ type ProtocolFactory func(zerolog.Logger, flow.Identifier, libp2pnet.StreamHandl
 func ToProtocolNames(names []string) []ProtocolName {
 	p := make([]ProtocolName, 0)
 	for _, name := range names {
-		p = append(p, ProtocolName(name))
+		p = append(p, ProtocolName(strings.Trim(name, " ")))
 	}
 	return p
 }
@@ -66,7 +66,13 @@ func ToProtocolFactory(name ProtocolName) (ProtocolFactory, error) {
 
 // Protocol represents a unicast protocol.
 type Protocol interface {
-	NewStream(s libp2pnet.Stream) (libp2pnet.Stream, error)
-	Handler() libp2pnet.StreamHandler
+	// UpgradeRawStream wraps a specific unicast protocol implementation around
+	// the plain libp2p stream.
+	UpgradeRawStream(s libp2pnet.Stream) (libp2pnet.Stream, error)
+	// Handler is a libp2p stream handler that implements the logic of handling
+	// an established incoming stream to this node.
+	Handler(stream libp2pnet.Stream)
+	// ProtocolId returns the libp2p protocol id associated to this protocol. In libp2p
+	// streams running with the same protocol are identified with the same  protocol id.
 	ProtocolId() protocol.ID
 }
