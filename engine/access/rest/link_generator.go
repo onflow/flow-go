@@ -57,10 +57,10 @@ func (generator *LinkGeneratorImpl) AccountLink(address string) (string, error) 
 	return generator.link(getAccountRoute, "address", address)
 }
 
-// selfLink generates the _link key value pair for the response
+// SelfLink generates the _link key value pair for the response
 // e.g.
 // "_links": { "_self": "/v1/blocks/c5e935bc75163db82e4a6cf9dc3b54656709d3e21c87385138300abd479c33b7" sx}
-func selfLink(id flow.Identifier, linkFun LinkFunc) (*models.Links, error) {
+func SelfLink(id flow.Identifier, linkFun LinkFunc) (*models.Links, error) {
 	url, err := linkFun(id)
 	if err != nil {
 		return nil, err
