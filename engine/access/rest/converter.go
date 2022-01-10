@@ -212,7 +212,7 @@ func aggregatedApprovalSignaturesResponse(signatures []flow.AggregatedSignature)
 			signerIDs[j] = signerID.String()
 		}
 
-		response[i] = response.AggregatedSignature{
+		response[i] = models.AggregatedSignature{
 			VerifierSignatures: verifierSignatures,
 			SignerIds:          signerIDs,
 		}

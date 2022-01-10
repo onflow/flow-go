@@ -3,6 +3,7 @@ package rest
 import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
 // getExecutionResultByID gets Execution Result payload by block IDs.

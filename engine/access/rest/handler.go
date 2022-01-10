@@ -74,37 +74,37 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// execute handler function and check for error
 	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
 	if err != nil {
-		h.errorHandler(w, err, errorLogger)
+		h.errorHandler(w, err, errLog)
 		return
 	}
 
 	// apply the select filter if any select fields have been specified
 	response, err = SelectFilter(response, decoratedRequest.Selects())
 	if err != nil {
-		h.errorHandler(w, err, errorLogger)
+		h.errorHandler(w, err, errLog)
 		return
 	}
 
 	// write response to response stream
-	h.jsonResponse(w, response, errorLogger)
+	h.jsonResponse(w, response, errLog)
 }
 
 func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
 	// rest status type error should be returned with status and user message provided
 	var statusErr StatusError
 	if errors.As(err, &statusErr) {
-		h.errorResponse(w, statusErr.Status(), statusErr.UserMessage(), errLog)
+		h.errorResponse(w, statusErr.Status(), statusErr.UserMessage(), errorLogger)
 		return
 	}
 
 	// handle grpc status error returned from the backend calls, we are forwarding the message to the client
 	if se, ok := status.FromError(err); ok {
 		if se.Code() == codes.NotFound {
-			h.errorResponse(w, http.StatusNotFound, se.Message(), errLog)
+			h.errorResponse(w, http.StatusNotFound, se.Message(), errorLogger)
 			return
 		}
 		if se.Code() == codes.InvalidArgument {
-			h.errorResponse(w, http.StatusBadRequest, se.Message(), errLog)
+			h.errorResponse(w, http.StatusBadRequest, se.Message(), errorLogger)
 			return
 		}
 	}
