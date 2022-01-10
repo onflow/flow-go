@@ -1,4 +1,4 @@
-package heroCache
+package herocache
 
 import (
 	"encoding/binary"
