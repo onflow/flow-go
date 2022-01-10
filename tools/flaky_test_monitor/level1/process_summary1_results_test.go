@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -56,12 +57,12 @@ func TestProcessSummary1TestRun(t *testing.T) {
 // HELPERS - UTILITIES
 
 func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
-	const expectedJsonFilePath = "../testdata/summary1/expected/"
-	const rawJsonFilePath = "../testdata/summary1/raw/"
+	const expectedJsonFilePath = "../testdata/summary1/expected"
+	const rawJsonFilePath = "../testdata/summary1/raw"
 
 	var expectedTestRun common.TestRun
 	// read in expected JSON from file
-	expectedJsonBytes, err := os.ReadFile(expectedJsonFilePath + jsonExpectedActualFile)
+	expectedJsonBytes, err := os.ReadFile(filepath.Join(expectedJsonFilePath, jsonExpectedActualFile))
 	require.Nil(t, err)
 	require.NotEmpty(t, expectedJsonBytes)
 
@@ -97,7 +98,7 @@ func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 
 	// simulate generating raw "go test -json" output by loading output from saved file
 	resultReader := FileResultReader{
-		rawJsonFile: rawJsonFilePath + jsonExpectedActualFile,
+		rawJsonFile: filepath.Join(rawJsonFilePath, jsonExpectedActualFile),
 	}
 	actualTestRun := processSummary1TestRun(&resultReader)
 
