@@ -4,13 +4,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 // TestVerificationStreamNegotiationSuite enables gzip stream compression only between execution and verification nodes, while the
 // rest of network runs on plain libp2p streams. It evaluates that network operates on its happy path concerning verification functionality.
 func TestVerificationStreamNegotiationSuite(t *testing.T) {
 	s := new(VerificationStreamNegotiationSuite)
-	s.preferredUnicasts = "gzip-compression" // enables gzip stream compression between execution and verification node
+	s.preferredUnicasts = string(unicast.GzipCompressionUnicast) // enables gzip stream compression between execution and verification node
 	suite.Run(t, s)
 }
 
