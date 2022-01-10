@@ -39,7 +39,7 @@ func (a *Account) Build(flowAccount *flow.Account, link rest.LinkGenerator, expa
 		return err
 	}
 
-	a.Links = self
+	a.Links = &self
 
 	return nil
 }
