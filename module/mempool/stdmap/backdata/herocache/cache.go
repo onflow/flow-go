@@ -15,7 +15,7 @@ import (
 func runtimeNano() int64
 
 const (
-	bucketSize = uint64(16)
+	slotsPerBucket = uint64(16)
 
 	// telemetryCounterInterval is the number of required interactions with
 	// this back data prior to printing any log. This is done as a slow-down mechanism
@@ -46,7 +46,7 @@ type key struct {
 }
 
 // keyBucket represents a bucket of keys.
-type keyBucket [bucketSize]key
+type keyBucket [slotsPerBucket]key
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
 type Cache struct {
@@ -81,8 +81,8 @@ type Cache struct {
 func NewCache(limit uint32, oversizeFactor uint32, ejectionMode pool.EjectionMode, logger zerolog.Logger) *Cache {
 	// total buckets.
 	capacity := uint64(limit * oversizeFactor)
-	bucketNum := capacity / bucketSize
-	if capacity%bucketSize != 0 {
+	bucketNum := capacity / slotsPerBucket
+	if capacity%slotsPerBucket != 0 {
 		// accounting for remainder.
 		bucketNum++
 	}
@@ -94,7 +94,7 @@ func NewCache(limit uint32, oversizeFactor uint32, ejectionMode pool.EjectionMod
 		buckets:                make([]keyBucket, bucketNum),
 		ejectionMode:           ejectionMode,
 		entities:               pool.NewPool(limit, ejectionMode),
-		availableSlotHistogram: make([]uint64, bucketSize+1), // +1 is to account for empty buckets as well.
+		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
 	}
 
 	return bd
@@ -191,7 +191,7 @@ func (a *Cache) Clear() {
 
 	a.buckets = make([]keyBucket, a.bucketNum)
 	a.entities = pool.NewPool(a.limit, a.ejectionMode)
-	a.availableSlotHistogram = make([]uint64, bucketSize+1)
+	a.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	a.interactionCounter = 0
 	a.lastTelemetryDump = 0
 	a.keyCount = 0
@@ -233,7 +233,7 @@ func (a *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 // The boolean return value determines whether an entity with given id exists in the BackData.
 func (a *Cache) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool) {
 	idPref, bucketIndex := a.idPrefixAndBucketIndex(entityID)
-	for slotIndex := sIndex(0); slotIndex < sIndex(bucketSize); slotIndex++ {
+	for slotIndex := sIndex(0); slotIndex < sIndex(slotsPerBucket); slotIndex++ {
 		if a.buckets[bucketIndex][slotIndex].keySha32of256 != idPref {
 			continue
 		}
@@ -287,7 +287,7 @@ func (a *Cache) slotInBucket(bucketIndex bIndex, idPref sha32of256, entityId flo
 
 	oldestKeyInBucket := a.keyCount + 1 // initializes oldest key to current max.
 
-	for s := sIndex(0); s < sIndex(bucketSize); s++ {
+	for s := sIndex(0); s < sIndex(slotsPerBucket); s++ {
 		if a.buckets[bucketIndex][s].slotAge < oldestKeyInBucket {
 			// record slot s as oldest slot
 			oldestKeyInBucket = a.buckets[bucketIndex][s].slotAge
@@ -333,7 +333,7 @@ func (a *Cache) slotInBucket(bucketIndex bIndex, idPref sha32of256, entityId flo
 // This scalar index is used to represent this (bucketIndex, slotIndex) pair in the underlying
 // entities list.
 func (a Cache) ownerIndexOf(bucketIndex bIndex, slotIndex sIndex) uint64 {
-	return (uint64(bucketIndex) * bucketSize) + uint64(slotIndex)
+	return (uint64(bucketIndex) * slotsPerBucket) + uint64(slotIndex)
 }
 
 // linkedEntityOf returns the entity linked to this (bucketIndex, slotIndex) pair from the underlying entities list.
