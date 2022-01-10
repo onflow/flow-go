@@ -104,6 +104,79 @@ func SaveToFile(fileName string, testSummary interface{}) {
 	AssertNoError(err, "error saving test summary to file")
 }
 
-func ProcessRawTestStep(testStep *RawTestStep) {
+func ProcessRawTestStep(rawTestStep *RawTestStep) {
+	// check if package result exists to hold test results
+	packageResult, packageResultExists := packageResultMap[rawTestStep.Package]
+	if !packageResultExists {
+		packageResult = &PackageResult{
+			Package: rawTestStep.Package,
 
+			// package result will hold map of test results
+			TestMap: make(map[string][]common.TestResult),
+
+			// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
+			// there are usually 2 or more outputs for a package
+			Output: make([]string, 0),
+		}
+		packageResultMap[rawTestStep.Package] = packageResult
+	}
+
+	// most raw test steps will have Test value - only package specific steps won't
+	if rawTestStep.Test != "" {
+
+		// "run" is the very first test step and it needs special treatment - to create all the data structures that will be used by subsequent test steps for the same test
+		if rawTestStep.Action == "run" {
+			var newTestResult common.TestResult
+			newTestResult.Test = rawTestStep.Test
+			newTestResult.Package = rawTestStep.Package
+
+			// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
+			// for passing tests, there are usually 2 outputs for a passing test and more outputs for a failing test
+			newTestResult.Output = make([]string, 0)
+
+			// append to test result slice, whether it's the first or subsequent test result
+			packageResult.TestMap[rawTestStep.Test] = append(packageResult.TestMap[rawTestStep.Test], newTestResult)
+			continue
+		}
+
+		lastTestResultIndex := len(packageResult.TestMap[rawTestStep.Test]) - 1
+		if lastTestResultIndex < 0 {
+			lastTestResultIndex = 0
+		}
+
+		testResults, ok := packageResult.TestMap[rawTestStep.Test]
+		if !ok {
+			panic(fmt.Sprintf("no test result for test %s", rawTestStep.Test))
+		}
+		lastTestResultPointer := &testResults[lastTestResultIndex]
+
+		// subsequent raw json outputs will have different data about the test - whether it passed/failed, what the test output was, etc
+		switch rawTestStep.Action {
+		case "output":
+			lastTestResultPointer.Output = append(lastTestResultPointer.Output, rawTestStep.Output)
+
+		case "pass", "fail", "skip":
+			lastTestResultPointer.Result = rawTestStep.Action
+			lastTestResultPointer.Elapsed = rawTestStep.Elapsed
+
+		case "pause", "cont":
+			// tests using t.Parallel() will have these values
+			// nothing to do - test will continue to run normally and have a pass/fail result at the end
+
+		default:
+			panic(fmt.Sprintf("unexpected action: %s", rawTestStep.Action))
+		}
+
+	} else {
+		// package level raw messages won't have a Test value
+		switch rawTestStep.Action {
+		case "output":
+			packageResult.Output = append(packageResult.Output, rawTestStep.Output)
+		case "pass", "fail", "skip":
+			packageResult.Result = rawTestStep.Action
+			packageResult.Elapsed = rawTestStep.Elapsed
+		default:
+			panic(fmt.Sprintf("unexpected action (package): %s", rawTestStep.Action))
+		}
+	}
 }
