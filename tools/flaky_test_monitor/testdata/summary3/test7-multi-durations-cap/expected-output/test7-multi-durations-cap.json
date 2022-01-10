@@ -1,0 +1,130 @@
+{
+  "no_results": [
+    {
+      "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+      "package": "github.com/onflow/flow-go/model/encodable",
+      "runs": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 13,
+      "failure_rate": 0,
+      "average_duration": 0,
+      "durations": [
+        0
+      ]
+    }
+  ],
+
+  "most_failures": [
+    {
+      "test": "TestSanitySha2_256",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 24,
+      "passed": 14,
+      "failed": 10,
+      "skipped": 1,
+      "no_result": 0,
+      "failure_rate": 0.42,
+      "average_duration": 0,
+      "durations": [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+      ]
+    },
+    {
+      "test": "TestSanitySha3_256",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 25,
+      "passed": 24,
+      "failed": 1,
+      "skipped": 0,
+      "no_result": 0,
+      "failure_rate": 0.04,
+      "average_duration": 0,
+      "durations": [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+      ]
+    }
+  ],
+
+  "most_failures_total": 2,
+
+  "longest_running": [
+    {
+      "test": "TestSha3_8",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 0,
+      "failure_rate": 0,
+      "average_duration": 0.45,
+      "durations": [
+        0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
+      ]
+    },
+
+    {
+      "test": "TestSha3_9",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 0,
+      "failure_rate": 0,
+      "average_duration": 0.38,
+      "durations": [
+        0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
+      ]
+    },
+
+    {
+      "test": "TestSha3_10",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 0,
+      "failure_rate": 0,
+      "average_duration": 0.35,
+      "durations": [
+        0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
+      ]
+    },
+
+    {
+      "test": "TestSha3_7",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 0,
+      "failure_rate": 0,
+      "average_duration": 0.27,
+      "durations": [
+        0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
+      ]
+    },
+
+    {
+      "test": "TestSha3_5",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 0,
+      "failure_rate": 0,
+      "average_duration": 0.26,
+      "durations": [
+        0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
+      ]
+    }
+  ],
+
+  "longest_running_total": 8
+}
