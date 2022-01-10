@@ -39,14 +39,16 @@ type sIndex uint64
 // it represents.
 type sha32of256 uint32
 
-type key struct {
-	slotAge       uint64      // age of this key.
-	entityIndex   pool.EIndex // link to actual entity.
-	keySha32of256 sha32of256  // 32-bits prefix of entity identifier.
+// slot is an internal notion corresponding to the identifier of an entity that is
+// meant to be stored in this Cache.
+type slot struct {
+	slotAge     uint64      // age of this slot.
+	entityIndex pool.EIndex // link to actual entity.
+	slotId      sha32of256  // slot id is the 32-bits prefix of entity identifier.
 }
 
-// keyBucket represents a bucket of keys.
-type keyBucket [slotsPerBucket]key
+// slotBucket represents a bucket of slots.
+type slotBucket [slotsPerBucket]slot
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
 type Cache struct {
@@ -54,11 +56,11 @@ type Cache struct {
 	// NOTE: as a BackData implementation, Cache must be non-blocking.
 	// Concurrency management is done by overlay Backend.
 	limit        uint32
-	keyCount     uint64 // total number of non-expired key-values
+	slotCount    uint64 // total number of non-expired key-values
 	bucketNum    uint64 // total number of buckets (i.e., total of buckets)
 	ejectionMode pool.EjectionMode
-	// buckets keeps the keys (i.e., entityId) of the (entityId, entity) pairs that are maintained in this BackData.
-	buckets []keyBucket
+	// buckets keeps the slots (i.e., entityId) of the (entityId, entity) pairs that are maintained in this BackData.
+	buckets []slotBucket
 	// entities keeps the values (i.e., entity) of the (entityId, entity) pairs that are maintained in this BackData.
 	entities *pool.HeroPool
 
@@ -91,7 +93,7 @@ func NewCache(limit uint32, oversizeFactor uint32, ejectionMode pool.EjectionMod
 		logger:                 logger,
 		bucketNum:              bucketNum,
 		limit:                  limit,
-		buckets:                make([]keyBucket, bucketNum),
+		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
 		entities:               pool.NewPool(limit, ejectionMode),
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
@@ -126,13 +128,13 @@ func (a *Cache) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 	// removes value from underlying entities list.
 	a.invalidateEntity(bucketIndex, sliceIndex)
 
-	// frees up key
-	a.invalidateKey(bucketIndex, sliceIndex)
+	// frees up slot
+	a.invalidateSlot(bucketIndex, sliceIndex)
 
 	return entity, true
 }
 
-// Adjust will adjust the value item using the given function if the given key can be found.
+// Adjust will adjust the value item using the given function if the given identifier can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value.
 func (a *Cache) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
 	defer a.logTelemetry()
@@ -189,12 +191,12 @@ func (a Cache) All() map[flow.Identifier]flow.Entity {
 func (a *Cache) Clear() {
 	defer a.logTelemetry()
 
-	a.buckets = make([]keyBucket, a.bucketNum)
+	a.buckets = make([]slotBucket, a.bucketNum)
 	a.entities = pool.NewPool(a.limit, a.ejectionMode)
 	a.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	a.interactionCounter = 0
 	a.lastTelemetryDump = 0
-	a.keyCount = 0
+	a.slotCount = 0
 }
 
 // Hash will use a merkle root hash to hash all items.
@@ -209,23 +211,23 @@ func (a *Cache) Hash() flow.Identifier {
 // a duplicate entityId exists in the BackData, and that entityId is linked to a valid entity.
 func (a *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	idPref, bucketIndex := a.idPrefixAndBucketIndex(entityId)
-	slotToUse, unique := a.slotInBucket(bucketIndex, idPref, entityId)
+	slotToUse, unique := a.slotIndexInBucket(bucketIndex, idPref, entityId)
 	if !unique {
 		// entityId already exists
 		return false
 	}
 
 	if _, _, ok := a.linkedEntityOf(bucketIndex, slotToUse); ok {
-		// we are replacing an already linked (but old) key that has a valid value, hence
+		// we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
 		a.invalidateEntity(bucketIndex, slotToUse)
 	}
 
-	a.keyCount++
+	a.slotCount++
 	entityIndex := a.entities.Add(entityId, entity, a.ownerIndexOf(bucketIndex, slotToUse))
-	a.buckets[bucketIndex][slotToUse].slotAge = a.keyCount
+	a.buckets[bucketIndex][slotToUse].slotAge = a.slotCount
 	a.buckets[bucketIndex][slotToUse].entityIndex = entityIndex
-	a.buckets[bucketIndex][slotToUse].keySha32of256 = idPref
+	a.buckets[bucketIndex][slotToUse].slotId = idPref
 	return true
 }
 
@@ -234,7 +236,7 @@ func (a *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 func (a *Cache) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool) {
 	idPref, bucketIndex := a.idPrefixAndBucketIndex(entityID)
 	for slotIndex := sIndex(0); slotIndex < sIndex(slotsPerBucket); slotIndex++ {
-		if a.buckets[bucketIndex][slotIndex].keySha32of256 != idPref {
+		if a.buckets[bucketIndex][slotIndex].slotId != idPref {
 			continue
 		}
 
@@ -258,39 +260,39 @@ func (a *Cache) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool
 // idPrefixAndBucketIndex determines the id prefix as well as the bucket index corresponding to the
 // given identifier.
 func (a Cache) idPrefixAndBucketIndex(id flow.Identifier) (sha32of256, bIndex) {
-	// uint64(id[0:8]) used to compute bucket index for which this key (i.e., id) belongs to
+	// uint64(id[0:8]) used to compute bucket index for which this identifier belongs to
 	bucketIndex := binary.LittleEndian.Uint64(id[0:8]) % a.bucketNum
 
-	// uint32(id[8:12]) used to compute a shorter key for this id to represent in memory.
+	// uint32(id[8:12]) used to compute a shorter identifier for this id to represent in memory.
 	idPref := binary.LittleEndian.Uint32(id[8:12])
 
 	return sha32of256(idPref), bIndex(bucketIndex)
 }
 
-// expiryThreshold returns the threshold for which all keys with index below threshold are considered old enough for eviction.
+// expiryThreshold returns the threshold for which all slots with index below threshold are considered old enough for eviction.
 func (a Cache) expiryThreshold() uint64 {
 	var expiryThreshold uint64 = 0
-	if a.keyCount > uint64(a.limit) {
-		// total number of keys written are above the predefined limit
-		expiryThreshold = a.keyCount - uint64(a.limit)
+	if a.slotCount > uint64(a.limit) {
+		// total number of slots written are above the predefined limit
+		expiryThreshold = a.slotCount - uint64(a.limit)
 	}
 
 	return expiryThreshold
 }
 
-// slotInBucket returns a free slot for this entityId in the bucket. In case the bucket is full, it invalidates the oldest (unlinked) key,
+// slotIndexInBucket returns a free slot for this entityId in the bucket. In case the bucket is full, it invalidates the oldest valid slot,
 // and returns its index as free slot. It returns false if the entityId already exists in this bucket.
-func (a *Cache) slotInBucket(bucketIndex bIndex, idPref sha32of256, entityId flow.Identifier) (sIndex, bool) {
+func (a *Cache) slotIndexInBucket(bucketIndex bIndex, idPref sha32of256, entityId flow.Identifier) (sIndex, bool) {
 	slotToUse := sIndex(0)
 	expiryThreshold := a.expiryThreshold()
 	availableSlotCount := uint64(0) // for telemetry logs.
 
-	oldestKeyInBucket := a.keyCount + 1 // initializes oldest key to current max.
+	oldestSlotInBucket := a.slotCount + 1 // initializes the oldest slot to current max.
 
 	for s := sIndex(0); s < sIndex(slotsPerBucket); s++ {
-		if a.buckets[bucketIndex][s].slotAge < oldestKeyInBucket {
+		if a.buckets[bucketIndex][s].slotAge < oldestSlotInBucket {
 			// record slot s as oldest slot
-			oldestKeyInBucket = a.buckets[bucketIndex][s].slotAge
+			oldestSlotInBucket = a.buckets[bucketIndex][s].slotAge
 			slotToUse = s
 		}
 
@@ -300,14 +302,14 @@ func (a *Cache) slotInBucket(bucketIndex bIndex, idPref sha32of256, entityId flo
 			continue
 		}
 
-		if a.buckets[bucketIndex][s].keySha32of256 != idPref {
-			// key is distinct and fresh, and hence move to next key.
+		if a.buckets[bucketIndex][s].slotId != idPref {
+			// slot id is distinct and fresh, and hence move to next slot.
 			continue
 		}
 
 		id, _, linked := a.linkedEntityOf(bucketIndex, s)
 		if !linked {
-			// key is not linked to a valid entity, hence, can be used
+			// slot is not linked to a valid entity, hence, can be used
 			// as an available slot.
 			availableSlotCount++
 			slotToUse = s
@@ -315,8 +317,8 @@ func (a *Cache) slotInBucket(bucketIndex bIndex, idPref sha32of256, entityId flo
 		}
 
 		if id != entityId {
-			// key is fresh, fully distinct, and linked. Hence,
-			// moving to next key.
+			// slot is fresh, fully distinct, and linked. Hence,
+			// moving to next slot.
 			continue
 		}
 
@@ -372,7 +374,7 @@ func (a *Cache) logTelemetry() {
 	}
 
 	lg := a.logger.With().
-		Uint64("total_keys_written", a.keyCount).
+		Uint64("total_slots_written", a.slotCount).
 		Uint64("total_interactions_since_last_log", a.interactionCounter).Logger()
 
 	for i := range a.availableSlotHistogram {
@@ -387,9 +389,8 @@ func (a *Cache) logTelemetry() {
 	a.lastTelemetryDump = runtimeNano()
 }
 
-// invalidateKey sets the key index of specified slot in the bucket to zero, so the key
-// is free to take.
-func (a *Cache) invalidateKey(bucketIndex bIndex, slotIndex sIndex) {
+// invalidateSlot marks slot as free so that it is ready to be re-used.
+func (a *Cache) invalidateSlot(bucketIndex bIndex, slotIndex sIndex) {
 	a.buckets[bucketIndex][slotIndex].slotAge = 0
 }
 
