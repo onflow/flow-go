@@ -4,12 +4,15 @@ import (
 	"context"
 	"testing"
 
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 type nodeOpt func(NodeBuilder)
@@ -28,6 +31,9 @@ func createNode(
 	opts ...nodeOpt,
 ) *Node {
 	builder := NewNodeBuilder(zerolog.Nop(), "0.0.0.0:0", networkKey, sporkID).
+		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
+			return NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID))
+		}).
 		SetPubSub(pubsub.NewGossipSub)
 
 	for _, opt := range opts {
