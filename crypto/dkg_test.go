@@ -1,10 +1,11 @@
-// +build relic
+//go:build relic
 
 package crypto
 
 import (
 	"fmt"
 	mrand "math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -17,6 +18,10 @@ import (
 var gt *testing.T
 
 func TestDKG(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
 	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
 	t.Run("JointFeldman", testJointFeldman)
@@ -714,6 +719,10 @@ func (proc *testDKGProcessor) invalidComplaintAnswerBroadcast(data []byte) {
 }
 
 func TestErrorTypes(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	t.Run("dkgFailureError", func(t *testing.T) {
 		failureError := dkgFailureErrorf("some error")
 		otherError := fmt.Errorf("some error")

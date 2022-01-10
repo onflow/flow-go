@@ -1,10 +1,11 @@
-// +build relic
+//go:build relic
 
 package crypto
 
 import (
 	"crypto/rand"
 	mrand "math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -16,6 +17,10 @@ import (
 
 // BLS tests
 func TestBLSBLS12381(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	halg := NewBLSKMAC("test tag")
 	// test the key generation seed lengths
 	testKeyGenSeed(t, BLSBLS12381, KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
@@ -58,6 +63,10 @@ func invalidSK(t *testing.T) PrivateKey {
 
 // BLS tests
 func TestBLSBLS12381Hasher(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	// generate a key pair
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	sk := randomSK(t, seed)
@@ -100,6 +109,10 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 
 // TestBLSEncodeDecode tests encoding and decoding of BLS keys
 func TestBLSEncodeDecode(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	// generic tests
 	testEncodeDecode(t, BLSBLS12381)
 
@@ -131,11 +144,19 @@ func TestBLSEncodeDecode(t *testing.T) {
 
 // TestBLSEquals tests equal for BLS keys
 func TestBLSEquals(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	testEquals(t, BLSBLS12381, ECDSAP256)
 }
 
 // TestBLSUtils tests some utility functions
 func TestBLSUtils(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	// generate a key pair
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	sk := randomSK(t, seed)
@@ -147,6 +168,10 @@ func TestBLSUtils(t *testing.T) {
 
 // BLS Proof of Possession test
 func TestBLSPOP(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -206,6 +231,10 @@ func TestBLSPOP(t *testing.T) {
 // Verify the aggregated signature using the multi-signature verification with
 // one message.
 func TestAggregateSignatures(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	// random message
 	input := make([]byte, 100)
 	_, err := rand.Read(input)
@@ -343,6 +372,10 @@ func TestAggregateSignatures(t *testing.T) {
 // the public key of the aggregated private key is equal to the aggregated
 // public key
 func TestAggregatePubKeys(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -417,6 +450,10 @@ func TestAggregatePubKeys(t *testing.T) {
 // BLS multi-signature
 // public keys removal sanity check
 func TestRemovePubKeys(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -516,6 +553,10 @@ func TestRemovePubKeys(t *testing.T) {
 // batch verification technique and compares the result to verifying each signature
 // separately.
 func TestBatchVerify(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -721,6 +762,10 @@ func BenchmarkBatchVerify(b *testing.B) {
 // and verify the aggregated signature using the multi-signature verification with
 // many message.
 func TestAggregateSignaturesManyMessages(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)

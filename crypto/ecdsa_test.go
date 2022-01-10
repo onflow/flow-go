@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"encoding/hex"
+	"os"
 	"testing"
 
 	"crypto/elliptic"
@@ -16,6 +17,10 @@ import (
 
 // ECDSA tests
 func TestECDSA(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	ecdsaCurves := []SigningAlgorithm{
 		ECDSAP256,
 		ECDSASecp256k1,
@@ -67,6 +72,10 @@ func BenchmarkECDSASecp256k1Verify(b *testing.B) {
 
 // TestECDSAEncodeDecode tests encoding and decoding of ECDSA keys
 func TestECDSAEncodeDecode(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	ecdsaCurves := []SigningAlgorithm{
 		ECDSAP256,
 		ECDSASecp256k1,
@@ -79,6 +88,10 @@ func TestECDSAEncodeDecode(t *testing.T) {
 
 // TestECDSAEquals tests equal for ECDSA keys
 func TestECDSAEquals(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	ecdsaCurves := []SigningAlgorithm{
 		ECDSAP256,
 		ECDSASecp256k1,
@@ -90,6 +103,10 @@ func TestECDSAEquals(t *testing.T) {
 
 // TestECDSAUtils tests some utility functions
 func TestECDSAUtils(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	ecdsaCurves := []SigningAlgorithm{
 		ECDSAP256,
 		ECDSASecp256k1,
@@ -124,6 +141,10 @@ func TestECDSAUtils(t *testing.T) {
 // This is only a sanity check meant to make sure the curve implemented
 // is checked against an independant test vector
 func TestScalarMult(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	secp256k1 := secp256k1Instance.curve
 	p256 := p256Instance.curve
 	genericMultTests := []struct {
@@ -205,6 +226,10 @@ func TestScalarMult(t *testing.T) {
 }
 
 func TestSignatureFormatCheck(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	curves := []SigningAlgorithm{
 		ECDSAP256,
 		ECDSASecp256k1,
@@ -288,6 +313,9 @@ func TestSignatureFormatCheck(t *testing.T) {
 }
 
 func TestEllipticUnmarshalSecp256k1(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
 
 	testVectors := []string{
 		"028b10bf56476bf7da39a3286e29df389177a2fa0fca2d73348ff78887515d8da1", // IsOnCurve for elliptic returns false

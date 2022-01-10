@@ -1,9 +1,10 @@
-// +build relic
+//go:build relic
 
 package crypto
 
 import (
 	"crypto/rand"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,10 @@ import (
 )
 
 func TestSPOCKProveVerifyAgainstData(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	// test the consistency with different data
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	data := make([]byte, 100)
@@ -70,6 +75,10 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 
 // tests of happy and unhappy paths of SPOCKVerify
 func TestSPOCKProveVerify(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	// test the consistency with different data
 	seed1 := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	seed2 := make([]byte, KeyGenSeedMinLenBLSBLS12381)

@@ -1,10 +1,11 @@
-// +build relic
+//go:build relic
 
 package crypto
 
 import (
 	"crypto/rand"
 	mrand "math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +16,10 @@ import (
 )
 
 func TestThresholdSignature(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	t.Run("stateful_simple_keygen", testStatefulThresholdSignatureSimpleKeyGen)
 	t.Run("stateful_signature_feldmanVSS_keygen", testStatefulThresholdSignatureFeldmanVSS)
 	t.Run("stateful_signature_jointFeldman_keygen", testStatefulThresholdSignatureJointFeldman)

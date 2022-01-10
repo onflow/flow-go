@@ -3,6 +3,7 @@ package random
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,10 @@ import (
 // it doesn't evaluate randomness of the random function and doesn't perform advanced statistical tests
 // just making sure code works on edge cases
 func TestRandInt(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	sampleSize := 64768
 	tolerance := 0.05
 	sampleSpace := uint64(16) // this should be a power of 2 for a more uniform distribution
@@ -39,6 +44,10 @@ func TestRandInt(t *testing.T) {
 // it doesn't evaluate randomness of the random function and doesn't perform advanced statistical tests
 // just making sure code works on edge cases
 func TestRandomPermutationSubset(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	listSize := 100
 	subsetSize := 20
 	seed := make([]byte, 16)
@@ -90,6 +99,10 @@ func TestRandomPermutationSubset(t *testing.T) {
 //  * permuting an empty set returns an empty list
 //  * drawing a sample of size zero from a non-empty set returns an empty list
 func TestEmptyPermutationSubset(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	seed := make([]byte, 16)
 	seed[0] = 45
 	rng, err := NewRand(seed)
@@ -107,6 +120,10 @@ func TestEmptyPermutationSubset(t *testing.T) {
 }
 
 func TestRandomShuffle(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	listSize := 100
 	seed := make([]byte, 16)
 	seed[0] = 45
@@ -148,6 +165,10 @@ func TestRandomShuffle(t *testing.T) {
 }
 
 func TestEmptyShuffle(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	seed := make([]byte, 16)
 	seed[0] = 45
 	rng, err := NewRand(seed)
@@ -161,6 +182,10 @@ func TestEmptyShuffle(t *testing.T) {
 }
 
 func TestRandomSamples(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	listSize := 100
 	samplesSize := 20
 	seed := make([]byte, 16)
@@ -210,6 +235,10 @@ func TestRandomSamples(t *testing.T) {
 
 // TestEmptySamples verifies that drawing a sample of size zero leaves the original list unchanged
 func TestEmptySamples(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	seed := make([]byte, 16)
 	seed[0] = 45
 	rng, err := NewRand(seed)
@@ -234,6 +263,10 @@ func TestEmptySamples(t *testing.T) {
 
 // TestState tests the function State()
 func TestState(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	// create a seed
 	len := 16 * 3 // 3 internal xorshifts
 	seed := make([]byte, len)

@@ -1,4 +1,4 @@
-// +build relic
+//go:build relic
 
 package crypto
 
@@ -11,6 +11,7 @@ package crypto
 // from the standard as both libraries are being developed.
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -198,17 +199,33 @@ func testSignHashCrossBLST(t *rapid.T) {
 }
 
 func TestEncodeDecodePrivateKeyCrossBLST(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
 }
 
 func TestEncodeDecodePublicKeyCrossBLST(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
 }
 
 func TestEncodeDecodeSignatureCrossBLST(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	rapid.Check(t, testEncodeDecodeSignatureCrossBLST)
 }
 
 func TestSignHashCrossBLST(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	rapid.Check(t, testSignHashCrossBLST)
 }

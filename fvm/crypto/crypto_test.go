@@ -3,6 +3,7 @@ package crypto_test
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,6 +18,10 @@ import (
 )
 
 func TestHashWithTag(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	t.Run("tag too long", func(t *testing.T) {
 		algorithms := []hash.HashingAlgorithm{
 			hash.SHA2_256,
@@ -43,6 +48,9 @@ func TestHashWithTag(t *testing.T) {
 }
 
 func TestVerifySignatureFromRuntime(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
 
 	// make sure the seed length is larger than miniumum seed lengths of all signature schemes
 	seedLength := 64
@@ -253,6 +261,9 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 }
 
 func TestValidatePublicKey(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
 
 	// make sure the seed length is larger than miniumum seed lengths of all signature schemes
 	seedLength := 64
@@ -306,6 +317,10 @@ func TestValidatePublicKey(t *testing.T) {
 }
 
 func TestHashingAlgorithmConversion(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	hashingAlgoMapping := map[runtime.HashAlgorithm]hash.HashingAlgorithm{
 		runtime.HashAlgorithmSHA2_256:              hash.SHA2_256,
 		runtime.HashAlgorithmSHA3_256:              hash.SHA3_256,
@@ -321,6 +336,10 @@ func TestHashingAlgorithmConversion(t *testing.T) {
 }
 
 func TestSigningAlgorithmConversion(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	signingAlgoMapping := map[runtime.SignatureAlgorithm]gocrypto.SigningAlgorithm{
 		runtime.SignatureAlgorithmECDSA_P256:      gocrypto.ECDSAP256,
 		runtime.SignatureAlgorithmECDSA_secp256k1: gocrypto.ECDSASecp256k1,

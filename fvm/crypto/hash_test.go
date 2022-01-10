@@ -2,6 +2,7 @@ package crypto_test
 
 import (
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -19,6 +20,9 @@ import (
 
 // TestPrefixedHash is a specific test for prefixed hashing
 func TestPrefixedHash(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
 
 	hashingAlgoToTestingAlgo := map[hash.HashingAlgorithm]func([]byte) []byte{
 		hash.SHA2_256: func(data []byte) []byte {

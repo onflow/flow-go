@@ -1,10 +1,11 @@
-// +build relic
+//go:build relic
 
 package crypto
 
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,6 +13,10 @@ import (
 )
 
 func TestDeterministicKeyGen(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	// 2 keys generated with the same seed should be equal
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
@@ -26,6 +31,10 @@ func TestDeterministicKeyGen(t *testing.T) {
 
 // test the deterministicity of the relic PRG (used by the DKG polynomials)
 func TestPRGseeding(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	blsInstance.reInit()
 	// 2 scalars generated with the same seed should be equal
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
@@ -78,6 +87,9 @@ func BenchmarkScalarMult(b *testing.B) {
 
 // Sanity-check of the map-to-G1 with regards to the IRTF draft hash-to-curve
 func TestMapToG1(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
 
 	// test vectors from https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#appendix-J.9.1
 	dst := []byte("QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_")
@@ -124,6 +136,10 @@ func BenchmarkHashToG1(b *testing.B) {
 // test Bowe subgroup check in G1
 // The test compares Bowe's check result to multiplying by the group order
 func TestSubgroupCheckG1(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	blsInstance.reInit()
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)

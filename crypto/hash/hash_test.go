@@ -3,6 +3,7 @@ package hash
 import (
 	"encoding/hex"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 
 // Sanity checks of SHA3_256
 func TestSanitySha3_256(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	input := []byte("test")
 	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
 
@@ -23,6 +28,10 @@ func TestSanitySha3_256(t *testing.T) {
 
 // Sanity checks of SHA3_384
 func TestSanitySha3_384(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	input := []byte("test")
 	expected, _ := hex.DecodeString("e516dabb23b6e30026863543282780a3ae0dccf05551cf0295178d7ff0f1b41eecb9db3ff219007c4e097260d58621bd")
 
@@ -33,6 +42,10 @@ func TestSanitySha3_384(t *testing.T) {
 
 // Sanity checks of SHA2_256
 func TestSanitySha2_256(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	input := []byte("test")
 	expected, _ := hex.DecodeString("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 
@@ -43,6 +56,10 @@ func TestSanitySha2_256(t *testing.T) {
 
 // Sanity checks of SHA2_256
 func TestSanitySha2_384(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	input := []byte("test")
 	expected, _ := hex.DecodeString("768412320f7b0aa5812fce428dc4706b3cae50e02a64caa16a782249bfe8efc4b7ef1ccb126255d196047dfedf17a0a9")
 
@@ -55,6 +72,9 @@ func TestSanitySha2_384(t *testing.T) {
 // the test vector is taken from the NIST document
 // https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/Kmac_samples.pdf
 func TestSanityKmac128(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
 
 	input := []byte{0x00, 0x01, 0x02, 0x03}
 	expected := []Hash{
@@ -92,6 +112,9 @@ func TestSanityKmac128(t *testing.T) {
 
 // TestHashersAPI tests the expected definition of the hashers APIs
 func TestHashersAPI(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
 
 	newKmac128 := func() Hasher {
 		kmac, err := NewKMAC_128([]byte("test_key________"), []byte("test_custommizer"), 32)
@@ -153,6 +176,10 @@ func TestHashersAPI(t *testing.T) {
 // It compares the hashes of random data of different lengths to
 // the output of standard Go sha3.
 func TestSha3(t *testing.T) {
+	if os.Getenv("TEST_NORMAL") == "" {
+		t.Skip("normal test skipped")
+	}
+
 	r := time.Now().UnixNano()
 	rand.Seed(r)
 	t.Logf("math rand seed is %d", r)
