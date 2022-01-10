@@ -46,7 +46,8 @@ func newSchemaValidation() (*SchemaValidation, error) {
 	}, nil
 }
 
-// Validate a http request against a schema
+//
+//Validate a http request against a schema
 func (v *SchemaValidation) Validate(r *http.Request) error {
 	route, path, err := v.router.FindRoute(r)
 	if err != nil {

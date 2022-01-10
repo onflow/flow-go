@@ -75,7 +75,7 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		expandable.Result = resultLink
 	}
 
-	self, _ := selfLink(tx.ID(), link.TransactionLink)
+	self, _ := SelfLink(tx.ID(), link.TransactionLink)
 
 	return &models.Transaction{
 		Id:                 tx.ID().String(),
@@ -133,7 +133,7 @@ func statusResponse(status flow.TransactionStatus) models.TransactionStatus {
 func transactionResultResponse(txr *access.TransactionResult, txID flow.Identifier, link LinkGenerator) *models.TransactionResult {
 	status := statusResponse(txr.Status)
 
-	self, _ := selfLink(txID, link.TransactionResultLink)
+	self, _ := SelfLink(txID, link.TransactionResultLink)
 
 	return &models.TransactionResult{
 		BlockId:         txr.BlockID.String(),
@@ -248,7 +248,7 @@ func collectionResponse(
 
 	expandable := &models.CollectionExpandable{}
 
-	self, err := selfLink(collection.ID(), link.CollectionLink)
+	self, err := SelfLink(collection.ID(), link.CollectionLink)
 	if err != nil {
 		return models.Collection{}, err
 	}
@@ -287,7 +287,7 @@ func serviceEventListResponse(eventList flow.ServiceEventList) []models.Event {
 }
 
 func executionResultResponse(exeResult *flow.ExecutionResult, link LinkGenerator) (*models.ExecutionResult, error) {
-	self, err := selfLink(exeResult.ID(), link.ExecutionResultLink)
+	self, err := SelfLink(exeResult.ID(), link.ExecutionResultLink)
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +361,7 @@ func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[s
 }
 
 func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkGenerator, expand map[string]bool) (*models.Block, error) {
-	self, err := selfLink(blk.ID(), link.BlockLink)
+	self, err := SelfLink(blk.ID(), link.BlockLink)
 	if err != nil {
 		return nil, err
 	}
