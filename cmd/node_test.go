@@ -48,7 +48,8 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		<-node.Ready()
 
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		err := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		assert.NoError(t, err)
 
 		<-finished
 
@@ -87,7 +88,8 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		<-node.Ready()
 
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		err := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		assert.NoError(t, err)
 
 		<-finished
 
@@ -195,7 +197,8 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		<-node.Ready()
 
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		err := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		assert.NoError(t, err)
 
 		<-finished
 

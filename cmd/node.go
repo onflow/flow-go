@@ -51,8 +51,12 @@ func NewNode(component component.Component, cfg *NodeConfig, logger zerolog.Logg
 // Any unhandled irrecoverable errors thrown in child components will propagate up to here and
 // result in a fatal error.
 func (node *FlowNodeImp) Run() {
+	// Cancelling this context notifies all child components that it's time to shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Block until node is shutting down
-	err := node.run()
+	err := node.run(ctx, cancel)
 
 	// Any error received is considered fatal.
 	if err != nil {
@@ -75,10 +79,7 @@ func (node *FlowNodeImp) Run() {
 // It returns:
 //   - nil if a termination signal is received, and all components have been gracefully stopped.
 //   - error if a irrecoverable error is received
-func (node *FlowNodeImp) run() error {
-	// Cancelling this context notifies all child components that it's time to shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-
+func (node *FlowNodeImp) run(ctx context.Context, shutdown context.CancelFunc) error {
 	// Components will pass unhandled irrecoverable errors to this channel via signalerCtx (or a
 	// child context). Any errors received on this channel should halt the node.
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
@@ -115,7 +116,7 @@ func (node *FlowNodeImp) run() error {
 	// 3: Shut down
 	// Send shutdown signal to components
 	node.logger.Info().Msgf("%s node shutting down", node.BaseConfig.NodeRole)
-	cancel()
+	shutdown()
 
 	// Block here until all components have stopped or an irrecoverable error is received.
 	return util.WaitError(errChan, node.Done())
