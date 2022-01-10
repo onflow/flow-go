@@ -282,7 +282,7 @@ func (c Cache) expiryThreshold() uint64 {
 
 // slotIndexInBucket returns a free slot for this entityId in the bucket. In case the bucket is full, it invalidates the oldest valid slot,
 // and returns its index as free slot. It returns false if the entityId already exists in this bucket.
-func (c *Cache) slotIndexInBucket(bucketIndex bIndex, idPref sha32of256, entityId flow.Identifier) (sIndex, bool) {
+func (c *Cache) slotIndexInBucket(bucketIndex bIndex, slotId sha32of256, entityId flow.Identifier) (sIndex, bool) {
 	slotToUse := sIndex(0)
 	expiryThreshold := c.expiryThreshold()
 	availableSlotCount := uint64(0) // for telemetry logs.
@@ -302,7 +302,7 @@ func (c *Cache) slotIndexInBucket(bucketIndex bIndex, idPref sha32of256, entityI
 			continue
 		}
 
-		if c.buckets[bucketIndex][s].slotId != idPref {
+		if c.buckets[bucketIndex][s].slotId != slotId {
 			// slot id is distinct and fresh, and hence move to next slot.
 			continue
 		}
