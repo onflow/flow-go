@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
@@ -14,7 +15,7 @@ const noResultsDir = "./no-results/"
 
 // process level 1 summary files in a single directory and output level 2 summary
 func processSummary2TestRun(level1Directory string) common.TestSummary2 {
-	dirEntries, err := os.ReadDir(level1Directory)
+	dirEntries, err := os.ReadDir(filepath.Join(level1Directory))
 	common.AssertNoError(err, "error reading level 1 directory")
 
 	// create directory to store failure messages
@@ -33,7 +34,7 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 		// read in each level 1 summary
 		var level1TestRun common.TestRun
 
-		level1JsonBytes, err := os.ReadFile(level1Directory + dirEntries[i].Name())
+		level1JsonBytes, err := os.ReadFile(filepath.Join(level1Directory, dirEntries[i].Name()))
 		common.AssertNoError(err, "error reading level 1 json")
 
 		err = json.Unmarshal(level1JsonBytes, &level1TestRun)
@@ -184,6 +185,6 @@ func main() {
 		panic("directory doesn't exist")
 	}
 
-	testSummary2 := processSummary2TestRun(common.AddTrailingSlash(os.Args[1]))
+	testSummary2 := processSummary2TestRun(os.Args[1])
 	common.SaveToFile("level2-summary.json", testSummary2)
 }
