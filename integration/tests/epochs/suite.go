@@ -558,18 +558,16 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 	// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
 		// ghost containers don't participate in the network skip any SN/LN ghost containers
-		if !testContainerConfig.Ghost {
-			nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
-			nodeContainer.AddFlag("insecure-access-api", "false")
+		nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
+		nodeContainer.AddFlag("insecure-access-api", "false")
 
-			accessNodeIDS := make([]string, 0)
-			for _, c := range s.net.ContainersByRole(flow.RoleAccess) {
-				if c.Config.Role == flow.RoleAccess && !c.Config.Ghost {
-					accessNodeIDS = append(accessNodeIDS, c.Config.NodeID.String())
-				}
+		accessNodeIDS := make([]string, 0)
+		for _, c := range s.net.ContainersByRole(flow.RoleAccess) {
+			if c.Config.Role == flow.RoleAccess && !c.Config.Ghost {
+				accessNodeIDS = append(accessNodeIDS, c.Config.NodeID.String())
 			}
-			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
+		nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 	}
 
 	return s.net.ContainerByID(info.NodeID)
