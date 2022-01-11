@@ -28,8 +28,6 @@ type ApiHandlerFunc func(
 	generator util.LinkGenerator,
 ) (interface{}, error)
 
-type ApiValidatorFunc func(r *request.Request) error
-
 // Handler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.

@@ -14,21 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 )
 
-// all route names
-const (
-	GetTransactionByIDRoute          = "getTransactionByID"
-	GetTransactionResultByIDRoute    = "getTransactionResultByID"
-	CreateTransactionRoute           = "createTransaction"
-	GetBlocksByIDRoute               = "getBlocksByIDs"
-	GetBlocksByHeightRoute           = "getBlocksByHeight"
-	GetCollectionByIDRoute           = "getCollectionByID"
-	ExecuteScriptRoute               = "executeScript"
-	GetBlockPayloadByIDRoute         = "getBlockPayloadByID"
-	GetExecutionResultByBlockIDRoute = "getExecutionResultByBlockID"
-	GetExecutionResultByIDRoute      = "getExecutionResultByID"
-	GetAccountRoute                  = "getAccount"
-)
-
 // NewServer returns an HTTP server initialized with the REST API handler
 func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) (*http.Server, error) {
 
@@ -73,97 +58,13 @@ func initRouter(backend access.API, logger zerolog.Logger) (*mux.Router, error) 
 		return nil, err
 	}
 
-	for _, r := range routeDefinitions() {
-		h := handlers.NewHandler(logger, backend, r.handler, linkGenerator, validation)
+	for _, r := range handlers.Routes {
+		h := handlers.NewHandler(logger, backend, r.Handler, linkGenerator, validation)
 		v1SubRouter.
-			Methods(r.method).
-			Path(r.pattern).
-			Name(r.name).
+			Methods(r.Method).
+			Path(r.Pattern).
+			Name(r.Name).
 			Handler(h)
 	}
 	return router, nil
-}
-
-type routeDefinition struct {
-	name       string
-	method     string
-	pattern    string
-	validators []handlers.ApiValidatorFunc
-	handler    handlers.ApiHandlerFunc
-}
-
-func routeDefinitions() []routeDefinition {
-	return []routeDefinition{
-		// Transactions
-		{
-			method:  http.MethodGet,
-			pattern: "/transactions/{id}",
-			name:    GetTransactionByIDRoute,
-			handler: handlers.getTransactionByID,
-		}, {
-			method:  http.MethodPost,
-			pattern: "/transactions",
-			name:    CreateTransactionRoute,
-			handler: handlers.createTransaction,
-		},
-		// Transaction Results
-		{
-			method:  http.MethodGet,
-			pattern: "/transaction_results/{id}",
-			name:    GetTransactionResultByIDRoute,
-			handler: handlers.getTransactionResultByID,
-		},
-		// Blocks
-		{
-			method:  http.MethodGet,
-			pattern: "/blocks/{id}",
-			name:    GetBlocksByIDRoute,
-			handler: handlers.getBlocksByIDs,
-		}, {
-			method:  http.MethodGet,
-			pattern: "/blocks",
-			name:    GetBlocksByHeightRoute,
-			handler: handlers.getBlocksByHeight,
-		},
-		// Block Payload
-		{
-			method:  http.MethodGet,
-			pattern: "/blocks/{id}/payload",
-			name:    GetBlockPayloadByIDRoute,
-			handler: handlers.getBlockPayloadByID,
-		},
-		// Execution Result
-		{
-			method:  http.MethodGet,
-			pattern: "/execution_results/{id}",
-			name:    GetExecutionResultByIDRoute,
-			handler: handlers.getExecutionResultByID,
-		},
-		{
-			method:  http.MethodGet,
-			pattern: "/execution_results",
-			name:    GetExecutionResultByBlockIDRoute,
-			handler: handlers.getExecutionResultsByBlockIDs,
-		},
-		// Collections
-		{
-			method:  http.MethodGet,
-			pattern: "/collections/{id}",
-			name:    GetCollectionByIDRoute,
-			handler: handlers.getCollectionByID,
-		},
-		// Scripts
-		{
-			method:  http.MethodPost,
-			pattern: "/scripts",
-			name:    ExecuteScriptRoute,
-			handler: handlers.executeScript,
-		},
-		// Accounts
-		{
-			method:  http.MethodGet,
-			pattern: "/accounts/{address}",
-			name:    GetAccountRoute,
-			handler: handlers.getAccount,
-		}}
 }
