@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 
 	"google.golang.org/grpc/codes"
@@ -16,7 +17,7 @@ import (
 )
 
 // getBlocksByID gets blocks by provided ID or list of IDs.
-func getBlocksByIDs(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
+func getBlocksByIDs(r *request.Request, backend access.API, link util.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockByIDsRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -34,7 +35,7 @@ func getBlocksByIDs(r *request.Request, backend access.API, link LinkGenerator) 
 	return blocks, nil
 }
 
-func getBlocksByHeight(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
+func getBlocksByHeight(r *request.Request, backend access.API, link util.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -87,7 +88,7 @@ func getBlocksByHeight(r *request.Request, backend access.API, link LinkGenerato
 }
 
 // getBlockPayloadByID gets block payload by ID
-func getBlockPayloadByID(r *request.Request, backend access.API, _ LinkGenerator) (interface{}, error) {
+func getBlockPayloadByID(r *request.Request, backend access.API, _ util.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockPayloadRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -108,7 +109,7 @@ func getBlockPayloadByID(r *request.Request, backend access.API, _ LinkGenerator
 	return payload, nil
 }
 
-func getBlock(option blockProviderOption, req *request.Request, backend access.API, link LinkGenerator) (*models.Block, error) {
+func getBlock(option blockProviderOption, req *request.Request, backend access.API, link util.LinkGenerator) (*models.Block, error) {
 	// lookup block
 	blkProvider := NewBlockProvider(backend, option)
 	blk, err := blkProvider.getBlock(req.Context())

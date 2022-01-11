@@ -1,18 +1,18 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func (c *Collection) Build(
 	collection *flow.LightCollection,
 	txs []*flow.TransactionBody,
-	link rest.LinkGenerator,
+	link util.LinkGenerator,
 	expand map[string]bool) error {
 
-	self, err := rest.SelfLink(collection.ID(), link.CollectionLink)
+	self, err := util.SelfLink(collection.ID(), link.CollectionLink)
 	if err != nil {
 		return err
 	}

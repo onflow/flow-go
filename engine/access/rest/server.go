@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 	"time"
 
@@ -63,7 +64,7 @@ func initRouter(backend access.API, logger zerolog.Logger) (*mux.Router, error) 
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
 
-	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
+	var linkGenerator util.LinkGenerator = util.NewLinkGeneratorImpl(v1SubRouter)
 
 	// create a schema validation
 	validation, err := newSchemaValidation()

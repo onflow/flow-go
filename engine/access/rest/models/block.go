@@ -1,17 +1,17 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func (b *Block) Build(
 	block *flow.Block,
 	execResult *flow.ExecutionResult,
-	link rest.LinkGenerator,
+	link util.LinkGenerator,
 	expand map[string]bool,
 ) error {
-	self, err := rest.SelfLink(block.ID(), link.BlockLink)
+	self, err := util.SelfLink(block.ID(), link.BlockLink)
 	if err != nil {
 		return err
 	}

@@ -2,11 +2,11 @@ package models
 
 import (
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionResult, link rest.LinkGenerator) {
+func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionResult, link util.LinkGenerator) {
 	args := make([]string, len(tx.Arguments))
 	for i, arg := range tx.Arguments {
 		args[i] = toBase64(arg)
@@ -27,7 +27,7 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionRes
 		expandable.Result = resultLink
 	}
 
-	self, _ := rest.SelfLink(tx.ID(), link.TransactionLink)
+	self, _ := util.SelfLink(tx.ID(), link.TransactionLink)
 
 	var payloadSigs TransactionSignatures
 	payloadSigs.Build(tx.PayloadSignatures)
@@ -55,7 +55,7 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionRes
 
 type Transactions []Transaction
 
-func (t *Transactions) Build(transactions []*flow.TransactionBody, link rest.LinkGenerator) {
+func (t *Transactions) Build(transactions []*flow.TransactionBody, link util.LinkGenerator) {
 	txs := make([]Transaction, len(transactions))
 	for i, tr := range transactions {
 		var tx Transaction
@@ -86,7 +86,7 @@ func (t *TransactionSignature) Build(sig flow.TransactionSignature) {
 	t.Signature = toBase64(sig.Signature)
 }
 
-func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Identifier, link rest.LinkGenerator) {
+func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Identifier, link util.LinkGenerator) {
 	var status TransactionStatus
 	status.Build(txr.Status)
 
@@ -99,7 +99,7 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	t.ComputationUsed = fromUint64(0)
 	t.Events = events
 
-	self, _ := rest.SelfLink(txID, link.TransactionResultLink)
+	self, _ := util.SelfLink(txID, link.TransactionResultLink)
 	t.Links = self
 }
 

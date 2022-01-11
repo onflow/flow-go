@@ -25,7 +25,7 @@ type Validator interface {
 type ApiHandlerFunc func(
 	r *request.Request,
 	backend access.API,
-	generator LinkGenerator,
+	generator util.LinkGenerator,
 ) (interface{}, error)
 
 type ApiValidatorFunc func(r *request.Request) error
@@ -36,7 +36,7 @@ type ApiValidatorFunc func(r *request.Request) error
 type Handler struct {
 	logger         zerolog.Logger
 	backend        access.API
-	linkGenerator  LinkGenerator
+	linkGenerator  util.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 	validator      Validator
 }
@@ -45,7 +45,7 @@ func NewHandler(
 	logger zerolog.Logger,
 	backend access.API,
 	handlerFunc ApiHandlerFunc,
-	generator LinkGenerator,
+	generator util.LinkGenerator,
 	validator Validator,
 ) *Handler {
 	return &Handler{

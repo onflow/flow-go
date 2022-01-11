@@ -1,11 +1,11 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func (a *Account) Build(flowAccount *flow.Account, link rest.LinkGenerator, expand map[string]bool) error {
+func (a *Account) Build(flowAccount *flow.Account, link util.LinkGenerator, expand map[string]bool) error {
 	account := Account{
 		Address: flowAccount.Address.String(),
 		Balance: fromUint64(flowAccount.Balance),

@@ -4,11 +4,12 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // getCollectionByID retrieves a collection by ID and builds a response
-func getCollectionByID(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
+func getCollectionByID(r *request.Request, backend access.API, link util.LinkGenerator) (interface{}, error) {
 	req, err := r.GetCollectionRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
