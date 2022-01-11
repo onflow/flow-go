@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/pool"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/heropool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -49,7 +49,7 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 	limit := uint(50_000)
 
 	backData := stdmap.NewBackendWithBackData(
-		herocache.NewCache(uint32(limit), 8, pool.LRUEjection, unittest.Logger()),
+		herocache.NewCache(uint32(limit), 8, heropool.LRUEjection, unittest.Logger()),
 		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000_000))

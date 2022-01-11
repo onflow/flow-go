@@ -9,18 +9,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/pool"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/heropool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestArrayBackData_SingleBucket evaluates health of state transition for storing 10 entities in an Cache with only
+// TestArrayBackData_SingleBucket evaluates health of state transition for storing 10 entities in a Cache with only
 // a single bucket (of 16). It also evaluates all stored items are retrievable.
 func TestArrayBackData_SingleBucket(t *testing.T) {
 	limit := 10
 
 	bd := NewCache(uint32(limit),
 		1,
-		pool.LRUEjection,
+		heropool.LRUEjection,
 		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
@@ -29,7 +29,7 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	testAddEntities(t, bd, entities)
 
 	// sanity checks
-	for i := pool.EIndex(0); i < pool.EIndex(len(entities)); i++ {
+	for i := heropool.EIndex(0); i < heropool.EIndex(len(entities)); i++ {
 		// since we are below limit, elements should be added sequentially at bucket 0.
 		// the ith added element has a key index of i+1,
 		// since 0 means unused key index in implementation.
@@ -52,7 +52,7 @@ func TestArrayBackData_Adjust(t *testing.T) {
 
 	bd := NewCache(uint32(limit),
 		8,
-		pool.LRUEjection,
+		heropool.LRUEjection,
 		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
@@ -130,7 +130,7 @@ func TestArrayBackData_WriteHeavy(t *testing.T) {
 
 	bd := NewCache(uint32(limit),
 		8,
-		pool.LRUEjection,
+		heropool.LRUEjection,
 		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
@@ -153,7 +153,7 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 
 	bd := NewCache(uint32(limit),
 		8,
-		pool.LRUEjection,
+		heropool.LRUEjection,
 		unittest.Logger())
 
 	entities := unittest.EntityListFixture(items)
@@ -177,7 +177,7 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 
 	bd := NewCache(uint32(limit),
 		8,
-		pool.RandomEjection,
+		heropool.RandomEjection,
 		unittest.Logger())
 
 	entities := unittest.EntityListFixture(items)
@@ -197,7 +197,7 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 
 	bd := NewCache(uint32(limit),
 		8,
-		pool.LRUEjection,
+		heropool.LRUEjection,
 		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
@@ -220,7 +220,7 @@ func TestArrayBackData_Clear(t *testing.T) {
 
 	bd := NewCache(uint32(limit),
 		8,
-		pool.LRUEjection,
+		heropool.LRUEjection,
 		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
@@ -247,27 +247,27 @@ func TestArrayBackData_All(t *testing.T) {
 	tt := []struct {
 		limit        uint32
 		items        uint32
-		ejectionMode pool.EjectionMode
+		ejectionMode heropool.EjectionMode
 	}{
 		{ // mempool has the limit of 100K, but we put 10K
 			limit:        100_000,
 			items:        10_000,
-			ejectionMode: pool.LRUEjection,
+			ejectionMode: heropool.LRUEjection,
 		},
 		{ // mempool has the limit of 100K, and we put exactly 100K items
 			limit:        100_000,
 			items:        100_000,
-			ejectionMode: pool.LRUEjection,
+			ejectionMode: heropool.LRUEjection,
 		},
 		{ // mempool has the limit of 100K, and we put 1M items with LRU ejection.
 			limit:        100_000,
 			items:        1_000_000,
-			ejectionMode: pool.LRUEjection,
+			ejectionMode: heropool.LRUEjection,
 		},
 		{ // mempool has the limit of 100K, and we put 1M items with random ejection.
 			limit:        100_000,
 			items:        1_000_000,
-			ejectionMode: pool.RandomEjection,
+			ejectionMode: heropool.RandomEjection,
 		},
 	}
 
@@ -281,7 +281,7 @@ func TestArrayBackData_All(t *testing.T) {
 
 			testAddEntities(t, bd, entities)
 
-			if tc.ejectionMode == pool.RandomEjection {
+			if tc.ejectionMode == heropool.RandomEjection {
 				// in random ejection mode we count total number of matched entities
 				// with All map.
 				testMapMatchCount(t, bd.All(), entities, int(tc.limit))
@@ -334,7 +334,7 @@ func TestArrayBackData_Rem(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d-limit-%d-items-%dfrom-%dcount", tc.limit, tc.items, tc.from, tc.count), func(t *testing.T) {
-			bd := NewCache(tc.limit, 8, pool.RandomEjection, unittest.Logger())
+			bd := NewCache(tc.limit, 8, heropool.RandomEjection, unittest.Logger())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
 			testAddEntities(t, bd, entities)

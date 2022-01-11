@@ -1,4 +1,4 @@
-package pool
+package heropool
 
 // link represents a slice-based doubly linked-list node that
 // consists of a next and previous poolIndex.

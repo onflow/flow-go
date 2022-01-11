@@ -1,4 +1,4 @@
-package pool
+package heropool
 
 import (
 	"fmt"
@@ -36,14 +36,14 @@ func TestStoreAndRetrieval_Without_Ejection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *HeroPool, []*unittest.MockEntity){
-				func(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					testInitialization(t, pool, entities)
 				},
-				func(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					testAddingEntities(t, pool, entities, LRUEjection)
 				},
-				func(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					testRetrievingEntitiesFrom(t, pool, entities, 0)
 				},
 			}...,
@@ -73,11 +73,11 @@ func TestStoreAndRetrieval_With_LRU_Ejection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *HeroPool, []*unittest.MockEntity){
-				func(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					testAddingEntities(t, pool, entities, LRUEjection)
 				},
-				func(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					// with a limit of tc.limit, storing a total of tc.entityCount (> tc.limit) entities, results
 					// in ejection of the first tc.entityCount - tc.limit entities.
 					// Hence, we check retrieval of the last tc.limit entities, which start from index
@@ -106,11 +106,11 @@ func TestStoreAndRetrieval_With_Random_Ejection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, RandomEjection, []func(*testing.T, *HeroPool, []*unittest.MockEntity){
-				func(t *testing.T, backData *HeroPool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, RandomEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
+				func(t *testing.T, backData *Pool, entities []*unittest.MockEntity) {
 					testAddingEntities(t, backData, entities, RandomEjection)
 				},
-				func(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					// with a limit of tc.limit, storing a total of tc.entityCount (> tc.limit) entities, results
 					// in ejection of "tc.entityCount - tc.limit" entities at random.
 					// Hence, we check retrieval any successful total of "tc.limit" entities.
@@ -156,11 +156,11 @@ func TestInvalidateEntity(t *testing.T) {
 	} {
 		// head invalidation test (LRU)
 		t.Run(fmt.Sprintf("head-invalidation-%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *HeroPool, []*unittest.MockEntity){
-				func(t *testing.T, backData *HeroPool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
+				func(t *testing.T, backData *Pool, entities []*unittest.MockEntity) {
 					testAddingEntities(t, backData, entities, LRUEjection)
 				},
-				func(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					testInvalidatingHead(t, pool, entities)
 				},
 			}...)
@@ -168,11 +168,11 @@ func TestInvalidateEntity(t *testing.T) {
 
 		// tail invalidation test (LIFO)
 		t.Run(fmt.Sprintf("tail-invalidation-%d-limit-%d-entities-", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *HeroPool, []*unittest.MockEntity){
-				func(t *testing.T, backData *HeroPool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
+				func(t *testing.T, backData *Pool, entities []*unittest.MockEntity) {
 					testAddingEntities(t, backData, entities, LRUEjection)
 				},
-				func(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					testInvalidatingTail(t, pool, entities)
 				},
 			}...)
@@ -180,11 +180,11 @@ func TestInvalidateEntity(t *testing.T) {
 
 		// random invalidation test
 		t.Run(fmt.Sprintf("random-invalidation-%d-limit-%d-entities-", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *HeroPool, []*unittest.MockEntity){
-				func(t *testing.T, backData *HeroPool, entities []*unittest.MockEntity) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
+				func(t *testing.T, backData *Pool, entities []*unittest.MockEntity) {
 					testAddingEntities(t, backData, entities, LRUEjection)
 				},
-				func(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 					testInvalidateAtRandom(t, pool, entities)
 				},
 			}...)
@@ -194,7 +194,7 @@ func TestInvalidateEntity(t *testing.T) {
 
 // testInvalidatingHead keeps invalidating elements at random and evaluates whether the linked-lists keeping the used and free state remains connected
 // from head to tail, and vice versa.
-func testInvalidateAtRandom(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+func testInvalidateAtRandom(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 	// total number of entities to store
 	totalEntitiesStored := len(entities)
 	// freeListInitialSize is total number of empty nodes after
@@ -244,7 +244,7 @@ func testInvalidateAtRandom(t *testing.T, pool *HeroPool, entities []*unittest.M
 
 // testInvalidatingHead keeps invalidating the head and evaluates the linked-list keeps updating its head
 // and remains connected.
-func testInvalidatingHead(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 	// total number of entities to store
 	totalEntitiesStored := len(entities)
 	// freeListInitialSize is total number of empty nodes after
@@ -333,7 +333,7 @@ func testInvalidatingHead(t *testing.T, pool *HeroPool, entities []*unittest.Moc
 }
 
 // testInvalidatingHead keeps invalidating the tail and evaluates the underlying free and used linked-lists keep updating its tail and remains connected.
-func testInvalidatingTail(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
+func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
 	size := len(entities)
 	offset := len(pool.poolEntities) - size
 	for i := 0; i < size; i++ {
@@ -419,7 +419,7 @@ func testInvalidatingTail(t *testing.T, pool *HeroPool, entities []*unittest.Moc
 }
 
 // testInitialization evaluates the state of an initialized pool before adding any element to it.
-func testInitialization(t *testing.T, pool *HeroPool, _ []*unittest.MockEntity) {
+func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 	// head and tail of "used" linked-list must be undefined at initialization time, since we have no elements in the list.
 	require.True(t, pool.used.head.isUndefined())
 	require.True(t, pool.used.tail.isUndefined())
@@ -452,7 +452,7 @@ func testInitialization(t *testing.T, pool *HeroPool, _ []*unittest.MockEntity) 
 }
 
 // testAddingEntities evaluates health of pool for storing new elements.
-func testAddingEntities(t *testing.T, pool *HeroPool, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
+func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
 	// adding elements
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
@@ -568,7 +568,7 @@ func testAddingEntities(t *testing.T, pool *HeroPool, entitiesToBeAdded []*unitt
 }
 
 // testRetrievingEntitiesFrom evaluates that all entities starting from given index are retrievable from pool.
-func testRetrievingEntitiesFrom(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity, from EIndex) {
+func testRetrievingEntitiesFrom(t *testing.T, pool *Pool, entities []*unittest.MockEntity, from EIndex) {
 	for i := from; i < EIndex(len(entities)); i++ {
 		actualID, actual, _ := pool.Get(i % EIndex(len(pool.poolEntities)))
 		require.Equal(t, entities[i].ID(), actualID)
@@ -577,7 +577,7 @@ func testRetrievingEntitiesFrom(t *testing.T, pool *HeroPool, entities []*unitte
 }
 
 // testRetrievingCount evaluates that exactly expected number of entities are retrievable from underlying pool.
-func testRetrievingCount(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity, expected int) {
+func testRetrievingCount(t *testing.T, pool *Pool, entities []*unittest.MockEntity, expected int) {
 	actualRetrievable := 0
 
 	for i := EIndex(0); i < EIndex(len(entities)); i++ {
@@ -597,9 +597,9 @@ func withTestScenario(t *testing.T,
 	limit uint32,
 	entityCount uint32,
 	ejectionMode EjectionMode,
-	helpers ...func(*testing.T, *HeroPool, []*unittest.MockEntity)) {
+	helpers ...func(*testing.T, *Pool, []*unittest.MockEntity)) {
 
-	pool := NewPool(limit, ejectionMode)
+	pool := NewHeroPool(limit, ejectionMode)
 
 	// head on underlying linked-list value should be uninitialized
 	require.True(t, pool.used.head.isUndefined())
@@ -613,7 +613,7 @@ func withTestScenario(t *testing.T,
 }
 
 // tailAccessibleFromHead checks tail of given entities linked-list is reachable from its head by traversing expected number of steps.
-func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, pool *HeroPool, steps uint32) {
+func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, pool *Pool, steps uint32) {
 	seen := make(map[EIndex]struct{})
 
 	index := headSliceIndex
@@ -633,7 +633,7 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 }
 
 //  headAccessibleFromTail checks head of given entities linked list is reachable from its tail by traversing expected number of steps.
-func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, pool *HeroPool, total uint32) {
+func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, pool *Pool, total uint32) {
 	seen := make(map[EIndex]struct{})
 
 	index := tailSliceIndex

@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/pool"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/heropool"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -45,9 +45,9 @@ type sha32of256 uint32
 // slot is an internal notion corresponding to the identifier of an entity that is
 // meant to be stored in this Cache.
 type slot struct {
-	slotAge     uint64      // age of this slot.
-	entityIndex pool.EIndex // link to actual entity.
-	slotId      sha32of256  // slot id is the 32-bits prefix of entity identifier.
+	slotAge     uint64          // age of this slot.
+	entityIndex heropool.EIndex // link to actual entity.
+	slotId      sha32of256      // slot id is the 32-bits prefix of entity identifier.
 }
 
 // slotBucket represents a bucket of slots.
@@ -61,11 +61,11 @@ type Cache struct {
 	limit        uint32
 	slotCount    uint64 // total number of non-expired key-values
 	bucketNum    uint64 // total number of buckets (i.e., total of buckets)
-	ejectionMode pool.EjectionMode
+	ejectionMode heropool.EjectionMode
 	// buckets keeps the slots (i.e., entityId) of the (entityId, entity) pairs that are maintained in this BackData.
 	buckets []slotBucket
 	// entities keeps the values (i.e., entity) of the (entityId, entity) pairs that are maintained in this BackData.
-	entities *pool.HeroPool
+	entities *heropool.Pool
 
 	// telemetry
 	//
@@ -83,7 +83,7 @@ type Cache struct {
 	lastTelemetryDump int64
 }
 
-func NewCache(limit uint32, oversizeFactor uint32, ejectionMode pool.EjectionMode, logger zerolog.Logger) *Cache {
+func NewCache(limit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, logger zerolog.Logger) *Cache {
 	// total buckets.
 	capacity := uint64(limit * oversizeFactor)
 	bucketNum := capacity / slotsPerBucket
@@ -98,7 +98,7 @@ func NewCache(limit uint32, oversizeFactor uint32, ejectionMode pool.EjectionMod
 		limit:                  limit,
 		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
-		entities:               pool.NewPool(limit, ejectionMode),
+		entities:               heropool.NewHeroPool(limit, ejectionMode),
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
 	}
 
@@ -195,7 +195,7 @@ func (c *Cache) Clear() {
 	defer c.logTelemetry()
 
 	c.buckets = make([]slotBucket, c.bucketNum)
-	c.entities = pool.NewPool(c.limit, c.ejectionMode)
+	c.entities = heropool.NewHeroPool(c.limit, c.ejectionMode)
 	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	c.interactionCounter = 0
 	c.lastTelemetryDump = 0

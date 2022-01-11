@@ -1,4 +1,4 @@
-package pool
+package heropool
 
 // poolIndex represents a slice-based linked list pointer. Instead of pointing
 // to a memory address, this pointer points to a slice index.
