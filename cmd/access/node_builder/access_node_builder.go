@@ -2,6 +2,7 @@ package node_builder
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -146,6 +147,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
 		supportsUnstakedFollower:     false,
+		PublicNetworkConfig: PublicNetworkConfig{
+			BindAddress: cmd.NotSet,
+		},
 	}
 }
 
@@ -585,6 +589,13 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
+		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
+	}).ValidateFlags(func() error {
+		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
+			return errors.New("public-network-address must be set if supports-unstaked-node is true")
+		}
+
+		return nil
 	})
 }
 

@@ -782,9 +782,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			if nodeConf.SupportsUnstakedNodes {
 				hostExternalNetworkPort := testingdock.RandomPort(t)
-				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
+				containerExternalNetworkPort := "9876/tcp"
+				nodeContainer.bindPort(hostExternalNetworkPort, containerExternalNetworkPort)
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
 				nodeContainer.addFlag("supports-unstaked-node", "true")
+				nodeContainer.addFlag("public-network-address", fmt.Sprintf("%s:9876", nodeContainer.Name()))
 			}
 
 			hostMetricsPort := testingdock.RandomPort(t)

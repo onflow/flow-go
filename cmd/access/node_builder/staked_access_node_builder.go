@@ -219,7 +219,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		builder.AccessNodeConfig.PublicNetworkConfig.Middleware = middleware
 
 		node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)
-		return builder.Network, nil
+		return network, nil
 	})
 }
 
