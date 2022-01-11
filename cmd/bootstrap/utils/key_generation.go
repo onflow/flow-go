@@ -4,9 +4,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
-	sdk "github.com/onflow/flow-go-sdk"
 	gohash "hash"
 	"io"
+
+	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/model/encodable"
 

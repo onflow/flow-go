@@ -38,7 +38,7 @@ func validateFlags(accessNodeIDS []string, snapshot protocol.Snapshot) ([]flow.I
 
 		return anIDS, nil
 	}
-	
+
 	return convertIDS(accessNodeIDS)
 }
 

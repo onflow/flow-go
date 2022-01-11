@@ -73,7 +73,6 @@ func (s *Suite) SetupTest() {
 
 	confs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
@@ -561,7 +560,7 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 		// ghost containers don't participate in the network skip any SN/LN ghost containers
 		if !testContainerConfig.Ghost {
 			nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
-			nodeContainer.AddFlag("insecure-access-api", "true")
+			nodeContainer.AddFlag("insecure-access-api", "false")
 
 			accessNodeIDS := make([]string, 0)
 			for _, c := range s.net.ContainersByRole(flow.RoleAccess) {
@@ -687,22 +686,15 @@ func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templat
 // is after the first epoch starts.
 // 2. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	bootstrapHead, err := rootSnapshot.Head()
-	require.NoError(s.T(), err)
-
-	header, err := s.client.GetLatestSealedBlockHeader(ctx)
-	require.NoError(s.T(), err)
-
-	// head should now be at-least 20 blocks higher from when we started
-	require.Truef(s.T(), header.Height-bootstrapHead.Height >= 20, "expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height)
-
 	fullAccountKey := sdk.NewAccountKey().
 		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	// submit transaction to create account
-	_, err = s.createAccount(
+	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
+	// To validate the LN joined the network successfully and is processing transactions we submit a
+	// create account transaction and assert there are no errors.
+	_, err := s.createAccount(
 		ctx,
 		fullAccountKey,
 		s.client.Account(),
