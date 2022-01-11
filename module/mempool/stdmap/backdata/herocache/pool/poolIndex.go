@@ -4,7 +4,7 @@ package pool
 // to a memory address, this pointer points to a slice index.
 //
 // Note: an "undefined" (i.e., nil) notion for this poolIndex corresponds to the
-// value of uint32(0). Hence, legit "index" values start from uint32(1).
+// value of uint32(0). Hence, legit "index" poolEntities start from uint32(1).
 // poolIndex also furnished with methods to convert a "poolIndex" value to
 // a slice index, and vice versa.
 type poolIndex struct {

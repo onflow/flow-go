@@ -19,11 +19,21 @@ const maximumRandomTrials = 10
 // EIndex is data type representing an entity index in HeroPool.
 type EIndex uint32
 
-// cachedEntity represents a cached entity that is maintained as a double linked list node.
-type cachedEntity struct {
-	owner  uint64
-	node   link
-	id     flow.Identifier
+// poolEntity represents the data type that is maintained by
+type poolEntity struct {
+	// owner maintains an external reference to the key associated with this entity.
+	// The key is maintained by the HeroCache, and entity is maintained by HeroPool.
+	owner uint64
+
+	// node keeps the link to the previous and next entities.
+	// When this entity is allocated, the node maintains the connections it to the next and previous (used) pool entities.
+	// When this entity is unallocated, the node maintains the connections to the next and previous unallocated (free) pool entities.
+	node link
+
+	// Identity associated with this entity.
+	id flow.Identifier
+
+	// Actual entity itself.
 	entity flow.Entity
 }
 
@@ -31,7 +41,7 @@ type HeroPool struct {
 	size         uint32
 	free         state // keeps track of free slots.
 	used         state // keeps track of allocated slots to cachedEntities.
-	values       []cachedEntity
+	poolEntities []poolEntity
 	ejectionMode EjectionMode
 }
 
@@ -45,7 +55,7 @@ func NewPool(limit uint32, ejectionMode EjectionMode) *HeroPool {
 			head: poolIndex{index: 0},
 			tail: poolIndex{index: 0},
 		},
-		values:       make([]cachedEntity, limit),
+		poolEntities: make([]poolEntity, limit),
 		ejectionMode: ejectionMode,
 	}
 
@@ -54,12 +64,12 @@ func NewPool(limit uint32, ejectionMode EjectionMode) *HeroPool {
 	return l
 }
 
-// initFreeEntities initializes the free double linked-list with the indices of all cached entity values.
+// initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
 func (e *HeroPool) initFreeEntities() {
 	e.free.head.setPoolIndex(0)
 	e.free.tail.setPoolIndex(0)
 
-	for i := 1; i < len(e.values); i++ {
+	for i := 1; i < len(e.poolEntities); i++ {
 		// appends slice index i to tail of free linked list
 		e.connect(e.free.tail, EIndex(i))
 		// and updates its tail
@@ -67,20 +77,20 @@ func (e *HeroPool) initFreeEntities() {
 	}
 }
 
-// Add writes given entity into a cachedEntity on the underlying entities linked-list. Return value is
+// Add writes given entity into a poolEntity on the underlying entities linked-list. Return value is
 // the index at which given entity is written on entities linked-list so that it can be accessed directly later.
 func (e *HeroPool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) EIndex {
 	entityIndex := e.sliceIndexForEntity()
-	e.values[entityIndex].entity = entity
-	e.values[entityIndex].id = entityId
-	e.values[entityIndex].owner = owner
-	e.values[entityIndex].node.next.setUndefined()
-	e.values[entityIndex].node.prev.setUndefined()
+	e.poolEntities[entityIndex].entity = entity
+	e.poolEntities[entityIndex].id = entityId
+	e.poolEntities[entityIndex].owner = owner
+	e.poolEntities[entityIndex].node.next.setUndefined()
+	e.poolEntities[entityIndex].node.prev.setUndefined()
 
 	if e.used.head.isUndefined() {
 		// used list is empty, hence setting head of used list to current entityIndex.
 		e.used.head.setPoolIndex(entityIndex)
-		e.values[e.used.head.sliceIndex()].node.prev.setUndefined()
+		e.poolEntities[e.used.head.sliceIndex()].node.prev.setUndefined()
 	}
 
 	if !e.used.tail.isUndefined() {
@@ -97,7 +107,7 @@ func (e *HeroPool) Add(entityId flow.Identifier, entity flow.Entity, owner uint6
 
 // Get returns entity corresponding to the entity index from the underlying list.
 func (e HeroPool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
-	return e.values[entityIndex].id, e.values[entityIndex].entity, e.values[entityIndex].owner
+	return e.poolEntities[entityIndex].id, e.poolEntities[entityIndex].entity, e.poolEntities[entityIndex].owner
 }
 
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
@@ -124,28 +134,28 @@ func (e HeroPool) Size() uint32 {
 }
 
 // getHeads returns entities corresponding to the used and free heads.
-func (e HeroPool) getHeads() (*cachedEntity, *cachedEntity) {
-	var usedHead, freeHead *cachedEntity
+func (e HeroPool) getHeads() (*poolEntity, *poolEntity) {
+	var usedHead, freeHead *poolEntity
 	if !e.used.head.isUndefined() {
-		usedHead = &e.values[e.used.head.sliceIndex()]
+		usedHead = &e.poolEntities[e.used.head.sliceIndex()]
 	}
 
 	if !e.free.head.isUndefined() {
-		freeHead = &e.values[e.free.head.sliceIndex()]
+		freeHead = &e.poolEntities[e.free.head.sliceIndex()]
 	}
 
 	return usedHead, freeHead
 }
 
 // getTails returns entities corresponding to the used and free tails.
-func (e HeroPool) getTails() (*cachedEntity, *cachedEntity) {
-	var usedTail, freeTail *cachedEntity
+func (e HeroPool) getTails() (*poolEntity, *poolEntity) {
+	var usedTail, freeTail *poolEntity
 	if !e.used.tail.isUndefined() {
-		usedTail = &e.values[e.used.tail.sliceIndex()]
+		usedTail = &e.poolEntities[e.used.tail.sliceIndex()]
 	}
 
 	if !e.free.tail.isUndefined() {
-		freeTail = &e.values[e.free.tail.sliceIndex()]
+		freeTail = &e.poolEntities[e.free.tail.sliceIndex()]
 	}
 
 	return usedTail, freeTail
@@ -153,8 +163,8 @@ func (e HeroPool) getTails() (*cachedEntity, *cachedEntity) {
 
 // connect links the prev and next nodes as the adjacent nodes in the double-linked list.
 func (e *HeroPool) connect(prev poolIndex, next EIndex) {
-	e.values[prev.sliceIndex()].node.next.setPoolIndex(next)
-	e.values[next].node.prev = prev
+	e.poolEntities[prev.sliceIndex()].node.next.setPoolIndex(next)
+	e.poolEntities[next].node.prev = prev
 }
 
 // invalidateUsedHead moves current used head forward by one node. It
@@ -192,12 +202,12 @@ func (e *HeroPool) invalidateRandomEntity() EIndex {
 func (e *HeroPool) claimFreeHead() EIndex {
 	oldFreeHeadIndex := e.free.head.sliceIndex()
 	// moves head forward
-	e.free.head = e.values[oldFreeHeadIndex].node.next
+	e.free.head = e.poolEntities[oldFreeHeadIndex].node.next
 	// new head should point to an undefined prev,
 	// but we first check if list is not empty, i.e.,
 	// head itself is not undefined.
 	if !e.free.head.isUndefined() {
-		e.values[e.free.head.sliceIndex()].node.prev.setUndefined()
+		e.poolEntities[e.free.head.sliceIndex()].node.prev.setUndefined()
 	}
 
 	// also, we check if the old head and tail are aligned and, if so, update the
@@ -208,8 +218,8 @@ func (e *HeroPool) claimFreeHead() EIndex {
 	}
 
 	// clears pointers of claimed head
-	e.values[oldFreeHeadIndex].node.next.setUndefined()
-	e.values[oldFreeHeadIndex].node.prev.setUndefined()
+	e.poolEntities[oldFreeHeadIndex].node.next.setUndefined()
+	e.poolEntities[oldFreeHeadIndex].node.prev.setUndefined()
 
 	return oldFreeHeadIndex
 }
@@ -223,8 +233,8 @@ func (e *HeroPool) Rem(sliceIndex EIndex) {
 // removing its corresponding linked-list node from the used linked list, and appending
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
 func (e *HeroPool) invalidateEntityAtIndex(sliceIndex EIndex) {
-	prev := e.values[sliceIndex].node.prev
-	next := e.values[sliceIndex].node.next
+	prev := e.poolEntities[sliceIndex].node.prev
+	next := e.poolEntities[sliceIndex].node.next
 
 	if sliceIndex != e.used.head.sliceIndex() && sliceIndex != e.used.tail.sliceIndex() {
 		// links next and prev elements for non-head and non-tail element
@@ -260,10 +270,10 @@ func (e *HeroPool) invalidateEntityAtIndex(sliceIndex EIndex) {
 	}
 
 	// invalidates entity and adds it to free entities.
-	e.values[sliceIndex].id = flow.ZeroID
-	e.values[sliceIndex].entity = nil
-	e.values[sliceIndex].node.next.setUndefined()
-	e.values[sliceIndex].node.prev.setUndefined()
+	e.poolEntities[sliceIndex].id = flow.ZeroID
+	e.poolEntities[sliceIndex].entity = nil
+	e.poolEntities[sliceIndex].node.next.setUndefined()
+	e.poolEntities[sliceIndex].node.prev.setUndefined()
 
 	e.appendToFreeList(sliceIndex)
 
@@ -288,11 +298,11 @@ func (e *HeroPool) appendToFreeList(sliceIndex EIndex) {
 // isInvalidated returns true if linked-list node represented by sliceIndex does not contain
 // a valid entity.
 func (e HeroPool) isInvalidated(sliceIndex EIndex) bool {
-	if e.values[sliceIndex].id != flow.ZeroID {
+	if e.poolEntities[sliceIndex].id != flow.ZeroID {
 		return false
 	}
 
-	if e.values[sliceIndex].entity != nil {
+	if e.poolEntities[sliceIndex].entity != nil {
 		return false
 	}
 

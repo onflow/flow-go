@@ -199,7 +199,7 @@ func testInvalidateAtRandom(t *testing.T, pool *HeroPool, entities []*unittest.M
 	totalEntitiesStored := len(entities)
 	// freeListInitialSize is total number of empty nodes after
 	// storing all items in the list
-	freeListInitialSize := len(pool.values) - totalEntitiesStored
+	freeListInitialSize := len(pool.poolEntities) - totalEntitiesStored
 
 	// (i+1) keeps total invalidated (head) entities.
 	for i := 0; i < totalEntitiesStored; i++ {
@@ -249,7 +249,7 @@ func testInvalidatingHead(t *testing.T, pool *HeroPool, entities []*unittest.Moc
 	totalEntitiesStored := len(entities)
 	// freeListInitialSize is total number of empty nodes after
 	// storing all items in the list
-	freeListInitialSize := len(pool.values) - totalEntitiesStored
+	freeListInitialSize := len(pool.poolEntities) - totalEntitiesStored
 
 	// (i+1) keeps total invalidated (head) entities.
 	for i := 0; i < totalEntitiesStored; i++ {
@@ -335,7 +335,7 @@ func testInvalidatingHead(t *testing.T, pool *HeroPool, entities []*unittest.Moc
 // testInvalidatingHead keeps invalidating the tail and evaluates the underlying free and used linked-lists keep updating its tail and remains connected.
 func testInvalidatingTail(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity) {
 	size := len(entities)
-	offset := len(pool.values) - size
+	offset := len(pool.poolEntities) - size
 	for i := 0; i < size; i++ {
 		// invalidates tail index
 		tailIndex := pool.used.tail.sliceIndex()
@@ -424,29 +424,29 @@ func testInitialization(t *testing.T, pool *HeroPool, _ []*unittest.MockEntity) 
 	require.True(t, pool.used.head.isUndefined())
 	require.True(t, pool.used.tail.isUndefined())
 
-	for i := 0; i < len(pool.values); i++ {
+	for i := 0; i < len(pool.poolEntities); i++ {
 		if i == 0 {
 			// head of "free" linked-list should point to index 0 of entities slice.
 			require.Equal(t, EIndex(i), pool.free.head.sliceIndex())
 			// previous element of head must be undefined (linked-list head feature).
-			require.True(t, pool.values[i].node.prev.isUndefined())
+			require.True(t, pool.poolEntities[i].node.prev.isUndefined())
 		}
 
 		if i != 0 {
 			// except head, any element should point back to its previous index in slice.
-			require.Equal(t, EIndex(i-1), pool.values[i].node.prev.sliceIndex())
+			require.Equal(t, EIndex(i-1), pool.poolEntities[i].node.prev.sliceIndex())
 		}
 
-		if i != len(pool.values)-1 {
+		if i != len(pool.poolEntities)-1 {
 			// except tail, any element should point forward to its next index in slice.
-			require.Equal(t, EIndex(i+1), pool.values[i].node.next.sliceIndex())
+			require.Equal(t, EIndex(i+1), pool.poolEntities[i].node.next.sliceIndex())
 		}
 
-		if i == len(pool.values)-1 {
+		if i == len(pool.poolEntities)-1 {
 			// tail of "free" linked-list should point to the last index in entities slice.
 			require.Equal(t, EIndex(i), pool.free.tail.sliceIndex())
 			// next element of tail must be undefined.
-			require.True(t, pool.values[i].node.next.isUndefined())
+			require.True(t, pool.poolEntities[i].node.next.isUndefined())
 		}
 	}
 }
@@ -458,14 +458,14 @@ func testAddingEntities(t *testing.T, pool *HeroPool, entitiesToBeAdded []*unitt
 		// adding each element must be successful.
 		pool.Add(e.ID(), e, uint64(i))
 
-		if i < len(pool.values) {
+		if i < len(pool.poolEntities) {
 			// in case of no over limit, size of entities linked list should be incremented by each addition.
 			require.Equal(t, pool.Size(), uint32(i+1))
 		}
 
 		if ejectionMode == LRUEjection {
 			// under LRU ejection mode, new entity should be placed at index i in back data
-			_, entity, _ := pool.Get(EIndex(i % len(pool.values)))
+			_, entity, _ := pool.Get(EIndex(i % len(pool.poolEntities)))
 			require.Equal(t, e, entity)
 		}
 
@@ -476,12 +476,12 @@ func testAddingEntities(t *testing.T, pool *HeroPool, entitiesToBeAdded []*unitt
 
 		if ejectionMode == LRUEjection {
 			expectedUsedHead := 0
-			if i >= len(pool.values) {
+			if i >= len(pool.poolEntities) {
 				// we are beyond limit, so LRU ejection must happen and used head must
 				// be moved.
-				expectedUsedHead = (i + 1) % len(pool.values)
+				expectedUsedHead = (i + 1) % len(pool.poolEntities)
 			}
-			require.Equal(t, pool.values[expectedUsedHead].entity, usedHead.entity)
+			require.Equal(t, pool.poolEntities[expectedUsedHead].entity, usedHead.entity)
 			// head must be healthy and point back to undefined.
 			require.True(t, usedHead.node.prev.isUndefined())
 		}
@@ -492,7 +492,7 @@ func testAddingEntities(t *testing.T, pool *HeroPool, entitiesToBeAdded []*unitt
 		require.True(t, usedTail.node.next.isUndefined())
 
 		// free head
-		if i < len(pool.values)-1 {
+		if i < len(pool.poolEntities)-1 {
 			// as long as we are below limit, after adding i element, free head
 			// should move to i+1 element.
 			require.Equal(t, EIndex(i+1), pool.free.head.sliceIndex())
@@ -506,12 +506,12 @@ func testAddingEntities(t *testing.T, pool *HeroPool, entitiesToBeAdded []*unitt
 		}
 
 		// free tail
-		if i < len(pool.values)-1 {
+		if i < len(pool.poolEntities)-1 {
 			// as long as we are below limit, after adding i element, free tail
 			// must keep pointing to last index of the array-based linked-list. In other
 			// words, adding element must not change free tail (since only free head is
 			// updated).
-			require.Equal(t, EIndex(len(pool.values)-1), pool.free.tail.sliceIndex())
+			require.Equal(t, EIndex(len(pool.poolEntities)-1), pool.free.tail.sliceIndex())
 			// head tail be healthy and point next to undefined.
 			require.True(t, freeTail.node.next.isUndefined())
 		} else {
@@ -525,10 +525,10 @@ func testAddingEntities(t *testing.T, pool *HeroPool, entitiesToBeAdded []*unitt
 		// must be reachable within i + 1 steps.
 		// +1 is since we start from index 0 not 1.
 		usedTraverseStep := uint32(i + 1)
-		if i >= len(pool.values) {
+		if i >= len(pool.poolEntities) {
 			// if we are above the limit, head to tail of used linked-list
 			// must be reachable within as many steps as the actual capacity of pool.
-			usedTraverseStep = uint32(len(pool.values))
+			usedTraverseStep = uint32(len(pool.poolEntities))
 		}
 		tailAccessibleFromHead(t,
 			pool.used.head.sliceIndex(),
@@ -546,8 +546,8 @@ func testAddingEntities(t *testing.T, pool *HeroPool, entitiesToBeAdded []*unitt
 		// must be reachable within "limit - i - 1" steps. "limit - i" part is since
 		// when we have i elements in pool, we have "limit - i" free slots, and -1 is
 		// since we start from index 0 not 1.
-		freeTraverseStep := uint32(len(pool.values) - i - 1)
-		if i >= len(pool.values) {
+		freeTraverseStep := uint32(len(pool.poolEntities) - i - 1)
+		if i >= len(pool.poolEntities) {
 			// if we are above the limit, head and tail of free linked-list must be reachable
 			// within 0 steps.
 			// The reason is linked-list is full and adding new elements is done
@@ -570,7 +570,7 @@ func testAddingEntities(t *testing.T, pool *HeroPool, entitiesToBeAdded []*unitt
 // testRetrievingEntitiesFrom evaluates that all entities starting from given index are retrievable from pool.
 func testRetrievingEntitiesFrom(t *testing.T, pool *HeroPool, entities []*unittest.MockEntity, from EIndex) {
 	for i := from; i < EIndex(len(entities)); i++ {
-		actualID, actual, _ := pool.Get(i % EIndex(len(pool.values)))
+		actualID, actual, _ := pool.Get(i % EIndex(len(pool.poolEntities)))
 		require.Equal(t, entities[i].ID(), actualID)
 		require.Equal(t, entities[i], actual)
 	}
@@ -581,8 +581,8 @@ func testRetrievingCount(t *testing.T, pool *HeroPool, entities []*unittest.Mock
 	actualRetrievable := 0
 
 	for i := EIndex(0); i < EIndex(len(entities)); i++ {
-		for j := EIndex(0); j < EIndex(len(pool.values)); j++ {
-			actualID, actual, _ := pool.Get(j % EIndex(len(pool.values)))
+		for j := EIndex(0); j < EIndex(len(pool.poolEntities)); j++ {
+			actualID, actual, _ := pool.Get(j % EIndex(len(pool.poolEntities)))
 			if entities[i].ID() == actualID && entities[i] == actual {
 				actualRetrievable++
 			}
@@ -627,8 +627,8 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		require.False(t, pool.values[index].node.next.isUndefined(), "tail not found, and reached end of list")
-		index = pool.values[index].node.next.sliceIndex()
+		require.False(t, pool.poolEntities[index].node.next.isUndefined(), "tail not found, and reached end of list")
+		index = pool.poolEntities[index].node.next.sliceIndex()
 	}
 }
 
@@ -647,6 +647,6 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		index = pool.values[index].node.prev.sliceIndex()
+		index = pool.poolEntities[index].node.prev.sliceIndex()
 	}
 }
