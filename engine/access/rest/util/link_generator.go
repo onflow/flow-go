@@ -33,29 +33,29 @@ func NewLinkGeneratorImpl(router *mux.Router) *LinkGeneratorImpl {
 }
 
 func (generator *LinkGeneratorImpl) BlockLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.getBlocksByIDRoute, id)
+	return generator.linkForID(rest.GetBlocksByIDRoute, id)
 }
 func (generator *LinkGeneratorImpl) PayloadLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.getBlockPayloadByIDRoute, id)
+	return generator.linkForID(rest.GetBlockPayloadByIDRoute, id)
 }
 func (generator *LinkGeneratorImpl) ExecutionResultLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.getExecutionResultByIDRoute, id)
+	return generator.linkForID(rest.GetExecutionResultByIDRoute, id)
 }
 
 func (generator *LinkGeneratorImpl) TransactionLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.getTransactionByIDRoute, id)
+	return generator.linkForID(rest.GetTransactionByIDRoute, id)
 }
 
 func (generator *LinkGeneratorImpl) TransactionResultLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.getTransactionResultByIDRoute, id)
+	return generator.linkForID(rest.GetTransactionResultByIDRoute, id)
 }
 
 func (generator *LinkGeneratorImpl) CollectionLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.getCollectionByIDRoute, id)
+	return generator.linkForID(rest.GetCollectionByIDRoute, id)
 }
 
 func (generator *LinkGeneratorImpl) AccountLink(address string) (string, error) {
-	return generator.link(rest.getAccountRoute, "address", address)
+	return generator.link(rest.GetAccountRoute, "address", address)
 }
 
 // SelfLink generates the _link key value pair for the response
