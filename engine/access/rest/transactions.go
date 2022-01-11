@@ -7,7 +7,7 @@ import (
 )
 
 // GetTransactionByID gets a transaction by requested ID.
-func getTransactionByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetTransactionByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetTransactionRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)

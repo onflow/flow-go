@@ -15,7 +15,7 @@ var GetTransactionByIDRoute = route{
 	Method:  http.MethodGet,
 	Pattern: "/transactions/{id}",
 	Name:    "getTransactionByID",
-	Handler: getTransactionByID,
+	Handler: GetTransactionByID,
 }
 
 var CreateTransactionRoute = route{
