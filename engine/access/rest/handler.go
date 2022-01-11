@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 
 	"github.com/rs/zerolog"
@@ -80,7 +81,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// apply the select filter if any select fields have been specified
-	response, err = SelectFilter(response, decoratedRequest.Selects())
+	response, err = util.SelectFilter(response, decoratedRequest.Selects())
 	if err != nil {
 		h.errorHandler(w, err, errLog)
 		return
