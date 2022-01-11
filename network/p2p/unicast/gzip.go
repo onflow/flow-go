@@ -31,20 +31,19 @@ func NewGzipCompressedUnicast(logger zerolog.Logger, sporkId flow.Identifier, de
 	}
 }
 
-func (g GzipStream) NewStream(s libp2pnet.Stream) (libp2pnet.Stream, error) {
+// UpgradeRawStream wraps gzip compression and decompression around the plain libp2p stream.
+func (g GzipStream) UpgradeRawStream(s libp2pnet.Stream) (libp2pnet.Stream, error) {
 	return compressed.NewCompressedStream(s, compressor.GzipStreamCompressor{})
 }
 
-func (g GzipStream) Handler() libp2pnet.StreamHandler {
-	return func(s libp2pnet.Stream) {
-		// converts native libp2p stream to gzip-compressed stream
-		s, err := g.NewStream(s)
-		if err != nil {
-			g.logger.Error().Err(err).Msg("could not create compressed stream")
-			return
-		}
-		g.defaultHandler(s)
+func (g GzipStream) Handler(s libp2pnet.Stream) {
+	// converts native libp2p stream to gzip-compressed stream
+	s, err := g.UpgradeRawStream(s)
+	if err != nil {
+		g.logger.Error().Err(err).Msg("could not create compressed stream")
+		return
 	}
+	g.defaultHandler(s)
 }
 
 func (g GzipStream) ProtocolId() protocol.ID {

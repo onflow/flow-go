@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"flaky-test-monitor/common"
 	"os"
 	"sort"
+
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
 // processSummary3TestRun processes a level 2 summary and produces level 3 summary which summarizes:
