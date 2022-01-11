@@ -17,6 +17,9 @@ func runtimeNano() int64
 const (
 	slotsPerBucket = uint64(16)
 
+	// slotAgeUnallocated defines an unallocated slot with zero age.
+	slotAgeUnallocated = uint64(0)
+
 	// telemetryCounterInterval is the number of required interactions with
 	// this back data prior to printing any log. This is done as a slow-down mechanism
 	// to avoid spamming logs upon read/write heavy operations. An interaction can be
@@ -342,7 +345,7 @@ func (c Cache) ownerIndexOf(bucketIndex bIndex, slotIndex sIndex) uint64 {
 // By a linked entity, we mean if the entity has an owner index matching to (bucketIndex, slotIndex).
 // The bool return value corresponds to whether there is a linked entity to this (bucketIndex, slotIndex) or not.
 func (c *Cache) linkedEntityOf(bucketIndex bIndex, slotIndex sIndex) (flow.Identifier, flow.Entity, bool) {
-	if c.buckets[bucketIndex][slotIndex].slotAge == 0 {
+	if c.buckets[bucketIndex][slotIndex].slotAge == slotAgeUnallocated {
 		// slotIndex never used, or recently invalidated, hence
 		// does not have any linked entity
 		return flow.Identifier{}, nil, false
@@ -353,15 +356,14 @@ func (c *Cache) linkedEntityOf(bucketIndex bIndex, slotIndex sIndex) (flow.Ident
 	id, entity, owner := c.entities.Get(valueIndex)
 	if c.ownerIndexOf(bucketIndex, slotIndex) != owner {
 		// entity is not linked to this (bucketIndex, slotIndex)
-		c.buckets[bucketIndex][slotIndex].slotAge = 0
+		c.buckets[bucketIndex][slotIndex].slotAge = slotAgeUnallocated
 		return flow.Identifier{}, nil, false
 	}
 
 	return id, entity, true
 }
 
-// logTelemetry prints telemetry logs depending on number of interactions and
-// last time telemetry has been logged.
+// logTelemetry prints telemetry logs depending on number of interactions and last time telemetry has been logged.
 func (c *Cache) logTelemetry() {
 	c.interactionCounter++
 	if c.interactionCounter < telemetryCounterInterval {
@@ -391,7 +393,7 @@ func (c *Cache) logTelemetry() {
 
 // deallocateSlot marks slot as free so that it is ready to be re-used.
 func (c *Cache) deallocateSlot(bucketIndex bIndex, slotIndex sIndex) {
-	c.buckets[bucketIndex][slotIndex].slotAge = 0
+	c.buckets[bucketIndex][slotIndex].slotAge = slotAgeUnallocated
 }
 
 // invalidateEntity removes the entity linked to the specified slot from the underlying entities
