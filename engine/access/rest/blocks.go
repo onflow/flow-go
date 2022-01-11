@@ -98,10 +98,13 @@ func getBlockPayloadByID(r *request.Request, backend access.API, _ LinkGenerator
 	if statusErr != nil {
 		return nil, statusErr
 	}
-	payload, err := blockPayloadResponse(blk.Payload)
+
+	var payload models.BlockPayload
+	err = payload.Build(blk.Payload)
 	if err != nil {
 		return nil, err
 	}
+
 	return payload, nil
 }
 
@@ -115,18 +118,27 @@ func getBlock(option blockProviderOption, req *request.Request, backend access.A
 
 	// lookup execution result
 	// (even if not specified as expandable, since we need the execution result ID to generate its expandable link)
+	var block models.Block
 	executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), blk.ID())
 	if err != nil {
 		// handle case where execution result is not yet available
 		if se, ok := status.FromError(err); ok {
 			if se.Code() == codes.NotFound {
-				return blockResponse(blk, nil, link, req.ExpandFields)
+				err := block.Build(blk, nil, link, req.ExpandFields)
+				if err != nil {
+					return nil, err
+				}
+				return &block, nil
 			}
 		}
 		return nil, err
 	}
 
-	return blockResponse(blk, executionResult, link, req.ExpandFields)
+	err = block.Build(blk, executionResult, link, req.ExpandFields)
+	if err != nil {
+		return nil, err
+	}
+	return &block, nil
 }
 
 // blockProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to

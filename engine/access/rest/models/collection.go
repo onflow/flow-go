@@ -38,3 +38,26 @@ func (c *Collection) Build(
 
 	return nil
 }
+
+func (c *CollectionGuarantee) Build(guarantee *flow.CollectionGuarantee) {
+	signerIDs := make([]string, len(guarantee.SignerIDs))
+	for i, signerID := range guarantee.SignerIDs {
+		signerIDs[i] = signerID.String()
+	}
+
+	c.CollectionId = guarantee.CollectionID.String()
+	c.SignerIds = signerIDs
+	c.Signature = toBase64(guarantee.Signature.Bytes())
+}
+
+type CollectionGuarantees []CollectionGuarantee
+
+func (c *CollectionGuarantees) Build(guarantees []*flow.CollectionGuarantee) {
+	collGuarantees := make([]CollectionGuarantee, len(guarantees))
+	for i, g := range guarantees {
+		var col CollectionGuarantee
+		col.Build(g)
+		collGuarantees[i] = col
+	}
+	*c = collGuarantees
+}
