@@ -171,9 +171,10 @@ func toSignature(signature string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid signature encoding")
 	}
-	if len(signatureBytes) != signatureLength {
-		return nil, errors.New("invalid signature length")
-	}
+	// TODO: fix the signature length validation
+	//if len(signatureBytes) != signatureLength {
+	//	return nil, errors.New("invalid signature length")
+	//}
 	return signatureBytes, nil
 }
 
