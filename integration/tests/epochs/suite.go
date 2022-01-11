@@ -410,8 +410,7 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	return result, nil
 }
 
-
-func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Environment, nodeID flow.Identifier)  {
+func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
 	result, err := s.submitAdminRemoveNodeTx(ctx, env, nodeID)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
@@ -580,7 +579,7 @@ func (s *Suite) assertInPhase(ctx context.Context, expectedPhase flow.EpochPhase
 }
 
 // assertEpochCounter requires actual epoch counter is equal to counter provided
-func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64)  {
+func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) {
 	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	actualCounter, err := snapshot.Epochs().Current().Counter()
@@ -622,7 +621,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // assertNetworkHealthyAfterVNChange after an verification node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
-func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo)  {
+func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	bootstrapHead, err := rootSnapshot.Head()
 	require.NoError(s.T(), err)
 
