@@ -13,22 +13,22 @@ type poolIndex struct {
 
 // isUndefined returns true if this poolIndex is set to zero. An undefined
 // poolIndex is equivalent to a nil address-based one.
-func (d poolIndex) isUndefined() bool {
-	return d.index == uint32(0)
+func (p poolIndex) isUndefined() bool {
+	return p.index == uint32(0)
 }
 
 // setUndefined sets poolIndex to its undefined (i.e., nil equivalent) value.
-func (d *poolIndex) setUndefined() {
-	d.index = uint32(0)
+func (p *poolIndex) setUndefined() {
+	p.index = uint32(0)
 }
 
 // sliceIndex returns the slice-index equivalent of the poolIndex.
-func (d poolIndex) sliceIndex() EIndex {
-	return EIndex(d.index) - 1
+func (p poolIndex) sliceIndex() EIndex {
+	return EIndex(p.index) - 1
 }
 
 // setPoolIndex converts the input slice-based index into a pool index and
 // sets the underlying poolIndex.
-func (d *poolIndex) setPoolIndex(sliceIndex EIndex) {
-	d.index = uint32(sliceIndex + 1)
+func (p *poolIndex) setPoolIndex(sliceIndex EIndex) {
+	p.index = uint32(sliceIndex + 1)
 }

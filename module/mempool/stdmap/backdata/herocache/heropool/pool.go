@@ -65,244 +65,244 @@ func NewHeroPool(limit uint32, ejectionMode EjectionMode) *Pool {
 }
 
 // initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
-func (e *Pool) initFreeEntities() {
-	e.free.head.setPoolIndex(0)
-	e.free.tail.setPoolIndex(0)
+func (p *Pool) initFreeEntities() {
+	p.free.head.setPoolIndex(0)
+	p.free.tail.setPoolIndex(0)
 
-	for i := 1; i < len(e.poolEntities); i++ {
+	for i := 1; i < len(p.poolEntities); i++ {
 		// appends slice index i to tail of free linked list
-		e.connect(e.free.tail, EIndex(i))
+		p.connect(p.free.tail, EIndex(i))
 		// and updates its tail
-		e.free.tail.setPoolIndex(EIndex(i))
+		p.free.tail.setPoolIndex(EIndex(i))
 	}
 }
 
 // Add writes given entity into a poolEntity on the underlying entities linked-list. Return value is
 // the index at which given entity is written on entities linked-list so that it can be accessed directly later.
-func (e *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) EIndex {
-	entityIndex := e.sliceIndexForEntity()
-	e.poolEntities[entityIndex].entity = entity
-	e.poolEntities[entityIndex].id = entityId
-	e.poolEntities[entityIndex].owner = owner
-	e.poolEntities[entityIndex].node.next.setUndefined()
-	e.poolEntities[entityIndex].node.prev.setUndefined()
+func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) EIndex {
+	entityIndex := p.sliceIndexForEntity()
+	p.poolEntities[entityIndex].entity = entity
+	p.poolEntities[entityIndex].id = entityId
+	p.poolEntities[entityIndex].owner = owner
+	p.poolEntities[entityIndex].node.next.setUndefined()
+	p.poolEntities[entityIndex].node.prev.setUndefined()
 
-	if e.used.head.isUndefined() {
+	if p.used.head.isUndefined() {
 		// used list is empty, hence setting head of used list to current entityIndex.
-		e.used.head.setPoolIndex(entityIndex)
-		e.poolEntities[e.used.head.sliceIndex()].node.prev.setUndefined()
+		p.used.head.setPoolIndex(entityIndex)
+		p.poolEntities[p.used.head.sliceIndex()].node.prev.setUndefined()
 	}
 
-	if !e.used.tail.isUndefined() {
+	if !p.used.tail.isUndefined() {
 		// links new entity to the tail
-		e.connect(e.used.tail, entityIndex)
+		p.connect(p.used.tail, entityIndex)
 	}
 
 	// since we are appending to the used list, entityIndex also acts as tail of the list.
-	e.used.tail.setPoolIndex(entityIndex)
+	p.used.tail.setPoolIndex(entityIndex)
 
-	e.size++
+	p.size++
 	return entityIndex
 }
 
 // Get returns entity corresponding to the entity index from the underlying list.
-func (e Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
-	return e.poolEntities[entityIndex].id, e.poolEntities[entityIndex].entity, e.poolEntities[entityIndex].owner
+func (p Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
+	return p.poolEntities[entityIndex].id, p.poolEntities[entityIndex].entity, p.poolEntities[entityIndex].owner
 }
 
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
-func (e *Pool) sliceIndexForEntity() EIndex {
-	if e.free.head.isUndefined() {
+func (p *Pool) sliceIndexForEntity() EIndex {
+	if p.free.head.isUndefined() {
 		// the free list is empty, so we are out of space, and we need to eject.
-		if e.ejectionMode == RandomEjection {
+		if p.ejectionMode == RandomEjection {
 			// turning a random entity into a free head.
-			e.invalidateRandomEntity()
+			p.invalidateRandomEntity()
 		} else {
 			// LRU ejection
 			// the used head is the oldest entity, so we turn the used head to a free head here.
-			e.invalidateUsedHead()
+			p.invalidateUsedHead()
 		}
 	}
 
 	// claiming the head of free list as the slice index for the next entity to be added
-	return e.claimFreeHead()
+	return p.claimFreeHead()
 }
 
 // Size returns total number of entities that this list maintains.
-func (e Pool) Size() uint32 {
-	return e.size
+func (p Pool) Size() uint32 {
+	return p.size
 }
 
 // getHeads returns entities corresponding to the used and free heads.
-func (e Pool) getHeads() (*poolEntity, *poolEntity) {
+func (p Pool) getHeads() (*poolEntity, *poolEntity) {
 	var usedHead, freeHead *poolEntity
-	if !e.used.head.isUndefined() {
-		usedHead = &e.poolEntities[e.used.head.sliceIndex()]
+	if !p.used.head.isUndefined() {
+		usedHead = &p.poolEntities[p.used.head.sliceIndex()]
 	}
 
-	if !e.free.head.isUndefined() {
-		freeHead = &e.poolEntities[e.free.head.sliceIndex()]
+	if !p.free.head.isUndefined() {
+		freeHead = &p.poolEntities[p.free.head.sliceIndex()]
 	}
 
 	return usedHead, freeHead
 }
 
 // getTails returns entities corresponding to the used and free tails.
-func (e Pool) getTails() (*poolEntity, *poolEntity) {
+func (p Pool) getTails() (*poolEntity, *poolEntity) {
 	var usedTail, freeTail *poolEntity
-	if !e.used.tail.isUndefined() {
-		usedTail = &e.poolEntities[e.used.tail.sliceIndex()]
+	if !p.used.tail.isUndefined() {
+		usedTail = &p.poolEntities[p.used.tail.sliceIndex()]
 	}
 
-	if !e.free.tail.isUndefined() {
-		freeTail = &e.poolEntities[e.free.tail.sliceIndex()]
+	if !p.free.tail.isUndefined() {
+		freeTail = &p.poolEntities[p.free.tail.sliceIndex()]
 	}
 
 	return usedTail, freeTail
 }
 
 // connect links the prev and next nodes as the adjacent nodes in the double-linked list.
-func (e *Pool) connect(prev poolIndex, next EIndex) {
-	e.poolEntities[prev.sliceIndex()].node.next.setPoolIndex(next)
-	e.poolEntities[next].node.prev = prev
+func (p *Pool) connect(prev poolIndex, next EIndex) {
+	p.poolEntities[prev.sliceIndex()].node.next.setPoolIndex(next)
+	p.poolEntities[next].node.prev = prev
 }
 
 // invalidateUsedHead moves current used head forward by one node. It
 // also removes the entity the invalidated head is presenting and appends the
 // node represented by the used head to the tail of the free list.
-func (e *Pool) invalidateUsedHead() EIndex {
-	headSliceIndex := e.used.head.sliceIndex()
-	e.invalidateEntityAtIndex(headSliceIndex)
+func (p *Pool) invalidateUsedHead() EIndex {
+	headSliceIndex := p.used.head.sliceIndex()
+	p.invalidateEntityAtIndex(headSliceIndex)
 
 	return headSliceIndex
 }
 
 // invalidateRandomEntity invalidates a random node from the used linked list, and appends it to the tail of the free list.
 // It also removes the entity that the invalidated node is presenting.
-func (e *Pool) invalidateRandomEntity() EIndex {
+func (p *Pool) invalidateRandomEntity() EIndex {
 	// in order not to keep failing on finding a random valid node to invalidate,
 	// we only try a limited number of times, and if we fail all, we invalidate the used head.
-	var index = e.used.head.sliceIndex()
+	var index = p.used.head.sliceIndex()
 
 	for i := 0; i < maximumRandomTrials; i++ {
-		candidate := EIndex(rand.Uint32() % e.size)
-		if !e.isInvalidated(candidate) {
+		candidate := EIndex(rand.Uint32() % p.size)
+		if !p.isInvalidated(candidate) {
 			// found a valid entity to invalidate
 			index = candidate
 			break
 		}
 	}
 
-	e.invalidateEntityAtIndex(index)
+	p.invalidateEntityAtIndex(index)
 	return index
 }
 
 // claimFreeHead moves the free head forward, and returns the slice index of the
 // old free head to host a new entity.
-func (e *Pool) claimFreeHead() EIndex {
-	oldFreeHeadIndex := e.free.head.sliceIndex()
+func (p *Pool) claimFreeHead() EIndex {
+	oldFreeHeadIndex := p.free.head.sliceIndex()
 	// moves head forward
-	e.free.head = e.poolEntities[oldFreeHeadIndex].node.next
+	p.free.head = p.poolEntities[oldFreeHeadIndex].node.next
 	// new head should point to an undefined prev,
 	// but we first check if list is not empty, i.e.,
 	// head itself is not undefined.
-	if !e.free.head.isUndefined() {
-		e.poolEntities[e.free.head.sliceIndex()].node.prev.setUndefined()
+	if !p.free.head.isUndefined() {
+		p.poolEntities[p.free.head.sliceIndex()].node.prev.setUndefined()
 	}
 
 	// also, we check if the old head and tail are aligned and, if so, update the
 	// tail as well. This happens when we claim the only existing
 	// node of the free list.
-	if e.free.tail.sliceIndex() == oldFreeHeadIndex {
-		e.free.tail.setUndefined()
+	if p.free.tail.sliceIndex() == oldFreeHeadIndex {
+		p.free.tail.setUndefined()
 	}
 
 	// clears pointers of claimed head
-	e.poolEntities[oldFreeHeadIndex].node.next.setUndefined()
-	e.poolEntities[oldFreeHeadIndex].node.prev.setUndefined()
+	p.poolEntities[oldFreeHeadIndex].node.next.setUndefined()
+	p.poolEntities[oldFreeHeadIndex].node.prev.setUndefined()
 
 	return oldFreeHeadIndex
 }
 
 // Rem removes entity corresponding to given sliceIndex from the list.
-func (e *Pool) Rem(sliceIndex EIndex) {
-	e.invalidateEntityAtIndex(sliceIndex)
+func (p *Pool) Rem(sliceIndex EIndex) {
+	p.invalidateEntityAtIndex(sliceIndex)
 }
 
 // invalidateEntityAtIndex invalidates the given sliceIndex in the linked list by
 // removing its corresponding linked-list node from the used linked list, and appending
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
-func (e *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
-	prev := e.poolEntities[sliceIndex].node.prev
-	next := e.poolEntities[sliceIndex].node.next
+func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
+	prev := p.poolEntities[sliceIndex].node.prev
+	next := p.poolEntities[sliceIndex].node.next
 
-	if sliceIndex != e.used.head.sliceIndex() && sliceIndex != e.used.tail.sliceIndex() {
+	if sliceIndex != p.used.head.sliceIndex() && sliceIndex != p.used.tail.sliceIndex() {
 		// links next and prev elements for non-head and non-tail element
-		e.connect(prev, next.sliceIndex())
+		p.connect(prev, next.sliceIndex())
 	}
 
-	if sliceIndex == e.used.head.sliceIndex() {
+	if sliceIndex == p.used.head.sliceIndex() {
 		// invalidating used head
 		// moves head forward
-		oldUsedHead, _ := e.getHeads()
-		e.used.head = oldUsedHead.node.next
+		oldUsedHead, _ := p.getHeads()
+		p.used.head = oldUsedHead.node.next
 		// new head should point to an undefined prev,
 		// but we first check if list is not empty, i.e.,
 		// head itself is not undefined.
-		if !e.used.head.isUndefined() {
-			usedHead, _ := e.getHeads()
+		if !p.used.head.isUndefined() {
+			usedHead, _ := p.getHeads()
 			usedHead.node.prev.setUndefined()
 		}
 	}
 
-	if sliceIndex == e.used.tail.sliceIndex() {
+	if sliceIndex == p.used.tail.sliceIndex() {
 		// invalidating used tail
 		// moves tail backward
-		oldUsedTail, _ := e.getTails()
-		e.used.tail = oldUsedTail.node.prev
+		oldUsedTail, _ := p.getTails()
+		p.used.tail = oldUsedTail.node.prev
 		// new head should point tail to an undefined next,
 		// but we first check if list is not empty, i.e.,
 		// tail itself is not undefined.
-		if !e.used.tail.isUndefined() {
-			usedTail, _ := e.getTails()
+		if !p.used.tail.isUndefined() {
+			usedTail, _ := p.getTails()
 			usedTail.node.next.setUndefined()
 		}
 	}
 
 	// invalidates entity and adds it to free entities.
-	e.poolEntities[sliceIndex].id = flow.ZeroID
-	e.poolEntities[sliceIndex].entity = nil
-	e.poolEntities[sliceIndex].node.next.setUndefined()
-	e.poolEntities[sliceIndex].node.prev.setUndefined()
+	p.poolEntities[sliceIndex].id = flow.ZeroID
+	p.poolEntities[sliceIndex].entity = nil
+	p.poolEntities[sliceIndex].node.next.setUndefined()
+	p.poolEntities[sliceIndex].node.prev.setUndefined()
 
-	e.appendToFreeList(sliceIndex)
+	p.appendToFreeList(sliceIndex)
 
 	// decrements Size
-	e.size--
+	p.size--
 }
 
 // appendToFreeList appends linked-list node represented by sliceIndex to tail of free list.
-func (e *Pool) appendToFreeList(sliceIndex EIndex) {
-	if e.free.head.isUndefined() {
+func (p *Pool) appendToFreeList(sliceIndex EIndex) {
+	if p.free.head.isUndefined() {
 		// free list is empty
-		e.free.head.setPoolIndex(sliceIndex)
-		e.free.tail.setPoolIndex(sliceIndex)
+		p.free.head.setPoolIndex(sliceIndex)
+		p.free.tail.setPoolIndex(sliceIndex)
 		return
 	}
 
 	// appends to the tail, and updates the tail
-	e.connect(e.free.tail, sliceIndex)
-	e.free.tail.setPoolIndex(sliceIndex)
+	p.connect(p.free.tail, sliceIndex)
+	p.free.tail.setPoolIndex(sliceIndex)
 }
 
 // isInvalidated returns true if linked-list node represented by sliceIndex does not contain
 // a valid entity.
-func (e Pool) isInvalidated(sliceIndex EIndex) bool {
-	if e.poolEntities[sliceIndex].id != flow.ZeroID {
+func (p Pool) isInvalidated(sliceIndex EIndex) bool {
+	if p.poolEntities[sliceIndex].id != flow.ZeroID {
 		return false
 	}
 
-	if e.poolEntities[sliceIndex].entity != nil {
+	if p.poolEntities[sliceIndex].entity != nil {
 		return false
 	}
 
