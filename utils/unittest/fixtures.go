@@ -369,6 +369,12 @@ func WithHeaderHeight(height uint64) func(header *flow.Header) {
 	}
 }
 
+func HeaderWithView(view uint64) func(*flow.Header) {
+	return func(header *flow.Header) {
+		header.View = view
+	}
+}
+
 func BlockHeaderFixture(opts ...func(header *flow.Header)) flow.Header {
 	height := uint64(rand.Uint32())
 	view := height + uint64(rand.Intn(1000))
@@ -898,11 +904,13 @@ func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.No
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
+	stakingKey := StakingPrivKeyByIdentifier(nodeID)
 	identity := flow.Identity{
-		NodeID:  nodeID,
-		Address: fmt.Sprintf("address-%v", nodeID[0:7]),
-		Role:    flow.RoleConsensus,
-		Stake:   1000,
+		NodeID:        nodeID,
+		Address:       fmt.Sprintf("address-%v", nodeID[0:7]),
+		Role:          flow.RoleConsensus,
+		Stake:         1000,
+		StakingPubKey: stakingKey.PublicKey(),
 	}
 	for _, apply := range opts {
 		apply(&identity)
@@ -1381,8 +1389,25 @@ func SeedFixtures(m int, n int) [][]byte {
 	return seeds
 }
 
+// BlockEventsFixture returns a block events model populated with random events of length n.
+func BlockEventsFixture(header flow.Header, n int) flow.BlockEvents {
+	types := []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
+
+	events := make([]flow.Event, n)
+	for i := 0; i < n; i++ {
+		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
+	}
+
+	return flow.BlockEvents{
+		BlockID:        header.ID(),
+		BlockHeight:    header.Height,
+		BlockTimestamp: header.Timestamp,
+		Events:         events,
+	}
+}
+
 // EventFixture returns an event
-func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier, payloadSize int) flow.Event {
+func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier, _ int) flow.Event {
 	return flow.Event{
 		Type:             eType,
 		TransactionIndex: transactionIndex,
@@ -1786,6 +1811,21 @@ func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.Priv
 		panic(err)
 	}
 	return sk
+}
+
+// PrivateKeyFixtureByIdentifier returns a private key for a given node.
+// given the same identifier, it will always return the same private key
+func PrivateKeyFixtureByIdentifier(algo crypto.SigningAlgorithm, seedLength int, id flow.Identifier) crypto.PrivateKey {
+	seed := append(id[:], id[:]...)
+	sk, err := crypto.GeneratePrivateKey(algo, seed[:seedLength])
+	if err != nil {
+		panic(err)
+	}
+	return sk
+}
+
+func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
+	return PrivateKeyFixtureByIdentifier(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381, id)
 }
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key
