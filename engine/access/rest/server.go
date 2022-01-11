@@ -15,17 +15,17 @@ import (
 
 // all route names
 const (
-	getTransactionByIDRoute          = "getTransactionByID"
-	getTransactionResultByIDRoute    = "getTransactionResultByID"
-	createTransactionRoute           = "createTransaction"
-	getBlocksByIDRoute               = "getBlocksByIDs"
-	getBlocksByHeightRoute           = "getBlocksByHeight"
-	getCollectionByIDRoute           = "getCollectionByID"
-	executeScriptRoute               = "executeScript"
-	getBlockPayloadByIDRoute         = "getBlockPayloadByID"
-	getExecutionResultByBlockIDRoute = "getExecutionResultByBlockID"
-	getExecutionResultByIDRoute      = "getExecutionResultByID"
-	getAccountRoute                  = "getAccount"
+	GetTransactionByIDRoute          = "getTransactionByID"
+	GetTransactionResultByIDRoute    = "getTransactionResultByID"
+	CreateTransactionRoute           = "createTransaction"
+	GetBlocksByIDRoute               = "getBlocksByIDs"
+	GetBlocksByHeightRoute           = "getBlocksByHeight"
+	GetCollectionByIDRoute           = "getCollectionByID"
+	ExecuteScriptRoute               = "executeScript"
+	GetBlockPayloadByIDRoute         = "getBlockPayloadByID"
+	GetExecutionResultByBlockIDRoute = "getExecutionResultByBlockID"
+	GetExecutionResultByIDRoute      = "getExecutionResultByID"
+	GetAccountRoute                  = "getAccount"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -97,72 +97,72 @@ func routeDefinitions() []routeDefinition {
 		{
 			method:  http.MethodGet,
 			pattern: "/transactions/{id}",
-			name:    getTransactionByIDRoute,
+			name:    GetTransactionByIDRoute,
 			handler: getTransactionByID,
 		}, {
 			method:  http.MethodPost,
 			pattern: "/transactions",
-			name:    createTransactionRoute,
+			name:    CreateTransactionRoute,
 			handler: createTransaction,
 		},
 		// Transaction Results
 		{
 			method:  http.MethodGet,
 			pattern: "/transaction_results/{id}",
-			name:    getTransactionResultByIDRoute,
+			name:    GetTransactionResultByIDRoute,
 			handler: getTransactionResultByID,
 		},
 		// Blocks
 		{
 			method:  http.MethodGet,
 			pattern: "/blocks/{id}",
-			name:    getBlocksByIDRoute,
+			name:    GetBlocksByIDRoute,
 			handler: getBlocksByIDs,
 		}, {
 			method:  http.MethodGet,
 			pattern: "/blocks",
-			name:    getBlocksByHeightRoute,
+			name:    GetBlocksByHeightRoute,
 			handler: getBlocksByHeight,
 		},
 		// Block Payload
 		{
 			method:  http.MethodGet,
 			pattern: "/blocks/{id}/payload",
-			name:    getBlockPayloadByIDRoute,
+			name:    GetBlockPayloadByIDRoute,
 			handler: getBlockPayloadByID,
 		},
 		// Execution Result
 		{
 			method:  http.MethodGet,
 			pattern: "/execution_results/{id}",
-			name:    getExecutionResultByIDRoute,
+			name:    GetExecutionResultByIDRoute,
 			handler: getExecutionResultByID,
 		},
 		{
 			method:  http.MethodGet,
 			pattern: "/execution_results",
-			name:    getExecutionResultByBlockIDRoute,
+			name:    GetExecutionResultByBlockIDRoute,
 			handler: getExecutionResultsByBlockIDs,
 		},
 		// Collections
 		{
 			method:  http.MethodGet,
 			pattern: "/collections/{id}",
-			name:    getCollectionByIDRoute,
+			name:    GetCollectionByIDRoute,
 			handler: getCollectionByID,
 		},
 		// Scripts
 		{
 			method:  http.MethodPost,
 			pattern: "/scripts",
-			name:    executeScriptRoute,
+			name:    ExecuteScriptRoute,
 			handler: executeScript,
 		},
 		// Accounts
 		{
 			method:  http.MethodGet,
 			pattern: "/accounts/{address}",
-			name:    getAccountRoute,
+			name:    GetAccountRoute,
 			handler: getAccount,
 		}}
 }
