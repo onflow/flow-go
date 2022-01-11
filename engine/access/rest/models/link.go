@@ -3,7 +3,29 @@ package models
 import (
 	"github.com/gorilla/mux"
 	"github.com/onflow/flow-go/model/flow"
+	"strings"
 )
+
+func (l *Links) Build(link string, err error) error {
+	if err != nil {
+		return err
+	}
+
+	l.Self = link
+	return nil
+}
+
+const getAccountLink = "/v1/accounts/{address}"
+
+func (l *Links) BuildAccount(address flow.Address) {
+	l.Self = buildAddressLink(getAccountLink, address)
+}
+
+func buildAddressLink(link string, address flow.Address) string {
+	return strings.ReplaceAll(link, "{address}", address.String())
+}
+
+func buildIdLink() {}
 
 // LinkGenerator generates the expandable value for the known endpoints
 // e.g. "/v1/blocks/c5e935bc75163db82e4a6cf9dc3b54656709d3e21c87385138300abd479c33b7"
@@ -15,15 +37,6 @@ type LinkGenerator interface {
 	ExecutionResultLink(id flow.Identifier) (string, error)
 	AccountLink(address string) (string, error)
 	CollectionLink(id flow.Identifier) (string, error)
-}
-
-func (l *Links) Build(link string, err error) error {
-	if err != nil {
-		return err
-	}
-
-	l.Self = link
-	return nil
 }
 
 type LinkFunc func(id flow.Identifier) (string, error)
