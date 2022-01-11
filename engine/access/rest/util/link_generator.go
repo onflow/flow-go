@@ -2,9 +2,7 @@ package util
 
 import (
 	"github.com/gorilla/mux"
-	"github.com/onflow/flow-go/engine/access/rest/handlers"
-	"github.com/onflow/flow-go/engine/access/rest/models"
-
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -33,42 +31,42 @@ func NewLinkGeneratorImpl(router *mux.Router) *LinkGeneratorImpl {
 }
 
 func (generator *LinkGeneratorImpl) BlockLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(handlers.GetBlocksByIDsRoute.Name, id)
+	return generator.linkForID(rest.GetBlocksByIDsRoute.Name, id)
 }
 func (generator *LinkGeneratorImpl) PayloadLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(handlers.GetBlockPayloadByIDRoute.Name, id)
+	return generator.linkForID(rest.GetBlockPayloadByIDRoute.Name, id)
 }
 func (generator *LinkGeneratorImpl) ExecutionResultLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(handlers.GetExecutionResultByIDRoute.Name, id)
+	return generator.linkForID(rest.GetExecutionResultByIDRoute.Name, id)
 }
 
 func (generator *LinkGeneratorImpl) TransactionLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(handlers.GetTransactionByIDRoute.Name, id)
+	return generator.linkForID(rest.GetTransactionByIDRoute.Name, id)
 }
 
 func (generator *LinkGeneratorImpl) TransactionResultLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(handlers.GetTransactionResultByIDRoute.Name, id)
+	return generator.linkForID(rest.GetTransactionResultByIDRoute.Name, id)
 }
 
 func (generator *LinkGeneratorImpl) CollectionLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(handlers.GetCollectionByIDRoute.Name, id)
+	return generator.linkForID(rest.GetCollectionByIDRoute.Name, id)
 }
 
 func (generator *LinkGeneratorImpl) AccountLink(address string) (string, error) {
-	return generator.link(handlers.GetAccountRoute.Name, "address", address)
+	return generator.link(rest.GetAccountRoute.Name, "address", address)
 }
 
 // SelfLink generates the _link key value pair for the response
 // e.g.
 // "_links": { "_self": "/v1/blocks/c5e935bc75163db82e4a6cf9dc3b54656709d3e21c87385138300abd479c33b7" sx}
-func SelfLink(id flow.Identifier, linkFun LinkFunc) (*models.Links, error) {
+func SelfLink(id flow.Identifier, linkFun LinkFunc) (*Link, error) {
 	url, err := linkFun(id)
 	if err != nil {
 		return nil, err
 	}
-	return &models.Links{
-		Self: url,
-	}, nil
+	var link Link
+	link.Build(url)
+	return &link, nil
 }
 
 func (generator *LinkGeneratorImpl) linkForID(route string, id flow.Identifier) (string, error) {
