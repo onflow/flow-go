@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 
 	"google.golang.org/grpc/codes"
@@ -17,7 +16,7 @@ import (
 )
 
 // getBlocksByID gets blocks by provided ID or list of IDs.
-func getBlocksByIDs(r *request.Request, backend access.API, link util.LinkGenerator) (interface{}, error) {
+func GetBlocksByIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockByIDsRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -35,7 +34,7 @@ func getBlocksByIDs(r *request.Request, backend access.API, link util.LinkGenera
 	return blocks, nil
 }
 
-func getBlocksByHeight(r *request.Request, backend access.API, link util.LinkGenerator) (interface{}, error) {
+func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -87,8 +86,8 @@ func getBlocksByHeight(r *request.Request, backend access.API, link util.LinkGen
 	return blocks, nil
 }
 
-// getBlockPayloadByID gets block payload by ID
-func getBlockPayloadByID(r *request.Request, backend access.API, _ util.LinkGenerator) (interface{}, error) {
+// GetBlockPayloadByID gets block payload by ID
+func GetBlockPayloadByID(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockPayloadRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -109,7 +108,7 @@ func getBlockPayloadByID(r *request.Request, backend access.API, _ util.LinkGene
 	return payload, nil
 }
 
-func getBlock(option blockProviderOption, req *request.Request, backend access.API, link util.LinkGenerator) (*models.Block, error) {
+func getBlock(option blockProviderOption, req *request.Request, backend access.API, link models.LinkGenerator) (*models.Block, error) {
 	// lookup block
 	blkProvider := NewBlockProvider(backend, option)
 	blk, err := blkProvider.getBlock(req.Context())

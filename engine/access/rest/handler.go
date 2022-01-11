@@ -25,7 +25,7 @@ type Validator interface {
 type ApiHandlerFunc func(
 	r *request.Request,
 	backend access.API,
-	generator util.LinkGenerator,
+	generator models.LinkGenerator,
 ) (interface{}, error)
 
 // Handler is custom http handler implementing custom handler function.
@@ -34,7 +34,7 @@ type ApiHandlerFunc func(
 type Handler struct {
 	logger         zerolog.Logger
 	backend        access.API
-	linkGenerator  util.LinkGenerator
+	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 	validator      Validator
 }
@@ -43,7 +43,7 @@ func NewHandler(
 	logger zerolog.Logger,
 	backend access.API,
 	handlerFunc ApiHandlerFunc,
-	generator util.LinkGenerator,
+	generator models.LinkGenerator,
 	validator Validator,
 ) *Handler {
 	return &Handler{

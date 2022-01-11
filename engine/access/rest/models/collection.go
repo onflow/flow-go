@@ -1,7 +1,6 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -10,10 +9,10 @@ const ExpandsTransactions = "transactions"
 func (c *Collection) Build(
 	collection *flow.LightCollection,
 	txs []*flow.TransactionBody,
-	link util.LinkGenerator,
+	link LinkGenerator,
 	expand map[string]bool) error {
 
-	self, err := util.SelfLink(collection.ID(), link.CollectionLink)
+	self, err := SelfLink(collection.ID(), link.CollectionLink)
 	if err != nil {
 		return err
 	}
@@ -48,7 +47,7 @@ func (c *CollectionGuarantee) Build(guarantee *flow.CollectionGuarantee) {
 
 	c.CollectionId = guarantee.CollectionID.String()
 	c.SignerIds = signerIDs
-	c.Signature = toBase64(guarantee.Signature.Bytes())
+	c.Signature = ToBase64(guarantee.Signature.Bytes())
 }
 
 type CollectionGuarantees []CollectionGuarantee

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"net/http"
 	"net/url"
 	"testing"
@@ -51,7 +52,7 @@ func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"script":             toBase64(tx.Script),
+		"script":             models.ToBase64(tx.Script),
 		"arguments":          tx.Arguments,
 		"reference_block_id": tx.ReferenceBlockID.String(),
 		"gas_limit":          fmt.Sprintf("%d", tx.GasLimit),
@@ -66,7 +67,7 @@ func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 			"address":      tx.EnvelopeSignatures[0].Address.String(),
 			"signer_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].SignerIndex),
 			"key_index":    fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
-			"signature":    toBase64(tx.EnvelopeSignatures[0].Signature),
+			"signature":    models.ToBase64(tx.EnvelopeSignatures[0].Signature),
 		}},
 	}
 }
@@ -114,7 +115,7 @@ func TestGetTransactions(t *testing.T) {
 					"result": "/v1/transaction_results/%s"
 				}
 			}`,
-			tx.ID(), tx.ReferenceBlockID, toBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
+			tx.ID(), tx.ReferenceBlockID, models.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
 
 		assertOKResponse(t, req, expected, backend)
 	})
@@ -182,7 +183,7 @@ func TestGetTransactions(t *testing.T) {
 				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
-			tx.ID(), tx.ReferenceBlockID, toBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, tx.ID(), tx.ID(), tx.ID())
+			tx.ID(), tx.ReferenceBlockID, models.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, tx.ID(), tx.ID(), tx.ID())
 		assertOKResponse(t, req, expected, backend)
 	})
 
@@ -248,7 +249,7 @@ func TestGetTransactionResult(t *testing.T) {
 			"_links": {
 				"_self": "/v1/transaction_results/%s"
 			}
-		}`, bid.String(), id.String(), toBase64(txr.Events[0].Payload), id.String())
+		}`, bid.String(), id.String(), models.ToBase64(txr.Events[0].Payload), id.String())
 		assertOKResponse(t, req, expected, backend)
 	})
 
@@ -304,7 +305,7 @@ func TestCreateTransaction(t *testing.T) {
 				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
-			tx.ID(), tx.ReferenceBlockID, toBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
+			tx.ID(), tx.ReferenceBlockID, models.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
 		assertOKResponse(t, req, expected, backend)
 	})
 

@@ -4,11 +4,10 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 )
 
-// getAccount handler retrieves account by address and returns the response
-func getAccount(r *request.Request, backend access.API, link util.LinkGenerator) (interface{}, error) {
+// GetAccount handler retrieves account by address and returns the response
+func GetAccount(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetAccountRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)

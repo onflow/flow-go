@@ -1,12 +1,11 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func (e *ExecutionResult) Build(exeResult *flow.ExecutionResult, link util.LinkGenerator) error {
-	self, err := util.SelfLink(exeResult.ID(), link.ExecutionResultLink)
+func (e *ExecutionResult) Build(exeResult *flow.ExecutionResult, link LinkGenerator) error {
+	self, err := SelfLink(exeResult.ID(), link.ExecutionResultLink)
 	if err != nil {
 		return err
 	}

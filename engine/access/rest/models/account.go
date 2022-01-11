@@ -1,40 +1,37 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func (a *Account) Build(flowAccount *flow.Account, link util.LinkGenerator, expand map[string]bool) error {
-	account := Account{
-		Address: flowAccount.Address.String(),
-		Balance: fromUint64(flowAccount.Balance),
-	}
+const expandableKeys = "keys"
+const expandableContracts = "contracts"
 
-	a.Expandable = &AccountExpandable{
-		Keys:      "keys",
-		Contracts: "contracts",
-	}
+func (a *Account) Build(flowAccount *flow.Account, link LinkGenerator, expand map[string]bool) error {
+	a.Address = flowAccount.Address.String()
+	a.Balance = fromUint64(flowAccount.Balance)
+	a.Expandable = &AccountExpandable{}
 
-	if expand[a.Expandable.Keys] {
+	if expand[expandableKeys] {
 		var keys AccountPublicKeys
 		keys.Build(flowAccount.Keys)
 		a.Keys = keys
-
-		a.Expandable.Keys = ""
+	} else {
+		a.Expandable.Keys = expandableKeys
 	}
 
-	if expand[a.Expandable.Contracts] {
+	if expand[expandableContracts] {
 		contracts := make(map[string]string, len(flowAccount.Contracts))
 		for name, code := range flowAccount.Contracts {
-			contracts[name] = toBase64(code)
+			contracts[name] = ToBase64(code)
 		}
 		a.Contracts = contracts
-		a.Expandable.Contracts = ""
+	} else {
+		a.Expandable.Contracts = expandableContracts
 	}
 
 	var self Links
-	err := self.Build(link.AccountLink(account.Address))
+	err := self.Build(link.AccountLink(a.Address))
 	if err != nil {
 		return err
 	}

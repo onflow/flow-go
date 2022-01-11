@@ -1,6 +1,8 @@
 package rest
 
-import "net/http"
+import (
+	"net/http"
+)
 
 type route struct {
 	Name    string
@@ -20,70 +22,70 @@ var CreateTransactionRoute = route{
 	Method:  http.MethodPost,
 	Pattern: "/transactions",
 	Name:    "createTransaction",
-	Handler: createTransaction,
+	Handler: CreateTransaction,
 }
 
 var GetTransactionResultByIDRoute = route{
 	Method:  http.MethodGet,
 	Pattern: "/transaction_results/{id}",
 	Name:    "getTransactionResultByID",
-	Handler: getTransactionResultByID,
+	Handler: GetTransactionResultByID,
 }
 
 var GetBlocksByIDsRoute = route{
 	Method:  http.MethodGet,
 	Pattern: "/blocks/{id}",
 	Name:    "getBlocksByIDs",
-	Handler: getBlocksByIDs,
+	Handler: GetBlocksByIDs,
 }
 
 var GetBlocksByHeightRoute = route{
 	Method:  http.MethodGet,
 	Pattern: "/blocks",
 	Name:    "getBlocksByHeight",
-	Handler: getBlocksByHeight,
+	Handler: GetBlocksByHeight,
 }
 
 var GetBlockPayloadByIDRoute = route{
 	Method:  http.MethodGet,
 	Pattern: "/blocks/{id}/payload",
 	Name:    "getBlockPayloadByID",
-	Handler: getBlockPayloadByID,
+	Handler: GetBlockPayloadByID,
 }
 
 var GetExecutionResultByIDRoute = route{
 	Method:  http.MethodGet,
 	Pattern: "/execution_results/{id}",
 	Name:    "getExecutionResultByID",
-	Handler: getExecutionResultByID,
+	Handler: GetExecutionResultByID,
 }
 
 var GetExecutionResultsByBlockIDsRoute = route{
 	Method:  http.MethodGet,
 	Pattern: "/execution_results",
 	Name:    "getExecutionResultByBlockID",
-	Handler: getExecutionResultsByBlockIDs,
+	Handler: GetExecutionResultsByBlockIDs,
 }
 
 var GetCollectionByIDRoute = route{
 	Method:  http.MethodGet,
 	Pattern: "/collections/{id}",
 	Name:    "getCollectionByID",
-	Handler: getCollectionByID,
+	Handler: GetCollectionByID,
 }
 
 var ExecuteScriptRoute = route{
 	Method:  http.MethodPost,
 	Pattern: "/scripts",
 	Name:    "executeScript",
-	Handler: executeScript,
+	Handler: ExecuteScript,
 }
 
 var GetAccountRoute = route{
 	Method:  http.MethodGet,
 	Pattern: "/accounts/{address}",
 	Name:    "getAccount",
-	Handler: getAccount,
+	Handler: GetAccount,
 }
 
 var Routes = []route{

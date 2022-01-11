@@ -7,7 +7,7 @@ func (e *Event) Build(event flow.Event) {
 	e.TransactionId = event.TransactionID.String()
 	e.TransactionIndex = fromUint64(uint64(event.TransactionIndex))
 	e.EventIndex = fromUint64(uint64(event.EventIndex))
-	e.Payload = toBase64(event.Payload)
+	e.Payload = ToBase64(event.Payload)
 }
 
 type Events []Event
