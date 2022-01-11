@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types/container"
@@ -488,7 +489,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		Name: networkConf.Name,
 	})
 
-	// create a temporary directory to store all bootstrapping files 
+	// create a temporary directory to store all bootstrapping files
 	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
@@ -511,7 +512,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		seal:                       seal,
 		result:                     result,
 		BootstrapDir:               bootstrapDir,
-		BootstrapSnapshot: 			bootstrapSnapshot,
+		BootstrapSnapshot:          bootstrapSnapshot,
 	}
 
 	// check that at-least 2 full access nodes must be configure in your test suite
@@ -861,7 +862,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	//            this ordering defines the DKG participant's indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
 
-	// run DKG for all consensus nodes
 	dkg, err := runDKG(stakedConfs)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
