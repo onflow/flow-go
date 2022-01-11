@@ -22,8 +22,8 @@ func (p *poolIndex) setUndefined() {
 	p.index = uint32(0)
 }
 
-// sliceIndex returns the slice-index equivalent of the poolIndex.
-func (p poolIndex) sliceIndex() EIndex {
+// getSliceIndex returns the slice-index equivalent of the poolIndex.
+func (p poolIndex) getSliceIndex() EIndex {
 	return EIndex(p.index) - 1
 }
 

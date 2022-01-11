@@ -213,14 +213,14 @@ func testInvalidateAtRandom(t *testing.T, pool *Pool, entities []*unittest.MockE
 		if i != totalEntitiesStored-1 {
 			// used linked-list
 			tailAccessibleFromHead(t,
-				pool.used.head.sliceIndex(),
-				pool.used.tail.sliceIndex(),
+				pool.used.head.getSliceIndex(),
+				pool.used.tail.getSliceIndex(),
 				pool,
 				pool.Size())
 
 			headAccessibleFromTail(t,
-				pool.used.head.sliceIndex(),
-				pool.used.tail.sliceIndex(),
+				pool.used.head.getSliceIndex(),
+				pool.used.tail.getSliceIndex(),
 				pool,
 				pool.Size())
 
@@ -228,14 +228,14 @@ func testInvalidateAtRandom(t *testing.T, pool *Pool, entities []*unittest.MockE
 			//
 			// after invalidating each item, size of free linked-list is incremented by one.
 			headAccessibleFromTail(t,
-				pool.free.head.sliceIndex(),
-				pool.free.tail.sliceIndex(),
+				pool.free.head.getSliceIndex(),
+				pool.free.tail.getSliceIndex(),
 				pool,
 				uint32(i+freeListInitialSize+1))
 
 			tailAccessibleFromHead(t,
-				pool.free.head.sliceIndex(),
-				pool.free.tail.sliceIndex(),
+				pool.free.head.getSliceIndex(),
+				pool.free.tail.getSliceIndex(),
 				pool,
 				uint32(i+freeListInitialSize+1))
 		}
@@ -259,17 +259,17 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 		// size of list should be decremented after each invalidation.
 		require.Equal(t, uint32(totalEntitiesStored-i-1), pool.Size())
 		// invalidated head should be appended to free entities
-		require.Equal(t, pool.free.tail.sliceIndex(), headIndex)
+		require.Equal(t, pool.free.tail.getSliceIndex(), headIndex)
 
 		if freeListInitialSize != 0 {
 			// number of entities is below limit, hence free list is not empty.
 			// invalidating used head must not change the free head.
-			require.Equal(t, EIndex(totalEntitiesStored), pool.free.head.sliceIndex())
+			require.Equal(t, EIndex(totalEntitiesStored), pool.free.head.getSliceIndex())
 		} else {
 			// number of entities is greater than or equal to limit, hence free list is empty.
 			// free head must be updated to the first invalidated head (index 0),
 			// and must be kept there for entire test (as we invalidate head not tail).
-			require.Equal(t, EIndex(0), pool.free.head.sliceIndex())
+			require.Equal(t, EIndex(0), pool.free.head.getSliceIndex())
 		}
 
 		// except when the list is empty, head must be updated after invalidation,
@@ -278,14 +278,14 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 		if i != totalEntitiesStored-1 {
 			// used linked-list
 			tailAccessibleFromHead(t,
-				pool.used.head.sliceIndex(),
-				pool.used.tail.sliceIndex(),
+				pool.used.head.getSliceIndex(),
+				pool.used.tail.getSliceIndex(),
 				pool,
 				pool.Size())
 
 			headAccessibleFromTail(t,
-				pool.used.head.sliceIndex(),
-				pool.used.tail.sliceIndex(),
+				pool.used.head.getSliceIndex(),
+				pool.used.tail.getSliceIndex(),
 				pool,
 				pool.Size())
 
@@ -293,14 +293,14 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			//
 			// after invalidating each item, size of free linked-list is incremented by one.
 			tailAccessibleFromHead(t,
-				pool.free.head.sliceIndex(),
-				pool.free.tail.sliceIndex(),
+				pool.free.head.getSliceIndex(),
+				pool.free.tail.getSliceIndex(),
 				pool,
 				uint32(i+1+freeListInitialSize))
 
 			headAccessibleFromTail(t,
-				pool.free.head.sliceIndex(),
-				pool.free.tail.sliceIndex(),
+				pool.free.head.getSliceIndex(),
+				pool.free.tail.getSliceIndex(),
 				pool,
 				uint32(i+1+freeListInitialSize))
 		}
@@ -314,12 +314,12 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			// used tail should point to the last element in pool, since we are
 			// invalidating head.
 			require.Equal(t, entities[totalEntitiesStored-1].ID(), usedTail.id)
-			require.Equal(t, EIndex(totalEntitiesStored-1), pool.used.tail.sliceIndex())
+			require.Equal(t, EIndex(totalEntitiesStored-1), pool.used.tail.getSliceIndex())
 
 			// used head must point to the next element in the pool,
 			// i.e., invalidating head moves it forward.
 			require.Equal(t, entities[i+1].ID(), usedHead.id)
-			require.Equal(t, EIndex(i+1), pool.used.head.sliceIndex())
+			require.Equal(t, EIndex(i+1), pool.used.head.getSliceIndex())
 		} else {
 			// pool is empty
 			// used head and tail must be nil and their corresponding
@@ -338,25 +338,25 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 	offset := len(pool.poolEntities) - size
 	for i := 0; i < size; i++ {
 		// invalidates tail index
-		tailIndex := pool.used.tail.sliceIndex()
+		tailIndex := pool.used.tail.getSliceIndex()
 		require.Equal(t, EIndex(size-1-i), tailIndex)
 
 		pool.invalidateEntityAtIndex(tailIndex)
 		// old head index must be invalidated
 		require.True(t, pool.isInvalidated(tailIndex))
 		// unclaimed head should be appended to free entities
-		require.Equal(t, pool.free.tail.sliceIndex(), tailIndex)
+		require.Equal(t, pool.free.tail.getSliceIndex(), tailIndex)
 
 		if offset != 0 {
 			// number of entities is below limit
 			// free must head keeps pointing to first empty index after
 			// adding all entities.
-			require.Equal(t, EIndex(size), pool.free.head.sliceIndex())
+			require.Equal(t, EIndex(size), pool.free.head.getSliceIndex())
 		} else {
 			// number of entities is greater than or equal to limit
 			// free head must be updated to last element in the pool (size - 1),
 			// and must be kept there for entire test (as we invalidate tail not head).
-			require.Equal(t, EIndex(size-1), pool.free.head.sliceIndex())
+			require.Equal(t, EIndex(size-1), pool.free.head.getSliceIndex())
 		}
 
 		// size of pool should be shrunk after each invalidation.
@@ -369,27 +369,27 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 
 			// used linked-list
 			tailAccessibleFromHead(t,
-				pool.used.head.sliceIndex(),
-				pool.used.tail.sliceIndex(),
+				pool.used.head.getSliceIndex(),
+				pool.used.tail.getSliceIndex(),
 				pool,
 				pool.Size())
 
 			headAccessibleFromTail(t,
-				pool.used.head.sliceIndex(),
-				pool.used.tail.sliceIndex(),
+				pool.used.head.getSliceIndex(),
+				pool.used.tail.getSliceIndex(),
 				pool,
 				pool.Size())
 
 			// free linked-list
 			tailAccessibleFromHead(t,
-				pool.free.head.sliceIndex(),
-				pool.free.tail.sliceIndex(),
+				pool.free.head.getSliceIndex(),
+				pool.free.tail.getSliceIndex(),
 				pool,
 				uint32(i+1+offset))
 
 			headAccessibleFromTail(t,
-				pool.free.head.sliceIndex(),
-				pool.free.tail.sliceIndex(),
+				pool.free.head.getSliceIndex(),
+				pool.free.tail.getSliceIndex(),
 				pool,
 				uint32(i+1+offset))
 		}
@@ -401,11 +401,11 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			//
 			// used tail should move backward after each invalidation
 			require.Equal(t, entities[size-i-2].ID(), usedTail.id)
-			require.Equal(t, EIndex(size-i-2), pool.used.tail.sliceIndex())
+			require.Equal(t, EIndex(size-i-2), pool.used.tail.getSliceIndex())
 
 			// used head must point to the first element in the pool,
 			require.Equal(t, entities[0].ID(), usedHead.id)
-			require.Equal(t, EIndex(0), pool.used.head.sliceIndex())
+			require.Equal(t, EIndex(0), pool.used.head.getSliceIndex())
 		} else {
 			// pool is empty
 			// used head and tail must be nil and their corresponding
@@ -427,24 +427,24 @@ func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 	for i := 0; i < len(pool.poolEntities); i++ {
 		if i == 0 {
 			// head of "free" linked-list should point to index 0 of entities slice.
-			require.Equal(t, EIndex(i), pool.free.head.sliceIndex())
+			require.Equal(t, EIndex(i), pool.free.head.getSliceIndex())
 			// previous element of head must be undefined (linked-list head feature).
 			require.True(t, pool.poolEntities[i].node.prev.isUndefined())
 		}
 
 		if i != 0 {
 			// except head, any element should point back to its previous index in slice.
-			require.Equal(t, EIndex(i-1), pool.poolEntities[i].node.prev.sliceIndex())
+			require.Equal(t, EIndex(i-1), pool.poolEntities[i].node.prev.getSliceIndex())
 		}
 
 		if i != len(pool.poolEntities)-1 {
 			// except tail, any element should point forward to its next index in slice.
-			require.Equal(t, EIndex(i+1), pool.poolEntities[i].node.next.sliceIndex())
+			require.Equal(t, EIndex(i+1), pool.poolEntities[i].node.next.getSliceIndex())
 		}
 
 		if i == len(pool.poolEntities)-1 {
 			// tail of "free" linked-list should point to the last index in entities slice.
-			require.Equal(t, EIndex(i), pool.free.tail.sliceIndex())
+			require.Equal(t, EIndex(i), pool.free.tail.getSliceIndex())
 			// next element of tail must be undefined.
 			require.True(t, pool.poolEntities[i].node.next.isUndefined())
 		}
@@ -495,7 +495,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 		if i < len(pool.poolEntities)-1 {
 			// as long as we are below limit, after adding i element, free head
 			// should move to i+1 element.
-			require.Equal(t, EIndex(i+1), pool.free.head.sliceIndex())
+			require.Equal(t, EIndex(i+1), pool.free.head.getSliceIndex())
 			// head must be healthy and point back to undefined.
 			require.True(t, freeHead.node.prev.isUndefined())
 		} else {
@@ -511,7 +511,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			// must keep pointing to last index of the array-based linked-list. In other
 			// words, adding element must not change free tail (since only free head is
 			// updated).
-			require.Equal(t, EIndex(len(pool.poolEntities)-1), pool.free.tail.sliceIndex())
+			require.Equal(t, EIndex(len(pool.poolEntities)-1), pool.free.tail.getSliceIndex())
 			// head tail be healthy and point next to undefined.
 			require.True(t, freeTail.node.next.isUndefined())
 		} else {
@@ -531,13 +531,13 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			usedTraverseStep = uint32(len(pool.poolEntities))
 		}
 		tailAccessibleFromHead(t,
-			pool.used.head.sliceIndex(),
-			pool.used.tail.sliceIndex(),
+			pool.used.head.getSliceIndex(),
+			pool.used.tail.getSliceIndex(),
 			pool,
 			usedTraverseStep)
 		headAccessibleFromTail(t,
-			pool.used.head.sliceIndex(),
-			pool.used.tail.sliceIndex(),
+			pool.used.head.getSliceIndex(),
+			pool.used.tail.getSliceIndex(),
 			pool,
 			usedTraverseStep)
 
@@ -555,13 +555,13 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			freeTraverseStep = uint32(0)
 		}
 		tailAccessibleFromHead(t,
-			pool.free.head.sliceIndex(),
-			pool.free.tail.sliceIndex(),
+			pool.free.head.getSliceIndex(),
+			pool.free.tail.getSliceIndex(),
 			pool,
 			freeTraverseStep)
 		headAccessibleFromTail(t,
-			pool.free.head.sliceIndex(),
-			pool.free.tail.sliceIndex(),
+			pool.free.head.getSliceIndex(),
+			pool.free.tail.getSliceIndex(),
 			pool,
 			freeTraverseStep)
 	}
@@ -628,7 +628,7 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 		require.False(t, ok, "duplicate identifiers found")
 
 		require.False(t, pool.poolEntities[index].node.next.isUndefined(), "tail not found, and reached end of list")
-		index = pool.poolEntities[index].node.next.sliceIndex()
+		index = pool.poolEntities[index].node.next.getSliceIndex()
 	}
 }
 
@@ -647,6 +647,6 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		index = pool.poolEntities[index].node.prev.sliceIndex()
+		index = pool.poolEntities[index].node.prev.getSliceIndex()
 	}
 }

@@ -90,7 +90,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) E
 	if p.used.head.isUndefined() {
 		// used list is empty, hence setting head of used list to current entityIndex.
 		p.used.head.setPoolIndex(entityIndex)
-		p.poolEntities[p.used.head.sliceIndex()].node.prev.setUndefined()
+		p.poolEntities[p.used.head.getSliceIndex()].node.prev.setUndefined()
 	}
 
 	if !p.used.tail.isUndefined() {
@@ -137,11 +137,11 @@ func (p Pool) Size() uint32 {
 func (p Pool) getHeads() (*poolEntity, *poolEntity) {
 	var usedHead, freeHead *poolEntity
 	if !p.used.head.isUndefined() {
-		usedHead = &p.poolEntities[p.used.head.sliceIndex()]
+		usedHead = &p.poolEntities[p.used.head.getSliceIndex()]
 	}
 
 	if !p.free.head.isUndefined() {
-		freeHead = &p.poolEntities[p.free.head.sliceIndex()]
+		freeHead = &p.poolEntities[p.free.head.getSliceIndex()]
 	}
 
 	return usedHead, freeHead
@@ -151,11 +151,11 @@ func (p Pool) getHeads() (*poolEntity, *poolEntity) {
 func (p Pool) getTails() (*poolEntity, *poolEntity) {
 	var usedTail, freeTail *poolEntity
 	if !p.used.tail.isUndefined() {
-		usedTail = &p.poolEntities[p.used.tail.sliceIndex()]
+		usedTail = &p.poolEntities[p.used.tail.getSliceIndex()]
 	}
 
 	if !p.free.tail.isUndefined() {
-		freeTail = &p.poolEntities[p.free.tail.sliceIndex()]
+		freeTail = &p.poolEntities[p.free.tail.getSliceIndex()]
 	}
 
 	return usedTail, freeTail
@@ -163,7 +163,7 @@ func (p Pool) getTails() (*poolEntity, *poolEntity) {
 
 // connect links the prev and next nodes as the adjacent nodes in the double-linked list.
 func (p *Pool) connect(prev poolIndex, next EIndex) {
-	p.poolEntities[prev.sliceIndex()].node.next.setPoolIndex(next)
+	p.poolEntities[prev.getSliceIndex()].node.next.setPoolIndex(next)
 	p.poolEntities[next].node.prev = prev
 }
 
@@ -171,7 +171,7 @@ func (p *Pool) connect(prev poolIndex, next EIndex) {
 // also removes the entity the invalidated head is presenting and appends the
 // node represented by the used head to the tail of the free list.
 func (p *Pool) invalidateUsedHead() EIndex {
-	headSliceIndex := p.used.head.sliceIndex()
+	headSliceIndex := p.used.head.getSliceIndex()
 	p.invalidateEntityAtIndex(headSliceIndex)
 
 	return headSliceIndex
@@ -182,7 +182,7 @@ func (p *Pool) invalidateUsedHead() EIndex {
 func (p *Pool) invalidateRandomEntity() EIndex {
 	// in order not to keep failing on finding a random valid node to invalidate,
 	// we only try a limited number of times, and if we fail all, we invalidate the used head.
-	var index = p.used.head.sliceIndex()
+	var index = p.used.head.getSliceIndex()
 
 	for i := 0; i < maximumRandomTrials; i++ {
 		candidate := EIndex(rand.Uint32() % p.size)
@@ -200,20 +200,20 @@ func (p *Pool) invalidateRandomEntity() EIndex {
 // claimFreeHead moves the free head forward, and returns the slice index of the
 // old free head to host a new entity.
 func (p *Pool) claimFreeHead() EIndex {
-	oldFreeHeadIndex := p.free.head.sliceIndex()
+	oldFreeHeadIndex := p.free.head.getSliceIndex()
 	// moves head forward
 	p.free.head = p.poolEntities[oldFreeHeadIndex].node.next
 	// new head should point to an undefined prev,
 	// but we first check if list is not empty, i.e.,
 	// head itself is not undefined.
 	if !p.free.head.isUndefined() {
-		p.poolEntities[p.free.head.sliceIndex()].node.prev.setUndefined()
+		p.poolEntities[p.free.head.getSliceIndex()].node.prev.setUndefined()
 	}
 
 	// also, we check if the old head and tail are aligned and, if so, update the
 	// tail as well. This happens when we claim the only existing
 	// node of the free list.
-	if p.free.tail.sliceIndex() == oldFreeHeadIndex {
+	if p.free.tail.getSliceIndex() == oldFreeHeadIndex {
 		p.free.tail.setUndefined()
 	}
 
@@ -224,24 +224,24 @@ func (p *Pool) claimFreeHead() EIndex {
 	return oldFreeHeadIndex
 }
 
-// Rem removes entity corresponding to given sliceIndex from the list.
+// Rem removes entity corresponding to given getSliceIndex from the list.
 func (p *Pool) Rem(sliceIndex EIndex) {
 	p.invalidateEntityAtIndex(sliceIndex)
 }
 
-// invalidateEntityAtIndex invalidates the given sliceIndex in the linked list by
+// invalidateEntityAtIndex invalidates the given getSliceIndex in the linked list by
 // removing its corresponding linked-list node from the used linked list, and appending
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
 	prev := p.poolEntities[sliceIndex].node.prev
 	next := p.poolEntities[sliceIndex].node.next
 
-	if sliceIndex != p.used.head.sliceIndex() && sliceIndex != p.used.tail.sliceIndex() {
+	if sliceIndex != p.used.head.getSliceIndex() && sliceIndex != p.used.tail.getSliceIndex() {
 		// links next and prev elements for non-head and non-tail element
-		p.connect(prev, next.sliceIndex())
+		p.connect(prev, next.getSliceIndex())
 	}
 
-	if sliceIndex == p.used.head.sliceIndex() {
+	if sliceIndex == p.used.head.getSliceIndex() {
 		// invalidating used head
 		// moves head forward
 		oldUsedHead, _ := p.getHeads()
@@ -255,7 +255,7 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
 		}
 	}
 
-	if sliceIndex == p.used.tail.sliceIndex() {
+	if sliceIndex == p.used.tail.getSliceIndex() {
 		// invalidating used tail
 		// moves tail backward
 		oldUsedTail, _ := p.getTails()
@@ -281,7 +281,7 @@ func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
 	p.size--
 }
 
-// appendToFreeList appends linked-list node represented by sliceIndex to tail of free list.
+// appendToFreeList appends linked-list node represented by getSliceIndex to tail of free list.
 func (p *Pool) appendToFreeList(sliceIndex EIndex) {
 	if p.free.head.isUndefined() {
 		// free list is empty
@@ -295,7 +295,7 @@ func (p *Pool) appendToFreeList(sliceIndex EIndex) {
 	p.free.tail.setPoolIndex(sliceIndex)
 }
 
-// isInvalidated returns true if linked-list node represented by sliceIndex does not contain
+// isInvalidated returns true if linked-list node represented by getSliceIndex does not contain
 // a valid entity.
 func (p Pool) isInvalidated(sliceIndex EIndex) bool {
 	if p.poolEntities[sliceIndex].id != flow.ZeroID {
