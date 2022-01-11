@@ -21,7 +21,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
-	contractHandler := handler.NewContractHandler(accounts, false, nil)
+	contractHandler := handler.NewContractHandler(accounts, false, nil, nil)
 
 	// no contract initially
 	names, err := contractHandler.GetContractNames(rAdd)
@@ -80,7 +80,8 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 
 	contractHandler := handler.NewContractHandler(accounts,
 		true,
-		func() []common.Address { return []common.Address{rAdd} })
+		func() []common.Address { return []common.Address{rAdd} },
+		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
 	// try to set contract by an unAuthRAdd
 	err = contractHandler.SetContract(rAdd, "testContract1", []byte("ABC"), []common.Address{unAuthRAdd})

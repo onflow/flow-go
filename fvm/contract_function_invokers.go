@@ -143,3 +143,30 @@ func AccountStorageCapacityInvocation(
 		return invoker.Invoke(env, traceSpan)
 	}
 }
+
+var checkAndUseContractAuditVoucherInvocationArgumentTypes = []sema.Type{
+	&sema.AddressType{},
+	sema.StringType,
+}
+
+func CheckAndUseContractAuditVoucherInvocation(
+	env Environment,
+	traceSpan opentracing.Span,
+) func(address common.Address, code string) (cadence.Value, error) {
+	return func(address common.Address, code string) (cadence.Value, error) {
+		invoker := NewTransactionContractFunctionInvoker(
+			common.AddressLocation{
+				Address: common.Address(env.Context().Chain.ServiceAddress()),
+				Name:    systemcontracts.ContractDeploymentAudits,
+			},
+			systemcontracts.ContractDeploymentAuditsFunction_useVoucherForDeploy,
+			[]interpreter.Value{
+				interpreter.NewAddressValue(address),
+				interpreter.NewStringValue(code),
+			},
+			checkAndUseContractAuditVoucherInvocationArgumentTypes,
+			env.Context().Logger,
+		)
+		return invoker.Invoke(env, traceSpan)
+	}
+}
