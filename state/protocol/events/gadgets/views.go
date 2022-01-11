@@ -90,8 +90,8 @@ func (v *Views) BlockFinalized(block *flow.Header) {
 	if cutoff >= len(v.orderedViews) {
 		if len(v.orderedViews) > 0 {
 			v.orderedViews = []uint64{}
-			return
 		}
+		return
 	}
 	// remove view callbacks which have been invoked
 	v.orderedViews = v.orderedViews[cutoff:]
