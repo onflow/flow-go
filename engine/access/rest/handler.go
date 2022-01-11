@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 
 	"github.com/rs/zerolog"
@@ -14,11 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 )
-
-// Validator provides validation for http requests
-type Validator interface {
-	Validate(r *http.Request) error
-}
 
 // ApiHandlerFunc is a function that contains endpoint handling logic,
 // it fetches necessary resources and returns an error or response model.
@@ -36,7 +31,6 @@ type Handler struct {
 	backend        access.API
 	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
-	validator      Validator
 }
 
 func NewHandler(
@@ -44,14 +38,12 @@ func NewHandler(
 	backend access.API,
 	handlerFunc ApiHandlerFunc,
 	generator models.LinkGenerator,
-	validator Validator,
 ) *Handler {
 	return &Handler{
 		logger:         logger,
 		backend:        backend,
 		apiHandlerFunc: handlerFunc,
 		linkGenerator:  generator,
-		validator:      validator,
 	}
 }
 
@@ -60,13 +52,6 @@ func NewHandler(
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// create a logger
 	errLog := h.logger.With().Str("request_url", r.URL.String()).Logger()
-
-	/*
-		err := h.validator.Validate(r)
-		if err != nil {
-			h.errorResponse(w, http.StatusBadRequest, err.Error(), errLog) // todo(sideninja) limit message
-			return
-		}*/
 
 	// create request decorator with parsed values
 	decoratedRequest := request.Decorate(r)
@@ -79,7 +64,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// apply the select filter if any select fields have been specified
-	response, err = routes.SelectFilter(response, decoratedRequest.Selects())
+	response, err = util.SelectFilter(response, decoratedRequest.Selects())
 	if err != nil {
 		h.errorHandler(w, err, errLog)
 		return
