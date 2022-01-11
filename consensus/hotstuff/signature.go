@@ -132,6 +132,6 @@ type Packer interface {
 	// sig is the aggregated signature data
 	// It returns:
 	//  - (sigData, nil) if successfully unpacked the signature data
-	//  - (nil, model.ErrInvalidSignature) if failed to unpack the signature data
+	//  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
 	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
 }

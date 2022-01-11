@@ -153,6 +153,11 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 // * model.InvalidVoteError - submitted vote with invalid signature
 // * model.DuplicatedSignerError if the signer has been already added
 // All other errors should be treated as exceptions.
+//
+// Impossibility of vote double-counting: Our signature scheme requires _every_ vote to supply a
+// staking signature. Therefore, the `stakingSigAggtor` has the set of _all_ signerIDs that have
+// provided a valid vote. Hence, the `stakingSigAggtor` guarantees that only a single vote can
+// be successfully added for each `signerID`, i.e. double-counting votes is impossible.
 func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
@@ -171,7 +176,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
 	}
 
-	// verify staking sig
+	// Verify staking sig.
 	err = p.stakingSigAggtor.Verify(vote.SignerID, stakingSig)
 	if err != nil {
 		if model.IsInvalidSignerError(err) {
@@ -189,7 +194,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 		return nil
 	}
 
-	// verify random beacon sig
+	// Verify random beacon sig
 	if randomBeaconSig != nil {
 		err = p.rbRector.Verify(vote.SignerID, randomBeaconSig)
 		if err != nil {
@@ -210,14 +215,14 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 		return nil
 	}
 
-	// aggregate staking sig
+	// Add staking sig to aggregator.
 	_, err = p.stakingSigAggtor.TrustedAdd(vote.SignerID, stakingSig)
 	if err != nil {
 		// we don't expect any errors here during normal operation, as we previously checked
 		// for duplicated votes from the same signer and verified the signer+signature
 		return fmt.Errorf("unexpected exception adding signature from vote %v to staking aggregator: %w", vote.ID(), err)
 	}
-	// aggregate random beacon sig
+	// Add random beacon sig to threshold sig reconstructor
 	if randomBeaconSig != nil {
 		_, err = p.rbRector.TrustedAdd(vote.SignerID, randomBeaconSig)
 		if err != nil {

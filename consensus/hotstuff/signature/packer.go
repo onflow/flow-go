@@ -108,7 +108,7 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 	}
 
 	// read all the possible signer IDs at the given block
-	consensus, err := p.committees.Identities(blockID, filter.HasRole(flow.RoleConsensus))
+	consensus, err := p.committees.Identities(blockID, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
 	}

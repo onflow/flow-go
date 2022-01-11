@@ -203,20 +203,62 @@ func (ps *ProposalSuite) TestProposalMissingParentLower() {
 	assert.True(ps.T(), errors.Is(err, model.ErrUnverifiableBlock), "if we don't have the proposal parent for a QC below finalized view, we should generate an unverifiable block error")
 }
 
+// TestProposalQCInvalid checks that Validator handles the verifier's error returns correctly.
+// In case of `model.ErrInvalidFormat` and model.ErrInvalidSignature`, we expect the Validator
+// to recognize those as an invalid QC, i.e. returns an `model.InvalidBlockError`.
+// In contrast, unexpected exceptions and `model.InvalidSignerError` should _not_ be
+// interpreted as a sign of an invalid QC.
 func (ps *ProposalSuite) TestProposalQCInvalid() {
+	ps.Run("invalid signature", func() {
+		*ps.verifier = mocks.Verifier{}
+		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(
+			fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
+		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
 
-	// change verifier to fail on QC validation
-	*ps.verifier = mocks.Verifier{}
-	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(
-		fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
-	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
+		// check that validation fails and the failure case is recognized as an invalid block
+		err := ps.validator.ValidateProposal(ps.proposal)
+		assert.True(ps.T(), model.IsInvalidBlockError(err), "if the block's QC signature is invalid, an ErrorInvalidBlock error should be raised")
+	})
 
-	// check that validation fails now
-	err := ps.validator.ValidateProposal(ps.proposal)
-	assert.Error(ps.T(), err, "a proposal with an invalid QC should be rejected")
+	ps.Run("invalid format", func() {
+		*ps.verifier = mocks.Verifier{}
+		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(
+			fmt.Errorf("invalid qc: %w", model.ErrInvalidFormat))
+		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
 
-	// check that the error is an invalid proposal error to allow creating slashing challenge
-	assert.True(ps.T(), model.IsInvalidBlockError(err), "if the block's QC signature is invalid, an ErrorInvalidBlock error should be raised")
+		// check that validation fails and the failure case is recognized as an invalid block
+		err := ps.validator.ValidateProposal(ps.proposal)
+		assert.True(ps.T(), model.IsInvalidBlockError(err), "if the block's QC has an invalid format, an ErrorInvalidBlock error should be raised")
+	})
+
+	// Theoretically, `VerifyQC` could also return a `model.InvalidSignerError`. However,
+	// for the time being, we assume that _every_ HotStuff participant is also a member of
+	// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
+	// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
+	//       we expect `model.InvalidSignerError` here during normal operations.
+	ps.Run("invalid signer", func() {
+		*ps.verifier = mocks.Verifier{}
+		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(
+			fmt.Errorf("invalid qc: %w", model.NewInvalidSignerErrorf("")))
+		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
+
+		// check that validation fails and the failure case is recognized as an invalid block
+		err := ps.validator.ValidateProposal(ps.proposal)
+		assert.Error(ps.T(), err)
+		assert.False(ps.T(), model.IsInvalidBlockError(err))
+	})
+
+	ps.Run("unknown exception", func() {
+		exception := errors.New("exception")
+		*ps.verifier = mocks.Verifier{}
+		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(exception)
+		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
+
+		// check that validation fails and the failure case is recognized as an invalid block
+		err := ps.validator.ValidateProposal(ps.proposal)
+		assert.ErrorIs(ps.T(), err, exception)
+		assert.False(ps.T(), model.IsInvalidBlockError(err))
+	})
 }
 
 func (ps *ProposalSuite) TestProposalQCError() {

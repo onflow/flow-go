@@ -143,6 +143,18 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // * model.InvalidVoteError - submitted vote with invalid signature
 // * model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
 // All other errors should be treated as exceptions.
+//
+// CAUTION: implementation is NOT (yet) BFT
+// Explanation: for correctness, we require that no voter can be counted repeatedly. However,
+// CombinedVoteProcessorV3 relies on the `VoteCollector`'s `votesCache` filter out all votes but the first for
+// every signerID. However, we have the edge case, where we still feed the proposers vote twice into the
+// `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
+// by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
+// TODO: (suggestion) I think it would be worth-while to include a second `votesCache` into the `CombinedVoteProcessorV3`.
+//       Thereby,  `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
+//       external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
+//       runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
+//       0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {

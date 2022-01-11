@@ -6,6 +6,7 @@ package verification
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -18,6 +19,8 @@ import (
 type StakingVerifier struct {
 	stakingHasher hash.Hasher
 }
+
+var _ hotstuff.Verifier = (*StakingVerifier)(nil)
 
 // NewStakingVerifier creates a new single verifier with the given dependencies.
 func NewStakingVerifier() *StakingVerifier {
@@ -55,16 +58,14 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, bloc
 //
 // In the single verification case, `sigData` represents a single signature (`crypto.Signature`).
 func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
-	// verify the aggregated staking signature
+	if len(signers) == 0 {
+		return fmt.Errorf("empty list of signers: %w", model.ErrInvalidFormat)
+	}
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	pks := make([]crypto.PublicKey, 0, len(signers))
-	for _, identity := range signers {
-		pks = append(pks, identity.StakingPubKey)
-	}
-
+	// verify the aggregated staking signature
 	// TODO: to be replaced by module/signature.PublicKeyAggregator in V2
-	aggregatedKey, err := crypto.AggregateBLSPublicKeys(pks)
+	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys()) // caution: requires non-empty slice of keys!
 	if err != nil {
 		return fmt.Errorf("could not compute aggregated key: %w", err)
 	}

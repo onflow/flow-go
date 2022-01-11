@@ -33,7 +33,7 @@ type voteContainer struct {
 //    we return a model.DoubleVoteError
 // .
 type VotesCache struct {
-	lock          sync.Mutex
+	lock          sync.RWMutex
 	view          uint64
 	votes         map[flow.Identifier]voteContainer // signerID -> first vote
 	voteConsumers []hotstuff.VoteConsumer
@@ -85,6 +85,24 @@ func (vc *VotesCache) AddVote(vote *model.Vote) error {
 		consumer(vote)
 	}
 	return nil
+}
+
+// GetVote returns the stored vote for the given `signerID`. Returns:
+//  - (vote, true) if a vote from signerID is known
+//  - (false, nil) no vote from signerID is known
+func (vc *VotesCache) GetVote(signerID flow.Identifier) (*model.Vote, bool) {
+	vc.lock.RLock()
+	container, exists := vc.votes[signerID] // if signerID is unknown, its `Vote` pointer is nil
+	vc.lock.RUnlock()
+	return container.Vote, exists
+}
+
+// Size returns the number of cached votes
+func (vc *VotesCache) Size() int {
+	vc.lock.RLock()
+	s := len(vc.votes)
+	vc.lock.RUnlock()
+	return s
 }
 
 // RegisterVoteConsumer registers a VoteConsumer. Upon registration, the cache

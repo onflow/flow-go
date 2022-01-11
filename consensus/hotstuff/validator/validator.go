@@ -17,6 +17,8 @@ type Validator struct {
 	verifier  hotstuff.Verifier
 }
 
+var _ hotstuff.Validator = (*Validator)(nil)
+
 // New creates a new Validator instance
 func New(
 	committee hotstuff.Committee,
@@ -62,6 +64,11 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
 	err = v.verifier.VerifyQC(signers, qc.SigData, block)
 	if err != nil {
+		// Theoretically, `VerifyQC` could also return a `model.InvalidSignerError`. However,
+		// for the time being, we assume that _every_ HotStuff participant is also a member of
+		// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
+		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
+		//       we expect `model.InvalidSignerError` here during normal operations.
 		switch {
 		case errors.Is(err, model.ErrInvalidFormat):
 			return newInvalidBlockError(block, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
@@ -146,14 +153,15 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	// check whether the signature data is valid for the vote in the hotstuff context
 	err = v.verifier.VerifyVote(voter, vote.SigData, block)
 	if err != nil {
-		switch {
-		case errors.Is(err, model.ErrInvalidFormat):
+		// Theoretically, `VerifyVote` could also return a `model.InvalidSignerError`. However,
+		// for the time being, we assume that _every_ HotStuff participant is also a member of
+		// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
+		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
+		//       we expect `model.InvalidSignerError` here during normal operations.
+		if errors.Is(err, model.ErrInvalidFormat) || errors.Is(err, model.ErrInvalidSignature) {
 			return nil, newInvalidVoteError(vote, err)
-		case errors.Is(err, model.ErrInvalidSignature):
-			return nil, newInvalidVoteError(vote, err)
-		default:
-			return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
 		}
+		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
 	}
 
 	return voter, nil
