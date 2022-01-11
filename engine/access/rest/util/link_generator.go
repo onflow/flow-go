@@ -2,7 +2,7 @@ package util
 
 import (
 	"github.com/gorilla/mux"
-	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/handlers"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -33,29 +33,29 @@ func NewLinkGeneratorImpl(router *mux.Router) *LinkGeneratorImpl {
 }
 
 func (generator *LinkGeneratorImpl) BlockLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.GetBlocksByIDRoute, id)
+	return generator.linkForID(handlers.GetBlocksByIDsRoute.Name, id)
 }
 func (generator *LinkGeneratorImpl) PayloadLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.GetBlockPayloadByIDRoute, id)
+	return generator.linkForID(handlers.GetBlockPayloadByIDRoute.Name, id)
 }
 func (generator *LinkGeneratorImpl) ExecutionResultLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.GetExecutionResultByIDRoute, id)
+	return generator.linkForID(handlers.GetExecutionResultByIDRoute.Name, id)
 }
 
 func (generator *LinkGeneratorImpl) TransactionLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.GetTransactionByIDRoute, id)
+	return generator.linkForID(handlers.GetTransactionByIDRoute.Name, id)
 }
 
 func (generator *LinkGeneratorImpl) TransactionResultLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.GetTransactionResultByIDRoute, id)
+	return generator.linkForID(handlers.GetTransactionResultByIDRoute.Name, id)
 }
 
 func (generator *LinkGeneratorImpl) CollectionLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(rest.GetCollectionByIDRoute, id)
+	return generator.linkForID(handlers.GetCollectionByIDRoute.Name, id)
 }
 
 func (generator *LinkGeneratorImpl) AccountLink(address string) (string, error) {
-	return generator.link(rest.GetAccountRoute, "address", address)
+	return generator.link(handlers.GetAccountRoute.Name, "address", address)
 }
 
 // SelfLink generates the _link key value pair for the response
