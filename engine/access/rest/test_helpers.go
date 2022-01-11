@@ -25,7 +25,7 @@ const (
 func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRecorder, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	router, err := initRouter(backend, logger)
+	router, err := newRouter(backend, logger)
 	if err != nil {
 		return nil, err
 	}
