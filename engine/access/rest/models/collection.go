@@ -1,10 +1,11 @@
 package models
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const ExpandsTransactions = "transactions"
 
 func (c *Collection) Build(
 	collection *flow.LightCollection,
@@ -19,7 +20,7 @@ func (c *Collection) Build(
 
 	var expandable CollectionExpandable
 	var transactions Transactions
-	if expand[request.ExpandsTransactions] {
+	if expand[ExpandsTransactions] {
 		transactions.Build(txs, link)
 	} else {
 		expandable.Transactions = make([]string, len(collection.Transactions))

@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest/handlers"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 	"time"
@@ -58,8 +57,8 @@ func initRouter(backend access.API, logger zerolog.Logger) (*mux.Router, error) 
 		return nil, err
 	}
 
-	for _, r := range handlers.Routes {
-		h := handlers.NewHandler(logger, backend, r.Handler, linkGenerator, validation)
+	for _, r := range Routes {
+		h := NewHandler(logger, backend, r.Handler, linkGenerator, validation)
 		v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
