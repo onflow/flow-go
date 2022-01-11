@@ -4,6 +4,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/rs/zerolog"
 	"net/http"
 )
@@ -17,8 +18,10 @@ func newRouter(backend access.API, logger zerolog.Logger) (*mux.Router, error) {
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
 
+	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
+
 	for _, r := range Routes {
-		h := NewHandler(logger, backend, r.Handler, nil)
+		h := NewHandler(logger, backend, r.Handler, linkGenerator)
 		v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
