@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"github.com/onflow/flow-go/engine/access/rest/handlers"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 	"time"
@@ -73,7 +74,7 @@ func initRouter(backend access.API, logger zerolog.Logger) (*mux.Router, error) 
 	}
 
 	for _, r := range routeDefinitions() {
-		h := NewHandler(logger, backend, r.handler, linkGenerator, validation)
+		h := handlers.NewHandler(logger, backend, r.handler, linkGenerator, validation)
 		v1SubRouter.
 			Methods(r.method).
 			Path(r.pattern).
@@ -87,8 +88,8 @@ type routeDefinition struct {
 	name       string
 	method     string
 	pattern    string
-	validators []ApiValidatorFunc
-	handler    ApiHandlerFunc
+	validators []handlers.ApiValidatorFunc
+	handler    handlers.ApiHandlerFunc
 }
 
 func routeDefinitions() []routeDefinition {
@@ -98,71 +99,71 @@ func routeDefinitions() []routeDefinition {
 			method:  http.MethodGet,
 			pattern: "/transactions/{id}",
 			name:    GetTransactionByIDRoute,
-			handler: getTransactionByID,
+			handler: handlers.getTransactionByID,
 		}, {
 			method:  http.MethodPost,
 			pattern: "/transactions",
 			name:    CreateTransactionRoute,
-			handler: createTransaction,
+			handler: handlers.createTransaction,
 		},
 		// Transaction Results
 		{
 			method:  http.MethodGet,
 			pattern: "/transaction_results/{id}",
 			name:    GetTransactionResultByIDRoute,
-			handler: getTransactionResultByID,
+			handler: handlers.getTransactionResultByID,
 		},
 		// Blocks
 		{
 			method:  http.MethodGet,
 			pattern: "/blocks/{id}",
 			name:    GetBlocksByIDRoute,
-			handler: getBlocksByIDs,
+			handler: handlers.getBlocksByIDs,
 		}, {
 			method:  http.MethodGet,
 			pattern: "/blocks",
 			name:    GetBlocksByHeightRoute,
-			handler: getBlocksByHeight,
+			handler: handlers.getBlocksByHeight,
 		},
 		// Block Payload
 		{
 			method:  http.MethodGet,
 			pattern: "/blocks/{id}/payload",
 			name:    GetBlockPayloadByIDRoute,
-			handler: getBlockPayloadByID,
+			handler: handlers.getBlockPayloadByID,
 		},
 		// Execution Result
 		{
 			method:  http.MethodGet,
 			pattern: "/execution_results/{id}",
 			name:    GetExecutionResultByIDRoute,
-			handler: getExecutionResultByID,
+			handler: handlers.getExecutionResultByID,
 		},
 		{
 			method:  http.MethodGet,
 			pattern: "/execution_results",
 			name:    GetExecutionResultByBlockIDRoute,
-			handler: getExecutionResultsByBlockIDs,
+			handler: handlers.getExecutionResultsByBlockIDs,
 		},
 		// Collections
 		{
 			method:  http.MethodGet,
 			pattern: "/collections/{id}",
 			name:    GetCollectionByIDRoute,
-			handler: getCollectionByID,
+			handler: handlers.getCollectionByID,
 		},
 		// Scripts
 		{
 			method:  http.MethodPost,
 			pattern: "/scripts",
 			name:    ExecuteScriptRoute,
-			handler: executeScript,
+			handler: handlers.executeScript,
 		},
 		// Accounts
 		{
 			method:  http.MethodGet,
 			pattern: "/accounts/{address}",
 			name:    GetAccountRoute,
-			handler: getAccount,
+			handler: handlers.getAccount,
 		}}
 }

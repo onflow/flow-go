@@ -1,9 +1,10 @@
-package rest
+package handlers
 
 import (
 	"bytes"
 	"fmt"
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,7 @@ const (
 func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRecorder, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	router, err := initRouter(backend, logger)
+	router, err := rest.initRouter(backend, logger)
 	if err != nil {
 		return nil, err
 	}
