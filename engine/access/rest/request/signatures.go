@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const signatureLength = 64
+const signatureLength = 128
 
 type TransactionSignature flow.TransactionSignature
 
@@ -19,18 +19,18 @@ func (s *TransactionSignature) Parse(sig models.TransactionSignature) error {
 
 	sigIndex, err := toUint64(sig.SignerIndex)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid signer index: %v", err)
 	}
 
 	keyIndex, err := toUint64(sig.KeyIndex)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid key index: %v", err)
 	}
 
 	var signature Signature
 	err = signature.Parse(sig.Signature)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid signature: %v", err)
 	}
 
 	*s = TransactionSignature(flow.TransactionSignature{
@@ -75,10 +75,7 @@ type Signature []byte
 func (s *Signature) Parse(raw string) error {
 	signatureBytes, err := fromBase64(raw)
 	if err != nil {
-		return fmt.Errorf("invalid signature encoding")
-	}
-	if len(signatureBytes) != signatureLength {
-		return fmt.Errorf("invalid signature length")
+		return fmt.Errorf("invalid encoding")
 	}
 
 	*s = signatureBytes
