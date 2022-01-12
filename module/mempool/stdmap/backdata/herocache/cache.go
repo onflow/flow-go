@@ -45,9 +45,9 @@ type sha32of256 uint32
 // slot is an internal notion corresponding to the identifier of an entity that is
 // meant to be stored in this Cache.
 type slot struct {
-	slotAge     uint64          // age of this slot.
-	entityIndex heropool.EIndex // link to actual entity.
-	slotId      sha32of256      // slot id is the 32-bits prefix of entity identifier.
+	slotAge         uint64          // age of this slot.
+	entityIndex     heropool.EIndex // link to actual entity.
+	entityId32of256 sha32of256      // the 32-bits prefix of entity identifier.
 }
 
 // slotBucket represents a bucket of slots.
@@ -213,8 +213,8 @@ func (c *Cache) Hash() flow.Identifier {
 // determines whether the write operation was successful. A write operation fails when there is already
 // a duplicate entityId exists in the BackData, and that entityId is linked to a valid entity.
 func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
-	idPref, bucketIndex := c.idPrefixAndBucketIndex(entityId)
-	slotToUse, unique := c.slotIndexInBucket(bucketIndex, idPref, entityId)
+	entityId32of256, bucketIndex := c.entityId32of256AndBucketIndex(entityId)
+	slotToUse, unique := c.slotIndexInBucket(bucketIndex, entityId32of256, entityId)
 	if !unique {
 		// entityId already exists
 		return false
@@ -230,16 +230,16 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	entityIndex := c.entities.Add(entityId, entity, c.ownerIndexOf(bucketIndex, slotToUse))
 	c.buckets[bucketIndex][slotToUse].slotAge = c.slotCount
 	c.buckets[bucketIndex][slotToUse].entityIndex = entityIndex
-	c.buckets[bucketIndex][slotToUse].slotId = idPref
+	c.buckets[bucketIndex][slotToUse].entityId32of256 = entityId32of256
 	return true
 }
 
 // get retrieves the entity corresponding to given identifier from underlying entities list.
 // The boolean return value determines whether an entity with given id exists in the BackData.
 func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool) {
-	idPref, bucketIndex := c.idPrefixAndBucketIndex(entityID)
+	entityId32of256, bucketIndex := c.entityId32of256AndBucketIndex(entityID)
 	for slotIndex := sIndex(0); slotIndex < sIndex(slotsPerBucket); slotIndex++ {
-		if c.buckets[bucketIndex][slotIndex].slotId != idPref {
+		if c.buckets[bucketIndex][slotIndex].entityId32of256 != entityId32of256 {
 			continue
 		}
 
@@ -260,16 +260,16 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool
 	return nil, 0, 0, false
 }
 
-// idPrefixAndBucketIndex determines the id prefix as well as the bucket index corresponding to the
+// entityId32of256AndBucketIndex determines the id prefix as well as the bucket index corresponding to the
 // given identifier.
-func (c Cache) idPrefixAndBucketIndex(id flow.Identifier) (sha32of256, bIndex) {
+func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bIndex) {
 	// uint64(id[0:8]) used to compute bucket index for which this identifier belongs to
 	bucketIndex := binary.LittleEndian.Uint64(id[0:8]) % c.bucketNum
 
 	// uint32(id[8:12]) used to compute a shorter identifier for this id to represent in memory.
-	idPref := binary.LittleEndian.Uint32(id[8:12])
+	entityId32of256 := binary.LittleEndian.Uint32(id[8:12])
 
-	return sha32of256(idPref), bIndex(bucketIndex)
+	return sha32of256(entityId32of256), bIndex(bucketIndex)
 }
 
 // expiryThreshold returns the threshold for which all slots with index below threshold are considered old enough for eviction.
@@ -305,7 +305,7 @@ func (c *Cache) slotIndexInBucket(bucketIndex bIndex, slotId sha32of256, entityI
 			continue
 		}
 
-		if c.buckets[bucketIndex][s].slotId != slotId {
+		if c.buckets[bucketIndex][s].entityId32of256 != slotId {
 			// slot id is distinct and fresh, and hence move to next slot.
 			continue
 		}
