@@ -9,13 +9,16 @@ import (
 const sealed = "sealed"
 const final = "final"
 
+// Special height values
 const SealedHeight = math.MaxUint64 - 1
 const FinalHeight = math.MaxUint64 - 2
+const EmptyHeight = math.MaxUint64 - 3
 
 type Height uint64
 
 func (h *Height) Parse(raw string) error {
 	if raw == "" { // allow empty
+		*h = EmptyHeight
 		return nil
 	}
 
@@ -51,9 +54,10 @@ func (h *Heights) Parse(raw []string) error {
 		if err != nil {
 			return err
 		}
-
 		heights[i] = height
 	}
+
+	*h = heights
 	return nil
 }
 
