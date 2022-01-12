@@ -1,6 +1,7 @@
 package request
 
 import (
+	"fmt"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,12 +17,12 @@ func (p *ProposalKey) Parse(raw models.ProposalKey) error {
 
 	keyIndex, err := toUint64(raw.KeyIndex)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid key index: %v", err)
 	}
 
 	seqNumber, err := toUint64(raw.SequenceNumber)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid sequence number: %v", err)
 	}
 
 	*p = ProposalKey(flow.ProposalKey{
