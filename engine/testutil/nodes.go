@@ -567,6 +567,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
 
+	eds := new(state_synchronization.ExecutionDataService)
+	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil)
+
 	computationEngine, err := computation.New(
 		node.Log,
 		node.Metrics,
@@ -579,7 +582,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		committer,
 		computation.DefaultScriptLogThreshold,
 		nil,
-		new(state_synchronization.ExecutionDataService),
+		eds,
 	)
 	require.NoError(t, err)
 
