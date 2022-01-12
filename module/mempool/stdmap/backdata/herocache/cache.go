@@ -32,13 +32,13 @@ const (
 	telemetryDurationInterval = 10 * time.Second
 )
 
-// bIndex is data type representing a bucket index.
-type bIndex uint64
+// bucketIndex is data type representing a bucket index.
+type bucketIndex uint64
 
-// sIndex is data type representing a slot index in a bucket.
-type sIndex uint64
+// slotIndex is data type representing a slot index in a bucket.
+type slotIndex uint64
 
-// sha32of256 is a 32-bits prefix flow.Identifier used to determine the bIndex of the entity
+// sha32of256 is a 32-bits prefix flow.Identifier used to determine the bucketIndex of the entity
 // it represents.
 type sha32of256 uint32
 
@@ -51,7 +51,9 @@ type slot struct {
 }
 
 // slotBucket represents a bucket of slots.
-type slotBucket [slotsPerBucket]slot
+type slotBucket struct {
+	slots [slotsPerBucket]slot
+}
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
 type Cache struct {
@@ -175,9 +177,9 @@ func (c Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
 
 	all := make(map[flow.Identifier]flow.Entity)
-	for bucketIndex, bucket := range c.buckets {
-		for slotIndex := range bucket {
-			id, entity, linked := c.linkedEntityOf(bIndex(bucketIndex), sIndex(slotIndex))
+	for b, bucket := range c.buckets {
+		for s := range bucket.slots {
+			id, entity, linked := c.linkedEntityOf(bucketIndex(b), slotIndex(s))
 			if !linked {
 				// slot may never be used, or recently invalidated
 				continue
@@ -213,37 +215,37 @@ func (c *Cache) Hash() flow.Identifier {
 // determines whether the write operation was successful. A write operation fails when there is already
 // a duplicate entityId exists in the BackData, and that entityId is linked to a valid entity.
 func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
-	entityId32of256, bucketIndex := c.entityId32of256AndBucketIndex(entityId)
-	slotToUse, unique := c.slotIndexInBucket(bucketIndex, entityId32of256, entityId)
+	entityId32of256, b := c.entityId32of256AndBucketIndex(entityId)
+	slotToUse, unique := c.slotIndexInBucket(b, entityId32of256, entityId)
 	if !unique {
 		// entityId already exists
 		return false
 	}
 
-	if _, _, ok := c.linkedEntityOf(bucketIndex, slotToUse); ok {
+	if _, _, ok := c.linkedEntityOf(b, slotToUse); ok {
 		// we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
-		c.invalidateEntity(bucketIndex, slotToUse)
+		c.invalidateEntity(b, slotToUse)
 	}
 
 	c.slotCount++
-	entityIndex := c.entities.Add(entityId, entity, c.ownerIndexOf(bucketIndex, slotToUse))
-	c.buckets[bucketIndex][slotToUse].slotAge = c.slotCount
-	c.buckets[bucketIndex][slotToUse].entityIndex = entityIndex
-	c.buckets[bucketIndex][slotToUse].entityId32of256 = entityId32of256
+	entityIndex := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
+	c.buckets[b].slots[slotToUse].slotAge = c.slotCount
+	c.buckets[b].slots[slotToUse].entityIndex = entityIndex
+	c.buckets[b].slots[slotToUse].entityId32of256 = entityId32of256
 	return true
 }
 
 // get retrieves the entity corresponding to given identifier from underlying entities list.
 // The boolean return value determines whether an entity with given id exists in the BackData.
-func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool) {
-	entityId32of256, bucketIndex := c.entityId32of256AndBucketIndex(entityID)
-	for slotIndex := sIndex(0); slotIndex < sIndex(slotsPerBucket); slotIndex++ {
-		if c.buckets[bucketIndex][slotIndex].entityId32of256 != entityId32of256 {
+func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotIndex, bool) {
+	entityId32of256, b := c.entityId32of256AndBucketIndex(entityID)
+	for s := slotIndex(0); s < slotIndex(slotsPerBucket); s++ {
+		if c.buckets[b].slots[s].entityId32of256 != entityId32of256 {
 			continue
 		}
 
-		id, entity, linked := c.linkedEntityOf(bucketIndex, slotIndex)
+		id, entity, linked := c.linkedEntityOf(b, s)
 		if !linked {
 			// no linked entity for this (bucketIndex, slotIndex) pair.
 			return nil, 0, 0, false
@@ -254,7 +256,7 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool
 			continue
 		}
 
-		return entity, bucketIndex, slotIndex, true
+		return entity, b, s, true
 	}
 
 	return nil, 0, 0, false
@@ -262,14 +264,14 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool
 
 // entityId32of256AndBucketIndex determines the id prefix as well as the bucket index corresponding to the
 // given identifier.
-func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bIndex) {
+func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bucketIndex) {
 	// uint64(id[0:8]) used to compute bucket index for which this identifier belongs to
-	bucketIndex := binary.LittleEndian.Uint64(id[0:8]) % c.bucketNum
+	b := binary.LittleEndian.Uint64(id[0:8]) % c.bucketNum
 
 	// uint32(id[8:12]) used to compute a shorter identifier for this id to represent in memory.
 	entityId32of256 := binary.LittleEndian.Uint32(id[8:12])
 
-	return sha32of256(entityId32of256), bIndex(bucketIndex)
+	return sha32of256(entityId32of256), bucketIndex(b)
 }
 
 // expiryThreshold returns the threshold for which all slots with index below threshold are considered old enough for eviction.
@@ -285,32 +287,32 @@ func (c Cache) expiryThreshold() uint64 {
 
 // slotIndexInBucket returns a free slot for this entityId in the bucket. In case the bucket is full, it invalidates the oldest valid slot,
 // and returns its index as free slot. It returns false if the entityId already exists in this bucket.
-func (c *Cache) slotIndexInBucket(bucketIndex bIndex, slotId sha32of256, entityId flow.Identifier) (sIndex, bool) {
-	slotToUse := sIndex(0)
+func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flow.Identifier) (slotIndex, bool) {
+	slotToUse := slotIndex(0)
 	expiryThreshold := c.expiryThreshold()
 	availableSlotCount := uint64(0) // for telemetry logs.
 
 	oldestSlotInBucket := c.slotCount + 1 // initializes the oldest slot to current max.
 
-	for s := sIndex(0); s < sIndex(slotsPerBucket); s++ {
-		if c.buckets[bucketIndex][s].slotAge < oldestSlotInBucket {
+	for s := slotIndex(0); s < slotIndex(slotsPerBucket); s++ {
+		if c.buckets[b].slots[s].slotAge < oldestSlotInBucket {
 			// record slot s as oldest slot
-			oldestSlotInBucket = c.buckets[bucketIndex][s].slotAge
+			oldestSlotInBucket = c.buckets[b].slots[s].slotAge
 			slotToUse = s
 		}
 
-		if c.buckets[bucketIndex][s].slotAge <= expiryThreshold {
+		if c.buckets[b].slots[s].slotAge <= expiryThreshold {
 			// slot technically expired or never assigned
 			availableSlotCount++
 			continue
 		}
 
-		if c.buckets[bucketIndex][s].entityId32of256 != slotId {
+		if c.buckets[b].slots[s].entityId32of256 != slotId {
 			// slot id is distinct and fresh, and hence move to next slot.
 			continue
 		}
 
-		id, _, linked := c.linkedEntityOf(bucketIndex, s)
+		id, _, linked := c.linkedEntityOf(b, s)
 		if !linked {
 			// slot is not linked to a valid entity, hence, can be used
 			// as an available slot.
@@ -337,26 +339,26 @@ func (c *Cache) slotIndexInBucket(bucketIndex bIndex, slotId sha32of256, entityI
 // ownerIndexOf maps the (bucketIndex, slotIndex) pair to a canonical unique (scalar) index.
 // This scalar index is used to represent this (bucketIndex, slotIndex) pair in the underlying
 // entities list.
-func (c Cache) ownerIndexOf(bucketIndex bIndex, slotIndex sIndex) uint64 {
-	return (uint64(bucketIndex) * slotsPerBucket) + uint64(slotIndex)
+func (c Cache) ownerIndexOf(b bucketIndex, s slotIndex) uint64 {
+	return (uint64(b) * slotsPerBucket) + uint64(s)
 }
 
 // linkedEntityOf returns the entity linked to this (bucketIndex, slotIndex) pair from the underlying entities list.
 // By a linked entity, we mean if the entity has an owner index matching to (bucketIndex, slotIndex).
 // The bool return value corresponds to whether there is a linked entity to this (bucketIndex, slotIndex) or not.
-func (c *Cache) linkedEntityOf(bucketIndex bIndex, slotIndex sIndex) (flow.Identifier, flow.Entity, bool) {
-	if c.buckets[bucketIndex][slotIndex].slotAge == slotAgeUnallocated {
+func (c *Cache) linkedEntityOf(b bucketIndex, s slotIndex) (flow.Identifier, flow.Entity, bool) {
+	if c.buckets[b].slots[s].slotAge == slotAgeUnallocated {
 		// slotIndex never used, or recently invalidated, hence
 		// does not have any linked entity
 		return flow.Identifier{}, nil, false
 	}
 
 	// retrieving entity index in the underlying entities linked-list
-	valueIndex := c.buckets[bucketIndex][slotIndex].entityIndex
+	valueIndex := c.buckets[b].slots[s].entityIndex
 	id, entity, owner := c.entities.Get(valueIndex)
-	if c.ownerIndexOf(bucketIndex, slotIndex) != owner {
+	if c.ownerIndexOf(b, s) != owner {
 		// entity is not linked to this (bucketIndex, slotIndex)
-		c.buckets[bucketIndex][slotIndex].slotAge = slotAgeUnallocated
+		c.buckets[b].slots[s].slotAge = slotAgeUnallocated
 		return flow.Identifier{}, nil, false
 	}
 
@@ -392,12 +394,12 @@ func (c *Cache) logTelemetry() {
 }
 
 // deallocateSlot marks slot as free so that it is ready to be re-used.
-func (c *Cache) deallocateSlot(bucketIndex bIndex, slotIndex sIndex) {
-	c.buckets[bucketIndex][slotIndex].slotAge = slotAgeUnallocated
+func (c *Cache) deallocateSlot(b bucketIndex, s slotIndex) {
+	c.buckets[b].slots[s].slotAge = slotAgeUnallocated
 }
 
 // invalidateEntity removes the entity linked to the specified slot from the underlying entities
 // list. So that entity slot is made available to take if needed.
-func (c *Cache) invalidateEntity(bucketIndex bIndex, slotIndex sIndex) {
-	c.entities.Rem(c.buckets[bucketIndex][slotIndex].entityIndex)
+func (c *Cache) invalidateEntity(b bucketIndex, s slotIndex) {
+	c.entities.Rem(c.buckets[b].slots[s].entityIndex)
 }

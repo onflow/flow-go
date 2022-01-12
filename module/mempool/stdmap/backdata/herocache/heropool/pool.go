@@ -13,9 +13,6 @@ const (
 	LRUEjection    = EjectionMode("lru-ejection")
 )
 
-// number of entries we try to eject before giving up and ejecting LRU
-const maximumRandomTrials = 10
-
 // EIndex is data type representing an entity index in Pool.
 type EIndex uint32
 
