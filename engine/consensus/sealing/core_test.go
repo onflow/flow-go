@@ -657,14 +657,15 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 		unittest.Seal.Fixture(
 			unittest.Seal.WithBlock(&s.ParentBlock)), nil)
 
-	payload := unittest.PayloadFixture(
+	// the incorporated block contains the result for the sealing candidate block
+	incorporatedBlockPayload := unittest.PayloadFixture(
 		unittest.WithReceipts(
 			unittest.ExecutionReceiptFixture(
 				unittest.WithResult(s.IncorporatedResult.Result))))
+	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
+
 	emptyPayload := flow.EmptyPayload()
 	payloads.On("ByBlockID", s.Block.ID()).Return(&emptyPayload, nil)
-	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
-		&payload, nil)
 
 	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
 
@@ -713,6 +714,71 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	// ValidDescendants has to return all valid descendants from finalized block
 	finalSnapShot := unittest.StateSnapshotForKnownBlock(&s.IncorporatedBlock, nil)
 	finalSnapShot.On("ValidDescendants").Return(blockChildren, nil)
+	s.State.On("Final").Return(finalSnapShot)
+
+	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
+		s.Headers, s.State, s.sealsDB, assigner, s.SigVerifier, s.SealsPL, s.Conduit, s.core.config)
+	require.NoError(s.T(), err)
+
+	err = core.RepopulateAssignmentCollectorTree(payloads)
+	require.NoError(s.T(), err)
+
+	// check collector tree, after repopulating we should have all collectors for execution results that we have
+	// traversed and they have to be processable.
+	for _, incorporatedResult := range expectedResults {
+		collector, err := core.collectorTree.GetOrCreateCollector(incorporatedResult.Result)
+		require.NoError(s.T(), err)
+		require.False(s.T(), collector.Created)
+		require.Equal(s.T(), approvals.VerifyingApprovals, collector.Collector.ProcessingStatus())
+	}
+}
+
+// TestRepopulateAssignmentCollectorTree_RootSealingSegment tests that the sealing
+// engine will be initialized correctly when bootstrapping with a root sealing
+// segment with multiple blocks, as is the case when joining the network at an epoch
+// boundary.
+//
+// In particular, the assignment collector tree population step should ignore
+// unknown block references below the root height.
+//
+func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_RootSealingSegment() {
+	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
+	assigner := &module.ChunkAssigner{}
+
+	// setup mocks
+	s.rootHeader = &s.IncorporatedBlock
+	payloads := &storage.Payloads{}
+	expectedResults := []*flow.IncorporatedResult{s.IncorporatedResult}
+
+	s.sealsDB.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
+		unittest.Seal.Fixture(
+			unittest.Seal.WithBlock(&s.ParentBlock)), nil)
+
+	// the incorporated block contains the result for the sealing candidate block
+	incorporatedBlockPayload := unittest.PayloadFixture(
+		unittest.WithReceipts(
+			unittest.ExecutionReceiptFixture(
+				unittest.WithResult(s.IncorporatedResult.Result))))
+	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
+
+	// the sealing candidate block (S) is the lowest block in the segment under consideration here
+	// initially, this block would represent the lowest block in a node's root sealing segment,
+	// meaning that all earlier blocks are not known. In this case we should ignore results and seals
+	// referencing unknown blocks (tested here by adding such a result+seal to the candidate payload).
+	candidatePayload := unittest.PayloadFixture(
+		unittest.WithReceipts(unittest.ExecutionReceiptFixture()), // receipt referencing pre-root block
+		unittest.WithSeals(unittest.Seal.Fixture()),               // seal referencing pre-root block
+	)
+	payloads.On("ByBlockID", s.Block.ID()).Return(&candidatePayload, nil)
+
+	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
+
+	assigner.On("Assign", s.IncorporatedResult.Result, mock.Anything).Return(s.ChunksAssignment, nil)
+
+	// root snapshot has no pending children
+	finalSnapShot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
+	finalSnapShot.On("ValidDescendants").Return(nil, nil)
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
