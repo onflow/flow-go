@@ -4,11 +4,15 @@ import (
 	"bufio"
 	"compress/gzip"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -25,6 +29,7 @@ var (
 	flagOutputDir         string
 	flagStateCommitment   string
 	flagGzip              bool
+	flagFullSearch        bool
 )
 
 var Cmd = &cobra.Command{
@@ -47,23 +52,28 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagGzip, "gzip", true,
 		"Write GZip-encoded")
+
+	Cmd.Flags().BoolVar(&flagFullSearch, "full-search", false,
+		"Use full search (WARNING - traverse all WALs, extremely slow)")
 }
 
 func run(*cobra.Command, []string) {
 	log.Info().Msg("start exporting ledger")
-	err := ExportLedger(flagExecutionStateDir, flagStateCommitment, flagOutputDir)
+	err := ExportLedger(flagExecutionStateDir, flagStateCommitment, flagOutputDir, flagFullSearch)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export ledger")
 	}
 }
 
 // ExportLedger exports ledger key value pairs at the given blockID
-func ExportLedger(ledgerPath string, targetstate string, outputPath string) error {
+func ExportLedger(ledgerPath string, targetstate string, outputPath string, fullSearch bool) error {
+
+	noopMetrics := &metrics.NoopCollector{}
 
 	diskWal, err := wal.NewDiskWAL(
 		zerolog.Nop(),
 		nil,
-		&metrics.NoopCollector{},
+		noopMetrics,
 		ledgerPath,
 		complete.DefaultCacheSize,
 		pathfinder.PathByteSize,
@@ -76,18 +86,17 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 		<-diskWal.Done()
 	}()
 
-	led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, &metrics.NoopCollector{}, log.Logger, 0)
-	if err != nil {
-		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
-	}
-
 	var state ledger.State
-	// if no target state provided export the most recent state
+
 	if len(targetstate) == 0 {
-		state, err = led.MostRecentTouchedState()
-		if err != nil {
-			return fmt.Errorf("failed to load most recently used state: %w", err)
+		if fullSearch {
+			return fmt.Errorf("target state must be provided when using full search")
 		}
+
+		//state, err = led.MostRecentTouchedState()
+		//if err != nil {
+		//	return fmt.Errorf("failed to load most recently used state: %w", err)
+		//}
 	} else {
 		st, err := hex.DecodeString(targetstate)
 		if err != nil {
@@ -98,6 +107,92 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 			return fmt.Errorf("failed to convert bytes to state: %w", err)
 		}
 	}
+
+	var write func(writer io.Writer) error
+
+	if fullSearch {
+		forest, err := mtrie.NewForest(complete.DefaultCacheSize, noopMetrics, func(evictedTrie *trie.MTrie) error {
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("cannot create forest: %w", err)
+		}
+
+		diskWal.PauseRecord()
+
+		sentinel := fmt.Errorf("we_got_the_trie_error")
+
+		rootState := ledger.RootHash(state)
+
+		err = diskWal.ReplayLogsOnly(
+			func(forestSequencing *flattener.FlattenedForest) error {
+				rebuiltTries, err := flattener.RebuildTries(forestSequencing)
+				if err != nil {
+					return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
+				}
+				err = forest.AddTries(rebuiltTries)
+				if err != nil {
+					return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
+				}
+
+				for _, trie := range rebuiltTries {
+					rootHash := trie.RootHash()
+					if rootState.Equals(rootHash) {
+						return sentinel
+					}
+				}
+				return nil
+			},
+			func(update *ledger.TrieUpdate) error {
+				rootHash, err := forest.Update(update)
+				if rootState.Equals(rootHash) {
+					return sentinel
+				}
+				return err
+			},
+			func(rootHash ledger.RootHash) error {
+				forest.RemoveTrie(rootHash)
+				return nil
+			},
+		)
+
+		if err != nil {
+			if !errors.Is(err, sentinel) {
+				return fmt.Errorf("cannot restore LedgerWAL: %w", err)
+			}
+		}
+
+		write = func(writer io.Writer) error {
+			mTrie, err := forest.GetTrie(rootState)
+			if err != nil {
+				return fmt.Errorf("cannot get trie")
+			}
+			return mTrie.DumpAsJSON(writer)
+		}
+
+	} else {
+		led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, noopMetrics, log.Logger, 0)
+		if err != nil {
+			return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
+		}
+
+		// if no target state provided export the most recent state
+		if len(targetstate) == 0 {
+			state, err = led.MostRecentTouchedState()
+			if err != nil {
+				return fmt.Errorf("failed to load most recently used state: %w", err)
+			}
+		}
+
+		write = func(writer io.Writer) error {
+			err = led.DumpTrieAsJSON(state, writer)
+			if err != nil {
+				return fmt.Errorf("cannot dump trie as json: %w", err)
+			}
+			return nil
+		}
+	}
+
 	filename := state.String() + ".trie.jsonl"
 	if flagGzip {
 		filename += ".gz"
@@ -120,9 +215,5 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 		writer = gzipWriter
 	}
 
-	err = led.DumpTrieAsJSON(state, writer)
-	if err != nil {
-		return fmt.Errorf("cannot dump trie as json: %w", err)
-	}
-	return nil
+	return write(writer)
 }
