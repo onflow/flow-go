@@ -20,6 +20,7 @@ func (b *Block) Build(
 	b.Header = &header
 
 	// add the payload to the response if it is specified as an expandable field
+	b.Expandable = &BlockExpandable{}
 	const ExpandableFieldPayload = "payload"
 	if expand[ExpandableFieldPayload] {
 		var payload BlockPayload

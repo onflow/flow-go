@@ -3,6 +3,7 @@ package rest
 import (
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/url"
@@ -44,8 +45,7 @@ func TestGetBlocks(t *testing.T) {
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
 
-	MaxAllowedIDs := 50
-	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(MaxAllowedIDs + 1))
+	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(request.MaxAllowedHeights + 1))
 
 	testVectors := []testVector{
 		{
@@ -106,7 +106,7 @@ func TestGetBlocks(t *testing.T) {
 			description:      "Get block by end height less than start height",
 			request:          getByStartEndHeightExpandedURL(t, heights[len(heights)-1], heights[0]),
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: `{"code":400, "message": "start height must be less than or equal to end height"}`,
+			expectedResponse: fmt.Sprintf(`{"code":400, "message": "start height must be less than or equal to end height"}`),
 		},
 		{
 			description:      "Get block by both heights and start and end height",
@@ -128,9 +128,9 @@ func TestGetBlocks(t *testing.T) {
 		},
 		{
 			description:      "Get block by more than maximum permissible number of IDs",
-			request:          getByHeightsExpandedURL(t, maxIDs.Strings()...), // height query param specified with no value
+			request:          getByIDsCondensedURL(t, maxIDs.Strings()), // height query param specified with no value
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: fmt.Sprintf(`{"code":400, "message": "invalid height specified: at most %d heights can be requested at a time"}`, MaxAllowedIDs),
+			expectedResponse: fmt.Sprintf(`{"code":400, "message": "at most %d IDs can be requested at a time"}`, request.MaxAllowedHeights),
 		},
 	}
 

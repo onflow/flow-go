@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/access"
 )
 
-// getBlocksByID gets blocks by provided ID or list of IDs.
+// GetBlocksByIDs gets blocks by provided ID or list of IDs.
 func GetBlocksByIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockByIDsRequest()
 	if err != nil {
