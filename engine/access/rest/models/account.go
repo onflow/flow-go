@@ -31,7 +31,10 @@ func (a *Account) Build(flowAccount *flow.Account, link LinkGenerator, expand ma
 	}
 
 	var self Links
-	self.BuildAccount(flowAccount.Address)
+	err := self.Build(link.AccountLink(a.Address))
+	if err != nil {
+		return err
+	}
 	a.Links = &self
 
 	return nil
