@@ -13,7 +13,7 @@ func (a *Arguments) Parse(raw []string) error {
 	for i, a := range raw {
 		arg, err := fromBase64(a)
 		if err != nil {
-			return fmt.Errorf("invalid script encoding")
+			return fmt.Errorf("invalid argument encoding: %v", err)
 		}
 		args[i] = arg
 	}
