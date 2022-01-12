@@ -275,16 +275,29 @@ func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, err
 	lastKey := p.lastAggregatedKey
 	p.RUnlock()
 
-	// add the new keys
+	// checks whether the delta of signers is larger than new list of signers.
+	deltaIsLarger := len(newSignerKeys)+len(missingSignerKeys) > len(updatedSignerSet)
+
+	var updatedKey crypto.PublicKey
 	var err error
-	updatedKey, err := crypto.AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
-	if err != nil {
-		return nil, fmt.Errorf("adding new staking keys failed: %w", err)
-	}
-	// remove the missing keys
-	updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
-	if err != nil {
-		return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
+	if deltaIsLarger {
+		// it is faster to aggregate the keys from scratch in this case
+		updatedKey, err = crypto.AggregateBLSPublicKeys(newSignerKeys)
+		if err != nil {
+			return nil, fmt.Errorf("aggregating staking keys failed: %w", err)
+		}
+	} else {
+		// it is faster to adjust the existing aggregated key in this case
+		// add the new keys
+		updatedKey, err = crypto.AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
+		if err != nil {
+			return nil, fmt.Errorf("adding new staking keys failed: %w", err)
+		}
+		// remove the missing keys
+		updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
+		if err != nil {
+			return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
+		}
 	}
 
 	// update the latest list and public key.
