@@ -134,7 +134,7 @@ func (c *Cache) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 	c.invalidateEntity(bucketIndex, sliceIndex)
 
 	// frees up slot
-	c.deallocateSlot(bucketIndex, sliceIndex)
+	c.unuseSlot(bucketIndex, sliceIndex)
 
 	return entity, true
 }
@@ -393,8 +393,8 @@ func (c *Cache) logTelemetry() {
 	c.lastTelemetryDump = runtimeNano()
 }
 
-// deallocateSlot marks slot as free so that it is ready to be re-used.
-func (c *Cache) deallocateSlot(b bucketIndex, s slotIndex) {
+// unuseSlot marks slot as free so that it is ready to be re-used.
+func (c *Cache) unuseSlot(b bucketIndex, s slotIndex) {
 	c.buckets[b].slots[s].slotAge = slotAgeUnallocated
 }
 
