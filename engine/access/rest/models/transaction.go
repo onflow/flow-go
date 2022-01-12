@@ -17,16 +17,15 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionRes
 	}
 
 	// if transaction result is provided then add that to the response, else add the result link to the expandable
-	var txResult TransactionResult
-	var expandable TransactionExpandable
+	t.Expandable = &TransactionExpandable{}
 	if txr != nil {
+		var txResult TransactionResult
 		txResult.Build(txr, tx.ID(), link)
+		t.Result = &txResult
 	} else {
 		resultLink, _ := link.TransactionResultLink(tx.ID())
-		expandable.Result = resultLink
+		t.Expandable.Result = resultLink
 	}
-
-	self, _ := SelfLink(tx.ID(), link.TransactionLink)
 
 	var payloadSigs TransactionSignatures
 	payloadSigs.Build(tx.PayloadSignatures)
@@ -47,9 +46,9 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionRes
 	t.Authorizers = auths
 	t.PayloadSignatures = payloadSigs
 	t.EnvelopeSignatures = envelopeSigs
-	t.Result = &txResult
+
+	self, _ := SelfLink(tx.ID(), link.TransactionLink)
 	t.Links = self
-	t.Expandable = &expandable
 }
 
 type Transactions []Transaction
