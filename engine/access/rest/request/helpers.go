@@ -81,5 +81,9 @@ func fromUint64(number uint64) string {
 }
 
 func toUint64(uint64Str string) (uint64, error) {
-	return strconv.ParseUint(uint64Str, 10, 64)
+	val, err := strconv.ParseUint(uint64Str, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("value must be an unsigned 64 bit integer") // hide error from user
+	}
+	return val, nil
 }
