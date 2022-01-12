@@ -267,10 +267,18 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 // signatures for building a QC. This function is run only once by a single worker.
 // Any error should be treated as exception.
 func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
+	// STEP 1: aggregate staking signatures (if there are any)
+	// Note: it is possible that all replicas signed with their random beacon keys. In this case, the Aggregator
+	// returns an `model.InsufficientSignaturesError`. If no replicas signed with their staking key,
+	// `BlockSignatureData.StakingSigners` and `BlockSignatureData.AggregatedStakingSig` should be set to nil.
 	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
-	if err != nil {
-		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
+	if err != nil && !model.IsInsufficientSignaturesError(err) {
+		return nil, fmt.Errorf("unexpected error aggregating staking signatures: %w", err)
 	}
+
+	// STEP 2: reconstruct random beacon group sig and aggregate random beacon sig shares
+	// Note: A valid random beacon group sig is required for QC validity. Our logic guarantees
+	// that we always collect the minimally required number (non-zero) of signature shares.
 	beaconSigners, aggregatedRandomBeaconSig, err := p.rbSigAggtor.Aggregate()
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate random beacon signatures: %w", err)
@@ -280,6 +288,7 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not reconstruct random beacon group signature: %w", err)
 	}
 
+	// STEP 3: generate BlockSignatureData and serialize it
 	blockSigData := &hotstuff.BlockSignatureData{
 		StakingSigners:               stakingSigners,
 		RandomBeaconSigners:          beaconSigners,
@@ -287,7 +296,6 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 		AggregatedRandomBeaconSig:    aggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: reconstructedBeaconSig,
 	}
-
 	signerIDs, sigData, err := p.packer.Pack(p.block.BlockID, blockSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)

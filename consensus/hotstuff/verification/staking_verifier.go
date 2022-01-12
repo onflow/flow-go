@@ -54,8 +54,14 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, bloc
 	return nil
 }
 
-// VerifyQC verifies the validity of a single signature on a quorum certificate.
-//
+// VerifyQC checks the cryptographic validity of the QC's `sigData` for the
+// given block. It is the responsibility of the calling code to ensure
+// that all `voters` are authorized, without duplicates. Return values:
+//  - nil if `sigData` is cryptographically valid
+//  - model.ErrInvalidFormat if `sigData` has an incompatible format
+//  - model.ErrInvalidSignature if a signature is invalid
+//  - unexpected errors should be treated as symptoms of bugs or uncovered
+//	  edge cases in the logic (i.e. as fatal)
 // In the single verification case, `sigData` represents a single signature (`crypto.Signature`).
 func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
 	if len(signers) == 0 {

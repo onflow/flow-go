@@ -642,6 +642,65 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 	})
 }
 
+// TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners tests the most optimal happy path,
+// where all consensus replicas vote using their random beacon keys. In this case,
+// no staking signatures were collected and the CombinedVoteProcessor should be setting
+// `BlockSignatureData.StakingSigners` and `BlockSignatureData.AggregatedStakingSig` to nil or empty slices.
+func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
+	// setup CombinedVoteProcessorV3
+	block := helper.MakeBlock()
+	stakingAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+	rbSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+	reconstructor := &mockhotstuff.RandomBeaconReconstructor{}
+	packer := &mockhotstuff.Packer{}
+
+	processor := &CombinedVoteProcessorV3{
+		log:              unittest.Logger(),
+		block:            block,
+		stakingSigAggtor: stakingAggregator,
+		rbSigAggtor:      rbSigAggregator,
+		rbRector:         reconstructor,
+		onQCCreated:      func(qc *flow.QuorumCertificate) { /* no op */ },
+		packer:           packer,
+		minRequiredStake: 70,
+		done:             *atomic.NewBool(false),
+	}
+
+	// The `stakingAggregator` is empty, i.e. it return ans InsufficientSignaturesError when we call `Aggregate()` on it.
+	stakingAggregator.On("TotalWeight").Return(uint64(0), nil).Once()
+	stakingAggregator.On("Aggregate").Return(nil, nil, model.NewInsufficientSignaturesErrorf("")).Once()
+
+	// Create another vote with a random beacon signature. With its addition, the `rbSigAggregator`
+	// by itself has collected enough votes to exceed the minimally required weight (70).
+	vote := unittest.VoteForBlockFixture(block, unittest.VoteWithBeaconSig())
+	rawSig := (crypto.Signature)(vote.SigData[1:])
+	rbSigAggregator.On("Verify", vote.SignerID, rawSig).Return(nil).Once()
+	rbSigAggregator.On("TrustedAdd", vote.SignerID, rawSig).Return(uint64(80), nil).Once()
+	rbSigAggregator.On("TotalWeight").Return(uint64(80), nil).Once()
+	rbSigAggregator.On("Aggregate").Return(unittest.IdentifierListFixture(11), unittest.RandomBytes(48), nil).Once()
+	reconstructor.On("TrustedAdd", vote.SignerID, rawSig).Return(true, nil).Once()
+	reconstructor.On("EnoughShares").Return(true).Once()
+	reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil).Once()
+
+	// Adding the vote should trigger QC generation. We expect `BlockSignatureData.StakingSigners`
+	// and `BlockSignatureData.AggregatedStakingSig` to be both empty, as there are no staking signatures.
+	packer.On("Pack", block.BlockID, mock.Anything).
+		Run(func(args mock.Arguments) {
+			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
+			require.Empty(testifyT, blockSigData.StakingSigners)
+			require.Empty(testifyT, blockSigData.AggregatedStakingSig)
+		}).
+		Return(unittest.IdentifierListFixture(11), unittest.RandomBytes(1017), nil).Once()
+
+	err := processor.Process(vote)
+	require.NoError(testifyT, err)
+
+	stakingAggregator.AssertExpectations(testifyT)
+	rbSigAggregator.AssertExpectations(testifyT)
+	reconstructor.AssertExpectations(testifyT)
+	packer.AssertExpectations(testifyT)
+}
+
 // TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness uses property testing to test liveness of concurrent votes processing.
 // We randomly draw a committee and check if we are able to create a QC with minimal number of nodes.
 // In each test iteration we expect to create a QC, we don't check correctness of data since it's checked by another test.

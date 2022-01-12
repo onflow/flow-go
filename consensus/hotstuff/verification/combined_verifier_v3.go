@@ -131,7 +131,6 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// STEP 1: verify random beacon group key
-	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// We do this first, since it is faster to check (no public key aggregation needed).
 	beaconValid, err := dkg.GroupKey().Verify(blockSigData.ReconstructedRandomBeaconSig, msg, c.beaconHasher)
 	if err != nil {
@@ -160,7 +159,6 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 
 	// STEP 2: verify aggregated random beacon key shares
-	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// Step 2a: fetch all beacon signers public keys.
 	// Note: A valid random beacon group sig is required for QC validity. To reconstruct
 	// the group sig, _strictly more_ than `threshold` sig shares are required.
@@ -194,7 +192,6 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 
 	// STEP 3: validating the aggregated staking signatures
-	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// Note: it is possible that all replicas signed with their random beacon keys, i.e.
 	// `blockSigData.StakingSigners` could be empty. In this case, the
 	// `blockSigData.AggregatedStakingSig` should also be empty.
