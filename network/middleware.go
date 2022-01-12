@@ -3,9 +3,9 @@
 package network
 
 import (
-	"time"
-
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/routing"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -48,16 +48,13 @@ type Middleware interface {
 	// Unsubscribe unsubscribes the middleware from a channel.
 	Unsubscribe(channel Channel) error
 
-	// Ping pings the target node and returns the ping RTT or an error
-	Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error)
-
-	// UpdateAllowList fetches the most recent identity of the nodes from overlay
-	// and updates the underlying libp2p node.
-	UpdateAllowList()
-
 	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
+
+	RoutingSystem() routing.Routing
+
+	Host() host.Host
 
 	IsConnected(nodeID flow.Identifier) (bool, error)
 }

@@ -1,4 +1,4 @@
-name: Flakiness Summary
+name: Flaky Test Summary
 
 on:
   push:
@@ -11,8 +11,8 @@ env:
   COMMIT_SHA: ${{ github.sha }}
 
 jobs:
-  tests:
-    name: Tests
+  level1:
+    name: Flaky Test Summary - Level 1
     strategy:
       fail-fast: false
       matrix:
@@ -42,6 +42,6 @@ jobs:
       uses: actions/checkout@v2
     - name: Run flakiness summary script
       working-directory: ./tools/flaky_test_monitor
-      run: ./flakiness-summary.sh
+      run: ./flaky-test-monitor-level1.sh
       env:
         TEST_CATEGORY: ${{ matrix.test-category }}

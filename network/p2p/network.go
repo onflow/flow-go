@@ -228,16 +228,7 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 }
 
 func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
-	// TODO: this is a hack, we should not rely on knowing the underlying implementation
-	mw, ok := n.mw.(*Middleware)
-	if !ok {
-		return nil, errors.New("middleware was of unexpected type")
-	}
-	if mw.libP2PNode.dht == nil {
-		return nil, errors.New("blob exchange is disabled because content routing is not configured")
-	}
-
-	bs := network.NewBlobService(mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), ds)
+	bs := network.NewBlobService(n.mw.Host(), n.mw.RoutingSystem(), channel.String(), ds)
 
 	// start the blob service using the network's context
 	bs.Start(parent)

@@ -9,7 +9,6 @@ import (
 
 	madns "github.com/multiformats/go-multiaddr-dns"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -31,7 +30,6 @@ type Resolver struct {
 	c              *cache
 	res            madns.BasicResolver // underlying resolver
 	collector      module.ResolverMetrics
-	unit           *engine.Unit
 	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
 	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
 }
@@ -61,7 +59,6 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},
-		unit:           engine.NewUnit(),
 	}
 
 	for _, opt := range opts {
@@ -69,16 +66,6 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	}
 
 	return resolver
-}
-
-// Ready initializes the resolver and returns a channel that is closed when the initialization is done.
-func (r *Resolver) Ready() <-chan struct{} {
-	return r.unit.Ready()
-}
-
-// Done terminates the resolver and returns a channel that is closed when the termination is done
-func (r *Resolver) Done() <-chan struct{} {
-	return r.unit.Done()
 }
 
 // LookupIPAddr implements BasicResolver interface for libp2p for looking up ip addresses through resolver.
@@ -105,7 +92,7 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 	}
 
 	if !fresh && r.shouldResolveIP(domain) {
-		r.unit.Launch(func() {
+		go func() {
 			_, err := r.lookupResolverForIPAddr(ctx, domain)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
@@ -115,7 +102,7 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 				}
 			}
 			r.doneResolvingIP(domain)
-		})
+		}()
 	}
 
 	r.collector.OnDNSCacheHit()
@@ -159,7 +146,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 	}
 
 	if !fresh && r.shouldResolveTXT(txt) {
-		r.unit.Launch(func() {
+		go func() {
 			defer r.doneResolvingTXT(txt)
 			_, err := r.lookupResolverForTXTAddr(ctx, txt)
 			if err != nil {
@@ -169,8 +156,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 					r.collector.OnDNSCacheInvalidated()
 				}
 			}
-		})
-
+		}()
 	}
 
 	r.collector.OnDNSCacheHit()

@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -52,9 +50,12 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	node, _ := nodeFixture(t,
+	node, _ := nodeFixture(
+		t,
 		ctx,
-		unittest.IdentifierFixture())
+		unittest.IdentifierFixture(),
+		"test_single_node_life_cycle",
+	)
 
 	stopNode(t, node)
 }
@@ -89,7 +90,7 @@ func TestAddPeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), count)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_add_peers", count)
 	defer stopNodes(t, nodes)
 
 	// add the remaining nodes to the first node as its set of peers
@@ -110,7 +111,7 @@ func TestRemovePeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), count)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
 	peerInfos, errs := peerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 	defer stopNodes(t, nodes)
@@ -128,59 +129,4 @@ func TestRemovePeers(t *testing.T) {
 		require.NoError(t, nodes[0].RemovePeer(pInfo.ID))
 		assert.Equal(t, network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
 	}
-}
-
-// TestPing tests that a node can ping another node
-func TestPing(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// creates two nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), 2)
-	defer stopNodes(t, nodes)
-
-	node1 := nodes[0]
-	node2 := nodes[1]
-	node1Id := *identities[0]
-	node2Id := *identities[1]
-
-	_, expectedVersion, expectedHeight, expectedView := mockPingInfoProvider()
-
-	// test node1 can ping node 2
-	testPing(t, node1, node2Id, expectedVersion, expectedHeight, expectedView)
-
-	// test node 2 can ping node 1
-	testPing(t, node2, node1Id, expectedVersion, expectedHeight, expectedView)
-}
-
-func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion string, expectedHeight uint64, expectedView uint64) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	pInfo, err := PeerAddressInfo(target)
-	assert.NoError(t, err)
-	source.host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-	resp, rtt, err := source.Ping(ctx, pInfo.ID)
-	assert.NoError(t, err)
-	assert.NotZero(t, rtt)
-	assert.Equal(t, expectedVersion, resp.Version)
-	assert.Equal(t, expectedHeight, resp.BlockHeight)
-	assert.Equal(t, expectedView, resp.HotstuffView)
-}
-
-func TestConnectionGatingBootstrap(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	node, identity := nodesFixture(t, ctx, unittest.IdentifierFixture(), 1)
-	node1 := node[0]
-	node1Id := identity[0]
-	defer stopNode(t, node1)
-	node1Info, err := PeerAddressInfo(*node1Id)
-	assert.NoError(t, err)
-
-	t.Run("updating allowlist of node w/o ConnGater does not crash", func(t *testing.T) {
-		// node1 allowlists node1
-		node1.UpdateAllowList(peer.IDSlice{node1Info.ID})
-	})
 }

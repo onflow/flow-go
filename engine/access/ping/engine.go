@@ -1,6 +1,8 @@
 package ping
 
 import (
+	"context"
+	"encoding/binary"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -9,42 +11,48 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
+// PingTimeout is maximum time to wait for a ping reply from a remote node
+const PingTimeout = time.Second * 4
+
 type Engine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	state   protocol.State
-	me      module.Local
-	metrics module.PingMetrics
+	unit         *engine.Unit
+	log          zerolog.Logger
+	idProvider   id.IdentityProvider
+	idTranslator p2p.IDTranslator
+	me           module.Local
+	metrics      module.PingMetrics
 
 	pingEnabled  bool
 	pingInterval time.Duration
-	middleware   network.Middleware
+	pingService  *p2p.PingService
 	nodeInfo     map[flow.Identifier]string // additional details about a node such as operator name
 }
 
 func New(
 	log zerolog.Logger,
-	state protocol.State,
+	idProvider id.IdentityProvider,
+	idTranslator p2p.IDTranslator,
 	me module.Local,
 	metrics module.PingMetrics,
 	pingEnabled bool,
-	mw network.Middleware,
+	pingService *p2p.PingService,
 	nodeInfoFile string,
 ) (*Engine, error) {
 
 	eng := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "ping").Logger(),
-		state:        state,
+		idProvider:   idProvider,
+		idTranslator: idTranslator,
 		me:           me,
 		metrics:      metrics,
 		pingEnabled:  pingEnabled,
 		pingInterval: time.Minute,
-		middleware:   mw,
+		pingService:  pingService,
 	}
 
 	// if a node info file is provided, it is read and the additional node information is reported as part of the ping metric
@@ -85,39 +93,45 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 func (e *Engine) startPing() {
-	peers, err := e.state.Final().Identities(filter.Not(filter.HasNodeID(e.me.NodeID())))
-	if err != nil {
-		e.log.Err(err).Msg("could not get identity list")
-		return
-	}
+	pingInterval := time.Minute
 
-	pingInterval := time.Second * 60
+	e.unit.LaunchPeriodically(func() {
+		peers := e.idProvider.Identities(filter.Not(filter.HasNodeID(e.me.NodeID())))
 
-	// for each peer, send a ping every ping interval
-	for i, peer := range peers {
-		func(peer *flow.Identity, delay time.Duration) {
-			e.log.Info().Str("peer", peer.String()).Dur("interval", pingInterval).Msg("periodically ping node")
-			e.unit.LaunchPeriodically(func() {
+		// for each peer, send a ping every ping interval
+		for _, peer := range peers {
+			peer := peer
+			pid := peer.ID()
+			delay := time.Duration(binary.BigEndian.Uint16(pid[:2])) % (pingInterval / time.Millisecond)
+			e.unit.LaunchAfter(delay, func() {
 				e.pingNode(peer)
-			}, pingInterval, delay)
-		}(peer, time.Duration(i)*time.Second)
-	}
+			})
+		}
+	}, pingInterval, 0)
 }
 
 // pingNode pings the given peer and updates the metrics with the result and the additional node information
 func (e *Engine) pingNode(peer *flow.Identity) {
-	id := peer.ID()
+	pid, err := e.idTranslator.GetPeerID(peer.ID())
+
+	if err != nil {
+		e.log.Error().Err(err).Str("peer", peer.String()).Msg("failed to get peer ID")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), PingTimeout)
+	defer cancel()
 
 	// ping the node
-	resp, rtt, pingErr := e.middleware.Ping(id) // ping will timeout in libp2p.PingTimeout seconds
+	resp, rtt, pingErr := e.pingService.Ping(ctx, pid) // ping will timeout in libp2p.PingTimeout seconds
 	if pingErr != nil {
-		e.log.Debug().Err(pingErr).Str("target", id.String()).Msg("failed to ping")
+		e.log.Debug().Err(pingErr).Str("target", peer.ID().String()).Msg("failed to ping")
 		// report the rtt duration as negative to make it easier to distinguish between pingable and non-pingable nodes
 		rtt = -1
 	}
 
 	// get the additional info about the node
-	info := e.nodeInfo[id]
+	info := e.nodeInfo[peer.ID()]
 
 	// update metric
 	e.metrics.NodeReachable(peer, info, rtt)

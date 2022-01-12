@@ -8,7 +8,12 @@ import (
 	"time"
 
 	addrutil "github.com/libp2p/go-addr-util"
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p-core/routing"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
@@ -18,8 +23,6 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -37,9 +40,8 @@ type nodeFixtureParameters struct {
 	unicasts    []unicast.ProtocolName
 	key         fcrypto.PrivateKey
 	address     string
-	allowList   bool
-	dhtEnabled  bool
-	dhtServer   bool
+	dhtOptions  []dht.Option
+	peerFilter  PeerFilter
 }
 
 type nodeFixtureParameterOption func(*nodeFixtureParameters)
@@ -47,12 +49,6 @@ type nodeFixtureParameterOption func(*nodeFixtureParameters)
 func withDefaultStreamHandler(handler network.StreamHandler) nodeFixtureParameterOption {
 	return func(p *nodeFixtureParameters) {
 		p.handlerFunc = handler
-	}
-}
-
-func withAllowListEnabled() nodeFixtureParameterOption {
-	return func(p *nodeFixtureParameters) {
-		p.allowList = true
 	}
 }
 
@@ -74,27 +70,35 @@ func withNetworkingAddress(address string) nodeFixtureParameterOption {
 	}
 }
 
-func withDHTNodeEnabled(asServer bool) nodeFixtureParameterOption {
+func withDHTOptions(opts ...dht.Option) nodeFixtureParameterOption {
 	return func(p *nodeFixtureParameters) {
-		p.dhtEnabled = true
-		p.dhtServer = asServer
+		p.dhtOptions = opts
+	}
+}
+
+func withPeerFilter(filter PeerFilter) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.peerFilter = filter
 	}
 }
 
 // nodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
-func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
+func nodeFixture(
+	t *testing.T,
+	ctx context.Context,
+	sporkId flow.Identifier,
+	dhtPrefix string,
+	opts ...nodeFixtureParameterOption,
+) (*Node, flow.Identity) {
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
 	// default parameters
 	parameters := &nodeFixtureParameters{
 		handlerFunc: func(network.Stream) {},
-		allowList:   false,
 		unicasts:    nil,
 		key:         generateNetworkingKey(t),
 		address:     defaultAddress,
-		dhtServer:   false,
-		dhtEnabled:  false,
 	}
 
 	for _, opt := range opts {
@@ -105,30 +109,19 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 		unittest.WithNetworkingKey(parameters.key.PublicKey()),
 		unittest.WithAddress(parameters.address))
 
-	pingInfoProvider, _, _, _ := mockPingInfoProvider()
-
-	// dns resolver
-	resolver := dns.NewResolver(metrics.NewNoopCollector())
-	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start resolver")
-
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(logger, noopMetrics)
 
-	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, parameters.address, parameters.key).
-		SetSporkID(sporkId).
+	builder := NewNodeBuilder(logger, parameters.address, parameters.key, sporkId).
 		SetConnectionManager(connManager).
-		SetPingInfoProvider(pingInfoProvider).
-		SetResolver(resolver).
-		SetTopicValidation(false).
-		SetLogger(logger)
+		SetPubSub(pubsub.NewGossipSub).
+		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
+			return NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkId.String()+"/"+dhtPrefix), parameters.dhtOptions...)
+		})
 
-	if parameters.allowList {
-		connGater := NewConnGater(logger)
+	if parameters.peerFilter != nil {
+		connGater := NewConnGater(logger, parameters.peerFilter)
 		builder.SetConnectionGater(connGater)
-	}
-
-	if parameters.dhtEnabled {
-		builder.SetDHTOptions(AsServer(parameters.dhtServer))
 	}
 
 	n, err := builder.Build(ctx)
@@ -148,17 +141,6 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 	identity.Address = ip + ":" + port
 
 	return n, *identity
-}
-
-func mockPingInfoProvider() (*mocknetwork.PingInfoProvider, string, uint64, uint64) {
-	version := "version_1"
-	height := uint64(5000)
-	view := uint64(10)
-	pingInfoProvider := new(mocknetwork.PingInfoProvider)
-	pingInfoProvider.On("SoftwareVersion").Return(version)
-	pingInfoProvider.On("SealedBlockHeight").Return(height)
-	pingInfoProvider.On("HotstuffView").Return(view)
-	return pingInfoProvider, version, height, view
 }
 
 // stopNodes stop all nodes in the input slice
@@ -223,7 +205,7 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // nodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func nodesFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, count int, opts ...nodeFixtureParameterOption) ([]*Node,
+func nodesFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, dhtPrefix string, count int, opts ...nodeFixtureParameterOption) ([]*Node,
 	flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
@@ -241,9 +223,10 @@ func nodesFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, co
 	var identities flow.IdentityList
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		node, identity := nodeFixture(t, ctx, sporkId, opts...)
+		node, identity := nodeFixture(t, ctx, sporkId, dhtPrefix, opts...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
+
 	return nodes, identities
 }

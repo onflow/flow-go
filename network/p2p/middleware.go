@@ -11,9 +11,11 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
+	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -28,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -76,10 +79,9 @@ type Middleware struct {
 	peerManagerFactory         PeerManagerFactoryFunc
 	peerManager                *PeerManager
 	unicastMessageTimeout      time.Duration
-	connectionGating           bool
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
-	*component.ComponentManager
+	component.Component
 }
 
 type MiddlewareOption func(*Middleware)
@@ -99,12 +101,6 @@ func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOp
 func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.peerManagerFactory = peerManagerFunc
-	}
-}
-
-func WithConnectionGating(enabled bool) MiddlewareOption {
-	return func(mw *Middleware) {
-		mw.connectionGating = enabled
 	}
 }
 
@@ -142,7 +138,6 @@ func NewMiddleware(
 		rootBlockID:           rootBlockID,
 		validators:            DefaultValidators(log, flowID),
 		unicastMessageTimeout: unicastMessageTimeout,
-		connectionGating:      false,
 		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
 	}
@@ -151,7 +146,7 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	mw.ComponentManager = component.NewComponentManagerBuilder().
+	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// TODO: refactor to avoid storing ctx altogether
 			mw.ctx = ctx
@@ -166,6 +161,8 @@ func NewMiddleware(
 			mw.stop()
 		}).Build()
 
+	mw.Component = cm
+
 	return mw
 }
 
@@ -176,6 +173,14 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
+func (m *Middleware) RoutingSystem() routing.Routing {
+	return m.libP2PNode.routing
+}
+
+func (m *Middleware) Host() host.Host {
+	return m.libP2PNode.host
+}
+
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	identities, err := m.ov.Topology()
 	if err != nil {
@@ -183,10 +188,6 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	}
 
 	return m.peerIDs(identities.NodeIDs()), nil
-}
-
-func (m *Middleware) allPeers() peer.IDSlice {
-	return m.peerIDs(m.ov.Identities().NodeIDs())
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
@@ -265,10 +266,6 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	m.UpdateNodeAddresses()
 
-	if m.connectionGating {
-		m.libP2PNode.UpdateAllowList(m.allPeers())
-	}
-
 	// create and use a peer manager if a peer manager factory was passed in during initialization
 	if m.peerManagerFactory != nil {
 		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
@@ -338,8 +335,8 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
 	tag := fmt.Sprintf("%v:%v", msg.ChannelID, msg.Type)
-	m.libP2PNode.connMgr.Protect(peerID, tag)
-	defer m.libP2PNode.connMgr.Unprotect(peerID, tag)
+	m.libP2PNode.host.ConnManager().Protect(peerID, tag)
+	defer m.libP2PNode.host.ConnManager().Unprotect(peerID, tag)
 
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
@@ -396,7 +393,12 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	_, isStaked := m.ov.Identities().ByNodeID(nodeID)
 
 	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize, isStaked)
+	conn := newReadConnection(m.ctx,
+		s, m.processAuthenticatedMessage,
+		log.With().Hex("remote_flow_id", logging.ID(nodeID)).Logger(),
+		m.metrics,
+		LargeMsgMaxUnicastMsgSize,
+		isStaked)
 
 	// kick off the reception loop to continuously receive messages
 	m.wg.Add(1)
@@ -519,28 +521,6 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 	m.metrics.NetworkMessageSent(len(data), string(channel), msg.Type)
 
 	return nil
-}
-
-// Ping pings the target node and returns the ping RTT or an error
-func (m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error) {
-	peerID, err := m.idTranslator.GetPeerID(targetID)
-	if err != nil {
-		return message.PingResponse{}, -1, fmt.Errorf("could not find peer id for target id: %w", err)
-	}
-
-	return m.libP2PNode.Ping(m.ctx, peerID)
-}
-
-// UpdateAllowList fetches the most recent identifiers of the nodes from overlay
-// and updates the underlying libp2p node.
-func (m *Middleware) UpdateAllowList() {
-	// update libp2pNode's approve lists if this middleware also does connection gating
-	if m.connectionGating {
-		m.libP2PNode.UpdateAllowList(m.allPeers())
-	}
-
-	// update peer connections if this middleware also does peer management
-	m.peerManagerUpdate()
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID.

@@ -126,17 +126,28 @@ func (s *Suite) TestViewsProgress() {
 	}
 }
 
-// TestEpochJoinAndLeave will stake a node by submitting all the transactions
-// that an node operator would submit, start a new container for that node, and remove
-// a container from the network of the same node type. After this orchestration assertions
-// specific to that node type are made to ensure the network is healthy.
-func (s *Suite) TestEpochJoinAndLeave() {
+//the following Epoch join and Leave test will stake a node by submitting all the transactions
+//that an node operator would submit, start a new container for that node, and remove
+//a container from the network of the same node type. After this orchestration assertions
+//specific to that node type are made to ensure the network is healthy.
+//
+//TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions related to the node change
+func (s *Suite) TestEpochJoinAndLeaveAN() {
+	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs AN tests should be run on an machine with adequate resources")
+	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
+}
+
+// TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions related to the node change
+func (s *Suite) TestEpochJoinAndLeaveVN() {
+	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs VN tests should be run on an machine with adequate resources")
+	s.runTestEpochJoinAndLeave(flow.RoleVerification, s.assertNetworkHealthyAfterVNChange)
+}
+
+func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth nodeUpdateValidation) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	env := utils.LocalnetEnv()
-
-	role := flow.RoleAccess
 
 	// grab the first container of this node role type, this is the container we will replace
 	containerToReplace := s.getContainerToReplace(role)
@@ -146,9 +157,7 @@ func (s *Suite) TestEpochJoinAndLeave() {
 	info, testContainer := s.StakeNewNode(ctx, env, role)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
-	result, err := s.SubmitAdminRemoveNodeTx(ctx, env, containerToReplace.Config.NodeID)
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), result.Error)
+	s.removeNodeFromProtocol(ctx, env, containerToReplace.Config.NodeID)
 
 	// wait for epoch setup phase before we start our container and pause the old container
 	s.WaitForPhase(ctx, flow.EpochPhaseSetup)
@@ -159,17 +168,27 @@ func (s *Suite) TestEpochJoinAndLeave() {
 	testContainer.WriteRootSnapshot(snapshot)
 	testContainer.Container.Start(ctx)
 
+	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
+	require.NoError(s.T(), err)
+
+	// wait for 5 views after the start of the next epoch before we pause our container to replace
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+5)
+
+	//make sure container to replace removed from smart contract state
+	s.assertNodeNotApprovedOrProposed(ctx, env, containerToReplace.Config.NodeID)
+
+	// assert transition to second epoch happened as expected
+	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
+	s.assertEpochCounter(ctx, 1)
+
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 
-	// wait for new container to startup and start processing blocks
-	// wait for end of second phase of the DKG
-	dkgPhase1FinalView, err := snapshot.Epochs().Current().DKGPhase1FinalView()
-	require.NoError(s.T(), err)
-	s.BlockState.WaitForSealedView(s.T(), dkgPhase1FinalView)
+	// wait for 5 views after pausing our container to replace before we assert healthy network
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+10)
 
-	// make sure the network is healthy after adding new AN
-	s.assertNetworkHealthyAfterANChange(ctx, env, snapshot, info)
+	// make sure the network is healthy after adding new node
+	checkNetworkHealth(ctx, env, snapshot, info)
 
 	s.net.StopContainers()
 }

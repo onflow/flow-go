@@ -4,19 +4,14 @@ import (
 	"context"
 
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 // This produces a new IPFS DHT
 // on the name, see https://github.com/libp2p/go-libp2p-kad-dht/issues/337
-func NewDHT(ctx context.Context, host host.Host, options ...dht.Option) (*dht.IpfsDHT, error) {
-
-	defaultOptions := defaultDHTOptions()
-	allOptions := append(defaultOptions, options...)
+func NewDHT(ctx context.Context, host host.Host, prefix protocol.ID, options ...dht.Option) (*dht.IpfsDHT, error) {
+	allOptions := append(options, dht.ProtocolPrefix(prefix))
 
 	kdht, err := dht.New(ctx, host, allOptions...)
 	if err != nil {
@@ -41,22 +36,4 @@ func AsServer(enable bool) dht.Option {
 		return dht.Mode(dht.ModeServer)
 	}
 	return dht.Mode(dht.ModeClient)
-}
-
-func WithBootstrapPeers(bootstrapNodes flow.IdentityList) (dht.Option, error) {
-	var peers []peer.AddrInfo
-	for _, b := range bootstrapNodes {
-		peer, err := PeerAddressInfo(*b)
-		if err != nil {
-			return nil, err
-		}
-		peers = append(peers, peer)
-	}
-	return dht.BootstrapPeers(peers...), nil
-}
-
-func defaultDHTOptions() []dht.Option {
-	return []dht.Option{
-		dht.ProtocolPrefix(unicast.FlowLibP2PProtocolCommonPrefix),
-	}
 }
