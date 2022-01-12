@@ -32,7 +32,6 @@ func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRec
 
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
-
 	return rr, nil
 }
 
