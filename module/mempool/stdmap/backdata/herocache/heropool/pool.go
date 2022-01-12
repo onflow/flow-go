@@ -115,8 +115,9 @@ func (p *Pool) sliceIndexForEntity() EIndex {
 	if p.free.head.isUndefined() {
 		// the free list is empty, so we are out of space, and we need to eject.
 		if p.ejectionMode == RandomEjection {
-			// turning a random entity into a free head.
-			p.invalidateRandomEntity()
+			// we only eject randomly when the pool is full and random ejection is on.
+			randomIndex := EIndex(rand.Uint32() % p.size)
+			p.invalidateEntityAtIndex(randomIndex)
 		} else {
 			// LRU ejection
 			// the used head is the oldest entity, so we turn the used head to a free head here.
@@ -175,26 +176,6 @@ func (p *Pool) invalidateUsedHead() EIndex {
 	p.invalidateEntityAtIndex(headSliceIndex)
 
 	return headSliceIndex
-}
-
-// invalidateRandomEntity invalidates a random node from the used linked list, and appends it to the tail of the free list.
-// It also removes the entity that the invalidated node is presenting.
-func (p *Pool) invalidateRandomEntity() EIndex {
-	// in order not to keep failing on finding a random valid node to invalidate,
-	// we only try a limited number of times, and if we fail all, we invalidate the used head.
-	var index = p.used.head.getSliceIndex()
-
-	for i := 0; i < maximumRandomTrials; i++ {
-		candidate := EIndex(rand.Uint32() % p.size)
-		if !p.isInvalidated(candidate) {
-			// found a valid entity to invalidate
-			index = candidate
-			break
-		}
-	}
-
-	p.invalidateEntityAtIndex(index)
-	return index
 }
 
 // claimFreeHead moves the free head forward, and returns the slice index of the

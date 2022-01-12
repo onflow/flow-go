@@ -177,68 +177,6 @@ func TestInvalidateEntity(t *testing.T) {
 				},
 			}...)
 		})
-
-		// random invalidation test
-		t.Run(fmt.Sprintf("random-invalidation-%d-limit-%d-entities-", tc.limit, tc.entityCount), func(t *testing.T) {
-			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *Pool, []*unittest.MockEntity){
-				func(t *testing.T, backData *Pool, entities []*unittest.MockEntity) {
-					testAddingEntities(t, backData, entities, LRUEjection)
-				},
-				func(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
-					testInvalidateAtRandom(t, pool, entities)
-				},
-			}...)
-		})
-	}
-}
-
-// testInvalidatingHead keeps invalidating elements at random and evaluates whether the linked-lists keeping the used and free state remains connected
-// from head to tail, and vice versa.
-func testInvalidateAtRandom(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
-	// total number of entities to store
-	totalEntitiesStored := len(entities)
-	// freeListInitialSize is total number of empty nodes after
-	// storing all items in the list
-	freeListInitialSize := len(pool.poolEntities) - totalEntitiesStored
-
-	// (i+1) keeps total invalidated (head) entities.
-	for i := 0; i < totalEntitiesStored; i++ {
-		pool.invalidateRandomEntity()
-
-		// size of pool should be decremented after each invalidation.
-		require.Equal(t, uint32(totalEntitiesStored-i-1), pool.Size())
-
-		// except when the pool is empty, head and tail must be accessible after each invalidation
-		// i.e., the underlying linked list remains connected despite invalidation.
-		if i != totalEntitiesStored-1 {
-			// used linked-list
-			tailAccessibleFromHead(t,
-				pool.used.head.getSliceIndex(),
-				pool.used.tail.getSliceIndex(),
-				pool,
-				pool.Size())
-
-			headAccessibleFromTail(t,
-				pool.used.head.getSliceIndex(),
-				pool.used.tail.getSliceIndex(),
-				pool,
-				pool.Size())
-
-			// free linked-list
-			//
-			// after invalidating each item, size of free linked-list is incremented by one.
-			headAccessibleFromTail(t,
-				pool.free.head.getSliceIndex(),
-				pool.free.tail.getSliceIndex(),
-				pool,
-				uint32(i+freeListInitialSize+1))
-
-			tailAccessibleFromHead(t,
-				pool.free.head.getSliceIndex(),
-				pool.free.tail.getSliceIndex(),
-				pool,
-				uint32(i+freeListInitialSize+1))
-		}
 	}
 }
 
