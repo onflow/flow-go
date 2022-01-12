@@ -43,11 +43,11 @@ func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBod
 	rr, err := executeRequest(req, backend)
 	assert.NoError(t, err)
 
-	require.Equal(t, status, rr.Code)
 	actualResponseBody := rr.Body.String()
 	require.JSONEq(t,
 		expectedRespBody,
 		actualResponseBody,
 		fmt.Sprintf("Failed Request: %s\nExpected JSON:\n %s \nActual JSON:\n %s\n", req.URL, expectedRespBody, actualResponseBody),
 	)
+	require.Equal(t, status, rr.Code)
 }
