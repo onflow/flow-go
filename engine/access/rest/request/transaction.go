@@ -46,9 +46,6 @@ func (t *Transaction) Parse(raw io.Reader) error {
 	if len(tx.EnvelopeSignatures) == 0 {
 		return fmt.Errorf("envelope signatures not provided")
 	}
-	if tx.ReferenceBlockId == "" {
-		return fmt.Errorf("reference block not provided")
-	}
 
 	var args Arguments
 	err = args.Parse(tx.Arguments)
@@ -59,7 +56,7 @@ func (t *Transaction) Parse(raw io.Reader) error {
 	var payer Address
 	err = payer.Parse(tx.Payer)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid payer: %v", err)
 	}
 
 	auths := make([]flow.Address, len(tx.Authorizers))
@@ -100,12 +97,12 @@ func (t *Transaction) Parse(raw io.Reader) error {
 	var blockID ID
 	err = blockID.Parse(tx.ReferenceBlockId)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid reference block ID: %v", err)
 	}
 
 	gasLimit, err := toUint64(tx.GasLimit)
 	if err != nil {
-		return fmt.Errorf("invalid value for gas limit")
+		return fmt.Errorf("invalid gas limit: %v", err)
 	}
 
 	*t = Transaction(flow.TransactionBody{
