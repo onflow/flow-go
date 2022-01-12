@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	mockstate "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -38,8 +39,9 @@ const RequiredApprovalsForSealConstructionTestingValue = 1
 type ApprovalProcessingCoreTestSuite struct {
 	approvals.BaseAssignmentCollectorTestSuite
 
-	sealsDB *storage.Seals
-	core    *Core
+	sealsDB    *storage.Seals
+	rootHeader *flow.Header
+	core       *Core
 }
 
 func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {
@@ -51,7 +53,14 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 
 	s.sealsDB = &storage.Seals{}
 
+	s.rootHeader = unittest.GenesisFixture().Header
+	params := new(mockstate.Params)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Maybe()
+	s.State.On("Params").Return(params)
+	params.On("Root").Return(
+		func() *flow.Header { return s.rootHeader },
+		func() error { return nil },
+	)
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
