@@ -1,6 +1,8 @@
 package models
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/onflow/flow-go/model/flow"
+)
 
 func (e *Event) Build(event flow.Event) {
 	e.Type_ = string(event.Type)
