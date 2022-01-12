@@ -32,7 +32,9 @@ type SealingSuite struct {
 	net    *testnet.FlowNetwork
 	conIDs []flow.Identifier
 	exeID  flow.Identifier
+	exe2ID flow.Identifier
 	exeSK  crypto.PrivateKey
+	exe2SK crypto.PrivateKey
 	verID  flow.Identifier
 	verSK  crypto.PrivateKey
 	reader *client.FlowMessageStreamReader
@@ -40,6 +42,13 @@ type SealingSuite struct {
 
 func (ss *SealingSuite) Execution() *client.GhostClient {
 	ghost := ss.net.ContainerByID(ss.exeID)
+	client, err := common.GetGhostClient(ghost)
+	require.NoError(ss.T(), err, "could not get ghost client")
+	return client
+}
+
+func (ss *SealingSuite) Execution2() *client.GhostClient {
+	ghost := ss.net.ContainerByID(ss.exe2ID)
 	client, err := common.GetGhostClient(ghost)
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
@@ -78,6 +87,12 @@ func (ss *SealingSuite) SetupTest() {
 	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.exeID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
+	// need another controllable execution node (used ghost) in order to
+	// send matching execution receipts
+	ss.exe2ID = unittest.IdentifierFixture()
+	exe2Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.exe2ID), testnet.AsGhost())
+	nodeConfigs = append(nodeConfigs, exe2Config)
+
 	// need one controllable verification node (used ghost)
 	ss.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.verID), testnet.AsGhost())
@@ -97,6 +112,10 @@ func (ss *SealingSuite) SetupTest() {
 	keys, err := ss.net.ContainerByID(ss.exeID).Config.NodeInfo.PrivateKeys()
 	require.NoError(ss.T(), err)
 	ss.exeSK = keys.StakingKey
+
+	keys, err = ss.net.ContainerByID(ss.exe2ID).Config.NodeInfo.PrivateKeys()
+	require.NoError(ss.T(), err)
+	ss.exe2SK = keys.StakingKey
 
 	keys, err = ss.net.ContainerByID(ss.verID).Config.NodeInfo.PrivateKeys()
 	require.NoError(ss.T(), err)
@@ -235,11 +254,29 @@ SearchLoop:
 
 	receipt.ExecutorSignature = sig
 
-	// keep trying to send execution receipt to the first consensus node
+	// keep trying to send 2 matching execution receipt to the first consensus node
+	receipt2 := flow.ExecutionReceipt{
+		ExecutorID:        ss.exe2ID, // our fake execution node
+		ExecutionResult:   result,    // result for target block
+		Spocks:            nil,       // ignored
+		ExecutorSignature: crypto.Signature{},
+	}
+
+	id = receipt2.ID()
+	sig2, err := ss.exe2SK.Sign(id[:], exeUtils.NewExecutionReceiptHasher())
+	require.NoError(ss.T(), err)
+
+	receipt2.ExecutorSignature = sig2
+
+	valid, err := ss.exe2SK.PublicKey().Verify(receipt2.ExecutorSignature, id[:], exeUtils.NewExecutionReceiptHasher())
+	require.NoError(ss.T(), err)
+	require.True(ss.T(), valid)
+
 ReceiptLoop:
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		err := ss.Execution().Send(ctx, engine.PushReceipts, &receipt, ss.conIDs...)
+		err = ss.Execution2().Send(ctx, engine.PushReceipts, &receipt2, ss.conIDs...)
 		cancel()
 		if err != nil {
 			ss.T().Logf("could not send execution receipt: %s\n", err)
@@ -249,6 +286,7 @@ ReceiptLoop:
 	}
 
 	ss.T().Logf("execution receipt submitted (receipt: %x, result: %x)\n", receipt.ID(), receipt.ExecutionResult.ID())
+	ss.T().Logf("execution receipt submitted (receipt2: %x, result: %x)\n", receipt2.ID(), receipt2.ExecutionResult.ID())
 
 	// attestation
 	atst := flow.Attestation{

@@ -43,6 +43,7 @@ type API interface {
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
 
 	GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error)
+	GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error)
 }
 
 // TODO: Combine this with flow.TransactionResult?
