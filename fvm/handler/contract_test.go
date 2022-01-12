@@ -93,3 +93,38 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, contractHandler.HasUpdates())
 }
+
+func TestContract_DeploymentVouchers(t *testing.T) {
+	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
+	accounts := state.NewAccounts(sth)
+
+	addressWithVoucher := flow.HexToAddress("01")
+	addressWithVoucherRuntime := runtime.Address(addressWithVoucher)
+	err := accounts.Create(nil, addressWithVoucher)
+	require.NoError(t, err)
+
+	addressNoVoucher := flow.HexToAddress("02")
+	addressNoVoucherRuntime := runtime.Address(addressNoVoucher)
+	err = accounts.Create(nil, addressNoVoucher)
+	require.NoError(t, err)
+
+	contractHandler := handler.NewContractHandler(accounts,
+		true,
+		func() []common.Address { return []common.Address{} },
+		func(address runtime.Address, code []byte) (bool, error) {
+			if address.String() == addressWithVoucher.String() {
+				return true, nil
+			}
+			return false, nil
+		})
+
+	// set contract without voucher
+	err = contractHandler.SetContract(addressNoVoucherRuntime, "testContract1", []byte("ABC"), []common.Address{addressNoVoucherRuntime})
+	require.Error(t, err)
+	require.False(t, contractHandler.HasUpdates())
+
+	// try to set contract with voucher
+	err = contractHandler.SetContract(addressWithVoucherRuntime, "testContract2", []byte("ABC"), []common.Address{addressWithVoucherRuntime})
+	require.NoError(t, err)
+	require.True(t, contractHandler.HasUpdates())
+}

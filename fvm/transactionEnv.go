@@ -99,7 +99,7 @@ func NewTransactionEnvironment(
 	env.contracts = handler.NewContractHandler(accounts,
 		ctx.RestrictedDeploymentEnabled,
 		env.GetAuthorizedAccountsForContractUpdates,
-		env.CheckAndUseContractAuditVoucher,
+		env.UseContractAuditVoucher,
 	)
 
 	if ctx.BlockHeader != nil {
@@ -180,12 +180,9 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 	return addresses
 }
 
-func (e *TransactionEnv) CheckAndUseContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
-	useVoucher := CheckAndUseContractAuditVoucherInvocation(e, e.traceSpan)
-	codeStr := string(code[:])
-	resultCdc, err := useVoucher(address, codeStr)
-	result := resultCdc.(cadence.Bool).ToGoValue().(bool)
-	return result, err
+func (e *TransactionEnv) UseContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
+	useVoucher := UseContractAuditVoucherInvocation(e, e.traceSpan)
+	return useVoucher(address, string(code[:]))
 }
 
 func (e *TransactionEnv) isAuthorizerServiceAccount() bool {

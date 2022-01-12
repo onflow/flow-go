@@ -14,7 +14,7 @@ import (
 )
 
 type AuthorizedAccountsForContractDeploymentFunc func() []common.Address
-type CheckAndUseContractAuditVoucherFunc func(address runtime.Address, code []byte) (bool, error)
+type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (bool, error)
 
 // ContractHandler handles all interaction
 // with smart contracts such as get/set/update
@@ -26,7 +26,7 @@ type ContractHandler struct {
 	draftUpdates                map[programs.ContractUpdateKey]programs.ContractUpdate
 	restrictedDeploymentEnabled bool
 	authorizedAccounts          AuthorizedAccountsForContractDeploymentFunc
-	checkAndUseVoucher          CheckAndUseContractAuditVoucherFunc
+	useContractAuditVoucher     UseContractAuditVoucherFunc
 	// handler doesn't have to be thread safe and right now
 	// is only used in a single thread but a mutex has been added
 	// here to prevent accidental multi-thread use in the future
@@ -36,13 +36,13 @@ type ContractHandler struct {
 func NewContractHandler(accounts state.Accounts,
 	restrictedDeploymentEnabled bool,
 	authorizedAccounts AuthorizedAccountsForContractDeploymentFunc,
-	checkAndUseVoucher CheckAndUseContractAuditVoucherFunc) *ContractHandler {
+	useContractAuditVoucher UseContractAuditVoucherFunc) *ContractHandler {
 	return &ContractHandler{
 		accounts:                    accounts,
 		draftUpdates:                make(map[programs.ContractUpdateKey]programs.ContractUpdate),
 		restrictedDeploymentEnabled: restrictedDeploymentEnabled,
 		authorizedAccounts:          authorizedAccounts,
-		checkAndUseVoucher:          checkAndUseVoucher,
+		useContractAuditVoucher:     useContractAuditVoucher,
 	}
 }
 
@@ -59,10 +59,10 @@ func (h *ContractHandler) GetContract(address runtime.Address, name string) (cod
 func (h *ContractHandler) SetContract(address runtime.Address, name string, code []byte, signingAccounts []runtime.Address) (err error) {
 	// check if authorized
 	if !h.isAuthorized(signingAccounts) {
-		// check if the contract has an audit voucher
-		voucherUsed, err := h.checkAndUseVoucher(address, code)
+		// check if there's an audit voucher for the contract
+		voucherUsed, err := h.useContractAuditVoucher(address, code)
 		if err != nil {
-			return fmt.Errorf("setting contract failed: (checkAndUseVoucher) %w", err)
+			return fmt.Errorf("setting contract failed: (useContractAuditVoucher) %w", err)
 		}
 		if !voucherUsed {
 			err = errors.NewOperationAuthorizationErrorf("SetContract", "setting contracts requires authorization from specific accounts")
