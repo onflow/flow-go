@@ -44,3 +44,6 @@ replace github.com/onflow/flow-go => ../
 replace github.com/onflow/flow-go/crypto => ../crypto
 
 replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.20.2-patch.1
+
+// Transitive dependency. Needed to make the go-compiler happy
+replace github.com/onflow/cadence/v19 => github.com/onflow/cadence v0.19.0
