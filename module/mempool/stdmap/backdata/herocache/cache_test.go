@@ -361,14 +361,14 @@ func testAddEntities(t *testing.T, bd *Cache, entities []*unittest.MockEntity) {
 		// adding each element must be successful.
 		require.True(t, bd.Add(e.ID(), e))
 
-		if uint32(i) < bd.limit {
+		if uint32(i) < bd.sizeLimit {
 			// when we are below limit the size of
 			// Cache should be incremented by each addition.
 			require.Equal(t, bd.Size(), uint(i+1))
 		} else {
 			// when we cross the limit, the ejection kicks in, and
 			// size must be steady at the limit.
-			require.Equal(t, uint32(bd.Size()), bd.limit)
+			require.Equal(t, uint32(bd.Size()), bd.sizeLimit)
 		}
 
 		// entity should be immediately retrievable

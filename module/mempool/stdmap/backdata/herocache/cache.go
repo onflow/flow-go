@@ -60,7 +60,7 @@ type Cache struct {
 	logger zerolog.Logger
 	// NOTE: as a BackData implementation, Cache must be non-blocking.
 	// Concurrency management is done by overlay Backend.
-	limit        uint32
+	sizeLimit    uint32
 	slotCount    uint64 // total number of non-expired key-values
 	bucketNum    uint64 // total number of buckets (i.e., total of buckets)
 	ejectionMode heropool.EjectionMode
@@ -85,9 +85,9 @@ type Cache struct {
 	lastTelemetryDump int64
 }
 
-func NewCache(limit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, logger zerolog.Logger) *Cache {
+func NewCache(sizeLimit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, logger zerolog.Logger) *Cache {
 	// total buckets.
-	capacity := uint64(limit * oversizeFactor)
+	capacity := uint64(sizeLimit * oversizeFactor)
 	bucketNum := capacity / slotsPerBucket
 	if capacity%slotsPerBucket != 0 {
 		// accounting for remainder.
@@ -97,10 +97,10 @@ func NewCache(limit uint32, oversizeFactor uint32, ejectionMode heropool.Ejectio
 	bd := &Cache{
 		logger:                 logger,
 		bucketNum:              bucketNum,
-		limit:                  limit,
+		sizeLimit:              sizeLimit,
 		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
-		entities:               heropool.NewHeroPool(limit, ejectionMode),
+		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode),
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
 	}
 
@@ -197,7 +197,7 @@ func (c *Cache) Clear() {
 	defer c.logTelemetry()
 
 	c.buckets = make([]slotBucket, c.bucketNum)
-	c.entities = heropool.NewHeroPool(c.limit, c.ejectionMode)
+	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
 	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	c.interactionCounter = 0
 	c.lastTelemetryDump = 0
@@ -277,9 +277,9 @@ func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bu
 // expiryThreshold returns the threshold for which all slots with index below threshold are considered old enough for eviction.
 func (c Cache) expiryThreshold() uint64 {
 	var expiryThreshold uint64 = 0
-	if c.slotCount > uint64(c.limit) {
+	if c.slotCount > uint64(c.sizeLimit) {
 		// total number of slots written are above the predefined limit
-		expiryThreshold = c.slotCount - uint64(c.limit)
+		expiryThreshold = c.slotCount - uint64(c.sizeLimit)
 	}
 
 	return expiryThreshold

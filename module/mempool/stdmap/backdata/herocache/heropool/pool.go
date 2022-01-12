@@ -42,7 +42,7 @@ type Pool struct {
 	ejectionMode EjectionMode
 }
 
-func NewHeroPool(limit uint32, ejectionMode EjectionMode) *Pool {
+func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode) *Pool {
 	l := &Pool{
 		free: state{
 			head: poolIndex{index: 0},
@@ -52,7 +52,7 @@ func NewHeroPool(limit uint32, ejectionMode EjectionMode) *Pool {
 			head: poolIndex{index: 0},
 			tail: poolIndex{index: 0},
 		},
-		poolEntities: make([]poolEntity, limit),
+		poolEntities: make([]poolEntity, sizeLimit),
 		ejectionMode: ejectionMode,
 	}
 
