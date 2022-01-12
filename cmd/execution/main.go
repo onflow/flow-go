@@ -117,7 +117,7 @@ func main() {
 		blockDataUploaders            []uploader.Uploader
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
-		eds                           state_synchronization.ExecutionDataService
+		executionDataService          state_synchronization.ExecutionDataService
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -352,6 +352,8 @@ func main() {
 				node.Logger,
 			)
 
+			executionDataService = eds
+
 			return eds, nil
 		}).
 		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -381,7 +383,7 @@ func main() {
 				committer,
 				scriptLogThreshold,
 				blockDataUploaders,
-				eds,
+				executionDataService,
 			)
 			if err != nil {
 				return nil, err
