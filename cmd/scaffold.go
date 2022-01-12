@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -10,10 +9,8 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -34,10 +31,10 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
@@ -68,17 +65,12 @@ type Metrics struct {
 type Storage = storage.All
 
 type namedModuleFunc struct {
-	fn   func(builder NodeBuilder, nodeConfig *NodeConfig) error
+	fn   BuilderFunc
 	name string
 }
 
 type namedComponentFunc struct {
-	fn   func(builder NodeBuilder, nodeConfig *NodeConfig) (module.ReadyDoneAware, error)
-	name string
-}
-
-type namedDoneObject struct {
-	ob   module.ReadyDoneAware
+	fn   ReadyDoneFactory
 	name string
 }
 
@@ -96,14 +88,12 @@ type FlowNodeBuilder struct {
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
 	components               []namedComponentFunc
-	doneObject               []namedDoneObject
-	sig                      chan os.Signal
-	preInitFns               []func(NodeBuilder, *NodeConfig)
-	postInitFns              []func(NodeBuilder, *NodeConfig)
-	lm                       *lifecycle.LifecycleManager
+	preInitFns               []BuilderFunc
+	postInitFns              []BuilderFunc
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
+	componentBuilder         component.ComponentManagerBuilder
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -144,7 +134,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+
 		codec := cborcodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
@@ -223,7 +214,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
-	fnb.Component("metrics server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.Component("metrics server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
 		return server, nil
 	})
@@ -236,7 +227,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
 		}
 		fnb.RegisterDefaultAdminCommands()
-		fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+		fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var opts []admin.CommandRunnerOption
 
 			if node.AdminCert != NotSet {
@@ -272,7 +263,7 @@ func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueTracer() {
-	fnb.Component("tracer", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.Component("tracer", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return fnb.Tracer, nil
 	})
 }
@@ -336,6 +327,8 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid log level")
 	}
+	// loglevel is set to debug, then overridden by SetGlobalLevel. this allows admin commands to
+	// modify the level during runtime
 	log = log.Level(zerolog.DebugLevel)
 	zerolog.SetGlobalLevel(lvl)
 
@@ -381,7 +374,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		}
 
 		// registers mempools as a Component so that its Ready method is invoked upon startup
-		fnb.Component("mempools metrics", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+		fnb.Component("mempools metrics", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			return mempools, nil
 		})
 	}
@@ -398,7 +391,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 		fnb.BaseConfig.profilerDuration,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
-	fnb.Component("profiler", func(node NodeBuilder, nodeConfig *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		return profiler, nil
 	})
 }
@@ -516,7 +509,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
-	fnb.Module("id providers", func(builder NodeBuilder, node *NodeConfig) error {
+	fnb.Module("id providers", func(node *NodeConfig) error {
 		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return err
@@ -696,55 +689,110 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	fnb.FvmOptions = vmOpts
 }
 
-func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
-	err := v.fn(fnb, fnb.NodeConfig)
+func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
+	err := v.fn(fnb.NodeConfig)
 	if err != nil {
-		fnb.Logger.Fatal().Err(err).Str("module", v.name).Msg("module initialization failed")
-	} else {
-		fnb.Logger.Info().Str("module", v.name).Msg("module initialization complete")
+		return fmt.Errorf("module %s initialization failed: %w", v.name, err)
 	}
+
+	fnb.Logger.Info().Str("module", v.name).Msg("module initialization complete")
+	return nil
 }
 
-func (fnb *FlowNodeBuilder) handleComponent(ctx irrecoverable.SignalerContext, v namedComponentFunc) {
+// handleComponents registers the component's factory method with the ComponentManager to be run
+// when the node starts.
+// It uses signal channels to ensure that components are started serially.
+func (fnb *FlowNodeBuilder) handleComponents() error {
+	// The parent/started channels are used to enforce serial startup.
+	// - parent is the started channel of the previous component.
+	// - when a component is ready, it closes its started channel by calling the provided callback.
+	// Components wait for their parent channel to close before starting, this ensures they start
+	// up serially, even though the ComponentManager will launch the goroutines in parallel.
 
-	log := fnb.Logger.With().Str("component", v.name).Logger()
+	// The first component is always started immediately
+	parent := make(chan struct{})
+	close(parent)
 
-	readyAware, err := v.fn(fnb, fnb.NodeConfig)
-	if err != nil {
-		log.Fatal().Err(err).Msg("component initialization failed")
-	} else {
-		log.Info().Msg("component initialization complete")
+	// Run all components
+	for _, f := range fnb.components {
+		started := make(chan struct{})
+		err := fnb.handleComponent(f, parent, func() { close(started) })
+		if err != nil {
+			return err
+		}
+		parent = started
 	}
+	return nil
+}
 
-	component, ok := readyAware.(component.Component)
-	if ok {
-		component.Start(ctx)
-	}
+// handleComponent constructs a component using the provided ReadyDoneFactory, and registers a
+// worker with the ComponentManager to be run when the node is started.
+//
+// The ComponentManager starts all workers in parallel. Since some components have non-idempotent
+// ReadyDoneAware interfaces, we need to ensure that they are started serially. This is accomplished
+// using the parentReady channel and the started closure. Components wait for the parentReady channel
+// to close before starting, and then call the started callback after they are ready(). The started
+// callback closes the parentReady channel of the next component, and so on.
+//
+// TODO: Instead of this serial startup, components should wait for their depenedencies to be ready
+// using their ReadyDoneAware interface. After components are updated to use the idempotent
+// ReadyDoneAware interface and explicilty wait for their dependencies to be ready, we can remove
+// this channel chaining.
+func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
+	// Add a closure that starts the component when the node is started, and then waits for it to exit
+	// gracefully.
+	// Startup for all components will happen in parallel, and components can use their dependencies'
+	// ReadyDoneAware interface to wait until they are ready.
+	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// wait for the previous component to be ready before starting
+		if err := util.WaitClosed(ctx, parentReady); err != nil {
+			return
+		}
 
-	select {
-	case <-readyAware.Ready():
-		log.Info().Msg("component startup complete")
-	case <-fnb.sig:
-		log.Warn().Msg("component startup aborted")
-		return
-	}
+		logger := fnb.Logger.With().Str("component", v.name).Logger()
 
-	fnb.doneObject = append(fnb.doneObject, namedDoneObject{
-		readyAware, v.name,
+		// First, build the component using the factory method.
+		readyAware, err := v.fn(fnb.NodeConfig)
+		if err != nil {
+			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", v.name, err))
+		}
+		logger.Info().Msg("component initialization complete")
+
+		// if this is a Component, use the Startable interface to start the component, otherwise
+		// Ready() will launch it.
+		component, isComponent := readyAware.(component.Component)
+		if isComponent {
+			component.Start(ctx)
+		}
+
+		// Wait until the component is ready
+		if err := util.WaitClosed(ctx, readyAware.Ready()); err != nil {
+			// The context was cancelled. Continue to on to shutdown logic.
+			logger.Warn().Msg("component startup aborted")
+
+			// Non-idempotent ReadyDoneAware components trigger shutdown by calling Done(). Don't
+			// do that here since it may not be safe if the component is not Ready().
+			if !isComponent {
+				return
+			}
+		} else {
+			logger.Info().Msg("component startup complete")
+			ready()
+
+			// Signal to the next component that we're ready.
+			started()
+		}
+
+		// Component shutdown is signaled by cancelling its context.
+		<-ctx.Done()
+		logger.Info().Msg("component shutdown started")
+
+		// Finally, wait until component has finished shutting down.
+		<-readyAware.Done()
+		logger.Info().Msg("component shutdown complete")
 	})
-}
 
-func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
-
-	log := fnb.Logger.With().Str("component", v.name).Logger()
-
-	select {
-	case <-v.ob.Done():
-		log.Info().Msg("component shutdown complete")
-	case <-fnb.sig:
-		log.Warn().Msg("component shutdown aborted")
-		return
-	}
+	return nil
 }
 
 // ExtraFlags enables binding additional flags beyond those defined in BaseConfig.
@@ -754,7 +802,7 @@ func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder {
 }
 
 // Module enables setting up dependencies of the engine with the builder context.
-func (fnb *FlowNodeBuilder) Module(name string, f func(builder NodeBuilder, node *NodeConfig) error) NodeBuilder {
+func (fnb *FlowNodeBuilder) Module(name string, f BuilderFunc) NodeBuilder {
 	fnb.modules = append(fnb.modules, namedModuleFunc{
 		fn:   f,
 		name: name,
@@ -778,27 +826,26 @@ func (fnb *FlowNodeBuilder) MustNot(err error) *zerolog.Event {
 	return nil
 }
 
-// Component adds a new component to the node that conforms to the ReadyDone
+// Component adds a new component to the node that conforms to the ReadyDoneAware
 // interface.
 //
-// When the node is run, this component will be started with `Ready`. When the
-// node is stopped, we will wait for the component to exit gracefully with
-// `Done`.
-func (fnb *FlowNodeBuilder) Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder {
+// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+// In both cases, the object is started when the node is run, and the node will wait for the
+// component to exit gracefully.
+func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuilder {
 	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:   f,
 		name: name,
 	})
-
 	return fnb
 }
 
-func (fnb *FlowNodeBuilder) PreInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder {
+func (fnb *FlowNodeBuilder) PreInit(f BuilderFunc) NodeBuilder {
 	fnb.preInitFns = append(fnb.preInitFns, f)
 	return fnb
 }
 
-func (fnb *FlowNodeBuilder) PostInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder {
+func (fnb *FlowNodeBuilder) PostInit(f BuilderFunc) NodeBuilder {
 	fnb.postInitFns = append(fnb.postInitFns, f)
 	return fnb
 }
@@ -865,9 +912,9 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 			Logger:     zerolog.New(os.Stderr),
 		},
 		flags:                    pflag.CommandLine,
-		lm:                       lifecycle.NewLifecycleManager(),
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
 		adminCommands:            make(map[string]func(*NodeConfig) commands.AdminCommand),
+		componentBuilder:         component.NewComponentManagerBuilder(),
 	}
 	return builder
 }
@@ -914,140 +961,102 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	})
 }
 
-// Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
-// down each component if a SIGINT is received. Until a SIGINT is received, Run will block.
-// Since, Run is a blocking call it should only be used when running a node as it's own independent process.
-func (fnb *FlowNodeBuilder) Run() {
-
-	// initialize signal catcher
-	fnb.sig = make(chan os.Signal, 1)
-	signal.Notify(fnb.sig, os.Interrupt, syscall.SIGTERM)
-
-	select {
-	case <-fnb.Ready():
-		fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
-	case <-fnb.sig:
-		fnb.Logger.Warn().Msg("node startup aborted")
-		os.Exit(1)
+func (fnb *FlowNodeBuilder) Build() (Node, error) {
+	// Run the prestart initialization. This includes anything that should be done before
+	// starting the components.
+	if err := fnb.onStart(); err != nil {
+		return nil, err
 	}
 
-	// block till a SIGINT is received
-	<-fnb.sig
+	return NewNode(
+		fnb.componentBuilder.Build(),
+		fnb.NodeConfig,
+		fnb.Logger,
+		fnb.postShutdown,
+		fnb.handleFatal,
+	), nil
+}
 
-	fnb.Logger.Info().Msgf("%s node shutting down", fnb.BaseConfig.NodeRole)
+func (fnb *FlowNodeBuilder) onStart() error {
 
-	select {
-	case <-fnb.Done():
-		fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
-	case <-fnb.sig:
-		fnb.Logger.Warn().Msg("node shutdown aborted")
-		os.Exit(1)
+	// seed random generator
+	rand.Seed(time.Now().UnixNano())
+
+	// init nodeinfo by reading the private bootstrap file if not already set
+	if fnb.NodeID == flow.ZeroID {
+		fnb.initNodeInfo()
 	}
 
-	os.Exit(0)
-}
+	fnb.initLogger()
 
-// Ready returns a channel that closes after initiating all common components (logger, database, protocol state etc.)
-// and then starting all modules and components.
-func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
-	fnb.lm.OnStart(func() {
-		// seed random generator
-		rand.Seed(time.Now().UnixNano())
+	fnb.initProfiler()
 
-		// init nodeinfo by reading the private bootstrap file if not already set
-		if fnb.NodeID == flow.ZeroID {
-			fnb.initNodeInfo()
+	fnb.initDB()
+	fnb.initSecretsDB()
+
+	fnb.initMetrics()
+
+	fnb.initStorage()
+
+	for _, f := range fnb.preInitFns {
+		if err := fnb.handlePreInit(f); err != nil {
+			return err
 		}
-
-		fnb.initLogger()
-
-		fnb.initProfiler()
-
-		fnb.initDB()
-		fnb.initSecretsDB()
-
-		fnb.initMetrics()
-
-		fnb.initStorage()
-
-		for _, f := range fnb.preInitFns {
-			fnb.handlePreInit(f)
-		}
-
-		fnb.initState()
-
-		fnb.initFvmOptions()
-
-		for _, f := range fnb.postInitFns {
-			fnb.handlePostInit(f)
-		}
-
-		// set up all admin commands
-		for commandName, commandFunc := range fnb.adminCommands {
-			command := commandFunc(fnb.NodeConfig)
-			fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
-			fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
-		}
-
-		// set up all modules
-		for _, f := range fnb.modules {
-			fnb.handleModule(f)
-		}
-
-		ctx, cancel := context.WithCancel(context.TODO())
-		fnb.Cancel = cancel
-		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-
-		// TODO: implement proper error handling
-		go func() {
-			select {
-			case err := <-errChan:
-				fnb.Logger.Fatal().Err(err).Msg("component encountered irrecoverable error")
-			case <-ctx.Done():
-			}
-		}()
-
-		// initialize all components
-		for _, f := range fnb.components {
-			fnb.handleComponent(signalerCtx, f)
-		}
-	})
-	return fnb.lm.Started()
-}
-
-// Done returns a channel that closes after all registered components are stopped
-func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
-	// cancel the context used by the networking layer
-	if fnb.Cancel != nil {
-		fnb.Cancel()
 	}
-	fnb.lm.OnStop(func() {
-		for i := len(fnb.doneObject) - 1; i >= 0; i-- {
-			doneObject := fnb.doneObject[i]
 
-			fnb.handleDoneObject(doneObject)
+	fnb.initState()
+
+	fnb.initFvmOptions()
+
+	for _, f := range fnb.postInitFns {
+		if err := fnb.handlePostInit(f); err != nil {
+			return err
 		}
+	}
 
-		fnb.closeDatabase()
-	})
-	return fnb.lm.Stopped()
+	// set up all admin commands
+	for commandName, commandFunc := range fnb.adminCommands {
+		command := commandFunc(fnb.NodeConfig)
+		fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+		fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
+	}
+
+	// run all modules
+	for _, f := range fnb.modules {
+		if err := fnb.handleModule(f); err != nil {
+			return err
+		}
+	}
+
+	// run all components
+	return fnb.handleComponents()
 }
 
-func (fnb *FlowNodeBuilder) handlePreInit(f func(builder NodeBuilder, node *NodeConfig)) {
-	f(fnb, fnb.NodeConfig)
-}
-
-func (fnb *FlowNodeBuilder) handlePostInit(f func(builder NodeBuilder, node *NodeConfig)) {
-	f(fnb, fnb.NodeConfig)
-}
-
-func (fnb *FlowNodeBuilder) closeDatabase() {
-	err := fnb.DB.Close()
+// postShutdown is called by the node before exiting
+// put any cleanup code here that should be run after all components have stopped
+func (fnb *FlowNodeBuilder) postShutdown() error {
+	err := fnb.closeDatabase()
 	if err != nil {
-		fnb.Logger.Error().
-			Err(err).
-			Msg("could not close database")
+		return fmt.Errorf("could not close database: %w", err)
 	}
+	return nil
+}
+
+// handleFatal handles irrecoverable errors by logging them and exiting the process.
+func (fnb *FlowNodeBuilder) handleFatal(err error) {
+	fnb.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
+}
+
+func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {
+	return f(fnb.NodeConfig)
+}
+
+func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
+	return f(fnb.NodeConfig)
+}
+
+func (fnb *FlowNodeBuilder) closeDatabase() error {
+	return fnb.DB.Close()
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
