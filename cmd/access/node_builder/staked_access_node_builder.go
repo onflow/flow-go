@@ -11,6 +11,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/crypto"
@@ -37,7 +39,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/utils/grpcutils"
-	"github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 // StakedAccessNodeBuilder builds a staked access node. The staked access node can optionally participate in the
