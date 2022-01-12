@@ -19,7 +19,7 @@ func TestAddress_InvalidParse(t *testing.T) {
 
 	for _, input := range inputs {
 		err := address.Parse(input)
-		assert.Error(t, err, "invalid address")
+		assert.EqualError(t, err, "invalid address")
 	}
 }
 
