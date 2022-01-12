@@ -118,7 +118,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	// Specifically, we expect that the verifier recognizes the `protocol.IdentityNotFoundError`
 	// as a sign of an invalid vote and wraps it into a `model.InvalidSignerError`.
 	*dkg = mocks.DKG{} // overwrite DKG mock with a new one
-	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{signerID})
+	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{NodeID: signerID})
 	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
 	require.True(t, model.IsInvalidSignerError(err))
 }

@@ -168,6 +168,6 @@ func BenchmarkAdd(b *testing.B) {
 	start.Wait()
 	t1 := time.Now()
 	done.Wait()
-	duration := time.Now().Sub(t1)
+	duration := time.Since(t1)
 	fmt.Printf("=> adding %d votes to Cache took %f seconds\n", cache.Size(), duration.Seconds())
 }

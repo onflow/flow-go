@@ -232,7 +232,7 @@ func IsInsufficientSignaturesError(err error) bool {
 	return errors.As(err, &e)
 }
 
-/* ********************** InsufficientSignaturesError ********************** */
+/* ************************** InvalidSignerError *************************** */
 
 // InvalidSignerError indicates that the signer is not authorized or unknown
 type InvalidSignerError struct {
