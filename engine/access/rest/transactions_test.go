@@ -87,7 +87,7 @@ func TestGetTransactions(t *testing.T) {
 			{
 			   "id":"%s",
 			   "script":"cHViIGZ1biBtYWluKCkge30=",
-               "arguments": null,
+               "arguments": [],
 			   "reference_block_id":"%s",
 			   "gas_limit":"10",
 			   "payer":"8c5303eaa26202d6",
