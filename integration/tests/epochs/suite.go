@@ -52,7 +52,7 @@ func (s *Suite) SetupTest() {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -60,7 +60,7 @@ func (s *Suite) SetupTest() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	// a ghost node masquerading as a consensus node
@@ -73,13 +73,12 @@ func (s *Suite) SetupTest() {
 
 	confs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		ghostConNode,
 	}
 
@@ -126,7 +125,7 @@ type StakedNodeOperationInfo struct {
 	StakingAccountKey       sdkcrypto.PrivateKey
 	NetworkingKey           sdkcrypto.PrivateKey
 	StakingKey              sdkcrypto.PrivateKey
-	MachineAccountAddress   flow.Address
+	MachineAccountAddress   sdk.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
 	MachineAccountPublicKey flow.AccountPublicKey
 	ContainerName           string
@@ -182,7 +181,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	containerName := s.getTestContainerName(role)
 
 	// register node using staking collection
-	result, err = s.SubmitStakingCollectionRegisterNodeTx(
+	result, machineAccountAddr, err := s.SubmitStakingCollectionRegisterNodeTx(
 		ctx,
 		env,
 		stakingAccountKey,
@@ -215,6 +214,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		NetworkingKey:           networkingKey,
 		MachineAccountKey:       machineAccountKey,
 		MachineAccountPublicKey: machineAccountPubKey,
+		MachineAccountAddress: machineAccountAddr,
 		ContainerName:           containerName,
 	}
 }
@@ -345,7 +345,7 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	stakingKey string,
 	amount string,
 	machineKey string,
-) (*sdk.TransactionResult, error) {
+) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -374,7 +374,22 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	result, err := s.client.WaitForSealed(ctx, registerNodeTx.ID())
 	require.NoError(s.T(), err)
 	stakingAccount.Keys[0].SequenceNumber++
-	return result, nil
+
+	if role == flow.RoleCollection || role == flow.RoleConsensus {
+		var machineAccountAddr sdk.Address
+		for _, event := range result.Events {
+			if event.Type == sdk.EventAccountCreated { // assume only one account created (safe because we control the transaction)
+				accountCreatedEvent := sdk.AccountCreatedEvent(event)
+				machineAccountAddr = accountCreatedEvent.Address()
+				break
+			}
+		}
+
+		require.NotZerof(s.T(), machineAccountAddr, "failed to create the machine account: %s", machineAccountAddr)
+		return result, machineAccountAddr, nil
+	}
+
+	return result, sdk.Address{}, nil
 }
 
 // SubmitStakingCollectionCloseStakeTx submits tx that calls StakingCollection.closeStake
@@ -526,18 +541,34 @@ func (s *Suite) assertNodeNotApprovedOrProposed(ctx context.Context, env templat
 // newTestContainerOnNetwork configures a new container on the suites network
 func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 		testnet.WithID(info.NodeID),
 	}
 
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
 	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
-	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
+	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
 	//add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
+
+	// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
+	if role == flow.RoleConsensus || role == flow.RoleCollection {
+		// ghost containers don't participate in the network skip any SN/LN ghost containers
+		nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
+		nodeContainer.AddFlag("insecure-access-api", "false")
+
+		accessNodeIDS := make([]string, 0)
+		for _, c := range s.net.ContainersByRole(flow.RoleAccess) {
+			if c.Config.Role == flow.RoleAccess && !c.Config.Ghost {
+				accessNodeIDS = append(accessNodeIDS, c.Config.NodeID.String())
+			}
+		}
+		nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
+	}
+
 	return s.net.ContainerByID(info.NodeID)
 }
 
@@ -587,6 +618,20 @@ func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) 
 	require.Equalf(s.T(), expectedCounter, actualCounter, "expected to be in epoch %d got %d", expectedCounter, actualCounter)
 }
 
+// assertQCVotingSuccessful asserts that the QC has completed successfully
+func (s *Suite) assertQCVotingSuccessful(ctx context.Context, env templates.Environment) {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetVotingCompletedScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected qc voting to have completed successfully")
+}
+
+// assertDKGSuccessful asserts that the DKG has completed successfully
+func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environment) {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetDKGCompletedScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")
+}
+
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
@@ -630,4 +675,27 @@ func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templat
 
 	// head should now be at-least 20 blocks higher from when we started
 	require.True(s.T(), header.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
+}
+
+// assertNetworkHealthyAfterLNChange after an collection node is removed or added to the network
+// this func can be used to perform sanity.
+// 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
+// is after the first epoch starts.
+// 2. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
+func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
+	// To validate the LN joined the network successfully and is processing transactions we submit a
+	// create account transaction and assert there are no errors.
+	_, err := s.createAccount(
+		ctx,
+		fullAccountKey,
+		s.client.Account(),
+		s.client.SDKServiceAddress(),
+	)
+	require.NoError(s.T(), err)
 }
