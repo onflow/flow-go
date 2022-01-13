@@ -190,8 +190,10 @@ func NewBlockProvider(backend access.API, options ...blockProviderOption) *block
 func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, error) {
 	if blkProvider.id != nil {
 		blk, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
-		if err != nil {
-			return nil, idLookupError(blkProvider.id, "block", err)
+		if err != nil { // unfortunately backend returns internal error status if not found
+			return nil, NewNotFoundError(
+				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
+			)
 		}
 		return blk, nil
 	}
@@ -212,14 +214,4 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, er
 		)
 	}
 	return blk, nil
-}
-
-// idLookupError adds ID to the error message
-func idLookupError(id *flow.Identifier, entityType string, err error) StatusError {
-	msg := fmt.Sprintf("error looking up %s with ID %s", entityType, id.String())
-	// if error has GRPC code NotFound, then return HTTP NotFound error
-	if status.Code(err) == codes.NotFound {
-		return NewNotFoundError(msg, err)
-	}
-	return NewRestError(http.StatusInternalServerError, msg, err)
 }
