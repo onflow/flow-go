@@ -10,24 +10,24 @@ const sealed = "sealed"
 const final = "final"
 
 // Special height values
-const SealedHeight = math.MaxUint64 - 1
-const FinalHeight = math.MaxUint64 - 2
-const EmptyHeight = math.MaxUint64 - 3
+const SealedHeight uint64 = math.MaxUint64 - 1
+const FinalHeight uint64 = math.MaxUint64 - 2
+const EmptyHeight uint64 = math.MaxUint64 - 3
 
 type Height uint64
 
 func (h *Height) Parse(raw string) error {
 	if raw == "" { // allow empty
-		*h = EmptyHeight
+		*h = Height(EmptyHeight)
 		return nil
 	}
 
 	if raw == sealed {
-		*h = SealedHeight
+		*h = Height(SealedHeight)
 		return nil
 	}
 	if raw == final {
-		*h = FinalHeight
+		*h = Height(FinalHeight)
 		return nil
 	}
 
@@ -55,7 +55,7 @@ func (h *Heights) Parse(raw []string) error {
 			return err
 		}
 		// don't include empty heights
-		if height == EmptyHeight {
+		if height == Height(EmptyHeight) {
 			continue
 		}
 
