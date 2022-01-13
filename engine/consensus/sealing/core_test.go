@@ -745,10 +745,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	assigner := &module.ChunkAssigner{}
+	payloads := &storage.Payloads{}
 
 	// setup mocks
 	s.rootHeader = &s.IncorporatedBlock
-	payloads := &storage.Payloads{}
 	expectedResults := []*flow.IncorporatedResult{s.IncorporatedResult}
 
 	s.sealsDB.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
@@ -776,9 +776,24 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 
 	assigner.On("Assign", s.IncorporatedResult.Result, mock.Anything).Return(s.ChunksAssignment, nil)
 
-	// root snapshot has no pending children
 	finalSnapShot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
+	s.Snapshots[s.rootHeader.ID()] = finalSnapShot
+	// root snapshot has no pending children
 	finalSnapShot.On("ValidDescendants").Return(nil, nil)
+	// set up sealing segment
+	finalSnapShot.On("SealingSegment").Return(
+		&flow.SealingSegment{
+			Blocks: []*flow.Block{{
+				Header:  &s.Block,
+				Payload: &candidatePayload,
+			}, {
+				Header:  &s.ParentBlock,
+				Payload: &flow.Payload{},
+			}, {
+				Header:  &s.IncorporatedBlock,
+				Payload: &incorporatedBlockPayload,
+			}},
+		}, nil)
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
