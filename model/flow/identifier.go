@@ -144,17 +144,13 @@ func GetIDs(value interface{}) []Identifier {
 
 func MerkleRoot(ids ...Identifier) Identifier {
 	var root Identifier
-	tree := merkle.NewTree()
+	tree, _ := merkle.NewTree(IdentifierLen) // we verify in a unit test that constructor does not error for this paramter
 	for i, id := range ids {
 		val := make([]byte, 8)
 		binary.BigEndian.PutUint64(val, uint64(i))
-		_, err := tree.Put(id[:], val) // Tree copies keys and values internally
-		if err != nil {
-			// This should never happen: per API, `Put` only errors if we feed it with
-			// zero-length keys or keys of different length. As Identifiers are fixed-sized
-			// arrays, either error condition is impossible.
-			panic("unexpected internal error: " + err.Error())
-		}
+		_, _ = tree.Put(id[:], val) // Tree copies keys and values internally
+		// `Put` only errors for keys whose length does not conform to the pre-configured length. As
+		// Identifiers are fixed-sized arrays, errors are impossible here, which we also verify in a unit test.
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)

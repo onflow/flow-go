@@ -4,13 +4,13 @@ package merkle
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
 var (
-	ErrorIncompatibleKeyLength = errors.New("only non-empty keys with up to 8192 bytes are supported")
-	ErrorVariableKeyLengths    = errors.New("only keys with uniform lengths are supported")
+	ErrorIncompatibleKeyLength = errors.New("key has incompatible size")
 )
 
 // maxKeyLength in bytes:
@@ -38,19 +38,22 @@ const maxKeyLength = 8192
 //  * Without any stored elements, there exists no root vertex in this data model,
 //    and we set `root` to nil.
 type Tree struct {
-	pathLength int
-	size       uint64
-	root       node
+	keyLength int
+	root      node
 }
 
-// NewTree creates a new empty patricia merkle tree.
-func NewTree() *Tree {
-	return &Tree{}
-}
-
-// Size returns the number of stored key-value pairs
-func (t *Tree) Size() uint64 {
-	return t.size
+// NewTree creates a new empty patricia merkle tree, with keys of the given
+// `keyLength` (length measured in bytes).
+// The current implementation only works with 1 ≤ keyLength ≤ 8192. Otherwise,
+// the sentinel error `ErrorIncompatibleKeyLength` is returned.
+func NewTree(keyLength int) (*Tree, error) {
+	if keyLength < 1 || maxKeyLength < keyLength {
+		return nil, fmt.Errorf("key length %d is outside of supported interval [1, %d]: %w", keyLength, maxKeyLength, ErrorIncompatibleKeyLength)
+	}
+	return &Tree{
+		keyLength: keyLength,
+		root:      nil,
+	}, nil
 }
 
 // Put stores the given value in the trie under the given key. If the key
@@ -62,28 +65,13 @@ func (t *Tree) Size() uint64 {
 //  * (true, nil):  key-value pair is stored; key existed prior to update and the old
 //                  value was overwritten
 //  * (false, error): with possible error returns
-//    - ErrorIncompatibleKeyLength if `key` is empty, or exceeds the max supported length of 8192 bytes.
-//    - ErrorVariableKeyLengths if the provided key length is _different_ than previously stored elements.
+//    - ErrorIncompatibleKeyLength if `key` has different length than the pre-configured value
 //    No other errors are returned.
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
-	if t.size == 0 { // empty key-value store
-		l := len(key)
-		if l == 0  || maxKeyLength < l {
-			return false, ErrorIncompatibleKeyLength
-		}
-		t.pathLength = len(key)
-		t.size = 1
-		return t.unsafePut(key, val), nil
-	}
-
-	// for non-empty key-value store: enforce that all keys have identical length
-	if len(key) != t.pathLength {
-		return false, ErrorVariableKeyLengths
+	if len(key) != t.keyLength {
+		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
 	}
 	replaced := t.unsafePut(key, val)
-	if !replaced {
-		t.size++
-	}
 	return replaced, nil
 }
 
@@ -227,7 +215,7 @@ PutLoop:
 // Get will retrieve the value associated with the given key. It returns true
 // if the key was found and false otherwise.
 func (t *Tree) Get(key []byte) ([]byte, bool) {
-	if t.size == 0 || t.pathLength != len(key) {
+	if t.root == nil || t.keyLength != len(key) {
 		return nil, false
 	}
 	return t.unsafeGet(key)
@@ -291,14 +279,10 @@ GetLoop:
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
 func (t *Tree) Del(key []byte) bool {
-	if t.size == 0 || t.pathLength != len(key) {
+	if t.root == nil || t.keyLength != len(key) {
 		return false
 	}
-	deleted := t.unsafeDel(key)
-	if deleted {
-		t.size--
-	}
-	return deleted
+	return t.unsafeDel(key)
 }
 
 // unsafeDel removes the value associated with the given key from the patricia
@@ -423,9 +407,10 @@ DelLoop:
 }
 
 // Hash returns the root hash of this patricia merkle tree.
+// Per convention, an empty trie has an empty hash.
 func (t *Tree) Hash() []byte {
-	if t.size == 0 {
-		return []byte{14, 87, 81, 192, 38, 229, 67, 178, 232, 171, 46, 176, 96, 153, 218, 161, 209, 229, 223, 71, 119, 143, 119, 135, 250, 171, 69, 205, 241, 47, 227, 168}
+	if t.root == nil {
+		return []byte{}
 	}
 	return t.root.Hash()
 }

@@ -104,7 +104,8 @@ func TestMerkleRoot(t *testing.T) {
 // Possibly written in another language, such as python, similar to the Ledger Trie Implementation
 func referenceMerkleRoot(t *testing.T, ids ...flow.Identifier) flow.Identifier {
 	var root flow.Identifier
-	tree := merkle.NewTree()
+	tree, err := merkle.NewTree(flow.IdentifierLen)
+	assert.NoError(t, err)
 	for idx, id := range ids {
 		idxVal := make([]byte, 8)
 		binary.BigEndian.PutUint64(idxVal, uint64(idx))

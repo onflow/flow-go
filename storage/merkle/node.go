@@ -42,7 +42,7 @@ var _ node = &short{}
 
 func (n *short) Hash() []byte {
 	c := serializedPathSegmentLength(n.count)
-	h, _ := blake2b.New256(shortNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
+	h, _ := blake2b.New256(shortNodeTag) // blake2b.New256(..) never errors for given MAC (verified in tests)
 	_, _ = h.Write(c[:])                 // blake2b.Write(..) never errors for _any_ input
 	_, _ = h.Write(n.path)               // blake2b.Write(..) never errors for _any_ input
 	_, _ = h.Write(n.child.Hash())       // blake2b.Write(..) never errors for _any_ input
@@ -73,7 +73,7 @@ type full struct {
 var _ node = &full{}
 
 func (n *full) Hash() []byte {
-	h, _ := blake2b.New256(fullNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
+	h, _ := blake2b.New256(fullNodeTag) // blake2b.New256(..) never errors for given MAC (verified in tests)
 	_, _ = h.Write(n.left.Hash())       // blake2b.Write(..) never errors for _any_ input
 	_, _ = h.Write(n.right.Hash())      // blake2b.Write(..) never errors for _any_ input
 	return h.Sum(nil)
@@ -90,8 +90,8 @@ type leaf struct {
 var _ node = &leaf{}
 
 func (n *leaf) Hash() []byte {
-	h, _ := blake2b.New256(leafNodeTag[:]) // blake2b.New256(..) error for given MAC (verified in tests)
-	_, _ = h.Write(n.val)                  // blake2b.Write(..) never errors for _any_ input
+	h, _ := blake2b.New256(leafNodeTag) // blake2b.New256(..) never errors for given MAC (verified in tests)
+	_, _ = h.Write(n.val)               // blake2b.Write(..) never errors for _any_ input
 	return h.Sum(nil)
 }
 
