@@ -206,8 +206,10 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, er
 	}
 
 	blk, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
-	if err != nil {
-		return nil, heightLookupError(blkProvider.height, "block", err)
+	if err != nil { // unfortunately backend returns internal error status if not found
+		return nil, NewNotFoundError(
+			fmt.Sprintf("error looking up block at height %d", blkProvider.height), err,
+		)
 	}
 	return blk, nil
 }
@@ -215,16 +217,6 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, er
 // idLookupError adds ID to the error message
 func idLookupError(id *flow.Identifier, entityType string, err error) StatusError {
 	msg := fmt.Sprintf("error looking up %s with ID %s", entityType, id.String())
-	// if error has GRPC code NotFound, then return HTTP NotFound error
-	if status.Code(err) == codes.NotFound {
-		return NewNotFoundError(msg, err)
-	}
-	return NewRestError(http.StatusInternalServerError, msg, err)
-}
-
-// heightLookupError adds height to the error message
-func heightLookupError(height uint64, entityType string, err error) StatusError {
-	msg := fmt.Sprintf("error looking up %s at height %d", entityType, height)
 	// if error has GRPC code NotFound, then return HTTP NotFound error
 	if status.Code(err) == codes.NotFound {
 		return NewNotFoundError(msg, err)
