@@ -275,8 +275,11 @@ GetLoop:
 	}
 }
 
-// Get will retrieve the value associated with the given key. It returns true
-// if the key was found and false otherwise.
+// Prove constructs inclusion proof for a given key if the key exists in the trie.
+// it traverse the trie from top to down and collect data for proof as follows:
+//  - if full node, capture the sibling node hash value and append zero to short counts
+//  - if short node, appends the node.shortCount to the short count list
+//  - if leaf, would capture the hash of the value
 func (t *Tree) Prove(key []byte) (*Proof, bool) {
 
 	// we start at the root again
@@ -314,6 +317,8 @@ ProveLoop:
 				cur = &n.right
 			}
 
+			// capturing short count as zero hints that we had a full node
+			// so we can read a hashValue from hashValues
 			shortCounts = append(shortCounts, 0)
 			hashValues = append(hashValues, neighbour.Hash())
 
@@ -331,6 +336,9 @@ ProveLoop:
 				}
 			}
 
+			// capturing a non-zero short counts hints that we had a short node
+			// during traverse and also capturing is needed to compute hash value
+			// for a short node.
 			shortCounts = append(shortCounts, uint8(n.count))
 
 			// forward pointer and index to child
@@ -341,11 +349,9 @@ ProveLoop:
 
 		// if we have a leaf, we found the key, return value and true
 		case *leaf:
-			h, _ := blake2b.New256(leafNodeTag)
-			_, _ = h.Write(n.val)
 			return &Proof{
 				Key:           key[:],
-				HashValue:     h.Sum(nil),
+				HashValue:     n.Hash(),
 				ShortCounts:   shortCounts,
 				InterimHashes: hashValues,
 			}, true
