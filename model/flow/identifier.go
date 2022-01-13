@@ -145,8 +145,16 @@ func GetIDs(value interface{}) []Identifier {
 func MerkleRoot(ids ...Identifier) Identifier {
 	var root Identifier
 	tree := merkle.NewTree()
-	for _, id := range ids {
-		tree.Put(id[:], nil)
+	for i, id := range ids {
+		val := make([]byte, 8)
+		binary.BigEndian.PutUint64(val, uint64(i))
+		_, err := tree.Put(id[:], val) // Tree copies keys and values internally
+		if err != nil {
+			// This should never happen: per API, `Put` only errors if we feed it with
+			// zero-length keys or keys of different length. As Identifiers are fixed-sized
+			// arrays, either error condition is impossible.
+			panic("unexpected internal error: " + err.Error())
+		}
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)
@@ -173,7 +181,7 @@ func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 }
 
 // Sample returns random sample of length 'size' of the ids
-// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher-Yates_shuffle).
 func Sample(size uint, ids ...Identifier) []Identifier {
 	n := uint(len(ids))
 	dup := make([]Identifier, 0, n)

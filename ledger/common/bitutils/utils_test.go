@@ -11,6 +11,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestBitVectorAllocation(t *testing.T) {
+	for bits := 0; bits <= 127; bits++ {
+		numBytes := bits / 8 // integer division with floor
+		if bits%8 > 0 {
+			numBytes += 1
+		}
+
+		vect := MakeBitVector(bits)
+		assert.Equal(t, numBytes, len(vect))
+	}
+}
+
 func TestBitTools(t *testing.T) {
 	seed := time.Now().UnixNano()
 	t.Logf("rand seed is %d", seed)
@@ -46,16 +58,20 @@ func TestBitTools(t *testing.T) {
 
 	t.Run("SetBit", func(t *testing.T) {
 		b.SetInt64(0)
-		bytes := make([]byte, (maxBits+7)/8) // length in bytes needed for maxbits
+		bytes := MakeBitVector(maxBits)
+		rand.Read(bytes) // fill bytes with random garbage to verify that setting each individual bit works
+
 		// build a random big bit by bit
-		for i := 0; i < maxBits; i++ {
+		for idx := 0; idx < maxBits; idx++ {
 			bit := rand.Intn(2)
 			// b = 2*b + bit
 			b.Lsh(&b, 1)
 			b.Add(&b, big.NewInt(int64(bit)))
 			// sets the bit at index i
 			if bit == 1 {
-				SetBit(bytes, i)
+				SetBit(bytes, idx, 1)
+			} else {
+				SetBit(bytes, idx, 0)
 			}
 		}
 

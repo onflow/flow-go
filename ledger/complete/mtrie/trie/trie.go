@@ -415,7 +415,7 @@ func addSiblingTrieHashToProofs(siblingTrie *node.Node, depth int, proofs []*led
 	isDef := nodeHash == ledger.GetDefaultHashForHeight(siblingTrie.Height())
 	if !isDef { // in proofs, we only provide non-default value hashes
 		for _, p := range proofs {
-			bitutils.SetBit(p.Flags, depth)
+			bitutils.SetBit(p.Flags, depth, 1)
 			p.Interims = append(p.Interims, nodeHash)
 		}
 	}

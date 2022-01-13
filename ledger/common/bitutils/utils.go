@@ -12,8 +12,18 @@ func Bit(b []byte, idx int) int {
 // SetBit sets the bit at position i in the byte array b
 //
 // The function assumes b has at least i bits. The caller must make sure this condition is met.
-func SetBit(b []byte, i int) {
-	byteIndex := i >> 3
-	i &= 7
-	b[byteIndex] |= 1 << (7 - i)
+func SetBit(b []byte, idx int, value int) {
+	byteIndex := idx >> 3
+	idx &= 7
+	mask := byte(1 << (7 - idx))
+	if value == 0 {
+		b[byteIndex] &= ^mask
+	} else {
+		b[byteIndex] |= mask
+	}
+}
+
+// MakeBitVector allocates a byte slice of minimal size that can hold numberBits.
+func MakeBitVector(numberBits int) []byte {
+	return make([]byte, (numberBits+7)>>3)
 }
