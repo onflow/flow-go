@@ -157,6 +157,23 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSealedBlockID, err)
 	}
 
+	// Get the root block of our local state - we allow references to unknown
+	// blocks below the root height
+	rootHeader, err := c.state.Params().Root()
+	if err != nil {
+		return fmt.Errorf("could not retrieve root header: %w", err)
+	}
+
+	// Determine the list of unknown blocks referenced within the sealing segment
+	// if we are initializing with a latest sealed block below the root height
+	var outdatedBlockIDs map[flow.Identifier]struct{}
+	if latestSealedBlock.Height <= rootHeader.Height {
+		outdatedBlockIDs, err = c.getOutdatedBlockIDsFromRootSealingSegment(rootHeader)
+		if err != nil {
+			return fmt.Errorf("could not get outdated block IDs from root segment: %w", err)
+		}
+	}
+
 	blocksProcessed := uint64(0)
 	totalBlocks := finalized.Height - latestSealedBlock.Height
 
@@ -169,6 +186,11 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		}
 
 		for _, result := range payload.Results {
+			// skip results referencing blocks before the root sealing segment
+			_, isOutdated := outdatedBlockIDs[result.BlockID]
+			if isOutdated {
+				continue
+			}
 			incorporatedResult := flow.NewIncorporatedResult(blockID, result)
 			err = c.ProcessIncorporatedResult(incorporatedResult)
 			if err != nil {
@@ -611,4 +633,37 @@ func (c *Core) requestPendingApprovals(observation consensus.SealingObservation,
 	}
 
 	return nil
+}
+
+// getOutdatedBlockIDsFromRootSealingSegment finds all references to unknown blocks
+// by execution results within the sealing segment. In general we disallow references
+// to unknown blocks, but execution results incorporated within the sealing segment
+// are an exception to this rule.
+//
+// For example, given the sealing segment A...E, B contains an ER referencing Z, but
+// since Z is prior to sealing segment, the node cannot valid the ER. Therefore, we
+// ignore these block references.
+//
+//      [  sealing segment  ]
+// Z <- A <- B(RZ) <- C <- D <- E
+//
+func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header) (map[flow.Identifier]struct{}, error) {
+
+	rootSealingSegment, err := c.state.AtBlockID(rootHeader.ID()).SealingSegment()
+	if err != nil {
+		return nil, fmt.Errorf("could not get root sealing segment: %w", err)
+	}
+
+	knownBlockIDs := make(map[flow.Identifier]struct{}) // track block IDs in the sealing segment
+	var outdatedBlockIDs flow.IdentifierList
+	for _, block := range rootSealingSegment.Blocks {
+		knownBlockIDs[block.ID()] = struct{}{}
+		for _, result := range block.Payload.Results {
+			_, known := knownBlockIDs[result.BlockID]
+			if !known {
+				outdatedBlockIDs = append(outdatedBlockIDs, result.BlockID)
+			}
+		}
+	}
+	return outdatedBlockIDs.Lookup(), nil
 }
