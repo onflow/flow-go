@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -99,18 +98,12 @@ type BlockEvents struct {
 
 type EventsList []Event
 
-// EventsListHash calculates a hash of events list,
-// by simply hashing byte representation of events in the lists
-func EventsListHash(el EventsList) (Identifier, error) {
-
-	hasher := hash.NewSHA3_256()
-
+// EventsListMerkleHash calculates the root hash of events inserted in order into a
+// merkle trie with the hash of event as the key and event index as of value
+func EventsListMerkleHash(el EventsList) (Identifier, error) {
+	eventIDs := make([]Identifier, 0)
 	for _, event := range el {
-		_, err := hasher.Write(event.Fingerprint())
-		if err != nil {
-			return ZeroID, fmt.Errorf("cannot write to hasher: %w", err)
-		}
+		eventIDs = append(eventIDs, MakeID(event))
 	}
-
-	return HashToID(hasher.SumHash()), nil
+	return MerkleRoot(eventIDs...), nil
 }

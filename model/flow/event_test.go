@@ -79,11 +79,11 @@ func TestEventsList(t *testing.T) {
 		eventC,
 	}
 
-	ABHash, err := flow.EventsListHash(listAB)
+	ABHash, err := flow.EventsListMerkleHash(listAB)
 	assert.NoError(t, err)
-	ACHash, err := flow.EventsListHash(listAC)
+	ACHash, err := flow.EventsListMerkleHash(listAC)
 	assert.NoError(t, err)
-	BAHash, err := flow.EventsListHash(listBA)
+	BAHash, err := flow.EventsListMerkleHash(listBA)
 	assert.NoError(t, err)
 
 	t.Run("different events have different hash", func(t *testing.T) {
