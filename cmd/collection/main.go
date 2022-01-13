@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"time"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -91,6 +94,12 @@ func main() {
 		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
+
+		dynamicStartup bool
+		initANAddress string
+		initANPubkey string
+		startupEpoch int
+		startupEpochPhase int
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
@@ -147,6 +156,11 @@ func main() {
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+		flags.BoolVar(&dynamicStartup, "dynamic-startup", false, "when set to true node will attempt to wait for a specified epoch counter & phase before initializing")
+		flags.StringVar(&initANAddress, "init-access-address", "", "the address of the trusted secure access node to connect to for pre-initialization")
+		flags.StringVar(&initANPubkey, "init-access-publickey", "", "the public key of the trusted secure access node to connect to for pre-initialization")
+		flags.IntVar(&startupEpoch, "startup-epoch", 0, "the epoch the node will wait for before initializing modules when using dynamic-starup")
+		flags.IntVar(&startupEpochPhase, "startup-epoch-phase", 0, "the epoch phase the node will wait for before initializing modules when using dynamic-starup")
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -163,6 +177,54 @@ func main() {
 	}
 
 	nodeBuilder.
+		PreInit(func(nodeConfig *cmd.NodeConfig) error {
+			//wait for epoch counter & phase
+			config, err := common.NewFlowClientConfig(initANAddress, initANPubkey, false)
+			if err != nil {
+				return fmt.Errorf("failed to create flow client config for node pre-initialization: %w", err)
+			}
+
+			flowClient, err := common.FlowClient(config)
+			if err != nil {
+				return fmt.Errorf("failed to create flow client for node pre-initialization: %w", err)
+			}
+
+			ctx := context.Background()
+			for {
+				bz, err := flowClient.GetLatestProtocolStateSnapshot(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get latest finalized protocol state snapshot during pre-initialization: %w", err)
+				}
+
+				var snapshotEnc inmem.EncodableSnapshot
+				err = json.Unmarshal(bz, &snapshotEnc)
+				if err != nil {
+					return fmt.Errorf("failed to unmarshal protocol state snapshot: %w", err)
+				}
+
+				snapshot := inmem.SnapshotFromEncodable(snapshotEnc)
+
+				currEpochCounter, err := snapshot.Epochs().Current().Counter()
+				if err != nil {
+					return fmt.Errorf("failed to get the current epoch counter: %w", err)
+				}
+
+				currEpochPhase, err := snapshot.Phase()
+				if err != nil {
+					return fmt.Errorf("failed to get the current epoch phase: %w", err)
+				}
+
+				if currEpochCounter == uint64(startupEpoch) && int(currEpochPhase) == startupEpochPhase {
+					nodeConfig.Logger.Warn().Msg("reached desired epoch and phase continuing exiting pre-init")
+					break
+				}
+
+				nodeConfig.Logger.Warn().Msg("waiting for epoch and phase")
+				time.Sleep(time.Minute)
+			}
+
+			return nil
+		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory

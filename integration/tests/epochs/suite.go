@@ -561,12 +561,21 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 		nodeContainer.AddFlag("insecure-access-api", "false")
 
 		accessNodeIDS := make([]string, 0)
+		accessNodeInitInfo := make(map[string]string)
 		for _, c := range s.net.ContainersByRole(flow.RoleAccess) {
 			if c.Config.Role == flow.RoleAccess && !c.Config.Ghost {
-				accessNodeIDS = append(accessNodeIDS, c.Config.NodeID.String())
+				accessNodeInitInfo["address"] = c.Config.NodeInfo.Address
+				accessNodeInitInfo["publickey"] = c.Config.NodeInfo.NetworkPubKey().String()
+				accessNodeIDS = append(accessNodeIDS, c.Config.NodeInfo.NodeID.String())
 			}
 		}
+
 		nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
+		nodeContainer.AddFlag("dynamic-startup", "true")
+		nodeContainer.AddFlag("init-access-address", accessNodeInitInfo["address"])
+		nodeContainer.AddFlag("init-access-publickey", accessNodeInitInfo["publickey"])
+		nodeContainer.AddFlag("startup-epoch", "1")
+		nodeContainer.AddFlag("startup-epoch-phase", "2")
 	}
 
 	return s.net.ContainerByID(info.NodeID)

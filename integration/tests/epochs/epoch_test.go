@@ -163,10 +163,10 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	info, testContainer := s.StakeNewNode(ctx, env, role)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
-	s.removeNodeFromProtocol(ctx, env, containerToReplace.Config.NodeID)
+	//s.removeNodeFromProtocol(ctx, env, containerToReplace.Config.NodeID)
 
 	// wait for epoch setup phase before we start our container and pause the old container
-	s.WaitForPhase(ctx, flow.EpochPhaseSetup)
+	//s.WaitForPhase(ctx, flow.EpochPhaseSetup)
 
 	// get latest snapshot and start new container
 	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
@@ -187,7 +187,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
 	s.assertEpochCounter(ctx, 1)
 
-	err = containerToReplace.Pause()
+	//err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 
 	// wait for 5 views after pausing our container to replace before we assert healthy network

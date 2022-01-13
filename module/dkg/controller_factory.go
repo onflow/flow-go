@@ -2,7 +2,6 @@ package dkg
 
 import (
 	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
