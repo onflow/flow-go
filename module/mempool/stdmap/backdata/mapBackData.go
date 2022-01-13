@@ -82,6 +82,26 @@ func (b MapBackData) All() map[flow.Identifier]flow.Entity {
 	return entities
 }
 
+func (b MapBackData) Identities() flow.IdentifierList {
+	ids := make(flow.IdentifierList, len(b.entities))
+	i := 0
+	for entityID := range b.entities {
+		ids[i] = entityID
+		i++
+	}
+	return ids
+}
+
+func (b MapBackData) Entities() []flow.Entity {
+	entities := make([]flow.Entity, len(b.entities))
+	i := 0
+	for _, entity := range b.entities {
+		entities[i] = entity
+		i++
+	}
+	return entities
+}
+
 // Clear removes all entities from the BackData.
 func (b *MapBackData) Clear() {
 	b.entities = make(map[flow.Identifier]flow.Entity)
