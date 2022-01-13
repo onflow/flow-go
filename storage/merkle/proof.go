@@ -15,6 +15,9 @@ type Proof struct {
 	// size of this is equal to the steps needed for verification,
 	// constructed by traversing top to down, if set to zero means we had a full node and a value from a hash value from InterimHashes should be read,
 	// any other value than 0 means we hit a short node and we need the shortcounts for computing the hash
+	//
+	// TODO: as this would include many zeros and would be sparse if the keys are computed as output of hashes, we might optimize
+	// this by using an sparse representation in the future (index and counts for non-zeros only)
 	ShortCounts []int
 	// a slice of hash values (hash value of siblings for full nodes, the size of this is equal to the zeros we have in ShortCounts)
 	InterimHashes [][]byte
