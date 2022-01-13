@@ -68,7 +68,7 @@ func (t *Tree) Size() uint64 {
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 	if t.size == 0 { // empty key-value store
 		l := len(key)
-		if l < 1 || maxKeyLength < l {
+		if l == 0  || maxKeyLength < l {
 			return false, ErrorIncompatibleKeyLength
 		}
 		t.pathLength = len(key)
