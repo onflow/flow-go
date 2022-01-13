@@ -192,6 +192,44 @@ func (c Cache) All() map[flow.Identifier]flow.Entity {
 	return all
 }
 
+func (c Cache) Identifiers() flow.IdentifierList {
+	ids := make(flow.IdentifierList, c.entities.Size())
+	i := 0
+	for b, bucket := range c.buckets {
+		for s := range bucket.slots {
+			id, _, linked := c.linkedEntityOf(bucketIndex(b), slotIndex(s))
+			if !linked {
+				// slot may never be used, or recently invalidated
+				continue
+			}
+
+			ids[i] = id
+			i++
+		}
+	}
+
+	return ids
+}
+
+func (c Cache) Entities() []flow.Entity {
+	entities := make([]flow.Entity, c.entities.Size())
+	i := 0
+	for b, bucket := range c.buckets {
+		for s := range bucket.slots {
+			_, entity, linked := c.linkedEntityOf(bucketIndex(b), slotIndex(s))
+			if !linked {
+				// slot may never be used, or recently invalidated
+				continue
+			}
+
+			entities[i] = entity
+			i++
+		}
+	}
+
+	return entities
+}
+
 // Clear removes all entities from the BackData.
 func (c *Cache) Clear() {
 	defer c.logTelemetry()
