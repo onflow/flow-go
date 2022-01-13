@@ -5,14 +5,14 @@ package merkle
 import (
 	"bytes"
 	"errors"
+	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"golang.org/x/crypto/blake2b"
 )
 
 var (
-	ErrorIncompatibleKeyLength = errors.New("only non-empty keys with up to 8192 bytes are supported")
-	ErrorVariableKeyLengths    = errors.New("only keys with uniform lengths are supported")
+	ErrorIncompatibleKeyLength = errors.New("key has incompatible size")
 )
 
 // maxKeyLength in bytes:
@@ -40,19 +40,22 @@ const maxKeyLength = 8192
 //  * Without any stored elements, there exists no root vertex in this data model,
 //    and we set `root` to nil.
 type Tree struct {
-	pathLength int
-	size       uint64
-	root       node
+	keyLength int
+	root      node
 }
 
-// NewTree creates a new empty patricia merkle tree.
-func NewTree() *Tree {
-	return &Tree{}
-}
-
-// Size returns the number of stored key-value pairs
-func (t *Tree) Size() uint64 {
-	return t.size
+// NewTree creates a new empty patricia merkle tree, with keys of the given
+// `keyLength` (length measured in bytes).
+// The current implementation only works with 1 ≤ keyLength ≤ 8192. Otherwise,
+// the sentinel error `ErrorIncompatibleKeyLength` is returned.
+func NewTree(keyLength int) (*Tree, error) {
+	if keyLength < 1 || maxKeyLength < keyLength {
+		return nil, fmt.Errorf("key length %d is outside of supported interval [1, %d]: %w", keyLength, maxKeyLength, ErrorIncompatibleKeyLength)
+	}
+	return &Tree{
+		keyLength: keyLength,
+		root:      nil,
+	}, nil
 }
 
 // Put stores the given value in the trie under the given key. If the key
@@ -64,28 +67,13 @@ func (t *Tree) Size() uint64 {
 //  * (true, nil):  key-value pair is stored; key existed prior to update and the old
 //                  value was overwritten
 //  * (false, error): with possible error returns
-//    - ErrorIncompatibleKeyLength if `key` is empty, or exceeds the max supported length of 8192 bytes.
-//    - ErrorVariableKeyLengths if the provided key length is _different_ than previously stored elements.
+//    - ErrorIncompatibleKeyLength if `key` has different length than the pre-configured value
 //    No other errors are returned.
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
-	if t.size == 0 { // empty key-value store
-		l := len(key)
-		if l < 1 || maxKeyLength < l {
-			return false, ErrorIncompatibleKeyLength
-		}
-		t.pathLength = len(key)
-		t.size = 1
-		return t.unsafePut(key, val), nil
-	}
-
-	// for non-empty key-value store: enforce that all keys have identical length
-	if len(key) != t.pathLength {
-		return false, ErrorVariableKeyLengths
+	if len(key) != t.keyLength {
+		return false, fmt.Errorf("trie is configured for key length of %d bytes, but got key with length %d: %w", t.keyLength, len(key), ErrorIncompatibleKeyLength)
 	}
 	replaced := t.unsafePut(key, val)
-	if !replaced {
-		t.size++
-	}
 	return replaced, nil
 }
 
@@ -114,7 +102,7 @@ PutLoop:
 		// just pick the next node based on whether the bit is set or not
 		case *full:
 			// if the bit is 0, we go left; otherwise (bit value 1), we go right
-			if bitutils.Bit(key, index) == 0 {
+			if bitutils.ReadBit(key, index) == 0 {
 				cur = &n.left
 			} else {
 				cur = &n.right
@@ -132,7 +120,7 @@ PutLoop:
 			commonCount := 0
 			shortPathCount := n.count
 			for i := 0; i < shortPathCount; i++ {
-				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
+				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					break
 				}
 				commonCount++
@@ -151,7 +139,7 @@ PutLoop:
 			if commonCount > 0 {
 				commonPath := bitutils.MakeBitVector(commonCount)
 				for i := 0; i < commonCount; i++ {
-					bitutils.SetBit(commonPath, i, bitutils.Bit(key, i+index))
+					bitutils.WriteBit(commonPath, i, bitutils.ReadBit(key, i+index))
 				}
 				commonNode := &short{count: commonCount, path: commonPath}
 				*cur = commonNode
@@ -165,7 +153,7 @@ PutLoop:
 			var remain *node
 			splitNode := &full{}
 			*cur = splitNode
-			if bitutils.Bit(n.path, commonCount) == 1 {
+			if bitutils.ReadBit(n.path, commonCount) == 1 {
 				cur = &splitNode.left
 				remain = &splitNode.right
 			} else {
@@ -182,7 +170,7 @@ PutLoop:
 			if remainCount > 0 {
 				remainPath := bitutils.MakeBitVector(remainCount)
 				for i := 0; i < remainCount; i++ {
-					bitutils.SetBit(remainPath, i, bitutils.Bit(n.path, i+commonCount+1))
+					bitutils.WriteBit(remainPath, i, bitutils.ReadBit(n.path, i+commonCount+1))
 				}
 				remainNode := &short{count: remainCount, path: remainPath}
 				*remain = remainNode
@@ -214,7 +202,7 @@ PutLoop:
 			finalCount := totalCount - index
 			finalPath := bitutils.MakeBitVector(finalCount)
 			for i := 0; i < finalCount; i++ {
-				bitutils.SetBit(finalPath, i, bitutils.Bit(key, index+i))
+				bitutils.WriteBit(finalPath, i, bitutils.ReadBit(key, index+i))
 			}
 			finalNode := &short{count: finalCount, path: []byte(finalPath)}
 			*cur = finalNode
@@ -229,7 +217,7 @@ PutLoop:
 // Get will retrieve the value associated with the given key. It returns true
 // if the key was found and false otherwise.
 func (t *Tree) Get(key []byte) ([]byte, bool) {
-	if t.size == 0 || t.pathLength != len(key) {
+	if t.root == nil || t.keyLength != len(key) {
 		return nil, false
 	}
 	return t.unsafeGet(key)
@@ -251,7 +239,7 @@ GetLoop:
 		// bit, so go left or right depending on whether it's set or not
 		case *full:
 			// forward pointer and index to the correct child
-			if bitutils.Bit(key, index) == 0 {
+			if bitutils.ReadBit(key, index) == 0 {
 				cur = &n.left
 			} else {
 				cur = &n.right
@@ -265,7 +253,7 @@ GetLoop:
 		case *short:
 			// if any part of the path doesn't match, key doesn't exist
 			for i := 0; i < n.count; i++ {
-				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
+				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					return nil, false
 				}
 			}
@@ -370,14 +358,10 @@ ProveLoop:
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
 func (t *Tree) Del(key []byte) bool {
-	if t.size == 0 || t.pathLength != len(key) {
+	if t.root == nil || t.keyLength != len(key) {
 		return false
 	}
-	deleted := t.unsafeDel(key)
-	if deleted {
-		t.size--
-	}
-	return deleted
+	return t.unsafeDel(key)
 }
 
 // unsafeDel removes the value associated with the given key from the patricia
@@ -412,7 +396,7 @@ DelLoop:
 			last = cur
 
 			// forward pointer and index to the correct child
-			if bitutils.Bit(key, index) == 0 {
+			if bitutils.ReadBit(key, index) == 0 {
 				cur = &n.left
 			} else {
 				cur = &n.right
@@ -431,7 +415,7 @@ DelLoop:
 
 			// if the path doesn't match at any point, we can't find the node
 			for i := 0; i < n.count; i++ {
-				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
+				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					return false
 				}
 			}
@@ -474,10 +458,10 @@ DelLoop:
 	var n *short
 	newPath := bitutils.MakeBitVector(1)
 	if f.left != nil {
-		bitutils.SetBit(newPath, 0, 0)
+		bitutils.ClearBit(newPath, 0)
 		n = &short{count: 1, path: newPath, child: f.left}
 	} else {
-		bitutils.SetBit(newPath, 0, 1)
+		bitutils.SetBit(newPath, 0)
 		n = &short{count: 1, path: newPath, child: f.right}
 	}
 	*last = n
@@ -502,9 +486,10 @@ DelLoop:
 }
 
 // Hash returns the root hash of this patricia merkle tree.
+// Per convention, an empty trie has an empty hash.
 func (t *Tree) Hash() []byte {
-	if t.size == 0 {
-		return []byte{14, 87, 81, 192, 38, 229, 67, 178, 232, 171, 46, 176, 96, 153, 218, 161, 209, 229, 223, 71, 119, 143, 119, 135, 250, 171, 69, 205, 241, 47, 227, 168}
+	if t.root == nil {
+		return []byte{}
 	}
 	return t.root.Hash()
 }
@@ -514,10 +499,10 @@ func merge(p *short, c *short) {
 	totalCount := p.count + c.count
 	totalPath := bitutils.MakeBitVector(totalCount)
 	for i := 0; i < p.count; i++ {
-		bitutils.SetBit(totalPath, i, bitutils.Bit(p.path, i))
+		bitutils.WriteBit(totalPath, i, bitutils.ReadBit(p.path, i))
 	}
 	for i := 0; i < c.count; i++ {
-		bitutils.SetBit(totalPath, i+p.count, bitutils.Bit(c.path, i))
+		bitutils.WriteBit(totalPath, i+p.count, bitutils.ReadBit(c.path, i))
 	}
 	p.count = totalCount
 	p.path = totalPath

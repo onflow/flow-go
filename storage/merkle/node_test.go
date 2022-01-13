@@ -13,7 +13,7 @@ import (
 var payload1, _ = hex.DecodeString("62b0326507ebce9d4a242908d20559ceca965c5e9848646bd0c05047c8487aadfcb3d851e77e5a055d306e48c376f8")
 var payload2, _ = hex.DecodeString("bab02e6213dfad3546aa473922bba0")
 
-// TestBlakeMac verifies that constructor blake2b.New256(m) never errors for any of the used MAC
+// TestBlakeMAC verifies that constructor blake2b.New256(m) never errors for any of the used MAC
 // values `m`. This is assumed by the Node's Hash() implementations. We test this assumption holds
 // at build time, but avoid runtime-checks for performance reasons.
 // Context: The blake2b MAC key should be less than 64 bytes. Constructor blake2b.New256(m) checks

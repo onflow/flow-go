@@ -11,24 +11,66 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/blake2b"
 )
 
 const TreeTestLength = 100000
 
-// TestEmptyTreeHash verifies that an empty tree has the expected hash value.
-// Convention: Root hash equals to zero-state of blake2b hasher
+// TestTreeInitialization verifies that tree initialization only accepts
+// compatible key lengths.
+func TestTreeInitialization(t *testing.T) {
+	// constructor should reject `keyLength` _outside_ of interval [1, 8192]
+	t.Run("key length outside of compatible bounds", func(t *testing.T) {
+		tree, err := NewTree(-1)
+		require.Nil(t, tree)
+		require.ErrorIs(t, err, ErrorIncompatibleKeyLength)
+
+		tree, err = NewTree(0)
+		require.Nil(t, tree)
+		require.ErrorIs(t, err, ErrorIncompatibleKeyLength)
+
+		tree, err = NewTree(8193)
+		require.Nil(t, tree)
+		require.ErrorIs(t, err, ErrorIncompatibleKeyLength)
+	})
+
+	// constructor should accept `keyLength` values in the interval [1, 8192]
+	t.Run("compatible key length", func(t *testing.T) {
+		tree, err := NewTree(1)
+		require.NotNil(t, tree)
+		require.NoError(t, err)
+
+		tree, err = NewTree(8192)
+		require.NotNil(t, tree)
+		require.NoError(t, err)
+	})
+}
+
+// TestEmptyTreeHash verifies that an empty tree returns the expected empty hash.
+// We test with:
+//  * different key sizes
+//  * a newly initialized trie (empty)
+//  * a trie, whose last element was removed
 func TestEmptyTreeHash(t *testing.T) {
-	// zero-state of blake2b hasher
-	b, _ := blake2b.New256(nil)
-	zeroBlake := b.Sum(nil)
+	for _, keyLength := range []int{1, 32, 8192} {
+		tree, _ := NewTree(keyLength)
+		assert.Empty(t, tree.Hash())
 
-	// reference value (from python reference implementation)
-	ref := "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"
-	require.Equal(t, ref, hex.EncodeToString(zeroBlake))
+		// generate random key-value pair
+		key := make([]byte, keyLength)
+		rand.Read(key)
+		val := []byte{1}
 
-	// compare with tree
-	assert.Equal(t, zeroBlake, NewTree().Hash())
+		// add key-value pair: hash should be non-empty
+		replaced, err := tree.Put(key, val)
+		assert.NoError(t, err)
+		assert.False(t, replaced)
+		assert.NotEmpty(t, tree.Hash())
+
+		// remove key: hash should now be empty again
+		removed := tree.Del(key)
+		assert.True(t, removed)
+		assert.Empty(t, tree.Hash())
+	}
 }
 
 // Test_ReferenceSingleEntry we construct a tree with a single key-value pair
@@ -40,10 +82,11 @@ func Test_ReferenceSingleEntry(t *testing.T) {
 		key := []byte{22, 83}                                                                  // key: 00010110 01010011
 		expectedRootHash := "3c4fd8e7bc5572d708d7ccab0a9ee06f74aac780e68c68d0b629ecb58a1fdf9d" // from python reference impl
 
-		tree := NewTree()
-		existed, err := tree.Put(key, val)
+		tree, err := NewTree(len(key))
 		assert.NoError(t, err)
-		assert.False(t, existed)
+		replaced, err := tree.Put(key, val)
+		assert.NoError(t, err)
+		assert.False(t, replaced)
 		require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
 	})
 
@@ -51,10 +94,11 @@ func Test_ReferenceSingleEntry(t *testing.T) {
 		key, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a33f0267b56b9a7be8defe38958f89c95fc")
 		expectedRootHash := "10eb7e9ffa397651acc2faf8a3c56207914418ca02ff9f39694effaf83d261e0" // from python reference impl
 
-		tree := NewTree()
-		existed, err := tree.Put(key, val)
+		tree, err := NewTree(len(key))
 		assert.NoError(t, err)
-		assert.False(t, existed)
+		replaced, err := tree.Put(key, val)
+		assert.NoError(t, err)
+		assert.False(t, replaced)
 		require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
 	})
 
@@ -67,10 +111,11 @@ func Test_ReferenceSingleEntry(t *testing.T) {
 		}
 
 		expectedRootHash := "80ae4aaff2f9cc82e56968db6c313a578b07723701e6fd745f256b30fac496bf" // from python reference impl
-		tree := NewTree()
-		existed, err := tree.Put(key, val)
+		tree, err := NewTree(len(key))
 		assert.NoError(t, err)
-		assert.False(t, existed)
+		replaced, err := tree.Put(key, val)
+		assert.NoError(t, err)
+		assert.False(t, replaced)
 		require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
 	})
 }
@@ -78,13 +123,15 @@ func Test_ReferenceSingleEntry(t *testing.T) {
 // Test_2EntryTree we construct a tree with a 2 key-value pairs and compare
 // its hash to a pre-computed value from a python reference implementation.
 func Test_2EntryTree(t *testing.T) {
+	keyLength := 2
 	key0 := []byte{20, 3}   // 00010100 00000011
 	key1 := []byte{23, 252} // 00010111 11111100
 	val0, _ := hex.DecodeString("62b0326507ebce9d4a242908d20559")
 	val1, _ := hex.DecodeString("bab02e6213dfad3546aa473922bba0")
 	expectedRootHash := "7f372aca94b91a527539967ba966c3a91c91e97b265fc4830801b4bcca01b06e" // from python reference impl
 
-	tree := NewTree()
+	tree, err := NewTree(keyLength)
+	assert.NoError(t, err)
 	replaced, err := tree.Put(key0, val0)
 	require.False(t, replaced)
 	require.NoError(t, err)
@@ -99,6 +146,7 @@ func Test_2EntryTree(t *testing.T) {
 // pair being modified in-place _after_ addition to the tree.
 func Test_KeyValuesAreSafeFromExternalModification(t *testing.T) {
 	// we re-use the same key-value pairs as in Test_2EntryTree:
+	keyLength := 2
 	key0 := []byte{20, 3}   // 00010100 00000011
 	key1 := []byte{23, 252} // 00010111 11111100
 	val0, _ := hex.DecodeString("62b0326507ebce9d4a242908d20559")
@@ -106,10 +154,11 @@ func Test_KeyValuesAreSafeFromExternalModification(t *testing.T) {
 	expectedRootHash := "7f372aca94b91a527539967ba966c3a91c91e97b265fc4830801b4bcca01b06e" // from python reference impl
 
 	// we now put the key-value pairs into a tree,
-	// but overwrite the key and value slices right after
+	// but modify the key and value slices right after *in-place*
 	postKey := []byte{255, 255}
 	postVal, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a")
-	tree := NewTree()
+	tree, err := NewTree(keyLength)
+	assert.NoError(t, err)
 	replaced, err := tree.Put(key0, val0)
 	require.False(t, replaced)
 	require.NoError(t, err)
@@ -131,131 +180,69 @@ func Test_KeyValuesAreSafeFromExternalModification(t *testing.T) {
 }
 
 // Test_KeyLengthChecked verifies that the Tree implementation checks that
-// * the key length is between 1 and 8192 bytes
-// * all keys have the4 same length
+// * the key has the length as configured at construction time
+// * rejects addition of key-value pair, if key does not conform to pre-configured length
 func Test_KeyLengthChecked(t *testing.T) {
 	val, _ := hex.DecodeString("bab02e6213dfad3546aa473922bba0")
 
 	t.Run("nil key", func(t *testing.T) {
-		tree := NewTree()
-		_, err := tree.Put(nil, val)
+		tree, err := NewTree(1)
+		assert.NoError(t, err)
+		_, err = tree.Put(nil, val) // nil key is not of length 17 and should be rejected
 		assert.ErrorIs(t, err, ErrorIncompatibleKeyLength)
 	})
 
 	t.Run("empty key", func(t *testing.T) {
-		tree := NewTree()
-		_, err := tree.Put([]byte{}, val)
+		tree, err := NewTree(1)
+		assert.NoError(t, err)
+		_, err = tree.Put([]byte{}, val) // empty key is not of length 17 and should be rejected
 		assert.ErrorIs(t, err, ErrorIncompatibleKeyLength)
 	})
 
 	t.Run("1-byte key", func(t *testing.T) {
 		key := make([]byte, 1)
-		tree := NewTree()
-		_, err := tree.Put(key, val)
+		tree, err := NewTree(1)
 		assert.NoError(t, err)
+		replaced, err := tree.Put(key, val) // key has the pre-configured length and should be accepted
+		assert.NoError(t, err)
+		assert.False(t, replaced)
 	})
 
 	t.Run("8192-byte key", func(t *testing.T) {
 		key := make([]byte, maxKeyLength)
-		tree := NewTree()
-		_, err := tree.Put(key, val)
+		tree, err := NewTree(8192)
 		assert.NoError(t, err)
+		replaced, err := tree.Put(key, val) // key has the pre-configured length and should be accepted
+		assert.NoError(t, err)
+		assert.False(t, replaced)
 	})
 
 	t.Run("key too long", func(t *testing.T) {
 		key := make([]byte, maxKeyLength+1)
-		tree := NewTree()
-		_, err := tree.Put(key, val)
+		tree, err := NewTree(8192)
+		assert.NoError(t, err)
+		_, err = tree.Put(key, val)
 		assert.ErrorIs(t, err, ErrorIncompatibleKeyLength)
 	})
-}
-
-// Test_DifferentLengthKeys verifies that the Tree refuses to add entries
-// with different key length
-func Test_DifferentLengthKeys(t *testing.T) {
-	key1 := make([]byte, 17) // 00...0
-	val1, _ := hex.DecodeString("bab02e6213dfad3546aa473922bba0")
-
-	key2 := make([]byte, 18)
-	key2[0] = byte(1) // 10...0
-	val2, _ := hex.DecodeString("62b0326507ebce9d4a242908d20559")
-
-	tree := NewTree()
-	_, err := tree.Put(key1, val1)
-	assert.NoError(t, err)
-	_, err = tree.Put(key2, val2)
-	assert.ErrorIs(t, err, ErrorVariableKeyLengths)
-}
-
-// Test_Size checks the tree's size computation
-func Test_Size(t *testing.T) {
-	// random key-value pairs (collisions are unlikely enough to never happen)
-	key1, val1 := randomKeyValuePair(32, 128)
-	key2, val2a := randomKeyValuePair(32, 128)
-	_, val2b := randomKeyValuePair(32, 128)
-	key3, val3 := randomKeyValuePair(32, 128)
-	unknownKey, _ := randomKeyValuePair(32, 128)
-
-	tree := NewTree()
-	replaced, err := tree.Put(key1, val1) // add key-value pair with new key
-	assert.NoError(t, err)
-	assert.False(t, replaced)
-	assert.Equal(t, uint64(1), tree.Size())
-
-	replaced, err = tree.Put(key2, val2a) // add key-value pair with new key
-	assert.NoError(t, err)
-	assert.False(t, replaced)
-	assert.Equal(t, uint64(2), tree.Size())
-
-	replaced, err = tree.Put(key2, val2b) // overwrite value of existing key
-	assert.NoError(t, err)
-	assert.True(t, replaced)
-	assert.Equal(t, uint64(2), tree.Size())
-
-	replaced, err = tree.Put(key3, val3) // add key-value pair with new key
-	assert.NoError(t, err)
-	assert.False(t, replaced)
-	assert.Equal(t, uint64(3), tree.Size())
-
-	removed := tree.Del(key2) // remove existing key-value pair
-	assert.True(t, removed)
-	assert.Equal(t, uint64(2), tree.Size())
-
-	removed = tree.Del(unknownKey) // remove unknown key-value pair
-	assert.False(t, removed)
-	assert.Equal(t, uint64(2), tree.Size())
-
-	removed = tree.Del(key1) // remove existing key-value pair
-	assert.True(t, removed)
-	assert.Equal(t, uint64(1), tree.Size())
-
-	removed = tree.Del(key1) // repeated removal should be no-op
-	assert.False(t, removed)
-	assert.Equal(t, uint64(1), tree.Size())
-
-	removed = tree.Del(key3) // remove existing key-value pair
-	assert.True(t, removed)
-	assert.Equal(t, uint64(0), tree.Size())
 }
 
 // TestTreeSingle verifies addition, retrieval and deletion operations
 // of a _single_ key-value pair to an otherwise empty tree.
 func TestTreeSingle(t *testing.T) {
-
 	// initialize the random generator, tree and zero hash
 	rand.Seed(time.Now().UnixNano())
-	tree := NewTree()
-	zero := tree.Hash()
+	keyLength := 32
+	tree, err := NewTree(keyLength)
+	assert.NoError(t, err)
 
 	// for the pre-defined number of times...
 	for i := 0; i < TreeTestLength; i++ {
-
 		// insert a random key with a random value and make sure it didn't
 		// exist yet; collisions are unlikely enough to never happen
-		key, val := randomKeyValuePair(32, 128)
-		existed, err := tree.Put(key, val)
+		key, val := randomKeyValuePair(keyLength, 128)
+		replaced, err := tree.Put(key, val)
 		assert.NoError(t, err)
-		assert.False(t, existed)
+		assert.False(t, replaced)
 
 		// retrieve the value again, check it as successful and the same
 		out, retrieved := tree.Get(key)
@@ -269,37 +256,38 @@ func TestTreeSingle(t *testing.T) {
 		_, retrieved = tree.Get(key)
 		assert.False(t, retrieved)
 
-		// get the root hash and make sure it's the zero hash again
-		hash := tree.Hash()
-		assert.Equal(t, zero, hash)
+		// get the root hash and make sure it's empty again as the tree is empty
+		assert.Empty(t, tree.Hash())
 	}
 }
 
+// TestTreeBatch tests addition and deletion of multiple key-value pairs.
+// Key-value pairs are added and deleted in the same order.
 func TestTreeBatch(t *testing.T) {
-
 	// initialize random generator, tree, zero hash
 	rand.Seed(time.Now().UnixNano())
-	tree := NewTree()
-	zero := tree.Hash()
+	keyLength := 32
+	tree, err := NewTree(keyLength)
+	assert.NoError(t, err)
 
-	// insert the given number of random keys and values
+	// insert a batch of random key-value pairs
 	keys := make([][]byte, 0, TreeTestLength)
 	vals := make([][]byte, 0, TreeTestLength)
 	for i := 0; i < TreeTestLength; i++ {
-		key, val := randomKeyValuePair(32, 128)
+		key, val := randomKeyValuePair(keyLength, 128)
 		keys = append(keys, key)
 		vals = append(vals, val)
 	}
 
-	// insert all of the key-value pairs and ensure they were unique
+	// insert key-value pairs and ensure there are no collisions
 	for i, key := range keys {
 		val := vals[i]
-		existed, err := tree.Put(key, val)
+		replaced, err := tree.Put(key, val)
 		assert.NoError(t, err)
-		assert.False(t, existed)
+		assert.False(t, replaced)
 	}
 
-	// retrieve all of the key-value pairs, ensure they were there and correct
+	// retrieve all key-value pairs, ensure they are found and are correct
 	for i, key := range keys {
 		val := vals[i]
 		out, retrieved := tree.Get(key)
@@ -308,24 +296,26 @@ func TestTreeBatch(t *testing.T) {
 		}
 	}
 
-	// remove all of the key-value pairs, ensure it worked
+	// remove all key-value pairs, ensure it worked
 	for _, key := range keys {
 		deleted := tree.Del(key)
 		assert.True(t, deleted)
 	}
 
-	// finally, check that the tree hash is zero after removing everything
-	hash := tree.Hash()
-	assert.Equal(t, zero, hash)
+	// get the root hash and make sure it's empty again as the tree is empty
+	assert.Empty(t, tree.Hash())
 }
 
+// TestRandomOrder tests that root hash of tree is independent of the order
+// in which the elements were added.
 func TestRandomOrder(t *testing.T) {
-
 	// initialize random generator, two trees and zero hash
 	rand.Seed(time.Now().UnixNano())
-	tree1 := NewTree()
-	tree2 := NewTree()
-	zero := tree1.Hash()
+	keyLength := 32
+	tree1, err := NewTree(keyLength)
+	assert.NoError(t, err)
+	tree2, err := NewTree(keyLength)
+	assert.NoError(t, err)
 
 	// generate the desired number of keys and map a value to each key
 	keys := make([][]byte, 0, TreeTestLength)
@@ -336,15 +326,15 @@ func TestRandomOrder(t *testing.T) {
 		vals[string(key)] = val
 	}
 
-	// insert all of the values into the first tree
+	// insert all key-value paris into the first tree
 	for _, key := range keys {
 		val := vals[string(key)]
-		existed, err := tree1.Put(key, val)
+		replaced, err := tree1.Put(key, val)
 		assert.NoError(t, err)
-		require.False(t, existed)
+		require.False(t, replaced)
 	}
 
-	// shuffle the keys and insert them with new order into the second tree
+	// shuffle the keys and insert them with random order into the second tree
 	rand.Shuffle(len(keys), func(i int, j int) {
 		keys[i], keys[j] = keys[j], keys[i]
 	})
@@ -358,9 +348,9 @@ func TestRandomOrder(t *testing.T) {
 
 	for _, key := range keys {
 		val := vals[string(key)]
-		existed, err := tree2.Put(key, val)
+		replaced, err := tree2.Put(key, val)
 		assert.NoError(t, err)
-		require.False(t, existed)
+		require.False(t, replaced)
 	}
 
 	// make sure the tree hashes were the same, in spite of random order
@@ -372,8 +362,8 @@ func TestRandomOrder(t *testing.T) {
 		require.True(t, deleted)
 	}
 
-	// make sure that its hash is zero in the end
-	assert.Equal(t, zero, tree1.Hash())
+	// get the root hash and make sure it's empty again as the tree is empty
+	assert.Empty(t, tree1.Hash())
 }
 
 func BenchmarkTree(b *testing.B) {
@@ -394,7 +384,10 @@ func randomKeyValuePair(keySize, valueSize int) ([]byte, []byte) {
 }
 
 func createTree(n int) *Tree {
-	t := NewTree()
+	t, err := NewTree(32)
+	if err != nil {
+		panic(err.Error())
+	}
 	for i := 0; i < n; i++ {
 		key, val := randomKeyValuePair(32, 128)
 		_, _ = t.Put(key, val)
