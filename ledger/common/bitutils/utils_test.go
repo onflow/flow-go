@@ -29,10 +29,10 @@ func TestBitTools(t *testing.T) {
 	rand.Seed(seed)
 	r := rand.NewSource(seed)
 
-	const maxBits = 24 // upper bound of indices to test
+	const maxBits = 131 * 8 // upper bound of indices to test
 	var b big.Int
 
-	t.Run("Bit", func(t *testing.T) {
+	t.Run("testing ReadBit", func(t *testing.T) {
 		var max big.Int
 		// set max to 2^maxBits
 		max.SetBit(&max, maxBits, 1)
@@ -52,14 +52,34 @@ func TestBitTools(t *testing.T) {
 		// test bit reads are equal for all indices
 		for i := 0; i < maxBits; i++ {
 			bit := int(b.Bit(i))
-			assert.Equal(t, bit, Bit(bytes, i))
+			assert.Equal(t, bit, ReadBit(bytes, i))
 		}
 	})
 
-	t.Run("SetBit", func(t *testing.T) {
+	t.Run("testing WriteBit", func(t *testing.T) {
 		b.SetInt64(0)
 		bytes := MakeBitVector(maxBits)
-		rand.Read(bytes) // fill bytes with random garbage to verify that setting each individual bit works
+		rand.Read(bytes) // fill bytes with random values to verify that writing to each individual bit works
+
+		// build a random big bit by bit
+		for idx := 0; idx < maxBits; idx++ {
+			bit := rand.Intn(2)
+			// b = 2*b + bit
+			b.Lsh(&b, 1)
+			b.Add(&b, big.NewInt(int64(bit)))
+			WriteBit(bytes, idx, bit) // sets the bit at index `idx`
+		}
+
+		// get the big int from the random slice
+		var randomBig big.Int
+		randomBig.SetBytes(bytes)
+		assert.Equal(t, 0, randomBig.Cmp(&b))
+	})
+
+	t.Run("testing ClearBit and SetBit", func(t *testing.T) {
+		b.SetInt64(0)
+		bytes := MakeBitVector(maxBits)
+		rand.Read(bytes) // fill bytes with random values to verify that writing to each individual bit works
 
 		// build a random big bit by bit
 		for idx := 0; idx < maxBits; idx++ {
@@ -69,9 +89,9 @@ func TestBitTools(t *testing.T) {
 			b.Add(&b, big.NewInt(int64(bit)))
 			// sets the bit at index i
 			if bit == 1 {
-				SetBit(bytes, idx, 1)
+				SetBit(bytes, idx)
 			} else {
-				SetBit(bytes, idx, 0)
+				ClearBit(bytes, idx)
 			}
 		}
 

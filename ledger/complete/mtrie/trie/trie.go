@@ -261,7 +261,7 @@ func update(
 	if compactLeaf != nil {
 		// if yes, check which branch it will go to.
 		path := *compactLeaf.Path()
-		if bitutils.Bit(path[:], depth) == 0 {
+		if bitutils.ReadBit(path[:], depth) == 0 {
 			lcompactLeaf = compactLeaf
 		} else {
 			rcompactLeaf = compactLeaf
@@ -415,7 +415,7 @@ func addSiblingTrieHashToProofs(siblingTrie *node.Node, depth int, proofs []*led
 	isDef := nodeHash == ledger.GetDefaultHashForHeight(siblingTrie.Height())
 	if !isDef { // in proofs, we only provide non-default value hashes
 		for _, p := range proofs {
-			bitutils.SetBit(p.Flags, depth, 1)
+			bitutils.SetBit(p.Flags, depth)
 			p.Interims = append(p.Interims, nodeHash)
 		}
 	}
@@ -505,7 +505,7 @@ func (mt *MTrie) IsAValidTrie() bool {
 func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
-		bit := bitutils.Bit(path[:], bitIndex)
+		bit := bitutils.ReadBit(path[:], bitIndex)
 		if bit == 0 {
 			paths[i], paths[j] = paths[j], paths[i]
 			payloads[i], payloads[j] = payloads[j], payloads[i]
@@ -526,7 +526,7 @@ func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) i
 func SplitPaths(paths []ledger.Path, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
-		bit := bitutils.Bit(path[:], bitIndex)
+		bit := bitutils.ReadBit(path[:], bitIndex)
 		if bit == 0 {
 			paths[i], paths[j] = paths[j], paths[i]
 			i++
@@ -546,7 +546,7 @@ func SplitPaths(paths []ledger.Path, bitIndex int) int {
 func splitTrieProofsByPath(paths []ledger.Path, proofs []*ledger.TrieProof, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
-		bit := bitutils.Bit(path[:], bitIndex)
+		bit := bitutils.ReadBit(path[:], bitIndex)
 		if bit == 0 {
 			paths[i], paths[j] = paths[j], paths[i]
 			proofs[i], proofs[j] = proofs[j], proofs[i]

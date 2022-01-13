@@ -112,7 +112,7 @@ PutLoop:
 		// just pick the next node based on whether the bit is set or not
 		case *full:
 			// if the bit is 0, we go left; otherwise (bit value 1), we go right
-			if bitutils.Bit(key, index) == 0 {
+			if bitutils.ReadBit(key, index) == 0 {
 				cur = &n.left
 			} else {
 				cur = &n.right
@@ -130,7 +130,7 @@ PutLoop:
 			commonCount := 0
 			shortPathCount := n.count
 			for i := 0; i < shortPathCount; i++ {
-				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
+				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					break
 				}
 				commonCount++
@@ -149,7 +149,7 @@ PutLoop:
 			if commonCount > 0 {
 				commonPath := bitutils.MakeBitVector(commonCount)
 				for i := 0; i < commonCount; i++ {
-					bitutils.SetBit(commonPath, i, bitutils.Bit(key, i+index))
+					bitutils.WriteBit(commonPath, i, bitutils.ReadBit(key, i+index))
 				}
 				commonNode := &short{count: commonCount, path: commonPath}
 				*cur = commonNode
@@ -163,7 +163,7 @@ PutLoop:
 			var remain *node
 			splitNode := &full{}
 			*cur = splitNode
-			if bitutils.Bit(n.path, commonCount) == 1 {
+			if bitutils.ReadBit(n.path, commonCount) == 1 {
 				cur = &splitNode.left
 				remain = &splitNode.right
 			} else {
@@ -180,7 +180,7 @@ PutLoop:
 			if remainCount > 0 {
 				remainPath := bitutils.MakeBitVector(remainCount)
 				for i := 0; i < remainCount; i++ {
-					bitutils.SetBit(remainPath, i, bitutils.Bit(n.path, i+commonCount+1))
+					bitutils.WriteBit(remainPath, i, bitutils.ReadBit(n.path, i+commonCount+1))
 				}
 				remainNode := &short{count: remainCount, path: remainPath}
 				*remain = remainNode
@@ -212,7 +212,7 @@ PutLoop:
 			finalCount := totalCount - index
 			finalPath := bitutils.MakeBitVector(finalCount)
 			for i := 0; i < finalCount; i++ {
-				bitutils.SetBit(finalPath, i, bitutils.Bit(key, index+i))
+				bitutils.WriteBit(finalPath, i, bitutils.ReadBit(key, index+i))
 			}
 			finalNode := &short{count: finalCount, path: []byte(finalPath)}
 			*cur = finalNode
@@ -249,7 +249,7 @@ GetLoop:
 		// bit, so go left or right depending on whether it's set or not
 		case *full:
 			// forward pointer and index to the correct child
-			if bitutils.Bit(key, index) == 0 {
+			if bitutils.ReadBit(key, index) == 0 {
 				cur = &n.left
 			} else {
 				cur = &n.right
@@ -263,7 +263,7 @@ GetLoop:
 		case *short:
 			// if any part of the path doesn't match, key doesn't exist
 			for i := 0; i < n.count; i++ {
-				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
+				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					return nil, false
 				}
 			}
@@ -333,7 +333,7 @@ DelLoop:
 			last = cur
 
 			// forward pointer and index to the correct child
-			if bitutils.Bit(key, index) == 0 {
+			if bitutils.ReadBit(key, index) == 0 {
 				cur = &n.left
 			} else {
 				cur = &n.right
@@ -352,7 +352,7 @@ DelLoop:
 
 			// if the path doesn't match at any point, we can't find the node
 			for i := 0; i < n.count; i++ {
-				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
+				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					return false
 				}
 			}
@@ -395,10 +395,10 @@ DelLoop:
 	var n *short
 	newPath := bitutils.MakeBitVector(1)
 	if f.left != nil {
-		bitutils.SetBit(newPath, 0, 0)
+		bitutils.ClearBit(newPath, 0)
 		n = &short{count: 1, path: newPath, child: f.left}
 	} else {
-		bitutils.SetBit(newPath, 0, 1)
+		bitutils.SetBit(newPath, 0)
 		n = &short{count: 1, path: newPath, child: f.right}
 	}
 	*last = n
@@ -435,10 +435,10 @@ func merge(p *short, c *short) {
 	totalCount := p.count + c.count
 	totalPath := bitutils.MakeBitVector(totalCount)
 	for i := 0; i < p.count; i++ {
-		bitutils.SetBit(totalPath, i, bitutils.Bit(p.path, i))
+		bitutils.WriteBit(totalPath, i, bitutils.ReadBit(p.path, i))
 	}
 	for i := 0; i < c.count; i++ {
-		bitutils.SetBit(totalPath, i+p.count, bitutils.Bit(c.path, i))
+		bitutils.WriteBit(totalPath, i+p.count, bitutils.ReadBit(c.path, i))
 	}
 	p.count = totalCount
 	p.path = totalPath
