@@ -34,6 +34,10 @@ const (
 	waitTimeout = 2 * time.Minute
 )
 
+// nodeUpdateValidation func that will be used to validate the network after some changes have been made
+// NOTE: rootSnapshot must be the snapshot that the node (info) was bootstrapped with.
+type nodeUpdateValidation func(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo)
+
 type Suite struct {
 	suite.Suite
 	common.TestnetStateTracker
@@ -198,7 +202,9 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	result = s.SubmitSetApprovedListTx(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
 	require.NoError(s.T(), result.Error)
 
-	s.checkStakingAuctionInProgress(ctx)
+	// ensure we are still in staking auction
+	s.assertInPhase(ctx, flow.EpochPhaseStaking)
+
 	return &StakedNodeOperationInfo{
 		NodeID:                  nodeID,
 		Role:                    role,
@@ -211,19 +217,6 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		MachineAccountPublicKey: machineAccountPubKey,
 		ContainerName:           containerName,
 	}
-}
-
-// checkStakingAuctionInProgress util func that asserts we are the staking auction phase
-func (s *Suite) checkStakingAuctionInProgress(ctx context.Context) {
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-	phase, err := snapshot.Phase()
-	require.NoError(s.T(), err)
-	head, err := snapshot.Head()
-	require.NoError(s.T(), err)
-
-	require.Equal(s.T(), flow.EpochPhaseStaking, phase)
-	require.True(s.T(), stakingAuctionViews > head.View)
 }
 
 // WaitForPhase waits for epoch phase and will timeout after 2 minutes
@@ -417,8 +410,17 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	return result, nil
 }
 
-// SubmitAdminRemoveNodeTx will submit the admin remove node transaction
-func (s *Suite) SubmitAdminRemoveNodeTx(ctx context.Context,
+func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
+	result, err := s.submitAdminRemoveNodeTx(ctx, env, nodeID)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), result.Error)
+
+	// ensure we submit transaction while in staking phase
+	s.assertInPhase(ctx, flow.EpochPhaseStaking)
+}
+
+// submitAdminRemoveNodeTx will submit the admin remove node transaction
+func (s *Suite) submitAdminRemoveNodeTx(ctx context.Context,
 	env templates.Environment,
 	nodeID flow.Identifier,
 ) (*sdk.TransactionResult, error) {
@@ -509,10 +511,22 @@ func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates
 	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in proposed table: %x", info.NodeID)
 }
 
+// assertNodeNotApprovedOrProposed executes the read approved nodes list and get proposed table scripts
+// and checks that the info.NodeID is not included in either - this means the node would be excluded from future epochs
+func (s *Suite) assertNodeNotApprovedOrProposed(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
+	// ensure node ID not in approved list
+	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
+	require.NotContainsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in approved nodes list: %x", nodeID)
+
+	// check if node is not in proposed table
+	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, nodeID)
+	require.NotContainsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in proposed table: %x", nodeID)
+}
+
 // newTestContainerOnNetwork configures a new container on the suites network
 func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.WithID(info.NodeID),
 	}
 
@@ -555,9 +569,26 @@ func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
 	return nil
 }
 
+// assertInPhase checks if we are in the phase provided and returns the current view
+func (s *Suite) assertInPhase(ctx context.Context, expectedPhase flow.EpochPhase) {
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	actualPhase, err := snapshot.Phase()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), expectedPhase, actualPhase)
+}
+
+// assertEpochCounter requires actual epoch counter is equal to counter provided
+func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) {
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	actualCounter, err := snapshot.Epochs().Current().Counter()
+	require.NoError(s.T(), err)
+	require.Equalf(s.T(), expectedCounter, actualCounter, "expected to be in epoch %d got %d", expectedCounter, actualCounter)
+}
+
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
 // this func can be used to perform sanity.
-// NOTE: rootSnapshot must be the snapshot that the node (info) was bootstrapped with.
 // 1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
 // 2. Check that the chain moved atleast 20 blocks from when the node was bootstrapped by comparing
 // head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
@@ -585,4 +616,18 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	require.NoError(s.T(), err)
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
 
+}
+
+// assertNetworkHealthyAfterVNChange after an verification node is removed or added to the network
+// this func can be used to perform sanity.
+// 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
+func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	bootstrapHead, err := rootSnapshot.Head()
+	require.NoError(s.T(), err)
+
+	header, err := s.client.GetLatestSealedBlockHeader(ctx)
+	require.NoError(s.T(), err)
+
+	// head should now be at-least 20 blocks higher from when we started
+	require.True(s.T(), header.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
 }
