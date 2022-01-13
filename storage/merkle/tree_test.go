@@ -128,6 +128,14 @@ func TestRandomOrder(t *testing.T) {
 	rand.Shuffle(len(keys), func(i int, j int) {
 		keys[i], keys[j] = keys[j], keys[i]
 	})
+
+	// get proofs for keys and verify for a subset of keys
+	for _, key := range keys[:100] {
+		proof, existed := tree1.Prove(key)
+		require.True(t, existed)
+		require.True(t, proof.Verify(tree1.Hash()))
+	}
+
 	for _, key := range keys {
 		val := vals[string(key)]
 		existed := tree2.Put(key, val)

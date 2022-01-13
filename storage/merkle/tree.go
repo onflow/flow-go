@@ -3,6 +3,8 @@
 package merkle
 
 import (
+	"bytes"
+
 	"github.com/jrick/bitset"
 	"golang.org/x/crypto/blake2b"
 )
@@ -229,6 +231,81 @@ GetLoop:
 	}
 }
 
+// Get will retrieve the value associated with the given key. It returns true
+// if the key was found and false otherwise.
+func (t *Tree) Prove(key []byte) (*Proof, bool) {
+
+	// we start at the root again
+	cur := &t.root
+
+	// we use the given key as path again
+	path := bitset.Bytes(key[:])
+
+	// and we start at a zero index in the path
+	index := uint(0)
+
+	// init proof params
+	hashValues := make([][]byte, 0)
+	shortCounts := make([]uint8, 0)
+
+ProveLoop:
+	for {
+		switch n := (*cur).(type) {
+
+		// if we have a full node, we can follow the path for at least one more
+		// bit, so go left or right depending on whether it's set or not
+		case *full:
+			var neighbour node
+			// forward pointer and index to the correct child
+			if !path.Get(int(index)) {
+				neighbour = n.right
+				cur = &n.left
+			} else {
+				neighbour = n.left
+				cur = &n.right
+			}
+
+			shortCounts = append(shortCounts, 0)
+			hashValues = append(hashValues, t.nodeHash(neighbour))
+
+			index++
+			continue ProveLoop
+
+		// if we have a short path, we can only follow the path if we have all
+		// of the short node path in common with the key
+		case *short:
+
+			// if any part of the path doesn't match, key doesn't exist
+			nodePath := bitset.Bytes(n.path)
+			for i := uint(0); i < n.count; i++ {
+				if path.Get(int(i+index)) != nodePath.Get(int(i)) {
+					return nil, false
+				}
+			}
+
+			shortCounts = append(shortCounts, uint8(n.count))
+
+			// forward pointer and index to child
+			cur = &n.child
+			index += n.count
+
+			continue ProveLoop
+
+		// if we have a leaf, we found the key, return value and true
+		case *leaf:
+			return &Proof{
+				Key:           key[:],
+				ShortCounts:   shortCounts,
+				InterimHashes: hashValues,
+			}, true
+
+		// if we have a nil node, key doesn't exist, return nil and false
+		case nil:
+			return nil, false
+		}
+	}
+}
+
 // Del will remove the value associated with the given key from the patricia
 // merkle trie. It will return true if they key was found and false otherwise.
 // Internally, any parent nodes between the leaf up to the closest shared path
@@ -420,4 +497,63 @@ func (t *Tree) nodeHash(node node) []byte {
 	default:
 		panic("invalid node type")
 	}
+}
+
+type Proof struct {
+	Key           []byte   // key
+	ShortCounts   []uint8  // if set to one means full node, else means short node
+	InterimHashes [][]byte // hash values
+}
+
+// Verify returns if the proof is valid and false otherwise
+func (p *Proof) Verify(expectedRootHash []byte) bool {
+	// iterate backward and verify the proof
+
+	// TODO: value hash should be here
+	currentHash := p.Key[:]
+	hashIndex := len(p.InterimHashes) - 1
+	path := bitset.Bytes(p.Key[:])
+
+	// compute last path index
+	pathIndex := len(p.InterimHashes)
+	for _, sc := range p.ShortCounts {
+		pathIndex += int(sc)
+	}
+
+	for i := len(p.ShortCounts) - 1; i >= 0; i-- {
+		shortCounts := p.ShortCounts[i]
+		h, _ := blake2b.New256(nil)
+		if shortCounts == 0 { // is full node
+			neighbour := p.InterimHashes[hashIndex]
+			hashIndex--
+			pathIndex--
+			// based on the bit on pathIndex, compute the hash
+			if path.Get(pathIndex) {
+				_, _ = h.Write(neighbour)
+				_, _ = h.Write(currentHash)
+				currentHash = h.Sum(nil)
+			} else {
+				_, _ = h.Write(currentHash)
+				_, _ = h.Write(neighbour)
+				currentHash = h.Sum(nil)
+			}
+			continue
+		}
+		// else its a short node
+		// construct the common path
+		commonPath := bitset.NewBytes(int(shortCounts))
+		pathIndex = pathIndex - int(shortCounts)
+		for j := 0; j < int(shortCounts); j++ {
+			commonPath.SetBool(j, path.Get(pathIndex+j))
+		}
+		_, _ = h.Write([]byte{byte(shortCounts)})
+		_, _ = h.Write(commonPath)
+		_, _ = h.Write(currentHash)
+		currentHash = h.Sum(nil)
+	}
+
+	if pathIndex != 0 || !bytes.Equal(currentHash, expectedRootHash) {
+		return false
+	}
+	return true
 }
