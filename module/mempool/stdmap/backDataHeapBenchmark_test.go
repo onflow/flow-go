@@ -193,12 +193,45 @@ func (b baselineLRU) All() map[flow.Identifier]flow.Entity {
 
 		entity, ok := b.ByID(id)
 		if !ok {
-			panic("could not retrive entity from mempool")
+			panic("could not retrieve entity from mempool")
 		}
 		all[id] = entity
 	}
 
 	return all
+}
+
+func (b baselineLRU) Identities() flow.IdentifierList {
+	ids := make(flow.IdentifierList, b.c.Len())
+	i := 0
+	for _, entityID := range b.c.Keys() {
+		id, ok := entityID.(flow.Identifier)
+		if !ok {
+			panic("could not assert to entity id")
+		}
+		ids[i] = id
+		i++
+	}
+	return ids
+}
+
+func (b baselineLRU) Entities() []flow.Entity {
+	entities := make([]flow.Entity, b.c.Len())
+	i := 0
+	for _, entityID := range b.c.Keys() {
+		id, ok := entityID.(flow.Identifier)
+		if !ok {
+			panic("could not assert to entity id")
+		}
+
+		entity, ok := b.ByID(id)
+		if !ok {
+			panic("could not retrieve entity from mempool")
+		}
+		entities[i] = entity
+		i++
+	}
+	return entities
 }
 
 // Clear removes all entities from the pool.
