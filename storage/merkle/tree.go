@@ -283,9 +283,11 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 	cur := &t.root
 
 	// we use the given key as path again
-	path := bitutils.MakeBitVector(t.pathLength)
-	for i := 0; i < t.pathLength; i++ {
-		bitutils.SetBit(path, i, bitutils.Bit(key, i))
+	path := bitutils.MakeBitVector(t.keyLength)
+	for i := 0; i < t.keyLength; i++ {
+		if bitutils.ReadBit(key, i) == 1 {
+			bitutils.SetBit(path, i)
+		}
 	}
 
 	// and we start at a zero index in the path
@@ -304,7 +306,7 @@ ProveLoop:
 		case *full:
 			var neighbour node
 			// forward pointer and index to the correct child
-			if bitutils.Bit(key, index) == 0 {
+			if bitutils.ReadBit(key, index) == 0 {
 				neighbour = n.right
 				cur = &n.left
 			} else {
@@ -324,7 +326,7 @@ ProveLoop:
 
 			// if any part of the path doesn't match, key doesn't exist
 			for i := 0; i < n.count; i++ {
-				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
+				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					return nil, false
 				}
 			}
@@ -339,8 +341,11 @@ ProveLoop:
 
 		// if we have a leaf, we found the key, return value and true
 		case *leaf:
+			h, _ := blake2b.New256(leafNodeTag)
+			_, _ = h.Write(n.val)
 			return &Proof{
 				Key:           key[:],
+				HashValue:     h.Sum(nil),
 				ShortCounts:   shortCounts,
 				InterimHashes: hashValues,
 			}, true
@@ -511,6 +516,7 @@ func merge(p *short, c *short) {
 
 type Proof struct {
 	Key           []byte   // key
+	HashValue     []byte   // hash of the Value
 	ShortCounts   []uint8  // if set to one means full node, else means short node
 	InterimHashes [][]byte // hash values
 }
@@ -518,7 +524,7 @@ type Proof struct {
 // Verify returns if the proof is valid and false otherwise
 func (p *Proof) Verify(expectedRootHash []byte) bool {
 	// iterate backward and verify the proof
-	currentHash := p.Key[:]
+	currentHash := p.HashValue
 	hashIndex := len(p.InterimHashes) - 1
 
 	// compute last path index
@@ -535,7 +541,7 @@ func (p *Proof) Verify(expectedRootHash []byte) bool {
 			pathIndex--
 			h, _ := blake2b.New256(fullNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
 			// based on the bit on pathIndex, compute the hash
-			if bitutils.Bit(p.Key, pathIndex) == 1 {
+			if bitutils.ReadBit(p.Key, pathIndex) == 1 {
 				_, _ = h.Write(neighbour)
 				_, _ = h.Write(currentHash)
 				currentHash = h.Sum(nil)
@@ -551,7 +557,9 @@ func (p *Proof) Verify(expectedRootHash []byte) bool {
 		commonPath := bitutils.MakeBitVector(int(shortCounts))
 		pathIndex = pathIndex - int(shortCounts)
 		for j := 0; j < int(shortCounts); j++ {
-			bitutils.SetBit(commonPath, j, bitutils.Bit(p.Key, pathIndex+j))
+			if bitutils.ReadBit(p.Key, pathIndex+j) == 1 {
+				bitutils.SetBit(commonPath, j)
+			}
 		}
 
 		h, _ := blake2b.New256(shortNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
