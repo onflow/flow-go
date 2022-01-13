@@ -75,7 +75,6 @@ type Core struct {
 	sealingTracker             consensus.SealingTracker           // logic-aware component for tracking sealing progress.
 	tracer                     module.Tracer                      // used to trace execution
 	config                     Config
-	rootHeader                 *flow.Header // the root header of this node's root state snapshot
 }
 
 func NewCore(
@@ -98,10 +97,6 @@ func NewCore(
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve last sealed block: %w", err)
 	}
-	rootHeader, err := state.Params().Root()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root block: %w", err)
-	}
 
 	core := &Core{
 		log:                        log.With().Str("engine", "sealing.Core").Logger(),
@@ -118,7 +113,6 @@ func NewCore(
 		seals:                      sealsDB,
 		sealsMempool:               sealsMempool,
 		config:                     config,
-		rootHeader:                 rootHeader,
 		requestTracker:             approvals.NewRequestTracker(headers, 10, 30),
 	}
 
@@ -247,25 +241,16 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 // * exception in case of any other error, usually this is not expected
 // * nil - successfully processed incorporated result
 func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error {
-
+	err := c.checkBlockOutdated(incRes.Result.BlockID)
+	if err != nil {
+		return fmt.Errorf("won't process outdated or unverifiable execution incRes %s: %w", incRes.Result.BlockID, err)
+	}
 	incorporatedBlock, err := c.headers.ByBlockID(incRes.IncorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not get block height for incorporated block %s: %w",
 			incRes.IncorporatedBlockID, err)
 	}
 	incorporatedAtHeight := incorporatedBlock.Height
-	belowRootHeight := incorporatedAtHeight <= c.rootHeader.Height
-
-	err = c.checkBlockOutdated(incRes.Result.BlockID)
-	// we can safely ignore results incorporated below the root height which
-	// are unverifiable (reference unknown blocks) - these are blocks which
-	// are incorporated prior to this node's initial snapshot
-	if belowRootHeight && engine.IsUnverifiableInputError(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("won't process outdated or unverifiable execution incRes %s: %w", incRes.Result.BlockID, err)
-	}
 
 	// For incorporating blocks at heights that are already finalized, we check that the incorporating block
 	// is on the finalized fork. Otherwise, the incorporating block is orphaned, and we can drop the result.
@@ -342,7 +327,7 @@ func (c *Core) checkBlockOutdated(blockID flow.Identifier) error {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("failed to retrieve header for block %x: %w", blockID, err)
 		}
-		return engine.NewUnverifiableInputError("no header for block (id=%x): %w", blockID, err)
+		return engine.NewUnverifiableInputError("no header for block: %v", blockID)
 	}
 
 	// it's important to use atomic operation to make sure that we have correct ordering
@@ -412,7 +397,6 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 // * exception in case of any other error, usually this is not expected
 // * nil - successfully processed result approval
 func (c *Core) processApproval(approval *flow.ResultApproval) error {
-	// TODO - could this panic?
 	err := c.checkBlockOutdated(approval.Body.BlockID)
 	if err != nil {
 		return fmt.Errorf("won't process approval for oudated block (%x): %w", approval.Body.BlockID, err)
