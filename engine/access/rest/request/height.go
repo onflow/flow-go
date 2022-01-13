@@ -48,8 +48,8 @@ type Heights []Height
 
 func (h *Heights) Parse(raw []string) error {
 	var height Height
-	heights := make([]Height, len(raw))
-	for i, r := range raw {
+	heights := make([]Height, 0)
+	for _, r := range raw {
 		err := height.Parse(r)
 		if err != nil {
 			return err
@@ -59,7 +59,7 @@ func (h *Heights) Parse(raw []string) error {
 			continue
 		}
 
-		heights[i] = height
+		heights = append(heights, height)
 	}
 
 	*h = heights
