@@ -54,6 +54,11 @@ func (h *Heights) Parse(raw []string) error {
 		if err != nil {
 			return err
 		}
+		// don't include empty heights
+		if height == EmptyHeight {
+			continue
+		}
+
 		heights[i] = height
 	}
 

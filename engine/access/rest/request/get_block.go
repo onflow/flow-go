@@ -74,13 +74,13 @@ func (g *GetBlock) Parse(rawHeights []string, rawStart string, rawEnd string) er
 	}
 
 	// check that if sealed or final are used they are provided as only value as mix and matching heights with sealed is not encouraged
-	if len(heights) > 0 {
+	if len(heights) > 1 {
 		for _, h := range heights {
 			if h == SealedHeight || h == FinalHeight {
 				return fmt.Errorf("can not provide '%s' or '%s' values with other height values", final, sealed)
 			}
 		}
-
+	} else if len(heights) == 1 {
 		// if we have special values for heights set the booleans
 		g.FinalHeight = heights[0] == FinalHeight
 		g.SealedHeight = heights[0] == SealedHeight
