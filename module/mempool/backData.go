@@ -32,6 +32,12 @@ type BackData interface {
 	// All returns all entities from the pool.
 	All() map[flow.Identifier]flow.Entity
 
+	// Identifiers returns the list of identifiers (keys) of entities stored in the backdata.
+	Identifiers() flow.IdentifierList
+
+	// Entities returns the list of entities stored in the backdata.
+	Entities() []flow.Entity
+
 	// Clear removes all entities from the pool.
 	Clear()
 

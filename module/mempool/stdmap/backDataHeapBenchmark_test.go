@@ -201,7 +201,7 @@ func (b baselineLRU) All() map[flow.Identifier]flow.Entity {
 	return all
 }
 
-func (b baselineLRU) Identities() flow.IdentifierList {
+func (b baselineLRU) Identifiers() flow.IdentifierList {
 	ids := make(flow.IdentifierList, b.c.Len())
 	i := 0
 	for _, entityID := range b.c.Keys() {

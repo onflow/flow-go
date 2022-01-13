@@ -82,7 +82,7 @@ func (b MapBackData) All() map[flow.Identifier]flow.Entity {
 	return entities
 }
 
-func (b MapBackData) Identities() flow.IdentifierList {
+func (b MapBackData) Identifiers() flow.IdentifierList {
 	ids := make(flow.IdentifierList, len(b.entities))
 	i := 0
 	for entityID := range b.entities {
