@@ -9,13 +9,17 @@ const maxArgumentsLength = 100
 type Arguments [][]byte
 
 func (a *Arguments) Parse(raw []string) error {
-	args := make([][]byte, len(raw))
-	for i, a := range raw {
-		arg, err := fromBase64(a)
+	args := make([][]byte, 0)
+	for _, rawArg := range raw {
+		if rawArg == "" { // skip empty
+			continue
+		}
+
+		arg, err := fromBase64(rawArg)
 		if err != nil {
 			return fmt.Errorf("invalid argument encoding: %v", err)
 		}
-		args[i] = arg
+		args = append(args, arg)
 	}
 
 	if len(args) > maxArgumentsLength {

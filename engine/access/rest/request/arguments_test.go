@@ -21,6 +21,10 @@ func TestArguments_InvalidParse(t *testing.T) {
 	}
 
 	tooLong := make([]string, maxAllowedScriptArguments+1)
+	for i := range tooLong {
+		tooLong[i] = "dGVzdA=="
+	}
+
 	err := arguments.Parse(tooLong)
 	assert.EqualError(t, err, fmt.Sprintf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArguments))
 }
