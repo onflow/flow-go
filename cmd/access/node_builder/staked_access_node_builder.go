@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/splitter"
-	splitternet "github.com/onflow/flow-go/engine/common/splitter/network"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -37,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	relaynet "github.com/onflow/flow-go/network/relay"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -106,10 +106,15 @@ func (anb *StakedAccessNodeBuilder) Initialize() error {
 }
 
 func (anb *StakedAccessNodeBuilder) enqueueSplitterNetwork() {
-	anb.Component("splitter network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		splitterNet := splitternet.NewNetwork(node.Network, node.Logger)
-		node.Network = splitterNet
-		return splitterNet, nil
+	anb.Component("relay network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		relayNet := relaynet.NewRelayNetwork(
+			node.Network,
+			anb.AccessNodeConfig.PublicNetworkConfig.Network,
+			node.Logger,
+			[]network.Channel{engine.ReceiveBlocks},
+		)
+		node.Network = relayNet
+		return relayNet, nil
 	})
 }
 
