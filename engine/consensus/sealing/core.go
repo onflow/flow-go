@@ -166,12 +166,9 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// Determine the list of unknown blocks referenced within the sealing segment
 	// if we are initializing with a latest sealed block below the root height
-	var outdatedBlockIDs map[flow.Identifier]struct{}
-	if latestSealedBlock.Height <= rootHeader.Height {
-		outdatedBlockIDs, err = c.getOutdatedBlockIDsFromRootSealingSegment(rootHeader)
-		if err != nil {
-			return fmt.Errorf("could not get outdated block IDs from root segment: %w", err)
-		}
+	outdatedBlockIDs, err := c.getOutdatedBlockIDsFromRootSealingSegment(rootHeader)
+	if err != nil {
+		return fmt.Errorf("could not get outdated block IDs from root segment: %w", err)
 	}
 
 	blocksProcessed := uint64(0)
