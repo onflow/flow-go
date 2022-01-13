@@ -296,7 +296,7 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 
 	// init proof params
 	hashValues := make([][]byte, 0)
-	shortCounts := make([]uint8, 0)
+	shortCounts := make([]int, 0)
 
 ProveLoop:
 	for {
@@ -305,20 +305,20 @@ ProveLoop:
 		// if we have a full node, we can follow the path for at least one more
 		// bit, so go left or right depending on whether it's set or not
 		case *full:
-			var neighbour node
+			var sibling node
 			// forward pointer and index to the correct child
 			if bitutils.ReadBit(key, index) == 0 {
-				neighbour = n.right
+				sibling = n.right
 				cur = &n.left
 			} else {
-				neighbour = n.left
+				sibling = n.left
 				cur = &n.right
 			}
 
 			// capturing short count as zero hints that we had a full node
 			// so we can read a hashValue from hashValues
 			shortCounts = append(shortCounts, 0)
-			hashValues = append(hashValues, neighbour.Hash())
+			hashValues = append(hashValues, sibling.Hash())
 
 			index++
 			continue ProveLoop
@@ -337,7 +337,7 @@ ProveLoop:
 			// capturing a non-zero short counts hints that we had a short node
 			// during traverse and also capturing is needed to compute hash value
 			// for a short node.
-			shortCounts = append(shortCounts, uint8(n.count))
+			shortCounts = append(shortCounts, n.count)
 
 			// forward pointer and index to child
 			cur = &n.child
