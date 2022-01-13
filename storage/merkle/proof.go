@@ -10,8 +10,8 @@ import (
 type Proof struct {
 	// key that is used to insert and look up the value
 	Key []byte
-	// hash of the value (note that this is different from the key as we hash the value with some extra tag bytes)
-	HashValue []byte
+	// value stored in the trie for the given key
+	Value []byte
 	// size of this is equal to the steps needed for verification,
 	// constructed by traversing top to down, if set to zero means we had a full node and a value from a hash value from InterimHashes should be read,
 	// any other value than 0 means we hit a short node and we need the shortcounts for computing the hash
@@ -23,14 +23,9 @@ type Proof struct {
 // Verify verifies the proof by constructing the hash values bottom up and cross check
 // the constructed root hash with the given one.
 // if the proof is valid it returns true and false otherwise
-func (p *Proof) Verify(value []byte, expectedRootHash []byte) bool {
-	// first check if the leaf hash matches the hashValue in the proof
-	if !bytes.Equal(p.HashValue, computeLeafHash(value)) {
-		return false
-	}
-
+func (p *Proof) Verify(expectedRootHash []byte) bool {
 	// iterate backward and verify the proof
-	currentHash := p.HashValue
+	currentHash := computeLeafHash(p.Value)
 	hashIndex := len(p.InterimHashes) - 1
 
 	// compute last path index

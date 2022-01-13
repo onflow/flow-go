@@ -278,8 +278,7 @@ GetLoop:
 //  - if full node, capture the sibling node hash value and append zero to short counts
 //  - if short node, appends the node.shortCount to the short count list
 //  - if leaf, would capture the hash of the value
-// it returns proof, value and a boolean if value existed
-func (t *Tree) Prove(key []byte) (*Proof, []byte, bool) {
+func (t *Tree) Prove(key []byte) (*Proof, bool) {
 
 	// we start at the root again
 	cur := &t.root
@@ -331,7 +330,7 @@ ProveLoop:
 			// if any part of the path doesn't match, key doesn't exist
 			for i := 0; i < n.count; i++ {
 				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
-					return nil, nil, false
+					return nil, false
 				}
 			}
 
@@ -350,14 +349,14 @@ ProveLoop:
 		case *leaf:
 			return &Proof{
 				Key:           key[:],
-				HashValue:     n.Hash(),
+				Value:         n.val,
 				ShortCounts:   shortCounts,
 				InterimHashes: hashValues,
-			}, n.val, true
+			}, true
 
 		// if we have a nil node, key doesn't exist, return nil and false
 		case nil:
-			return nil, nil, false
+			return nil, false
 		}
 	}
 }
