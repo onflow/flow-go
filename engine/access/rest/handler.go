@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -85,11 +86,18 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 	// handle grpc status error returned from the backend calls, we are forwarding the message to the client
 	if se, ok := status.FromError(err); ok {
 		if se.Code() == codes.NotFound {
-			h.errorResponse(w, http.StatusNotFound, se.Message(), errorLogger)
+			msg := fmt.Sprintf("Flow resource not found: %s", se.Message())
+			h.errorResponse(w, http.StatusNotFound, msg, errorLogger)
 			return
 		}
 		if se.Code() == codes.InvalidArgument {
-			h.errorResponse(w, http.StatusBadRequest, se.Message(), errorLogger)
+			msg := fmt.Sprintf("Invalid Flow argument: %s", se.Message())
+			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
+			return
+		}
+		if se.Code() == codes.Internal {
+			msg := fmt.Sprintf("Invalid Flow request: %s", se.Message())
+			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
 			return
 		}
 	}
