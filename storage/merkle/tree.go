@@ -533,8 +533,6 @@ type Proof struct {
 // Verify returns if the proof is valid and false otherwise
 func (p *Proof) Verify(expectedRootHash []byte) bool {
 	// iterate backward and verify the proof
-
-	// TODO: value hash should be here
 	currentHash := p.Key[:]
 	hashIndex := len(p.InterimHashes) - 1
 
@@ -546,11 +544,11 @@ func (p *Proof) Verify(expectedRootHash []byte) bool {
 
 	for i := len(p.ShortCounts) - 1; i >= 0; i-- {
 		shortCounts := p.ShortCounts[i]
-		h, _ := blake2b.New256(nil)
 		if shortCounts == 0 { // is full node
 			neighbour := p.InterimHashes[hashIndex]
 			hashIndex--
 			pathIndex--
+			h, _ := blake2b.New256(fullNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
 			// based on the bit on pathIndex, compute the hash
 			if bitutils.Bit(p.Key, pathIndex) == 1 {
 				_, _ = h.Write(neighbour)
@@ -570,9 +568,12 @@ func (p *Proof) Verify(expectedRootHash []byte) bool {
 		for j := 0; j < int(shortCounts); j++ {
 			bitutils.SetBit(commonPath, j, bitutils.Bit(p.Key, pathIndex+j))
 		}
-		_, _ = h.Write([]byte{byte(shortCounts)})
-		_, _ = h.Write(commonPath)
-		_, _ = h.Write(currentHash)
+
+		h, _ := blake2b.New256(shortNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
+		c := serializedPathSegmentLength(int(shortCounts))
+		_, _ = h.Write(c[:])        // blake2b.Write(..) never errors for _any_ input
+		_, _ = h.Write(commonPath)  // blake2b.Write(..) never errors for _any_ input
+		_, _ = h.Write(currentHash) // blake2b.Write(..) never errors for _any_ input
 		currentHash = h.Sum(nil)
 	}
 
