@@ -7,7 +7,9 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
@@ -58,7 +60,7 @@ func (m *OrderedMapMigration) Migrate(payloads []ledger.Payload) ([]ledger.Paylo
 
 	m.reportFile = reportFile
 
-	total := int64(len(payloads) * 3)
+	total := int64(len(payloads))
 	m.progress = progressbar.Default(total, "Migrating:")
 
 	return m.migrate(payloads)
@@ -364,28 +366,8 @@ func (r RawStorable) Encode(enc *atree.Encoder) error {
 	return enc.CBOR.EncodeRawBytes(r)
 }
 
-func getUintCBORSize(v uint64) uint32 {
-	if v <= 23 {
-		return 1
-	}
-	if v <= math.MaxUint8 {
-		return 2
-	}
-	if v <= math.MaxUint16 {
-		return 3
-	}
-	if v <= math.MaxUint32 {
-		return 5
-	}
-	return 9
-}
-
 func (r RawStorable) ByteSize() uint32 {
-	length := len(r)
-	if length == 0 {
-		return 1
-	}
-	return getUintCBORSize(uint64(length)) + uint32(length)
+	return uint32(len(r))
 }
 
 func (r RawStorable) StoredValue(storage atree.SlabStorage) (atree.Value, error) {
@@ -415,18 +397,52 @@ func rawStorableComparator(storage atree.SlabStorage, value atree.Value, otherSt
 	return result == 0, nil
 }
 
+func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storagePayloads []ledger.Payload, slabPayloads []ledger.Payload) {
+	for _, p := range inp {
+		if state.IsFVMStateKey(
+			string(p.Key.KeyParts[0].Value),
+			string(p.Key.KeyParts[1].Value),
+			string(p.Key.KeyParts[2].Value),
+		) {
+			fvmPayloads = append(fvmPayloads, p)
+			continue
+		}
+		if bytes.HasPrefix(p.Key.KeyParts[2].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
+			slabPayloads = append(slabPayloads, p)
+			continue
+		}
+		// otherwise this is a storage payload
+		storagePayloads = append(storagePayloads, p)
+	}
+	return
+}
+
 func (m *OrderedMapMigration) migrate(payload []ledger.Payload) ([]ledger.Payload, error) {
-	ledgerView := NewView(payload)
+	fvmPayloads, storagePayloads, slabPayloads := splitPayloads(payload)
+	if len(slabPayloads) != 0 {
+		return nil, fmt.Errorf(
+			"slab storages are not empty: found %d",
+			len(slabPayloads),
+		)
+	}
+
+	ledgerView := NewView(fvmPayloads)
 	m.initPersistentSlabStorage(ledgerView)
 	m.initIntepreter()
 
 	sortedByOwnerAndDomain := make(map[string](map[string][]Pair))
 
-	for _, p := range payload {
-		owner, domain, key :=
+	for _, p := range storagePayloads {
+		owner, entry :=
 			string(p.Key.KeyParts[0].Value),
-			string(p.Key.KeyParts[1].Value),
 			string(p.Key.KeyParts[2].Value)
+		// if the entry doesn't contain a separator, we just ignore it
+		// since it is storage metadata and does not need migration
+		if !strings.Contains(entry, "\x1f") {
+			continue
+		}
+		splitEntry := strings.Split(entry, "\x1f")
+		domain, key := splitEntry[0], splitEntry[1]
 		value := p.Value
 
 		domainMap, domainOk := sortedByOwnerAndDomain[owner]
@@ -445,7 +461,13 @@ func (m *OrderedMapMigration) migrate(payload []ledger.Payload) ([]ledger.Payloa
 		for domain, keyValuePairs := range domainMaps {
 			for _, pair := range keyValuePairs {
 				storageMap := m.newStorage.GetStorageMap(common.BytesToAddress([]byte(owner)), domain)
-				orderedMap := reflect.ValueOf(storageMap).Elem().FieldByName("orderedMap").Interface().(*atree.OrderedMap)
+				// in the interest of not having to update Cadence and break its abstractions to allow
+				// this one-time migration, just use reflection to grab the unexported field
+				unsafeOrderedMap := reflect.ValueOf(storageMap).Elem().FieldByName("orderedMap")
+				orderedMap := reflect.NewAt(
+					unsafeOrderedMap.Type(),
+					unsafe.Pointer(unsafeOrderedMap.UnsafeAddr()),
+				).Elem().Interface().(*atree.OrderedMap)
 				orderedMap.Set(
 					rawStorableComparator,
 					rawStorableHashInput,
