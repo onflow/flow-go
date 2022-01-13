@@ -4,18 +4,31 @@ import (
 	"bytes"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
-	"golang.org/x/crypto/blake2b"
 )
 
+// Proof caputres all data needed for inclusion proof of a single value inserted under key `Key`
 type Proof struct {
-	Key           []byte   // key
-	HashValue     []byte   // hash of the Value
-	ShortCounts   []uint8  // if set to one means full node, else means short node
-	InterimHashes [][]byte // hash values
+	// key that is used to insert and look up the value
+	Key []byte
+	// hash of the value (note that this is different from the key as we hash the value with some extra tag bytes)
+	HashValue []byte
+	// size of this is equal to the steps needed for verification,
+	// constructed by traversing top to down, if set to zero means we had a full node and a value from a hash value from InterimHashes should be read,
+	// any other value than 0 means we hit a short node and we need the shortcounts for computing the hash
+	ShortCounts []uint8
+	// a slice of hash values (hash value of siblings for full nodes, the size of this is equal to the zeros we have in ShortCounts)
+	InterimHashes [][]byte
 }
 
-// Verify returns if the proof is valid and false otherwise
-func (p *Proof) Verify(expectedRootHash []byte) bool {
+// Verify verifies the proof by constructing the hash values bottom up and cross check
+// the constructed root hash with the given one.
+// if the proof is valid it returns true and false otherwise
+func (p *Proof) Verify(value []byte, expectedRootHash []byte) bool {
+	// first check if the leaf hash matches the hashValue in the proof
+	if !bytes.Equal(p.HashValue, computeLeafHash(value)) {
+		return false
+	}
+
 	// iterate backward and verify the proof
 	currentHash := p.HashValue
 	hashIndex := len(p.InterimHashes) - 1
@@ -26,22 +39,19 @@ func (p *Proof) Verify(expectedRootHash []byte) bool {
 		pathIndex += int(sc)
 	}
 
+	// for each step check if is full node or short node and compute the
+	// hash value accordingly
 	for i := len(p.ShortCounts) - 1; i >= 0; i-- {
 		shortCounts := p.ShortCounts[i]
 		if shortCounts == 0 { // is full node
 			neighbour := p.InterimHashes[hashIndex]
 			hashIndex--
 			pathIndex--
-			h, _ := blake2b.New256(fullNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
 			// based on the bit on pathIndex, compute the hash
 			if bitutils.ReadBit(p.Key, pathIndex) == 1 {
-				_, _ = h.Write(neighbour)
-				_, _ = h.Write(currentHash)
-				currentHash = h.Sum(nil)
+				currentHash = computeFullHash(neighbour, currentHash)
 			} else {
-				_, _ = h.Write(currentHash)
-				_, _ = h.Write(neighbour)
-				currentHash = h.Sum(nil)
+				currentHash = computeFullHash(currentHash, neighbour)
 			}
 			continue
 		}
@@ -55,12 +65,7 @@ func (p *Proof) Verify(expectedRootHash []byte) bool {
 			}
 		}
 
-		h, _ := blake2b.New256(shortNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
-		c := serializedPathSegmentLength(int(shortCounts))
-		_, _ = h.Write(c[:])        // blake2b.Write(..) never errors for _any_ input
-		_, _ = h.Write(commonPath)  // blake2b.Write(..) never errors for _any_ input
-		_, _ = h.Write(currentHash) // blake2b.Write(..) never errors for _any_ input
-		currentHash = h.Sum(nil)
+		currentHash = computeShortHash(int(shortCounts), commonPath, currentHash)
 	}
 
 	if pathIndex != 0 || !bytes.Equal(currentHash, expectedRootHash) {
