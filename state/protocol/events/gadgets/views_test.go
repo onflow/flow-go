@@ -1,45 +1,62 @@
 package gadgets
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestViews(t *testing.T) {
-	views := NewViews()
+// viewsMachine is a wrapper around Views which provides conditional actions
+// for rapid property-based testing.
+type viewsMachine struct {
+	views         *Views
+	callbacks     map[uint64]int // # of callbacks at each view
+	calls         int            // incremented each time a callback is invoked
+	expectedCalls int            // expected value of calls at any given time
+}
 
-	calls := []int{}
-	order := 0
-	makeCallback := func() events.OnViewCallback {
-		corder := order
-		order++
-		return func(*flow.Header) {
-			calls = append(calls, corder)
-		}
-	}
+func (m *viewsMachine) Init(_ *rapid.T) {
+	m.views = NewViews()
+	m.callbacks = make(map[uint64]int)
+	m.calls = 0
+	m.expectedCalls = 0
+}
 
-	for i := 1; i <= 100; i++ {
-		views.OnView(uint64(i), makeCallback())
-		views.OnView(uint64(i), makeCallback())
-	}
+func (m *viewsMachine) OnView(t *rapid.T) {
+	view := rapid.Uint64().Draw(t, "view").(uint64)
+	m.views.OnView(view, func(_ *flow.Header) {
+		m.calls++ // count actual number of calls invoked by Views
+	})
 
-	views.OnView(101, makeCallback())
+	count := m.callbacks[view]
+	m.callbacks[view] = count + 1
+}
+
+func (m *viewsMachine) BlockFinalized(t *rapid.T) {
+	view := rapid.Uint64().Draw(t, "view").(uint64)
 
 	block := unittest.BlockHeaderFixture()
-	block.View = 100
-	views.BlockFinalized(&block)
+	block.View = view
+	m.views.BlockFinalized(&block)
 
-	// ensure callbacks were invoked correctly
-	assert.Equal(t, 200, len(calls))
+	// increase the number of expected calls and remove those callbacks from our model
+	for indexedView, nCallbacks := range m.callbacks {
+		if indexedView <= view {
+			m.expectedCalls += nCallbacks
+			delete(m.callbacks, indexedView)
+		}
+	}
+}
 
-	assert.True(t, sort.IntsAreSorted(calls), "callbacks executed in wrong order")
+func (m *viewsMachine) Check(t *rapid.T) {
+	// the expected number of callbacks should be invoked
+	assert.Equal(t, m.expectedCalls, m.calls)
+}
 
-	// ensure map is cleared appropriately (only view 101 should remain)
-	assert.Equal(t, 1, len(views.callbacks))
+func TestViewsRapid(t *testing.T) {
+	rapid.Check(t, rapid.Run(new(viewsMachine)))
 }
