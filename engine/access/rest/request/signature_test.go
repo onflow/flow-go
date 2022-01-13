@@ -13,6 +13,7 @@ func TestSignature_InvalidParse(t *testing.T) {
 		err string
 	}{
 		{"s", "invalid encoding"},
+		{"", "missing value"},
 	}
 
 	for _, test := range tests {

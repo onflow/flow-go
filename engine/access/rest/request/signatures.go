@@ -73,10 +73,16 @@ func (t TransactionSignatures) Flow() []flow.TransactionSignature {
 type Signature []byte
 
 func (s *Signature) Parse(raw string) error {
+	if raw == "" {
+		return fmt.Errorf("missing value")
+	}
+
 	signatureBytes, err := fromBase64(raw)
 	if err != nil {
 		return fmt.Errorf("invalid encoding")
 	}
+
+	// todo validate length
 
 	*s = signatureBytes
 	return nil
