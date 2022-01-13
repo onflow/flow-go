@@ -340,7 +340,7 @@ func TestRandomOrder(t *testing.T) {
 	})
 
 	// get proofs for keys and verify for a subset of keys
-	for _, key := range keys[:10] {
+	for _, key := range keys[:100] {
 		proof, existed := tree1.Prove(key)
 		require.True(t, existed)
 		require.True(t, proof.Verify(tree1.Hash()))
