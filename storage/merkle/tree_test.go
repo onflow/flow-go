@@ -202,6 +202,7 @@ func Test_KeyLengthChecked(t *testing.T) {
 	t.Run("1-byte key", func(t *testing.T) {
 		key := make([]byte, 1)
 		tree, err := NewTree(1)
+		assert.NoError(t, err)
 		replaced, err := tree.Put(key, val) // key has the pre-configured length and should be accepted
 		assert.NoError(t, err)
 		assert.False(t, replaced)
