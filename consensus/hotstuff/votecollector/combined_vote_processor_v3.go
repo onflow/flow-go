@@ -268,12 +268,22 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 // Any error should be treated as exception.
 func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 	// STEP 1: aggregate staking signatures (if there are any)
-	// Note: it is possible that all replicas signed with their random beacon keys. In this case, the Aggregator
-	// returns an `model.InsufficientSignaturesError`. If no replicas signed with their staking key,
-	// `BlockSignatureData.StakingSigners` and `BlockSignatureData.AggregatedStakingSig` should be set to nil.
-	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
-	if err != nil && !model.IsInsufficientSignaturesError(err) {
-		return nil, fmt.Errorf("unexpected error aggregating staking signatures: %w", err)
+	// * It is possible that all replicas signed with their random beacon keys.
+	//   Per Convention, we represent an empty set of staking signers as
+	//   `stakingSigners` and `aggregatedStakingSig` both being zero-length
+	//   (here, we use `nil`).
+	// * If it hasn't collected _any_ signatures yet, `stakingSigAggtor.Aggregate()`
+	//   errors with an `model.InsufficientSignaturesError`. We shortcut this case,
+	//   and only call aggregate, if the `stakingSigAggtor` has collected signatures
+	//   with non-zero weight (i.e. at least one signature was collected).
+	var stakingSigners []flow.Identifier // nil (zero value) represents empty set of staking signers
+	var aggregatedStakingSig []byte      // nil (zero value) for empty set of staking signers
+	if p.stakingSigAggtor.TotalWeight() > 0 {
+		var err error
+		stakingSigners, aggregatedStakingSig, err = p.stakingSigAggtor.Aggregate()
+		if err != nil {
+			return nil, fmt.Errorf("unexpected error aggregating staking signatures: %w", err)
+		}
 	}
 
 	// STEP 2: reconstruct random beacon group sig and aggregate random beacon sig shares
