@@ -507,6 +507,16 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	s.core.requestTracker = approvals.NewRequestTracker(s.core.headers, 1, 3)
 	s.SealsPL.On("ByID", mock.Anything).Return(nil, false)
 
+	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
+	s.Snapshots[s.rootHeader.ID()] = rootSnapshot
+	rootSnapshot.On("SealingSegment").Return(
+		&flow.SealingSegment{
+			Blocks: []*flow.Block{{
+				Header:  s.rootHeader,
+				Payload: &flow.Payload{},
+			}},
+		})
+
 	// n is the total number of blocks and incorporated-results we add to the
 	// chain and mempool
 	n := 100
