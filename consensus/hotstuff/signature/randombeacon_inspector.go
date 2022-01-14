@@ -60,7 +60,7 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 	}
 
 	if !valid { // invalid signature
-		return model.ErrInvalidSignature
+		return fmt.Errorf("invalid beacon share from signer Index %d: %w", signerIndex, model.ErrInvalidSignature)
 	}
 	return nil
 }

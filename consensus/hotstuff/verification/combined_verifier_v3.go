@@ -188,7 +188,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// Our previous threshold check also guarantees that `beaconPubKeys` is not empty.
 	err = verifyAggregatedSignature(beaconPubKeys, blockSigData.AggregatedRandomBeaconSig, c.beaconHasher)
 	if err != nil {
-		return fmt.Errorf("verifying aggregated random beacon sig shares failed: %w", err)
+		return fmt.Errorf("verifying aggregated random beacon sig shares failed for block %v: %w", block.BlockID, err)
 	}
 
 	// STEP 3: validating the aggregated staking signatures
@@ -198,7 +198,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	numStakingSigners := len(blockSigData.StakingSigners)
 	if numStakingSigners == 0 {
 		if len(blockSigData.AggregatedStakingSig) > 0 {
-			return fmt.Errorf("all replicas signed with random beacon keys, but QC has aggregated staking sig: %w", model.ErrInvalidFormat)
+			return fmt.Errorf("all replicas signed with random beacon keys, but QC has aggregated staking sig for block %v: %w", block.BlockID, model.ErrInvalidFormat)
 		}
 		// no aggregated staking sig to verify
 		return nil
@@ -216,7 +216,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 	err = verifyAggregatedSignature(stakingPubKeys, blockSigData.AggregatedStakingSig, c.stakingHasher)
 	if err != nil {
-		return fmt.Errorf("verifying aggregated staking sig failed: %w", err)
+		return fmt.Errorf("verifying aggregated staking sig failed for block %v: %w", block.BlockID, err)
 
 	}
 
