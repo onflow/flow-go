@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
@@ -186,6 +187,11 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 			// skip results referencing blocks before the root sealing segment
 			_, isOutdated := outdatedBlockIDs[result.BlockID]
 			if isOutdated {
+				c.log.Debug().
+					Hex("container_block_id", logging.ID(blockID)).
+					Hex("result_id", logging.ID(result.ID())).
+					Hex("executed_block_id", logging.ID(result.BlockID)).
+					Msg("skipping outdated block referenced in root sealing segment")
 				continue
 			}
 			incorporatedResult := flow.NewIncorporatedResult(blockID, result)
