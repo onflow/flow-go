@@ -137,7 +137,14 @@ func (i *TransactionInvoker) Process(
 		})
 
 		if err != nil {
-			txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
+			var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
+			if errors.As(err, &interactionLimiExceededErr) {
+				// If it is this special interaction limit error, just set it directly as the tx error
+				txError = err
+			} else {
+				// Otherwise, do what we use to do
+				txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
+			}
 		}
 
 		// break the loop
