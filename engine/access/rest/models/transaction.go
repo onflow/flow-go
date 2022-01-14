@@ -91,7 +91,10 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	var events Events
 	events.Build(txr.Events)
 
-	t.BlockId = txr.BlockID.String()
+	if txr.BlockID != flow.ZeroID { // don't send back 0 ID
+		t.BlockId = txr.BlockID.String()
+	}
+
 	t.Status = &status
 	t.ErrorMessage = txr.ErrorMessage
 	t.ComputationUsed = fromUint64(0)
