@@ -117,7 +117,7 @@ func TestExecutionFlow(t *testing.T) {
 	// check collection node received the collection request from execution node
 	providerEngine := new(mocknetwork.Engine)
 	provConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
-	providerEngine.On("Submit", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	providerEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args.Get(1).(flow.Identifier)
 			req := args.Get(2).(*messages.EntityRequest)
