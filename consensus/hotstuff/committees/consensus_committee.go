@@ -85,7 +85,7 @@ func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*
 		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
 	}
 	if !filter.IsVotingConsensusCommitteeMember(identity) {
-		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
+		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff voting participant", nodeID)
 	}
 	return identity, nil
 }
