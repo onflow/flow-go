@@ -696,9 +696,9 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 		done:             *atomic.NewBool(false),
 	}
 
-	// The `stakingAggregator` is empty, i.e. it return ans InsufficientSignaturesError when we call `Aggregate()` on it.
-	stakingAggregator.On("TotalWeight").Return(uint64(0), nil).Once()
-	stakingAggregator.On("Aggregate").Return(nil, nil, model.NewInsufficientSignaturesErrorf("")).Once()
+	// The `stakingAggregator` is empty, i.e. it returns ans InsufficientSignaturesError when we call `Aggregate()` on it.
+	stakingAggregator.On("TotalWeight").Return(uint64(0), nil).Twice() // called a second time to determine whether there are any staking sigs to aggregate
+	stakingAggregator.On("Aggregate").Return(nil, nil, model.NewInsufficientSignaturesErrorf("")).Maybe()
 
 	// Create another vote with a random beacon signature. With its addition, the `rbSigAggregator`
 	// by itself has collected enough votes to exceed the minimally required weight (70).
@@ -781,7 +781,26 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		// mock expected calls to aggregators and reconstructor
 		combinedSigs := unittest.SignaturesFixture(3)
-		stakingAggregator.On("Aggregate").Return(stakingSigners.NodeIDs(), []byte(combinedSigs[0]), nil).Once()
+		stakingAggregator.On("Aggregate").Return(
+			// per API convention, model.InsufficientSignaturesError is returns when no signatures were collected
+			func() []flow.Identifier {
+				if len(stakingSigners) == 0 {
+					return nil
+				}
+				return stakingSigners.NodeIDs()
+			},
+			func() []byte {
+				if len(stakingSigners) == 0 {
+					return nil
+				}
+				return combinedSigs[0]
+			},
+			func() error {
+				if len(stakingSigners) == 0 {
+					return model.NewInsufficientSignaturesErrorf("")
+				}
+				return nil
+			}).Maybe()
 		rbSigAggregator.On("Aggregate").Return(beaconSigners.NodeIDs(), []byte(combinedSigs[1]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
 
