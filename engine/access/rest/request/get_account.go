@@ -35,5 +35,10 @@ func (g *GetAccount) Parse(rawAddress string, rawHeight string) error {
 	g.Address = address.Flow()
 	g.Height = height.Flow()
 
+	// default to last block
+	if g.Height == EmptyHeight {
+		g.Height = SealedHeight
+	}
+
 	return nil
 }
