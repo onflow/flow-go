@@ -80,18 +80,16 @@ func (t SigType) Valid() bool {
 // Implementations must be concurrency safe.
 type WeightedSignatureAggregator interface {
 	// Verify verifies the signature under the stored public keys and message.
-	// Error returns:
+	// Expected errors during normal operations:
 	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
-	//  - generic error in case of unexpected runtime failures
 	Verify(signerID flow.Identifier, sig crypto.Signature) error
 
 	// TrustedAdd adds a signature to the internal set of signatures and adds the signer's
-	// weight to the total collected weight, iff the signature is _not_ a duplicate.
-	//
-	// The total weight of all collected signatures (excluding duplicates) is returned regardless
+	// weight to the total collected weight, iff the signature is _not_ a duplicate. The
+	// total weight of all collected signatures (excluding duplicates) is returned regardless
 	// of any returned error.
-	// The function errors with:
+	// Expected errors during normal operations:
 	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 	//  - model.DuplicatedSignerError if the signer has been already added
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error)
@@ -100,9 +98,10 @@ type WeightedSignatureAggregator interface {
 	TotalWeight() uint64
 
 	// Aggregate aggregates the signatures and returns the aggregated signature.
-	// The function performs a final verification and errors if the aggregated signature is not valid. This is
-	// required for the function safety since "TrustedAdd" allows adding invalid signatures.
-	// The function errors with:
+	// The function performs a final verification and errors if the aggregated
+	// signature is not valid. This is required for the function safety since
+	// `TrustedAdd` allows adding invalid signatures.
+	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
 	//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 	Aggregate() ([]flow.Identifier, []byte, error)

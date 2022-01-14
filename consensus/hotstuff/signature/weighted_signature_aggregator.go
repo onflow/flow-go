@@ -74,10 +74,9 @@ func NewWeightedSignatureAggregator(
 }
 
 // Verify verifies the signature under the stored public keys and message.
-// Error returns:
+// Expected errors during normal operations:
 //  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 //  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
-//  - generic error in case of unexpected runtime failures
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	info, ok := w.idToInfo[signerID]
