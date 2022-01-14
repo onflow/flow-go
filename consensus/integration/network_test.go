@@ -76,11 +76,13 @@ func (n *Network) Register(channel network.Channel, engine network.MessageProces
 		queue:   make(chan message, 1024),
 	}
 
-	for msg := range con.queue {
-		go func(m message) {
-			_ = engine.Process(channel, m.originID, m.event)
-		}(msg)
-	}
+	go func() {
+		for msg := range con.queue {
+			go func(m message) {
+				_ = engine.Process(channel, m.originID, m.event)
+			}(msg)
+		}
+	}()
 
 	n.conduits[channel] = con
 	return con, nil
