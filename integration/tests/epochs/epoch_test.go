@@ -149,6 +149,11 @@ func (s *Suite) TestEpochJoinAndLeaveLN() {
 	s.runTestEpochJoinAndLeave(flow.RoleCollection, s.assertNetworkHealthyAfterLNChange)
 }
 
+func (s *Suite) TestEpochJoinAndLeaveSN() {
+	//unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs VN tests should be run on an machine with adequate resources")
+	s.runTestEpochJoinAndLeave(flow.RoleConsensus, s.testNetworkChange)
+}
+
 func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth nodeUpdateValidation) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

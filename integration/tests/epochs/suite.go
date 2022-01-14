@@ -699,3 +699,7 @@ func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templat
 	)
 	require.NoError(s.T(), err)
 }
+
+func (s *Suite) testNetworkChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
+	return
+}

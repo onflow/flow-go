@@ -159,13 +159,6 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		return
 	}
 
-	// flag that we are starting the dkg for this epoch
-	err = e.dkgState.SetDKGStarted(nextEpochCounter)
-	if err != nil {
-		// unexpected storage-level error
-		log.Fatal().Err(err).Msg("could not set dkg started")
-	}
-
 	curDKGInfo, err := e.getDKGInfo(firstID)
 	if err != nil {
 		// unexpected storage-level error
@@ -180,6 +173,13 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		Uint64("phase3", curDKGInfo.phase3FinalView).
 		Interface("members", committee.NodeIDs()).
 		Msg("epoch info")
+
+	_, err = dkgmodule.GetDKGCommitteeIndex(e.me.NodeID(), committee)
+	if err != nil {
+		// node not found in DKG committee bypass starting the DKG
+		log.Warn().Err(err).Msg("failed to get node DKG committee index")
+		return
+	}
 
 	controller, err := e.controllerFactory.Create(
 		dkgmodule.CanonicalInstanceID(first.ChainID, nextEpochCounter),
@@ -200,6 +200,13 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 			log.Fatal().Err(err).Msg("DKG Run error")
 		}
 	})
+
+	// flag that we are starting the dkg for this epoch
+	err = e.dkgState.SetDKGStarted(nextEpochCounter)
+	if err != nil {
+		// unexpected storage-level error
+		log.Fatal().Err(err).Msg("could not set dkg started")
+	}
 
 	// NOTE:
 	// We register two callbacks for views that mark a state transition: one for
