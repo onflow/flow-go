@@ -80,7 +80,7 @@ func NewBatchLoadGenerator(fclient *client.Client,
 
 	// TODO get these params hooked to the top level
 	stTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
-	txTracker, err := NewTxTracker(zerolog.New(os.Stderr), 5000, 100, accessNodeAddress, time.Second/10, stTracker)
+	txTracker, err := NewTxTracker(zerolog.New(os.Stderr), 5000, 50, accessNodeAddress, time.Second/10, stTracker)
 	if err != nil {
 		return nil, err
 	}
