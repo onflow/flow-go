@@ -272,9 +272,9 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 	//   Per Convention, we represent an empty set of staking signers as
 	//   `stakingSigners` and `aggregatedStakingSig` both being zero-length
 	//   (here, we use `nil`).
-	// * If it hasn't collected _any_ signatures yet, `stakingSigAggtor.Aggregate()`
-	//   errors with an `model.InsufficientSignaturesError`. We shortcut this case,
-	//   and only call aggregate, if the `stakingSigAggtor` has collected signatures
+	// * If it has _not collected any_ signatures, `stakingSigAggtor.Aggregate()`
+	//   errors with a `model.InsufficientSignaturesError`. We shortcut this case,
+	//   and only call `Aggregate`, if the `stakingSigAggtor` has collected signatures
 	//   with non-zero weight (i.e. at least one signature was collected).
 	var stakingSigners []flow.Identifier // nil (zero value) represents empty set of staking signers
 	var aggregatedStakingSig []byte      // nil (zero value) for empty set of staking signers
