@@ -88,7 +88,7 @@ func GenerateExecutionResultForBlock(
 		BlockID:          block.ID(),
 		Chunks:           chunks,
 		ServiceEvents:    convertedServiceEvents,
-		ExecutionDataID:  executionDataId,
+		ExecutionDataID:  executionDataID,
 	}
 
 	return er, nil
