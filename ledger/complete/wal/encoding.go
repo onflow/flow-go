@@ -18,12 +18,13 @@ The LedgerWAL update record uses two operations so far - an update which must in
 which only needs a root tree state commitment.
 Updates need to be atomic, hence we prepare binary representation of whole changeset.
 Since keys, values and state commitments date types are variable length, we have to store it as well.
-Every record has:
+If OP = WALDelete, record has:
 
 1 byte Operation Type | 2 bytes Big Endian uint16 length of state commitment | state commitment data
 
-If OP = WALUpdate, then it follow with:
+If OP = WALUpdate, record has:
 
+1 byte Operation Type | 2 bytes version | 1 byte TypeTrieUpdate | 2 bytes Big Endian uint16 length of state commitment | state commitment data |
 4 bytes Big Endian uint32 - total number of key/value pairs | 2 bytes Big Endian uint16 - length of key (keys are the same length)
 
 and for every pair after
