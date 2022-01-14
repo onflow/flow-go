@@ -93,13 +93,13 @@ func NewPSMT(
 			// otherwise the value is stored in the proofs
 			defaultHash := ledger.GetDefaultHashForHeight(currentNode.height - 1)
 			v := defaultHash
-			flag := bitutils.Bit(pr.Flags, j)
+			flag := bitutils.ReadBit(pr.Flags, j)
 			if flag == 1 {
 				// use the proof at index prValueIndex
 				v = pr.Interims[prValueIndex]
 				prValueIndex++
 			}
-			bit := bitutils.Bit(path[:], j)
+			bit := bitutils.ReadBit(path[:], j)
 			// look at the bit number j (left to right) for branching
 			if bit == 1 { // right branching
 				if currentNode.lChild == nil { // check left child
