@@ -1,9 +1,9 @@
 package migrations
 
 import (
-	"fmt"
 	"testing"
 
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/engine/execution/state"
 	state2 "github.com/onflow/flow-go/fvm/state"
@@ -38,12 +38,15 @@ func TestOrderedMapMigration(t *testing.T) {
 			{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
 			{Key: createAccountPayloadKey(address1, "storage\x1fFoo"), Value: []byte{1}},
 			{Key: createAccountPayloadKey(address1, "public\x1fBar"), Value: []byte{3}},
-			{Key: createAccountPayloadKey(address1, "private\x1fBar"), Value: []byte{3}},
+			{Key: createAccountPayloadKey(address1, "private\x1fBar"), Value: []byte{2}},
 		}
 		migratedPayload, err := mig.Migrate(payload)
 		require.NoError(t, err)
 		require.Equal(t, len(migratedPayload), 9)
 
-		fmt.Println(migratedPayload)
+		cadenceAddress, _ := common.HexToAddress("0x1")
+
+		stored := mig.Interpreter.ReadStored(cadenceAddress, "public", "Bar")
+		require.Equal(t, stored, []byte{3})
 	})
 }

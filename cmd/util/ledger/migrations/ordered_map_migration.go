@@ -33,7 +33,7 @@ type OrderedMapMigration struct {
 	programs    *programs.Programs
 	reportFile  *os.File
 	newStorage  *runtime.Storage
-	interpreter *interpreter.Interpreter
+	Interpreter *interpreter.Interpreter
 
 	progress *progressbar.ProgressBar
 }
@@ -116,7 +116,7 @@ func (m *OrderedMapMigration) initIntepreter() {
 		))
 	}
 
-	m.interpreter = inter
+	m.Interpreter = inter
 }
 
 func (m *OrderedMapMigration) loadProgram(
@@ -382,21 +382,6 @@ func (r RawStorable) Storable(_ atree.SlabStorage, _ atree.Address, _ uint64) (a
 	return r, nil
 }
 
-func rawStorableHashInput(v atree.Value, _ []byte) ([]byte, error) {
-	return []byte(v.(RawStorable)), nil
-}
-
-func rawStorableComparator(storage atree.SlabStorage, value atree.Value, otherStorable atree.Storable) (bool, error) {
-	otherValue, err := otherStorable.StoredValue(storage)
-	if err != nil {
-		return false, err
-	}
-
-	result := bytes.Compare(value.(RawStorable), otherValue.(RawStorable))
-
-	return result == 0, nil
-}
-
 func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storagePayloads []ledger.Payload, slabPayloads []ledger.Payload) {
 	for _, p := range inp {
 		if state.IsFVMStateKey(
@@ -460,7 +445,7 @@ func (m *OrderedMapMigration) migrate(payload []ledger.Payload) ([]ledger.Payloa
 	for owner, domainMaps := range sortedByOwnerAndDomain {
 		for domain, keyValuePairs := range domainMaps {
 			for _, pair := range keyValuePairs {
-				storageMap := m.newStorage.GetStorageMap(common.BytesToAddress([]byte(owner)), domain)
+				storageMap := m.newStorage.GetStorageMap(common.MustBytesToAddress([]byte(owner)), domain)
 				// in the interest of not having to update Cadence and break its abstractions to allow
 				// this one-time migration, just use reflection to grab the unexported field
 				unsafeOrderedMap := reflect.ValueOf(storageMap).Elem().FieldByName("orderedMap")
@@ -469,9 +454,9 @@ func (m *OrderedMapMigration) migrate(payload []ledger.Payload) ([]ledger.Payloa
 					unsafe.Pointer(unsafeOrderedMap.UnsafeAddr()),
 				).Elem().Interface().(*atree.OrderedMap)
 				orderedMap.Set(
-					rawStorableComparator,
-					rawStorableHashInput,
-					RawStorable(pair.Key),
+					interpreter.StringAtreeComparator,
+					interpreter.StringAtreeHashInput,
+					interpreter.StringAtreeValue(pair.Key),
 					RawStorable(pair.Value),
 				)
 			}
@@ -479,7 +464,7 @@ func (m *OrderedMapMigration) migrate(payload []ledger.Payload) ([]ledger.Payloa
 	}
 
 	// we don't need to update any contracts in this migration
-	err := m.newStorage.Commit(m.interpreter, false)
+	err := m.newStorage.Commit(m.Interpreter, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
 	}
