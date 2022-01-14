@@ -247,6 +247,7 @@ func update(
 	// in the remaining code: the registers to update are strictly larger than 1:
 	//   - either len(paths)>1
 	//   - or len(paths) == 1 and compactLeaf!= nil
+	//   - or len(paths) == 1 and parentNode != nil && !parentNode.IsLeaf()
 
 	// Split paths and payloads to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
@@ -500,7 +501,7 @@ func (mt *MTrie) IsAValidTrie() bool {
 //
 //  For instance, if `paths` contains the following 3 paths, and bitIndex is `1`:
 //  [[0,0,1,1], [0,1,0,1], [0,0,0,1]]
-//  then `splitByPath` returns 1 and updates `paths` into:
+//  then `splitByPath` returns 2 and updates `paths` into:
 //  [[0,0,1,1], [0,0,0,1], [0,1,0,1]]
 func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) int {
 	i := 0
