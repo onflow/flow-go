@@ -58,9 +58,9 @@ type Network struct {
 var _ network.Network = (*Network)(nil)
 
 type registerEngineRequest struct {
-	channel  network.Channel
-	engine   network.Engine
-	respChan chan *registerEngineResp
+	channel          network.Channel
+	messageProcessor network.MessageProcessor
+	respChan         chan *registerEngineResp
 }
 
 type registerEngineResp struct {
@@ -138,7 +138,7 @@ func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerCon
 	for {
 		select {
 		case req := <-n.registerEngineRequests:
-			conduit, err := n.handleRegisterEngineRequest(parent, req.channel, req.engine)
+			conduit, err := n.handleRegisterEngineRequest(parent, req.channel, req.messageProcessor)
 			resp := &registerEngineResp{
 				conduit: conduit,
 				err:     err,
@@ -195,7 +195,7 @@ func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready compone
 	<-n.mw.Done()
 }
 
-func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	if !channels.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
@@ -239,16 +239,16 @@ func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.Signaler
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
 	respChan := make(chan *registerEngineResp)
 
 	select {
 	case <-n.ComponentManager.ShutdownSignal():
 		return nil, ErrNetworkShutdown
 	case n.registerEngineRequests <- &registerEngineRequest{
-		channel:  channel,
-		engine:   engine,
-		respChan: respChan,
+		channel:          channel,
+		messageProcessor: messageProcessor,
+		respChan:         respChan,
 	}:
 		select {
 		case <-n.ComponentManager.ShutdownSignal():

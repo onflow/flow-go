@@ -47,13 +47,13 @@ func (_m *Network) Ready() <-chan struct{} {
 	return r0
 }
 
-// Register provides a mock function with given fields: channel, engine
-func (_m *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
-	ret := _m.Called(channel, engine)
+// Register provides a mock function with given fields: channel, messageProcessor
+func (_m *Network) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
+	ret := _m.Called(channel, messageProcessor)
 
 	var r0 network.Conduit
-	if rf, ok := ret.Get(0).(func(network.Channel, network.Engine) network.Conduit); ok {
-		r0 = rf(channel, engine)
+	if rf, ok := ret.Get(0).(func(network.Channel, network.MessageProcessor) network.Conduit); ok {
+		r0 = rf(channel, messageProcessor)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(network.Conduit)
@@ -61,8 +61,8 @@ func (_m *Network) Register(channel network.Channel, engine network.Engine) (net
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(network.Channel, network.Engine) error); ok {
-		r1 = rf(channel, engine)
+	if rf, ok := ret.Get(1).(func(network.Channel, network.MessageProcessor) error); ok {
+		r1 = rf(channel, messageProcessor)
 	} else {
 		r1 = ret.Error(1)
 	}

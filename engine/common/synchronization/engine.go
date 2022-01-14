@@ -47,7 +47,7 @@ type Engine struct {
 	participantsProvider identifier.IdentifierProvider
 	finalizedHeader      *FinalizedHeaderCache
 
-	requestHandler *RequestHandlerEngine // component responsible for handling requests
+	requestHandler *RequestHandler // component responsible for handling requests
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
@@ -105,7 +105,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader, true)
+	e.requestHandler = NewRequestHandler(log, metrics, con.Unicast, me, blocks, core, finalizedHeader, true)
 
 	return e, nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -132,8 +133,12 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 		go func(x int) {
 			// creates and adds a fake item to the mempool
 			item := fake(fmt.Sprintf("item%d", x))
-			_ = pool.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-				backdata[item.ID()] = item
+			_ = pool.Run(func(backdata mempool.BackData) error {
+				added := backdata.Add(item.ID(), item)
+				if !added {
+					return fmt.Errorf("potential race condition on adding to back data")
+				}
+
 				return nil
 			})
 
