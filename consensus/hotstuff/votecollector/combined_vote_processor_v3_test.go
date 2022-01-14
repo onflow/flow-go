@@ -469,14 +469,21 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		// need separate locks to safely update vectors of voted signers
 		stakingAggregatorLock := &sync.Mutex{}
 		beaconAggregatorLock := &sync.Mutex{}
+		beaconReconstructorLock := &sync.Mutex{}
 
 		stakingAggregator.On("TotalWeight").Return(func() uint64 {
+			stakingAggregatorLock.Lock()
+			defer stakingAggregatorLock.Unlock()
 			return stakingTotalWeight
 		})
 		rbSigAggregator.On("TotalWeight").Return(func() uint64 {
+			beaconAggregatorLock.Lock()
+			defer beaconAggregatorLock.Unlock()
 			return thresholdTotalWeight
 		})
 		reconstructor.On("EnoughShares").Return(func() bool {
+			beaconReconstructorLock.Lock()
+			defer beaconReconstructorLock.Unlock()
 			return collectedShares >= beaconSignersCount
 		})
 
@@ -489,7 +496,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 				return aggregatedStakingSigners
 			},
 			func() []byte { return combinedSigs[0] },
-			func() error { return nil }).Once()
+			func() error { return nil }).Maybe() // Aggregate is only called, if some staking sigs were collected
 
 		rbSigAggregator.On("Aggregate").Return(
 			func() []flow.Identifier {
@@ -502,32 +509,55 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
 
 		// mock expected call to Packer
-		mergedSignerIDs := make([]flow.Identifier, 0)
+		mergedSignerIDs := ([]flow.Identifier)(nil)
 		packedSigData := unittest.RandomBytes(128)
 		packer := &mockhotstuff.Packer{}
 		packer.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
+			// in the following, we check validity for each field of `blockSigData` individually
 
+			// 1. CHECK: `StakingSigners` and `RandomBeaconSigners`
+			// Verify that input `hotstuff.BlockSignatureData` has the expected structure.
+			//  * When the Vote Processor notices that constructing a valid QC is possible, it does
+			//    so with the signatures collected at this time.
+			//  * However, due to concurrency, additional votes might have been added to the aggregators
+			//    by tailing threads, _before_ we reach this validation logic. Therefore, the set of
+			//    signers in the aggregators might now be _larger_ than what is reported in the QC.
+			// Therefore, we test that the signers reported in the QC are a _subset_ of the signatures
+			// that are now in the aggregators.
 			// check that aggregated signers are part of all votes signers
 			// due to concurrent processing it is possible that Aggregate will return less that we have actually aggregated
 			// but still enough to construct the QC
 			require.Subset(t, aggregatedStakingSigners, blockSigData.StakingSigners)
 			require.Subset(t, aggregatedBeaconSigners, blockSigData.RandomBeaconSigners)
-			require.GreaterOrEqual(t, uint64(len(blockSigData.StakingSigners)+len(blockSigData.RandomBeaconSigners)),
-				honestParticipants)
 
-			expectedBlockSigData := &hotstuff.BlockSignatureData{
-				StakingSigners:               blockSigData.StakingSigners,
-				RandomBeaconSigners:          blockSigData.RandomBeaconSigners,
-				AggregatedStakingSig:         []byte(combinedSigs[0]),
-				AggregatedRandomBeaconSig:    []byte(combinedSigs[1]),
-				ReconstructedRandomBeaconSig: combinedSigs[2],
+			// 2. CHECK: supermajority
+			// All participants are equally staked in this test. Per configuration, collecting `honestParticipants`
+			// number of votes is the minimally required supermajority.
+			require.GreaterOrEqual(t, uint64(len(blockSigData.StakingSigners)+len(blockSigData.RandomBeaconSigners)), honestParticipants)
+
+			// 3. CHECK: `AggregatedStakingSig`
+			// Here, we have to pay attention to the edge case where all replicas voted with their random beacon sig.
+			// Per protocol convention, the `AggregatedStakingSig` should be empty, for an empty set of StakingSigners.
+			if len(blockSigData.StakingSigners) == 0 {
+				require.Empty(t, blockSigData.AggregatedStakingSig)
+			} else {
+				// otherwise, we expect `AggregatedStakingSig` to be the return value of
+				// `stakingAggregator.Aggregate()`, which we mocked as `combinedSigs[0]`
+				require.Equal(t, []byte(combinedSigs[0]), blockSigData.AggregatedStakingSig)
 			}
 
-			require.Equal(t, expectedBlockSigData, blockSigData)
+			// 4. CHECK: `AggregatedRandomBeaconSig` and `ReconstructedRandomBeaconSig`
+			// We require that each QC contains valid random beacon value, i.e. we must collect some votes with
+			// random beacon signatures to construct a valid QC. Hence, `AggregatedRandomBeaconSig` should be the
+			// output of `rbSigAggregator.Aggregate()`, which we mocked as `combinedSigs[1]`.
+			require.Equal(t, []byte(combinedSigs[1]), blockSigData.AggregatedRandomBeaconSig)
+			// Furthermore, `ReconstructedRandomBeaconSig` should be the output of `reconstructor.Reconstruct()`,
+			// which we mocked as `combinedSigs[2]`
+			require.Equal(t, combinedSigs[2], blockSigData.ReconstructedRandomBeaconSig)
 
 			// fill merged signers with collected signers
-			mergedSignerIDs = append(expectedBlockSigData.StakingSigners, expectedBlockSigData.RandomBeaconSigners...)
+			mergedSignerIDs = append(blockSigData.StakingSigners, blockSigData.RandomBeaconSigners...)
 		}).Return(
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []flow.Identifier { return mergedSignerIDs },
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
@@ -595,8 +625,8 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 				aggregatedBeaconSigners = append(aggregatedBeaconSigners, signerID)
 			}).Return(uint64(0), nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
-				beaconAggregatorLock.Lock()
-				defer beaconAggregatorLock.Unlock()
+				beaconReconstructorLock.Lock()
+				defer beaconReconstructorLock.Unlock()
 				collectedShares++
 			}).Return(true, nil).Maybe()
 			votes = append(votes, vote)
