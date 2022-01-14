@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"fmt"
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
@@ -42,6 +43,11 @@ func GetExecutionResultByID(r *request.Request, backend access.API, link models.
 	res, err := backend.GetExecutionResultByID(r.Context(), req.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	if res == nil {
+		err := fmt.Errorf("execution result with ID: %s not found", req.ID.String())
+		return nil, NewNotFoundError(err.Error(), err)
 	}
 
 	var response models.ExecutionResult
