@@ -73,10 +73,9 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 // The order of the signatures in the slice does not matter since the aggregation
 // is commutative. The slice should not be empty.
 // No subgroup membership check is performed on the input signatures.
-// Error returns:
+// Expected error returns during normal operations:
 //  - invalidInputsError if no signatures are provided (sigs is empty) or
 //    some signatures are invalid
-//  - generic error in case of unexpected runtime failures
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	// set BLS context
 	blsInstance.reInit()

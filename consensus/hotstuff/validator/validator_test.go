@@ -323,16 +323,16 @@ func (vs *VoteSuite) SetupTest() {
 	vs.validator = New(vs.committee, vs.forks, vs.verifier)
 }
 
+// TestVoteOK checks the happy case, which is the default for the suite
 func (vs *VoteSuite) TestVoteOK() {
-
-	// check the happy case, which is the default for the suite
 	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
 	assert.NoError(vs.T(), err, "a valid vote should be accepted")
 }
 
+// TestVoteMismatchingView checks that the Validator handles the case where the
+// vote contains a mismatching `View` value. In this case, the vote is invalid.
+// Hence, we expect the Validator to return a `model.InvalidVoteError`.
 func (vs *VoteSuite) TestVoteMismatchingView() {
-
-	// make the view on the vote different
 	vs.vote.View++
 
 	// check that the vote is no longer validated
@@ -343,9 +343,9 @@ func (vs *VoteSuite) TestVoteMismatchingView() {
 	assert.True(vs.T(), model.IsInvalidVoteError(err), "a mismatching view should create a invalid vote error")
 }
 
+// TestVoteSignatureError checks that the Validator does not misinterpret
+// unexpected exceptions for invalid votes.
 func (vs *VoteSuite) TestVoteSignatureError() {
-
-	// make the verification fail on exception
 	*vs.verifier = mocks.Verifier{}
 	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(fmt.Errorf("some exception"))
 
@@ -355,26 +355,32 @@ func (vs *VoteSuite) TestVoteSignatureError() {
 	assert.False(vs.T(), model.IsInvalidVoteError(err), "internal exception should not be interpreted as invalid vote")
 }
 
+// TestVoteInvalidSignerID checks that the Validator correctly handles a vote
+// with a SignerID that does not correspond to a valid consensus participant.
+// In this case, the `hotstuff.Committee` returns a `model.InvalidSignerError`,
+// which the Validator should recognize as a symptom for an invalid vote.
+// Hence, we expect the validator to return a `model.InvalidVoteError`.
 func (vs *VoteSuite) TestVoteInvalidSignerID() {
-
-	// make sure the signer ID  is treated as invalid
 	*vs.committee = mocks.Committee{}
 	vs.committee.On("Identity", vs.block.BlockID, vs.vote.SignerID).Return(nil, model.NewInvalidSignerErrorf(""))
 
 	// A `model.InvalidSignerError` from the committee should be interpreted as
 	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
 	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
-	assert.Error(vs.T(), err, "a vote with an invalid signature should be rejected")
-	assert.True(vs.T(), model.IsInvalidVoteError(err), "a vote with an invalid signature should be rejected")
+	assert.Error(vs.T(), err, "a vote with unknown SignerID should be rejected")
+	assert.True(vs.T(), model.IsInvalidVoteError(err), "a vote with unknown SignerID should be rejected")
 }
 
+// TestVoteSignatureInvalid checks that the Validator correctly handles votes
+// with cryptographically invalid signature. In this case, the `hotstuff.Verifier`
+// returns a `model.ErrInvalidSignature`, which the Validator should recognize as
+// a symptom for an invalid vote.
+// Hence, we expect the validator to return a `model.InvalidVoteError`.
 func (vs *VoteSuite) TestVoteSignatureInvalid() {
-
-	// make sure the signature is treated as invalid
 	*vs.verifier = mocks.Verifier{}
 	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(fmt.Errorf("staking sig is invalid: %w", model.ErrInvalidSignature))
 
-	// A `model.ErrInvalidSignature` from the committee should be interpreted as
+	// A `model.ErrInvalidSignature` from the `hotstuff.Verifier` should be interpreted as
 	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
 	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
 	assert.Error(vs.T(), err, "a vote with an invalid signature should be rejected")

@@ -10,12 +10,12 @@ type Validator interface {
 
 	// ValidateQC checks the validity of a QC for a given block.
 	// During normal operations, the following error returns are expected:
-	//	* model.InvalidBlockError if the QC is invalid
+	//  * model.InvalidBlockError if the QC is invalid
 	ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error
 
 	// ValidateProposal checks the validity of a proposal.
 	// During normal operations, the following error returns are expected:
-	//	* model.InvalidBlockError if the block is invalid
+	//  * model.InvalidBlockError if the block is invalid
 	ValidateProposal(proposal *model.Proposal) error
 
 	// ValidateVote checks the validity of a vote for a given block and

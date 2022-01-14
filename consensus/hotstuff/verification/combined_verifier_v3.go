@@ -6,10 +6,6 @@ package verification
 import (
 	"fmt"
 
-	msig "github.com/onflow/flow-go/module/signature"
-
-	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
@@ -17,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // CombinedVerifierV3 is a verifier capable of verifying two signatures, one for each
