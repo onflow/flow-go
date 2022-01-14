@@ -1389,8 +1389,25 @@ func SeedFixtures(m int, n int) [][]byte {
 	return seeds
 }
 
+// BlockEventsFixture returns a block events model populated with random events of length n.
+func BlockEventsFixture(header flow.Header, n int) flow.BlockEvents {
+	types := []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
+
+	events := make([]flow.Event, n)
+	for i := 0; i < n; i++ {
+		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
+	}
+
+	return flow.BlockEvents{
+		BlockID:        header.ID(),
+		BlockHeight:    header.Height,
+		BlockTimestamp: header.Timestamp,
+		Events:         events,
+	}
+}
+
 // EventFixture returns an event
-func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier, payloadSize int) flow.Event {
+func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier, _ int) flow.Event {
 	return flow.Event{
 		Type:             eType,
 		TransactionIndex: transactionIndex,
@@ -1643,8 +1660,8 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	commit := &flow.EpochCommit{
 		Counter:            uint64(rand.Uint32()),
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(QuorumCertificatesFixtures(1)),
-		DKGGroupKey:        KeyFixture(crypto.ECDSAP256).PublicKey(),
-		DKGParticipantKeys: PublicKeysFixture(2, crypto.ECDSAP256),
+		DKGGroupKey:        KeyFixture(crypto.BLSBLS12381).PublicKey(),
+		DKGParticipantKeys: PublicKeysFixture(2, crypto.BLSBLS12381),
 	}
 	for _, apply := range opts {
 		apply(commit)
@@ -1808,7 +1825,7 @@ func PrivateKeyFixtureByIdentifier(algo crypto.SigningAlgorithm, seedLength int,
 }
 
 func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
-	return PrivateKeyFixtureByIdentifier(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256, id)
+	return PrivateKeyFixtureByIdentifier(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381, id)
 }
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key
