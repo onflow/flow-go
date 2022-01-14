@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"fmt"
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
@@ -60,6 +61,11 @@ func CreateTransaction(r *request.Request, backend access.API, link models.LinkG
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println(req.Transaction.EnvelopeSignatures)
+	fmt.Println(req.Transaction.EnvelopeSignatures[0].Signature)
+	fmt.Println(string(req.Transaction.EnvelopeSignatures[0].Signature))
+	fmt.Printf("\n%x\n", req.Transaction.EnvelopeSignatures[0].Signature)
 
 	var response models.Transaction
 	response.Build(&req.Transaction, nil, link)

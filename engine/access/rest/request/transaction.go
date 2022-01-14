@@ -88,6 +88,9 @@ func (t *Transaction) Parse(raw io.Reader) error {
 		return err
 	}
 
+	fmt.Println("#1", tx.EnvelopeSignatures)
+	fmt.Println("#1", envelopeSigs)
+
 	// script comes in as a base64 encoded string, decode base64 back to a string here
 	script, err := fromBase64(tx.Script)
 	if err != nil {

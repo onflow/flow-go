@@ -10,25 +10,30 @@ const signatureLength = 128
 
 type TransactionSignature flow.TransactionSignature
 
-func (s *TransactionSignature) Parse(sig models.TransactionSignature) error {
+func (s *TransactionSignature) Parse(
+	rawAddress string,
+	rawSignerIndex string,
+	rawKeyIndex string,
+	rawSignature string,
+) error {
 	var address Address
-	err := address.Parse(sig.Address)
+	err := address.Parse(rawAddress)
 	if err != nil {
 		return err
 	}
 
-	sigIndex, err := toUint64(sig.SignerIndex)
+	sigIndex, err := toUint64(rawSignerIndex)
 	if err != nil {
 		return fmt.Errorf("invalid signer index: %v", err)
 	}
 
-	keyIndex, err := toUint64(sig.KeyIndex)
+	keyIndex, err := toUint64(rawKeyIndex)
 	if err != nil {
 		return fmt.Errorf("invalid key index: %v", err)
 	}
 
 	var signature Signature
-	err = signature.Parse(sig.Signature)
+	err = signature.Parse(rawSignature)
 	if err != nil {
 		return fmt.Errorf("invalid signature: %v", err)
 	}
@@ -53,12 +58,14 @@ func (t *TransactionSignatures) Parse(rawSigs []models.TransactionSignature) err
 	signatures := make([]TransactionSignature, len(rawSigs))
 	for i, sig := range rawSigs {
 		var signature TransactionSignature
-		err := signature.Parse(sig)
+		err := signature.Parse(sig.Address, sig.SignerIndex, sig.KeyIndex, sig.Signature)
 		if err != nil {
 			return err
 		}
 		signatures[i] = signature
 	}
+
+	*t = signatures
 	return nil
 }
 
