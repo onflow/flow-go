@@ -31,16 +31,15 @@ func (p *PSMT) RootHash() ledger.RootHash {
 // TODO return list of indecies instead of paths
 func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 	var failedPaths []ledger.Path
-	payloads := make([]*ledger.Payload, 0)
-	for _, path := range paths {
+	payloads := make([]*ledger.Payload, len(paths))
+	for i, path := range paths {
 		// lookup the path for the payload
 		node, found := p.pathLookUp[path]
 		if !found {
-			payloads = append(payloads, nil)
 			failedPaths = append(failedPaths, path)
 			continue
 		}
-		payloads = append(payloads, node.payload)
+		payloads[i] = node.payload
 	}
 	if len(failedPaths) > 0 {
 		return nil, &ErrMissingPath{Paths: failedPaths}
