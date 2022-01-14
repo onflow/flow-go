@@ -3,13 +3,16 @@ package relay
 import (
 	"fmt"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 )
 
 type RelayNetwork struct {
-	network.Network
+	originNet      network.Network
 	destinationNet network.Network
 	logger         zerolog.Logger
 	channels       network.ChannelList
@@ -24,7 +27,7 @@ func NewRelayNetwork(
 	channels []network.Channel,
 ) *RelayNetwork {
 	return &RelayNetwork{
-		Network:        originNetwork,
+		originNet:      originNetwork,
 		destinationNet: destinationNetwork,
 		logger:         logger.With().Str("component", "relay_network").Logger(),
 		channels:       channels,
@@ -33,7 +36,7 @@ func NewRelayNetwork(
 
 func (r *RelayNetwork) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
 	if !r.channels.Contains(channel) {
-		return r.Network.Register(channel, messageProcessor)
+		return r.originNet.Register(channel, messageProcessor)
 	}
 
 	relayer, err := NewRelayer(r.destinationNet, channel, messageProcessor)
@@ -42,7 +45,7 @@ func (r *RelayNetwork) Register(channel network.Channel, messageProcessor networ
 		return nil, fmt.Errorf("failed to register relayer on origin network: %w", err)
 	}
 
-	conduit, err := r.Network.Register(channel, relayer)
+	conduit, err := r.originNet.Register(channel, relayer)
 
 	if err != nil {
 		if closeErr := relayer.Close(); closeErr != nil {
@@ -53,4 +56,18 @@ func (r *RelayNetwork) Register(channel network.Channel, messageProcessor networ
 	}
 
 	return conduit, nil
+}
+
+func (r *RelayNetwork) Start(ctx irrecoverable.SignalerContext) {}
+
+func (r *RelayNetwork) Ready() <-chan struct{} {
+	return util.AllReady(r.originNet, r.destinationNet)
+}
+
+func (r *RelayNetwork) Done() <-chan struct{} {
+	return util.AllDone(r.originNet, r.destinationNet)
+}
+
+func (r *RelayNetwork) RegisterBlobService(channel network.Channel, store datastore.Batching) (network.BlobService, error) {
+	return r.originNet.RegisterBlobService(channel, store)
 }

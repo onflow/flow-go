@@ -86,7 +86,7 @@ func (anb *StakedAccessNodeBuilder) Initialize() error {
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
 	if anb.supportsUnstakedFollower {
 		anb.enqueueUnstakedNetworkInit()
-		anb.enqueueSplitterNetwork()
+		anb.enqueueRelayNetwork()
 	}
 
 	anb.EnqueueMetricsServerInit()
@@ -102,7 +102,7 @@ func (anb *StakedAccessNodeBuilder) Initialize() error {
 	return nil
 }
 
-func (anb *StakedAccessNodeBuilder) enqueueSplitterNetwork() {
+func (anb *StakedAccessNodeBuilder) enqueueRelayNetwork() {
 	anb.Component("relay network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		relayNet := relaynet.NewRelayNetwork(
 			node.Network,
