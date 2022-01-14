@@ -62,7 +62,7 @@ func (n *Network) RegisterBlobService(channel network.Channel, store datastore.B
 // Register will subscribe the given engine with the spitter on the given channel, and all registered
 // engines will be notified with incoming messages on the channel.
 // The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
