@@ -168,7 +168,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "00000010")) //make sure we have enough segments saved
 		})
 
-		// create a new forest and reply WAL
+		// create a new forest and replay WAL
 		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 

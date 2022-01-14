@@ -45,12 +45,11 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 	if len(failedPaths) > 0 {
 		return nil, &ErrMissingPath{Paths: failedPaths}
 	}
-	// after updating all the nodes, compute the value recursively only once
 	return payloads, nil
 }
 
 // Update updates registers and returns rootValue after updates
-// in case of error, it returns a list of paths for which update failed
+// in case of error, it returns a list of keys for which update failed
 func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) (ledger.RootHash, error) {
 	var failedKeys []ledger.Key
 	for i, path := range paths {
@@ -88,20 +87,20 @@ func NewPSMT(
 		payload := pr.Payload
 
 		// we process the path, bit by bit, until we reach the end of the proof (due to compactness)
-		prValueIndex := 0        // we keep track of our progress through proofs by proofIndex
+		prValueIndex := 0        // we keep track of our progress through proofs by prValueIndex
 		currentNode := psmt.root // start from the rootNode and walk down the tree
 		for j := 0; j < int(pr.Steps); j++ {
 			// if a flag (bit j in flags) is false, the value is a default value
 			// otherwise the value is stored in the proofs
 			defaultHash := ledger.GetDefaultHashForHeight(currentNode.height - 1)
 			v := defaultHash
-			flag := bitutils.Bit(pr.Flags, j)
+			flag := bitutils.ReadBit(pr.Flags, j)
 			if flag == 1 {
-				// use the proof at index proofIndex
+				// use the proof at index prValueIndex
 				v = pr.Interims[prValueIndex]
 				prValueIndex++
 			}
-			bit := bitutils.Bit(path[:], j)
+			bit := bitutils.ReadBit(path[:], j)
 			// look at the bit number j (left to right) for branching
 			if bit == 1 { // right branching
 				if currentNode.lChild == nil { // check left child
