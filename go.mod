@@ -57,7 +57,7 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/atree v0.1.1
+	github.com/onflow/atree v0.1.2-0.20211216135231-f8f0a14c7272
 	github.com/onflow/cadence v0.20.2
 	github.com/onflow/flow v0.2.3-0.20211203180137-d6c902ccc3a7
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
@@ -81,7 +81,7 @@ require (
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.8.1
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1-0.20210824115523-ab6dc3262822
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
@@ -108,3 +108,5 @@ require (
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 replace github.com/onflow/flow-go/crypto => ./crypto
+
+replace github.com/onflow/cadence => ../cadence

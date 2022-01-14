@@ -382,6 +382,21 @@ func (r RawStorable) Storable(_ atree.SlabStorage, _ atree.Address, _ uint64) (a
 	return r, nil
 }
 
+func rawStorableHashInput(v atree.Value, _ []byte) ([]byte, error) {
+	return []byte(v.(RawStorable)), nil
+}
+
+func rawStorableComparator(storage atree.SlabStorage, value atree.Value, otherStorable atree.Storable) (bool, error) {
+	otherValue, err := otherStorable.StoredValue(storage)
+	if err != nil {
+		return false, err
+	}
+
+	result := bytes.Compare(value.(RawStorable), otherValue.(RawStorable))
+
+	return result == 0, nil
+}
+
 func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storagePayloads []ledger.Payload, slabPayloads []ledger.Payload) {
 	for _, p := range inp {
 		if state.IsFVMStateKey(
@@ -454,6 +469,7 @@ func (m *OrderedMapMigration) migrate(payload []ledger.Payload) ([]ledger.Payloa
 					unsafe.Pointer(unsafeOrderedMap.UnsafeAddr()),
 				).Elem().Interface().(*atree.OrderedMap)
 				orderedMap.Set(
+					// these should be rawstorables too probably
 					interpreter.StringAtreeComparator,
 					interpreter.StringAtreeHashInput,
 					interpreter.StringAtreeValue(pair.Key),
