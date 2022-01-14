@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"net/http"
 
 	"github.com/rs/zerolog"
@@ -80,6 +81,14 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 	var statusErr StatusError
 	if errors.As(err, &statusErr) {
 		h.errorResponse(w, statusErr.Status(), statusErr.UserMessage(), errorLogger)
+		return
+	}
+
+	// handle cadence errors
+	var cadenceError *fvmErrors.CadenceRuntimeError
+	if fvmErrors.As(err, &cadenceError) {
+		msg := fmt.Sprintf("Cadence error: %s", cadenceError.Error())
+		h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
 		return
 	}
 
