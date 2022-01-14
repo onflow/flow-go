@@ -84,7 +84,7 @@ func (i *TransactionInvoker) Process(
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
 		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
-			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
+			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
 		sth.EnableLimitEnforcement()
@@ -132,7 +132,7 @@ func (i *TransactionInvoker) Process(
 			},
 		)
 		if err != nil {
-			txError = fmt.Errorf("transaction invocation failed: %w", errors.HandleRuntimeError(err))
+			txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
 		}
 
 		// break the loop
@@ -167,7 +167,7 @@ func (i *TransactionInvoker) Process(
 	// this needs to happen before checking limits, so that contract changes are committed to the state
 	updatedKeys, err := env.Commit()
 	if err != nil && txError == nil {
-		txError = fmt.Errorf("transaction invocation failed: %w", err)
+		txError = fmt.Errorf("transaction invocation failed when committing Environment: %w", err)
 	}
 
 	// if there is still no error check if all account storage limits are ok
@@ -197,7 +197,7 @@ func (i *TransactionInvoker) Process(
 
 		updatedKeys, err = env.Commit()
 		if err != nil && feesError == nil {
-			feesError = fmt.Errorf("transaction invocation failed: %w", err)
+			feesError = fmt.Errorf("transaction invocation failed after deducting fees: %w", err)
 		}
 
 		// if fee deduction fails just do clean up and exit
