@@ -215,7 +215,7 @@ PutLoop:
 // Get will retrieve the value associated with the given key. It returns true
 // if the key was found and false otherwise.
 func (t *Tree) Get(key []byte) ([]byte, bool) {
-	if t.root == nil || t.keyLength != len(key) {
+	if t.keyLength != len(key) {
 		return nil, false
 	}
 	return t.unsafeGet(key)
@@ -279,7 +279,7 @@ GetLoop:
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
 func (t *Tree) Del(key []byte) bool {
-	if t.root == nil || t.keyLength != len(key) {
+	if t.keyLength != len(key) {
 		return false
 	}
 	return t.unsafeDel(key)
