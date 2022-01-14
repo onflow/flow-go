@@ -1,7 +1,6 @@
 package committees
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -85,9 +84,14 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	suite.payloads.On("ByBlockID", nonRootBlockID).Return(&payload, nil)
 	suite.payloads.On("ByBlockID", rootBlockID).Return(&rootPayload, nil)
 
+	// a real cluster member which continues to be a valid member
 	realClusterMember := suite.members[1]
+	// a real cluster member which loses all its stake between cluster initialization
+	// and the test's reference block
 	realNoWeightClusterMember := suite.members[2]
-	realClusterMember.Stake = 0
+	realNoWeightClusterMember.Stake = 0
+	// a real cluster member which is ejected between cluster initialization and
+	// the test's reference block
 	realEjectedClusterMember := suite.members[3]
 	realEjectedClusterMember.Ejected = true
 	realNonClusterMember := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -103,44 +107,48 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	suite.Run("should return ErrInvalidSigner for non-existent signer", func() {
 		suite.Run("root block", func() {
 			_, err := suite.com.Identity(rootBlockID, fakeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, fakeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
 		})
 	})
 
 	suite.Run("should return ErrInvalidSigner for existent non-cluster-member", func() {
 		suite.Run("root block", func() {
 			_, err := suite.com.Identity(rootBlockID, realNonClusterMember.NodeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, realNonClusterMember.NodeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
 		})
 	})
 
 	suite.Run("should return ErrInvalidSigner for existent but ejected cluster member", func() {
+		// at the root block, the cluster member is not ejected yet
 		suite.Run("root block", func() {
-			_, err := suite.com.Identity(rootBlockID, realEjectedClusterMember.NodeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			actual, err := suite.com.Identity(rootBlockID, realEjectedClusterMember.NodeID)
+			suite.Require().NoError(err)
+			suite.Assert().Equal(realEjectedClusterMember, actual)
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, realEjectedClusterMember.NodeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
 		})
 	})
 
 	suite.Run("should return ErrInvalidSigner for existent but zero-weight cluster member", func() {
+		// at the root block, the cluster member has its initial weight
 		suite.Run("root block", func() {
-			_, err := suite.com.Identity(rootBlockID, realNoWeightClusterMember.NodeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			actual, err := suite.com.Identity(rootBlockID, realNoWeightClusterMember.NodeID)
+			suite.Require().NoError(err)
+			suite.Assert().Equal(realNoWeightClusterMember, actual)
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, realNoWeightClusterMember.NodeID)
-			suite.Assert().True(errors.Is(model.ErrInvalidSigner, err))
+			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
 		})
 	})
 
