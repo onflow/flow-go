@@ -647,7 +647,7 @@ func (c *Core) requestPendingApprovals(observation consensus.SealingObservation,
 // since Z is prior to sealing segment, the node cannot valid the ER. Therefore, we
 // ignore these block references.
 //
-//      [  sealing segment  ]
+//      [  sealing segment       ]
 // Z <- A <- B(RZ) <- C <- D <- E
 //
 func (c *Core) getOutdatedBlockIDsFromRootSealingSegment(rootHeader *flow.Header) (map[flow.Identifier]struct{}, error) {
