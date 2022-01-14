@@ -43,7 +43,6 @@ require (
 	github.com/ipfs/go-ipfs-provider v0.7.0
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipld/go-ipld-prime v0.14.1 // indirect
-	github.com/jrick/bitset v1.0.0
 	github.com/libp2p/go-addr-util v0.1.0
 	github.com/libp2p/go-libp2p v0.16.0
 	github.com/libp2p/go-libp2p-core v0.11.0
