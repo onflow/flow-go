@@ -70,7 +70,7 @@ func GenerateExecutionResultForBlock(
 	block *flow.Block,
 	chunks []*flow.Chunk,
 	serviceEvents []flow.Event,
-	executionDataId flow.Identifier,
+	executionDataID flow.Identifier,
 ) (*flow.ExecutionResult, error) {
 
 	// convert Cadence service event representation to flow-go representation
