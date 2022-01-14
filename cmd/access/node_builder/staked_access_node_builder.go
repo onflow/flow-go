@@ -19,11 +19,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
-	"github.com/onflow/flow-go/engine/access/relay"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/requester"
-	"github.com/onflow/flow-go/engine/common/splitter"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -82,15 +80,14 @@ func (anb *StakedAccessNodeBuilder) InitIDProviders() {
 func (anb *StakedAccessNodeBuilder) Initialize() error {
 	anb.InitIDProviders()
 
-	// if this is an access node that supports unstaked followers, enqueue the unstaked network
-	if anb.supportsUnstakedFollower {
-		anb.enqueueUnstakedNetworkInit()
-	}
-
 	// enqueue the regular network
 	anb.EnqueueNetworkInit()
 
-	anb.enqueueSplitterNetwork()
+	// if this is an access node that supports unstaked followers, enqueue the unstaked network
+	if anb.supportsUnstakedFollower {
+		anb.enqueueUnstakedNetworkInit()
+		anb.enqueueSplitterNetwork()
+	}
 
 	anb.EnqueueMetricsServerInit()
 
@@ -260,50 +257,23 @@ func (anb *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 		})
 
 	if anb.supportsUnstakedFollower {
-		var unstakedNetworkConduit network.Conduit
-		var proxyEngine *splitter.Engine
+		anb.Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			syncRequestHandler, err := synceng.NewRequestHandlerEngine(
+				node.Logger.With().Bool("unstaked", true).Logger(),
+				unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
+				anb.AccessNodeConfig.PublicNetworkConfig.Network,
+				node.Me,
+				node.Storage.Blocks,
+				anb.SyncCore,
+				anb.FinalizedHeader,
+			)
 
-		anb.
-			Component("unstaked sync request proxy", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				proxyEngine = splitter.New(node.Logger, engine.PublicSyncCommittee)
+			if err != nil {
+				return nil, fmt.Errorf("could not create unstaked sync request handler: %w", err)
+			}
 
-				// register the proxy engine with the unstaked network
-				var err error
-				unstakedNetworkConduit, err = anb.AccessNodeConfig.PublicNetworkConfig.Network.Register(engine.PublicSyncCommittee, proxyEngine)
-				if err != nil {
-					return nil, fmt.Errorf("could not register unstaked sync request proxy: %w", err)
-				}
-
-				return proxyEngine, nil
-			}).
-			Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				syncRequestHandler := synceng.NewRequestHandlerEngine(
-					node.Logger.With().Bool("unstaked", true).Logger(),
-					unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
-					unstakedNetworkConduit,
-					node.Me,
-					node.Storage.Blocks,
-					anb.SyncCore,
-					anb.FinalizedHeader,
-					// don't queue missing heights from unstaked nodes
-					// since we are always more up-to-date than them
-					false,
-				)
-				// register the sync request handler with the proxy engine
-				proxyEngine.RegisterEngine(syncRequestHandler)
-
-				return syncRequestHandler, nil
-			}).
-			Component("relay engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				return relay.New(
-					node.Logger,
-					network.ChannelList{
-						engine.ReceiveBlocks,
-					},
-					node.Network,
-					anb.AccessNodeConfig.PublicNetworkConfig.Network,
-				)
-			})
+			return syncRequestHandler, nil
+		})
 	}
 
 	anb.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
