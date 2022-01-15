@@ -23,7 +23,6 @@ import (
 )
 
 func TestExecutionStateSealing(t *testing.T) {
-	t.Skip()
 	suite.Run(t, new(SealingSuite))
 }
 
