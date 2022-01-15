@@ -58,7 +58,7 @@ func (is *InclusionSuite) SetupTest() {
 	// need three real consensus nodes
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithID(conID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithID(conID))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		is.conIDs = append(is.conIDs, conID)
 	}
@@ -110,26 +110,85 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	sentinel := unittest.CollectionGuaranteeFixture()
 	sentinel.SignerIDs = []flow.Identifier{is.collID}
 	sentinel.ReferenceBlockID = is.net.Root().ID()
+	colID := sentinel.CollectionID
 
-	is.T().Logf("collection guarantee generated: %x\n", sentinel.CollectionID)
+	is.T().Logf("collection guarantee generated: %x\n", colID)
+
+	is.sendingGuaranteeToConsensusNodes(sentinel, deadline)
+	is.T().Logf("sent collection %x to consensus node \n", colID)
+
+	proposal := is.checkingCollectionHasBeenIncludedInBlock(sentinel, deadline)
+	proposalID := proposal.Header.ID()
+	is.T().Logf("%x: collection guarantee %x included!\n", proposalID, colID)
+
+	is.checkingProposalConfirmed(sentinel, proposal, deadline)
+	is.T().Logf("collection guarantee %x confirmed for 3 times, sealed!", colID)
+
+	is.T().Logf("stopping containers")
+}
+
+func (is *InclusionSuite) sendingGuaranteeToConsensusNodes(sentinel *flow.CollectionGuarantee, deadline time.Time) {
+	colID := sentinel.CollectionID
 
 	// keep trying to send collection guarantee to at least one consensus node
-SendingLoop:
 	for time.Now().Before(deadline) {
 		conID := is.conIDs[rand.Intn(len(is.conIDs))]
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		is.T().Logf("sending collection %x to consensus node %v\n", colID, conID)
 		err := is.Collection().Send(ctx, engine.PushGuarantees, sentinel, conID)
 		cancel()
 		if err != nil {
 			is.T().Logf("could not send collection guarantee: %s\n", err)
 			continue
 		}
-		break SendingLoop
+
+		return
+	}
+}
+
+func (is *InclusionSuite) checkingCollectionHasBeenIncludedInBlock(sentinel *flow.CollectionGuarantee, deadline time.Time) *messages.BlockProposal {
+	colID := sentinel.CollectionID
+	// we try to find a block with the guarantee included and three confirmations
+	for time.Now().Before(deadline) {
+
+		// we read the next message until we reach deadline
+		_, msg, err := is.reader.Next()
+		if err != nil {
+			is.T().Logf("could not read message: %s\n", err)
+			continue
+		}
+
+		// we only care about block proposals at the moment
+		proposal, ok := msg.(*messages.BlockProposal)
+		if !ok {
+			continue
+		}
+
+		guarantees := proposal.Payload.Guarantees
+
+		// check if the collection guarantee is included
+		for _, guarantee := range guarantees {
+			if guarantee.CollectionID == sentinel.CollectionID {
+				proposalID := proposal.Header.ID()
+				is.T().Logf("%x: collection guarantee %x included!\n", proposalID, colID)
+				return proposal
+			}
+		}
 	}
 
+	is.T().Fatalf("timeout checking collection guarantee %x included\n", colID)
+	return nil
+}
+
+// checkingProposalConfirmed returns whether it has seen 3 blocks confirmations on the block
+// that contains the guarantee
+func (is *InclusionSuite) checkingProposalConfirmed(sentinel *flow.CollectionGuarantee, proposal *messages.BlockProposal, deadline time.Time) {
+	colID := sentinel.CollectionID
 	// we try to find a block with the guarantee included and three confirmations
 	confirmations := make(map[flow.Identifier]uint)
-InclusionLoop:
+	// add the proposal that includes the guarantee
+	confirmations[proposal.Header.ID()] = 0
+
 	for time.Now().Before(deadline) {
 
 		// we read the next message until we reach deadline
@@ -151,17 +210,6 @@ InclusionLoop:
 		if processed {
 			continue
 		}
-		guarantees := proposal.Payload.Guarantees
-
-		// if the collection guarantee is included, we add the block to those we
-		// monitor for confirmations
-		for _, guarantee := range guarantees {
-			if guarantee.CollectionID == sentinel.CollectionID {
-				confirmations[proposalID] = 0
-				is.T().Logf("%x: collection guarantee included!\n", proposalID)
-				continue InclusionLoop
-			}
-		}
 
 		// if the parent is in the map, it is on a chain that included the
 		// guarantee; take parent confirmatians plus one as the confirmations
@@ -169,24 +217,14 @@ InclusionLoop:
 		n, ok := confirmations[proposal.Header.ParentID]
 		if ok {
 			confirmations[proposalID] = n + 1
-			is.T().Logf("%x: collection guarantee confirmed! (count: %d)\n", proposalID, n+1)
+			is.T().Logf("%x: collection guarantee %x confirmed! (count: %d)\n", proposalID, colID, n+1)
 		}
 
 		// if we reached three or more confirmations, we are done!
 		if confirmations[proposalID] >= 3 {
-			break
+			return
 		}
 	}
 
-	// make sure we found the guarantee in at least one block proposal
-	require.NotEmpty(is.T(), confirmations, "collection guarantee should have been included in at least one block")
-
-	// check if we have a block with 3 confirmations that contained it
-	max := uint(0)
-	for _, n := range confirmations {
-		if n > max {
-			max = n
-		}
-	}
-	require.GreaterOrEqual(is.T(), max, uint(3), "should have confirmed one collection guarantee inclusion block at least three times")
+	is.T().Fatalf("timeout, collection guarantee %x not confirmed\n", colID)
 }

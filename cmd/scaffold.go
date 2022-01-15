@@ -1094,6 +1094,8 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 			Err(err).
 			Msg("could not close database")
 	}
+
+	fnb.Logger.Info().Msg("database has been closed")
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {

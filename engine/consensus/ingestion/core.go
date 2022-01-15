@@ -57,6 +57,8 @@ func NewCore(
 // All other errors are unexpected and potential symptoms of internal state corruption.
 func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
+	e.log.Info().Msgf("on guarantee called for guarantee %v from %v", guarantee.ID(), originID)
+
 	span, _, isSampled := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
 	if isSampled {
 		span.LogKV("originID", originID.String())

@@ -523,29 +523,46 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
 		}
 	}
-	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAccessNodeIDS, fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
+	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAccessNodeIDS,
+		fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
 
-	// add each node to the network
+	// start ghost nodes first
 	for _, nodeConf := range confs {
+		if !nodeConf.Ghost {
+			continue
+		}
+
+		t.Logf("start container as ghost %v", nodeConf.ContainerName)
+		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
+		require.NoError(t, err)
+	}
+
+	// add each follower to the network
+	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
+	for _, followerConf := range networkConf.ConsensusFollowers {
+		t.Logf("start consensus follower %v", followerConf.NodeID)
+		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
+	}
+
+	// add each consensus / collection node to the network
+	// add as last, because consensus nodes need to start up all together.
+	// the closer they got ready together, the more reliable the tests can finish
+	for _, nodeConf := range confs {
+		// ghost node has been started already
+		if nodeConf.Ghost {
+			continue
+		}
+
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
-		if nodeConf.Role == flow.RoleConsensus || nodeConf.Role == flow.RoleCollection {
-			// ghost containers don't participate in the network skip any SN/LN ghost containers
-			if !nodeConf.Ghost {
-				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
-				nodeContainer.addFlag("insecure-access-api", "false")
-				nodeContainer.addFlag("access-node-ids", "*")
-			}
+		if nodeConf.Role == flow.RoleConsensus {
+			t.Logf("start consensus container %v", nodeConf.ContainerName)
+			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
+			nodeContainer.addFlag("insecure-access-api", "false")
+			nodeContainer.addFlag("access-node-ids", "*")
 		}
-	}
-
-	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
-
-	// add each follower to the network
-	for _, followerConf := range networkConf.ConsensusFollowers {
-		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
 	return flowNetwork
@@ -964,7 +981,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
 	}
 	epochConfig := epochs.EpochConfig{
-		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
 		NumViewsInEpoch:              cadence.UInt64(networkConf.ViewsInEpoch),
