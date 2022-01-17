@@ -1,6 +1,6 @@
 ## How does Flow Integration Tests work
 
-The integration tests creates a network in local with different node types running as docker instances. The docker instances are created and started in the test case by a testing utility called `testingdock`.
+The integration tests create a network locally with different node types running as docker instances. The docker instances are created and started in the test case by a testing utility called `testingdock`.
 
 `testingdock` is a small testing utility which uses local Docker to run a network of nodes. With it, we are able to create, start, stop, and remove docker containers in test cases written in golang.
 
@@ -67,7 +67,7 @@ During test cases debugging, you might want to update some code. However, if you
 
 So you need to rebuild all the images by running `make docker-build-flow` again before re-running the integration tests.
 
-Rebuilding all images take quite some time, here is a shortcut:
+Rebuilding all images takes quite some time, here is a shortcut:
 
 If consensus's code was changed, then only consensus's image need to be rebuilt, so simply run `make docker-build-consensus` instead of rebuilding all the images.
 
