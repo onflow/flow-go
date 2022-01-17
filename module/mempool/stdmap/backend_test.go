@@ -240,3 +240,23 @@ func addRandomEntities(t *testing.T, backend *Backend, num int) {
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "failed to add elements in time")
 }
+
+func TestBackend_All(t *testing.T) {
+	backend := NewBackend()
+	entities := unittest.EntityListFixture(100)
+
+	// Add
+	for _, e := range entities {
+		// all entities must be stored successfully
+		require.True(t, backend.Add(e))
+	}
+
+	// All
+	all := backend.All()
+	require.Equal(t, len(entities), len(all))
+	for _, expected := range entities {
+		actual, ok := backend.ByID(expected.ID())
+		require.True(t, ok)
+		require.Equal(t, expected, actual)
+	}
+}
