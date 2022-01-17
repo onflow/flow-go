@@ -1,9 +1,8 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package stdmap
+package stdmap_test
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -15,25 +14,16 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type fake []byte
-
-func (f fake) ID() flow.Identifier {
-	return flow.HashToID(f)
-}
-
-func (f fake) Checksum() flow.Identifier {
-	return flow.Identifier(sha256.Sum256(f))
-}
-
 func TestAddRem(t *testing.T) {
-	item1 := fake("DEAD")
-	item2 := fake("AGAIN")
+	item1 := unittest.MockEntityFixture()
+	item2 := unittest.MockEntityFixture()
 
 	t.Run("should be able to add and rem", func(t *testing.T) {
-		pool := NewBackend()
+		pool := stdmap.NewBackend()
 		added := pool.Add(item1)
 		require.True(t, added)
 		added = pool.Add(item2)
@@ -66,11 +56,11 @@ func TestAddRem(t *testing.T) {
 }
 
 func TestAdjust(t *testing.T) {
-	item1 := fake("DEAD")
-	item2 := fake("AGAIN")
+	item1 := unittest.MockEntityFixture()
+	item2 := unittest.MockEntityFixture()
 
 	t.Run("should not adjust if not exist", func(t *testing.T) {
-		pool := NewBackend()
+		pool := stdmap.NewBackend()
 		_ = pool.Add(item1)
 
 		// item2 doesn't exist
@@ -86,7 +76,7 @@ func TestAdjust(t *testing.T) {
 	})
 
 	t.Run("should adjust if exists", func(t *testing.T) {
-		pool := NewBackend()
+		pool := stdmap.NewBackend()
 		_ = pool.Add(item1)
 
 		updatedItem, ok := pool.Adjust(item1.ID(), func(old flow.Entity) flow.Entity {
@@ -103,13 +93,13 @@ func TestAdjust(t *testing.T) {
 	})
 }
 
-// Test that size mempool deduplicates based on ID
+// Test that size mempool de-duplicates based on ID
 func Test_DeduplicationByID(t *testing.T) {
-	item1 := fake("A")
-	item2 := fake("A") // identical ID, but different instance
+	item1 := unittest.MockEntityFixture()
+	item2 := unittest.MockEntity{Identifier: item1.Identifier} // duplicate
 	assert.True(t, item1.ID() == item2.ID())
 
-	pool := NewBackend()
+	pool := stdmap.NewBackend()
 	pool.Add(item1)
 	pool.Add(item2)
 	assert.Equal(t, uint(1), pool.Size())
@@ -124,7 +114,7 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 		limit = 150
 		swarm = 150
 	)
-	pool := NewBackend(WithLimit(limit))
+	pool := stdmap.NewBackend(stdmap.WithLimit(limit))
 
 	wg := sync.WaitGroup{}
 	wg.Add(swarm)
@@ -132,7 +122,7 @@ func TestBackend_RunLimitChecking(t *testing.T) {
 	for i := 0; i < swarm; i++ {
 		go func(x int) {
 			// creates and adds a fake item to the mempool
-			item := fake(fmt.Sprintf("item%d", x))
+			item := unittest.MockEntityFixture()
 			_ = pool.Run(func(backdata mempool.BackData) error {
 				added := backdata.Add(item.ID(), item)
 				if !added {
@@ -159,7 +149,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 		limit = 20
 		swarm = 20
 	)
-	pool := NewBackend(WithLimit(limit))
+	pool := stdmap.NewBackend(stdmap.WithLimit(limit))
 
 	// on ejection callback: test whether ejected identity is no longer part of the mempool
 	ensureEntityNotInMempool := func(entity flow.Entity) {
@@ -180,7 +170,7 @@ func TestBackend_RegisterEjectionCallback(t *testing.T) {
 	for i := 0; i < swarm; i++ {
 		go func(x int) {
 			// creates and adds a fake item to the mempool
-			item := fake(fmt.Sprintf("item%d", x))
+			item := unittest.MockEntityFixture()
 			pool.Add(item)
 			wg.Done()
 		}(i)
@@ -203,7 +193,7 @@ func TestBackend_Multiple_OnEjectionCallbacks(t *testing.T) {
 	const (
 		limit = 30
 	)
-	pool := NewBackend(WithLimit(limit))
+	pool := stdmap.NewBackend(stdmap.WithLimit(limit))
 	pool.RegisterEjectionCallbacks(callback, callback)
 
 	t.Run("fill mempool up to limit", func(t *testing.T) {
@@ -227,14 +217,13 @@ func TestBackend_Multiple_OnEjectionCallbacks(t *testing.T) {
 	})
 }
 
-func addRandomEntities(t *testing.T, backend *Backend, num int) {
+func addRandomEntities(t *testing.T, backend *stdmap.Backend, num int) {
 	// add swarm-number of items to backend
 	wg := sync.WaitGroup{}
 	wg.Add(num)
 	for ; num > 0; num-- {
 		go func() {
-			randID := unittest.IdentifierFixture()
-			backend.Add(fake(randID[:])) // creates and adds a fake item to the mempool
+			backend.Add(unittest.MockEntityFixture()) // creates and adds a fake item to the mempool
 			wg.Done()
 		}()
 	}
@@ -242,7 +231,7 @@ func addRandomEntities(t *testing.T, backend *Backend, num int) {
 }
 
 func TestBackend_All(t *testing.T) {
-	backend := NewBackend()
+	backend := stdmap.NewBackend()
 	entities := unittest.EntityListFixture(100)
 
 	// Add
