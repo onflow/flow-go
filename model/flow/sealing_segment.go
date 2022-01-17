@@ -257,6 +257,8 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 }
 
 // hasValidSeal returns true if the latest seal as of highest is for lowest.
+// NOTE: only applicable for non-root sealing segments containing multiple blocks,
+// root sealing segments are checked by isValidRootSegment.
 func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 	lowestID := builder.lowest().ID()
 	highestID := builder.highest().ID()
@@ -265,7 +267,7 @@ func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 	latestSealID := builder.latestSeals[highestID]
 
 	// find the seal within the block payloads
-	// NOTE: it is impossible for latestSeal to be builder.FirstSeal
+	// NOTE: for non-root sealing segments, it is impossible for latestSeal to be builder.FirstSeal
 	for i := len(builder.blocks) - 1; i >= 0; i-- {
 		block := builder.blocks[i]
 		// look for latestSealID in the payload
