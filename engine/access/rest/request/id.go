@@ -42,12 +42,21 @@ func (i *IDs) Parse(raw []string) error {
 		return fmt.Errorf("at most %d IDs can be requested at a time", maxIDsLength)
 	}
 
-	ids := make([]ID, len(raw))
-	for j, r := range raw {
-		err := ids[j].Parse(r)
+	// make a map to have only unique values as keys
+	uniqueIDs := make(map[ID]bool)
+	for _, r := range raw {
+		var id ID
+		err := id.Parse(r)
 		if err != nil {
 			return err
 		}
+
+		uniqueIDs[id] = true
+	}
+
+	ids := make([]ID, 0)
+	for id := range uniqueIDs {
+		ids = append(ids, id)
 	}
 
 	*i = ids
