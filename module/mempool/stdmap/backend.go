@@ -155,12 +155,8 @@ func (b *Backend) All() []flow.Entity {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)All")
 	//defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	all := make([]flow.Entity, 0, b.backData.Size())
-	for _, e := range b.backData.Entities() {
-		all = append(all, e)
-	}
 
-	return all
+	return b.backData.Entities()
 }
 
 // Clear removes all entities from the pool.
