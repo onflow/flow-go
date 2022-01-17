@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 
 	"github.com/onflow/flow-go/access"
@@ -10,19 +11,22 @@ const blockQueryParam = "block_ids"
 const eventTypeQuery = "type"
 
 // getEvents for the provided block range or list of block IDs filtered by type.
-func getEvents(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
+func getEvents(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetEventsRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
+	// if the request has block IDs provided then return events for block IDs
+	var blocksEvents models.BlocksEvents
 	if len(req.BlockIDs) > 0 {
 		events, err := backend.GetEventsForBlockIDs(r.Context(), req.Type, req.BlockIDs)
 		if err != nil {
 			return nil, err
 		}
-		// todo handle
-		return
+
+		blocksEvents.Build(events)
+		return blocksEvents, nil
 	}
 
 	// if end height is provided with special values then load the height
@@ -35,10 +39,12 @@ func getEvents(r *request.Request, backend access.API, link LinkGenerator) (inte
 		req.EndHeight = latest.Height
 	}
 
+	// if request provided block height range then return events for that range
 	events, err := backend.GetEventsForHeightRange(r.Context(), req.Type, req.StartHeight, req.EndHeight)
 	if err != nil {
 		return nil, err
 	}
 
-	// todo events response
+	blocksEvents.Build(events)
+	return blocksEvents, nil
 }
