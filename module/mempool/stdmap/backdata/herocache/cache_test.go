@@ -459,7 +459,6 @@ func testEntitiesMatchFrom(t *testing.T, expectedEntities []flow.Entity, actualE
 	require.Len(t, expectedEntities, len(actualEntities)-from)
 
 	for i, actual := range actualEntities {
-
 		if i < from {
 			require.NotContains(t, expectedEntities, actual)
 		} else {
@@ -473,7 +472,6 @@ func testIdentifiersMatchFrom(t *testing.T, expectedIdentifiers flow.IdentifierL
 	require.Len(t, expectedIdentifiers, len(actualEntities)-from)
 
 	for i, actual := range actualEntities {
-
 		if i < from {
 			require.NotContains(t, expectedIdentifiers, actual.ID())
 		} else {
