@@ -170,7 +170,7 @@ func (net *FlowNetwork) Result() *flow.ExecutionResult {
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
 	// makes it easier to see logs for a specific test case
-	fmt.Println("starting network: ", net.config.Name)
+	fmt.Println("starting flow network with docker containers: ", net.config.Name)
 	net.suite.Start(ctx)
 }
 
@@ -491,6 +491,8 @@ func integrationBootstrapDir() (string, error) {
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
+	t.Logf("preparing flow network")
+
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	require.NotZero(t, len(networkConf.Nodes), "must specify at least one node")
@@ -590,6 +592,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	}
 
 	flowNetwork.PrintMetricsPorts()
+
+	t.Logf("finish preparing flow network")
 
 	return flowNetwork
 }
