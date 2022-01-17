@@ -285,6 +285,7 @@ func TestArrayBackData_All(t *testing.T) {
 				// in random ejection mode we count total number of matched entities
 				// with All map.
 				testMapMatchCount(t, bd.All(), entities, int(tc.limit))
+				testEntitiesMatchCount(t, bd.Entities(), entities, int(tc.limit))
 			} else {
 				// in LRU ejection mode we match All items based on a from index (i.e., last "from" items).
 				from := int(tc.items) - int(tc.limit)
@@ -494,6 +495,18 @@ func testMapMatchCount(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity
 		actualCount++
 	}
 	require.Equal(t, count, actualCount)
+}
+
+// testEntitiesMatchCount is a test helper that checks specified number of entities are retrievable from given list.
+func testEntitiesMatchCount(t *testing.T, expectedEntities []flow.Entity, actualEntities []*unittest.MockEntity, count int) {
+	entitiesMap := make(map[flow.Identifier]flow.Entity)
+
+	// converts expected entities list to a map in order to utilize a test helper.
+	for _, expected := range expectedEntities {
+		entitiesMap[expected.ID()] = expected
+	}
+
+	testMapMatchCount(t, entitiesMap, actualEntities, count)
 }
 
 // testRetrievableCount is a test helper that checks the number of retrievable entities from backdata exactly matches
