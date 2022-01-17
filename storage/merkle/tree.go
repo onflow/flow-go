@@ -274,10 +274,10 @@ GetLoop:
 }
 
 // Prove constructs inclusion proof for a given key if the key exists in the trie.
-// it traverse the trie from top to down and collect data for proof as follows:
+// It traverses the trie from top to down and collects data for proof as follows:
 //  - if full node, capture the sibling node hash value and append zero to short counts
 //  - if short node, appends the node.shortCount to the short count list
-//  - if leaf, would capture the hash of the value
+//  - if leaf, would capture the leaf value
 func (t *Tree) Prove(key []byte) (*Proof, bool) {
 
 	// we start at the root again
