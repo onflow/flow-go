@@ -128,7 +128,7 @@ func (i *TransactionInvoker) Process(
 		var err error
 		// disable this transaction as it runs forever
 		if txIDStr == "2198424ef51722706b4c8a50a0cdadb9723dfe677cdf97fd5a42f47f18d3c1d0" {
-			err = errors.NewTransactionExecutionLimitError()
+			txError = errors.NewTransactionExecutionLimitError()
 		} else {
 			err = recoverLedgerInteractionLimitExceeded(lg.With().Str("task", "execute transaction").Logger(), func() error {
 				return vm.Runtime.ExecuteTransaction(
