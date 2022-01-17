@@ -92,6 +92,11 @@ func (i *TransactionInvoker) Process(
 		sth.EnableLimitEnforcement()
 	}()
 
+	lg := i.logger.With().
+		Str("txHash", txIDStr).
+		Uint64("blockHeight", blockHeight).
+		Logger()
+
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 		if retry {
 			// rest state
@@ -100,9 +105,7 @@ func (i *TransactionInvoker) Process(
 			// force cleanup if retries
 			programs.ForceCleanup()
 
-			i.logger.Warn().
-				Str("txHash", txIDStr).
-				Uint64("blockHeight", blockHeight).
+			lg.Warn().
 				Int("retries_count", numberOfRetries).
 				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
 				Msg("retrying transaction execution")
@@ -122,7 +125,7 @@ func (i *TransactionInvoker) Process(
 
 		location := common.TransactionLocation(proc.ID[:])
 
-		err := recoverLedgerInteractionLimitExceeded(i.logger, func() error {
+		err := recoverLedgerInteractionLimitExceeded(lg, func() error {
 			return vm.Runtime.ExecuteTransaction(
 				runtime.Script{
 					Source:    proc.Transaction.Script,
@@ -184,7 +187,7 @@ func (i *TransactionInvoker) Process(
 
 	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
-		txError = recoverLedgerInteractionLimitExceeded(i.logger, func() error {
+		txError = recoverLedgerInteractionLimitExceeded(lg, func() error {
 			return NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
 		})
 	}
@@ -274,7 +277,10 @@ func recoverLedgerInteractionLimitExceeded(logger zerolog.Logger, f func() error
 		}
 	}()
 
-	return f()
+	logger.Debug().Msgf("executing transaction in runtime")
+	err = f()
+	logger.Debug().Msgf("finish executing transaction in runtime")
+	return err
 }
 
 func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) (err error) {
