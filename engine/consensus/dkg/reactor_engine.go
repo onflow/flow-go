@@ -159,6 +159,13 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		return
 	}
 
+	// flag that we are starting the dkg for this epoch
+	err = e.dkgState.SetDKGStarted(nextEpochCounter)
+	if err != nil {
+		// unexpected storage-level error
+		log.Fatal().Err(err).Msg("could not set dkg started")
+	}
+
 	curDKGInfo, err := e.getDKGInfo(firstID)
 	if err != nil {
 		// unexpected storage-level error
@@ -176,7 +183,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 
 	if _, ok := committee.GetIndex(e.me.NodeID()); !ok {
 		// node not found in DKG committee bypass starting the DKG
-		log.Warn().Str("node_id", e.me.NodeID().String()).Msg("node is not part of DKG committee, skip starting DKG engine")
+		log.Warn().Str("node_id", e.me.NodeID().String()).Msg("node is not part of DKG committee skip starting DKG engine, this node will not participate in consensus after the next epoch starts")
 		return
 	}
 
@@ -199,13 +206,6 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 			log.Fatal().Err(err).Msg("DKG Run error")
 		}
 	})
-
-	// flag that we are starting the dkg for this epoch
-	err = e.dkgState.SetDKGStarted(nextEpochCounter)
-	if err != nil {
-		// unexpected storage-level error
-		log.Fatal().Err(err).Msg("could not set dkg started")
-	}
 
 	// NOTE:
 	// We register two callbacks for views that mark a state transition: one for
