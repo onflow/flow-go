@@ -11,7 +11,7 @@ test:
 integration-test: access-tests common-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests
 
 .PHONY: ci-integration-test
-ci-integration-test: common-tests execution-tests epochs-tests verification-tests network-tests consensus-tests # collection-tests access-tests
+ci-integration-test: consensus-tests # execution-tests epochs-tests verification-tests network-tests collection-tests access-tests common-tests
 
 .PHONY: access-tests
 access-tests:
