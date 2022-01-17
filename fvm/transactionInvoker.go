@@ -125,7 +125,7 @@ func (i *TransactionInvoker) Process(
 
 		location := common.TransactionLocation(proc.ID[:])
 
-		err := recoverLedgerInteractionLimitExceeded(lg, func() error {
+		err := recoverLedgerInteractionLimitExceeded(lg.With().Str("task", "execute transaction").Logger(), func() error {
 			return vm.Runtime.ExecuteTransaction(
 				runtime.Script{
 					Source:    proc.Transaction.Script,
@@ -187,7 +187,7 @@ func (i *TransactionInvoker) Process(
 
 	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
-		txError = recoverLedgerInteractionLimitExceeded(lg, func() error {
+		txError = recoverLedgerInteractionLimitExceeded(lg.With().Str("task", "check limit").Logger(), func() error {
 			return NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
 		})
 	}
@@ -306,7 +306,14 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 	}()
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	err = recoverLedgerInteractionLimitExceeded(i.logger, func() error {
+
+	txIDStr := proc.ID.String()
+	lg := i.logger.With().
+		Str("txHash", txIDStr).
+		Str("task", "deductTransactionFees").
+		Logger()
+
+	err = recoverLedgerInteractionLimitExceeded(lg, func() error {
 		_, err := deductTxFees(proc.Transaction.Payer)
 		return err
 	})

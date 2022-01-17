@@ -734,11 +734,10 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
-		vmOpts = append(vmOpts,
-			fvm.WithRestrictedDeployment(false),
-		)
-	}
+	// disable contract deployment
+	vmOpts = append(vmOpts,
+		fvm.WithRestrictedDeployment(true),
+	)
 	fnb.FvmOptions = vmOpts
 }
 
