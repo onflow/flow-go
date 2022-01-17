@@ -37,6 +37,14 @@ type PoolEntity struct {
 	entity flow.Entity
 }
 
+func (p PoolEntity) Id() flow.Identifier {
+	return p.id
+}
+
+func (p PoolEntity) Entity() flow.Entity {
+	return p.entity
+}
+
 type Pool struct {
 	size         uint32
 	free         state // keeps track of free slots.
