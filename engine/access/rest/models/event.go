@@ -24,3 +24,26 @@ func (e *Events) Build(events []flow.Event) {
 
 	*e = evs
 }
+
+func (b *BlockEvents) Build(blockEvents flow.BlockEvents) {
+	b.BlockHeight = fromUint64(blockEvents.BlockHeight)
+	b.BlockId = blockEvents.BlockID.String()
+	b.BlockTimestamp = blockEvents.BlockTimestamp
+
+	var events Events
+	events.Build(blockEvents.Events)
+	b.Events = events
+}
+
+type BlocksEvents []BlockEvents
+
+func (b *BlocksEvents) Build(blocksEvents []flow.BlockEvents) {
+	evs := make([]BlockEvents, len(blocksEvents))
+	for i, ev := range blocksEvents {
+		var blockEvent BlockEvents
+		blockEvent.Build(ev)
+		evs[i] = blockEvent
+	}
+
+	*b = evs
+}
