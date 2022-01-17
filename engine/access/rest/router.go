@@ -93,4 +93,9 @@ var Routes = []route{{
 	Pattern: "/accounts/{address}",
 	Name:    "getAccount",
 	Handler: GetAccount,
+}, {
+	Method:  http.MethodGet,
+	Pattern: "/events",
+	Name:    "getEvents",
+	Handler: GetEvents,
 }}
