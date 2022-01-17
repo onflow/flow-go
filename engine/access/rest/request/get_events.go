@@ -18,9 +18,9 @@ type GetEvents struct {
 
 func (g *GetEvents) Build(r *Request) error {
 	return g.Parse(
+		r.GetQueryParam(eventTypeQuery),
 		r.GetQueryParam(startHeightQuery),
 		r.GetQueryParam(endHeightQuery),
-		r.GetQueryParam(eventTypeQuery),
 		r.GetQueryParams(blockQuery),
 	)
 }
@@ -29,12 +29,12 @@ func (g *GetEvents) Parse(rawType string, rawStart string, rawEnd string, rawBlo
 	var height Height
 	err := height.Parse(rawStart)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid start height: %w", err)
 	}
 	g.StartHeight = height.Flow()
 	err = height.Parse(rawEnd)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid end height: %w", err)
 	}
 	g.EndHeight = height.Flow()
 

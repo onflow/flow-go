@@ -41,6 +41,11 @@ type BlocksEvents []BlockEvents
 func (b *BlocksEvents) Build(blocksEvents []flow.BlockEvents) {
 	evs := make([]BlockEvents, len(blocksEvents))
 	for i, ev := range blocksEvents {
+		// don't include blocks without events
+		if len(ev.Events) == 0 {
+			continue
+		}
+
 		var blockEvent BlockEvents
 		blockEvent.Build(ev)
 		evs[i] = blockEvent
