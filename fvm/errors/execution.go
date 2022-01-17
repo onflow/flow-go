@@ -246,3 +246,18 @@ func (e *EncodingUnsupportedValueError) Error() string {
 func (e *EncodingUnsupportedValueError) Code() ErrorCode {
 	return ErrCodeEncodingUnsupportedValue
 }
+
+type TransactionExecutionLimitError struct{}
+
+func NewTransactionExecutionLimitError() *TransactionExecutionLimitError {
+	return &TransactionExecutionLimitError{}
+}
+
+func (e TransactionExecutionLimitError) Error() string {
+	return "transaction execution reached limit"
+}
+
+// Code returns the error code for this error
+func (e TransactionExecutionLimitError) Code() ErrorCode {
+	return ErrCodeExecutionError
+}
