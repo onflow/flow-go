@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -9,7 +10,7 @@ const expandableContracts = "contracts"
 
 func (a *Account) Build(flowAccount *flow.Account, link LinkGenerator, expand map[string]bool) error {
 	a.Address = flowAccount.Address.String()
-	a.Balance = fromUint64(flowAccount.Balance)
+	a.Balance = util.FromUint64(flowAccount.Balance)
 	a.Expandable = &AccountExpandable{}
 
 	if expand[expandableKeys] {
@@ -23,7 +24,7 @@ func (a *Account) Build(flowAccount *flow.Account, link LinkGenerator, expand ma
 	if expand[expandableContracts] {
 		contracts := make(map[string]string, len(flowAccount.Contracts))
 		for name, code := range flowAccount.Contracts {
-			contracts[name] = ToBase64(code)
+			contracts[name] = util.ToBase64(code)
 		}
 		a.Contracts = contracts
 	} else {
@@ -44,12 +45,12 @@ func (a *AccountPublicKey) Build(k flow.AccountPublicKey) {
 	sigAlgo := SigningAlgorithm(k.SignAlgo.String())
 	hashAlgo := HashingAlgorithm(k.HashAlgo.String())
 
-	a.Index = fromUint64(uint64(k.Index))
+	a.Index = util.FromUint64(uint64(k.Index))
 	a.PublicKey = k.PublicKey.String()
 	a.SigningAlgorithm = &sigAlgo
 	a.HashingAlgorithm = &hashAlgo
-	a.SequenceNumber = fromUint64(k.SeqNumber)
-	a.Weight = fromUint64(uint64(k.Weight))
+	a.SequenceNumber = util.FromUint64(k.SeqNumber)
+	a.Weight = util.FromUint64(uint64(k.Weight))
 	a.Revoked = k.Revoked
 }
 

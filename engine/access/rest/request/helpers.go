@@ -1,13 +1,11 @@
 package request
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/model/flow"
 	"io"
-	"strconv"
 	"strings"
 )
 
@@ -70,20 +68,4 @@ func (g *GetByIDRequest) Parse(rawID string) error {
 	g.ID = id.Flow()
 
 	return nil
-}
-
-func fromBase64(bytesStr string) ([]byte, error) {
-	return base64.StdEncoding.DecodeString(bytesStr)
-}
-
-func fromUint64(number uint64) string {
-	return fmt.Sprintf("%d", number)
-}
-
-func toUint64(uint64Str string) (uint64, error) {
-	val, err := strconv.ParseUint(uint64Str, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("value must be an unsigned 64 bit integer") // hide error from user
-	}
-	return val, nil
 }

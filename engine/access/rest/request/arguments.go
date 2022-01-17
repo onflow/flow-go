@@ -2,6 +2,7 @@ package request
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 )
 
 const maxArgumentsLength = 100
@@ -15,7 +16,7 @@ func (a *Arguments) Parse(raw []string) error {
 			continue
 		}
 
-		arg, err := fromBase64(rawArg)
+		arg, err := util.FromBase64(rawArg)
 		if err != nil {
 			return fmt.Errorf("invalid argument encoding: %v", err)
 		}

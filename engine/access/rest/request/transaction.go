@@ -3,6 +3,7 @@ package request
 import (
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 	"io"
 )
@@ -89,7 +90,7 @@ func (t *Transaction) Parse(raw io.Reader) error {
 	}
 
 	// script comes in as a base64 encoded string, decode base64 back to a string here
-	script, err := fromBase64(tx.Script)
+	script, err := util.FromBase64(tx.Script)
 	if err != nil {
 		return fmt.Errorf("invalid transaction script encoding")
 	}
@@ -100,7 +101,7 @@ func (t *Transaction) Parse(raw io.Reader) error {
 		return fmt.Errorf("invalid reference block ID: %v", err)
 	}
 
-	gasLimit, err := toUint64(tx.GasLimit)
+	gasLimit, err := util.ToUint64(tx.GasLimit)
 	if err != nil {
 		return fmt.Errorf("invalid gas limit: %v", err)
 	}

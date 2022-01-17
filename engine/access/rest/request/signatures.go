@@ -3,6 +3,7 @@ package request
 import (
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,12 +23,12 @@ func (s *TransactionSignature) Parse(
 		return err
 	}
 
-	sigIndex, err := toUint64(rawSignerIndex)
+	sigIndex, err := util.ToUint64(rawSignerIndex)
 	if err != nil {
 		return fmt.Errorf("invalid signer index: %v", err)
 	}
 
-	keyIndex, err := toUint64(rawKeyIndex)
+	keyIndex, err := util.ToUint64(rawKeyIndex)
 	if err != nil {
 		return fmt.Errorf("invalid key index: %v", err)
 	}
@@ -84,7 +85,7 @@ func (s *Signature) Parse(raw string) error {
 		return fmt.Errorf("missing value")
 	}
 
-	signatureBytes, err := fromBase64(raw)
+	signatureBytes, err := util.FromBase64(raw)
 	if err != nil {
 		return fmt.Errorf("invalid encoding")
 	}

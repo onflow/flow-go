@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -47,7 +48,7 @@ func (c *CollectionGuarantee) Build(guarantee *flow.CollectionGuarantee) {
 
 	c.CollectionId = guarantee.CollectionID.String()
 	c.SignerIds = signerIDs
-	c.Signature = ToBase64(guarantee.Signature.Bytes())
+	c.Signature = util.ToBase64(guarantee.Signature.Bytes())
 }
 
 type CollectionGuarantees []CollectionGuarantee

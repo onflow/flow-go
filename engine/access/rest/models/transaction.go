@@ -2,13 +2,14 @@ package models
 
 import (
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator) {
 	args := make([]string, len(tx.Arguments))
 	for i, arg := range tx.Arguments {
-		args[i] = ToBase64(arg)
+		args[i] = util.ToBase64(arg)
 	}
 
 	auths := make([]string, len(tx.Authorizers))
@@ -37,10 +38,10 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionRes
 	proposalKey.Build(tx.ProposalKey)
 
 	t.Id = tx.ID().String()
-	t.Script = ToBase64(tx.Script)
+	t.Script = util.ToBase64(tx.Script)
 	t.Arguments = args
 	t.ReferenceBlockId = tx.ReferenceBlockID.String()
-	t.GasLimit = fromUint64(tx.GasLimit)
+	t.GasLimit = util.FromUint64(tx.GasLimit)
 	t.Payer = tx.Payer.String()
 	t.ProposalKey = &proposalKey
 	t.Authorizers = auths
@@ -79,9 +80,9 @@ func (t *TransactionSignatures) Build(signatures []flow.TransactionSignature) {
 
 func (t *TransactionSignature) Build(sig flow.TransactionSignature) {
 	t.Address = sig.Address.String()
-	t.SignerIndex = fromUint64(uint64(sig.SignerIndex))
-	t.KeyIndex = fromUint64(sig.KeyIndex)
-	t.Signature = ToBase64(sig.Signature)
+	t.SignerIndex = util.FromUint64(uint64(sig.SignerIndex))
+	t.KeyIndex = util.FromUint64(sig.KeyIndex)
+	t.Signature = util.ToBase64(sig.Signature)
 }
 
 func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Identifier, link LinkGenerator) {
@@ -97,7 +98,7 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 
 	t.Status = &status
 	t.ErrorMessage = txr.ErrorMessage
-	t.ComputationUsed = fromUint64(0)
+	t.ComputationUsed = util.FromUint64(0)
 	t.Events = events
 
 	self, _ := SelfLink(txID, link.TransactionResultLink)
@@ -123,6 +124,6 @@ func (t *TransactionStatus) Build(status flow.TransactionStatus) {
 
 func (p *ProposalKey) Build(key flow.ProposalKey) {
 	p.Address = key.Address.String()
-	p.KeyIndex = fromUint64(key.KeyIndex)
-	p.SequenceNumber = fromUint64(key.SequenceNumber)
+	p.KeyIndex = util.FromUint64(key.KeyIndex)
+	p.SequenceNumber = util.FromUint64(key.SequenceNumber)
 }

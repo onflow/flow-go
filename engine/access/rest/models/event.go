@@ -1,15 +1,16 @@
 package models
 
 import (
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func (e *Event) Build(event flow.Event) {
 	e.Type_ = string(event.Type)
 	e.TransactionId = event.TransactionID.String()
-	e.TransactionIndex = fromUint64(uint64(event.TransactionIndex))
-	e.EventIndex = fromUint64(uint64(event.EventIndex))
-	e.Payload = ToBase64(event.Payload)
+	e.TransactionIndex = util.FromUint64(uint64(event.TransactionIndex))
+	e.EventIndex = util.FromUint64(uint64(event.EventIndex))
+	e.Payload = util.ToBase64(event.Payload)
 }
 
 type Events []Event
@@ -26,7 +27,7 @@ func (e *Events) Build(events []flow.Event) {
 }
 
 func (b *BlockEvents) Build(blockEvents flow.BlockEvents) {
-	b.BlockHeight = fromUint64(blockEvents.BlockHeight)
+	b.BlockHeight = util.FromUint64(blockEvents.BlockHeight)
 	b.BlockId = blockEvents.BlockID.String()
 	b.BlockTimestamp = blockEvents.BlockTimestamp
 
