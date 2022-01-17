@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 	"net/url"
 	"testing"
@@ -41,8 +41,8 @@ func TestScripts(t *testing.T) {
 	validCode := []byte(`pub fun main(foo: String): String { return foo }`)
 	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
 	validBody := map[string]interface{}{
-		"script":    models.ToBase64(validCode),
-		"arguments": []string{models.ToBase64(validArgs)},
+		"script":    util.ToBase64(validCode),
+		"arguments": []string{util.ToBase64(validArgs)},
 	}
 
 	t.Run("get by Latest height", func(t *testing.T) {

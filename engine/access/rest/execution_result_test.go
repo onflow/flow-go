@@ -2,6 +2,8 @@ package rest
 
 import (
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"net/http"
 	"net/url"
 	"strings"
@@ -117,7 +119,7 @@ func TestGetResultBlockID(t *testing.T) {
 		}]`, result.ID(), result.BlockID, result.ID())
 		assertOKResponse(t, req, expected, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
-	}
+	})
 
 	t.Run("get by block ID not found", func(t *testing.T) {
 		backend := &mock.API{}

@@ -2,8 +2,8 @@ package rest
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/url"
@@ -265,7 +265,7 @@ func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, 
 			"_self": "%s"
 		}
 	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
-			models.ToBase64(block.Header.ParentVoterSigData), execResultID, execResult.BlockID, execLink, blockLink)
+			util.ToBase64(block.Header.ParentVoterSigData), execResultID, execResult.BlockID, execLink, blockLink)
 	}
 
 	return fmt.Sprintf(`
@@ -285,5 +285,5 @@ func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, 
 			"_self": "%s"
 		}
 	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
-		models.ToBase64(block.Header.ParentVoterSigData), payloadLink, execLink, blockLink)
+		util.ToBase64(block.Header.ParentVoterSigData), payloadLink, execLink, blockLink)
 }
