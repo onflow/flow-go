@@ -552,13 +552,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAccessNodeIDS,
 		fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
 
-	// start ghost nodes first
+	// start ghost nodes
 	for _, nodeConf := range confs {
 		if !nodeConf.Ghost {
 			continue
 		}
 
-		t.Logf("start container as ghost %v", nodeConf.ContainerName)
+		t.Logf("add container as ghost %v, node id: %v", nodeConf.ContainerName, nodeConf.NodeID)
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 	}
@@ -579,12 +579,12 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			continue
 		}
 
+		t.Logf("add container as real node %v, node id: %v", nodeConf.ContainerName, nodeConf.NodeID)
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 		if nodeConf.Role == flow.RoleConsensus {
-			t.Logf("start consensus container %v", nodeConf.ContainerName)
 			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
@@ -661,7 +661,6 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 // AddNode creates a node container with the given config and adds it to the
 // network.
 func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf ContainerConfig) error {
-
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
 		Name:      nodeConf.ContainerName,
