@@ -293,6 +293,8 @@ func TestArrayBackData_All(t *testing.T) {
 					from = 0
 				}
 				testMapMatchFrom(t, bd.All(), entities, from)
+				testEntitiesMatchFrom(t, bd.Entities(), entities, from)
+				testIdentifiersMatchFrom(t, bd.Identifiers(), entities, from)
 			}
 		})
 	}
@@ -448,6 +450,34 @@ func testMapMatchFrom(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity,
 		} else {
 			require.True(t, ok)
 			require.Equal(t, expected, actual)
+		}
+	}
+}
+
+// testEntitiesMatchFrom is a test helper that checks entities are retrievable from given list starting specified index.
+func testEntitiesMatchFrom(t *testing.T, expectedEntities []flow.Entity, actualEntities []*unittest.MockEntity, from int) {
+	require.Len(t, expectedEntities, len(actualEntities)-from)
+
+	for i, actual := range actualEntities {
+
+		if i < from {
+			require.NotContains(t, expectedEntities, actual)
+		} else {
+			require.Contains(t, expectedEntities, actual)
+		}
+	}
+}
+
+// testIdentifiersMatchFrom is a test helper that checks identifiers of entities are retrievable from given list starting specified index.
+func testIdentifiersMatchFrom(t *testing.T, expectedIdentifiers flow.IdentifierList, actualEntities []*unittest.MockEntity, from int) {
+	require.Len(t, expectedIdentifiers, len(actualEntities)-from)
+
+	for i, actual := range actualEntities {
+
+		if i < from {
+			require.NotContains(t, expectedIdentifiers, actual.ID())
+		} else {
+			require.Contains(t, expectedIdentifiers, actual.ID())
 		}
 	}
 }
