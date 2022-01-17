@@ -1,8 +1,6 @@
 package dkg
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
@@ -49,15 +47,9 @@ func (f *ControllerFactory) Create(
 	participants flow.IdentityList,
 	seed []byte) (module.DKGController, error) {
 
-	myIndex := -1
-	for i, id := range participants.NodeIDs() {
-		if id == f.me.NodeID() {
-			myIndex = i
-			break
-		}
-	}
-	if myIndex < 0 {
-		return nil, fmt.Errorf("node does not belong to dkg committee")
+	myIndex, err := GetDKGCommitteeIndex(f.me.NodeID(), participants)
+	if err != nil {
+		return nil, err
 	}
 
 	broker := NewBroker(
