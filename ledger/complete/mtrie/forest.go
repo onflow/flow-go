@@ -257,8 +257,8 @@ func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 func (f *Forest) GetTries() ([]*trie.MTrie, error) {
 	// ToDo needs concurrency safety
 	keys := f.tries.Keys()
-	tries := make([]*trie.MTrie, 0, len(keys))
-	for _, key := range keys {
+	tries := make([]*trie.MTrie, len(keys))
+	for i, key := range keys {
 		t, ok := f.tries.Get(key)
 		if !ok {
 			return nil, errors.New("concurrent Forest modification")
@@ -267,7 +267,7 @@ func (f *Forest) GetTries() ([]*trie.MTrie, error) {
 		if !ok {
 			return nil, errors.New("forest contains an element of a wrong type")
 		}
-		tries = append(tries, trie)
+		tries[i] = trie
 	}
 	return tries, nil
 }

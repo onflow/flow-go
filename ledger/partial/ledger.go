@@ -82,9 +82,9 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 				pathToKey[path] = key
 			}
 
-			keys := make([]ledger.Key, 0, len(pErr.Paths))
-			for _, path := range pErr.Paths {
-				keys = append(keys, pathToKey[path])
+			keys := make([]ledger.Key, len(pErr.Paths))
+			for i, path := range pErr.Paths {
+				keys[i] = pathToKey[path]
 			}
 			return nil, &ledger.ErrMissingKeys{Keys: keys}
 		}
