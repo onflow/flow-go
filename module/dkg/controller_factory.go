@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"fmt"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
@@ -47,9 +48,9 @@ func (f *ControllerFactory) Create(
 	participants flow.IdentityList,
 	seed []byte) (module.DKGController, error) {
 
-	myIndex, err := GetDKGCommitteeIndex(f.me.NodeID(), participants)
-	if err != nil {
-		return nil, err
+	myIndex, ok := participants.GetIndex(f.me.NodeID())
+	if !ok {
+		return nil, fmt.Errorf("failed to create controller factory, node %s is not part of DKG committee", f.me.NodeID().String())
 	}
 
 	broker := NewBroker(
@@ -57,14 +58,14 @@ func (f *ControllerFactory) Create(
 		dkgInstanceID,
 		participants,
 		f.me,
-		myIndex,
+		int(myIndex),
 		f.dkgContractClients,
 		f.tunnel,
 	)
 
 	n := len(participants)
 	threshold := signature.RandomBeaconThreshold(n)
-	dkg, err := crypto.NewJointFeldman(n, threshold, myIndex, broker)
+	dkg, err := crypto.NewJointFeldman(n, threshold, int(myIndex), broker)
 	if err != nil {
 		return nil, err
 	}

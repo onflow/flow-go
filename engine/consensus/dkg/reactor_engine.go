@@ -174,10 +174,9 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		Interface("members", committee.NodeIDs()).
 		Msg("epoch info")
 
-	_, err = dkgmodule.GetDKGCommitteeIndex(e.me.NodeID(), committee)
-	if err != nil {
+	if _, ok := committee.GetIndex(e.me.NodeID()); !ok {
 		// node not found in DKG committee bypass starting the DKG
-		log.Warn().Err(err).Msg("node index not found in dkg committee")
+		log.Warn().Str("node_id", e.me.NodeID().String()).Msg("node is not part of DKG committee, skip starting DKG engine")
 		return
 	}
 
