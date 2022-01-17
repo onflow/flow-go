@@ -80,9 +80,5 @@ func (g *GetEvents) Parse(rawType string, rawStart string, rawEnd string, rawBlo
 		}
 	}
 
-	if len(g.BlockIDs) > 0 {
-
-	}
-
 	return nil
 }
