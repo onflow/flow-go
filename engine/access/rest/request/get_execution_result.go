@@ -6,7 +6,6 @@ import (
 )
 
 const idQuery = "id"
-const noBlockIdsErr = "no block IDs provided"
 
 type GetExecutionResultByBlockIDs struct {
 	BlockIDs []flow.Identifier
@@ -27,7 +26,7 @@ func (g *GetExecutionResultByBlockIDs) Parse(rawIDs []string) error {
 	g.BlockIDs = ids.Flow()
 
 	if len(g.BlockIDs) == 0 {
-		return fmt.Errorf(noBlockIdsErr)
+		return fmt.Errorf("no block IDs provided")
 	}
 
 	return nil
