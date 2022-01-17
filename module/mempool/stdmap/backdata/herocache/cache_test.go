@@ -249,24 +249,24 @@ func TestArrayBackData_All(t *testing.T) {
 		items        uint32
 		ejectionMode heropool.EjectionMode
 	}{
-		{ // mempool has the limit of 100K, but we put 10K
-			limit:        100_000,
+		{ // mempool has the limit of 1000, but we put 100.
+			limit:        1000,
+			items:        100,
+			ejectionMode: heropool.LRUEjection,
+		},
+		{ // mempool has the limit of 1000, and we put exactly 1000 items.
+			limit:        1000,
+			items:        1000,
+			ejectionMode: heropool.LRUEjection,
+		},
+		{ // mempool has the limit of 1000, and we put 10K items with LRU ejection.
+			limit:        1000,
 			items:        10_000,
 			ejectionMode: heropool.LRUEjection,
 		},
-		{ // mempool has the limit of 100K, and we put exactly 100K items
-			limit:        100_000,
-			items:        100_000,
-			ejectionMode: heropool.LRUEjection,
-		},
-		{ // mempool has the limit of 100K, and we put 1M items with LRU ejection.
-			limit:        100_000,
-			items:        1_000_000,
-			ejectionMode: heropool.LRUEjection,
-		},
-		{ // mempool has the limit of 100K, and we put 1M items with random ejection.
-			limit:        100_000,
-			items:        1_000_000,
+		{ // mempool has the limit of 1000, and we put 10K items with random ejection.
+			limit:        1000,
+			items:        10_000,
 			ejectionMode: heropool.RandomEjection,
 		},
 	}
