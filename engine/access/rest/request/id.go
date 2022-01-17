@@ -43,7 +43,8 @@ func (i *IDs) Parse(raw []string) error {
 	}
 
 	// make a map to have only unique values as keys
-	uniqueIDs := make(map[ID]bool)
+	ids := make(IDs, 0)
+	uniqueIDs := make(map[string]bool)
 	for _, r := range raw {
 		var id ID
 		err := id.Parse(r)
@@ -51,12 +52,10 @@ func (i *IDs) Parse(raw []string) error {
 			return err
 		}
 
-		uniqueIDs[id] = true
-	}
-
-	ids := make([]ID, 0)
-	for id := range uniqueIDs {
-		ids = append(ids, id)
+		if !uniqueIDs[id.Flow().String()] {
+			uniqueIDs[id.Flow().String()] = true
+			ids = append(ids, id)
+		}
 	}
 
 	*i = ids
