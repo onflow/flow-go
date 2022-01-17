@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +22,7 @@ func buildTransaction() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"script":             models.ToBase64(tx.Script),
+		"script":             util.ToBase64(tx.Script),
 		"arguments":          tx.Arguments,
 		"reference_block_id": tx.ReferenceBlockID.String(),
 		"gas_limit":          fmt.Sprintf("%d", tx.GasLimit),
@@ -37,7 +37,7 @@ func buildTransaction() map[string]interface{} {
 			"address":      tx.EnvelopeSignatures[0].Address.String(),
 			"signer_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].SignerIndex),
 			"key_index":    fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
-			"signature":    models.ToBase64(tx.EnvelopeSignatures[0].Signature),
+			"signature":    util.ToBase64(tx.EnvelopeSignatures[0].Signature),
 		}},
 	}
 }
@@ -122,7 +122,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 func TestTransaction_ValidParse(t *testing.T) {
 	script := `pub fun main() {}`
 	tx := buildTransaction()
-	tx["script"] = models.ToBase64([]byte(script))
+	tx["script"] = util.ToBase64([]byte(script))
 	input := transactionToReader(tx)
 
 	var transaction Transaction

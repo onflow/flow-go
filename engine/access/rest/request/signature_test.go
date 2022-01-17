@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -38,7 +39,7 @@ func TestTransactionSignature_ValidParse(t *testing.T) {
 	addr := "01cf0e2f2f715450"
 	sig := "c83665f5212fad065cd27d370ef80e5fbdd20cd57411af5c76076a15dced05ac6e6d9afa88cd7337bf9c869f6785ecc1c568ca593a99dfeec14e024c0cd78289"
 	sigHex, _ := hex.DecodeString(sig)
-	encodedSig := models.ToBase64(sigHex)
+	encodedSig := util.ToBase64(sigHex)
 	err := txSignature.Parse(addr, "0", "0", encodedSig)
 
 	assert.NoError(t, err)
@@ -62,7 +63,7 @@ func TestTransactionSignatures_ValidParse(t *testing.T) {
 		sigs := make([]models.TransactionSignature, len(test.inAddresses))
 		for i, a := range test.inAddresses {
 			sigHex, _ := hex.DecodeString(test.inSigs[i])
-			encodedSig := models.ToBase64(sigHex)
+			encodedSig := util.ToBase64(sigHex)
 			sigs[i].Signature = encodedSig
 			sigs[i].SignerIndex = "0"
 			sigs[i].KeyIndex = "0"

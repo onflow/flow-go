@@ -2,7 +2,7 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
@@ -10,7 +10,7 @@ import (
 
 const validBody = "pub fun main() { }"
 
-var validBodyEncoded = models.ToBase64([]byte(validBody))
+var validBodyEncoded = util.ToBase64([]byte(validBody))
 
 func TestScript_InvalidParse(t *testing.T) {
 	test := map[string]string{
@@ -33,7 +33,7 @@ func TestScript_ValidParse(t *testing.T) {
 	body := strings.NewReader(fmt.Sprintf(
 		`{ "script": "%s", "arguments": ["%s"] }`,
 		validBodyEncoded,
-		models.ToBase64(arg1),
+		util.ToBase64(arg1),
 	))
 
 	var script Script
