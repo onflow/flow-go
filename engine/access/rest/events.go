@@ -10,8 +10,8 @@ import (
 const blockQueryParam = "block_ids"
 const eventTypeQuery = "type"
 
-// getEvents for the provided block range or list of block IDs filtered by type.
-func getEvents(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+// GetEvents for the provided block range or list of block IDs filtered by type.
+func GetEvents(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetEventsRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
