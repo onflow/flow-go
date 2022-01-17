@@ -18,6 +18,7 @@ type EIndex uint32
 
 // poolEntity represents the data type that is maintained by
 type poolEntity struct {
+	PoolEntity
 	// owner maintains an external reference to the key associated with this entity.
 	// The key is maintained by the HeroCache, and entity is maintained by Pool.
 	owner uint64
@@ -26,7 +27,9 @@ type poolEntity struct {
 	// When this entity is allocated, the node maintains the connections it to the next and previous (used) pool entities.
 	// When this entity is unallocated, the node maintains the connections to the next and previous unallocated (free) pool entities.
 	node link
+}
 
+type PoolEntity struct {
 	// Identity associated with this entity.
 	id flow.Identifier
 
@@ -105,6 +108,20 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) E
 // Get returns entity corresponding to the entity index from the underlying list.
 func (p Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
 	return p.poolEntities[entityIndex].id, p.poolEntities[entityIndex].entity, p.poolEntities[entityIndex].owner
+}
+
+// All returns all stored entities in this pool.
+func (p Pool) All() []PoolEntity {
+	all := make([]PoolEntity, p.size)
+	next := p.used.head
+
+	for i := uint32(0); i < p.size; i++ {
+		e := p.poolEntities[next.getSliceIndex()]
+		all[i] = e.PoolEntity
+		next = e.node.next
+	}
+
+	return all
 }
 
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
