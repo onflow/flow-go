@@ -177,16 +177,8 @@ func (c Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
 
 	all := make(map[flow.Identifier]flow.Entity)
-	for b, bucket := range c.buckets {
-		for s := range bucket.slots {
-			id, entity, linked := c.linkedEntityOf(bucketIndex(b), slotIndex(s))
-			if !linked {
-				// slot may never be used, or recently invalidated
-				continue
-			}
-
-			all[id] = entity
-		}
+	for _, p := range c.entities.All() {
+		all[p.Id()] = p.Entity()
 	}
 
 	return all
