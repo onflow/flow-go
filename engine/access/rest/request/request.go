@@ -74,6 +74,12 @@ func (rd *Request) GetTransactionResultRequest() (GetTransactionResult, error) {
 	return req, err
 }
 
+func (rd *Request) GetEventsRequest() (GetEvents, error) {
+	var req GetEvents
+	err := req.Build(rd)
+	return req, err
+}
+
 func (rd *Request) CreateTransactionRequest() (CreateTransaction, error) {
 	var req CreateTransaction
 	err := req.Build(rd)
