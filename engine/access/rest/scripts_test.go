@@ -98,8 +98,8 @@ func TestScripts(t *testing.T) {
 		assertResponse(
 			t,
 			req,
-			http.StatusInternalServerError,
-			`{"code":500, "message":"internal server error"}`,
+			http.StatusBadRequest,
+			`{"code":400, "message":"Invalid Flow request: internal server error"}`,
 			backend,
 		)
 	})

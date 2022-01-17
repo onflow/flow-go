@@ -63,11 +63,11 @@ func TestGetResultByID(t *testing.T) {
 		id := unittest.IdentifierFixture()
 		backend.Mock.
 			On("GetExecutionResultByID", mocks.Anything, id).
-			Return(nil, status.Error(codes.NotFound, "not found")).
+			Return(nil, status.Error(codes.NotFound, "block not found")).
 			Once()
 
 		req := getResultByIDReq(id.String(), nil)
-		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"not found"}`, backend)
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }
@@ -101,11 +101,11 @@ func TestGetResultBlockID(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		backend.Mock.
 			On("GetExecutionResultForBlockID", mocks.Anything, blockID).
-			Return(nil, status.Error(codes.NotFound, "not found")).
+			Return(nil, status.Error(codes.NotFound, "block not found")).
 			Once()
 
 		req := getResultByIDReq("", []string{blockID.String()})
-		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"not found"}`, backend)
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }
