@@ -171,9 +171,10 @@ func toSignature(signature string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid signature encoding")
 	}
-	if len(signatureBytes) != signatureLength {
-		return nil, errors.New("invalid signature length")
-	}
+	// TODO: fix the signature length validation
+	//if len(signatureBytes) != signatureLength {
+	//	return nil, errors.New("invalid signature length")
+	//}
 	return signatureBytes, nil
 }
 
@@ -425,6 +426,25 @@ func eventsResponse(events []flow.Event) []generated.Event {
 	}
 
 	return eventsRes
+}
+
+func blockEventsResponse(block flow.BlockEvents) generated.BlockEvents {
+	return generated.BlockEvents{
+		BlockId:        block.BlockID.String(),
+		BlockHeight:    fromUint64(block.BlockHeight),
+		BlockTimestamp: block.BlockTimestamp,
+		Events:         eventsResponse(block.Events),
+		Links:          nil, // todo link
+	}
+}
+
+func blocksEventsResponse(blocks []flow.BlockEvents) []generated.BlockEvents {
+	events := make([]generated.BlockEvents, len(blocks))
+	for i, b := range blocks {
+		events[i] = blockEventsResponse(b)
+	}
+
+	return events
 }
 
 func statusResponse(status flow.TransactionStatus) generated.TransactionStatus {
