@@ -283,14 +283,6 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 	// we start at the root again
 	cur := &t.root
 
-	// we use the given key as path again
-	path := bitutils.MakeBitVector(t.keyLength)
-	for i := 0; i < t.keyLength; i++ {
-		if bitutils.ReadBit(key, i) == 1 {
-			bitutils.SetBit(path, i)
-		}
-	}
-
 	// and we start at a zero index in the path
 	index := 0
 
