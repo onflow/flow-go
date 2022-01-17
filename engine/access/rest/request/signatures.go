@@ -2,12 +2,11 @@ package request
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-const signatureLength = 128
 
 type TransactionSignature flow.TransactionSignature
 

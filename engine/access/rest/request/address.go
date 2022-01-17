@@ -2,9 +2,10 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"regexp"
 	"strings"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type Address flow.Address

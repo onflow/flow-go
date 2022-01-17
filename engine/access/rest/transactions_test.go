@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 	"net/url"
 	"testing"
+
+	"github.com/onflow/flow-go/engine/access/rest/util"
 
 	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"

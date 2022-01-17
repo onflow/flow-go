@@ -1,12 +1,14 @@
 package rest
 
 import (
+	"net/http"
+
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/models"
-	"github.com/rs/zerolog"
-	"net/http"
 )
 
 func newRouter(backend access.API, logger zerolog.Logger) (*mux.Router, error) {

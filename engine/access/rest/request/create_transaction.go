@@ -1,8 +1,9 @@
 package request
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"io"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type CreateTransaction struct {

@@ -2,10 +2,11 @@ package request
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
-	"io"
 )
 
 const maxAuthorizers = 100

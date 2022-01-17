@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/gorilla/mux"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -73,7 +74,10 @@ func SelfLink(id flow.Identifier, linkFun LinkFunc) (*Links, error) {
 		return nil, err
 	}
 	var link Links
-	link.Build(url, nil)
+	err = link.Build(url, nil)
+	if err != nil {
+		return nil, err
+	}
 	return &link, nil
 }
 

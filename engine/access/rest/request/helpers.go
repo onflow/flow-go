@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"io"
 	"strings"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func parseBody(raw io.Reader, dst interface{}) error {

@@ -2,8 +2,9 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"io"
+
+	"github.com/onflow/flow-go/engine/access/rest/util"
 )
 
 type scriptBody struct {
