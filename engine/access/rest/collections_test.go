@@ -119,7 +119,7 @@ func TestGetCollections(t *testing.T) {
 			testID.String(),
 			nil,
 			status.Error(codes.NotFound, "not found"),
-			`{"code":404,"message":"not found"}`,
+			`{"code":404,"message":"Flow resource not found: not found"}`,
 			http.StatusNotFound,
 		}, {
 			"invalidID",
@@ -131,9 +131,9 @@ func TestGetCollections(t *testing.T) {
 			{
 				unittest.IdentifierFixture().String(),
 				nil,
-				status.Errorf(codes.Internal, ""),
-				`{"code":500,"message":"internal server error"}`,
-				http.StatusInternalServerError,
+				status.Errorf(codes.Internal, "block not found"),
+				`{"code":400,"message":"Invalid Flow request: block not found"}`,
+				http.StatusBadRequest,
 			},
 		}
 
