@@ -186,18 +186,8 @@ func (c Cache) All() map[flow.Identifier]flow.Entity {
 
 func (c Cache) Identifiers() flow.IdentifierList {
 	ids := make(flow.IdentifierList, c.entities.Size())
-	i := 0
-	for b, bucket := range c.buckets {
-		for s := range bucket.slots {
-			id, _, linked := c.linkedEntityOf(bucketIndex(b), slotIndex(s))
-			if !linked {
-				// slot may never be used, or recently invalidated
-				continue
-			}
-
-			ids[i] = id
-			i++
-		}
+	for i, p := range c.entities.All() {
+		ids[i] = p.Id()
 	}
 
 	return ids
@@ -205,18 +195,8 @@ func (c Cache) Identifiers() flow.IdentifierList {
 
 func (c Cache) Entities() []flow.Entity {
 	entities := make([]flow.Entity, c.entities.Size())
-	i := 0
-	for b, bucket := range c.buckets {
-		for s := range bucket.slots {
-			_, entity, linked := c.linkedEntityOf(bucketIndex(b), slotIndex(s))
-			if !linked {
-				// slot may never be used, or recently invalidated
-				continue
-			}
-
-			entities[i] = entity
-			i++
-		}
+	for i, p := range c.entities.All() {
+		entities[i] = p.Entity()
 	}
 
 	return entities
