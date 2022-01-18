@@ -3,22 +3,27 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+
+	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
 // ApiHandlerFunc is a function that contains endpoint handling logic,
 // it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
-	r *request,
+	r *request.Request,
 	backend access.API,
-	generator LinkGenerator,
+	generator models.LinkGenerator,
 ) (interface{}, error)
 
 // Handler is custom http handler implementing custom handler function.
@@ -27,11 +32,16 @@ type ApiHandlerFunc func(
 type Handler struct {
 	logger         zerolog.Logger
 	backend        access.API
-	linkGenerator  LinkGenerator
+	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 }
 
-func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandlerFunc, generator LinkGenerator) *Handler {
+func NewHandler(
+	logger zerolog.Logger,
+	backend access.API,
+	handlerFunc ApiHandlerFunc,
+	generator models.LinkGenerator,
+) *Handler {
 	return &Handler{
 		logger:         logger,
 		backend:        backend,
@@ -43,27 +53,28 @@ func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandle
 // ServerHTTP function acts as a wrapper to each request providing common handling functionality
 // such as logging, error handling, request decorators
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
+	// create a logger
+	errLog := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// create request decorator with parsed values
-	decoratedRequest := decorateRequest(r)
+	decoratedRequest := request.Decorate(r)
 
 	// execute handler function and check for error
 	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
 	if err != nil {
-		h.errorHandler(w, err, errorLogger)
+		h.errorHandler(w, err, errLog)
 		return
 	}
 
 	// apply the select filter if any select fields have been specified
-	response, err = SelectFilter(response, decoratedRequest.selects())
+	response, err = util.SelectFilter(response, decoratedRequest.Selects())
 	if err != nil {
-		h.errorHandler(w, err, errorLogger)
+		h.errorHandler(w, err, errLog)
 		return
 	}
 
 	// write response to response stream
-	h.jsonResponse(w, response, errorLogger)
+	h.jsonResponse(w, response, errLog)
 }
 
 func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
@@ -74,14 +85,29 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 		return
 	}
 
+	// handle cadence errors
+	var cadenceError *fvmErrors.CadenceRuntimeError
+	if fvmErrors.As(err, &cadenceError) {
+		msg := fmt.Sprintf("Cadence error: %s", cadenceError.Error())
+		h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
+		return
+	}
+
 	// handle grpc status error returned from the backend calls, we are forwarding the message to the client
 	if se, ok := status.FromError(err); ok {
 		if se.Code() == codes.NotFound {
-			h.errorResponse(w, http.StatusNotFound, se.Message(), errorLogger)
+			msg := fmt.Sprintf("Flow resource not found: %s", se.Message())
+			h.errorResponse(w, http.StatusNotFound, msg, errorLogger)
 			return
 		}
 		if se.Code() == codes.InvalidArgument {
-			h.errorResponse(w, http.StatusBadRequest, se.Message(), errorLogger)
+			msg := fmt.Sprintf("Invalid Flow argument: %s", se.Message())
+			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
+			return
+		}
+		if se.Code() == codes.Internal {
+			msg := fmt.Sprintf("Invalid Flow request: %s", se.Message())
+			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
 			return
 		}
 	}
@@ -125,7 +151,7 @@ func (h *Handler) errorResponse(
 	w.WriteHeader(returnCode)
 
 	// create error response model
-	modelError := generated.ModelError{
+	modelError := models.ModelError{
 		Code:    int32(returnCode),
 		Message: responseMessage,
 	}
@@ -141,13 +167,4 @@ func (h *Handler) errorResponse(
 		w.WriteHeader(http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("failed to send error response")
 	}
-}
-
-// NotImplemented handler returns an error explaining the endpoint is not yet implemented
-func NotImplemented(
-	_ *request,
-	_ access.API,
-	_ LinkGenerator,
-) (interface{}, StatusError) {
-	return nil, NewRestError(http.StatusNotImplemented, "endpoint not implemented", nil)
 }

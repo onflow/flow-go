@@ -5,35 +5,26 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
-const (
-	ExpandableFieldPayload    = "payload"
-	ExpandableExecutionResult = "execution_result"
-	sealedHeightQueryParam    = "sealed"
-	finalHeightQueryParam     = "final"
-	startHeightQueryParam     = "start_height"
-	endHeightQueryParam       = "end_height"
-	heightQueryParam          = "height"
-)
-
-// getBlocksByID gets blocks by provided ID or list of IDs.
-func getBlocksByIDs(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
-
-	ids, err := r.ids()
+// GetBlocksByIDs gets blocks by provided ID or list of IDs.
+func GetBlocksByIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+	req, err := r.GetBlockByIDsRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
-	blocks := make([]*generated.Block, len(ids))
-	for i, id := range ids {
+	blocks := make([]*models.Block, len(req.IDs))
+	for i, id := range req.IDs {
 		block, err := getBlock(forID(&id), r, backend, link)
 		if err != nil {
 			return nil, err
@@ -44,47 +35,25 @@ func getBlocksByIDs(r *request, backend access.API, link LinkGenerator) (interfa
 	return blocks, nil
 }
 
-func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
-	heights, err := r.getQueryParams(heightQueryParam)
+func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+	req, err := r.GetBlockRequest()
 	if err != nil {
-		return nil, NewBadRequestError(fmt.Errorf("block heights invalid: %w", err))
-	}
-
-	startHeight := r.getQueryParam(startHeightQueryParam)
-	endHeight := r.getQueryParam(endHeightQueryParam)
-
-	// if both height and one or both of start and end height are provided
-	if len(heights) > 0 && (startHeight != "" || endHeight != "") {
-		err := fmt.Errorf("can only provide either heights or start and end height range")
 		return nil, NewBadRequestError(err)
 	}
 
-	// if neither height nor start and end height are provided
-	if len(heights) == 0 && (startHeight == "" || endHeight == "") {
-		err := fmt.Errorf("must provide either heights or start and end height range")
-		return nil, NewBadRequestError(err)
-	}
-
-	// if the query is /blocks?height=final or /blocks?height=sealed, lookup the last finalized or the last sealed block
-	if len(heights) == 1 && (heights[0] == finalHeightQueryParam || heights[0] == sealedHeightQueryParam) {
-		block, err := getBlock(forFinalized(heights[0]), r, backend, link)
+	if req.FinalHeight || req.SealedHeight {
+		block, err := getBlock(forFinalized(req.Heights[0]), r, backend, link)
 		if err != nil {
 			return nil, err
 		}
 
-		return []*generated.Block{block}, nil
+		return []*models.Block{block}, nil
 	}
 
 	// if the query is /blocks/height=1000,1008,1049...
-	if len(heights) > 0 {
-		uintHeights, err := toHeights(heights)
-		if err != nil {
-			heightError := fmt.Errorf("invalid height specified: %w", err)
-			return nil, NewBadRequestError(heightError)
-		}
-
-		blocks := make([]*generated.Block, len(uintHeights))
-		for i, h := range uintHeights {
+	if req.HasHeights() {
+		blocks := make([]*models.Block, len(req.Heights))
+		for i, h := range req.Heights {
 			block, err := getBlock(forHeight(h), r, backend, link)
 			if err != nil {
 				return nil, err
@@ -96,40 +65,18 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 	}
 
 	// support providing end height as "sealed" or "final"
-	if endHeight == finalHeightQueryParam || endHeight == sealedHeightQueryParam {
-		latest, err := backend.GetLatestBlock(r.Context(), endHeight == sealedHeightQueryParam)
+	if req.EndHeight == request.FinalHeight || req.EndHeight == request.SealedHeight {
+		latest, err := backend.GetLatestBlock(r.Context(), req.EndHeight == request.SealedHeight)
 		if err != nil {
 			return nil, err
 		}
 
-		endHeight = fmt.Sprintf("%d", latest.Header.Height)
+		req.EndHeight = latest.Header.Height // overwrite special value height with fetched
 	}
 
-	// lookup block by start and end height range
-	start, err := toHeight(startHeight)
-	if err != nil {
-		heightError := fmt.Errorf("invalid start height: %w", err)
-		return nil, NewBadRequestError(heightError)
-	}
-	end, err := toHeight(endHeight)
-	if err != nil {
-		heightError := fmt.Errorf("invalid end height: %w", err)
-		return nil, NewBadRequestError(heightError)
-	}
-
-	if start > end {
-		err := fmt.Errorf("start height must be less than or equal to end height")
-		return nil, NewBadRequestError(err)
-	}
-
-	if end-start > MaxAllowedHeights {
-		err := fmt.Errorf("height range %d exceeds maximum allowed of %d", end-start, MaxAllowedHeights)
-		return nil, NewBadRequestError(err)
-	}
-
-	blocks := make([]*generated.Block, 0)
+	blocks := make([]*models.Block, 0)
 	// start and end height inclusive
-	for i := start; i <= end; i++ {
+	for i := req.StartHeight; i <= req.EndHeight; i++ {
 		block, err := getBlock(forHeight(i), r, backend, link)
 		if err != nil {
 			return nil, err
@@ -140,27 +87,29 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 	return blocks, nil
 }
 
-// getBlockPayloadByID gets block payload by ID
-func getBlockPayloadByID(req *request, backend access.API, _ LinkGenerator) (interface{}, error) {
-
-	id, err := req.id()
+// GetBlockPayloadByID gets block payload by ID
+func GetBlockPayloadByID(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
+	req, err := r.GetBlockPayloadRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
-	blkProvider := NewBlockProvider(backend, forID(&id))
-	blk, statusErr := blkProvider.getBlock(req.Context())
+	blkProvider := NewBlockProvider(backend, forID(&req.ID))
+	blk, statusErr := blkProvider.getBlock(r.Context())
 	if statusErr != nil {
 		return nil, statusErr
 	}
-	payload, err := blockPayloadResponse(blk.Payload)
+
+	var payload models.BlockPayload
+	err = payload.Build(blk.Payload)
 	if err != nil {
 		return nil, err
 	}
+
 	return payload, nil
 }
 
-func getBlock(option blockProviderOption, req *request, backend access.API, link LinkGenerator) (*generated.Block, error) {
+func getBlock(option blockProviderOption, req *request.Request, backend access.API, link models.LinkGenerator) (*models.Block, error) {
 	// lookup block
 	blkProvider := NewBlockProvider(backend, option)
 	blk, err := blkProvider.getBlock(req.Context())
@@ -170,18 +119,27 @@ func getBlock(option blockProviderOption, req *request, backend access.API, link
 
 	// lookup execution result
 	// (even if not specified as expandable, since we need the execution result ID to generate its expandable link)
+	var block models.Block
 	executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), blk.ID())
 	if err != nil {
 		// handle case where execution result is not yet available
 		if se, ok := status.FromError(err); ok {
 			if se.Code() == codes.NotFound {
-				return blockResponse(blk, nil, link, req.expandFields)
+				err := block.Build(blk, nil, link, req.ExpandFields)
+				if err != nil {
+					return nil, err
+				}
+				return &block, nil
 			}
 		}
 		return nil, err
 	}
 
-	return blockResponse(blk, executionResult, link, req.expandFields)
+	err = block.Build(blk, executionResult, link, req.ExpandFields)
+	if err != nil {
+		return nil, err
+	}
+	return &block, nil
 }
 
 // blockProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to
@@ -207,13 +165,13 @@ func forHeight(height uint64) blockProviderOption {
 	}
 }
 
-func forFinalized(queryParam string) blockProviderOption {
+func forFinalized(queryParam uint64) blockProviderOption {
 	return func(blkProvider *blockProvider) {
 		switch queryParam {
-		case sealedHeightQueryParam:
+		case request.SealedHeight:
 			blkProvider.sealed = true
 			fallthrough
-		case finalHeightQueryParam:
+		case request.FinalHeight:
 			blkProvider.latest = true
 		}
 	}
@@ -233,8 +191,10 @@ func NewBlockProvider(backend access.API, options ...blockProviderOption) *block
 func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, error) {
 	if blkProvider.id != nil {
 		blk, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
-		if err != nil {
-			return nil, idLookupError(blkProvider.id, "block", err)
+		if err != nil { // unfortunately backend returns internal error status if not found
+			return nil, NewNotFoundError(
+				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
+			)
 		}
 		return blk, nil
 	}
@@ -249,28 +209,10 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, er
 	}
 
 	blk, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
-	if err != nil {
-		return nil, heightLookupError(blkProvider.height, "block", err)
+	if err != nil { // unfortunately backend returns internal error status if not found
+		return nil, NewNotFoundError(
+			fmt.Sprintf("error looking up block at height %d", blkProvider.height), err,
+		)
 	}
 	return blk, nil
-}
-
-// idLookupError adds ID to the error message
-func idLookupError(id *flow.Identifier, entityType string, err error) StatusError {
-	msg := fmt.Sprintf("error looking up %s with ID %s", entityType, id.String())
-	// if error has GRPC code NotFound, then return HTTP NotFound error
-	if status.Code(err) == codes.NotFound {
-		return NewNotFoundError(msg, err)
-	}
-	return NewRestError(http.StatusInternalServerError, msg, err)
-}
-
-// heightLookupError adds height to the error message
-func heightLookupError(height uint64, entityType string, err error) StatusError {
-	msg := fmt.Sprintf("error looking up %s at height %d", entityType, height)
-	// if error has GRPC code NotFound, then return HTTP NotFound error
-	if status.Code(err) == codes.NotFound {
-		return NewNotFoundError(msg, err)
-	}
-	return NewRestError(http.StatusInternalServerError, msg, err)
 }
