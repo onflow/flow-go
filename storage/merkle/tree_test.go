@@ -343,7 +343,9 @@ func TestRandomOrder(t *testing.T) {
 	for _, key := range keys[:100] {
 		proof, existed := tree1.Prove(key)
 		require.True(t, existed)
-		require.True(t, proof.Verify(tree1.Hash()))
+		isValid, err := proof.Verify(tree1.Hash())
+		assert.NoError(t, err)
+		require.True(t, isValid)
 	}
 
 	for _, key := range keys {

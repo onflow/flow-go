@@ -288,7 +288,10 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 
 	// init proof params
 	hashValues := make([][]byte, 0)
-	shortCounts := make([]int, 0)
+	skipBits := make([]uint8, 0)
+
+	steps := 0
+	isAShortNode := bitutils.MakeBitVector(len(key))
 
 ProveLoop:
 	for {
@@ -307,12 +310,10 @@ ProveLoop:
 				cur = &n.right
 			}
 
-			// capturing short count as zero hints that we had a full node
-			// so we can read a hashValue from hashValues
-			shortCounts = append(shortCounts, 0)
 			hashValues = append(hashValues, sibling.Hash())
-
+			steps++
 			index++
+
 			continue ProveLoop
 
 		// if we have a short path, we can only follow the path if we have all
@@ -326,23 +327,23 @@ ProveLoop:
 				}
 			}
 
-			// capturing a non-zero short counts hints that we had a short node
-			// during traverse and also capturing is needed to compute hash value
-			// for a short node.
-			shortCounts = append(shortCounts, n.count)
+			skipBits = append(skipBits, uint8(n.count))
 
-			// forward pointer and index to child
 			cur = &n.child
 			index += n.count
+
+			bitutils.SetBit(isAShortNode, steps)
+			steps++
 
 			continue ProveLoop
 
 		// if we have a leaf, we found the key, return value and true
 		case *leaf:
 			return &Proof{
-				Key:           key[:],
+				Key:           key,
 				Value:         n.val,
-				ShortCounts:   shortCounts,
+				IsAShortNode:  isAShortNode,
+				SkipBits:      skipBits,
 				InterimHashes: hashValues,
 			}, true
 
