@@ -2,10 +2,12 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/onflow/flow-go/utils/unittest"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_GetByID_Parse(t *testing.T) {

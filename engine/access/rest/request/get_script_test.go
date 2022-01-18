@@ -2,10 +2,12 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/onflow/flow-go/engine/access/rest/util"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetScript_InvalidParse(t *testing.T) {
