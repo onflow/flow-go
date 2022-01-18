@@ -339,7 +339,7 @@ func (anb *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateK
 		connManager := p2p.NewConnManager(anb.Logger, anb.PublicNetworkConfig.Metrics)
 		resolver := dns.NewResolver(anb.PublicNetworkConfig.Metrics, dns.WithTTL(anb.BaseConfig.DNSCacheTTL))
 
-		node, err := p2p.NewNodeBuilder(anb.Logger, anb.PublicNetworkConfig.BindAddress, networkKey, anb.SporkID).
+		libp2pNode, err := p2p.NewNodeBuilder(anb.Logger, anb.PublicNetworkConfig.BindAddress, networkKey, anb.SporkID).
 			SetBasicResolver(resolver).
 			SetSubscriptionFilter(
 				p2p.NewRoleBasedFilter(
@@ -357,7 +357,7 @@ func (anb *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateK
 			return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 		}
 
-		anb.LibP2PNode = node
+		anb.LibP2PNode = libp2pNode
 
 		return anb.LibP2PNode, nil
 	}
