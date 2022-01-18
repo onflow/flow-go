@@ -287,8 +287,8 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 	index := 0
 
 	// init proof params
-	hashValues := make([][]byte, 0)
-	shortCounts := make([]int, 0)
+	siblingHashes := make([][]byte, 0)
+	interimNodeTypes := make([]uint32, 0)
 
 ProveLoop:
 	for {
@@ -308,9 +308,9 @@ ProveLoop:
 			}
 
 			// capturing short count as zero hints that we had a full node
-			// so we can read a hashValue from hashValues
-			shortCounts = append(shortCounts, 0)
-			hashValues = append(hashValues, sibling.Hash())
+			// so we can read a hashValue from siblingHashes
+			interimNodeTypes = append(interimNodeTypes, 0)
+			siblingHashes = append(siblingHashes, sibling.Hash())
 
 			index++
 			continue ProveLoop
@@ -329,7 +329,7 @@ ProveLoop:
 			// capturing a non-zero short counts hints that we had a short node
 			// during traverse and also capturing is needed to compute hash value
 			// for a short node.
-			shortCounts = append(shortCounts, n.count)
+			interimNodeTypes = append(interimNodeTypes, uint32(n.count))
 
 			// forward pointer and index to child
 			cur = &n.child
@@ -340,10 +340,10 @@ ProveLoop:
 		// if we have a leaf, we found the key, return value and true
 		case *leaf:
 			return &Proof{
-				Key:           key[:],
-				Value:         n.val,
-				ShortCounts:   shortCounts,
-				InterimHashes: hashValues,
+				Key:              key,
+				Value:            n.val,
+				InterimNodeTypes: interimNodeTypes,
+				SiblingHashes:    siblingHashes,
 			}, true
 
 		// if we have a nil node, key doesn't exist, return nil and false
