@@ -3,14 +3,9 @@
 package merkle
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
-)
-
-var (
-	ErrorIncompatibleKeyLength = errors.New("key has incompatible size")
 )
 
 // maxKeyLength in bytes:

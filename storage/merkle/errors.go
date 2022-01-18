@@ -1,8 +1,11 @@
 package merkle
 
 import (
+	"errors"
 	"fmt"
 )
+
+var ErrorIncompatibleKeyLength = errors.New("key has incompatible size")
 
 // MalformedProofError is returned when the proof format has an issue
 type MalformedProofError struct {
