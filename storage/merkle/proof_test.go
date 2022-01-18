@@ -47,6 +47,11 @@ func TestProofWithASingleKey(t *testing.T) {
 	assert.Error(t, err)
 	require.False(t, isValid)
 
+	// malformed proof - issue with the expected state commitment
+	proof.Key = key
+	isValid, err = proof.Verify(nil)
+	assert.Error(t, err)
+	require.False(t, isValid)
 }
 
 // TestProofsWithRandomKeys tests proof generation and verification
