@@ -26,7 +26,7 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		// and the sibling to node n, whose hash (aka `siblingHash`) must be defined by the Proof.
 
 		var siblingHash hash.Hash
-		flag := bitutils.Bit(p.Flags, treeHeight-h)
+		flag := bitutils.ReadBit(p.Flags, treeHeight-h)
 
 		if flag == 1 { // if flag is set, siblingHash is stored in the proof
 			if proofIndex < 0 { // proof invalid: too few values
@@ -38,7 +38,7 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 			siblingHash = ledger.GetDefaultHashForHeight(h - 1)
 		}
 
-		bit := bitutils.Bit(p.Path[:], treeHeight-h)
+		bit := bitutils.ReadBit(p.Path[:], treeHeight-h)
 		// hashing is order dependent
 		if bit == 1 { // we hash our way up to the parent along the parent's right branch
 			computed = hash.HashInterNode(siblingHash, computed)

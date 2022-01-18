@@ -320,10 +320,10 @@ func TestSplitByPath(t *testing.T) {
 
 	// check correctness
 	for i := 0; i < index; i++ {
-		assert.Equal(t, bitutils.Bit(paths[i][:], randomIndex), 0)
+		assert.Equal(t, bitutils.ReadBit(paths[i][:], randomIndex), 0)
 	}
 	for i := index; i < len(paths); i++ {
-		assert.Equal(t, bitutils.Bit(paths[i][:], randomIndex), 1)
+		assert.Equal(t, bitutils.ReadBit(paths[i][:], randomIndex), 1)
 	}
 
 	// check the multi-set didn't change

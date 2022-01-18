@@ -31,16 +31,15 @@ func (p *PSMT) RootHash() ledger.RootHash {
 // TODO return list of indecies instead of paths
 func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 	var failedPaths []ledger.Path
-	payloads := make([]*ledger.Payload, 0)
-	for _, path := range paths {
+	payloads := make([]*ledger.Payload, len(paths))
+	for i, path := range paths {
 		// lookup the path for the payload
 		node, found := p.pathLookUp[path]
 		if !found {
-			payloads = append(payloads, nil)
 			failedPaths = append(failedPaths, path)
 			continue
 		}
-		payloads = append(payloads, node.payload)
+		payloads[i] = node.payload
 	}
 	if len(failedPaths) > 0 {
 		return nil, &ErrMissingPath{Paths: failedPaths}
@@ -94,13 +93,13 @@ func NewPSMT(
 			// otherwise the value is stored in the proofs
 			defaultHash := ledger.GetDefaultHashForHeight(currentNode.height - 1)
 			v := defaultHash
-			flag := bitutils.Bit(pr.Flags, j)
+			flag := bitutils.ReadBit(pr.Flags, j)
 			if flag == 1 {
 				// use the proof at index prValueIndex
 				v = pr.Interims[prValueIndex]
 				prValueIndex++
 			}
-			bit := bitutils.Bit(path[:], j)
+			bit := bitutils.ReadBit(path[:], j)
 			// look at the bit number j (left to right) for branching
 			if bit == 1 { // right branching
 				if currentNode.lChild == nil { // check left child
