@@ -678,6 +678,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		return fmt.Errorf("could not get tmp dir: %w", err)
 	}
 
+	t.Logf("adding container %v for %v node", nodeConf.ContainerName, nodeConf.Role)
+
 	nodeContainer := &Container{
 		Config:  nodeConf,
 		Ports:   make(map[string]string),
@@ -871,6 +873,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	if nodeConf.Role == flow.RoleAccess || nodeConf.Role == flow.RoleConsensus {
 		execution1 := net.ContainerByName("execution_1")
 		execution1.After(suiteContainer)
+	} else {
+		net.network.After(suiteContainer)
 	}
 	return nil
 }
