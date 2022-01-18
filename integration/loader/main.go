@@ -92,7 +92,7 @@ func main() {
 	}
 
 	loadedAccessAddr := accessNodeAddrs[0]
-	flowClient, err := client.New(loadedAccessAddr, grpc.WithInsecure())
+	flowClient, err := client.New(loadedAccessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
 	}
@@ -101,7 +101,7 @@ func main() {
 	if len(accessNodeAddrs) > 1 {
 		supervisorAccessAddr = accessNodeAddrs[1]
 	}
-	supervisorClient, err := client.New(supervisorAccessAddr, grpc.WithInsecure())
+	supervisorClient, err := client.New(supervisorAccessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
 	}

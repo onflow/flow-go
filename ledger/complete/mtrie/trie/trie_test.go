@@ -234,7 +234,7 @@ func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([
 	return paths, payloads
 }
 
-// sampleRandomRegisterWrites generates path-payload tuples for `number` randomly selected registers;
+// sampleRandomRegisterWritesWithPrefix generates path-payload tuples for `number` randomly selected registers;
 // each path is starting with the specified `prefix` and is filled to the full length with random bytes
 // caution: register paths might repeat
 func sampleRandomRegisterWritesWithPrefix(rng *LinearCongruentialGenerator, number int, prefix []byte) ([]ledger.Path, []ledger.Payload) {
