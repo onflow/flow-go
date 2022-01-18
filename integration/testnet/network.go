@@ -552,7 +552,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAccessNodeIDS,
 		fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
 
-	// start ghost nodes
 	for _, nodeConf := range confs {
 		var nodeType = "real"
 		if nodeConf.Ghost {
@@ -563,11 +562,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 
+		// ghost nodes will not need any fags
 		if nodeConf.Ghost {
 			continue
 		}
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
+		// this is required otherwise collection node will fail to startup
 		if nodeConf.Role == flow.RoleCollection || nodeConf.Role == flow.RoleConsensus {
 			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 			nodeContainer.AddFlag("insecure-access-api", "false")
@@ -861,7 +862,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	suiteContainer := net.suite.Container(*opts)
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
+
 	// start ghost node right away
+	// ghost nodes are to help testing other nodes' logic,
+	// in order to reduce tests flakyness, we try to prepare the network, so that the real node
+	// can be tested with the network that all ghost nodes are up. Therefore, we start
+	// ghost nodes right away
 	if nodeConf.Ghost {
 		net.network.After(suiteContainer)
 		return nil

@@ -58,7 +58,7 @@ func (is *InclusionSuite) SetupTest() {
 	// need three real consensus nodes
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithID(conID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithID(conID))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		is.conIDs = append(is.conIDs, conID)
 	}

@@ -66,9 +66,8 @@ func New(
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				g, ok := msg.Payload.(*flow.CollectionGuarantee)
+				_, ok := msg.Payload.(*flow.CollectionGuarantee)
 				if ok {
-					log.Info().Msgf("received collection guarantee %v from %v", g.ID(), msg.OriginID)
 					engineMetrics.MessageReceived(metrics.EngineConsensusIngestion, metrics.MessageCollectionGuarantee)
 				}
 				return ok
