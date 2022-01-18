@@ -17,6 +17,7 @@ import (
 
 // PingTimeout is maximum time to wait for a ping reply from a remote node
 const PingTimeout = time.Second * 4
+const PingInterval = time.Minute
 
 type Engine struct {
 	unit         *engine.Unit
@@ -26,10 +27,9 @@ type Engine struct {
 	me           module.Local
 	metrics      module.PingMetrics
 
-	pingEnabled  bool
-	pingInterval time.Duration
-	pingService  *p2p.PingService
-	nodeInfo     map[flow.Identifier]string // additional details about a node such as operator name
+	pingEnabled bool
+	pingService *p2p.PingService
+	nodeInfo    map[flow.Identifier]string // additional details about a node such as operator name
 }
 
 func New(
@@ -51,7 +51,6 @@ func New(
 		me:           me,
 		metrics:      metrics,
 		pingEnabled:  pingEnabled,
-		pingInterval: time.Minute,
 		pingService:  pingService,
 	}
 
@@ -93,7 +92,6 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 func (e *Engine) startPing() {
-	pingInterval := time.Minute
 
 	e.unit.LaunchPeriodically(func() {
 		peers := e.idProvider.Identities(filter.Not(filter.HasNodeID(e.me.NodeID())))
@@ -102,12 +100,12 @@ func (e *Engine) startPing() {
 		for _, peer := range peers {
 			peer := peer
 			pid := peer.ID()
-			delay := time.Duration(binary.BigEndian.Uint16(pid[:2])) % (pingInterval / time.Millisecond)
+			delay := time.Duration(binary.BigEndian.Uint16(pid[:2])) % (PingInterval / time.Millisecond)
 			e.unit.LaunchAfter(delay, func() {
 				e.pingNode(peer)
 			})
 		}
-	}, pingInterval, 0)
+	}, PingInterval, 0)
 }
 
 // pingNode pings the given peer and updates the metrics with the result and the additional node information
