@@ -280,6 +280,11 @@ GetLoop:
 //  - if leaf, would capture the leaf value
 func (t *Tree) Prove(key []byte) (*Proof, bool) {
 
+	// check the len of key first
+	if t.keyLength != len(key) {
+		return nil, false
+	}
+
 	// we start at the root again
 	cur := &t.root
 
@@ -348,7 +353,7 @@ ProveLoop:
 				InterimHashes: interimHashes,
 			}, true
 
-		// if we have a nil node, key doesn't exist, return nil and false
+		// the only possible nil node is the root node of an empty trie
 		case nil:
 			return nil, false
 		}

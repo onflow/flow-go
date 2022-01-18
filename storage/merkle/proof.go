@@ -2,12 +2,13 @@ package merkle
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
-// Proof caputres all data needed for inclusion proof of a single value inserted under key `Key` into the merkle trie
+// Proof captures all data needed for inclusion proof of a single value inserted under key `Key` into the merkle trie
 type Proof struct {
 	// Key used to insert and look up the value
 	Key []byte
@@ -51,6 +52,10 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 	}
 	keyIndex-- // consider index starts from zero
 
+	if len(p.Key) != keyIndex+1 {
+		return false, errors.New("malformed proof, key length does not match")
+	}
+
 	// compute the hash value of the leaf
 	currentHash := computeLeafHash(p.Value)
 
@@ -65,7 +70,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 			// read and pop the sibling hash value from InterimHashes
 			if interimHashIndex < 0 {
-				return false, fmt.Errorf("malformed proof, no more InterimHashes available to read")
+				return false, errors.New("malformed proof, no more InterimHashes available to read")
 			}
 			sibling := p.InterimHashes[interimHashIndex]
 			interimHashIndex--
@@ -87,7 +92,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 		// read and pop from SkipBits
 		if skipBitIndex < 0 {
-			return false, fmt.Errorf("malformed proof, no more SkipBits available to read")
+			return false, errors.New("malformed proof, no more SkipBits available to read")
 		}
 		skipBits := int(p.SkipBits[skipBitIndex])
 		skipBitIndex--
@@ -110,12 +115,12 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 	// in the end we should have used all the path space available
 	if keyIndex >= 0 {
-		return false, fmt.Errorf("there are more bits in the key that has not been checked")
+		return false, errors.New("there are more bits in the key that has not been checked")
 	}
 
 	// the final hash value should match whith what was expected
 	if !bytes.Equal(currentHash, expectedRootHash) {
-		return false, fmt.Errorf("rootHash not matched")
+		return false, errors.New("rootHash not matched")
 	}
 
 	return true, nil
