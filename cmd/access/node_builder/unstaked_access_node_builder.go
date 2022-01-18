@@ -180,7 +180,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Pr
 			SetBasicResolver(resolver).
 			SetSubscriptionFilter(
 				p2p.NewRoleBasedFilter(
-					0, builder.IdentityProvider,
+					p2p.UnstakedRole, builder.IdentityProvider,
 				),
 			).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {

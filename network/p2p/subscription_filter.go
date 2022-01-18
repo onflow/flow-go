@@ -16,6 +16,8 @@ type RoleBasedFilter struct {
 	myRole     flow.Role
 }
 
+const UnstakedRole = flow.Role(0)
+
 func NewRoleBasedFilter(role flow.Role, idProvider id.IdentityProvider) *RoleBasedFilter {
 	filter := &RoleBasedFilter{
 		idProvider: idProvider,
@@ -30,7 +32,7 @@ func (f *RoleBasedFilter) getRole(pid peer.ID) flow.Role {
 		return id.Role
 	}
 
-	return 0
+	return UnstakedRole
 }
 
 func (f *RoleBasedFilter) allowed(role flow.Role, topic string) bool {
