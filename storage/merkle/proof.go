@@ -3,7 +3,6 @@ package merkle
 import (
 	"bytes"
 	"errors"
-	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
@@ -35,7 +34,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 	// number of steps should be smaller than number of bits i the IsAShortNode
 	if steps > len(p.IsAShortNode)*8 {
-		return false, fmt.Errorf("malformed proof, IsShortNode length doesnt match the size of skipbits and interimhashes")
+		return false, errors.New("malformed proof, IsShortNode length doesnt match the size of skipbits and interimhashes")
 	}
 
 	// an index to consume interim hashes from the last element to the first element
