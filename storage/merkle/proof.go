@@ -14,7 +14,7 @@ type Proof struct {
 	Key []byte
 	// Value stored in the trie for the given key
 	Value []byte
-	// IsAShortNode captures a way to determine short nodes versus full nodes while tranversing the
+	// IsAShortNode holds bits of data to determine short nodes versus full nodes while tranversing the
 	// trie downward. if the bit is set to 1, it means that we have reached to a short node, and
 	// if is set to 0 means we have reached a full node.
 	IsAShortNode []byte
