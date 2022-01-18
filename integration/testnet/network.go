@@ -568,7 +568,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		}
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
-		if nodeConf.Role == flow.RoleConsensus {
+		if nodeConf.Role == flow.RoleCollection || nodeConf.Role == flow.RoleConsensus {
 			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
