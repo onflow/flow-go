@@ -354,7 +354,7 @@ func (anb *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateK
 			Build(ctx)
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 		}
 
 		anb.LibP2PNode = node
