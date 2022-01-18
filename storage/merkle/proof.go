@@ -2,7 +2,6 @@ package merkle
 
 import (
 	"bytes"
-	"errors"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
@@ -34,7 +33,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 	// number of steps should be smaller than number of bits i the IsAShortNode
 	if steps > len(p.IsAShortNode)*8 {
-		return false, errors.New("malformed proof, IsShortNode length doesnt match the size of skipbits and interimhashes")
+		return false, NewErrorMalformedProoff("the length of IsAShortNode doesn't match the length of SkipBits and InterimHashes")
 	}
 
 	// an index to consume interim hashes from the last element to the first element
@@ -52,7 +51,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 	keyIndex-- // consider index starts from zero
 
 	if len(p.Key) != keyIndex+1 {
-		return false, errors.New("malformed proof, key length does not match")
+		return false, NewErrorMalformedProoff("key length doesn't match the length of SkipBits and InterimHashes")
 	}
 
 	// compute the hash value of the leaf
@@ -69,7 +68,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 			// read and pop the sibling hash value from InterimHashes
 			if interimHashIndex < 0 {
-				return false, errors.New("malformed proof, no more InterimHashes available to read")
+				return false, NewErrorMalformedProoff("no more InterimHashes available to read")
 			}
 			sibling := p.InterimHashes[interimHashIndex]
 			interimHashIndex--
@@ -91,7 +90,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 		// read and pop from SkipBits
 		if skipBitIndex < 0 {
-			return false, errors.New("malformed proof, no more SkipBits available to read")
+			return false, NewErrorMalformedProoff("no more SkipBits available to read")
 		}
 		skipBits := int(p.SkipBits[skipBitIndex])
 		skipBitIndex--
@@ -114,12 +113,12 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 	// in the end we should have used all the path space available
 	if keyIndex >= 0 {
-		return false, errors.New("there are more bits in the key that has not been checked")
+		return false, NewErrorMalformedProoff("a subset of the key is not checked (keyIndex: %d)", keyIndex)
 	}
 
 	// the final hash value should match whith what was expected
 	if !bytes.Equal(currentHash, expectedRootHash) {
-		return false, errors.New("rootHash not matched")
+		return false, NewErrorMalformedProoff("root hash doesn't match, expected %X, computed %X", expectedRootHash, currentHash)
 	}
 
 	return true, nil
