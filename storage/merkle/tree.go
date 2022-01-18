@@ -296,7 +296,7 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 	skipBits := make([]uint16, 0)
 
 	steps := 0
-	isAShortNode := bitutils.MakeBitVector(len(key))
+	shortNodeVisited := make([]bool, 0, len(key))
 
 ProveLoop:
 	for {
@@ -317,6 +317,7 @@ ProveLoop:
 
 			index++
 			interimHashes = append(interimHashes, sibling.Hash())
+			shortNodeVisited = append(shortNodeVisited, false)
 			steps++
 
 			continue ProveLoop
@@ -338,13 +339,21 @@ ProveLoop:
 				panic("short node count not fitting a uint16")
 			}
 			skipBits = append(skipBits, uint16(n.count))
-			bitutils.SetBit(isAShortNode, steps)
+			shortNodeVisited = append(shortNodeVisited, true)
 			steps++
 
 			continue ProveLoop
 
 		// if we have a leaf, we found the key, return value and true
 		case *leaf:
+			// compress isAShortNode
+			isAShortNode := bitutils.MakeBitVector(len(shortNodeVisited))
+			for _, b := range shortNodeVisited {
+				if b {
+					bitutils.SetBit(isAShortNode, steps)
+				}
+			}
+
 			return &Proof{
 				Key:           key,
 				Value:         n.val,
