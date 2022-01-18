@@ -46,7 +46,6 @@ func createTransactionReq(body interface{}) *http.Request {
 
 func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
-	tx.PayloadSignatures = []flow.TransactionSignature{}
 	auth := make([]string, len(tx.Authorizers))
 	for i, a := range tx.Authorizers {
 		auth[i] = a.String()
@@ -64,7 +63,7 @@ func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
 		},
 		"authorizers":        auth,
-		"payload_signatures": nil,
+		"payload_signatures": []flow.TransactionSignature{},
 		"envelope_signatures": []map[string]interface{}{{
 			"address":      tx.EnvelopeSignatures[0].Address.String(),
 			"signer_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].SignerIndex),
@@ -266,9 +265,10 @@ func TestGetTransactionResult(t *testing.T) {
 func TestCreateTransaction(t *testing.T) {
 
 	t.Run("create", func(t *testing.T) {
-		t.Skip()
 		backend := &mock.API{}
 		tx := unittest.TransactionBodyFixture()
+		tx.PayloadSignatures = []flow.TransactionSignature{} // fix fixture nil values
+		tx.Arguments = [][]uint8{}
 		req := createTransactionReq(validCreateBody(tx))
 
 		backend.Mock.
@@ -279,7 +279,7 @@ func TestCreateTransaction(t *testing.T) {
 			{
 			   "id":"%s",
 			   "script":"cHViIGZ1biBtYWluKCkge30=",
-			   "arguments":null,
+			   "arguments": [],
 			   "reference_block_id":"%s",
 			   "gas_limit":"10",
 			   "payer":"8c5303eaa26202d6",
@@ -291,6 +291,7 @@ func TestCreateTransaction(t *testing.T) {
 			   "authorizers":[
 				  "8c5303eaa26202d6"
 			   ],
+ 				"payload_signatures": [],
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
@@ -321,7 +322,7 @@ func TestCreateTransaction(t *testing.T) {
 			{"reference_block_id", "", `{"code":400, "message":"reference block not provided"}`},
 			{"gas_limit", "-1", `{"code":400, "message":"invalid gas limit: value must be an unsigned 64 bit integer"}`},
 			{"payer", "yo", `{"code":400, "message":"invalid payer: invalid address"}`},
-			{"proposal_key", "yo", `{"code":400, "message":"request body contains an invalid value for the \"proposal_key\" field (at position 333)"}`},
+			{"proposal_key", "yo", `{"code":400, "message":"request body contains an invalid value for the \"proposal_key\" field (at position 331)"}`},
 			{"authorizers", "", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 32)"}`},
 			{"authorizers", "yo", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 34)"}`},
 			{"envelope_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"envelope_signatures\" field (at position 75)"}`},
