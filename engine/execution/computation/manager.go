@@ -231,10 +231,10 @@ func (e *Manager) ComputeBlock(
 
 	e.programsCache.Set(block.ID(), toInsert)
 
-	g, uploadCtx := errgroup.WithContext(ctx)
+	group, uploadCtx := errgroup.WithContext(ctx)
 	var rootID flow.Identifier
 
-	g.Go(func() error {
+	group.Go(func() error {
 		var collections []*flow.Collection
 		for _, collection := range result.ExecutableBlock.Collections() {
 			collections = append(collections, &flow.Collection{
@@ -258,12 +258,12 @@ func (e *Manager) ComputeBlock(
 	for _, uploader := range e.uploaders {
 		uploader := uploader
 
-		g.Go(func() error {
+		group.Go(func() error {
 			return uploader.Upload(result)
 		})
 	}
 
-	err = g.Wait()
+	err = group.Wait()
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload block result: %w", err)
