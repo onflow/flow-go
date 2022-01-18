@@ -668,6 +668,7 @@ func (s *Suite) submitSmokeTestTransaction(ctx context.Context)  {
 // head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
 // 3. Check that we can execute a script on the AN
 func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
+	// assert atleast 20 blocks have been finalized since the node replacement
 	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, uint64(20))
 
 	// get snapshot directly from new AN and compare head with head from the
@@ -687,6 +688,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	// assert atleast 20 blocks have been finalized since the node replacement
 	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, uint64(20))
 }
 
@@ -707,6 +709,7 @@ func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templat
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 // 2. Submit transaction to network
 func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	// assert atleast 20 blocks have been finalized since the node replacement
 	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, uint64(20))
 
 	// after swapping a consensus node and ensuring blocks continue to be finalized we submit a transaction to the
