@@ -3,12 +3,27 @@ package stdmap
 import (
 	"net"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/heropool"
 )
 
 var _ mempool.DNSCache = &DNSCache{}
 
 type DNSCache struct {
+	ipCache  *Backend
+	txtCache *Backend
+}
+
+func NewDNSCache(sizeLimit uint32, logger zerolog.Logger) *DNSCache {
+	return &DNSCache{
+		txtCache: NewBackendWithBackData(
+			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger)),
+		ipCache: NewBackendWithBackData(
+			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger)),
+	}
 }
 
 func (d *DNSCache) PutIpDomain(domain string, addresses []net.IPAddr) error {
