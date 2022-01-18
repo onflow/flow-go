@@ -151,7 +151,7 @@ func (s *Suite) TestEpochJoinAndLeaveLN() {
 
 // TestEpochJoinAndLeaveLN should update consensus nodes and assert healthy network conditions related to the node change
 func (s *Suite) TestEpochJoinAndLeaveSN() {
-	//unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs SN tests should be run on an machine with adequate resources")
+	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs SN tests should be run on an machine with adequate resources")
 	s.runTestEpochJoinAndLeave(flow.RoleConsensus, s.assertNetworkHealthyAfterSNChange)
 }
 

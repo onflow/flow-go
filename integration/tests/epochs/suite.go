@@ -632,9 +632,9 @@ func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environme
 	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")
 }
 
-// assertLatestSealedBlockHeightHigher will compare the height of head of the snapshot provided with the
-// latest finalized snapshot and assert that atleast 20 blocks have passed.
-func (s *Suite) assertLatestSealedBlockHeightHigher(ctx context.Context, snapshot *inmem.Snapshot)  {
+// assertLatestFinalizedBlockHeightHigher will assert the difference between snapshot and latest finalized snapshot
+// is higher .
+func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snapshot *inmem.Snapshot, numOfBlocks uint64)  {
 	bootstrapHead, err := snapshot.Head()
 	require.NoError(s.T(), err)
 
@@ -642,7 +642,26 @@ func (s *Suite) assertLatestSealedBlockHeightHigher(ctx context.Context, snapsho
 	require.NoError(s.T(), err)
 
 	// head should now be at-least 20 blocks higher from when we started
-	require.True(s.T(), header.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
+	require.True(s.T(), header.Height-bootstrapHead.Height >= numOfBlocks, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
+}
+
+// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+func (s *Suite) submitSmokeTestTransaction(ctx context.Context)  {
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
+	// To validate the LN joined the network successfully and is processing transactions we submit a
+	// create account transaction and assert there are no errors.
+	_, err := s.createAccount(
+		ctx,
+		fullAccountKey,
+		s.client.Account(),
+		s.client.SDKServiceAddress(),
+	)
+	require.NoError(s.T(), err)
 }
 
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
@@ -652,7 +671,7 @@ func (s *Suite) assertLatestSealedBlockHeightHigher(ctx context.Context, snapsho
 // head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
 // 3. Check that we can execute a script on the AN
 func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
-	s.assertLatestSealedBlockHeightHigher(ctx, rootSnapshot)
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, uint64(20))
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
@@ -671,29 +690,15 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	s.assertLatestSealedBlockHeightHigher(ctx, rootSnapshot)
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, uint64(20))
 }
 
 // assertNetworkHealthyAfterLNChange after an collection node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
-// is after the first epoch starts.
+// is after the first epoch.
 func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	fullAccountKey := sdk.NewAccountKey().
-		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
-		SetHashAlgo(sdkcrypto.SHA2_256).
-		SetWeight(sdk.AccountKeyWeightThreshold)
-
-	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
-	// To validate the LN joined the network successfully and is processing transactions we submit a
-	// create account transaction and assert there are no errors.
-	_, err := s.createAccount(
-		ctx,
-		fullAccountKey,
-		s.client.Account(),
-		s.client.SDKServiceAddress(),
-	)
-	require.NoError(s.T(), err)
+	s.submitSmokeTestTransaction(ctx)
 }
 
 // assertNetworkHealthyAfterSNChange after replacing a consensus node in the test and waiting until
@@ -702,23 +707,12 @@ func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templat
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 // 2. Submit transaction to network
 func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	s.assertLatestSealedBlockHeightHigher(ctx, rootSnapshot)
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, uint64(20))
 
 	// after swapping a consensus node and ensuring blocks continue to be finalized we submit a transaction to the
 	// network to ensure the network is overall healthy
-	fullAccountKey := sdk.NewAccountKey().
-		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
-		SetHashAlgo(sdkcrypto.SHA2_256).
-		SetWeight(sdk.AccountKeyWeightThreshold)
-
 	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
 	// To validate the LN joined the network successfully and is processing transactions we submit a
 	// create account transaction and assert there are no errors.
-	_, err := s.createAccount(
-		ctx,
-		fullAccountKey,
-		s.client.Account(),
-		s.client.SDKServiceAddress(),
-	)
-	require.NoError(s.T(), err)
+	s.submitSmokeTestTransaction(ctx)
 }
