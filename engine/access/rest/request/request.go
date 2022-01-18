@@ -1,10 +1,12 @@
 package request
 
 import (
-	"github.com/gorilla/mux"
-	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/mux"
+
+	"github.com/onflow/flow-go/engine/access/rest/middleware"
 )
 
 // Request a convenience wrapper around the http request to make it easy to read request query params

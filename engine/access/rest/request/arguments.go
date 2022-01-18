@@ -2,6 +2,7 @@ package request
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/engine/access/rest/util"
 )
 

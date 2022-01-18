@@ -3,9 +3,10 @@ package rest
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"net/http"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

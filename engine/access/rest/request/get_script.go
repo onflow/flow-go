@@ -2,8 +2,9 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"io"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const blockIDQuery = "block_id"

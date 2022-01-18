@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"net/http"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"

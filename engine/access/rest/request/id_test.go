@@ -1,10 +1,12 @@
 package request
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestID_InvalidParse(t *testing.T) {
@@ -61,7 +63,7 @@ func TestIDs_ValidParse(t *testing.T) {
 }
 
 func TestIDs_InvalidParse(t *testing.T) {
-	testIDs := make([]string, maxIDsLength+1)
+	testIDs := make([]string, MaxIDsLength+1)
 	var ids IDs
 	err := ids.Parse(testIDs)
 	assert.EqualError(t, err, "at most 50 IDs can be requested at a time")

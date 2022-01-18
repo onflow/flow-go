@@ -3,10 +3,12 @@ package request
 import (
 	"encoding/hex"
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestSignature_InvalidParse(t *testing.T) {

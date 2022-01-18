@@ -1,12 +1,14 @@
-package util
+package util_test
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/models"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 
 	"github.com/stretchr/testify/require"
 )
@@ -66,7 +68,7 @@ func testFilter(t *testing.T, inputJson, exepectedJson string, description strin
 	}
 	err := json.Unmarshal([]byte(inputJson), &outputInterface)
 	require.NoErrorf(t, err, description)
-	filteredOutput, err := SelectFilter(outputInterface, selectKeys)
+	filteredOutput, err := util.SelectFilter(outputInterface, selectKeys)
 	require.NoErrorf(t, err, description)
 	filteredOutputBytes, err := json.Marshal(filteredOutput)
 	require.NoErrorf(t, err, description)
@@ -95,7 +97,7 @@ func ExampleSelectFilter() {
 		"something.nonexisting",
 	}
 
-	filteredBlock, err := SelectFilter(blocks, selectKeys)
+	filteredBlock, err := util.SelectFilter(blocks, selectKeys)
 	if err != nil {
 		fmt.Println(err)
 		return

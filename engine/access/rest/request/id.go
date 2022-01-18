@@ -3,11 +3,12 @@ package request
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"regexp"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
-const maxIDsLength = 50
+const MaxIDsLength = 50
 
 type ID flow.Identifier
 
@@ -38,8 +39,8 @@ func (i ID) Flow() flow.Identifier {
 type IDs []ID
 
 func (i *IDs) Parse(raw []string) error {
-	if len(raw) > maxIDsLength {
-		return fmt.Errorf("at most %d IDs can be requested at a time", maxIDsLength)
+	if len(raw) > MaxIDsLength {
+		return fmt.Errorf("at most %d IDs can be requested at a time", MaxIDsLength)
 	}
 
 	// make a map to have only unique values as keys

@@ -2,14 +2,16 @@ package rest
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -106,7 +108,7 @@ func TestGetBlocks(t *testing.T) {
 			description:      "Get block by end height less than start height",
 			request:          getByStartEndHeightExpandedURL(t, heights[len(heights)-1], heights[0]),
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: fmt.Sprintf(`{"code":400, "message": "start height must be less than or equal to end height"}`),
+			expectedResponse: `{"code":400, "message": "start height must be less than or equal to end height"}`,
 		},
 		{
 			description:      "Get block by both heights and start and end height",

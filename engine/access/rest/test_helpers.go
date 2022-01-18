@@ -3,13 +3,15 @@ package rest
 import (
 	"bytes"
 	"fmt"
-	"github.com/onflow/flow-go/access/mock"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/access/mock"
 )
 
 const (
