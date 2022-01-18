@@ -34,6 +34,7 @@ type OrderedMapMigration struct {
 	reportFile  *os.File
 	newStorage  *runtime.Storage
 	Interpreter *interpreter.Interpreter
+	ledgerView  *view
 
 	progress *progressbar.ProgressBar
 }
@@ -63,7 +64,11 @@ func (m *OrderedMapMigration) Migrate(payloads []ledger.Payload) ([]ledger.Paylo
 	total := int64(len(payloads))
 	m.progress = progressbar.Default(total, "Migrating:")
 
-	return m.migrate(payloads)
+	storagePayloads, err := m.initialize(payloads)
+	if err != nil {
+		panic(err)
+	}
+	return m.migrate(storagePayloads)
 }
 
 func (m *OrderedMapMigration) initPersistentSlabStorage(v *view) {
@@ -382,21 +387,6 @@ func (r RawStorable) Storable(_ atree.SlabStorage, _ atree.Address, _ uint64) (a
 	return r, nil
 }
 
-func rawStorableHashInput(v atree.Value, _ []byte) ([]byte, error) {
-	return []byte(v.(RawStorable)), nil
-}
-
-func rawStorableComparator(storage atree.SlabStorage, value atree.Value, otherStorable atree.Storable) (bool, error) {
-	otherValue, err := otherStorable.StoredValue(storage)
-	if err != nil {
-		return false, err
-	}
-
-	result := bytes.Compare(value.(RawStorable), otherValue.(RawStorable))
-
-	return result == 0, nil
-}
-
 func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storagePayloads []ledger.Payload, slabPayloads []ledger.Payload) {
 	for _, p := range inp {
 		if state.IsFVMStateKey(
@@ -417,7 +407,7 @@ func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storageP
 	return
 }
 
-func (m *OrderedMapMigration) migrate(payload []ledger.Payload) ([]ledger.Payload, error) {
+func (m *OrderedMapMigration) initialize(payload []ledger.Payload) ([]ledger.Payload, error) {
 	fvmPayloads, storagePayloads, slabPayloads := splitPayloads(payload)
 	if len(slabPayloads) != 0 {
 		return nil, fmt.Errorf(
@@ -426,10 +416,13 @@ func (m *OrderedMapMigration) migrate(payload []ledger.Payload) ([]ledger.Payloa
 		)
 	}
 
-	ledgerView := NewView(fvmPayloads)
-	m.initPersistentSlabStorage(ledgerView)
+	m.ledgerView = NewView(fvmPayloads)
+	m.initPersistentSlabStorage(m.ledgerView)
 	m.initIntepreter()
+	return storagePayloads, nil
+}
 
+func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledger.Payload, error) {
 	sortedByOwnerAndDomain := make(map[string](map[string][]Pair))
 
 	for _, p := range storagePayloads {
@@ -485,5 +478,5 @@ func (m *OrderedMapMigration) migrate(payload []ledger.Payload) ([]ledger.Payloa
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
 	}
 
-	return ledgerView.Payloads(), nil
+	return m.ledgerView.Payloads(), nil
 }
