@@ -76,7 +76,7 @@ func (ss *SealingSuite) SetupTest() {
 	// need three real consensus nodes
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithID(conID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithID(conID))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		ss.conIDs = append(ss.conIDs, conID)
 	}
