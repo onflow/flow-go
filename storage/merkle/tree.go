@@ -343,9 +343,9 @@ ProveLoop:
 		case *leaf:
 			// compress isAShortNode
 			isAShortNode := bitutils.MakeBitVector(len(shortNodeVisited))
-			for _, b := range shortNodeVisited {
+			for i, b := range shortNodeVisited {
 				if b {
-					bitutils.SetBit(isAShortNode, steps)
+					bitutils.SetBit(isAShortNode, i)
 				}
 			}
 

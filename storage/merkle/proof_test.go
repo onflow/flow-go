@@ -37,6 +37,16 @@ func TestProofWithASingleKey(t *testing.T) {
 	proof, existed = tree1.Prove(key2)
 	require.False(t, existed)
 	require.Nil(t, proof)
+
+	// malformed proof - issue with the key
+	proof, existed = tree1.Prove(key)
+	require.True(t, existed)
+	proof.Key = key2
+
+	isValid, err = proof.Verify(tree1.Hash())
+	assert.Error(t, err)
+	require.False(t, isValid)
+
 }
 
 // TestProofsWithRandomKeys tests proof generation and verification

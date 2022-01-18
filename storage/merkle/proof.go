@@ -50,7 +50,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 	}
 	keyIndex-- // consider index starts from zero
 
-	if len(p.Key) != keyIndex+1 {
+	if len(p.Key)*8 != keyIndex+1 {
 		return false, NewErrorMalformedProoff("key length doesn't match the length of SkipBits and InterimHashes")
 	}
 
