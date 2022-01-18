@@ -3,11 +3,10 @@ package committees
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // NewStaticCommittee returns a new committee with a static participant set.
