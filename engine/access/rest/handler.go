@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
@@ -55,6 +56,15 @@ func NewHandler(
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// create a logger
 	errLog := h.logger.With().Str("request_url", r.URL.String()).Logger()
+
+	// limit requested body size
+	maxRequestBodySize := int64(2 * math.Pow(10, 7)) // limit to 2MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+	err := r.ParseForm()
+	if err != nil {
+		errLog.Error().Msg("requested body size too big")
+		return
+	}
 
 	// create request decorator with parsed values
 	decoratedRequest := request.Decorate(r)
