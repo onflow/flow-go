@@ -13,7 +13,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/network/message"
+	fprotocol "github.com/onflow/flow-go/state/protocol"
 )
 
 const maxPingMessageSize = 5 * kb
@@ -24,7 +26,7 @@ const pingTimeout = time.Second * 60
 type PingService struct {
 	host             host.Host
 	pingProtocolID   protocol.ID
-	pingInfoProvider PingInfoProvider
+	pingInfoProvider *PingInfoProviderImpl
 	logger           zerolog.Logger
 }
 
@@ -62,8 +64,43 @@ func (p PingInfoProviderImpl) HotstuffView() uint64 {
 	return view
 }
 
-func NewPingService(h host.Host, pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider, logger zerolog.Logger) *PingService {
+type PingServiceOption func(*PingService)
+
+func WithHotstuffViewFn(fn func() (uint64, error)) PingServiceOption {
+	return func(e *PingService) {
+		e.pingInfoProvider.HotstuffViewFun = fn
+	}
+}
+
+func NewPingService(
+	h host.Host,
+	pingProtocolID protocol.ID,
+	state fprotocol.State,
+	logger zerolog.Logger,
+	options ...PingServiceOption,
+) *PingService {
+	// setup the Ping provider to return the software version and the sealed block height
+	pingInfoProvider := &PingInfoProviderImpl{
+		SoftwareVersionFun: func() string {
+			return build.Semver()
+		},
+		SealedBlockHeightFun: func() (uint64, error) {
+			head, err := state.Sealed().Head()
+			if err != nil {
+				return 0, err
+			}
+			return head.Height, nil
+		},
+		HotstuffViewFun: func() (uint64, error) {
+			return 0, fmt.Errorf("hotstuff view reporting disabled")
+		},
+	}
 	ps := &PingService{host: h, pingProtocolID: pingProtocolID, pingInfoProvider: pingInfoProvider, logger: logger}
+
+	for _, option := range options {
+		option(ps)
+	}
+
 	h.SetStreamHandler(pingProtocolID, ps.PingHandler)
 	return ps
 }

@@ -39,8 +39,8 @@ func New(
 	me module.Local,
 	metrics module.PingMetrics,
 	pingEnabled bool,
-	pingService *p2p.PingService,
 	nodeInfoFile string,
+	pingService *p2p.PingService,
 ) (*Engine, error) {
 
 	eng := &Engine{

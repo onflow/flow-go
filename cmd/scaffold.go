@@ -133,9 +133,19 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
 
+func (fnb *FlowNodeBuilder) EnqueuePingService() {
+	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
+
+		// needed to setup ping handler, but the returned value is unused
+		_ = p2p.NewPingService(node.Middleware.Host(), pingLibP2PProtocolID, node.State, node.Logger)
+
+		return &module.NoopReadyDoneAware{}, nil
+	})
+}
+
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-
 		codec := cborcodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
@@ -934,6 +944,8 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 	fnb.InitIDProviders()
 
 	fnb.EnqueueNetworkInit()
+
+	fnb.EnqueuePingService()
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()

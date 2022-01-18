@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
@@ -277,25 +276,8 @@ func (anb *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 	}
 
 	anb.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// setup the Ping provider to return the software version and the sealed block height
-		pingProvider := p2p.PingInfoProviderImpl{
-			SoftwareVersionFun: func() string {
-				return build.Semver()
-			},
-			SealedBlockHeightFun: func() (uint64, error) {
-				head, err := node.State.Sealed().Head()
-				if err != nil {
-					return 0, err
-				}
-				return head.Height, nil
-			},
-			HotstuffViewFun: func() (uint64, error) {
-				return 0, fmt.Errorf("non-consensus nodes do not report hotstuff view in ping")
-			},
-		}
-
 		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
-		pingService := p2p.NewPingService(node.Middleware.Host(), pingLibP2PProtocolID, pingProvider, node.Logger)
+		pingService := p2p.NewPingService(node.Middleware.Host(), pingLibP2PProtocolID, node.State, node.Logger)
 
 		ping, err := pingeng.New(
 			node.Logger,
@@ -304,8 +286,8 @@ func (anb *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			node.Me,
 			anb.PingMetrics,
 			anb.pingEnabled,
-			pingService,
 			anb.nodeInfoFile,
+			pingService,
 		)
 
 		if err != nil {
