@@ -339,15 +339,6 @@ func TestRandomOrder(t *testing.T) {
 		keys[i], keys[j] = keys[j], keys[i]
 	})
 
-	// get proofs for keys and verify for a subset of keys
-	for _, key := range keys[:100] {
-		proof, existed := tree1.Prove(key)
-		require.True(t, existed)
-		isValid, err := proof.Verify(tree1.Hash())
-		assert.NoError(t, err)
-		require.True(t, isValid)
-	}
-
 	for _, key := range keys {
 		val := vals[string(key)]
 		replaced, err := tree2.Put(key, val)

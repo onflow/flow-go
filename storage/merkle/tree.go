@@ -287,8 +287,8 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 	index := 0
 
 	// init proof params
-	hashValues := make([][]byte, 0)
-	skipBits := make([]uint8, 0)
+	interimHashes := make([][]byte, 0)
+	skipBits := make([]uint16, 0)
 
 	steps := 0
 	isAShortNode := bitutils.MakeBitVector(len(key))
@@ -310,9 +310,9 @@ ProveLoop:
 				cur = &n.right
 			}
 
-			hashValues = append(hashValues, sibling.Hash())
-			steps++
 			index++
+			interimHashes = append(interimHashes, sibling.Hash())
+			steps++
 
 			continue ProveLoop
 
@@ -327,11 +327,12 @@ ProveLoop:
 				}
 			}
 
-			skipBits = append(skipBits, uint8(n.count))
-
 			cur = &n.child
 			index += n.count
-
+			if n.count > 65535 {
+				panic("short node count not fitting a uint16")
+			}
+			skipBits = append(skipBits, uint16(n.count))
 			bitutils.SetBit(isAShortNode, steps)
 			steps++
 
@@ -344,7 +345,7 @@ ProveLoop:
 				Value:         n.val,
 				IsAShortNode:  isAShortNode,
 				SkipBits:      skipBits,
-				InterimHashes: hashValues,
+				InterimHashes: interimHashes,
 			}, true
 
 		// if we have a nil node, key doesn't exist, return nil and false
