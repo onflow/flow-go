@@ -652,9 +652,6 @@ func (s *Suite) submitSmokeTestTransaction(ctx context.Context)  {
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
-	// To validate the LN joined the network successfully and is processing transactions we submit a
-	// create account transaction and assert there are no errors.
 	_, err := s.createAccount(
 		ctx,
 		fullAccountKey,
@@ -698,6 +695,9 @@ func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templat
 // 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
 // is after the first epoch.
 func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
+	// To validate the LN joined the network successfully and is processing transactions we submit a
+	// create account transaction and assert there are no errors.
 	s.submitSmokeTestTransaction(ctx)
 }
 
