@@ -6,7 +6,7 @@ import (
 )
 
 // Verifier is the component responsible for the cryptographic integrity of
-// votes, proposals and QC's against w.r.t. the block they are signing.
+// votes, proposals and QC's against the block they are signing.
 // Overall, there are two criteria for the validity of a vote and QC:
 //  (1) the signer ID(s) must correspond to authorized consensus participants
 //  (2) the signature must be cryptographically valid.
@@ -25,20 +25,19 @@ type Verifier interface {
 	// from the provided voter identity. It is the responsibility of the
 	// calling code to ensure that `voter` is authorized to vote.
 	// The implementation returns the following sentinel errors:
-	// * verification.ErrInvalidFormat if the signature has an incompatible format.
+	// * signature.ErrInvalidFormat if the signature has an incompatible format.
+	// * model.ErrInvalidSignature is the signature is invalid
 	// * unexpected errors should be treated as symptoms of bugs or uncovered
 	//   edge cases in the logic (i.e. as fatal)
-	VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error)
+	VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) error
 
 	// VerifyQC checks the validity of a QC for the given block.
-	// The first return value indicates whether `sigData` is a valid signature
-	// from the provided voter identity. It is the responsibility of the
-	// calling code to ensure that `voter` is authorized to vote.
-	// It is the responsibility of the calling code to ensure that `voters`
-	// only contains authorized nodes (without duplicates).
-	// The implementation returns the following sentinel errors:
-	// * verification.ErrInvalidFormat if the signature has an incompatible format.
-	// * unexpected errors should be treated as symptoms of bugs or uncovered
-	//   edge cases in the logic (i.e. as fatal)
-	VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error)
+	// It returns:
+	//  - `nil` to indicate the given `sigData` is a valid signature from the
+	//          provided voter identity. It is the responsibility of the
+	//          calling code to ensure that `voter` is authorized to vote,
+	//          and the `voters` only contains authorized nodes (without duplicates).
+	//  - `signature.ErrInvalidFormat` if the signature has an incompatible format.
+	//  - error if running into any unexpected exception (i.e. fatal error)
+	VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) error
 }

@@ -23,7 +23,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -38,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -52,7 +53,6 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
@@ -115,6 +115,7 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
+		hotstuffModules         *consensus.HotstuffModules
 		dkgState                *bstorage.DKGState
 		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
 	)
@@ -204,10 +205,7 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Index,
 				node.Storage.Results,
-				node.Storage.Seals,
-				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
-
-			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+				node.Storage.Seals)
 
 			sealValidator, err := validation.NewSealValidator(
 				node.State,
@@ -216,7 +214,6 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,
-				resultApprovalSigVerifier,
 				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				conMetrics)
@@ -301,6 +298,7 @@ func main() {
 					if err != nil {
 						return err
 					}
+					return nil
 				}
 				return nil
 			}
@@ -403,7 +401,6 @@ func main() {
 		}).
 		Component("sealing engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
 			config := sealing.DefaultConfig()
@@ -426,7 +423,6 @@ func main() {
 				node.State,
 				node.Storage.Seals,
 				chunkAssigner,
-				resultApprovalSigVerifier,
 				seals,
 				config,
 			)
@@ -523,37 +519,94 @@ func main() {
 
 			return ing, err
 		}).
-		Component("consensus components", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-			// TODO: we should probably find a way to initialize mutually dependent engines separately
-
-			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-			// initialize the pending blocks cache
-			proposals := buffer.NewPendingBlocks()
-
-			core, err := compliance.NewCore(node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Metrics.Mempool,
-				node.Metrics.Compliance,
-				cleaner,
+		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize the block finalizer
+			finalize := finalizer.NewFinalizer(
+				node.DB,
 				node.Storage.Headers,
-				node.Storage.Payloads,
 				mutableState,
-				proposals,
-				syncCore)
+				node.Tracer,
+				finalizer.WithCleanup(finalizer.CleanupMempools(
+					node.Metrics.Mempool,
+					conMetrics,
+					node.Storage.Payloads,
+					guarantees,
+					seals,
+				)),
+			)
+
+			// initialize Main consensus committee's state
+			var committee hotstuff.Committee
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+			}
+			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
+
+			epochLookup := epochs.NewEpochLookup(node.State)
+			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, safeBeaconKeys)
+
+			// initialize the combined signer for hotstuff
+			var signer hotstuff.Signer
+			signer = verification.NewCombinedSigner(
+				node.Me,
+				beaconKeyStore,
+			)
+			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
+
+			// initialize a logging notifier for hotstuff
+			notifier := createNotifier(
+				node.Logger,
+				mainMetrics,
+				node.Tracer,
+				node.RootChainID,
+			)
+
+			notifier.AddConsumer(finalizationDistributor)
+
+			// initialize the persister
+			persist := persister.New(node.DB, node.RootChainID)
+
+			finalizedBlock, err := node.State.Final().Head()
+			if err != nil {
+				return nil, err
 			}
 
-			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
+			forks, err := consensus.NewForks(
+				finalizedBlock,
+				node.Storage.Headers,
+				finalize,
+				notifier,
+				node.RootBlock.Header,
+				node.RootQC,
+			)
 			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
+				return nil, err
 			}
 
+			qcDistributor := pubsub.NewQCCreatedDistributor()
+			validator := consensus.NewValidator(mainMetrics, committee, forks)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+			lowestViewForVoteProcessing := finalizedBlock.View + 1
+			aggregator, err := consensus.NewVoteAggregator(node.Logger, lowestViewForVoteProcessing, notifier, voteProcessorFactory)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
+			}
+
+			hotstuffModules = &consensus.HotstuffModules{
+				Notifier:             notifier,
+				Committee:            committee,
+				Signer:               signer,
+				Persist:              persist,
+				QCCreatedDistributor: qcDistributor,
+				Forks:                forks,
+				Validator:            validator,
+				Aggregator:           aggregator,
+			}
+
+			return aggregator, nil
+		}).
+		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
@@ -580,73 +633,6 @@ func main() {
 
 			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
-			// initialize the block finalizer
-			finalize := finalizer.NewFinalizer(
-				node.DB,
-				node.Storage.Headers,
-				mutableState,
-				node.Tracer,
-				finalizer.WithCleanup(finalizer.CleanupMempools(
-					node.Metrics.Mempool,
-					conMetrics,
-					node.Storage.Payloads,
-					guarantees,
-					seals,
-				)),
-			)
-
-			// initialize the aggregating signature module for staking signatures
-			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
-
-			// initialize the verifier used to verify threshold signatures
-			thresholdVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-
-			// initialize the simple merger to combine staking & beacon signatures
-			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-
-			// initialize Main consensus committee's state
-			var committee hotstuff.Committee
-			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
-			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
-
-			epochLookup := epochs.NewEpochLookup(node.State)
-
-			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, safeBeaconKeys)
-
-			// initialize the combined signer for hotstuff
-			var signer hotstuff.SignerVerifier
-			signer = verification.NewCombinedSigner(
-				committee,
-				staking,
-				thresholdVerifier,
-				merger,
-				thresholdSignerStore,
-				node.NodeID,
-			)
-			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
-
-			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(
-				node.Logger,
-				mainMetrics,
-				node.Tracer,
-				node.RootChainID,
-			)
-
-			notifier.AddConsumer(finalizationDistributor)
-
-			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
-
-			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
-			if err != nil {
-				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
-			}
-
 			opts := []consensus.Option{
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
@@ -660,22 +646,48 @@ func main() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
 
+			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			if err != nil {
+				return nil, err
+			}
+
+			// initialize the entity database accessors
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+
+			// initialize the pending blocks cache
+			proposals := buffer.NewPendingBlocks()
+
+			complianceCore, err := compliance.NewCore(node.Logger,
+				node.Metrics.Engine,
+				node.Tracer,
+				node.Metrics.Mempool,
+				node.Metrics.Compliance,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				mutableState,
+				proposals,
+				syncCore,
+				hotstuffModules.Aggregator)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, complianceCore)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
+			}
+
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
-				notifier,
 				mainMetrics,
-				node.Storage.Headers,
-				committee,
 				build,
-				finalize,
-				persist,
-				signer,
 				comp,
-				node.RootBlock.Header,
-				node.RootQC,
-				finalized,
+				finalizedBlock,
 				pending,
+				hotstuffModules,
 				opts...,
 			)
 			if err != nil {

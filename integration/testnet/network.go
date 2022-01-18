@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
+
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
@@ -168,7 +170,7 @@ func (net *FlowNetwork) Result() *flow.ExecutionResult {
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
 	// makes it easier to see logs for a specific test case
-	fmt.Println(">>>> starting network: ", net.config.Name)
+	fmt.Println("starting network: ", net.config.Name)
 	net.suite.Start(ctx)
 }
 
@@ -914,7 +916,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	//            this ordering defines the DKG participant's indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
 
-	// run DKG for all consensus nodes
 	dkg, err := runDKG(stakedConfs)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
@@ -1136,7 +1137,7 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 		return dkgmod.DKGData{}, err
 	}
 
-	dkg, err := run.RunFastKG(nConsensusNodes, dkgSeed)
+	dkg, err := dkg.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return dkgmod.DKGData{}, err
 	}

@@ -8,11 +8,10 @@ test:
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: access-tests common-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests 
+integration-test: access-tests common-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests
 
-# NOTE: Currently skipping collection and consensus tests due to them not passing properly on CI
 .PHONY: ci-integration-test
-ci-integration-test: access-tests common-tests execution-tests epochs-tests verification-tests network-tests # collection-tests # consensus-tests
+ci-integration-test: access-tests common-tests execution-tests epochs-tests verification-tests network-tests # collection-tests consensus-tests
 
 .PHONY: access-tests
 access-tests:
