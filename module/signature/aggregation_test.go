@@ -177,9 +177,9 @@ func TestAggregatorSameMessage(t *testing.T) {
 	})
 
 	// Generally, `Aggregate()` can fail in two places, when invalid signatures were added via `TrustedAdd`:
-	//  1. The signature itself has an invalid structure, i.e. it can't be decoded to a curve point. In this
+	//  1. The signature itself has an invalid structure, i.e. it can't be deserialized successfully. In this
 	//     case, already the aggregation step fails.
-	//  2. The signature can be decoded to a curve point, but the signature doesn't match the public key. In
+	//  2. The signature was deserialized successfully, but the aggregate signature doesn't verify to the aggregate public key. In
 	//     this case, the aggregation step succeeds. But the post-check fails.
 	t.Run("invalid signature", func(t *testing.T) {
 		_, s := createAggregationData(t, 1)

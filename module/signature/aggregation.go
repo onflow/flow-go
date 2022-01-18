@@ -193,14 +193,14 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 		if crypto.IsInvalidInputsError(err) {
 			return nil, nil, NewInvalidSignatureIncludedErrorf("signatures with invalid structure were included via TrustedAdd: %w", err)
 		}
-		return nil, nil, fmt.Errorf("BLS signature aggregtion failed: %w", err)
+		return nil, nil, fmt.Errorf("BLS signature aggregation failed: %w", err)
 	}
 	ok, err := s.VerifyAggregate(indices, aggregatedSignature) // no errors expected (unless some public BLS keys are invalid)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unexpected error during signature aggregation: %w", err)
 	}
 	if !ok {
-		return nil, nil, NewInvalidSignatureIncludedErrorf("signatures that do not match their public key were included via TrustedAdd")
+		return nil, nil, NewInvalidSignatureIncludedErrorf("invalid signature(s) have been included via TrustedAdd")
 	}
 	s.cachedSignature = aggregatedSignature
 	s.cachedSignerIndices = indices

@@ -168,9 +168,9 @@ func Test_VerifyQCV3(t *testing.T) {
 	committee := &mocks.Committee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
-	// generate 17 BSL keys as stubs for staking keys and use them to generate an aggregated staking sig
+	// generate 17 BLS keys as stubs for staking keys and use them to generate an aggregated staking sig
 	privStakingKeys, aggStakingSig := generateAggregatedSignature(t, 17, msg, encoding.ConsensusVoteTag)
-	// generate 11 BSL keys as stubs for individual random beacon key shares and use them to generate an aggregated rand beacon sig
+	// generate 11 BLS keys as stubs for individual random beacon key shares and use them to generate an aggregated rand beacon sig
 	privRbKeyShares, aggRbSig := generateAggregatedSignature(t, 11, msg, encoding.RandomBeaconTag)
 
 	stakingSigners := generateIdentitiesForPrivateKeys(t, privStakingKeys)

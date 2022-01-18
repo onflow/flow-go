@@ -34,7 +34,7 @@ func NewRandomBeaconInspector(
 		message,
 		encoding.RandomBeaconTag)
 	if err != nil {
-		return nil, fmt.Errorf("creating BSL Threshold Signature Inspector failed: %w", err)
+		return nil, fmt.Errorf("creating BLS Threshold Signature Inspector failed: %w", err)
 	}
 
 	return &randomBeaconInspector{
@@ -122,7 +122,7 @@ func (r *randomBeaconInspector) Reconstruct() (crypto.Signature, error) {
 		if crypto.IsNotEnoughSharesError(err) {
 			return nil, model.NewInsufficientSignaturesError(err)
 		}
-		return nil, fmt.Errorf("unexpected error random beacon sig reconstruction: %w", err)
+		return nil, fmt.Errorf("unexpected error during random beacon sig reconstruction: %w", err)
 	}
 	return sig, nil
 }
