@@ -45,9 +45,11 @@ func (g *GetScript) Parse(rawHeight string, rawID string, rawScript io.Reader) e
 	}
 	g.Script = script
 
-	if g.BlockID == flow.ZeroID && g.BlockHeight == EmptyHeight {
-		return fmt.Errorf("either block ID or block height must be provided")
+	// default to last sealed block
+	if g.BlockHeight == EmptyHeight && g.BlockID == flow.ZeroID {
+		g.BlockHeight = SealedHeight
 	}
+
 	if g.BlockID != flow.ZeroID && g.BlockHeight != EmptyHeight {
 		return fmt.Errorf("can not provide both block ID and block height")
 	}

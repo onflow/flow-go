@@ -19,7 +19,8 @@ func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerato
 		return backend.ExecuteScriptAtBlockID(r.Context(), req.BlockID, req.Script.Source, req.Script.Args)
 	}
 
-	if req.BlockHeight == request.SealedHeight {
+	// default to sealed height
+	if req.BlockHeight == request.SealedHeight || req.BlockHeight == request.EmptyHeight {
 		return backend.ExecuteScriptAtLatestBlock(r.Context(), req.Script.Source, req.Script.Args)
 	}
 

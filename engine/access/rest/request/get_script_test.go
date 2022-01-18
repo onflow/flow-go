@@ -43,4 +43,9 @@ func TestGetScript_ValidParse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, getScript.BlockHeight, uint64(1))
 	assert.Equal(t, fmt.Sprintf("%s", getScript.Script.Source), source)
+
+	validScript1 := strings.NewReader(fmt.Sprintf(`{ "script": "%s", "arguments": [] }`, util.ToBase64([]byte(source))))
+	err = getScript.Parse("", "", validScript1)
+	assert.NoError(t, err)
+	assert.Equal(t, getScript.BlockHeight, SealedHeight)
 }
