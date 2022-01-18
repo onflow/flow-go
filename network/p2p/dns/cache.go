@@ -4,6 +4,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/onflow/flow-go/module/mempool/model"
 )
 
 // DefaultTimeToLive is the default duration a dns result is cached.
@@ -18,15 +20,15 @@ const (
 type cache struct {
 	sync.RWMutex
 	ttl      time.Duration // time-to-live for cache entry
-	ipCache  map[string]*ipCacheEntry
-	txtCache map[string]*txtCacheEntry
+	ipCache  map[string]*model.IpCacheEntryDNS
+	txtCache map[string]*model.TxtCacheEntryDNS
 }
 
 func newCache() *cache {
 	return &cache{
 		ttl:      DefaultTimeToLive,
-		ipCache:  make(map[string]*ipCacheEntry),
-		txtCache: make(map[string]*txtCacheEntry),
+		ipCache:  make(map[string]*model.IpCacheEntryDNS),
+		txtCache: make(map[string]*model.TxtCacheEntryDNS),
 	}
 }
 
@@ -45,13 +47,13 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
 
-	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
+	if time.Duration(runtimeNano()-entry.Timestamp) > c.ttl {
 		// exists but expired
-		return entry.addresses, cacheEntryExists, !cacheEntryFresh
+		return entry.Addresses, cacheEntryExists, !cacheEntryFresh
 	}
 
 	// exists and fresh
-	return entry.addresses, cacheEntryExists, cacheEntryFresh
+	return entry.Addresses, cacheEntryExists, cacheEntryFresh
 }
 
 // resolveIPCache resolves the txt through the cache if it is available.
@@ -69,13 +71,13 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
 
-	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
+	if time.Duration(runtimeNano()-entry.Timestamp) > c.ttl {
 		// exists but expired
-		return entry.addresses, cacheEntryExists, !cacheEntryFresh
+		return entry.Addresses, cacheEntryExists, !cacheEntryFresh
 	}
 
 	// exists and fresh
-	return entry.addresses, cacheEntryExists, cacheEntryFresh
+	return entry.Addresses, cacheEntryExists, cacheEntryFresh
 }
 
 // updateIPCache updates the cache entry for the domain.
@@ -83,9 +85,9 @@ func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
 	c.Lock()
 	defer c.Unlock()
 
-	c.ipCache[domain] = &ipCacheEntry{
-		addresses: addr,
-		timestamp: runtimeNano(),
+	c.ipCache[domain] = &model.IpCacheEntryDNS{
+		Addresses: addr,
+		Timestamp: runtimeNano(),
 	}
 }
 
@@ -94,9 +96,9 @@ func (c *cache) updateTXTCache(txt string, addr []string) {
 	c.Lock()
 	defer c.Unlock()
 
-	c.txtCache[txt] = &txtCacheEntry{
-		addresses: addr,
-		timestamp: runtimeNano(),
+	c.txtCache[txt] = &model.TxtCacheEntryDNS{
+		Addresses: addr,
+		Timestamp: runtimeNano(),
 	}
 }
 
