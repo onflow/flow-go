@@ -11,6 +11,7 @@ import (
 	splitterEngine "github.com/onflow/flow-go/engine/common/splitter"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -45,11 +46,15 @@ func NewNetwork(
 
 	n.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			<-n.net.Ready()
+			err := util.WaitClosed(ctx, n.net.Ready())
+
+			if err != nil {
+				return
+			}
 
 			ready()
 
-			<-n.net.Done()
+			<-ctx.Done()
 		}).Build()
 
 	return n
