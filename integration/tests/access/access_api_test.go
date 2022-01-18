@@ -72,6 +72,7 @@ func (suite *AccessSuite) SetupTest() {
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 
 	// start the network
+	suite.T().Logf("starting flow network with docker containers")
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.net.Start(suite.ctx)
 }

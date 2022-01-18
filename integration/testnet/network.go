@@ -518,7 +518,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
-	fmt.Printf("BootstrapDir: %s \n", bootstrapDir)
+	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
 	root, result, seal, confs, bootstrapSnapshot, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
@@ -554,34 +554,18 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// start ghost nodes
 	for _, nodeConf := range confs {
-		if !nodeConf.Ghost {
-			continue
+		var nodeType = "real"
+		if nodeConf.Ghost {
+			nodeType = "ghost"
 		}
 
-		t.Logf("add container as ghost %v, node id: %v", nodeConf.ContainerName, nodeConf.NodeID)
+		t.Logf("add docker container type: %s, %v, node id: %v, address: %v", nodeType, nodeConf.ContainerName, nodeConf.NodeID, nodeConf.Address)
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
-	}
 
-	// add each follower to the network
-	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
-	for _, followerConf := range networkConf.ConsensusFollowers {
-		t.Logf("start consensus follower %v", followerConf.NodeID)
-		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
-	}
-
-	// add each consensus / collection node to the network
-	// add as last, because consensus nodes need to start up all together.
-	// the closer they got ready together, the more reliable the tests can finish
-	for _, nodeConf := range confs {
-		// ghost node has been started already
 		if nodeConf.Ghost {
 			continue
 		}
-
-		t.Logf("add container as real node %v, node id: %v", nodeConf.ContainerName, nodeConf.NodeID)
-		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
-		require.NoError(t, err)
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 		if nodeConf.Role == flow.RoleConsensus {
@@ -589,6 +573,14 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
+	}
+
+	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
+
+	// add each follower to the network
+	for _, followerConf := range networkConf.ConsensusFollowers {
+		t.Logf("add consensus follower %v", followerConf.NodeID)
+		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
 	flowNetwork.PrintMetricsPorts()
@@ -867,11 +859,18 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	suiteContainer := net.suite.Container(*opts)
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
+	// start ghost node right away
+	if nodeConf.Ghost {
+		net.network.After(suiteContainer)
+		return nil
+	}
+
+	// if is real node, since the node config has been sorted, execution should always
+	// be created before consensus node. so by the time we are creating access/consensus
+	// node, the execution has been created, and we can add the dependency here
 	if nodeConf.Role == flow.RoleAccess || nodeConf.Role == flow.RoleConsensus {
 		execution1 := net.ContainerByName("execution_1")
 		execution1.After(suiteContainer)
-	} else {
-		net.network.After(suiteContainer)
 	}
 	return nil
 }
