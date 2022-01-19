@@ -28,7 +28,7 @@ type AccessClient struct {
 //
 // An error will be returned if the host is unreachable.
 func NewAccessClient(addr string) (*AccessClient, error) {
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(addr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}

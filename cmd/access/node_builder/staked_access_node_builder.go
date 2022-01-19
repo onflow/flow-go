@@ -142,7 +142,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			collectionRPCConn, err := grpc.Dial(
 				builder.rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure(),
+				grpc.WithInsecure(), //nolint:staticcheck
 				backend.WithClientUnaryInterceptor(builder.rpcConf.CollectionClientTimeout))
 			if err != nil {
 				return err
@@ -161,7 +161,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
 					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-					grpc.WithInsecure())
+					grpc.WithInsecure()) //nolint:staticcheck
 				if err != nil {
 					return err
 				}
