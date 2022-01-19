@@ -7,10 +7,12 @@ import (
 // DNSCache provides an in-memory cache for storing dns entries.
 type DNSCache interface {
 	// PutIpDomain adds the given ip domain into cache.
-	PutIpDomain(string, []net.IPAddr) error
+	// The uint64 argument is the timestamp associated with the domain.
+	PutIpDomain(string, int64, []net.IPAddr) bool
 
 	// PutTxtDomain adds the given txt domain into the cache.
-	PutTxtDomain(string, []string) error
+	// The uint64 argument is the timestamp associated with the domain.
+	PutTxtDomain(string, int64, []string) bool
 
 	// GetIpDomain returns the ip domain if exists in the cache.
 	// The second return value determines the timestamp of adding the
