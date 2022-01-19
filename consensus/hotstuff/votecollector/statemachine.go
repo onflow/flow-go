@@ -96,15 +96,33 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
 			return nil
 		}
-		return fmt.Errorf("internal error adding vote to cache: %w", err)
+		return fmt.Errorf("internal error adding vote %v to cache for block %v: %w",
+			vote.ID(),
+			vote.BlockID,
+			err)
 	}
 
 	err = m.processVote(vote)
 	if err != nil {
 		if errors.Is(err, VoteForIncompatibleBlockError) {
+			// When there are multiple votes with different block ID, at least one of them is an invalid
+			// vote. It's hard to tell which one is invalid, because both might have a correct signature.
+			// A malicious leader might lead to this by creating two proposals with the same view, and
+			// other honest voters might send correct votes as they only saw one of the proposals.
+			// When the next leader receives multiple votes for incompatible block (block IDs are different),
+			// it will only accept the first vote that is received, which determines the block ID at this view.
+			// Any votes received later will be considered as incompatible and dropped.
+
+			m.log.Warn().
+				Err(err).
+				Msg("received vote for incompatible block")
+
 			return nil
 		}
-		return fmt.Errorf("internal error processing vote: %w", err)
+		return fmt.Errorf("internal error processing vote %v for block %v: %w",
+			vote.ID(),
+			vote.BlockID,
+			err)
 	}
 	return nil
 }
@@ -160,7 +178,9 @@ func (m *VoteCollector) View() uint64 {
 func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 
 	if proposal.Block.View != m.View() {
-		return fmt.Errorf("this VoteCollector accepts proposals only for view %d but received %d", m.votesCache.View(), proposal.Block.View)
+		return fmt.Errorf("this VoteCollector accepts proposals only for view %d but received %d when receiving block %v",
+			m.votesCache.View(), proposal.Block.View,
+			proposal.Block.BlockID)
 	}
 
 	for {
@@ -175,9 +195,14 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 			if errors.Is(err, ErrDifferentCollectorState) {
 				continue // concurrent state update by other thread => restart our logic
 			}
+
+			m.log.Info().
+				Hex("block_id", proposal.Block.BlockID[:]).
+				Msg("vote collector status changed from caching to verifying")
+
 			if err != nil {
-				return fmt.Errorf("internal error updating VoteProcessor's status from %s to %s: %w",
-					proc.Status().String(), hotstuff.VoteCollectorStatusVerifying.String(), err)
+				return fmt.Errorf("internal error updating VoteProcessor's status from %s to %s for block %v: %w",
+					proc.Status().String(), hotstuff.VoteCollectorStatusVerifying.String(), proposal.Block.BlockID, err)
 			}
 			m.processCachedVotes(proposal.Block)
 
@@ -187,8 +212,8 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 		case hotstuff.VoteCollectorStatusVerifying:
 			verifyingProc, ok := proc.(hotstuff.VerifyingVoteProcessor)
 			if !ok {
-				return fmt.Errorf("VoteProcessor has status %s but it has an incompatible implementation type %T",
-					proc.Status(), verifyingProc)
+				return fmt.Errorf("VoteProcessor has status %s but it has an incompatible implementation type %T, when processing block %v",
+					proc.Status(), verifyingProc, proposal.Block.BlockID)
 			}
 			if verifyingProc.Block().BlockID != proposal.Block.BlockID {
 				m.terminateVoteProcessing()
@@ -199,7 +224,8 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 		case hotstuff.VoteCollectorStatusInvalid: /* no op */
 
 		default:
-			return fmt.Errorf("VoteProcessor reported unknown status %s", proc.Status())
+			return fmt.Errorf("VoteProcessor reported unknown status %s when processing block %v", proc.Status(),
+				proposal.Block.BlockID)
 		}
 
 		return nil
