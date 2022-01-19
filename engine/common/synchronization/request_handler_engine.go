@@ -7,10 +7,44 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage"
 )
+
+type ResponseSender interface {
+	SendResponse(interface{}, flow.Identifier) error
+}
+
+type ResponseSenderImpl struct {
+	con network.Conduit
+}
+
+func (r *ResponseSenderImpl) SendResponse(res interface{}, target flow.Identifier) error {
+	switch res.(type) {
+	case *messages.BlockResponse:
+		err := r.con.Unicast(res, target)
+		if err != nil {
+			return fmt.Errorf("could not unicast block response to target %x: %w", target, err)
+		}
+	case *messages.SyncResponse:
+		err := r.con.Unicast(res, target)
+		if err != nil {
+			return fmt.Errorf("could not unicast sync response to target %x: %w", target, err)
+		}
+	default:
+		return fmt.Errorf("unable to unicast unexpected response %+v", res)
+	}
+
+	return nil
+}
+
+func NewResponseSender(con network.Conduit) *ResponseSenderImpl {
+	return &ResponseSenderImpl{
+		con: con,
+	}
+}
 
 type RequestHandlerEngine struct {
 	requestHandler *RequestHandler
@@ -37,7 +71,7 @@ func NewRequestHandlerEngine(
 	e.requestHandler = NewRequestHandler(
 		logger,
 		metrics,
-		con.Unicast,
+		NewResponseSender(con),
 		me,
 		blocks,
 		core,

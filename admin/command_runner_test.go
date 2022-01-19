@@ -80,7 +80,7 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 		}
 	}()
 
-	conn, err := grpc.Dial("unix:///"+suite.runner.grpcAddress, grpc.WithInsecure())
+	conn, err := grpc.Dial("unix:///"+suite.runner.grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
 	suite.NoError(err)
 	suite.conn = conn
 	suite.client = pb.NewAdminClient(conn)

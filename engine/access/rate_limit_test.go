@@ -200,7 +200,7 @@ func accessAPIClient(address string) (accessproto.AccessAPIClient, io.Closer, er
 	conn, err := grpc.Dial(
 		address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-		grpc.WithInsecure())
+		grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to address %s: %w", address, err)
 	}

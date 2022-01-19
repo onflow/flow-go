@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -133,9 +134,27 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
 
+func (fnb *FlowNodeBuilder) EnqueuePingService() {
+	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
+
+		// needed to setup ping handler, but the returned value is unused
+		_ = p2p.NewPingService(node.Middleware.Host(), pingLibP2PProtocolID, node.State, node.Logger)
+
+		return &module.NoopReadyDoneAware{}, nil
+	})
+}
+
+func (fnb *FlowNodeBuilder) EnqueueResolver() {
+	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		resolver := dns.NewResolver(fnb.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+		fnb.Resolver = resolver
+		return resolver, nil
+	})
+}
+
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-
 		codec := cborcodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
@@ -150,7 +169,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.SporkID,
 			fnb.IdentityProvider,
 			fnb.Metrics.Network,
-			fnb.BaseConfig.DNSCacheTTL,
+			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 		)
 
@@ -933,7 +952,11 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
+	fnb.EnqueueResolver()
+
 	fnb.EnqueueNetworkInit()
+
+	fnb.EnqueuePingService()
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/connmgr"
@@ -26,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	flownet "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
@@ -43,7 +41,7 @@ func DefaultLibP2PNodeFactory(
 	sporkId flow.Identifier,
 	idProvider id.IdentityProvider,
 	metrics module.NetworkMetrics,
-	dnsResolverTTL time.Duration,
+	resolver madns.BasicResolver,
 	role string,
 ) LibP2PFactoryFunc {
 
@@ -54,7 +52,6 @@ func DefaultLibP2PNodeFactory(
 
 			return found
 		})
-		resolver := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
 
 		builder := NewNodeBuilder(log, address, flowKey, sporkId).
 			SetBasicResolver(resolver).

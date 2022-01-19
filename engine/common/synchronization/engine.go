@@ -105,7 +105,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandler(log, metrics, con.Unicast, me, blocks, core, finalizedHeader, true)
+	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, blocks, core, finalizedHeader, true)
 
 	return e, nil
 }
