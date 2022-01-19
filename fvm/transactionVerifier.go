@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -184,6 +185,14 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
+	if !v.accountSignatureSchemeIsSupported(accountKey) {
+		err = fmt.Errorf("account key uses a signature scheme that is not supported for transaction verification")
+		if sType == envelopeSignature {
+			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
+		}
+		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
+	}
+
 	valid, err := v.SignatureVerifier.Verify(
 		txSig.Signature,
 		string(flow.TransactionDomainTag[:]),
@@ -207,6 +216,15 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 	return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
+}
+
+func (TransactionSignatureVerifier) accountSignatureSchemeIsSupported(
+	accountKey flow.AccountPublicKey,
+) bool {
+	if accountKey.HashAlgo != hash.SHA2_256 && accountKey.HashAlgo != hash.SHA3_256 && accountKey.HashAlgo != hash.KMAC128 {
+		return false
+	}
+	return true
 }
 
 func (v *TransactionSignatureVerifier) hasSufficientKeyWeight(
