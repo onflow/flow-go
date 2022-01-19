@@ -38,6 +38,7 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`constructing root protocol snapshot` +
 	`wrote file \S+/root-protocol-state-snapshot.json` +
 	`saved result and seal are matching` +
+	`saved root snapshot is valid` +
 	`attempting to copy private key files` +
 	`skipping copy of private keys to output dir` +
 	`created keys for \d+ consensus nodes` +
