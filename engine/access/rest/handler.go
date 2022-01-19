@@ -84,7 +84,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write response to response stream
-	h.jsonResponse(w, response, errLog)
+	h.jsonResponse(w, http.StatusOK, response, errLog)
 }
 
 func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
@@ -129,7 +129,7 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 }
 
 // jsonResponse builds a JSON response and send it to the client
-func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, errLogger zerolog.Logger) {
+func (h *Handler) jsonResponse(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// serialise response to JSON and handler errors
@@ -139,7 +139,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, errL
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(code)
 	// write response to response stream
 	_, err = w.Write(encodedResponse)
 	if err != nil {
@@ -156,24 +156,10 @@ func (h *Handler) errorResponse(
 	responseMessage string,
 	logger zerolog.Logger,
 ) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(returnCode)
-
 	// create error response model
 	modelError := models.ModelError{
 		Code:    int32(returnCode),
 		Message: responseMessage,
 	}
-	encodedError, err := json.Marshal(modelError)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		logger.Error().Str("response_message", responseMessage).Msg("failed to json encode error message")
-		return
-	}
-
-	_, err = w.Write(encodedError)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		logger.Error().Err(err).Msg("failed to send error response")
-	}
+	h.jsonResponse(w, returnCode, modelError, logger)
 }
