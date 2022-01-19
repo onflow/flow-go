@@ -632,8 +632,8 @@ func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environme
 	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")
 }
 
-// assertLatestFinalizedBlockHeightHigher will assert the difference between snapshot and latest finalized snapshot
-// is higher .
+// assertLatestFinalizedBlockHeightHigher will assert that the difference between snapshot height and latest finalized height
+// is greater than numOfBlocks.
 func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snapshot *inmem.Snapshot, numOfBlocks uint64)  {
 	bootstrapHead, err := snapshot.Head()
 	require.NoError(s.T(), err)
