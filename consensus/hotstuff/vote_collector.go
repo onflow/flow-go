@@ -1,10 +1,10 @@
 package hotstuff
 
 import (
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/rs/zerolog"
 )
 
 // VoteConsumer consumes all votes for one specific view. It is registered with

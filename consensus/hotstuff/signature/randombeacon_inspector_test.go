@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/utils/unittest"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -18,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestRandomBeaconInspector(t *testing.T) {

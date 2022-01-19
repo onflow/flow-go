@@ -7,11 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence"
 	sdk "github.com/onflow/flow-go-sdk"
-
 	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffPacker "github.com/onflow/flow-go/consensus/hotstuff/packer"
