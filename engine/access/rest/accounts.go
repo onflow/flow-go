@@ -13,7 +13,7 @@ func GetAccount(r *request.Request, backend access.API, link models.LinkGenerato
 		return nil, NewBadRequestError(err)
 	}
 
-	// in case we provide special height values 'final' and 'sealed' fetch that height and overwrite request wtih it
+	// in case we receive special height values 'final' and 'sealed', fetch that height and overwrite request with it
 	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
 		header, err := backend.GetLatestBlockHeader(r.Context(), req.Height == request.SealedHeight)
 		if err != nil {
