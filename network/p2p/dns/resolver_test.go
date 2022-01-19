@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -26,6 +27,10 @@ func TestResolver_HappyPath(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver := NewResolver(zerolog.Nop(), metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
 
+	ctx, _ := irrecoverable.WithSignaler(context.Background())
+	resolver.Start(ctx)
+	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
+
 	size := 10 // 10 text and 10 ip domains.
 	times := 5 // each domain is queried 5 times.
 	txtTestCases := txtLookupFixture(size)
@@ -37,6 +42,7 @@ func TestResolver_HappyPath(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	unittest.RequireCloseBefore(t, resolver.Done(), 100*time.Millisecond, "could not stop dns resolver on time")
 }
 
 // TestResolver_CacheExpiry evaluates that cached dns entries get expired and underlying resolver gets called after their time-to-live is passed.
@@ -48,6 +54,10 @@ func TestResolver_CacheExpiry(t *testing.T) {
 		metrics.NewNoopCollector(),
 		WithBasicResolver(&basicResolver),
 		WithTTL(1*time.Second)) // cache timeout set to 1 seconds for this test
+
+	ctx, _ := irrecoverable.WithSignaler(context.Background())
+	resolver.Start(ctx)
+	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 
 	size := 10 // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 5 times
@@ -66,12 +76,17 @@ func TestResolver_CacheExpiry(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	unittest.RequireCloseBefore(t, resolver.Done(), 100*time.Millisecond, "could not stop dns resolver on time")
 }
 
 // TestResolver_Error evaluates that when the underlying resolver returns an error, the resolver itself does not cache the result.
 func TestResolver_Error(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver := NewResolver(zerolog.Nop(), metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
+
+	ctx, _ := irrecoverable.WithSignaler(context.Background())
+	resolver.Start(ctx)
+	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 
 	// one test case for txt and one for ip
 	times := 5 // each test case tried 5 times
@@ -86,6 +101,7 @@ func TestResolver_Error(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	unittest.RequireCloseBefore(t, resolver.Done(), 100*time.Millisecond, "could not stop dns resolver on time")
 
 	// since resolving hits an error, cache is invalidated.
 	require.Empty(t, resolver.c.ipCache)
@@ -101,6 +117,10 @@ func TestResolver_Expired_Invalidated(t *testing.T) {
 		metrics.NewNoopCollector(),
 		WithBasicResolver(&basicResolver),
 		WithTTL(1*time.Second)) // 1 second TTL for test
+
+	ctx, _ := irrecoverable.WithSignaler(context.Background())
+	resolver.Start(ctx)
+	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start dns resolver on time")
 
 	// one test case for txt and one for ip
 	txtTestCases := txtLookupFixture(1)
@@ -119,6 +139,7 @@ func TestResolver_Expired_Invalidated(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
+	unittest.RequireCloseBefore(t, resolver.Done(), 100*time.Millisecond, "could not stop dns resolver on time")
 
 	// since resolving hits an error, cache is invalidated.
 	require.Empty(t, resolver.c.ipCache)
