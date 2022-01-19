@@ -36,17 +36,17 @@ The code here is deliberately simple, for performance.
 
 func EncodeUpdate(update *ledger.TrieUpdate) []byte {
 	encUpdate := encoding.EncodeTrieUpdate(update)
-	buf := make([]byte, 0, len(encUpdate)+1)
+	buf := make([]byte, len(encUpdate)+1)
 	// set WAL type
-	buf = append(buf, byte(WALUpdate))
+	buf[0] = byte(WALUpdate)
 	// TODO use 2 bytes for encoding length
 	// the rest is encoded update
-	buf = append(buf, encUpdate...)
+	copy(buf[1:], encUpdate)
 	return buf
 }
 
 func EncodeDelete(rootHash ledger.RootHash) []byte {
-	buf := make([]byte, 0)
+	buf := make([]byte, 0, 1+2+len(rootHash))
 	buf = append(buf, byte(WALDelete))
 	buf = utils.AppendShortData(buf, rootHash[:])
 	return buf
