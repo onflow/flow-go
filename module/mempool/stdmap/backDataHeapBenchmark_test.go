@@ -23,9 +23,9 @@ import (
 // hashicorp LRU cache with 50K capacity against writing 100M entities,
 // with Garbage Collection (GC) disabled.
 func BenchmarkBaselineLRU(b *testing.B) {
-	//if !experiment() {
-	//	b.Skip("skips benchmarking baseline LRU, set environment variable to enable")
-	//}
+	if !experiment() {
+		b.Skip("skips benchmarking baseline LRU, set environment variable to enable")
+	}
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 
 	limit := uint(50)
