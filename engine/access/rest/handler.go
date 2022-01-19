@@ -139,14 +139,13 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, errL
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
 	// write response to response stream
 	_, err = w.Write(encodedResponse)
 	if err != nil {
 		h.errorHandler(w, err, errLogger)
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
 }
 
 // errorResponse sends an HTTP error response to the client with the given return code
