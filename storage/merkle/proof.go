@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
-// Proof captures all data needed for inclusion proof of a single value inserted under key `Key` into the merkle trie
+// Proof captures all data needed for proving inclusion of a single value inserted under key `Key` into the merkle trie
 type Proof struct {
 	// Key used to insert and look up the value
 	Key []byte
@@ -28,10 +28,18 @@ type Proof struct {
 // if the proof is valid it returns true and false otherwise
 func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
+	// first check the key size to be smaller than max allowed
+	if len(p.Key) > maxKeyLength {
+		return false, NewErrorMalformedProoff("key length is larger than max key lenght allowed (%d > %d)", len(p.Key), maxKeyLength)
+	}
+
 	// number of steps
 	steps := len(p.SkipBits) + len(p.InterimHashes)
-
-	// number of steps should be smaller than number of bits i the IsAShortNode
+	// number of steps should be smaller than max key length
+	if steps > maxKeyLength {
+		return false, NewErrorMalformedProoff("length of SkipBits pluse length of InterimHashes is larger than max key lenght allowed (%d > %d)", steps, maxKeyLength)
+	}
+	// number of steps should be smaller than number of bits in the IsAShortNode
 	if steps > len(p.IsAShortNode)*8 {
 		return false, NewErrorMalformedProoff("the length of IsAShortNode doesn't match the length of SkipBits and InterimHashes")
 	}
