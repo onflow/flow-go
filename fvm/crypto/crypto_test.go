@@ -7,9 +7,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/errors"
 
 	"github.com/onflow/cadence/runtime"
 
