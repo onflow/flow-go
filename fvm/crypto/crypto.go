@@ -139,7 +139,7 @@ func VerifySignatureFromRuntime(
 	// check ECDSA compatibilites
 	if sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1 {
 		// hashing compatibility
-		if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
+		if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 && hashAlgo != hash.Keccak_256 {
 			return false, errors.NewValueErrorf(sigAlgo.String(), "cannot use hashing algorithm type %s with signature signature algorithm type %s",
 				hashAlgo, sigAlgo)
 		}
