@@ -23,6 +23,7 @@ func TestHashWithTag(t *testing.T) {
 			hash.SHA2_384,
 			hash.SHA3_256,
 			hash.SHA3_384,
+			hash.Keccak_256,
 		}
 
 		okTag := [flow.DomainTagLength / 2]byte{}   // tag does not exceed 32 bytes
@@ -74,6 +75,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			runtime.HashAlgorithmSHA3_256,
 			runtime.HashAlgorithmSHA3_384,
 			runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+			runtime.HashAlgorithmKECCAK_256,
 		}
 
 		for _, s := range signatureAlgos {
@@ -312,6 +314,7 @@ func TestHashingAlgorithmConversion(t *testing.T) {
 		runtime.HashAlgorithmSHA2_384:              hash.SHA2_384,
 		runtime.HashAlgorithmSHA3_384:              hash.SHA3_384,
 		runtime.HashAlgorithmKMAC128_BLS_BLS12_381: hash.KMAC128,
+		runtime.HashAlgorithmKECCAK_256:            hash.Keccak_256,
 	}
 
 	for runtimeAlgo, cryptoAlgo := range hashingAlgoMapping {

@@ -1949,6 +1949,25 @@ func TestHashing(t *testing.T) {
 			},
 		},
 		{
+			Algo:    runtime.HashAlgorithmKECCAK_256,
+			WithTag: false,
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "1d5ced4738dd4e0bb4628dad7a7b59b8e339a75ece97a4ad004773a49ed7b5bc", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmKECCAK_256,
+			WithTag: true,
+			Tag:     "some_tag",
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "8454ec77f76b229a473770c91e3ea6e7e852416d747805215d15d53bdc56ce5f", result)
+			},
+		},
+		{
 			Algo:    runtime.HashAlgorithmSHA2_256,
 			WithTag: true,
 			Tag:     "some_tag",
@@ -2050,6 +2069,7 @@ func TestHashing(t *testing.T) {
 		runtime.HashAlgorithmSHA2_384,
 		runtime.HashAlgorithmSHA3_384,
 		runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+		runtime.HashAlgorithmKECCAK_256,
 	}
 
 	for i, algo := range hashAlgos {
