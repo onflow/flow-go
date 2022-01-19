@@ -163,6 +163,11 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
 	numRbSigners := len(blockSigData.RandomBeaconSigners)
 	if numRbSigners <= threshold {
+		// The Protocol prescribes that the random beacon signers that contributed to the QC are credited in the QC.
+		// Depending on the reward model, under-reporting node contributions can be exploited in grieving attacks.
+		// To construct a valid QC, the node generating it must have collected _more_ than `threshold` signatures.
+		// Reporting fewer random beacon signers, the node is purposefully miss-representing node contributions.
+		// We reject QCs with under-reported random beacon signers to reduce the surface of potential grieving attacks.
 		return fmt.Errorf("require at least %d random beacon sig shares but only got %d: %w", threshold+1, numRbSigners, model.ErrInvalidFormat)
 	}
 	beaconPubKeys := make([]crypto.PublicKey, 0, numRbSigners)

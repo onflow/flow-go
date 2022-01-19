@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/utils/unittest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -188,15 +190,32 @@ func (rs *randomBeaconSuite) TestInvalidSignature() {
 }
 
 func (rs *randomBeaconSuite) TestConstructorErrors() {
-	// invalid keys size
-	pkSharesInvalid := make([]crypto.PublicKey, crypto.ThresholdSignMaxSize+1)
-	follower, err := NewRandomBeaconInspector(rs.pkGroup, pkSharesInvalid, rs.threshold, rs.thresholdSignatureMessage)
-	assert.Error(rs.T(), err)
-	assert.True(rs.T(), crypto.IsInvalidInputsError(err))
-	assert.Nil(rs.T(), follower)
-	// invalid threshold
-	follower, err = NewRandomBeaconInspector(rs.pkGroup, rs.pkShares, len(rs.pkShares)+1, rs.thresholdSignatureMessage)
-	assert.Error(rs.T(), err)
-	assert.True(rs.T(), crypto.IsInvalidInputsError(err))
-	assert.Nil(rs.T(), follower)
+	// too few key shares
+	pkSharesInvalid := make([]crypto.PublicKey, crypto.ThresholdSignMinSize-1)
+	i, err := NewRandomBeaconInspector(rs.pkGroup, pkSharesInvalid, rs.threshold, rs.thresholdSignatureMessage)
+	assert.True(rs.T(), model.IsConfigurationError(err))
+	assert.Nil(rs.T(), i)
+
+	// too many key shares
+	pkSharesInvalid = make([]crypto.PublicKey, crypto.ThresholdSignMaxSize+1)
+	i, err = NewRandomBeaconInspector(rs.pkGroup, pkSharesInvalid, rs.threshold, rs.thresholdSignatureMessage)
+	assert.True(rs.T(), model.IsConfigurationError(err))
+	assert.Nil(rs.T(), i)
+
+	// threshold too large
+	i, err = NewRandomBeaconInspector(rs.pkGroup, rs.pkShares, len(rs.pkShares), rs.thresholdSignatureMessage)
+	assert.True(rs.T(), model.IsConfigurationError(err))
+	assert.Nil(rs.T(), i)
+
+	// threshold negative
+	i, err = NewRandomBeaconInspector(rs.pkGroup, rs.pkShares, 0, rs.thresholdSignatureMessage)
+	assert.True(rs.T(), model.IsConfigurationError(err))
+	assert.Nil(rs.T(), i)
+
+	// included non-BLS key in public key shares
+	pkSharesInvalid = append(([]crypto.PublicKey)(nil), rs.pkShares...) // copy
+	pkSharesInvalid[len(pkSharesInvalid)-1] = unittest.KeyFixture(crypto.ECDSAP256).PublicKey()
+	i, err = NewRandomBeaconInspector(rs.pkGroup, pkSharesInvalid, rs.threshold, rs.thresholdSignatureMessage)
+	assert.True(rs.T(), model.IsConfigurationError(err))
+	assert.Nil(rs.T(), i)
 }

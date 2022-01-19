@@ -13,8 +13,6 @@ var (
 	ErrInvalidSignature  = errors.New("invalid signature")
 )
 
-/* ****************************** NoVoteError ****************************** */
-
 // NoVoteError contains the reason of why the voter didn't vote for a block proposal.
 type NoVoteError struct {
 	Msg string
@@ -28,20 +26,34 @@ func IsNoVoteError(err error) bool {
 	return errors.As(err, &e)
 }
 
-/* *************************** ConfigurationError ************************** */
-
+// ConfigurationError indicates that a constructor or component was initialized with
+// invalid or inconsistent parameters.
 type ConfigurationError struct {
-	Msg string
+	err error
 }
 
-func (e ConfigurationError) Error() string { return e.Msg }
+func NewConfigurationError(err error) error {
+	return ConfigurationError{err}
+}
 
+func NewConfigurationErrorf(msg string, args ...interface{}) error {
+	return ConfigurationError{fmt.Errorf(msg, args...)}
+}
+
+func (e ConfigurationError) Error() string { return e.err.Error() }
+func (e ConfigurationError) Unwrap() error { return e.err }
+
+// IsConfigurationError returns whether err is a ConfigurationError
+func IsConfigurationError(err error) bool {
+	var e ConfigurationError
+	return errors.As(err, &e)
+}
+
+// MissingBlockError indicates that no block with identifier `BlockID` is known
 type MissingBlockError struct {
 	View    uint64
 	BlockID flow.Identifier
 }
-
-/* *************************** MissingBlockError *************************** */
 
 func (e MissingBlockError) Error() string {
 	return fmt.Sprintf("missing Block at view %d with ID %v", e.View, e.BlockID)
@@ -53,8 +65,7 @@ func IsMissingBlockError(err error) bool {
 	return errors.As(err, &e)
 }
 
-/* *************************** InvalidBlockError *************************** */
-
+// InvalidBlockError indicates that the block with identifier `BlockID` is invalid
 type InvalidBlockError struct {
 	BlockID flow.Identifier
 	View    uint64
@@ -75,12 +86,19 @@ func (e InvalidBlockError) Unwrap() error {
 	return e.Err
 }
 
-/* *************************** InvalidVoteError **************************** */
-
+// InvalidVoteError indicates that the vote with identifier `VoteID` is invalid
 type InvalidVoteError struct {
 	VoteID flow.Identifier
 	View   uint64
 	Err    error
+}
+
+func NewInvalidVoteErrorf(vote *Vote, msg string, args ...interface{}) error {
+	return InvalidVoteError{
+		VoteID: vote.ID(),
+		View:   vote.View,
+		Err:    fmt.Errorf(msg, args...),
+	}
 }
 
 func (e InvalidVoteError) Error() string {
@@ -97,16 +115,6 @@ func (e InvalidVoteError) Unwrap() error {
 	return e.Err
 }
 
-func NewInvalidVoteErrorf(vote *Vote, msg string, args ...interface{}) error {
-	return InvalidVoteError{
-		VoteID: vote.ID(),
-		View:   vote.View,
-		Err:    fmt.Errorf(msg, args...),
-	}
-}
-
-/* ****************** ByzantineThresholdExceededError ********************** */
-
 // ByzantineThresholdExceededError is raised if HotStuff detects malicious conditions which
 // prove a Byzantine threshold of consensus replicas has been exceeded.
 // Per definition, the byzantine threshold is exceeded is there are byzantine consensus
@@ -119,8 +127,8 @@ func (e ByzantineThresholdExceededError) Error() string {
 	return e.Evidence
 }
 
-/* **************************** DoubleVoteError **************************** */
-
+// DoubleVoteError indicates that a consensus replica has voted for two different
+// blocks, or has provided two semantically different votes for the same block.
 type DoubleVoteError struct {
 	FirstVote       *Vote
 	ConflictingVote *Vote
@@ -160,8 +168,6 @@ func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...i
 	}
 }
 
-/* ************************* DuplicatedSignerError ************************* */
-
 // DuplicatedSignerError indicates that a signature from the same node ID has already been added
 type DuplicatedSignerError struct {
 	err error
@@ -183,8 +189,6 @@ func IsDuplicatedSignerError(err error) bool {
 	var e DuplicatedSignerError
 	return errors.As(err, &e)
 }
-
-/* ********************* InvalidSignatureIncludedError ********************* */
 
 // InvalidSignatureIncludedError indicates that some signatures, included via TrustedAdd, are invalid
 type InvalidSignatureIncludedError struct {
@@ -208,8 +212,6 @@ func IsInvalidSignatureIncludedError(err error) bool {
 	return errors.As(err, &e)
 }
 
-/* ********************** InsufficientSignaturesError ********************** */
-
 // InsufficientSignaturesError indicates that not enough signatures have been stored to complete the operation.
 type InsufficientSignaturesError struct {
 	err error
@@ -231,8 +233,6 @@ func IsInsufficientSignaturesError(err error) bool {
 	var e InsufficientSignaturesError
 	return errors.As(err, &e)
 }
-
-/* ************************** InvalidSignerError *************************** */
 
 // InvalidSignerError indicates that the signer is not authorized or unknown
 type InvalidSignerError struct {

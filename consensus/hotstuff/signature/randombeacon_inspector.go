@@ -15,10 +15,10 @@ type randomBeaconInspector struct {
 }
 
 // NewRandomBeaconInspector instantiates a new randomBeaconInspector.
-// The constructor errors if:
+// The constructor errors with a `model.ConfigurationError` in any of the following cases
 //  - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`,
 //    for n the number of participants `n := len(publicKeyShares)`
-//  - threshold value is not between 0 and n-1
+//  - threshold value is not in interval [1, n-1]
 //  - any input public key is not a BLS key
 func NewRandomBeaconInspector(
 	groupPublicKey crypto.PublicKey,
@@ -26,7 +26,6 @@ func NewRandomBeaconInspector(
 	threshold int,
 	message []byte,
 ) (*randomBeaconInspector, error) {
-
 	inspector, err := crypto.NewBLSThresholdSignatureInspector(
 		groupPublicKey,
 		publicKeyShares,
@@ -34,7 +33,10 @@ func NewRandomBeaconInspector(
 		message,
 		encoding.RandomBeaconTag)
 	if err != nil {
-		return nil, fmt.Errorf("creating BLS Threshold Signature Inspector failed: %w", err)
+		if crypto.IsInvalidInputsError(err) {
+			return nil, model.NewConfigurationErrorf("invalid parametrization for BLS Threshold Signature Inspector: %w", err)
+		}
+		return nil, fmt.Errorf("unexpected exception while instantiating BLS Threshold Signature Inspector: %w", err)
 	}
 
 	return &randomBeaconInspector{
@@ -80,7 +82,7 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 //      - model.InvalidSignerError if signerIndex is invalid (out of the valid range)
 //  	- model.DuplicatedSignerError if the signer has been already added
 //      - other error if there is an unexpected exception.
-func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
+func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signature) (bool, error) {
 	// Trusted add to the crypto layer
 	enough, err := r.inspector.TrustedAdd(signerIndex, share)
 	if err != nil {

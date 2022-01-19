@@ -73,6 +73,18 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, bl
 	// TODO: to be replaced by module/signature.PublicKeyAggregator in V2
 	aggregatedKey, err := crypto.AggregateBLSPublicKeys(signers.PublicStakingKeys()) // caution: requires non-empty slice of keys!
 	if err != nil {
+		// `AggregateBLSPublicKeys` returns a `crypto.invalidInputsError` in two distinct cases:
+		//  (i) In case no keys are provided, i.e.  `len(signers) == 0`.
+		//      This scenario _is expected_ during normal operations, because a byzantine
+		//      proposer might construct an (invalid) QC with an empty list of signers.
+		// (ii) In case some provided public keys are invalid.
+		//      This scenario is _not expected_ during normal operations, because all keys are
+		//      supposed to be checked _before_ they enter the protocol state bases on a proof
+		//      of possession. BUT, we don't have proof of possessions implemented at the moment.
+		//
+		// By checking `len(signers) == 0` upfront , we can rule out case (i) as a source of error.
+		// Hence, if we encounter an error here, we know it is case (ii). Thereby, we can clearly
+		// distinguish a faulty _external_ input from an _internal_ uncovered edge-case.
 		return fmt.Errorf("could not compute aggregated key: %w", err)
 	}
 	stakingValid, err := aggregatedKey.Verify(sigData, msg, v.stakingHasher)
