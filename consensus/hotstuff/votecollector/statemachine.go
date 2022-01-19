@@ -244,8 +244,7 @@ func (m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
 // * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
 func (m *VoteCollector) caching2Verifying(proposal *model.Proposal) error {
 	blockID := proposal.Block.BlockID
-	log := m.log.With().Hex("BlockID", blockID[:]).Logger()
-	newProc, err := m.createVerifyingProcessor(log, proposal)
+	newProc, err := m.createVerifyingProcessor(m.log, proposal)
 	if err != nil {
 		return fmt.Errorf("failed to create VerifyingVoteProcessor for block %v: %w", blockID, err)
 	}

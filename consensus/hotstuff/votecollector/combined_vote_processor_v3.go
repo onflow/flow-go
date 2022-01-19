@@ -89,7 +89,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
 	return &CombinedVoteProcessorV3{
-		log:              log,
+		log:              log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:            block,
 		stakingSigAggtor: stakingSigAggtor,
 		rbSigAggtor:      rbSigAggtor,
@@ -228,7 +228,6 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	}
 
 	p.log.Info().
-		Hex("block_id", qc.BlockID[:]).
 		Uint64("view", qc.View).
 		Int("num_signers", len(qc.SignerIDs)).
 		Msg("new qc has been created")

@@ -122,7 +122,7 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 	minRequiredStake uint64,
 ) *CombinedVoteProcessorV2 {
 	return &CombinedVoteProcessorV2{
-		log:              log,
+		log:              log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:            block,
 		stakingSigAggtor: stakingSigAggtor,
 		rbRector:         rbRector,
@@ -236,7 +236,6 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	}
 
 	p.log.Info().
-		Hex("block_id", qc.BlockID[:]).
 		Uint64("view", qc.View).
 		Int("num_signers", len(qc.SignerIDs)).
 		Msg("new qc has been created")
