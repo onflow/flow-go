@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -124,12 +125,12 @@ func VerifySignatureFromRuntime(
 
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
-		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
+		return false, errors.NewValueErrorf(fmt.Sprintf("%d", signatureAlgorithm), "signature algorithm type not found")
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
-		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
+		return false, errors.NewValueErrorf(fmt.Sprintf("%d", hashAlgorithm), "hashing algorithm type not found")
 	}
 
 	// check ECDSA compatibilites
@@ -155,7 +156,7 @@ func VerifySignatureFromRuntime(
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
-		return false, errors.NewValueErrorf(string(rawPublicKey), "cannot decode public key: %w", err)
+		return false, errors.NewValueErrorf(hex.EncodeToString(rawPublicKey), "cannot decode public key: %w", err)
 	}
 
 	valid, err := verifier.Verify(
