@@ -49,28 +49,28 @@ func (is *InclusionSuite) SetupTest() {
 	var nodeConfigs []testnet.NodeConfig
 
 	// need one dummy execution node (unused ghost)
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
 	// need one dummy verification node (unused ghost)
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
 
 	// need three real consensus nodes
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithID(conID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.WithID(conID))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		is.conIDs = append(is.conIDs, conID)
 	}
 
 	// need one controllable collection node (used ghost)
 	is.collID = unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(is.collID), testnet.AsGhost())
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.WithID(is.collID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	nodeConfigs = append(nodeConfigs,
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
 	)
 
 	// generate the network config
