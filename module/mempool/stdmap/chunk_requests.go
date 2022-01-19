@@ -44,8 +44,8 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 	var retryAfter time.Duration
 	var attempts uint64
 
-	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-		entity, ok := backdata[chunkID]
+	err := cs.Backend.Run(func(backdata mempool.BackData) error {
+		entity, ok := backdata.ByID(chunkID)
 		if !ok {
 			return fmt.Errorf("request does not exist for chunk %x", chunkID)
 		}
@@ -64,8 +64,8 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 // The insertion is only successful if there is no duplicate chunk request for the same
 // tuple of (chunkID, resultID, chunkIndex).
 func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
-	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-		entity, exists := backdata[request.ChunkID]
+	err := cs.Backend.Run(func(backdata mempool.BackData) error {
+		entity, exists := backdata.ByID(request.ChunkID)
 		chunkLocatorID := request.Locator.ID()
 
 		if !exists {
@@ -77,7 +77,10 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 				Locators:    locators,
 				RequestInfo: request.ChunkDataPackRequestInfo,
 			}
-			backdata[request.ChunkID] = status
+			added := backdata.Add(request.ChunkID, status)
+			if !added {
+				return fmt.Errorf("potential race condition in adding chunk requests")
+			}
 			return nil
 		}
 
@@ -91,7 +94,7 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 		status.RequestInfo.Disagrees = status.RequestInfo.Disagrees.Union(request.Disagrees)
 		status.RequestInfo.Targets = status.RequestInfo.Targets.Union(request.Targets)
 
-		backdata[request.ChunkID] = status
+		backdata.Add(request.ChunkID, status)
 		return nil
 	})
 
@@ -112,14 +115,17 @@ func (cs *ChunkRequests) Rem(chunkID flow.Identifier) bool {
 func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, bool) {
 	var locators map[flow.Identifier]*chunks.Locator
 
-	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-		entity, exists := backdata[chunkID]
+	err := cs.Backend.Run(func(backdata mempool.BackData) error {
+		entity, exists := backdata.ByID(chunkID)
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
 		locators = toChunkRequestStatus(entity).Locators
 
-		delete(backdata, chunkID)
+		_, removed := backdata.Rem(chunkID)
+		if !removed {
+			return fmt.Errorf("potential race condition on removing chunk request from mempool")
+		}
 
 		return nil
 	})
@@ -137,8 +143,8 @@ func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, boo
 //
 // The increments are done atomically, thread-safe, and in isolation.
 func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
-	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-		entity, exists := backdata[chunkID]
+	err := cs.Backend.Run(func(backdata mempool.BackData) error {
+		entity, exists := backdata.ByID(chunkID)
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
@@ -174,8 +180,8 @@ func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater m
 	var retryAfter time.Duration
 	var attempts uint64
 
-	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-		entity, exists := backdata[chunkID]
+	err := cs.Backend.Run(func(backdata mempool.BackData) error {
+		entity, exists := backdata.ByID(chunkID)
 		if !exists {
 			return fmt.Errorf("not exist")
 		}

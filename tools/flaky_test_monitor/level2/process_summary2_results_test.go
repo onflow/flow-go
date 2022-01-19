@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"flaky-test-monitor/common"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
 type TestData struct {
@@ -43,8 +45,8 @@ func tearDown(t *testing.T) {
 
 // HELPERS - UTILITIES
 
-const actualFailureMessagesPath = "./failures/"
-const actualNoResultMessagesPath = "./no-results/"
+const actualFailureMessagesPath = "./failures"
+const actualNoResultMessagesPath = "./no-results"
 
 func deleteMessagesDir(t *testing.T) {
 	// delete failure test dir that stores failure messages
@@ -57,11 +59,11 @@ func deleteMessagesDir(t *testing.T) {
 }
 
 func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool, hasNoResultTests bool) {
-	inputTestDataPath := "../testdata/summary2/" + testDir + "/input/"
+	inputTestDataPath := filepath.Join("../testdata/summary2", testDir, "input")
 
-	expectedOutputTestDataPath := "../testdata/summary2/" + testDir + "/expected-output/" + testDir + ".json"
-	expectedFailureMessagesPath := "../testdata/summary2/" + testDir + "/expected-output/failures/"
-	expectedNoResultMessagesPath := "../testdata/summary2/" + testDir + "/expected-output/no-results/"
+	expectedOutputTestDataPath := filepath.Join("../testdata/summary2", testDir, "expected-output", testDir+".json")
+	expectedFailureMessagesPath := filepath.Join("../testdata/summary2", testDir, "expected-output/failures")
+	expectedNoResultMessagesPath := filepath.Join("../testdata/summary2", testDir, "expected-output/no-results")
 
 	// **************************************************************
 	actualTestSummary2 := processSummary2TestRun(inputTestDataPath)
@@ -85,23 +87,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool, h
 		require.True(t, isFoundExpected)
 		require.True(t, isFoundActual)
 
-		require.Equal(t, expectedTestSummary.Package, actualTestSummary.Package)
-		require.Equal(t, expectedTestSummary.Test, actualTestSummary.Test)
-
-		require.Equal(t, expectedTestSummary.Runs, actualTestSummary.Runs)
-		require.Equal(t, expectedTestSummary.Passed, actualTestSummary.Passed)
-		require.Equal(t, expectedTestSummary.Failed, actualTestSummary.Failed)
-		require.Equal(t, expectedTestSummary.Skipped, actualTestSummary.Skipped)
-		require.Equal(t, expectedTestSummary.NoResult, actualTestSummary.NoResult)
-
-		require.Equal(t, expectedTestSummary.FailureRate, actualTestSummary.FailureRate)
-
-		// check all durations
-		require.Equal(t, len(expectedTestSummary.Durations), len(actualTestSummary.Durations))
-		for i := range expectedTestSummary.Durations {
-			require.Equal(t, expectedTestSummary.Durations[i], actualTestSummary.Durations[i])
-		}
-		require.Equal(t, expectedTestSummary.AverageDuration, actualTestSummary.AverageDuration)
+		common.AssertTestSummariesEqual(t, *expectedTestSummary, *actualTestSummary)
 	}
 
 	// make sure calculated summary level 2 is what we expected
@@ -158,10 +144,10 @@ func checkMessagesHelper(t *testing.T, expectedMessagesPath string, actualMessag
 
 		// under each sub-directory, there should be 1 or more text files (failure1.txt/no-result1.txt, failure2.txt/no-result2.txt, etc)
 		// that holds the raw failure / no-result message for that test
-		expectedMessagesDirFiles, err := os.ReadDir(expectedMessagesPath + expectedMessageDir.Name())
+		expectedMessagesDirFiles, err := os.ReadDir(filepath.Join(expectedMessagesPath, expectedMessageDir.Name()))
 		require.Nil(t, err)
 
-		actualMessageDirFiles, err := os.ReadDir(actualMessagesPath + actualMessageDirs[expectedMessageDirIndex].Name())
+		actualMessageDirFiles, err := os.ReadDir(filepath.Join(actualMessagesPath, actualMessageDirs[expectedMessageDirIndex].Name()))
 		require.Nil(t, err)
 
 		// make sure there are the expected number of failed / no-result text files in the sub-directory
@@ -174,11 +160,11 @@ func checkMessagesHelper(t *testing.T, expectedMessagesPath string, actualMessag
 		// a sub-directory of the test name will hold all test failure / no-result messages
 
 		for expectedMessageFileIndex, expectedMessageFileDirEntry := range expectedMessagesDirFiles {
-			expectedMessageFilePath := expectedMessagesPath + expectedMessageDir.Name() + "/" + expectedMessageFileDirEntry.Name()
+			expectedMessageFilePath := filepath.Join(expectedMessagesPath, expectedMessageDir.Name(), expectedMessageFileDirEntry.Name())
 			expectedMessageFileBytes, err := os.ReadFile(expectedMessageFilePath)
 			require.Nil(t, err)
 
-			actualMessageFilePath := actualMessagesPath + actualMessageDirs[expectedMessageDirIndex].Name() + "/" + actualMessageDirFiles[expectedMessageFileIndex].Name()
+			actualMessageFilePath := filepath.Join(actualMessagesPath, actualMessageDirs[expectedMessageDirIndex].Name(), actualMessageDirFiles[expectedMessageFileIndex].Name())
 			actualMessageFileBytes, err := os.ReadFile(actualMessageFilePath)
 			require.Nil(t, err)
 
