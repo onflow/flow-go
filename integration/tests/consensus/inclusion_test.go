@@ -142,8 +142,13 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		}
 
 		// we only care about block proposals at the moment
-		_, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msg.(*messages.BlockProposal)
 		if !ok {
+			continue
+		}
+
+		// wait until proposal finalized
+		if proposal.Header.Height < 2 {
 			continue
 		}
 		return
