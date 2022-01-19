@@ -172,7 +172,7 @@ func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel
 
 func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Time, sentinel *flow.CollectionGuarantee) *messages.BlockProposal {
 	colID := sentinel.CollectionID
-	// we try to find a block with the guarantee included and three confirmations
+	// we try to find a block with the guarantee included
 	for time.Now().Before(deadline) {
 
 		// we read the next message until we reach deadline
