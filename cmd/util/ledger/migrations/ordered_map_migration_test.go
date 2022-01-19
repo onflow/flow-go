@@ -187,3 +187,92 @@ func TestMultipleAccounts(t *testing.T) {
 
 	})
 }
+
+func TestComplexValue(t *testing.T) {
+	dir := t.TempDir()
+	mig := OrderedMapMigration{
+		Log:       zerolog.Logger{},
+		OutputDir: dir,
+	}
+
+	address1 := flow.HexToAddress("0x1")
+	cadenceAddress, _ := common.HexToAddress("0x1")
+
+	mig.initialize([]ledger.Payload{
+		{Key: createAccountPayloadKey(address1, state2.KeyExists), Value: []byte{1}},
+		{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
+	})
+
+	encodeValue := func(v interpreter.Value) ledger.Value {
+		storable, _ := v.Storable(mig.newStorage, atree.Address(address1), math.MaxUint64)
+		encodedInt, _ := atree.Encode(storable, interpreter.CBOREncMode)
+		return encodedInt
+	}
+
+	t.Run("migrate complex values", func(t *testing.T) {
+
+		one := interpreter.NewIntValueFromInt64(1)
+		str := interpreter.NewStringValue("test")
+
+		fields := []interpreter.CompositeField{
+			{
+				Name:  "x",
+				Value: one,
+			},
+			{
+				Name:  "y",
+				Value: str,
+			},
+		}
+
+		s := interpreter.NewCompositeValue(
+			mig.Interpreter,
+			common.AddressLocation{},
+			"S",
+			common.CompositeKindStructure,
+			fields,
+			cadenceAddress,
+		)
+
+		r := interpreter.NewCompositeValue(
+			mig.Interpreter,
+			common.AddressLocation{},
+			"R",
+			common.CompositeKindResource,
+			fields,
+			cadenceAddress,
+		)
+
+		payload := []ledger.Payload{
+			{Key: createAccountPayloadKey(address1, "storage\x1fFoo"), Value: encodeValue(s)},
+			{Key: createAccountPayloadKey(address1, "storage\x1fBar"), Value: encodeValue(r)},
+		}
+		migratedPayload, err := mig.migrate(payload)
+		require.NoError(t, err)
+		require.Equal(t, len(migratedPayload), 7)
+
+		migrated := &OrderedMapMigration{}
+		migrated.initPersistentSlabStorage(NewView(migratedPayload))
+		migrated.initIntepreter()
+
+		getLocationRange := func() interpreter.LocationRange {
+			return interpreter.ReturnEmptyLocationRange()
+		}
+
+		stored := migrated.Interpreter.ReadStored(cadenceAddress, "storage", "Foo")
+		require.IsType(t, &interpreter.CompositeValue{}, stored)
+		composite := stored.(*interpreter.CompositeValue)
+		require.Equal(t, composite.Kind, common.CompositeKindStructure)
+		require.Equal(t, composite.QualifiedIdentifier, "S")
+		require.Equal(t, composite.GetMember(migrated.Interpreter, getLocationRange, "x"), one)
+		require.Equal(t, composite.GetMember(migrated.Interpreter, getLocationRange, "y"), str)
+
+		stored = migrated.Interpreter.ReadStored(cadenceAddress, "storage", "Bar")
+		require.IsType(t, &interpreter.CompositeValue{}, stored)
+		composite = stored.(*interpreter.CompositeValue)
+		require.Equal(t, composite.Kind, common.CompositeKindResource)
+		require.Equal(t, composite.QualifiedIdentifier, "R")
+		require.Equal(t, composite.GetMember(migrated.Interpreter, getLocationRange, "x"), one)
+		require.Equal(t, composite.GetMember(migrated.Interpreter, getLocationRange, "y"), str)
+	})
+}
