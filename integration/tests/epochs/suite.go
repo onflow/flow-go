@@ -669,7 +669,7 @@ func (s *Suite) submitSmokeTestTransaction(ctx context.Context)  {
 // 3. Check that we can execute a script on the AN
 func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
 	// assert atleast 20 blocks have been finalized since the node replacement
-	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, uint64(20))
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
