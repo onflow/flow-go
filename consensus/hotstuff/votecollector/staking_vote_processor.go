@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	msig "github.com/onflow/flow-go/module/signature"
 )
 
 /* ***************** Base-Factory for StakingVoteProcessor ****************** */
@@ -115,8 +114,13 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	}
 	err = p.stakingSigAggtor.Verify(vote.SignerID, vote.SigData)
 	if err != nil {
-		if errors.Is(err, msig.ErrInvalidFormat) {
-			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has invalid signature: %w", vote.ID(), vote.View, err)
+		if model.IsInvalidSignerError(err) {
+			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
+				vote.ID(), vote.View, err)
+		}
+		if errors.Is(err, model.ErrInvalidSignature) {
+			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
+				vote.ID(), vote.View, err)
 		}
 		return fmt.Errorf("internal error checking signature validity: %w", err)
 	}
@@ -126,7 +130,9 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	}
 	totalWeight, err := p.stakingSigAggtor.TrustedAdd(vote.SignerID, vote.SigData)
 	if err != nil {
-		return fmt.Errorf("adding the signature to staking aggregator failed: %w", err)
+		// we don't expect any errors here during normal operation, as we previously checked
+		// for duplicated votes from the same signer and verified the signer+signature
+		return fmt.Errorf("unexpected exception adding signature from vote %x to staking aggregator: %w", vote.ID(), err)
 	}
 
 	// checking of conditions for building QC are satisfied

@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/state/protocol"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -88,7 +89,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	err = verifier.VerifyVote(nodeID, vote.SigData, block)
 	require.NoError(t, err)
 
-	// vote on different bock should be invalid
+	// vote on different block should be invalid
 	blockWrongID := *block
 	blockWrongID.BlockID[0]++
 	err = verifier.VerifyVote(nodeID, vote.SigData, &blockWrongID)
@@ -107,10 +108,18 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// vote with changed signature should be invalid
-	wrongSigData := *vote
-	wrongSigData.SigData[4]++
-	err = verifier.VerifyVote(nodeID, wrongSigData.SigData, block)
+	brokenSig := append([]byte{}, vote.SigData...) // copy
+	brokenSig[4]++
+	err = verifier.VerifyVote(nodeID, brokenSig, block)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
+
+	// Vote from a node that is _not_ part of the Random Beacon committee should be rejected.
+	// Specifically, we expect that the verifier recognizes the `protocol.IdentityNotFoundError`
+	// as a sign of an invalid vote and wraps it into a `model.InvalidSignerError`.
+	*dkg = mocks.DKG{} // overwrite DKG mock with a new one
+	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{NodeID: signerID})
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	require.True(t, model.IsInvalidSignerError(err))
 }
 
 // Test that when DKG key is not available for a view, a signed block can pass the validation
@@ -165,7 +174,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
 	require.NoError(t, err)
 
-	// As the proposer does not have a Random Beacon Key, it should sign soley with its staking key.
+	// As the proposer does not have a Random Beacon Key, it should sign solely with its staking key.
 	// In this case, the SigData should be identical to the staking sig.
 	expectedStakingSig, err := stakingPriv.Sign(
 		MakeVoteMessage(block.View, block.BlockID),
@@ -173,4 +182,21 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Equal(t, expectedStakingSig, crypto.Signature(proposal.SigData))
+}
+
+// Test_VerifyQC checks that a QC without any signers is rejected right away without calling into any sub-components
+func Test_VerifyQC(t *testing.T) {
+	committee := &mocks.Committee{}
+	packer := signature.NewConsensusSigDataPacker(committee)
+	verifier := NewCombinedVerifier(committee, packer)
+
+	header := unittest.BlockHeaderFixture()
+	block := model.BlockFromFlow(&header, header.View-1)
+	sigData := unittest.QCSigDataFixture()
+
+	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	require.ErrorIs(t, err, model.ErrInvalidFormat)
+
+	err = verifier.VerifyQC(nil, sigData, block)
+	require.ErrorIs(t, err, model.ErrInvalidFormat)
 }

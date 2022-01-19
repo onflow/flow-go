@@ -4,8 +4,10 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // RandomBeaconReconstructor implements hotstuff.RandomBeaconReconstructor.
@@ -30,13 +32,16 @@ func NewRandomBeaconReconstructor(dkg hotstuff.DKG, randomBeaconInspector hotstu
 // execute the business logic, without interfering with each other).
 // It allows concurrent verification of the given signature.
 // Returns :
-//  - engine.InvalidInputError if signerIndex is invalid
-//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+//  - model.InvalidSignerError if signerID is invalid
+//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 //  - other error if there is an unexpected exception.
 func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	signerIndex, err := r.dkg.Index(signerID)
 	if err != nil {
-		return fmt.Errorf("could not map signerID %v to signerIndex: %w", signerID, err)
+		if protocol.IsIdentityNotFound(err) {
+			return model.NewInvalidSignerErrorf("signer %v is not a valid random beacon participant: %w", signerID, err)
+		}
+		return fmt.Errorf("internal error retrieving DKG index for %v: %w", signerID, err)
 	}
 	return r.RandomBeaconInspector.Verify(int(signerIndex), sig)
 }
@@ -53,13 +58,16 @@ func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.
 //  - (true, nil) if the signature has been added, and enough shares have been collected.
 //  - (false, nil) if the signature has been added, but not enough shares were collected.
 //  - (false, error) if there is any exception adding the signature share.
-//      - engine.InvalidInputError if signerIndex is invalid
-//  	- engine.DuplicatedEntryError if the signer has been already added
+//      - model.InvalidSignerError if signerIndex is invalid (out of the valid range)
+//  	- model.DuplicatedSignerError if the signer has been already added
 //      - other error if there is an unexpected exception.
 func (r *RandomBeaconReconstructor) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
 	signerIndex, err := r.dkg.Index(signerID)
 	if err != nil {
-		return false, fmt.Errorf("could not map signerID %v to signerIndex: %w", signerID, err)
+		if protocol.IsIdentityNotFound(err) {
+			return false, model.NewInvalidSignerErrorf("signer %v is not a valid random beacon participant: %w", signerID, err)
+		}
+		return false, fmt.Errorf("internal error retrieving DKG index for %v: %w", signerID, err)
 	}
 	return r.RandomBeaconInspector.TrustedAdd(int(signerIndex), sig)
 }
