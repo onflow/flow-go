@@ -175,9 +175,11 @@ func (c Cache) Size() uint {
 // All returns all entities from the BackData.
 func (c Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
+	entitiesList := c.entities.All()
+	all := make(map[flow.Identifier]flow.Entity, len(c.entities.All()))
 
-	all := make(map[flow.Identifier]flow.Entity)
-	for _, p := range c.entities.All() {
+	for i := 0; i < len(entitiesList); i++ {
+		p := entitiesList[i]
 		all[p.Id()] = p.Entity()
 	}
 
