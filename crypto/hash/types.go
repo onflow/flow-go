@@ -25,10 +25,10 @@ const (
 	securityBits = 128
 
 	// Lengths of hash outputs in bytes
-	HashLenSha2_256 = 32
-	HashLenSha2_384 = 48
-	HashLenSha3_256 = 32
-	HashLenSha3_384 = 48
+	HashLenSHA2_256 = 32
+	HashLenSHA2_384 = 48
+	HashLenSHA3_256 = 32
+	HashLenSHA3_384 = 48
 
 	// KMAC
 	// the minimum key length in bytes

@@ -1,15 +1,15 @@
 package hash
 
 const (
-	rateSha3_256 = 136
-	rateSha3_384 = 104
+	rateSHA3_256 = 136
+	rateSHA3_384 = 104
 )
 
 // NewSHA3_256 returns a new instance of SHA3-256 hasher.
 func NewSHA3_256() Hasher {
 	return &sha3State{
-		rate:      rateSha3_256,
-		outputLen: HashLenSha3_256,
+		rate:      rateSHA3_256,
+		outputLen: HashLenSHA3_256,
 		bufIndex:  bufNilValue,
 		bufSize:   bufNilValue,
 	}
@@ -18,8 +18,8 @@ func NewSHA3_256() Hasher {
 // NewSHA3_384 returns a new instance of SHA3-384 hasher.
 func NewSHA3_384() Hasher {
 	return &sha3State{
-		rate:      rateSha3_384,
-		outputLen: HashLenSha3_384,
+		rate:      rateSHA3_384,
+		outputLen: HashLenSHA3_384,
 		bufIndex:  bufNilValue,
 		bufSize:   bufNilValue,
 	}
@@ -33,9 +33,9 @@ func (d *sha3State) Size() int {
 // Algorithm returns the hashing algorithm of the instance.
 func (s *sha3State) Algorithm() HashingAlgorithm {
 	switch s.outputLen {
-	case HashLenSha3_256:
+	case HashLenSHA3_256:
 		return SHA3_256
-	case HashLenSha3_384:
+	case HashLenSHA3_384:
 		return SHA3_384
 	default:
 		panic("failed to return the hashing algorithm because of an incompatible output length")
@@ -71,10 +71,10 @@ func (d *sha3State) Write(p []byte) (int, error) {
 // The function is not part of the Hasher API. It is a light API
 // that allows a simple computation of a hash and minimizes
 // heap allocations.
-func ComputeSHA3_256(result *[HashLenSha3_256]byte, data []byte) {
+func ComputeSHA3_256(result *[HashLenSHA3_256]byte, data []byte) {
 	state := &sha3State{
-		rate:      rateSha3_256,
-		outputLen: HashLenSha3_256,
+		rate:      rateSHA3_256,
+		outputLen: HashLenSHA3_256,
 		bufIndex:  bufNilValue,
 		bufSize:   bufNilValue,
 	}
