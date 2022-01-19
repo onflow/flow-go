@@ -7,6 +7,8 @@
 
 package hash
 
+// keccakF1600 is Keccak permutation function with
+// a width of 1600 bits and 24 rounds.
 // This function is implemented in keccakf_amd64.s.
 
 //go:noescape

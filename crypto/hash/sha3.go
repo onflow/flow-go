@@ -3,12 +3,15 @@ package hash
 const (
 	rateSHA3_256 = 136
 	rateSHA3_384 = 104
+
+	dsByteSHA3 = byte(0x6)
 )
 
 // NewSHA3_256 returns a new instance of SHA3-256 hasher.
 func NewSHA3_256() Hasher {
 	return &sha3State{
 		rate:      rateSHA3_256,
+		dsByte:    dsByteSHA3,
 		outputLen: HashLenSHA3_256,
 		bufIndex:  bufNilValue,
 		bufSize:   bufNilValue,
@@ -19,6 +22,7 @@ func NewSHA3_256() Hasher {
 func NewSHA3_384() Hasher {
 	return &sha3State{
 		rate:      rateSHA3_384,
+		dsByte:    dsByteSHA3,
 		outputLen: HashLenSHA3_384,
 		bufIndex:  bufNilValue,
 		bufSize:   bufNilValue,
@@ -74,6 +78,7 @@ func (d *sha3State) Write(p []byte) (int, error) {
 func ComputeSHA3_256(result *[HashLenSHA3_256]byte, data []byte) {
 	state := &sha3State{
 		rate:      rateSHA3_256,
+		dsByte:    dsByteSHA3,
 		outputLen: HashLenSHA3_256,
 		bufIndex:  bufNilValue,
 		bufSize:   bufNilValue,
@@ -116,19 +121,7 @@ func ComputeSHA3_256(result *[HashLenSHA3_256]byte, data []byte) {
 const (
 	// maxRate is the maximum size of the internal buffer. SHA3-256
 	// currently needs the largest buffer.
-	maxRate = 1088 / 8
-
-	// dsbyte contains the "domain separation" bits and the first bit of
-	// the padding.
-	// Using a little-endian bit-ordering convention, it is "01" for SHA-3.
-	// The padding rule from section 5.1 is applied to pad the message to a multiple
-	// of the rate, which involves adding a "1" bit, zero or more "0" bits, and
-	// a final "1" bit. We merge the first "1" bit from the padding into dsbyte,
-	// giving 00000110b (0x06).
-	// [1] http://csrc.nist.gov/publications/drafts/fips-202/fips_202_draft.pdf
-	//     "Draft FIPS 202: SHA-3 Standard: Permutation-Based Hash and
-	//      Extendable-Output Functions (May 2014)"
-	dsbyte = byte(0x6)
+	maxRate = rateSHA3_256
 )
 
 type sha3State struct {
@@ -137,10 +130,21 @@ type sha3State struct {
 	// `buf` is a sub-slice that points into `storage` using `bufIndex` and `bufSize`:
 	// - `bufIndex` is the index of the first element of buf
 	// - `bufSize` is the size of buf
-	bufIndex  int
-	bufSize   int
-	rate      int // the number of bytes of state to use
-	outputLen int // the default output size in bytes
+	bufIndex int
+	bufSize  int
+	rate     int // the number of bytes of state to use
+	// dsbyte contains the domain separation bits (if any are defined)
+	// and the first bit of the 10*1 padding.
+	// Using a little-endian bit-ordering convention, it is 0b01 for SHA-3
+	// and not defined for legacy Keccak.
+	// The padding 10*1 is applied to pad the message to a multiple
+	// of the rate, which involves adding a "1" bit, zero or more "0" bits, and
+	// a final "1" bit. We merge the first "1" bit from the padding into dsbyte,
+	// ( giving 0b00000110 for SHA-3 and 0b00000001 for legacy Keccak)
+	// [1] https://keccak.team/sponge_duplex.html
+	//     "The sponge and duplex constructions"
+	dsByte    byte // the domain separation byte with one bit padding
+	outputLen int  // the default output size in bytes
 }
 
 // returns the current buf
@@ -224,7 +228,7 @@ func (d *sha3State) padAndPermute() {
 	// at least one byte of space in d.buf because, if it were full,
 	// permute would have been called to empty it. dsbyte also contains the
 	// first one bit for the padding. See the comment in the state struct.
-	d.appendBuf([]byte{dsbyte})
+	d.appendBuf([]byte{d.dsByte})
 	zerosStart := d.bufSize
 	d.setBuf(0, d.rate)
 	buf := d.buf()
