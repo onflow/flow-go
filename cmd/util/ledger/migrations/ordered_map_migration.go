@@ -261,15 +261,15 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 
 	for owner, domainMaps := range sortedByOwnerAndDomain {
 		for domain, keyValuePairs := range domainMaps {
+			storageMap := m.newStorage.GetStorageMap(common.MustBytesToAddress([]byte(owner)), domain)
+			// in the interest of not having to update Cadence and break its abstractions to allow
+			// this one-time migration, just use reflection to grab the unexported field
+			unsafeOrderedMap := reflect.ValueOf(storageMap).Elem().FieldByName("orderedMap")
+			orderedMap := reflect.NewAt(
+				unsafeOrderedMap.Type(),
+				unsafe.Pointer(unsafeOrderedMap.UnsafeAddr()),
+			).Elem().Interface().(*atree.OrderedMap)
 			for _, pair := range keyValuePairs {
-				storageMap := m.newStorage.GetStorageMap(common.MustBytesToAddress([]byte(owner)), domain)
-				// in the interest of not having to update Cadence and break its abstractions to allow
-				// this one-time migration, just use reflection to grab the unexported field
-				unsafeOrderedMap := reflect.ValueOf(storageMap).Elem().FieldByName("orderedMap")
-				orderedMap := reflect.NewAt(
-					unsafeOrderedMap.Type(),
-					unsafe.Pointer(unsafeOrderedMap.UnsafeAddr()),
-				).Elem().Interface().(*atree.OrderedMap)
 				orderedMap.Set(
 					// these should be rawstorables too probably
 					interpreter.StringAtreeComparator,
