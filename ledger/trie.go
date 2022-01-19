@@ -337,9 +337,10 @@ func NewTrieBatchProof() *TrieBatchProof {
 // NewTrieBatchProofWithEmptyProofs creates an instance of Batchproof
 // filled with n newly created proofs (empty)
 func NewTrieBatchProofWithEmptyProofs(numberOfProofs int) *TrieBatchProof {
-	bp := NewTrieBatchProof()
+	bp := new(TrieBatchProof)
+	bp.Proofs = make([]*TrieProof, numberOfProofs)
 	for i := 0; i < numberOfProofs; i++ {
-		bp.AppendProof(NewTrieProof())
+		bp.Proofs[i] = NewTrieProof()
 	}
 	return bp
 }
@@ -351,18 +352,18 @@ func (bp *TrieBatchProof) Size() int {
 
 // Paths returns the slice of paths for this batch proof
 func (bp *TrieBatchProof) Paths() []Path {
-	paths := make([]Path, 0)
-	for _, p := range bp.Proofs {
-		paths = append(paths, p.Path)
+	paths := make([]Path, len(bp.Proofs))
+	for i, p := range bp.Proofs {
+		paths[i] = p.Path
 	}
 	return paths
 }
 
 // Payloads returns the slice of paths for this batch proof
 func (bp *TrieBatchProof) Payloads() []*Payload {
-	payloads := make([]*Payload, 0)
-	for _, p := range bp.Proofs {
-		payloads = append(payloads, p.Payload)
+	payloads := make([]*Payload, len(bp.Proofs))
+	for i, p := range bp.Proofs {
+		payloads[i] = p.Payload
 	}
 	return payloads
 }

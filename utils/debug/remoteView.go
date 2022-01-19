@@ -54,7 +54,7 @@ func WithBlockID(blockID flow.Identifier) RemoteViewOption {
 }
 
 func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
-	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure())
+	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		panic(err)
 	}

@@ -16,7 +16,6 @@ require (
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
-	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.3.1-0.20211029162100-5d5d7c3edd41
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gogo/protobuf v1.3.2
@@ -57,16 +56,15 @@ require (
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/atree v0.1.1
-	github.com/onflow/cadence v0.20.2
+	github.com/onflow/cadence v0.20.3
 	github.com/onflow/flow v0.2.3-0.20211203180137-d6c902ccc3a7
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.9.0
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.9.0
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.24.0
 	github.com/onflow/flow-go/crypto v0.21.4-0.20211125190211-7b31c986316e
 	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
@@ -76,10 +74,10 @@ require (
 	github.com/schollz/progressbar/v3 v3.8.3
 	github.com/sethvargo/go-retry v0.1.0
 	github.com/smartystreets/assertions v1.0.0 // indirect
-	github.com/spf13/cast v1.4.1 // indirect
-	github.com/spf13/cobra v1.2.1
+	github.com/spf13/afero v1.8.0 // indirect
+	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.8.1
+	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
@@ -87,18 +85,17 @@ require (
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.7.0
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+	golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881 // indirect
+	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/api v0.58.0
-	google.golang.org/genproto v0.0.0-20211007155348-82e027067bd4
-	google.golang.org/grpc v1.40.0
+	google.golang.org/api v0.63.0
+	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa
+	google.golang.org/grpc v1.43.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.27.1
-	gopkg.in/ini.v1 v1.63.0 // indirect
 	gotest.tools v2.2.0+incompatible
 	lukechampine.com/blake3 v1.1.7 // indirect
 	pgregory.net/rapid v0.4.7

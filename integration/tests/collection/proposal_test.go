@@ -35,7 +35,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 
 		for j := 0; j < clusterSize; j++ {
 			node := suite.Collector(uint(i), uint(j))
-			client, err := client.New(node.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+			client, err := client.New(node.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
 			suite.Require().NoError(err)
 			forCluster = append(forCluster, client)
 		}
@@ -219,7 +219,7 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	for i := 0; i < nNodes; i++ {
 		clients[i], err = client.New(
 			suite.Collector(0, uint(i)).Addr(testnet.ColNodeAPIPort),
-			grpc.WithInsecure(),
+			grpc.WithInsecure(), //nolint:staticcheck
 		)
 		suite.Require().NoError(err)
 	}
