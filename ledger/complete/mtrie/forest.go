@@ -75,6 +75,55 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 	return forest, nil
 }
 
+// ValueSizes returns value sizes for a slice of paths and error (if any)
+// TODO: can be optimized further if we don't care about changing the order of the input r.Paths
+func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
+
+	if len(r.Paths) == 0 {
+		return []int{}, nil
+	}
+
+	// lookup the trie by rootHash
+	trie, err := f.GetTrie(r.RootHash)
+	if err != nil {
+		return nil, err
+	}
+
+	// deduplicate paths:
+	// Generally, we expect the VM to deduplicate reads and writes. Hence, the following is a pre-caution.
+	// TODO: We could take out the following de-duplication logic
+	//       Which increases the cost for duplicates but reduces ValueSizes complexity without duplicates.
+	deduplicatedPaths := make([]ledger.Path, 0, len(r.Paths))
+	pathOrgIndex := make(map[ledger.Path][]int)
+	for i, path := range r.Paths {
+		// only collect duplicated paths once
+		indices, ok := pathOrgIndex[path]
+		if !ok { // deduplication here is optional
+			deduplicatedPaths = append(deduplicatedPaths, path)
+		}
+		// append the index
+		pathOrgIndex[path] = append(indices, i)
+	}
+
+	sizes := trie.UnsafeValueSizes(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
+
+	// reconstruct value sizes in the same key order that called the method
+	orderedValueSizes := make([]int, len(r.Paths))
+	totalValueSize := 0
+	for i, p := range deduplicatedPaths {
+		size := sizes[i]
+		indices := pathOrgIndex[p]
+		for _, j := range indices {
+			orderedValueSizes[j] = size
+		}
+		totalValueSize += len(indices) * size
+	}
+	// TODO rename the metrics
+	f.metrics.ReadValuesSize(uint64(totalValueSize))
+
+	return orderedValueSizes, nil
+}
+
 // Read reads values for an slice of paths and returns values and error (if any)
 // TODO: can be optimized further if we don't care about changing the order of the input r.Paths
 func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
