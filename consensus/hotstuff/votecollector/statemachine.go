@@ -192,14 +192,15 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 				continue // concurrent state update by other thread => restart our logic
 			}
 
-			m.log.Info().
-				Hex("block_id", proposal.Block.BlockID[:]).
-				Msg("vote collector status changed from caching to verifying")
-
 			if err != nil {
 				return fmt.Errorf("internal error updating VoteProcessor's status from %s to %s for block %v: %w",
 					proc.Status().String(), hotstuff.VoteCollectorStatusVerifying.String(), proposal.Block.BlockID, err)
 			}
+
+			m.log.Info().
+				Hex("block_id", proposal.Block.BlockID[:]).
+				Msg("vote collector status changed from caching to verifying")
+
 			m.processCachedVotes(proposal.Block)
 
 		// We already received a valid block for this view. Check whether the proposer is
