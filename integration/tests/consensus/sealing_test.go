@@ -62,6 +62,7 @@ func (ss *SealingSuite) Verification() *client.GhostClient {
 }
 
 func (ss *SealingSuite) SetupTest() {
+	ss.T().Logf("test case setup sealing")
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -140,6 +141,7 @@ func (ss *SealingSuite) SetupTest() {
 }
 
 func (ss *SealingSuite) TearDownTest() {
+	ss.T().Logf("test case tear down sealing")
 	ss.net.Remove()
 	ss.cancel()
 }

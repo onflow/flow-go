@@ -40,6 +40,7 @@ func (is *InclusionSuite) Collection() *client.GhostClient {
 }
 
 func (is *InclusionSuite) SetupTest() {
+	is.T().Logf("test case setup inclusion")
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -97,6 +98,7 @@ func (is *InclusionSuite) SetupTest() {
 }
 
 func (is *InclusionSuite) TearDownTest() {
+	is.T().Logf("test case tear down inclusion")
 	is.net.Remove()
 	is.cancel()
 }

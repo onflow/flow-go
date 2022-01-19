@@ -64,6 +64,8 @@ func TestCollectorSuite(t *testing.T) {
 // NOTE: This must be called explicitly by each test, since nodes/clusters vary
 //       between test cases.
 func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
+	suite.T().Logf("test case startup %v", name)
+
 	var (
 		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 		// DKG require at least 2 consensus nodes
@@ -115,6 +117,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 }
 
 func (suite *CollectorSuite) TearDownTest() {
+	suite.T().Logf("test case tear down %v", name)
 	// avoid nil pointer errors for skipped tests
 	if suite.cancel != nil {
 		defer suite.cancel()
