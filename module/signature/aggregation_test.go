@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package signature
@@ -13,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 )
 
 func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature) {
@@ -46,7 +46,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 	signersNum := 20
 
-	// constrcutor edge cases
+	// constructor edge cases
 	t.Run("constructor", func(t *testing.T) {
 		msg := []byte("random_msg")
 		tag := "random_tag"
@@ -125,9 +125,6 @@ func TestAggregatorSameMessage(t *testing.T) {
 		}
 	})
 
-	invalidInput := engine.NewInvalidInputError("some error")
-	duplicate := newErrDuplicatedSigner("some error")
-
 	// Unhappy paths
 	t.Run("invalid inputs", func(t *testing.T) {
 		aggregator, sigs := createAggregationData(t, signersNum)
@@ -135,33 +132,27 @@ func TestAggregatorSameMessage(t *testing.T) {
 		for _, index := range []int{-1, signersNum} {
 			ok, err := aggregator.Verify(index, sigs[0])
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.True(t, IsInvalidSignerIdxError(err))
 
 			ok, err = aggregator.VerifyAndAdd(index, sigs[0])
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.True(t, IsInvalidSignerIdxError(err))
 
 			err = aggregator.TrustedAdd(index, sigs[0])
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.True(t, IsInvalidSignerIdxError(err))
 
 			ok, err = aggregator.HasSignature(index)
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.True(t, IsInvalidSignerIdxError(err))
 
 			ok, err = aggregator.VerifyAggregate([]int{index}, sigs[0])
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.True(t, IsInvalidSignerIdxError(err))
 		}
 		// empty list
 		ok, err := aggregator.VerifyAggregate([]int{}, sigs[0])
 		assert.False(t, ok)
-		assert.Error(t, err)
-		assert.IsType(t, invalidInput, err)
+		assert.True(t, IsInsufficientSignaturesError(err))
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
@@ -173,47 +164,60 @@ func TestAggregatorSameMessage(t *testing.T) {
 		// TrustedAdd
 		for i := range sigs {
 			err := aggregator.TrustedAdd(i, sigs[i]) // same signature for same index
-			assert.Error(t, err)
-			assert.IsType(t, duplicate, err)
+			assert.True(t, IsDuplicatedSignerIdxError(err))
 			err = aggregator.TrustedAdd(i, sigs[(i+1)%signersNum]) // different signature for same index
-			assert.Error(t, err)
-			assert.IsType(t, duplicate, err)
-			// VerifyAndAdd
-			ok, err := aggregator.VerifyAndAdd(i, sigs[i]) // valid but redundant signature
+			assert.True(t, IsDuplicatedSignerIdxError(err))
+			ok, err := aggregator.VerifyAndAdd(i, sigs[i]) // same signature for same index
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, duplicate, err)
+			assert.True(t, IsDuplicatedSignerIdxError(err))
+			ok, err = aggregator.VerifyAndAdd(i, sigs[(i+1)%signersNum]) // different signature for same index
+			assert.False(t, ok)
+			assert.True(t, IsDuplicatedSignerIdxError(err))
 		}
 	})
 
+	// Generally, `Aggregate()` can fail in two places, when invalid signatures were added via `TrustedAdd`:
+	//  1. The signature itself has an invalid structure, i.e. it can't be deserialized successfully. In this
+	//     case, already the aggregation step fails.
+	//  2. The signature was deserialized successfully, but the aggregate signature doesn't verify to the aggregate public key. In
+	//     this case, the aggregation step succeeds. But the post-check fails.
 	t.Run("invalid signature", func(t *testing.T) {
-		aggregator, sigs := createAggregationData(t, signersNum)
-		// corrupt sigs[0]
-		sigs[0][4] ^= 1
-		// test Verify
-		ok, err := aggregator.Verify(0, sigs[0])
-		require.NoError(t, err)
-		assert.False(t, ok)
-		// test Verify and Add
-		ok, err = aggregator.VerifyAndAdd(0, sigs[0])
-		require.NoError(t, err)
-		assert.False(t, ok)
-		// check signature is still not added
-		ok, err = aggregator.HasSignature(0)
-		require.NoError(t, err)
-		assert.False(t, ok)
-		// add signatures for aggregation including corrupt sigs[0]
-		for i, sig := range sigs {
-			err := aggregator.TrustedAdd(i, sig)
+		_, s := createAggregationData(t, 1)
+		invalidStructureSig := (crypto.Signature)([]byte{0, 0})
+		mismatchingSig := s[0]
+
+		for _, invalidSig := range []crypto.Signature{invalidStructureSig, mismatchingSig} {
+			aggregator, sigs := createAggregationData(t, signersNum)
+			ok, err := aggregator.VerifyAndAdd(0, sigs[0]) // first, add a valid signature
 			require.NoError(t, err)
+			assert.True(t, ok)
+
+			// add invalid signature for signer with index 1:
+			// method that check validity should reject it:
+			ok, err = aggregator.Verify(1, invalidSig) // stand-alone verification
+			require.NoError(t, err)
+			assert.False(t, ok)
+			ok, err = aggregator.VerifyAndAdd(1, invalidSig) // verification plus addition
+			require.NoError(t, err)
+			assert.False(t, ok)
+			// check signature is still not added
+			ok, err = aggregator.HasSignature(1)
+			require.NoError(t, err)
+			assert.False(t, ok)
+
+			// TrustedAdd should accept invalid signature
+			err = aggregator.TrustedAdd(1, invalidSig)
+			require.NoError(t, err)
+
+			// Aggregation should validate its own aggregation result and error with sentinel InvalidSignatureIncludedError
+			signers, agg, err := aggregator.Aggregate()
+			assert.Error(t, err)
+			assert.True(t, IsInvalidSignatureIncludedError(err))
+			assert.Nil(t, agg)
+			assert.Nil(t, signers)
 		}
-		signers, agg, err := aggregator.Aggregate()
-		assert.Error(t, err)
-		assert.Nil(t, agg)
-		assert.Nil(t, signers)
-		// fix sigs[0]
-		sigs[0][4] ^= 1
 	})
+
 }
 
 func TestKeyAggregator(t *testing.T) {
@@ -237,7 +241,7 @@ func TestKeyAggregator(t *testing.T) {
 	aggregator, err := NewPublicKeyAggregator(keys)
 	require.NoError(t, err)
 
-	// constrcutor edge cases
+	// constructor edge cases
 	t.Run("constructor", func(t *testing.T) {
 		// wrong key types
 		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)

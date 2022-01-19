@@ -1,8 +1,12 @@
 package votecollector
 
 import (
+	"fmt"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -38,6 +42,34 @@ func TestVotesCache_AddVoteIncompatibleView(t *testing.T) {
 	vote := unittest.VoteFixture(unittest.WithVoteView(view + 1))
 	err := cache.AddVote(vote)
 	require.ErrorIs(t, err, VoteForIncompatibleViewError)
+}
+
+// TestVotesCache_GetVote tests that GetVote method
+func TestVotesCache_GetVote(t *testing.T) {
+	view := uint64(100)
+	knownVote := unittest.VoteFixture(unittest.WithVoteView(view))
+	doubleVote := unittest.VoteFixture(unittest.WithVoteView(view), unittest.WithVoteSignerID(knownVote.SignerID))
+
+	cache := NewVotesCache(view)
+
+	// unknown vote
+	vote, found := cache.GetVote(unittest.IdentifierFixture())
+	assert.Nil(t, vote)
+	assert.False(t, found)
+
+	// known vote
+	err := cache.AddVote(knownVote)
+	assert.NoError(t, err)
+	vote, found = cache.GetVote(knownVote.SignerID)
+	assert.Equal(t, knownVote, vote)
+	assert.True(t, found)
+
+	// for a signer ID with a known vote, the cache should memorize the _first_ encountered vote
+	err = cache.AddVote(doubleVote)
+	assert.True(t, model.IsDoubleVoteError(err))
+	vote, found = cache.GetVote(doubleVote.SignerID)
+	assert.Equal(t, knownVote, vote)
+	assert.True(t, found)
 }
 
 // TestVotesCache_All tests that All returns previously added votes in same order
@@ -91,4 +123,50 @@ func TestVotesCache_RegisterVoteConsumer(t *testing.T) {
 	// at this point consumedVotes has to have all votes created before and after registering vote
 	// consumer, and they must be in same order
 	require.Equal(t, expectedVotes, consumedVotes)
+}
+
+// BenchmarkAdd measured the time it takes to add `numberVotes` concurrently to the VotesCache.
+// On MacBook with Intel i7-7820HQ CPU @ 2.90GHz:
+// adding 1 million votes in total, with 20 threads concurrently, took 0.48s
+func BenchmarkAdd(b *testing.B) {
+	numberVotes := 1_000_000
+	threads := 20
+
+	// Setup: create worker routines and votes to feed
+	view := uint64(10)
+	cache := NewVotesCache(view)
+
+	var start sync.WaitGroup
+	start.Add(threads)
+	var done sync.WaitGroup
+	done.Add(threads)
+
+	blockID := unittest.IdentifierFixture()
+	n := numberVotes / threads
+
+	for ; threads > 0; threads-- {
+		go func(i int) {
+			// create votes and signal ready
+			votes := make([]model.Vote, 0, n)
+			for len(votes) < n {
+				v := unittest.VoteFixture(unittest.WithVoteView(view), unittest.WithVoteBlockID(blockID))
+				votes = append(votes, *v)
+			}
+			start.Done()
+
+			// Wait for last worker routine to signal ready. Then,
+			// feed all votes into cache
+			start.Wait()
+			for _, v := range votes {
+				err := cache.AddVote(&v)
+				assert.NoError(b, err)
+			}
+			done.Done()
+		}(threads)
+	}
+	start.Wait()
+	t1 := time.Now()
+	done.Wait()
+	duration := time.Since(t1)
+	fmt.Printf("=> adding %d votes to Cache took %f seconds\n", cache.Size(), duration.Seconds())
 }

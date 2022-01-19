@@ -13,8 +13,8 @@ type RandomBeaconInspector interface {
 	// execute the business logic, without interfering with each other).
 	// It allows concurrent verification of the given signature.
 	// Returns :
-	//  - engine.InvalidInputError if signerIndex is invalid
-	//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+	//  - model.InvalidSignerError if signerIndex is invalid
+	//  - model.ErrInvalidSignature if signerIndex is valid but signature is cryptographically invalid
 	//  - other error if there is an unexpected exception.
 	Verify(signerIndex int, share crypto.Signature) error
 
@@ -30,8 +30,8 @@ type RandomBeaconInspector interface {
 	//  - (true, nil) if the signature has been added, and enough shares have been collected.
 	//  - (false, nil) if the signature has been added, but not enough shares were collected.
 	//  - (false, error) if there is any exception adding the signature share.
-	//      - engine.InvalidInputError if signerIndex is invalid
-	//  	- engine.DuplicatedEntryError if the signer has been already added
+	//      - model.InvalidSignerError if signerIndex is invalid (out of the valid range)
+	//  	- model.DuplicatedSignerError if the signer has been already added
 	//      - other error if there is an unexpected exception.
 	TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error)
 
@@ -44,8 +44,8 @@ type RandomBeaconInspector interface {
 	//
 	// Returns:
 	// - (signature, nil) if no error occurred
-	// - (nil, crypto.notEnoughSharesError) if not enough shares were collected
-	// - (nil, crypto.invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
+	// - (nil, model.InsufficientSignaturesError) if not enough shares were collected
+	// - (nil, model.InvalidSignatureIncluded) if at least one collected share does not serialize to a valid BLS signature,
 	//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
 	//    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
 	// - (nil, error) for any other unexpected error.
