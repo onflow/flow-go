@@ -641,7 +641,7 @@ func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snap
 	header, err := s.client.GetLatestSealedBlockHeader(ctx)
 	require.NoError(s.T(), err)
 
-	// head should now be at-least 20 blocks higher from when we started
+	// head should now be at-least numOfBlocks blocks higher from when we started
 	require.True(s.T(), header.Height-bootstrapHead.Height >= numOfBlocks, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
 }
 
