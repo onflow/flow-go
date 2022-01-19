@@ -51,7 +51,7 @@ func NewTxTracker(
 		done:          make(chan bool, numberOfWorkers),
 		stats:         stats}
 	for i := 0; i < numberOfWorkers; i++ {
-		fclient, err := client.New(accessNodeAddress, grpc.WithInsecure())
+		fclient, err := client.New(accessNodeAddress, grpc.WithInsecure()) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
