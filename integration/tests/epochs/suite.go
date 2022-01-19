@@ -646,6 +646,7 @@ func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snap
 }
 
 // submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// This ensures a single transaction can be sealed by the network.
 func (s *Suite) submitSmokeTestTransaction(ctx context.Context)  {
 	fullAccountKey := sdk.NewAccountKey().
 		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
