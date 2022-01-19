@@ -232,7 +232,7 @@ func (m *OrderedMapMigration) initialize(payload []ledger.Payload) ([]ledger.Pay
 }
 
 func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledger.Payload, error) {
-	sortedByOwnerAndDomain := make(map[string](map[string][]Pair))
+	groupedByOwnerAndDomain := make(map[string](map[string][]Pair))
 
 	for _, p := range storagePayloads {
 		owner, entry :=
@@ -247,7 +247,7 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 		domain, key := splitEntry[0], splitEntry[1]
 		value := p.Value
 
-		domainMap, domainOk := sortedByOwnerAndDomain[owner]
+		domainMap, domainOk := groupedByOwnerAndDomain[owner]
 		if !domainOk {
 			domainMap = make(map[string][]Pair)
 		}
@@ -256,10 +256,10 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 			keyValuePairs = make([]Pair, 0)
 		}
 		domainMap[domain] = append(keyValuePairs, Pair{Key: key, Value: value})
-		sortedByOwnerAndDomain[owner] = domainMap
+		groupedByOwnerAndDomain[owner] = domainMap
 	}
 
-	for owner, domainMaps := range sortedByOwnerAndDomain {
+	for owner, domainMaps := range groupedByOwnerAndDomain {
 		for domain, keyValuePairs := range domainMaps {
 			storageMap := m.newStorage.GetStorageMap(common.MustBytesToAddress([]byte(owner)), domain)
 			// in the interest of not having to update Cadence and break its abstractions to allow
