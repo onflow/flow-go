@@ -245,7 +245,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	}
 
 	// look up for non existing paths
-	retPayloads, err := f.Read(r)
+	retValueSizes, err := f.ValueSizes(r)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	notFoundPayloads := make([]ledger.Payload, 0)
 	for i, path := range r.Paths {
 		// add if empty
-		if retPayloads[i].IsEmpty() {
+		if retValueSizes[i] == 0 {
 			notFoundPaths = append(notFoundPaths, path)
 			notFoundPayloads = append(notFoundPayloads, *ledger.EmptyPayload())
 		}
