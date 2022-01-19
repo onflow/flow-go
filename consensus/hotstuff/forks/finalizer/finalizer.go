@@ -34,7 +34,7 @@ var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestor")
 
 func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Finalizer, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
-		return nil, &model.ConfigurationError{Msg: "invalid root: root qc is not pointing to root block"}
+		return nil, model.NewConfigurationErrorf("invalid root: root qc is not pointing to root block")
 	}
 
 	fnlzr := Finalizer{

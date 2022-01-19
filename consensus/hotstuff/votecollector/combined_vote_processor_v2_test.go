@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -124,94 +123,114 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 		err := s.processor.Process(vote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+		require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
 	})
 }
 
-// TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 doesn't collect signatures for votes with invalid signature.
-// Checks are made for cases where both staking and staking+beacon signatures were submitted.
+// TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 rejects invalid votes for the following scenarios:
+//  1) vote where `SignerID` is not a valid consensus participant;
+//     we test correct handling of votes that only a staking signature as well as votes with staking+beacon signatures
+//  2) vote from a valid consensus participant
+//     case 2a: vote contains only a staking signatures that is invalid
+//     case 2b: vote contains _invalid staking sig_, and valid random beacon sig
+//     case 2c: vote contains valid staking sig, but _invalid beacon sig_
+// In all cases, the CombinedVoteProcessor should interpret these failure cases as invalid votes
+// and return an InvalidVoteError.
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignature() {
-	exception := errors.New("unexpected-exception")
-	// test for staking signatures
-	s.Run("staking-sig", func() {
-		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
-		stakingSig := crypto.Signature(stakingVote.SigData)
-
-		s.stakingAggregator.On("Verify", stakingVote.SignerID, stakingSig).Return(msig.ErrInvalidFormat).Once()
-
-		// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
-		err := s.processor.Process(stakingVote)
+	// Scenario 1) vote where `SignerID` is not a valid consensus participant;
+	// sentinel error `InvalidSignerError` from WeightedSignatureAggregator should be wrapped as `InvalidVoteError`
+	s.Run("vote with invalid signerID", func() {
+		// vote with only a staking signature
+		stakingOnlyVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
+		s.stakingAggregator.On("Verify", stakingOnlyVote.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Once()
+		err := s.processor.Process(stakingOnlyVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+		require.True(s.T(), model.IsInvalidSignerError(err))
 
-		s.stakingAggregator.On("Verify", stakingVote.SignerID, stakingSig).Return(exception)
-
-		// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
-		err = s.processor.Process(stakingVote)
-		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
-		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
+		// vote with staking+beacon signatures
+		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
+		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Maybe()
+		s.reconstructor.On("Verify", doubleSigVote.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Maybe()
+		err = s.processor.Process(doubleSigVote)
+		require.Error(s.T(), err)
+		require.True(s.T(), model.IsInvalidVoteError(err))
+		require.True(s.T(), model.IsInvalidSignerError(err))
 
 		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
-		// we shouldn't even validate second signature if first one is incorrect
-		s.reconstructor.AssertNotCalled(s.T(), "Verify")
 		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
 	})
-	s.Run("staking-double-sig", func() {
-		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
-		stakingSig := crypto.Signature(doubleSigVote.SigData[:hsig.SigLen])
 
-		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, stakingSig).Return(msig.ErrInvalidFormat).Once()
-
-		// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
-		err := s.processor.Process(doubleSigVote)
+	// Scenario 2) vote from a valid consensus participant but included sig(s) are cryptographically invalid;
+	// sentinel error `ErrInvalidSignature` from WeightedSignatureAggregator should be wrapped as `InvalidVoteError`
+	s.Run("vote from valid participant but with invalid signature(s)", func() {
+		// case 2a: vote contains only a staking signatures that is invalid
+		voteA := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
+		s.stakingAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.ErrInvalidSignature).Once()
+		err := s.processor.Process(voteA)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+		require.ErrorAs(s.T(), err, &model.ErrInvalidSignature)
 
-		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, stakingSig).Return(exception)
-
-		// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
-		err = s.processor.Process(doubleSigVote)
-		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
-		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
-
-		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
-		// we shouldn't even validate second signature if first one is incorrect
-		s.reconstructor.AssertNotCalled(s.T(), "Verify")
-		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
-	})
-	// test same cases for beacon signature
-	s.Run("beacon-sig", func() {
-		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
-		stakingSig := crypto.Signature(doubleSigVote.SigData[:hsig.SigLen])
-		beaconSig := crypto.Signature(doubleSigVote.SigData[hsig.SigLen:])
-
-		// staking sig valid, beacon sig invalid
-		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, stakingSig).Return(nil).Once()
-		s.reconstructor.On("Verify", doubleSigVote.SignerID, beaconSig).Return(msig.ErrInvalidFormat).Once()
-
-		// expect sentinel error in case Verify returns ErrInvalidFormat
-		err := s.processor.Process(doubleSigVote)
+		// case 2b: vote contains _invalid staking sig_, and valid random beacon sig
+		voteB := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
+		s.stakingAggregator.On("Verify", voteB.SignerID, mock.Anything).Return(model.ErrInvalidSignature).Once()
+		s.reconstructor.On("Verify", voteB.SignerID, mock.Anything).Return(nil).Maybe()
+		err = s.processor.Process(voteB)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+		require.ErrorAs(s.T(), err, &model.ErrInvalidSignature)
 
-		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, stakingSig).Return(nil).Once()
-		s.reconstructor.On("Verify", doubleSigVote.SignerID, beaconSig).Return(exception)
-
-		// except exception
-		err = s.processor.Process(doubleSigVote)
-		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
-		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
+		// case 2c: vote contains valid staking sig, but _invalid beacon sig_
+		voteC := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
+		s.stakingAggregator.On("Verify", voteC.SignerID, mock.Anything).Return(nil).Maybe()
+		s.reconstructor.On("Verify", voteC.SignerID, mock.Anything).Return(model.ErrInvalidSignature).Once()
+		err = s.processor.Process(voteC)
+		require.Error(s.T(), err)
+		require.True(s.T(), model.IsInvalidVoteError(err))
+		require.ErrorAs(s.T(), err, &model.ErrInvalidSignature)
 
 		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
 	})
 }
 
-// TestProcess_TrustedAddError tests a case where we were able to successfully verify signature but failed to collect it.
-func (s *CombinedVoteProcessorV2TestSuite) TestProcess_TrustedAddError() {
+// TestProcess_TrustedAdd_Exception tests that unexpected exceptions returned by
+// WeightedSignatureAggregator.Verify(..) are _not_ interpreted as invalid votes
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_Verify_Exception() {
+	exception := errors.New("unexpected-exception")
+
+	s.Run("vote with staking-sig only", func() {
+		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception).Once()
+		err := s.processor.Process(stakingVote)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
+	})
+
+	s.Run("vote with staking+beacon sig", func() {
+		// verifying staking sig leads to unexpected exception
+		doubleSigVoteA := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
+		s.stakingAggregator.On("Verify", doubleSigVoteA.SignerID, mock.Anything).Return(exception).Once()
+		s.reconstructor.On("Verify", doubleSigVoteA.SignerID, mock.Anything).Return(nil).Maybe()
+		err := s.processor.Process(doubleSigVoteA)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
+
+		// verifying beacon sig leads to unexpected exception
+		doubleSigVoteB := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
+		s.stakingAggregator.On("Verify", doubleSigVoteB.SignerID, mock.Anything).Return(nil).Maybe()
+		s.reconstructor.On("Verify", doubleSigVoteB.SignerID, mock.Anything).Return(exception).Once()
+		err = s.processor.Process(doubleSigVoteB)
+		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
+	})
+}
+
+// TestProcess_TrustedAdd_Exception tests that unexpected exceptions returned by
+// WeightedSignatureAggregator.Verify(..) are propagated, but _not_ interpreted as invalid votes
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_TrustedAdd_Exception() {
 	exception := errors.New("unexpected-exception")
 	s.Run("staking-sig", func() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())

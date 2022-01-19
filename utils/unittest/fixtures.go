@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
-
 	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffPacker "github.com/onflow/flow-go/consensus/hotstuff/packer"
@@ -377,7 +376,7 @@ func HeaderWithView(view uint64) func(*flow.Header) {
 }
 
 func BlockHeaderFixture(opts ...func(header *flow.Header)) flow.Header {
-	height := uint64(rand.Uint32())
+	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
 	header := BlockHeaderWithParentFixture(&flow.Header{
 		ChainID:  flow.Emulator,
@@ -919,7 +918,7 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	return &identity
 }
 
-// IdentityFixture returns a node identity and networking private key
+// IdentityWithNetworkingKeyFixture returns a node identity and networking private key
 func IdentityWithNetworkingKeyFixture(opts ...func(*flow.Identity)) (*flow.Identity, crypto.PrivateKey) {
 	networkKey := NetworkingPrivKeyFixture()
 	opts = append(opts, WithNetworkingKey(networkKey.PublicKey()))
@@ -1561,6 +1560,12 @@ func VoteFixture(opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
 	return vote
 }
 
+func WithVoteSignerID(signerID flow.Identifier) func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.SignerID = signerID
+	}
+}
+
 func WithVoteView(view uint64) func(*hotstuff.Vote) {
 	return func(vote *hotstuff.Vote) {
 		vote.View = view
@@ -1590,7 +1595,7 @@ func VoteWithStakingSig() func(*hotstuff.Vote) {
 	}
 }
 
-func VoteWithThresholdSig() func(*hotstuff.Vote) {
+func VoteWithBeaconSig() func(*hotstuff.Vote) {
 	return func(vote *hotstuff.Vote) {
 		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeRandomBeacon)}, vote.SigData...)
 	}
