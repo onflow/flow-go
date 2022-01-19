@@ -36,10 +36,10 @@ func (c *NoopProcessor) Status() hotstuff.VoteCollectorStatus { return c.status 
 //    but for a different blockID
 func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
 	if vote.View != block.View {
-		return fmt.Errorf("vote %v 's view is %d while block's view is %d: %w ", vote.ID(), vote.View, block.View, VoteForIncompatibleViewError)
+		return fmt.Errorf("vote %v has view %d while block's view is %d: %w ", vote.ID(), vote.View, block.View, VoteForIncompatibleViewError)
 	}
 	if vote.BlockID != block.BlockID {
-		return fmt.Errorf("expected vote %v for block %v but %v: %w ", vote.ID(), block.BlockID, vote.BlockID, VoteForIncompatibleBlockError)
+		return fmt.Errorf("expecting only votes for block %v, but vote %v is for block %v: %w ", block.BlockID, vote.ID(), vote.BlockID, VoteForIncompatibleBlockError)
 	}
 	return nil
 }

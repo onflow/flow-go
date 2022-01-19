@@ -97,22 +97,21 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 			return nil
 		}
 		return fmt.Errorf("internal error adding vote %v to cache for block %v: %w",
-			vote.ID(),
-			vote.BlockID,
-			err)
+			vote.ID(), vote.BlockID, err)
 	}
 
 	err = m.processVote(vote)
 	if err != nil {
 		if errors.Is(err, VoteForIncompatibleBlockError) {
-			// When there are multiple votes with different block ID, at least one of them is an invalid
-			// vote. It's hard to tell which one is invalid, because both might have a correct signature.
-			// A malicious leader might lead to this by creating two proposals with the same view, and
-			// other honest voters might send correct votes as they only saw one of the proposals.
-			// When the next leader receives multiple votes for incompatible block (block IDs are different),
-			// it will only accept the first vote that is received, which determines the block ID at this view.
-			// Any votes received later will be considered as incompatible and dropped.
-
+			// For honest nodes, there should be only a single proposal per view and all votes should
+			// be for this proposal. However, byzantine nodes might deviate from this happy path:
+			// * A malicious leader might create multiple (individually valid) conflicting proposals for the
+			//   same view. Honest replicas will send correct votes for whatever proposal they see first.
+			//   We only accept the first valid block and reject any other conflicting blocks that show up later.
+			// * Alternatively, malicious replicas might send votes with the expected view, but for blocks that
+			//   don't exist.
+			// In either case, receiving votes for the same view but for different block IDs is a symptom
+			// of malicious consensus participants.  Hence, we log it here as a warning:
 			m.log.Warn().
 				Err(err).
 				Msg("received vote for incompatible block")
@@ -120,9 +119,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 			return nil
 		}
 		return fmt.Errorf("internal error processing vote %v for block %v: %w",
-			vote.ID(),
-			vote.BlockID,
-			err)
+			vote.ID(), vote.BlockID, err)
 	}
 	return nil
 }
@@ -178,9 +175,8 @@ func (m *VoteCollector) View() uint64 {
 func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 
 	if proposal.Block.View != m.View() {
-		return fmt.Errorf("this VoteCollector accepts proposals only for view %d but received %d when receiving block %v",
-			m.votesCache.View(), proposal.Block.View,
-			proposal.Block.BlockID)
+		return fmt.Errorf("this VoteCollector requires a proposal for view %d but received block %v with view %d",
+			m.votesCache.View(), proposal.Block.BlockID, proposal.Block.View)
 	}
 
 	for {
@@ -212,8 +208,8 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 		case hotstuff.VoteCollectorStatusVerifying:
 			verifyingProc, ok := proc.(hotstuff.VerifyingVoteProcessor)
 			if !ok {
-				return fmt.Errorf("VoteProcessor has status %s but it has an incompatible implementation type %T, when processing block %v",
-					proc.Status(), verifyingProc, proposal.Block.BlockID)
+				return fmt.Errorf("while processing block %v, found that VoteProcessor reports status %s but has an incompatible implementation type %T",
+					proposal.Block.BlockID, proc.Status(), verifyingProc)
 			}
 			if verifyingProc.Block().BlockID != proposal.Block.BlockID {
 				m.terminateVoteProcessing()
@@ -224,8 +220,7 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 		case hotstuff.VoteCollectorStatusInvalid: /* no op */
 
 		default:
-			return fmt.Errorf("VoteProcessor reported unknown status %s when processing block %v", proc.Status(),
-				proposal.Block.BlockID)
+			return fmt.Errorf("while processing block %v, found that VoteProcessor reported unknown status %s", proposal.Block.BlockID, proc.Status())
 		}
 
 		return nil
