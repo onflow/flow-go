@@ -147,6 +147,7 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		if currentState != m.Status() {
 			continue
 		}
+
 		return nil
 	}
 }
