@@ -27,6 +27,13 @@ type WeightedSignatureAggregator struct {
 	idToInfo    map[flow.Identifier]signerInfo            // auxiliary map to lookup signer weight and index by ID (only gets updated by constructor)
 	totalWeight uint64                                    // weight collected (gets updated)
 	lock        sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
+
+	// collectedIDs tracks the Identities of all nodes whose signatures have been collected so far.
+	// The reason for tracking the duplicate signers at this module level is that having no duplicates
+	// is a Hotstuff constraint, rather than a cryptographic aggregation constraint. We are planning to
+	// extend the cryptographic primitives to support multiplicity higher than 1 in the future.
+	// Therefore, we already add the logic for identifying duplicates here.
+	collectedIDs map[flow.Identifier]struct{} // map of collected IDs (gets updated)
 }
 
 var _ hotstuff.WeightedSignatureAggregator = (*WeightedSignatureAggregator)(nil)
@@ -67,9 +74,10 @@ func NewWeightedSignatureAggregator(
 	}
 
 	return &WeightedSignatureAggregator{
-		aggregator: agg,
-		ids:        ids,
-		idToInfo:   idToInfo,
+		aggregator:   agg,
+		ids:          ids,
+		idToInfo:     idToInfo,
+		collectedIDs: make(map[flow.Identifier]struct{}),
 	}, nil
 }
 
@@ -113,17 +121,18 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
+	// check for repeated occurrence of signerID (in anticipation of aggregator supporting multiplicities larger than 1 in the future)
+	if _, duplicate := w.collectedIDs[signerID]; duplicate {
+		return w.totalWeight, model.NewDuplicatedSignerErrorf("signature from %v was already added", signerID)
+	}
+
 	err := w.aggregator.TrustedAdd(info.index, sig)
 	if err != nil {
-		// During normal operations, signature.InvalidSignerIdxError should never occur. But adding signatures
-		// from the same signer repeatedly could happen; hence we expect signature.DuplicatedSignerIdxError.
-		if signature.IsDuplicatedSignerIdxError(err) {
-			return w.totalWeight, model.NewDuplicatedSignerErrorf("signature from %v was already added: %w", signerID, err)
-		}
-		// for duplicated votes from the same signer and verified the signer+signature
-		return w.totalWeight, fmt.Errorf("trusted add of signature from %v failed: %w", signerID, err)
+		// During normal operations, signature.InvalidSignerIdxError or signature.DuplicatedSignerIdxError should never occur.
+		return w.totalWeight, fmt.Errorf("unexpected exception while trusted add of signature from %v: %w", signerID, err)
 	}
 	w.totalWeight += info.weight
+	w.collectedIDs[signerID] = struct{}{}
 
 	return w.totalWeight, nil
 }

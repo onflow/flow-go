@@ -168,8 +168,6 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 		switch proc.Status() {
 		// first valid block for this view: commence state transition from caching to verifying
 		case hotstuff.VoteCollectorStatusCaching:
-			// TODO: implement logic for validating block proposal, converting it to vote and further processing
-
 			err := m.caching2Verifying(proposal)
 			if errors.Is(err, ErrDifferentCollectorState) {
 				continue // concurrent state update by other thread => restart our logic
