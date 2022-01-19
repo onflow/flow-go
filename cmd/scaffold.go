@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -144,6 +145,14 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 	})
 }
 
+func (fnb *FlowNodeBuilder) EnqueueResolver() {
+	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		resolver := dns.NewResolver(fnb.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+		fnb.Resolver = resolver
+		return resolver, nil
+	})
+}
+
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		codec := cborcodec.NewCodec()
@@ -160,7 +169,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.SporkID,
 			fnb.IdentityProvider,
 			fnb.Metrics.Network,
-			fnb.BaseConfig.DNSCacheTTL,
+			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 		)
 
@@ -942,6 +951,8 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
+
+	fnb.EnqueueResolver()
 
 	fnb.EnqueueNetworkInit()
 

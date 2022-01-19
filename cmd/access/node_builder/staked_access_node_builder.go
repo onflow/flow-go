@@ -79,11 +79,14 @@ func (builder *StakedAccessNodeBuilder) InitIDProviders() {
 func (builder *StakedAccessNodeBuilder) Initialize() error {
 	builder.InitIDProviders()
 
+	builder.EnqueueResolver()
+
 	// enqueue the regular network
 	builder.EnqueueNetworkInit()
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
 	if builder.supportsUnstakedFollower {
+		builder.enqueueUnstakedResolver()
 		builder.enqueueUnstakedNetworkInit()
 		builder.enqueueRelayNetwork()
 	}
@@ -99,6 +102,14 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 	builder.EnqueueTracer()
 
 	return nil
+}
+
+func (builder *StakedAccessNodeBuilder) enqueueUnstakedResolver() {
+	builder.Component("resolver", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		resolver := dns.NewResolver(builder.Logger, builder.PublicNetworkConfig.Metrics, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
+		builder.PublicNetworkConfig.Resolver = resolver
+		return resolver, nil
+	})
 }
 
 func (builder *StakedAccessNodeBuilder) enqueueRelayNetwork() {
@@ -337,10 +348,9 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
 		connManager := p2p.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
-		resolver := dns.NewResolver(builder.PublicNetworkConfig.Metrics, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
 		libp2pNode, err := p2p.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
-			SetBasicResolver(resolver).
+			SetBasicResolver(builder.PublicNetworkConfig.Resolver).
 			SetSubscriptionFilter(
 				p2p.NewRoleBasedFilter(
 					flow.RoleAccess, builder.IdentityProvider,

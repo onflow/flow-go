@@ -18,11 +18,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -160,10 +158,7 @@ func (builder *UnstakedAccessNodeBuilder) validateParams() error {
 // 		No connection manager
 // 		Default libp2p pubsub options
 func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-
 	return func(ctx context.Context) (*p2p.Node, error) {
-		resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
-
 		var pis []peer.AddrInfo
 
 		for _, b := range builder.bootstrapIdentities {
@@ -177,7 +172,6 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Pr
 		}
 
 		node, err := p2p.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
-			SetBasicResolver(resolver).
 			SetSubscriptionFilter(
 				p2p.NewRoleBasedFilter(
 					p2p.UnstakedRole, builder.IdentityProvider,
@@ -237,15 +231,11 @@ func (builder *UnstakedAccessNodeBuilder) enqueueMiddleware() {
 			// Networking key
 			unstakedNetworkKey := node.NetworkKey
 
-			// Network Metrics
-			// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
-			unstakedNetworkMetrics := metrics.NewNoopCollector()
-
 			libP2PFactory := builder.initLibP2PFactory(unstakedNetworkKey)
 
 			msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, unstakedNodeID)
 
-			builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, msgValidators...)
+			builder.initMiddleware(unstakedNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
 
 			return nil
 		})
@@ -262,13 +252,8 @@ func (builder *UnstakedAccessNodeBuilder) Build() (cmd.Node, error) {
 func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-		// Network Metrics
-		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
-		unstakedNetworkMetrics := metrics.NewNoopCollector()
-
 		// topology is nil since its automatically managed by libp2p
-		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, builder.Middleware, nil)
+		network, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil)
 		if err != nil {
 			return nil, err
 		}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -35,6 +36,7 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
@@ -104,6 +106,7 @@ type PublicNetworkConfig struct {
 	BindAddress string
 	Network     network.Network
 	Metrics     module.NetworkMetrics
+	Resolver    madns.BasicResolver
 }
 
 // DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
@@ -140,6 +143,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		supportsUnstakedFollower:     false,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
+			Metrics:     metrics.NewNoopCollector(),
 		},
 	}
 }
