@@ -16,8 +16,8 @@ const (
 	SHA3_384
 	// KMAC (Keccak based MAC algorithm)
 	KMAC128
-	// legacy KECCAK
-	KECCAK_256
+	// legacy Keccak
+	Keccak_256
 )
 
 // String returns the string representation of this hashing algorithm.
@@ -29,7 +29,7 @@ func (h HashingAlgorithm) String() string {
 		"SHA3_256",
 		"SHA3_384",
 		"KMAC128",
-		"KECCAK_256"}[h]
+		"Keccak_256"}[h]
 }
 
 const (
@@ -41,7 +41,7 @@ const (
 	HashLenSHA2_384   = 48
 	HashLenSHA3_256   = 32
 	HashLenSHA3_384   = 48
-	HashLenKECCAK_256 = 32
+	HashLenKeccak_256 = 32
 
 	// KMAC
 	// the minimum key length in bytes
