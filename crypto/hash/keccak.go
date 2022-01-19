@@ -10,7 +10,7 @@ func (s *spongeState) Algorithm() HashingAlgorithm {
 	return s.algo
 }
 
-// ComputeHash calculates and returns the SHA3 digest of the input.
+// ComputeHash calculates and returns the digest of the input.
 // It updates the state (and therefore not thread-safe) and doesn't allow
 // further writing without calling Reset().
 func (s *spongeState) ComputeHash(data []byte) Hash {
@@ -19,7 +19,7 @@ func (s *spongeState) ComputeHash(data []byte) Hash {
 	return s.sum()
 }
 
-// SumHash returns the SHA3-256 digest of the data written to the state.
+// SumHash returns the digest of the data written to the state.
 // It updates the state and doesn't allow further writing without
 // calling Reset().
 func (s *spongeState) SumHash() Hash {
@@ -65,7 +65,8 @@ func (d *spongeState) Write(p []byte) (int, error) {
 
 const (
 	// maxRate is the maximum size of the internal buffer. SHA3-256
-	// currently needs the largest buffer.
+	// currently needs the largest buffer among supported sponge-based
+	// algorithms.
 	maxRate = rateSHA3_256
 )
 

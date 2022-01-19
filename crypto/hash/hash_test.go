@@ -51,12 +51,12 @@ func TestSanitySHA2_384(t *testing.T) {
 	assert.Equal(t, Hash(expected), hash)
 }
 
-// Sanity check of KECCAK_256
-func TestSanityKECCAK_256(t *testing.T) {
+// Sanity check of Keccak_256
+func TestSanityKeccak_256(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("9c22ff5f21f0b81b113e63f7db6da94fedef11b2119b4088b89664fb9a3cb658")
 
-	alg := NewKECCAK_256()
+	alg := NewKeccak_256()
 	hash := alg.ComputeHash(input)
 	assert.Equal(t, Hash(expected), hash)
 }
@@ -117,7 +117,7 @@ func TestHashersAPI(t *testing.T) {
 		NewSHA3_256,
 		NewSHA3_384,
 		newKmac128,
-		NewKECCAK_256,
+		NewKeccak_256,
 	}
 
 	r := time.Now().UnixNano()
@@ -199,14 +199,14 @@ func TestSHA3(t *testing.T) {
 	})
 }
 
-// TestKECCAK is a specific test of KECCAK-256.
+// TestKeccak is a specific test of Keccak-256.
 // It compares the hashes of random data of different lengths to
 // the output of Go LegacyKeccak.
-func TestKECCAK(t *testing.T) {
+func TestKeccak(t *testing.T) {
 	r := time.Now().UnixNano()
 	rand.Seed(r)
 	t.Logf("math rand seed is %d", r)
-	var expected [HashLenKECCAK_256]byte
+	var expected [HashLenKeccak_256]byte
 
 	for i := 0; i < 5000; i++ {
 		value := make([]byte, i)
@@ -216,7 +216,7 @@ func TestKECCAK(t *testing.T) {
 		k.Sum(expected[:0])
 
 		// test hash computation using the hasher
-		hasher := NewKECCAK_256()
+		hasher := NewKeccak_256()
 		h := hasher.ComputeHash(value)
 		assert.Equal(t, expected[:], []byte(h))
 	}
@@ -273,10 +273,10 @@ func BenchmarkComputeHash(b *testing.B) {
 		b.StopTimer()
 	})
 
-	b.Run("KECCAK_256", func(b *testing.B) {
+	b.Run("Keccak_256", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			alg := NewKECCAK_256()
+			alg := NewKeccak_256()
 			alg.ComputeHash(m)
 		}
 		b.StopTimer()
