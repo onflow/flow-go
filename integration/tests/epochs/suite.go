@@ -653,6 +653,7 @@ func (s *Suite) submitSmokeTestTransaction(ctx context.Context)  {
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
+	// createAccount will submit a create account transaction and wait for it to be sealed
 	_, err := s.createAccount(
 		ctx,
 		fullAccountKey,
@@ -690,7 +691,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	// assert atleast 20 blocks have been finalized since the node replacement
-	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, uint64(20))
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 }
 
 // assertNetworkHealthyAfterLNChange after an collection node is removed or added to the network
@@ -707,16 +708,10 @@ func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templat
 // assertNetworkHealthyAfterSNChange after replacing a consensus node in the test and waiting until
 // the epoch transition we should observe blocks finalizing and we should be able to submit a transaction
 // that will indicate overall network health
-// 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
-// 2. Submit transaction to network
+// 1. Submit transaction to network
 func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	// assert atleast 20 blocks have been finalized since the node replacement
-	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, uint64(20))
-
-	// after swapping a consensus node and ensuring blocks continue to be finalized we submit a transaction to the
-	// network to ensure the network is overall healthy
-	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
-	// To validate the LN joined the network successfully and is processing transactions we submit a
-	// create account transaction and assert there are no errors.
+	// At this point we can assure that our SN node is participating in finalization and sealing because
+	// there are only 2 SN nodes in the network now we will submit a transaction to the
+	// network to ensure the network is overall healthy.
 	s.submitSmokeTestTransaction(ctx)
 }
