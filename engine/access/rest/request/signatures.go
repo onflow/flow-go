@@ -89,8 +89,6 @@ func (s *Signature) Parse(raw string) error {
 		return fmt.Errorf("invalid encoding")
 	}
 
-	// todo validate length
-
 	*s = signatureBytes
 	return nil
 }

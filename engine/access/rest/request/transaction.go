@@ -39,9 +39,6 @@ func (t *Transaction) Parse(raw io.Reader) error {
 	if len(tx.Arguments) > maxAllowedScriptArguments {
 		return fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArguments)
 	}
-	if len(tx.EnvelopeSignatures) == 0 {
-		return fmt.Errorf("envelope signatures not provided")
-	}
 	if tx.ReferenceBlockId == "" {
 		return fmt.Errorf("reference block not provided")
 	}
