@@ -53,6 +53,7 @@ type Heights []Height
 func (h *Heights) Parse(raw []string) error {
 	var height Height
 	heights := make([]Height, 0)
+	uniqueHeights := make(map[string]bool)
 	for _, r := range raw {
 		err := height.Parse(r)
 		if err != nil {
@@ -63,7 +64,10 @@ func (h *Heights) Parse(raw []string) error {
 			continue
 		}
 
-		heights = append(heights, height)
+		if !uniqueHeights[r] {
+			uniqueHeights[r] = true
+			heights = append(heights, height)
+		}
 	}
 
 	*h = heights
