@@ -214,7 +214,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		NetworkingKey:           networkingKey,
 		MachineAccountKey:       machineAccountKey,
 		MachineAccountPublicKey: machineAccountPubKey,
-		MachineAccountAddress: machineAccountAddr,
+		MachineAccountAddress:   machineAccountAddr,
 		ContainerName:           containerName,
 	}
 }

@@ -165,7 +165,7 @@ func (q *LRUEjector) Eject(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	// finds the oldest entity
 	oldestSQ := uint64(math.MaxUint64)
 	var oldestID flow.Identifier
-	for id := range b.backData.All() {
+	for _, id := range b.backData.Identifiers() {
 		if sq, ok := q.table[id]; ok {
 			if sq < oldestSQ {
 				oldestID = id
