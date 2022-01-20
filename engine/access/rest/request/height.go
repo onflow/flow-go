@@ -36,6 +36,10 @@ func (h *Height) Parse(raw string) error {
 		return fmt.Errorf("invalid height format")
 	}
 
+	if height >= EmptyHeight {
+		return fmt.Errorf("invalid height value")
+	}
+
 	*h = Height(height)
 	return nil
 }
