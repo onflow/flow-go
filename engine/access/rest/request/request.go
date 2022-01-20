@@ -112,19 +112,7 @@ func (rd *Request) GetQueryParam(name string) string {
 
 func (rd *Request) GetQueryParams(name string) []string {
 	param := rd.Request.URL.Query().Get(name)
-	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
-	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
-	// accommodate the client for now by doing a strings.Fields if commas are not present.
-	// Issue to to fix the client: https://github.com/onflow/flow/issues/698
-	param = strings.TrimSuffix(param, "]")
-	param = strings.TrimPrefix(param, "[")
-	if len(param) == 0 {
-		return nil
-	}
-	if strings.Contains(param, ",") {
-		return strings.Split(param, ",")
-	}
-	return strings.Fields(param)
+	return toStringArray(param)
 }
 
 // Decorate takes http request and applies functions to produce our custom
@@ -154,6 +142,10 @@ func sliceToMap(values []string) map[string]bool {
 }
 
 func toStringArray(in string) []string {
+	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
+	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
+	// accommodate the client for now by doing a strings.Fields if commas are not present.
+	// Issue to to fix the client: https://github.com/onflow/flow/issues/698
 	in = strings.TrimSuffix(in, "]")
 	in = strings.TrimPrefix(in, "[")
 	var out []string
