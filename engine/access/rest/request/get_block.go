@@ -66,7 +66,7 @@ func (g *GetBlock) Parse(rawHeights []string, rawStart string, rawEnd string) er
 		return fmt.Errorf("start height must be less than or equal to end height")
 	}
 	// check if range exceeds maximum but only if end is not equal to special value which is not known yet
-	if g.EndHeight-g.StartHeight > MaxAllowedHeights && g.EndHeight != FinalHeight && g.EndHeight != SealedHeight {
+	if g.EndHeight-g.StartHeight >= MaxAllowedHeights && g.EndHeight != FinalHeight && g.EndHeight != SealedHeight {
 		return fmt.Errorf("height range %d exceeds maximum allowed of %d", g.EndHeight-g.StartHeight, MaxAllowedHeights)
 	}
 
