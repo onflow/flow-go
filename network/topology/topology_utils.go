@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -56,6 +57,15 @@ func clusterPeers(id flow.Identifier, state protocol.State) (flow.IdentityList, 
 	clusterList, err := currentEpoch.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract cluster list %w", err)
+	}
+
+	myId, err := state.Final().Identity(id)
+	if !myId.Role.Valid() {
+		fanout, err := state.Final().Identities(filter.HasRole(flow.RoleConsensus, flow.RoleCollection))
+		if err != nil {
+			return nil, fmt.Errorf("could not extract consensus and collection nodes: %w", err)
+		}
+		return fanout, nil
 	}
 
 	myCluster, _, found := clusterList.ByNodeID(id)
