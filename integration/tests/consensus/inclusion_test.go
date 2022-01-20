@@ -136,7 +136,7 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 	for time.Now().Before(deadline) {
 
 		// we read the next message until we reach deadline
-		_, msg, err := is.reader.Next()
+		originID, msg, err := is.reader.Next()
 		if err != nil {
 			is.T().Logf("could not read message: %s\n", err)
 			continue
@@ -148,6 +148,7 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 			continue
 		}
 
+		is.T().Logf("receive block proposal from %v, height %v", originID, proposal.Header.Height)
 		// wait until proposal finalized
 		if proposal.Header.Height >= 1 {
 			return
@@ -183,7 +184,7 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 	for time.Now().Before(deadline) {
 
 		// we read the next message until we reach deadline
-		_, msg, err := is.reader.Next()
+		originID, msg, err := is.reader.Next()
 		if err != nil {
 			is.T().Logf("could not read message: %s\n", err)
 			continue
@@ -196,6 +197,7 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		}
 
 		guarantees := proposal.Payload.Guarantees
+		is.T().Logf("receive block proposal from %v, %v guarantees included in the payload!", originID, len(guarantees))
 
 		// check if the collection guarantee is included
 		for _, guarantee := range guarantees {
@@ -223,7 +225,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 	for time.Now().Before(deadline) {
 
 		// we read the next message until we reach deadline
-		_, msg, err := is.reader.Next()
+		originID, msg, err := is.reader.Next()
 		if err != nil {
 			is.T().Logf("could not read message: %s\n", err)
 			continue
@@ -237,6 +239,8 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 
 		// check if the proposal was already processed
 		proposalID := proposal.Header.ID()
+		is.T().Logf("proposal %v received from %v", proposalID, originID)
+
 		_, processed := confirmations[proposalID]
 		if processed {
 			continue

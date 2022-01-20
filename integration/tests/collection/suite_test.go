@@ -258,14 +258,14 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
-		_, msg, err := suite.reader.Next()
+		originID, msg, err := suite.reader.Next()
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
 			header := val.Header
 			collection := val.Payload.Collection
-			suite.T().Logf("got collection height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
+			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, header.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
 					delete(lookup, txID)
@@ -289,11 +289,11 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		case *flow.CollectionGuarantee:
 			finalizedTxIDs, ok := proposals[val.CollectionID]
 			if !ok {
-				suite.T().Logf("got guarantee before the collection proposal (collection id=%x)", val.CollectionID)
+				suite.T().Logf("got guarantee from %v before the collection proposal (collection id=%x)", originID, val.CollectionID)
 				guarantees[val.CollectionID] = true
 				continue
 			} else {
-				suite.T().Logf("got guarantee (id=%x)", val.CollectionID)
+				suite.T().Logf("got guarantee from %v (id=%x)", originID, val.CollectionID)
 			}
 			for _, txID := range finalizedTxIDs {
 				delete(lookup, txID)
@@ -306,7 +306,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			}
 
 		case *flow.TransactionBody:
-			suite.T().Log("got tx: ", val.ID())
+			suite.T().Logf("got tx from %v: %v", originID, val.ID())
 		}
 	}
 
