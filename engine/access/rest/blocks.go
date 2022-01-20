@@ -72,6 +72,10 @@ func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkG
 		}
 
 		req.EndHeight = latest.Header.Height // overwrite special value height with fetched
+
+		if req.StartHeight > req.EndHeight {
+			return nil, NewBadRequestError(fmt.Errorf("start height must be less than or equal to end height"))
+		}
 	}
 
 	blocks := make([]*models.Block, 0)
