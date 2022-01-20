@@ -102,9 +102,6 @@ type EventsList []Event
 // EventsListMerkleHash calculates the root hash of events inserted in order into a
 // merkle trie with the hash of event as the key and event index as of value
 func EventsListMerkleHash(el EventsList) (Identifier, error) {
-
-	eventIDs := make([]Identifier, 0)
-
 	var root Identifier
 	tree, err := merkle.NewTree(IdentifierLen)
 	if err != nil {
@@ -114,8 +111,9 @@ func EventsListMerkleHash(el EventsList) (Identifier, error) {
 	for _, event := range el {
 		// event fingerprint is the rlp encoding of the wrapperevent
 		// eventID is the standard sha3 hash of event fingerprint
-		eventID := MakeID(event)
-		_, err = tree.Put(eventID[:], event.Fingerprint())
+		e := event
+		eventID := MakeID(e)
+		_, err = tree.Put(eventID[:], e.Fingerprint())
 		if err != nil {
 			return root, err
 		}
@@ -124,5 +122,5 @@ func EventsListMerkleHash(el EventsList) (Identifier, error) {
 	hash := tree.Hash()
 	copy(root[:], hash)
 
-	return MerkleRoot(eventIDs...), nil
+	return root, nil
 }
