@@ -11,8 +11,6 @@ import (
 )
 
 func parseBody(raw io.Reader, dst interface{}) error {
-	//todo(sideninja) validate size
-
 	dec := json.NewDecoder(raw)
 	dec.DisallowUnknownFields()
 
