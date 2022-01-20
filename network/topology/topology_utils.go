@@ -60,6 +60,10 @@ func clusterPeers(id flow.Identifier, state protocol.State) (flow.IdentityList, 
 	}
 
 	myId, err := state.Final().Identity(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract my identity: %w", err)
+	}
+
 	if !myId.Role.Valid() {
 		fanout, err := state.Final().Identities(filter.HasRole(flow.RoleConsensus, flow.RoleCollection))
 		if err != nil {
