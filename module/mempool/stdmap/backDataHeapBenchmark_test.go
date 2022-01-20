@@ -204,7 +204,8 @@ func (b baselineLRU) All() map[flow.Identifier]flow.Entity {
 func (b baselineLRU) Identifiers() flow.IdentifierList {
 	ids := make(flow.IdentifierList, b.c.Len())
 	entityIds := b.c.Keys()
-	for i := 0; i < len(entityIds); i++ {
+	total := len(entityIds)
+	for i := 0; i < total; i++ {
 		id, ok := entityIds[i].(flow.Identifier)
 		if !ok {
 			panic("could not assert to entity id")
@@ -217,7 +218,8 @@ func (b baselineLRU) Identifiers() flow.IdentifierList {
 func (b baselineLRU) Entities() []flow.Entity {
 	entities := make([]flow.Entity, b.c.Len())
 	entityIds := b.c.Keys()
-	for i := 0; i < len(entityIds); i++ {
+	total := len(entityIds)
+	for i := 0; i < total; i++ {
 		id, ok := entityIds[i].(flow.Identifier)
 		if !ok {
 			panic("could not assert to entity id")

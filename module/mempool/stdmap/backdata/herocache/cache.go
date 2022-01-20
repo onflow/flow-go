@@ -178,7 +178,8 @@ func (c Cache) All() map[flow.Identifier]flow.Entity {
 	entitiesList := c.entities.All()
 	all := make(map[flow.Identifier]flow.Entity, len(c.entities.All()))
 
-	for i := 0; i < len(entitiesList); i++ {
+	total := len(entitiesList)
+	for i := 0; i < total; i++ {
 		p := entitiesList[i]
 		all[p.Id()] = p.Entity()
 	}
