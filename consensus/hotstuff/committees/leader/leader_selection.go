@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/indices"
 )
 
 const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 mins * 24 hours * 30 days * 6 months
@@ -119,7 +120,7 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
 func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16, error) {
 	// create random number generator from the seed
-	rng, err := random.NewChacha20PRG(seed, []byte("leader_selec"))
+	rng, err := random.NewChacha20PRG(seed, indices.ConsensusLeaderSelectionCustomizer)
 	if err != nil {
 		return nil, fmt.Errorf("can not create rng: %w", err)
 	}
