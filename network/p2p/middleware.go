@@ -183,6 +183,8 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 		return nil, err
 	}
 
+	m.log.Info().Str("identities", fmt.Sprintf("%v", identities)).Msg("topology created")
+
 	return m.peerIDs(identities.NodeIDs()), nil
 }
 
