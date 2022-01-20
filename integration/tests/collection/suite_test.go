@@ -117,7 +117,6 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 }
 
 func (suite *CollectorSuite) TearDownTest() {
-	suite.T().Logf("test case tear down %v", name)
 	// avoid nil pointer errors for skipped tests
 	if suite.cancel != nil {
 		defer suite.cancel()
