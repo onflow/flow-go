@@ -30,7 +30,7 @@ func parseBody(raw io.Reader, dst interface{}) error {
 			return fmt.Errorf("request body contains an invalid value for the %q field (at position %d)", unmarshalTypeError.Field, unmarshalTypeError.Offset)
 		case strings.HasPrefix(err.Error(), "json: unknown field "):
 			fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
-			return fmt.Errorf("Request body contains unknown field %s", fieldName)
+			return fmt.Errorf("request body contains unknown field %s", fieldName)
 		case errors.Is(err, io.EOF):
 			return fmt.Errorf("request body must not be empty")
 		default:

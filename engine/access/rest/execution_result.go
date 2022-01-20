@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
-// GetExecutionResultByID gets Execution Result payload by block IDs.
+// GetExecutionResultsByBlockIDs gets Execution Result payload by block IDs.
 func GetExecutionResultsByBlockIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetExecutionResultByBlockIDsRequest()
 	if err != nil {

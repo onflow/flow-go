@@ -24,7 +24,7 @@ func TestGetScript_InvalidParse(t *testing.T) {
 		{"1", "7bc42fe85d32ca513769a74f97f7e1a7bad6c9407f0d934c2aa645ef9cf613c7", validScript, "can not provide both block ID and block height"},
 		{"final", "7bc42fe85d32ca513769a74f97f7e1a7bad6c9407f0d934c2aa645ef9cf613c7", validScript, "can not provide both block ID and block height"},
 		{"", "2", validScript, "invalid ID format"},
-		{"1", "", `{ "foo": "zoo" }`, `Request body contains unknown field "foo"`},
+		{"1", "", `{ "foo": "zoo" }`, `request body contains unknown field "foo"`},
 	}
 
 	for i, test := range tests {
