@@ -24,18 +24,18 @@ func (s *TransactionSignature) Parse(
 
 	sigIndex, err := util.ToUint64(rawSignerIndex)
 	if err != nil {
-		return fmt.Errorf("invalid signer index: %v", err)
+		return fmt.Errorf("invalid signer index: %w", err)
 	}
 
 	keyIndex, err := util.ToUint64(rawKeyIndex)
 	if err != nil {
-		return fmt.Errorf("invalid key index: %v", err)
+		return fmt.Errorf("invalid key index: %w", err)
 	}
 
 	var signature Signature
 	err = signature.Parse(rawSignature)
 	if err != nil {
-		return fmt.Errorf("invalid signature: %v", err)
+		return fmt.Errorf("invalid signature: %w", err)
 	}
 
 	*s = TransactionSignature(flow.TransactionSignature{

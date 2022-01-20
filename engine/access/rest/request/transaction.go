@@ -58,7 +58,7 @@ func (t *Transaction) Parse(raw io.Reader) error {
 	var payer Address
 	err = payer.Parse(tx.Payer)
 	if err != nil {
-		return fmt.Errorf("invalid payer: %v", err)
+		return fmt.Errorf("invalid payer: %w", err)
 	}
 
 	auths := make([]flow.Address, len(tx.Authorizers))
@@ -99,12 +99,12 @@ func (t *Transaction) Parse(raw io.Reader) error {
 	var blockID ID
 	err = blockID.Parse(tx.ReferenceBlockId)
 	if err != nil {
-		return fmt.Errorf("invalid reference block ID: %v", err)
+		return fmt.Errorf("invalid reference block ID: %w", err)
 	}
 
 	gasLimit, err := util.ToUint64(tx.GasLimit)
 	if err != nil {
-		return fmt.Errorf("invalid gas limit: %v", err)
+		return fmt.Errorf("invalid gas limit: %w", err)
 	}
 
 	*t = Transaction(flow.TransactionBody{

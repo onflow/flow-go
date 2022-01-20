@@ -19,12 +19,12 @@ func (p *ProposalKey) Parse(raw models.ProposalKey) error {
 
 	keyIndex, err := util.ToUint64(raw.KeyIndex)
 	if err != nil {
-		return fmt.Errorf("invalid key index: %v", err)
+		return fmt.Errorf("invalid key index: %w", err)
 	}
 
 	seqNumber, err := util.ToUint64(raw.SequenceNumber)
 	if err != nil {
-		return fmt.Errorf("invalid sequence number: %v", err)
+		return fmt.Errorf("invalid sequence number: %w", err)
 	}
 
 	*p = ProposalKey(flow.ProposalKey{

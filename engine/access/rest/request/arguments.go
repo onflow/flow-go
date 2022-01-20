@@ -19,7 +19,7 @@ func (a *Arguments) Parse(raw []string) error {
 
 		arg, err := util.FromBase64(rawArg)
 		if err != nil {
-			return fmt.Errorf("invalid argument encoding: %v", err)
+			return fmt.Errorf("invalid argument encoding: %w", err)
 		}
 		args = append(args, arg)
 	}
