@@ -104,9 +104,9 @@ func (is *InclusionSuite) TearDownTest() {
 }
 
 func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
-	is.T().Logf("------ test started")
+	is.T().Logf("%v ------ test started", time.Now())
 	// fix the deadline for the test as a whole
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()
@@ -118,9 +118,10 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	is.T().Logf("seen a proposal")
 
-	conID := is.sendCollectionToConsensus(deadline, sentinel)
-
-	is.T().Logf("sent collection %x to consensus %v", colID, conID)
+	// send collection to each consensus node, ensure they are received the guarantee
+	for _, colID := range is.conIDs {
+		is.sendCollectionToConsensus(deadline, sentinel, colID)
+	}
 
 	proposal := is.waitUntilCollectionIncludeInProposal(deadline, sentinel)
 
@@ -148,22 +149,20 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		}
 
 		// wait until proposal finalized
-		if proposal.Header.Height < 2 {
-			continue
+		if proposal.Header.Height >= 1 {
+			return
 		}
-		return
 	}
 	is.T().Fatal("timeout waiting to see proposal")
 }
 
-func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel *flow.CollectionGuarantee) flow.Identifier {
+func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel *flow.CollectionGuarantee, conID flow.Identifier) {
 	colID := sentinel.CollectionID
 
-	conID := is.conIDs[0]
 	// keep trying to send collection guarantee to at least one consensus node
 	for time.Now().Before(deadline) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		is.T().Logf("sending collection %x to consensus node %v\n", colID, conID)
+		is.T().Logf("%s sending collection %x to consensus node %v\n", time.Now(), colID, conID)
 		err := is.Collection().Send(ctx, engine.PushGuarantees, sentinel, conID)
 		cancel()
 		if err != nil {
@@ -171,10 +170,11 @@ func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel
 			continue
 		}
 
-		return conID
+		is.T().Logf("%v sent collection %x to consensus %v", time.Now(), colID, conID)
+		return
 	}
-	is.T().Fatalf("timeout sendng collection %x to consensus", colID)
-	return flow.ZeroID
+
+	is.T().Fatalf("%v timeout (deadline %s) sendng collection %x to consensus", time.Now(), deadline, colID)
 }
 
 func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Time, sentinel *flow.CollectionGuarantee) *messages.BlockProposal {
