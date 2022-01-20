@@ -1558,6 +1558,12 @@ func TestSignatureVerification(t *testing.T) {
 				return hash.NewSHA2_256()
 			},
 		},
+		{
+			"KECCAK_256",
+			func() hash.Hasher {
+				return hash.NewKeccak_256()
+			},
+		},
 	}
 
 	testForHash := func(signatureAlgorithm signatureAlgorithm, hashAlgorithm hashAlgorithm) {

@@ -5,10 +5,9 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/cadence/runtime"
 
 	gocrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -55,12 +54,14 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				runtime.HashAlgorithmKMAC128_BLS_BLS12_381: struct{}{},
 			},
 			runtime.SignatureAlgorithmECDSA_P256: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256: struct{}{},
-				runtime.HashAlgorithmSHA3_256: struct{}{},
+				runtime.HashAlgorithmSHA2_256:   struct{}{},
+				runtime.HashAlgorithmSHA3_256:   struct{}{},
+				runtime.HashAlgorithmKECCAK_256: struct{}{},
 			},
 			runtime.SignatureAlgorithmECDSA_secp256k1: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256: struct{}{},
-				runtime.HashAlgorithmSHA3_256: struct{}{},
+				runtime.HashAlgorithmSHA2_256:   struct{}{},
+				runtime.HashAlgorithmSHA3_256:   struct{}{},
+				runtime.HashAlgorithmKECCAK_256: struct{}{},
 			},
 		}
 
@@ -218,6 +219,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 		hashAlgos := []runtime.HashAlgorithm{
 			runtime.HashAlgorithmSHA2_256,
 			runtime.HashAlgorithmSHA3_256,
+			runtime.HashAlgorithmKECCAK_256,
 		}
 
 		for _, c := range cases {
