@@ -195,7 +195,7 @@ func generateBlock() (models.Block, error) {
 	multipleDummySignatures := []string{dummySignature, dummySignature}
 	dummyID := "abcd"
 	dateString := "2021-11-20T11:45:26.371Z"
-	time, err := time.Parse(time.RFC3339, dateString)
+	t, err := time.Parse(time.RFC3339, dateString)
 	if err != nil {
 		return models.Block{}, err
 	}
@@ -205,7 +205,7 @@ func generateBlock() (models.Block, error) {
 			Id:                   dummyID,
 			ParentId:             dummyID,
 			Height:               "100",
-			Timestamp:            time,
+			Timestamp:            t,
 			ParentVoterSignature: dummySignature,
 		},
 		Payload: &models.BlockPayload{
