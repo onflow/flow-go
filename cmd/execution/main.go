@@ -338,6 +338,8 @@ func main() {
 				return nil, err
 			}
 
+			// TODO: we should implement the TaskComparator here once we have a way to map from CID to block ID
+			// This will allow execution nodes to prioritize requests for more recent CIDs over older ones.
 			bs, err := node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
 
 			if err != nil {

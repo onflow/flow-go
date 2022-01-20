@@ -71,6 +71,7 @@ type registerEngineResp struct {
 type registerBlobServiceRequest struct {
 	channel  network.Channel
 	ds       datastore.Batching
+	opts     []network.BlobServiceOption
 	respChan chan *registerBlobServiceResp
 }
 
@@ -162,7 +163,7 @@ func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.Signal
 	for {
 		select {
 		case req := <-n.registerBlobServiceRequests:
-			blobService, err := n.handleRegisterBlobServiceRequest(parent, req.channel, req.ds)
+			blobService, err := n.handleRegisterBlobServiceRequest(parent, req.channel, req.ds, req.opts)
 			resp := &registerBlobServiceResp{
 				blobService: blobService,
 				err:         err,
@@ -227,8 +228,8 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 	return conduit, nil
 }
 
-func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
-	bs := network.NewBlobService(n.mw.Host(), n.mw.RoutingSystem(), channel.String(), ds)
+func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService, error) {
+	bs := network.NewBlobService(n.mw.Host(), n.mw.RoutingSystem(), channel.String(), ds, opts...)
 
 	// start the blob service using the network's context
 	bs.Start(parent)
@@ -261,7 +262,7 @@ func (n *Network) Register(channel network.Channel, messageProcessor network.Mes
 
 // RegisterBlobService registers a BlobService on the given channel.
 // The returned BlobService can be used to request blobs from the network.
-func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
+func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
 	respChan := make(chan *registerBlobServiceResp)
 
 	select {
@@ -270,6 +271,7 @@ func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batc
 	case n.registerBlobServiceRequests <- &registerBlobServiceRequest{
 		channel:  channel,
 		ds:       ds,
+		opts:     opts,
 		respChan: respChan,
 	}:
 		select {

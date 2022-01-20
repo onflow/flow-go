@@ -72,7 +72,8 @@ var _ BlobService = (*blobService)(nil)
 var _ component.Component = (*blobService)(nil)
 
 type BlobServiceConfig struct {
-	ReprovideInterval time.Duration // the interval at which the DHT provider entries are refreshed
+	ReprovideInterval time.Duration    // the interval at which the DHT provider entries are refreshed
+	BitswapOptions    []bitswap.Option // options to pass to the Bitswap service
 }
 
 type BlobServiceOption func(*BlobServiceConfig)
@@ -81,6 +82,12 @@ type BlobServiceOption func(*BlobServiceConfig)
 func WithReprovideInterval(d time.Duration) BlobServiceOption {
 	return func(config *BlobServiceConfig) {
 		config.ReprovideInterval = d
+	}
+}
+
+func WithBitswapOptions(opts ...bitswap.Option) BlobServiceOption {
+	return func(config *BlobServiceConfig) {
+		config.BitswapOptions = opts
 	}
 }
 
@@ -105,7 +112,7 @@ func NewBlobService(
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			bs.blockService = blockservice.New(bstore, bitswap.New(ctx, bsNetwork, bstore))
+			bs.blockService = blockservice.New(bstore, bitswap.New(ctx, bsNetwork, bstore, config.BitswapOptions...))
 
 			ready()
 		}).

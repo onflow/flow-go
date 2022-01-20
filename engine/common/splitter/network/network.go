@@ -60,8 +60,8 @@ func NewNetwork(
 	return n
 }
 
-func (n *Network) RegisterBlobService(channel network.Channel, store datastore.Batching) (network.BlobService, error) {
-	return n.net.RegisterBlobService(channel, store)
+func (n *Network) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
+	return n.net.RegisterBlobService(channel, store, opts...)
 }
 
 // Register will subscribe the given engine with the spitter on the given channel, and all registered
