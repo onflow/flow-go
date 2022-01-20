@@ -99,8 +99,8 @@ type BlockEvents struct {
 
 type EventsList []Event
 
-// EventsListMerkleHash calculates the root hash of events inserted in order into a
-// merkle trie with the hash of event as the key and event index as of value
+// EventsListMerkleHash calculates the root hash of events inserted into a
+// merkle trie with the hash of event as the key and encoded event as value
 func EventsListMerkleHash(el EventsList) (Identifier, error) {
 	var root Identifier
 	tree, err := merkle.NewTree(IdentifierLen)
@@ -110,7 +110,7 @@ func EventsListMerkleHash(el EventsList) (Identifier, error) {
 
 	for _, event := range el {
 		// event fingerprint is the rlp encoding of the wrapperevent
-		// eventID is the standard sha3 hash of event fingerprint
+		// eventID is the standard sha3 hash of the event fingerprint
 		e := event
 		eventID := MakeID(e)
 		_, err = tree.Put(eventID[:], e.Fingerprint())
