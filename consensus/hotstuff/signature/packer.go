@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // ConsensusSigDataPacker implements the hotstuff.Packer interface.
@@ -36,8 +36,8 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	signerIDs := make([]flow.Identifier, 0, count)
 	sigTypes := make([]hotstuff.SigType, 0, count)
 
-	// read all the possible signer IDs at the given block
-	consensus, err := p.committees.Identities(blockID, filter.HasRole(flow.RoleConsensus))
+	// retrieve all authorized consensus participants at the given block
+	consensus, err := p.committees.Identities(blockID, filter.Any)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
 	}
@@ -93,12 +93,12 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 // sig is the aggregated signature data
 // It returns:
 //  - (sigData, nil) if successfully unpacked the signature data
-//  - (nil, signature.ErrInvalidFormat) if failed to unpack the signature data
+//  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
 func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	data, err := p.Decode(sigData)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode sig data %s: %w", err, signature.ErrInvalidFormat)
+		return nil, fmt.Errorf("could not decode sig data %s: %w", err, model.ErrInvalidFormat)
 	}
 
 	// deserialize the compact sig types
@@ -108,7 +108,7 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 	}
 
 	// read all the possible signer IDs at the given block
-	consensus, err := p.committees.Identities(blockID, filter.HasRole(flow.RoleConsensus))
+	consensus, err := p.committees.Identities(blockID, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
 	}
@@ -127,7 +127,7 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 		_, ok := lookup[signerID]
 		if !ok {
 			return nil, fmt.Errorf("unknown signer ID (%v) at the given block (%v): %w",
-				signerID, blockID, signature.ErrInvalidFormat)
+				signerID, blockID, model.ErrInvalidFormat)
 		}
 
 		if sigType == hotstuff.SigTypeStaking {
@@ -135,7 +135,7 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 		} else if sigType == hotstuff.SigTypeRandomBeacon {
 			randomBeaconSigners = append(randomBeaconSigners, signerID)
 		} else {
-			return nil, fmt.Errorf("unknown sigType %v, %w", sigType, signature.ErrInvalidFormat)
+			return nil, fmt.Errorf("unknown sigType %v, %w", sigType, model.ErrInvalidFormat)
 		}
 	}
 
@@ -192,8 +192,8 @@ func serializeToBitVector(sigTypes []hotstuff.SigType) ([]byte, error) {
 // - count: the total number of sig types to be deserialized from the given bytes
 // It returns:
 // - (sigTypes, nil) if successfully deserialized sig types
-// - (nil, signature.ErrInvalidFormat) if the number of serialized bytes doesn't match the given number of sig types
-// - (nil, signature.ErrInvalidFormat) if the remaining bits in the last byte are not all 0s
+// - (nil, model.ErrInvalidFormat) if the number of serialized bytes doesn't match the given number of sig types
+// - (nil, model.ErrInvalidFormat) if the remaining bits in the last byte are not all 0s
 func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType, error) {
 	types := make([]hotstuff.SigType, 0, count)
 
@@ -202,7 +202,7 @@ func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType,
 	totalBytes := bytesCount(count)
 	if len(serialized) != totalBytes {
 		return nil, fmt.Errorf("encoding sig types of %d signers requires %d bytes but got %d bytes: %w",
-			count, totalBytes, len(serialized), signature.ErrInvalidFormat)
+			count, totalBytes, len(serialized), model.ErrInvalidFormat)
 	}
 
 	// parse each bit in the bit-vector, bit 0 is SigTypeStaking, bit 1 is SigTypeRandomBeacon
@@ -223,7 +223,7 @@ func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType,
 	remainings := byt << (8 - offset)
 	if remainings != byte(0) {
 		return nil, fmt.Errorf("the remaining bits are expected to be all 0s, but are %v: %w",
-			remainings, signature.ErrInvalidFormat)
+			remainings, model.ErrInvalidFormat)
 	}
 
 	return types, nil

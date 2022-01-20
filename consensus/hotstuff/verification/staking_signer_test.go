@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -103,4 +105,18 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 		err = verifier.VerifyVote(signerIdentity, vote.SigData, block)
 		require.NoError(t, err)
 	})
+}
+
+// TestStakingSigner_VerifyQC checks that a QC without any signers is rejected right away without calling into any sub-components
+func TestStakingSigner_VerifyQC(t *testing.T) {
+	header := unittest.BlockHeaderFixture()
+	block := model.BlockFromFlow(&header, header.View-1)
+	sigData := unittest.RandomBytes(127)
+
+	verifier := NewStakingVerifier()
+	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	require.ErrorIs(t, err, model.ErrInvalidFormat)
+
+	err = verifier.VerifyQC(nil, sigData, block)
+	require.ErrorIs(t, err, model.ErrInvalidFormat)
 }

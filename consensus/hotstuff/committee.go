@@ -29,7 +29,7 @@ type Committee interface {
 	// Identity returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO STAKE at the specified block.
 	// ERROR conditions:
-	//    * ErrInvalidSigner if participantID does NOT correspond to a _staked_ HotStuff participant at the specified block.
+	//  * model.InvalidSignerError if participantID does NOT correspond to a _staked_ HotStuff participant at the specified block.
 	Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 
 	// LeaderForView returns the identity of the leader for a given view.

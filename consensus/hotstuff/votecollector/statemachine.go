@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
-	"github.com/onflow/flow-go/engine"
 )
 
 var (
@@ -138,7 +137,7 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 			// ATTENTION: due to how our logic is designed this situation is only possible
 			// where we receive the same vote twice, this is not a case of double voting.
 			// This scenario is possible if leader submits his vote additionally to the vote in proposal.
-			if engine.IsDuplicatedEntryError(err) {
+			if model.IsDuplicatedSignerError(err) {
 				return nil
 			}
 			return err
@@ -186,8 +185,6 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 		switch proc.Status() {
 		// first valid block for this view: commence state transition from caching to verifying
 		case hotstuff.VoteCollectorStatusCaching:
-			// TODO: implement logic for validating block proposal, converting it to vote and further processing
-
 			err := m.caching2Verifying(proposal)
 			if errors.Is(err, ErrDifferentCollectorState) {
 				continue // concurrent state update by other thread => restart our logic

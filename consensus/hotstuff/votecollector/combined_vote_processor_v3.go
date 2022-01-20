@@ -121,7 +121,7 @@ type CombinedVoteProcessorV3 struct {
 	done             atomic.Bool
 }
 
-var _ hotstuff.VoteProcessor = (*CombinedVoteProcessorV3)(nil)
+var _ hotstuff.VerifyingVoteProcessor = (*CombinedVoteProcessorV3)(nil)
 
 // Block returns block that is part of proposal that we are processing votes for.
 func (p *CombinedVoteProcessorV3) Block() *model.Block {
@@ -141,7 +141,20 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // * VoteForIncompatibleBlockError - submitted vote for incompatible block
 // * VoteForIncompatibleViewError - submitted vote for incompatible view
 // * model.InvalidVoteError - submitted vote with invalid signature
+// * model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
 // All other errors should be treated as exceptions.
+//
+// CAUTION: implementation is NOT (yet) BFT
+// Explanation: for correctness, we require that no voter can be counted repeatedly. However,
+// CombinedVoteProcessorV3 relies on the `VoteCollector`'s `votesCache` filter out all votes but the first for
+// every signerID. However, we have the edge case, where we still feed the proposers vote twice into the
+// `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
+// by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
+// TODO: (suggestion) I think it would be worth-while to include a second `votesCache` into the `CombinedVoteProcessorV3`.
+//       Thereby,  `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
+//       external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
+//       runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
+//       0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
@@ -154,7 +167,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	}
 	sigType, sig, err := signature.DecodeSingleSig(vote.SigData)
 	if err != nil {
-		if errors.Is(err, msig.ErrInvalidFormat) {
+		if errors.Is(err, model.ErrInvalidFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
@@ -165,7 +178,11 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	case hotstuff.SigTypeStaking:
 		err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
-			if errors.Is(err, msig.ErrInvalidFormat) {
+			if model.IsInvalidSignerError(err) {
+				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
+					vote.ID(), vote.View, err)
+			}
+			if errors.Is(err, model.ErrInvalidSignature) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
 					vote.ID(), vote.View, err)
 			}
@@ -176,13 +193,19 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		}
 		_, err = p.stakingSigAggtor.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
+			// we don't expect any errors here during normal operation, as we previously checked
+			// for duplicated votes from the same signer and verified the signer+signature
 			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
 		}
 
 	case hotstuff.SigTypeRandomBeacon:
 		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
-			if errors.Is(err, msig.ErrInvalidFormat) {
+			if model.IsInvalidSignerError(err) {
+				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not from an authorized random beacon participant: %w",
+					vote.ID(), vote.View, err)
+			}
+			if errors.Is(err, model.ErrInvalidSignature) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid random beacon signature: %w",
 					vote.ID(), vote.View, err)
 			}
@@ -192,17 +215,19 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		if p.done.Load() {
 			return nil
 		}
+		// Add signatures to `rbSigAggtor` and `rbRector`: we don't expect any errors during normal operation,
+		// as we previously checked for duplicated votes from the same signer and verified the signer+signature
 		_, err = p.rbSigAggtor.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
-			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
+			return fmt.Errorf("unexpected exception adding signature from vote %v to random beacon aggregator: %w", vote.ID(), err)
 		}
 		_, err = p.rbRector.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
-			return fmt.Errorf("adding the signature to random beacon reconstructor failed for vote %v: %w", vote.ID(), err)
+			return fmt.Errorf("unexpected exception adding signature from vote %v to random beacon reconstructor: %w", vote.ID(), err)
 		}
 
 	default:
-		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, msig.ErrInvalidFormat)
+		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, model.ErrInvalidFormat)
 	}
 
 	// checking of conditions for building QC are satisfied
@@ -241,10 +266,28 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 // signatures for building a QC. This function is run only once by a single worker.
 // Any error should be treated as exception.
 func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
-	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
-	if err != nil {
-		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
+	// STEP 1: aggregate staking signatures (if there are any)
+	// * It is possible that all replicas signed with their random beacon keys.
+	//   Per Convention, we represent an empty set of staking signers as
+	//   `stakingSigners` and `aggregatedStakingSig` both being zero-length
+	//   (here, we use `nil`).
+	// * If it has _not collected any_ signatures, `stakingSigAggtor.Aggregate()`
+	//   errors with a `model.InsufficientSignaturesError`. We shortcut this case,
+	//   and only call `Aggregate`, if the `stakingSigAggtor` has collected signatures
+	//   with non-zero weight (i.e. at least one signature was collected).
+	var stakingSigners []flow.Identifier // nil (zero value) represents empty set of staking signers
+	var aggregatedStakingSig []byte      // nil (zero value) for empty set of staking signers
+	if p.stakingSigAggtor.TotalWeight() > 0 {
+		var err error
+		stakingSigners, aggregatedStakingSig, err = p.stakingSigAggtor.Aggregate()
+		if err != nil {
+			return nil, fmt.Errorf("unexpected error aggregating staking signatures: %w", err)
+		}
 	}
+
+	// STEP 2: reconstruct random beacon group sig and aggregate random beacon sig shares
+	// Note: A valid random beacon group sig is required for QC validity. Our logic guarantees
+	// that we always collect the minimally required number (non-zero) of signature shares.
 	beaconSigners, aggregatedRandomBeaconSig, err := p.rbSigAggtor.Aggregate()
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate random beacon signatures: %w", err)
@@ -254,6 +297,7 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not reconstruct random beacon group signature: %w", err)
 	}
 
+	// STEP 3: generate BlockSignatureData and serialize it
 	blockSigData := &hotstuff.BlockSignatureData{
 		StakingSigners:               stakingSigners,
 		RandomBeaconSigners:          beaconSigners,
@@ -261,7 +305,6 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 		AggregatedRandomBeaconSig:    aggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: reconstructedBeaconSig,
 	}
-
 	signerIDs, sigData, err := p.packer.Pack(p.block.BlockID, blockSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
