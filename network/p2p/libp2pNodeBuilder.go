@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	stream "github.com/libp2p/go-libp2p-transport-upgrader"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-tcp-transport"
@@ -21,6 +22,7 @@ import (
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
@@ -69,6 +71,13 @@ func DefaultLibP2PNodeFactory(
 
 		return builder.Build(ctx)
 	}
+}
+
+// DefaultMessageIDFunction returns a default message ID function based on the message's data
+func DefaultMessageIDFunction(msg *pb.Message) string {
+	h := hash.NewSHA3_384()
+	_, _ = h.Write(msg.Data)
+	return h.SumHash().Hex()
 }
 
 type NodeBuilder interface {
@@ -182,6 +191,7 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	psOpts := append(
 		DefaultPubsubOptions(DefaultMaxPubSubMsgSize),
 		pubsub.WithDiscovery(discovery.NewRoutingDiscovery(rsys)),
+		pubsub.WithMessageIdFn(DefaultMessageIDFunction),
 	)
 
 	if builder.subscriptionFilter != nil {
