@@ -24,6 +24,30 @@ type Proof struct {
 }
 
 // formatIsValid validates the format and size of elements of the proof
+//
+// A valid proof as to satisfy the following consistency conditions:
+// 1. A valid inclusion proof represents a full path through the merkle tree.
+//    We separate the path into a sequence of interim vertices and a tailing leaf.
+//    For interim vertex (with index i, counted from the root node) along the path,
+//    the proof as to contain the following information:
+//      (i) whether the vertex is a short node (InterimNodeTypes[i] == 1) or
+//          a full node (InterimNodeTypes[i] == 0)
+//     (ii) for each short node, we need the number of bits in the node's key segment
+//          (entry in ShortPathLengths)
+//    (iii) for a full node, we need the hash of the sibling that is _not_ on the path
+//          (entry in SiblingHashes)
+//    Hence, len(ShortPathLengths) + len(SiblingHashes) specifies how many _interim_
+//    vertices are on the merkle path. Consequently, we require the same number of _bits_
+//    in InterimNodeTypes. Therefore, we know that InterimNodeTypes should have a length
+//    of `(numberBits+7)>>3` _bytes_.
+// 2. The key length (measured in bytes) has to be in the interval [1, 8192].
+//    Furthermore, each interim vertex on the merkle path represents:
+//    * either a single bit in case of a full node:
+//      we expect InterimNodeTypes[i] == 0
+//    * a positive number of bits in case of a short node:
+//      we expect InterimNodeTypes[i] == 1
+//      and the number of bits is encoded in the respective element of ShortPathLengths
+//    Hence, the total key length _in bits_ should be: len(SiblingHashes) + sum(ShortPathLengths)
 func (p *Proof) formatIsValid() (bool, error) {
 
 	// validate the key size
@@ -36,7 +60,7 @@ func (p *Proof) formatIsValid() (bool, error) {
 
 	// number of steps
 	steps := len(p.SkipBits) + len(p.SiblingHashes)
-	// number of steps should be smaller than max key length
+	// number of steps should be smaller or equal to the max key length
 	if steps > maxKeyLength {
 		return false, NewMalformedProofErrorf("length of SkipBits plus length of SiblingHashes is larger than max key lenght allowed (%d > %d)", steps, maxKeyLength)
 	}
