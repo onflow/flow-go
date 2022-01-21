@@ -1,6 +1,8 @@
 package topology
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -22,5 +24,7 @@ func Factory(name Name) (FactoryFunction, error) {
 		return RandomizedTopologyFactory(), nil
 	case TopicBased:
 		return TopicBasedTopologyFactory(), nil
+	default:
+		return nil, fmt.Errorf("unknown topology name: %s", name)
 	}
 }

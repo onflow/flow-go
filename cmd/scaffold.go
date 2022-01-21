@@ -132,6 +132,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
+	fnb.flags.StringVar(&fnb.BaseConfig.topology, "topology", defaultConfig.topology, "networking overlay topology")
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
