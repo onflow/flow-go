@@ -2,25 +2,37 @@ package epochs
 
 import (
 	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
+// TestEpochs runs the epochs integration test suite.
 func TestEpochs(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
-// TestViewsProgress asserts epoch state transitions over two full epochs
+// TestStaticEpochTransition asserts epoch state transitions over two full epochs
 // without any nodes joining or leaving.
-func (s *Suite) TestViewsProgress() {
+func (s *Suite) TestStaticEpochTransition() {
 	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky test")
+
+	// use shorter epoch phases as no staking operations need to occur in the
+	// staking phase for this test
+	s.StakingAuctionLen = 10
+	s.DKGPhaseLen = 50
+	s.EpochLen = 200
+
+	s.StartNetwork()
+	defer s.StopNetwork()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -126,35 +138,51 @@ func (s *Suite) TestViewsProgress() {
 	}
 }
 
-//the following Epoch join and Leave test will stake a node by submitting all the transactions
-//that an node operator would submit, start a new container for that node, and remove
-//a container from the network of the same node type. After this orchestration assertions
-//specific to that node type are made to ensure the network is healthy.
+// The following Epoch join and Leave test will stake a node by submitting all the transactions
+// that a node operator would submit, start a new container for that node, and remove
+// a container from the network of the same node type. After this orchestration assertions
+// specific to that node type are made to ensure the network is healthy.
 //
-//TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions related to the node change
+// TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions related to the node change
 func (s *Suite) TestEpochJoinAndLeaveAN() {
 	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs AN tests should be run on an machine with adequate resources")
+	s.StartNetwork()
+	defer s.StopNetwork()
 	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
 }
 
 // TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions related to the node change
 func (s *Suite) TestEpochJoinAndLeaveVN() {
 	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs VN tests should be run on an machine with adequate resources")
+	s.StartNetwork()
+	defer s.StopNetwork()
 	s.runTestEpochJoinAndLeave(flow.RoleVerification, s.assertNetworkHealthyAfterVNChange)
 }
 
 // TestEpochJoinAndLeaveLN should update collection nodes and assert healthy network conditions related to the node change
 func (s *Suite) TestEpochJoinAndLeaveLN() {
 	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs LN tests should be run on an machine with adequate resources")
+	s.StartNetwork()
+	defer s.StopNetwork()
 	s.runTestEpochJoinAndLeave(flow.RoleCollection, s.assertNetworkHealthyAfterLNChange)
 }
 
 // TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions related to the node change
 func (s *Suite) TestEpochJoinAndLeaveSN() {
 	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs SN tests should be run on an machine with adequate resources")
+	s.StartNetwork()
+	defer s.StopNetwork()
 	s.runTestEpochJoinAndLeave(flow.RoleConsensus, s.assertNetworkHealthyAfterSNChange)
 }
 
+// runTestEpochJoinAndLeave coordinates adding and removing one node with the given
+// role during the first epoch, then running the network health validation function
+// once the network has successfully transitioned into the second epoch.
+//
+// This tests:
+// * that nodes can stake and join the network at an epoch boundary
+// * that nodes can unstake and leave the network at an epoch boundary
+// * role-specific network health validation after the swap has completed
 func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth nodeUpdateValidation) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

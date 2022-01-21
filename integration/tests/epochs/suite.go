@@ -4,8 +4,15 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/crypto"
@@ -13,11 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"strings"
-	"time"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -26,18 +28,16 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const (
-	stakingAuctionViews = 200
-	dkgPhaseViews       = 50
-	epochViewsLength    = 380
+const waitTimeout = 2 * time.Minute
 
-	waitTimeout = 2 * time.Minute
-)
-
-// nodeUpdateValidation func that will be used to validate the network after some changes have been made
+// nodeUpdateValidation func that will be used to validate the health of the network
+// after an identity table change during an epoch transition. This is used in
+// tandem with runTestEpochJoinAndLeave.
+//
 // NOTE: rootSnapshot must be the snapshot that the node (info) was bootstrapped with.
 type nodeUpdateValidation func(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo)
 
+// Suite encapsulates common functionality for epoch integration tests.
 type Suite struct {
 	suite.Suite
 	common.TestnetStateTracker
@@ -46,9 +46,23 @@ type Suite struct {
 	nodeConfigs []testnet.NodeConfig
 	ghostID     flow.Identifier
 	client      *testnet.Client
+
+	// Epoch config (lengths in views)
+	StakingAuctionLen uint64
+	DKGPhaseLen       uint64
+	EpochLen          uint64
 }
 
 func (s *Suite) SetupTest() {
+	// set default values for epoch length config - use a longer staking auction length
+	// by default to allow time for staking nodes to join at the first epoch boundary
+	s.StakingAuctionLen = 200
+	s.DKGPhaseLen = 50
+	s.EpochLen = 380
+}
+
+// StartNetwork sets up and starts the Flow network configured for epoch integration tests.
+func (s *Suite) StartNetwork() {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -63,9 +77,9 @@ func (s *Suite) SetupTest() {
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
-	// a ghost node masquerading as a consensus node
+	// a ghost node masquerading as an access node
 	s.ghostID = unittest.IdentifierFixture()
-	ghostConNode := testnet.NewNodeConfig(
+	ghostNode := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithID(s.ghostID),
@@ -79,10 +93,10 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
-		ghostConNode,
+		ghostNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, stakingAuctionViews, dkgPhaseViews, epochViewsLength)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
@@ -109,14 +123,16 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return client
 }
 
-func (s *Suite) TearDownTest() {
+// StopNetwork tears down and cleans up the Docker network.
+func (s *Suite) StopNetwork() {
 	s.net.Remove()
 	if s.cancel != nil {
 		s.cancel()
 	}
 }
 
-// StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)
+// StakedNodeOperationInfo struct contains all the node information needed to
+// start a node after it is onboarded (staked and registered).
 type StakedNodeOperationInfo struct {
 	NodeID                  flow.Identifier
 	Role                    flow.Role
@@ -131,7 +147,7 @@ type StakedNodeOperationInfo struct {
 	ContainerName           string
 }
 
-// StakeNode will generate initial keys needed for a SN/LN node and onboard this node using the following steps;
+// StakeNode will generate initial keys needed for a SN/LN node and onboard this node using the following steps:
 // 1. Generate keys (networking, staking, machine)
 // 2. Create a new account, this will be the staking account
 // 3. Transfer token amount for the given role to the staking account
@@ -139,6 +155,7 @@ type StakedNodeOperationInfo struct {
 // 5. Create Staking collection for node
 // 6. Register node using staking collection object
 func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role flow.Role) *StakedNodeOperationInfo {
+
 	stakingAccountKey, networkingKey, stakingKey, machineAccountKey, machineAccountPubKey := s.generateAccountKeys(role)
 	nodeID := flow.MakeID(stakingKey.PublicKey().Encode())
 	fullAccountKey := sdk.NewAccountKey().
@@ -634,7 +651,7 @@ func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environme
 
 // assertLatestFinalizedBlockHeightHigher will assert that the difference between snapshot height and latest finalized height
 // is greater than numOfBlocks.
-func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snapshot *inmem.Snapshot, numOfBlocks uint64)  {
+func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snapshot *inmem.Snapshot, numOfBlocks uint64) {
 	bootstrapHead, err := snapshot.Head()
 	require.NoError(s.T(), err)
 
@@ -647,7 +664,7 @@ func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snap
 
 // submitSmokeTestTransaction will submit a create account transaction to smoke test network
 // This ensures a single transaction can be sealed by the network.
-func (s *Suite) submitSmokeTestTransaction(ctx context.Context)  {
+func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
 	fullAccountKey := sdk.NewAccountKey().
 		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
 		SetHashAlgo(sdkcrypto.SHA2_256).
