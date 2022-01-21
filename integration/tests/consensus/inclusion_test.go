@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ func TestCollectionGuaranteeInclusion(t *testing.T) {
 
 type InclusionSuite struct {
 	suite.Suite
+	common.TestnetStateTracker
 	cancel context.CancelFunc
 	net    *testnet.FlowNetwork
 	conIDs []flow.Identifier
@@ -49,28 +51,28 @@ func (is *InclusionSuite) SetupTest() {
 	var nodeConfigs []testnet.NodeConfig
 
 	// need one dummy execution node (unused ghost)
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
+	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.InfoLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
 	// need one dummy verification node (unused ghost)
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.InfoLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
 
 	// need three real consensus nodes
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.WithID(conID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithID(conID))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		is.conIDs = append(is.conIDs, conID)
 	}
 
 	// need one controllable collection node (used ghost)
 	is.collID = unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.WithID(is.collID), testnet.AsGhost())
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithID(is.collID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	nodeConfigs = append(nodeConfigs,
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel)),
 	)
 
 	// generate the network config
@@ -83,6 +85,12 @@ func (is *InclusionSuite) SetupTest() {
 	ctx, cancel := context.WithCancel(context.Background())
 	is.cancel = cancel
 	is.net.Start(ctx)
+
+	fmt.Println("------")
+	for _, node := range netConfig.Nodes {
+		fmt.Printf("role: %s, ghost:%t, id:%x\n", node.Role, node.Ghost, node.Identifier)
+	}
+	fmt.Println("------")
 
 	// subscribe to the ghost
 	for attempts := 0; ; attempts++ {
@@ -105,6 +113,9 @@ func (is *InclusionSuite) TearDownTest() {
 
 func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	is.T().Logf("------ test started")
+
+	time.Sleep(20 * time.Second)
+
 	// fix the deadline for the test as a whole
 	deadline := time.Now().Add(20 * time.Second)
 
@@ -116,19 +127,19 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	is.waitUntilSeenProposal(deadline)
 
-	is.T().Logf("seen a proposal")
+	is.T().Logf("fanout seen a proposal")
 
 	conID := is.sendCollectionToConsensus(deadline, sentinel)
 
-	is.T().Logf("sent collection %x to consensus %v", colID, conID)
+	is.T().Logf("fanout sent collection %x to consensus %v", colID, conID)
 
 	proposal := is.waitUntilCollectionIncludeInProposal(deadline, sentinel)
 
-	is.T().Logf("collection guarantee %x included in a proposal %x\n", colID, proposal.Header.ID())
+	is.T().Logf("fanout collection guarantee %x included in a proposal %x\n", colID, proposal.Header.ID())
 
 	is.waitUntilProposalConfirmed(deadline, sentinel, proposal)
 
-	is.T().Logf("collection guarantee %x is confirmed 3 times\n", colID)
+	is.T().Logf("fanout collection guarantee %x is confirmed 3 times\n", colID)
 }
 
 func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
