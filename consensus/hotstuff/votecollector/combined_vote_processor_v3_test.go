@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -132,52 +131,52 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() 
 	err := s.processor.Process(vote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+	require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
 }
 
-// TestProcess_InvalidSignature tests that CombinedVoteProcessorV3 doesn't collect signatures for votes with invalid signature.
-// Checks are made for cases where both staking and threshold signatures were submitted.
+// TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 rejects invalid votes for the following scenarios:
+//  1) vote containing staking sig
+//  2) vote containing random beacon sig
+// For each scenario, we test two sub-cases:
+//  * `SignerID` is not a valid consensus participant;
+//  * `SignerID` is valid consensus participant but the signature is cryptographically invalid
 func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
-	exception := errors.New("unexpected-exception")
-	// test for staking signatures
-	s.Run("staking-sig", func() {
-		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
-
-		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
-
-		// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
-		err := s.processor.Process(stakingVote)
+	s.Run("vote with staking-sig", func() {
+		// sentinel error from `InvalidSignerError` should be wrapped as `InvalidVoteError`
+		voteA := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+		s.stakingAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Once()
+		err := s.processor.Process(voteA)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+		require.True(s.T(), model.IsInvalidSignerError(err))
 
-		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
-
-		// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
-		err = s.processor.Process(stakingVote)
-		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
-		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
+		// sentinel error from `ErrInvalidSignature` should be wrapped as `InvalidVoteError`
+		voteB := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+		s.stakingAggregator.On("Verify", voteB.SignerID, mock.Anything).Return(model.ErrInvalidSignature).Once()
+		err = s.processor.Process(voteB)
+		require.Error(s.T(), err)
+		require.True(s.T(), model.IsInvalidVoteError(err))
+		require.ErrorAs(s.T(), err, &model.ErrInvalidSignature)
 
 		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 	})
-	// test same cases for threshold signature
-	s.Run("threshold-sig", func() {
-		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
 
-		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
-
-		// expect sentinel error in case Verify returns ErrInvalidFormat
-		err := s.processor.Process(thresholdVote)
+	s.Run("vote with beacon-sig", func() {
+		// sentinel error from `InvalidSignerError` should be wrapped as `InvalidVoteError`
+		voteA := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
+		s.rbSigAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Once()
+		err := s.processor.Process(voteA)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+		require.True(s.T(), model.IsInvalidSignerError(err))
 
-		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(exception)
-
-		// except exception
-		err = s.processor.Process(thresholdVote)
-		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
-		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
+		// sentinel error from `ErrInvalidSignature` should be wrapped as `InvalidVoteError`
+		voteB := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
+		s.rbSigAggregator.On("Verify", voteB.SignerID, mock.Anything).Return(model.ErrInvalidSignature).Once()
+		err = s.processor.Process(voteB)
+		require.Error(s.T(), err)
+		require.True(s.T(), model.IsInvalidVoteError(err))
+		require.ErrorAs(s.T(), err, &model.ErrInvalidSignature)
 
 		s.rbSigAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
@@ -185,8 +184,36 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 
 }
 
-// TestProcess_TrustedAddError tests a case where we were able to successfully verify signature but failed to collect it.
-func (s *CombinedVoteProcessorV3TestSuite) TestProcess_TrustedAddError() {
+// TestProcess_TrustedAdd_Exception tests that unexpected exceptions returned by
+// WeightedSignatureAggregator.Verify(..) are propagated, but _not_ interpreted as invalid votes
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_Verify_Exception() {
+	exception := errors.New("unexpected-exception")
+
+	s.Run("vote with staking-sig", func() {
+		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
+
+		err := s.processor.Process(stakingVote)
+		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
+		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
+		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
+	})
+
+	s.Run("vote with beacon-sig", func() {
+		beaconVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
+		s.rbSigAggregator.On("Verify", beaconVote.SignerID, mock.Anything).Return(exception)
+
+		err := s.processor.Process(beaconVote)
+		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
+		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
+		s.rbSigAggregator.AssertNotCalled(s.T(), "TrustedAdd")
+		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
+	})
+}
+
+// TestProcess_TrustedAdd_Exception tests that unexpected exceptions returned by
+// WeightedSignatureAggregator.TrustedAdd(..) are _not_ interpreted as invalid votes
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_TrustedAdd_Exception() {
 	exception := errors.New("unexpected-exception")
 	s.Run("staking-sig", func() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
@@ -198,7 +225,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_TrustedAddError() {
 		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 	s.Run("threshold-sig", func() {
-		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
+		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
 		*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
 		*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
 		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(nil)
@@ -336,7 +363,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_EnoughSharesNotEnoughStak
 	// threshold signatures
 	s.sigWeight = 10
 	for i := uint64(0); i < s.minRequiredShares; i++ {
-		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
+		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithBeaconSig())
 		s.rbSigAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
@@ -442,14 +469,21 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		// need separate locks to safely update vectors of voted signers
 		stakingAggregatorLock := &sync.Mutex{}
 		beaconAggregatorLock := &sync.Mutex{}
+		beaconReconstructorLock := &sync.Mutex{}
 
 		stakingAggregator.On("TotalWeight").Return(func() uint64 {
+			stakingAggregatorLock.Lock()
+			defer stakingAggregatorLock.Unlock()
 			return stakingTotalWeight
 		})
 		rbSigAggregator.On("TotalWeight").Return(func() uint64 {
+			beaconAggregatorLock.Lock()
+			defer beaconAggregatorLock.Unlock()
 			return thresholdTotalWeight
 		})
 		reconstructor.On("EnoughShares").Return(func() bool {
+			beaconReconstructorLock.Lock()
+			defer beaconReconstructorLock.Unlock()
 			return collectedShares >= beaconSignersCount
 		})
 
@@ -462,7 +496,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 				return aggregatedStakingSigners
 			},
 			func() []byte { return combinedSigs[0] },
-			func() error { return nil }).Once()
+			func() error { return nil }).Maybe() // Aggregate is only called, if some staking sigs were collected
 
 		rbSigAggregator.On("Aggregate").Return(
 			func() []flow.Identifier {
@@ -475,32 +509,55 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
 
 		// mock expected call to Packer
-		mergedSignerIDs := make([]flow.Identifier, 0)
+		mergedSignerIDs := ([]flow.Identifier)(nil)
 		packedSigData := unittest.RandomBytes(128)
 		packer := &mockhotstuff.Packer{}
 		packer.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
+			// in the following, we check validity for each field of `blockSigData` individually
 
+			// 1. CHECK: `StakingSigners` and `RandomBeaconSigners`
+			// Verify that input `hotstuff.BlockSignatureData` has the expected structure.
+			//  * When the Vote Processor notices that constructing a valid QC is possible, it does
+			//    so with the signatures collected at this time.
+			//  * However, due to concurrency, additional votes might have been added to the aggregators
+			//    by tailing threads, _before_ we reach this validation logic. Therefore, the set of
+			//    signers in the aggregators might now be _larger_ than what is reported in the QC.
+			// Therefore, we test that the signers reported in the QC are a _subset_ of the signatures
+			// that are now in the aggregators.
 			// check that aggregated signers are part of all votes signers
 			// due to concurrent processing it is possible that Aggregate will return less that we have actually aggregated
 			// but still enough to construct the QC
 			require.Subset(t, aggregatedStakingSigners, blockSigData.StakingSigners)
 			require.Subset(t, aggregatedBeaconSigners, blockSigData.RandomBeaconSigners)
-			require.GreaterOrEqual(t, uint64(len(blockSigData.StakingSigners)+len(blockSigData.RandomBeaconSigners)),
-				honestParticipants)
 
-			expectedBlockSigData := &hotstuff.BlockSignatureData{
-				StakingSigners:               blockSigData.StakingSigners,
-				RandomBeaconSigners:          blockSigData.RandomBeaconSigners,
-				AggregatedStakingSig:         []byte(combinedSigs[0]),
-				AggregatedRandomBeaconSig:    []byte(combinedSigs[1]),
-				ReconstructedRandomBeaconSig: combinedSigs[2],
+			// 2. CHECK: supermajority
+			// All participants are equally staked in this test. Per configuration, collecting `honestParticipants`
+			// number of votes is the minimally required supermajority.
+			require.GreaterOrEqual(t, uint64(len(blockSigData.StakingSigners)+len(blockSigData.RandomBeaconSigners)), honestParticipants)
+
+			// 3. CHECK: `AggregatedStakingSig`
+			// Here, we have to pay attention to the edge case where all replicas voted with their random beacon sig.
+			// Per protocol convention, the `AggregatedStakingSig` should be empty, for an empty set of StakingSigners.
+			if len(blockSigData.StakingSigners) == 0 {
+				require.Empty(t, blockSigData.AggregatedStakingSig)
+			} else {
+				// otherwise, we expect `AggregatedStakingSig` to be the return value of
+				// `stakingAggregator.Aggregate()`, which we mocked as `combinedSigs[0]`
+				require.Equal(t, []byte(combinedSigs[0]), blockSigData.AggregatedStakingSig)
 			}
 
-			require.Equal(t, expectedBlockSigData, blockSigData)
+			// 4. CHECK: `AggregatedRandomBeaconSig` and `ReconstructedRandomBeaconSig`
+			// We require that each QC contains valid random beacon value, i.e. we must collect some votes with
+			// random beacon signatures to construct a valid QC. Hence, `AggregatedRandomBeaconSig` should be the
+			// output of `rbSigAggregator.Aggregate()`, which we mocked as `combinedSigs[1]`.
+			require.Equal(t, []byte(combinedSigs[1]), blockSigData.AggregatedRandomBeaconSig)
+			// Furthermore, `ReconstructedRandomBeaconSig` should be the output of `reconstructor.Reconstruct()`,
+			// which we mocked as `combinedSigs[2]`
+			require.Equal(t, combinedSigs[2], blockSigData.ReconstructedRandomBeaconSig)
 
 			// fill merged signers with collected signers
-			mergedSignerIDs = append(expectedBlockSigData.StakingSigners, expectedBlockSigData.RandomBeaconSigners...)
+			mergedSignerIDs = append(blockSigData.StakingSigners, blockSigData.RandomBeaconSigners...)
 		}).Return(
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []flow.Identifier { return mergedSignerIDs },
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
@@ -556,7 +613,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			votes = append(votes, vote)
 		}
 		for _, signer := range beaconSigners {
-			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithThresholdSig())
+			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithBeaconSig())
 			vote.SignerID = signer
 			expectedSig := crypto.Signature(vote.SigData[1:])
 			rbSigAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
@@ -568,8 +625,8 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 				aggregatedBeaconSigners = append(aggregatedBeaconSigners, signerID)
 			}).Return(uint64(0), nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
-				beaconAggregatorLock.Lock()
-				defer beaconAggregatorLock.Unlock()
+				beaconReconstructorLock.Lock()
+				defer beaconReconstructorLock.Unlock()
 				collectedShares++
 			}).Return(true, nil).Maybe()
 			votes = append(votes, vote)
@@ -609,10 +666,69 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		}
 
 		//processing extra votes shouldn't result in creating new QCs
-		vote := unittest.VoteForBlockFixture(block, unittest.VoteWithThresholdSig())
+		vote := unittest.VoteForBlockFixture(block, unittest.VoteWithBeaconSig())
 		err := processor.Process(vote)
 		require.NoError(t, err)
 	})
+}
+
+// TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners tests the most optimal happy path,
+// where all consensus replicas vote using their random beacon keys. In this case,
+// no staking signatures were collected and the CombinedVoteProcessor should be setting
+// `BlockSignatureData.StakingSigners` and `BlockSignatureData.AggregatedStakingSig` to nil or empty slices.
+func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
+	// setup CombinedVoteProcessorV3
+	block := helper.MakeBlock()
+	stakingAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+	rbSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+	reconstructor := &mockhotstuff.RandomBeaconReconstructor{}
+	packer := &mockhotstuff.Packer{}
+
+	processor := &CombinedVoteProcessorV3{
+		log:              unittest.Logger(),
+		block:            block,
+		stakingSigAggtor: stakingAggregator,
+		rbSigAggtor:      rbSigAggregator,
+		rbRector:         reconstructor,
+		onQCCreated:      func(qc *flow.QuorumCertificate) { /* no op */ },
+		packer:           packer,
+		minRequiredStake: 70,
+		done:             *atomic.NewBool(false),
+	}
+
+	// The `stakingAggregator` is empty, i.e. it returns ans InsufficientSignaturesError when we call `Aggregate()` on it.
+	stakingAggregator.On("TotalWeight").Return(uint64(0), nil).Twice() // called a second time to determine whether there are any staking sigs to aggregate
+	stakingAggregator.On("Aggregate").Return(nil, nil, model.NewInsufficientSignaturesErrorf("")).Maybe()
+
+	// Create another vote with a random beacon signature. With its addition, the `rbSigAggregator`
+	// by itself has collected enough votes to exceed the minimally required weight (70).
+	vote := unittest.VoteForBlockFixture(block, unittest.VoteWithBeaconSig())
+	rawSig := (crypto.Signature)(vote.SigData[1:])
+	rbSigAggregator.On("Verify", vote.SignerID, rawSig).Return(nil).Once()
+	rbSigAggregator.On("TrustedAdd", vote.SignerID, rawSig).Return(uint64(80), nil).Once()
+	rbSigAggregator.On("TotalWeight").Return(uint64(80), nil).Once()
+	rbSigAggregator.On("Aggregate").Return(unittest.IdentifierListFixture(11), unittest.RandomBytes(48), nil).Once()
+	reconstructor.On("TrustedAdd", vote.SignerID, rawSig).Return(true, nil).Once()
+	reconstructor.On("EnoughShares").Return(true).Once()
+	reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil).Once()
+
+	// Adding the vote should trigger QC generation. We expect `BlockSignatureData.StakingSigners`
+	// and `BlockSignatureData.AggregatedStakingSig` to be both empty, as there are no staking signatures.
+	packer.On("Pack", block.BlockID, mock.Anything).
+		Run(func(args mock.Arguments) {
+			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
+			require.Empty(testifyT, blockSigData.StakingSigners)
+			require.Empty(testifyT, blockSigData.AggregatedStakingSig)
+		}).
+		Return(unittest.IdentifierListFixture(11), unittest.RandomBytes(1017), nil).Once()
+
+	err := processor.Process(vote)
+	require.NoError(testifyT, err)
+
+	stakingAggregator.AssertExpectations(testifyT)
+	rbSigAggregator.AssertExpectations(testifyT)
+	reconstructor.AssertExpectations(testifyT)
+	packer.AssertExpectations(testifyT)
 }
 
 // TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness uses property testing to test liveness of concurrent votes processing.
@@ -665,7 +781,26 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		// mock expected calls to aggregators and reconstructor
 		combinedSigs := unittest.SignaturesFixture(3)
-		stakingAggregator.On("Aggregate").Return(stakingSigners.NodeIDs(), []byte(combinedSigs[0]), nil).Once()
+		stakingAggregator.On("Aggregate").Return(
+			// per API convention, model.InsufficientSignaturesError is returns when no signatures were collected
+			func() []flow.Identifier {
+				if len(stakingSigners) == 0 {
+					return nil
+				}
+				return stakingSigners.NodeIDs()
+			},
+			func() []byte {
+				if len(stakingSigners) == 0 {
+					return nil
+				}
+				return combinedSigs[0]
+			},
+			func() error {
+				if len(stakingSigners) == 0 {
+					return model.NewInsufficientSignaturesErrorf("")
+				}
+				return nil
+			}).Maybe()
 		rbSigAggregator.On("Aggregate").Return(beaconSigners.NodeIDs(), []byte(combinedSigs[1]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
 
@@ -713,7 +848,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			votes = append(votes, vote)
 		}
 		for _, signer := range beaconSigners {
-			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithThresholdSig())
+			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithBeaconSig())
 			vote.SignerID = signer.ID()
 			stake := signer.Stake
 			expectedSig := crypto.Signature(vote.SigData[1:])

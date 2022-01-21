@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding/rlp"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // SigDataPacker implements logic for encoding/decoding SignatureData using RLP encoding.
@@ -49,7 +49,7 @@ func UnpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
 	packer := SigDataPacker{}
 	sig, err := packer.Decode(sigData)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode sig data %s: %w", err, signature.ErrInvalidFormat)
+		return nil, fmt.Errorf("could not decode sig data %s: %w", err, model.ErrInvalidFormat)
 	}
 	return sig.ReconstructedRandomBeaconSig, nil
 }

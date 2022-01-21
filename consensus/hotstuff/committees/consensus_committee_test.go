@@ -55,25 +55,25 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 	com, err := NewConsensusCommittee(state, unittest.IdentifierFixture())
 	require.NoError(t, err)
 
-	t.Run("non-existent identity should return ErrInvalidSigner", func(t *testing.T) {
+	t.Run("non-existent identity should return InvalidSignerError", func(t *testing.T) {
 		_, err := com.Identity(blockID, fakeID)
-		require.True(t, errors.Is(model.ErrInvalidSigner, err))
+		require.True(t, model.IsInvalidSignerError(err))
 	})
 
-	t.Run("existent but non-committee-member identity should return ErrInvalidSigner", func(t *testing.T) {
+	t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
 		t.Run("unstaked consensus node", func(t *testing.T) {
 			_, err := com.Identity(blockID, unstakedConsensusIdentity.NodeID)
-			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("ejected consensus node", func(t *testing.T) {
 			_, err := com.Identity(blockID, ejectedConsensusIdentity.NodeID)
-			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("otherwise valid non-consensus node", func(t *testing.T) {
 			_, err := com.Identity(blockID, validNonConsensusIdentity.NodeID)
-			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+			require.True(t, model.IsInvalidSignerError(err))
 		})
 	})
 

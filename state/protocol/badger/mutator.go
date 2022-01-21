@@ -598,6 +598,14 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
 		// set epoch phase - since we are starting a new epoch we begin in the staking phase
 		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
+		// set current epoch view values
+		events = append(
+			events,
+			func() { m.metrics.CurrentEpochFinalView(currentEpochSetup.FinalView) },
+			func() { m.metrics.CurrentDKGPhase1FinalView(currentEpochSetup.DKGPhase1FinalView) },
+			func() { m.metrics.CurrentDKGPhase2FinalView(currentEpochSetup.DKGPhase2FinalView) },
+			func() { m.metrics.CurrentDKGPhase3FinalView(currentEpochSetup.DKGPhase3FinalView) },
+		)
 	}
 
 	// if EECC is triggered, update metric

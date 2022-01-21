@@ -83,6 +83,7 @@ type BaseAssignmentCollectorTestSuite struct {
 	WorkerPool        *workerpool.WorkerPool
 	Blocks            map[flow.Identifier]*flow.Header
 	State             *protocol.State
+	Snapshots         map[flow.Identifier]*protocol.Snapshot
 	Headers           *storage.Headers
 	Assigner          *module.ChunkAssigner
 	SealsPL           *mempool.IncorporatedResultSeals
@@ -113,6 +114,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.Blocks[s.ParentBlock.ID()] = &s.ParentBlock
 	s.Blocks[s.Block.ID()] = &s.Block
 	s.Blocks[s.IncorporatedBlock.ID()] = &s.IncorporatedBlock
+	s.Snapshots = make(map[flow.Identifier]*protocol.Snapshot)
 
 	// setup identities for each block
 	s.IdentitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
@@ -151,11 +153,15 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 
 	s.State.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
-			if block, found := s.Blocks[blockID]; found {
-				return unittest.StateSnapshotForKnownBlock(block, s.IdentitiesCache[blockID])
-			} else {
-				return unittest.StateSnapshotForUnknownBlock()
+			if snapshot, found := s.Snapshots[blockID]; found {
+				return snapshot
 			}
+			if block, found := s.Blocks[blockID]; found {
+				snapshot := unittest.StateSnapshotForKnownBlock(block, s.IdentitiesCache[blockID])
+				s.Snapshots[blockID] = snapshot
+				return snapshot
+			}
+			return unittest.StateSnapshotForUnknownBlock()
 		},
 	)
 

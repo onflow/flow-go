@@ -42,7 +42,7 @@ func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitte
 	if isCommitteeMember {
 		committee.On("Identity", mock.Anything, me.NodeID).Return(me, nil)
 	} else {
-		committee.On("Identity", mock.Anything, me.NodeID).Return(nil, model.ErrInvalidSigner)
+		committee.On("Identity", mock.Anything, me.NodeID).Return(nil, model.NewInvalidSignerErrorf(""))
 	}
 
 	voter := New(signer, forks, persist, committee, lastVotedView)

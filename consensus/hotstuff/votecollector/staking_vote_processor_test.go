@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -72,28 +71,36 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 // Checks are made for cases where both staking and threshold signatures were submitted.
 func (s *StakingVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 	exception := errors.New("unexpected-exception")
-	stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 
-	s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
-
-	// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
-	err := s.processor.Process(stakingVote)
+	// sentinel error from `InvalidSignerError` should be wrapped as `InvalidVoteError`
+	voteA := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+	s.stakingAggregator.On("Verify", voteA.SignerID, mock.Anything).Return(model.NewInvalidSignerErrorf("")).Once()
+	err := s.processor.Process(voteA)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+	require.True(s.T(), model.IsInvalidSignerError(err))
 
-	s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
+	// sentinel error from `ErrInvalidSignature` should be wrapped as `InvalidVoteError`
+	voteB := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+	s.stakingAggregator.On("Verify", voteB.SignerID, mock.Anything).Return(model.ErrInvalidSignature).Once()
+	err = s.processor.Process(voteB)
+	require.Error(s.T(), err)
+	require.True(s.T(), model.IsInvalidVoteError(err))
+	require.ErrorAs(s.T(), err, &model.ErrInvalidSignature)
 
 	// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
-	err = s.processor.Process(stakingVote)
+	voteC := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+	s.stakingAggregator.On("Verify", voteC.SignerID, mock.Anything).Return(exception)
+	err = s.processor.Process(voteC)
 	require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
 	require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
 	s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 }
 
-// TestProcess_TrustedAddError tests a case where we were able to successfully verify signature but failed to collect it.
-func (s *StakingVoteProcessorTestSuite) TestProcess_TrustedAddError() {
+// TestProcess_TrustedAdd_Exception tests that unexpected exceptions returned by
+// WeightedSignatureAggregator.TrustedAdd(..) are _not_ interpreted as invalid votes
+func (s *StakingVoteProcessorTestSuite) TestProcess_TrustedAdd_Exception() {
 	exception := errors.New("unexpected-exception")
 	stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}

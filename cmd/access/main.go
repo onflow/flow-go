@@ -24,5 +24,9 @@ func main() {
 		anb.Logger.Fatal().Err(err).Send()
 	}
 
-	nodeBuilder.Build().Run()
+	node, err := nodeBuilder.Build()
+	if err != nil {
+		anb.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
 }
