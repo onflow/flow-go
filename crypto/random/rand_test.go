@@ -152,15 +152,12 @@ func TestSubPermutation(t *testing.T) {
 		for i := 0; i < sampleSize; i++ {
 			shuffledlist, err := rng.SubPermutation(listSize, subsetSize)
 			require.NoError(t, err)
-			if len(shuffledlist) != subsetSize {
-				t.Errorf("PermutateSubset returned a list with a wrong size")
-			}
+			require.Equal(t, len(shuffledlist), subsetSize)
 			has := make(map[int]struct{})
 			for j, e := range shuffledlist {
 				// check for repetition
-				if _, ok := has[e]; ok {
-					t.Errorf("dupplicated item in the results returned by PermutateSubset")
-				}
+				_, ok := has[e]
+				require.False(t, ok, "duplicated item")
 				has[e] = struct{}{}
 				// fill the distribution
 				samplingDistribution[e] += 1.0
@@ -242,9 +239,8 @@ func TestShuffle(t *testing.T) {
 			has := make(map[int]struct{})
 			for j, e := range list {
 				// check for repetition
-				if _, ok := has[e]; ok {
-					t.Errorf("dupplicated item in the results returned by PermutateSubset")
-				}
+				_, ok := has[e]
+				require.False(t, ok, "duplicated item")
 				has[e] = struct{}{}
 				// fill the distribution
 				if e == testElement {
@@ -312,9 +308,8 @@ func TestSamples(t *testing.T) {
 			has := make(map[int]struct{})
 			for j, e := range list[:samplesSize] {
 				// check for repetition
-				if _, ok := has[e]; ok {
-					t.Errorf("dupplicated item in the results returned by PermutateSubset")
-				}
+				_, ok := has[e]
+				require.False(t, ok, "duplicated item")
 				has[e] = struct{}{}
 				// fill the distribution
 				samplingDistribution[e] += 1.0
@@ -388,18 +383,18 @@ func TestStateRestore(t *testing.T) {
 
 	// check the state is deterministic
 	state_clone := rng.Store()
-	require.True(t, bytes.Equal(state, state_clone), "Store is not deterministic")
+	assert.True(t, bytes.Equal(state, state_clone), "Store is not deterministic")
 
 	// check Store is the Restore reverse function
 	secondRng, err := RestoreChacha20PRG(state)
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(state, secondRng.Store()), "Store o Restore is not identity")
+	assert.True(t, bytes.Equal(state, secondRng.Store()), "Store o Restore is not identity")
 
 	// check the 2 PRGs are generating identical outputs
 	iterations = mrand.Intn(1000)
 	for i := 0; i < iterations; i++ {
 		rand1 := rng.UintN(1024)
 		rand2 := secondRng.UintN(1024)
-		require.Equal(t, rand1, rand2, "the 2 rngs are not identical on round %d", i)
+		assert.Equal(t, rand1, rand2, "the 2 rngs are not identical on round %d", i)
 	}
 }
