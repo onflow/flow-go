@@ -8,7 +8,7 @@ import (
 	mrand "math/rand"
 	"sort"
 	"testing"
-	"time"
+	_ "time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -221,7 +221,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 }
 
 func TestKeyAggregator(t *testing.T) {
-	r := time.Now().UnixNano()
+	r := int64(1642805485791537000) //time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
 
@@ -249,23 +249,62 @@ func TestKeyAggregator(t *testing.T) {
 		require.NoError(t, err)
 		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 		require.NoError(t, err)
+		// wrong key type
 		_, err = NewPublicKeyAggregator([]crypto.PublicKey{sk.PublicKey()})
 		assert.Error(t, err)
 		_, err = NewPublicKeyAggregator([]crypto.PublicKey{nil})
 		assert.Error(t, err)
+		// empty keys
+		_, err = NewPublicKeyAggregator([]crypto.PublicKey{})
+		assert.Error(t, err)
 	})
 
-	t.Run("greedy algorithm", func(t *testing.T) {
+	// aggregation edge cases
+	t.Run("empty signers", func(t *testing.T) {
+		// empty input
+		_, err = aggregator.KeyAggregate(indices[:0])
+		assert.Error(t, err)
+
+		aggregateTwice := func(l1, h1, l2, h2 int) {
+			var key, expectedKey crypto.PublicKey
+			key, err = aggregator.KeyAggregate(indices[l1:h1])
+			require.NoError(t, err)
+			expectedKey, err = crypto.AggregateBLSPublicKeys(keys[l1:h1])
+			require.NoError(t, err)
+			assert.True(t, key.Equals(expectedKey))
+
+			key, err = aggregator.KeyAggregate(indices[l2:h2])
+			require.NoError(t, err)
+			expectedKey, err = crypto.AggregateBLSPublicKeys(keys[l2:h2])
+			require.NoError(t, err)
+			assert.True(t, key.Equals(expectedKey))
+		}
+
+		// No overlaps
+		aggregateTwice(1, 5, 7, 13)
+
+		// big overlap (greedy algorithm)
+		aggregateTwice(1, 9, 2, 10)
+
+		// small overlap (aggregate from scratch)
+		aggregateTwice(1, 9, 8, 11)
+
+		// same signers
+		aggregateTwice(1, 9, 1, 9)
+	})
+
+	t.Run("greedy algorithm with randomized intervals", func(t *testing.T) {
 		// iterate over different random cases to make sure
 		// the delta algorithm works
 		rounds := 30
 		for i := 0; i < rounds; i++ {
 			go func() { // test module concurrency
-				low := mrand.Intn(signersNum)
-				high := low + mrand.Intn(signersNum-low)
+				low := mrand.Intn(signersNum - 1)
+				high := low + 1 + mrand.Intn(signersNum-1-low)
 				var key, expectedKey crypto.PublicKey
 				var err error
 				key, err = aggregator.KeyAggregate(indices[low:high])
+				t.Logf("%d-%d", low, high)
 				require.NoError(t, err)
 				if low == high {
 					expectedKey = crypto.NeutralBLSPublicKey()

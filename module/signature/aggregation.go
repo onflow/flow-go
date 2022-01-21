@@ -261,8 +261,16 @@ type PublicKeyAggregator struct {
 	// since the caller should not be aware of the internal non thread-safe algorithm.
 }
 
-// NewPublicKeyAggregator creates an index-based key aggregator, for the given list of authorized signers
+// NewPublicKeyAggregator creates an index-based key aggregator, for the given list of authorized signers.
+//
+// The constructor errors if:
+//  - the input keys are empty.
+//  - any input public key algorithm is not BLS.
 func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator, error) {
+	// check for empty list
+	if len(publicKeys) == 0 {
+		return nil, fmt.Errorf("input keys cannot be empty")
+	}
 	// check for BLS keys
 	for i, key := range publicKeys {
 		if key == nil || key.Algorithm() != crypto.BLSBLS12381 {
@@ -280,7 +288,15 @@ func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator
 }
 
 // KeyAggregate returns the aggregated public key of the input signers.
+//
+// The aggregation errors if:
+//  - input signers is empty.
+//  Other errors are unexpected during normal operations.
 func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, error) {
+	// check for empty list
+	if len(signers) == 0 {
+		return nil, fmt.Errorf("input signers cannot be empty")
+	}
 
 	// this greedy algorithm assumes the signers set does not vary much from one call
 	// to KeyAggregate to another. It computes the delta of signers compared to the
@@ -296,6 +312,7 @@ func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, err
 
 	// checks whether the delta of signers is larger than new list of signers.
 	deltaIsLarger := len(newSignerKeys)+len(missingSignerKeys) > len(updatedSignerSet)
+	deltaIsLarger = false
 
 	var updatedKey crypto.PublicKey
 	var err error
@@ -303,6 +320,7 @@ func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, err
 		// it is faster to aggregate the keys from scratch in this case
 		updatedKey, err = crypto.AggregateBLSPublicKeys(newSignerKeys)
 		if err != nil {
+			// not expected as the keys are not empty and all keys are BLS
 			return nil, fmt.Errorf("aggregating staking keys failed: %w", err)
 		}
 	} else {
@@ -310,11 +328,13 @@ func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, err
 		// add the new keys
 		updatedKey, err = crypto.AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
 		if err != nil {
+			// not expected in notrmal operations as there is at least one key, and all keys are BLS
 			return nil, fmt.Errorf("adding new staking keys failed: %w", err)
 		}
 		// remove the missing keys
 		updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
 		if err != nil {
+			// not expected in notrmal operations as there is at least one key, and all keys are BLS
 			return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
 		}
 	}
