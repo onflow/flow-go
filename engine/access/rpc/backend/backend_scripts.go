@@ -106,13 +106,17 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		}
 		errors = multierror.Append(errors, err)
 	}
-	return nil, errors.ErrorOrNil()
+	errToReturn := errors.ErrorOrNil()
+	if errToReturn != nil {
+		b.log.Error().Stack().Err(err).Msg("Script execution failed for Nodes")
+	}
+	return nil, errToReturn
 }
 
 func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", execNode.String(), err)
 	}
 	defer closer.Close()
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
