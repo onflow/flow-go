@@ -264,6 +264,12 @@ func TestKeyAggregator(t *testing.T) {
 		// empty input
 		_, err = aggregator.KeyAggregate(indices[:0])
 		assert.Error(t, err)
+		// invalid signer
+		_, err = aggregator.KeyAggregate([]int{-1})
+		assert.True(t, IsInvalidSignerIdxError(err))
+
+		_, err = aggregator.KeyAggregate([]int{signersNum})
+		assert.True(t, IsInvalidSignerIdxError(err))
 
 		aggregateTwice := func(l1, h1, l2, h2 int) {
 			var key, expectedKey crypto.PublicKey

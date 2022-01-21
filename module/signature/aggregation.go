@@ -290,12 +290,20 @@ func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator
 // KeyAggregate returns the aggregated public key of the input signers.
 //
 // The aggregation errors if:
-//  - input signers is empty.
-//  Other errors are unexpected during normal operations.
+//  - genric error if input signers is empty.
+//  - InvalidSignerIdxError if any signer is out of bound.
+//  - other generic errors are unexpected during normal operations.
 func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, error) {
 	// check for empty list
 	if len(signers) == 0 {
 		return nil, fmt.Errorf("input signers cannot be empty")
+	}
+
+	// check signers
+	for i, signer := range signers {
+		if signer >= p.n || signer < 0 {
+			return nil, NewInvalidSignerIdxErrorf("signer %d at index %d is invalid", signer, i)
+		}
 	}
 
 	// this greedy algorithm assumes the signers set does not vary much from one call
