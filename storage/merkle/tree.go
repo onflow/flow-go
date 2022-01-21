@@ -330,10 +330,7 @@ ProveLoop:
 
 			cur = &n.child
 			index += n.count
-			if n.count > 65535 {
-				panic("short node count not fitting a uint16")
-			}
-			shortPathLengths = append(shortPathLengths, uint16(n.count))
+			shortPathLengths = append(shortPathLengths, n.CountAsUint16Encoding())
 			shortNodeVisited = append(shortNodeVisited, true)
 			steps++
 

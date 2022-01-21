@@ -151,7 +151,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 		if shortPathLengthIndex < 0 {
 			return false, NewMalformedProofErrorf("no more ShortPathLengths available to read")
 		}
-		shortPathLengths := int(p.ShortPathLengths[shortPathLengthIndex])
+		shortPathLengths := countUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
 		shortPathLengthIndex--
 
 		// construct the common path
