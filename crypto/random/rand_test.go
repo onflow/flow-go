@@ -99,7 +99,7 @@ func TestUint(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("basic randomness", func(t *testing.T) {
-		sampleSize := 100000
+		sampleSize := 50000
 		tolerance := 0.05
 		sampleSpace := uint64(10 + mrand.Intn(100))
 		distribution := make([]float64, sampleSpace)
@@ -141,7 +141,7 @@ func TestSubPermutation(t *testing.T) {
 		subsetSize := 20
 
 		// statictics parameters
-		sampleSize := 100000
+		sampleSize := 80000
 		tolerance := 0.05
 		// tests the subset sampling randomness
 		samplingDistribution := make([]float64, listSize)
@@ -217,10 +217,10 @@ func TestShuffle(t *testing.T) {
 	rng, err := NewChacha20PRG(seed, customizer)
 	require.NoError(t, err)
 
-	t.Run("basic randmoness", func(t *testing.T) {
+	t.Run("basic randomness", func(t *testing.T) {
 		listSize := 100
 		// test parameters
-		sampleSize := 100000
+		sampleSize := 50000
 		tolerance := 0.05
 		// the distribution of a particular element of the list, testElement
 		distribution := make([]float64, listSize)
@@ -231,7 +231,7 @@ func TestShuffle(t *testing.T) {
 			list = append(list, i)
 		}
 
-		for i := 0; i < sampleSize; i++ {
+		shuffleAndCount := func(t *testing.T) {
 			err = rng.Shuffle(listSize, func(i, j int) {
 				list[i], list[j] = list[j], list[i]
 			})
@@ -248,9 +248,27 @@ func TestShuffle(t *testing.T) {
 				}
 			}
 		}
-		stdev := stat.StdDev(distribution, nil)
-		mean := stat.Mean(distribution, nil)
-		assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+
+		t.Run("shuffle a random permutation", func(t *testing.T) {
+			for k := 0; k < sampleSize; k++ {
+				shuffleAndCount(t)
+			}
+			stdev := stat.StdDev(distribution, nil)
+			mean := stat.Mean(distribution, nil)
+			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+		})
+
+		t.Run("shuffle a same permutation", func(t *testing.T) {
+			for k := 0; k < sampleSize; k++ {
+				for i := 0; i < listSize; i++ {
+					list[i] = i
+				}
+				shuffleAndCount(t)
+			}
+			stdev := stat.StdDev(distribution, nil)
+			mean := stat.Mean(distribution, nil)
+			assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed. stdev %v, mean %v", stdev, mean))
+		})
 	})
 
 	t.Run("empty slice", func(t *testing.T) {
@@ -287,7 +305,7 @@ func TestSamples(t *testing.T) {
 		samplesSize := 20
 
 		// statictics parameters
-		sampleSize := 100000
+		sampleSize := 50000
 		tolerance := 0.05
 		// tests the subset sampling randomness
 		samplingDistribution := make([]float64, listSize)
