@@ -249,24 +249,24 @@ func TestArrayBackData_All(t *testing.T) {
 		items        uint32
 		ejectionMode heropool.EjectionMode
 	}{
-		{ // mempool has the limit of 100K, but we put 10K
-			limit:        100_000,
+		{ // mempool has the limit of 1000, but we put 100.
+			limit:        1000,
+			items:        100,
+			ejectionMode: heropool.LRUEjection,
+		},
+		{ // mempool has the limit of 1000, and we put exactly 1000 items.
+			limit:        1000,
+			items:        1000,
+			ejectionMode: heropool.LRUEjection,
+		},
+		{ // mempool has the limit of 1000, and we put 10K items with LRU ejection.
+			limit:        1000,
 			items:        10_000,
 			ejectionMode: heropool.LRUEjection,
 		},
-		{ // mempool has the limit of 100K, and we put exactly 100K items
-			limit:        100_000,
-			items:        100_000,
-			ejectionMode: heropool.LRUEjection,
-		},
-		{ // mempool has the limit of 100K, and we put 1M items with LRU ejection.
-			limit:        100_000,
-			items:        1_000_000,
-			ejectionMode: heropool.LRUEjection,
-		},
-		{ // mempool has the limit of 100K, and we put 1M items with random ejection.
-			limit:        100_000,
-			items:        1_000_000,
+		{ // mempool has the limit of 1000, and we put 10K items with random ejection.
+			limit:        1000,
+			items:        10_000,
 			ejectionMode: heropool.RandomEjection,
 		},
 	}
@@ -285,6 +285,8 @@ func TestArrayBackData_All(t *testing.T) {
 				// in random ejection mode we count total number of matched entities
 				// with All map.
 				testMapMatchCount(t, bd.All(), entities, int(tc.limit))
+				testEntitiesMatchCount(t, bd.Entities(), entities, int(tc.limit))
+				testIdentifiersMatchCount(t, bd.Identifiers(), entities, int(tc.limit))
 			} else {
 				// in LRU ejection mode we match All items based on a from index (i.e., last "from" items).
 				from := int(tc.items) - int(tc.limit)
@@ -293,6 +295,8 @@ func TestArrayBackData_All(t *testing.T) {
 					from = 0
 				}
 				testMapMatchFrom(t, bd.All(), entities, from)
+				testEntitiesMatchFrom(t, bd.Entities(), entities, from)
+				testIdentifiersMatchFrom(t, bd.Identifiers(), entities, from)
 			}
 		})
 	}
@@ -452,6 +456,32 @@ func testMapMatchFrom(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity,
 	}
 }
 
+// testEntitiesMatchFrom is a test helper that checks entities are retrievable from given list starting specified index.
+func testEntitiesMatchFrom(t *testing.T, expectedEntities []flow.Entity, actualEntities []*unittest.MockEntity, from int) {
+	require.Len(t, expectedEntities, len(actualEntities)-from)
+
+	for i, actual := range actualEntities {
+		if i < from {
+			require.NotContains(t, expectedEntities, actual)
+		} else {
+			require.Contains(t, expectedEntities, actual)
+		}
+	}
+}
+
+// testIdentifiersMatchFrom is a test helper that checks identifiers of entities are retrievable from given list starting specified index.
+func testIdentifiersMatchFrom(t *testing.T, expectedIdentifiers flow.IdentifierList, actualEntities []*unittest.MockEntity, from int) {
+	require.Len(t, expectedIdentifiers, len(actualEntities)-from)
+
+	for i, actual := range actualEntities {
+		if i < from {
+			require.NotContains(t, expectedIdentifiers, actual.ID())
+		} else {
+			require.Contains(t, expectedIdentifiers, actual.ID())
+		}
+	}
+}
+
 // testMapMatchFrom is a test helper that checks specified number of entities are retrievable from entitiesMap.
 func testMapMatchCount(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity, entities []*unittest.MockEntity, count int) {
 	require.Len(t, entitiesMap, count)
@@ -463,6 +493,39 @@ func testMapMatchCount(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity
 			continue
 		}
 		require.Equal(t, expected, actual)
+		actualCount++
+	}
+	require.Equal(t, count, actualCount)
+}
+
+// testEntitiesMatchCount is a test helper that checks specified number of entities are retrievable from given list.
+func testEntitiesMatchCount(t *testing.T, expectedEntities []flow.Entity, actualEntities []*unittest.MockEntity, count int) {
+	entitiesMap := make(map[flow.Identifier]flow.Entity)
+
+	// converts expected entities list to a map in order to utilize a test helper.
+	for _, expected := range expectedEntities {
+		entitiesMap[expected.ID()] = expected
+	}
+
+	testMapMatchCount(t, entitiesMap, actualEntities, count)
+}
+
+// testIdentifiersMatchCount is a test helper that checks specified number of entities are retrievable from given list.
+func testIdentifiersMatchCount(t *testing.T, expectedIdentifiers flow.IdentifierList, actualEntities []*unittest.MockEntity, count int) {
+	idMap := make(map[flow.Identifier]struct{})
+
+	// converts expected identifiers to a map.
+	for _, expectedId := range expectedIdentifiers {
+		idMap[expectedId] = struct{}{}
+	}
+
+	require.Len(t, idMap, count)
+	actualCount := 0
+	for _, e := range actualEntities {
+		_, ok := idMap[e.ID()]
+		if !ok {
+			continue
+		}
 		actualCount++
 	}
 	require.Equal(t, count, actualCount)
