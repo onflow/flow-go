@@ -190,9 +190,9 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	return nil
 }
 
-// isValidRootSnapshot checks internal consistency of root state snapshot
+// IsValidRootSnapshot checks internal consistency of root state snapshot
 // if verifyResultID allows/disallows Result ID verification
-func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
+func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 
 	segment, err := snap.SealingSegment()
 	if err != nil {
@@ -203,8 +203,9 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("could not latest sealed result: %w", err)
 	}
 
-	if len(segment.Blocks) == 0 {
-		return fmt.Errorf("invalid empty sealing segment")
+	err = segment.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid root sealing segment: %w", err)
 	}
 
 	highest := segment.Highest() // reference block of the snapshot

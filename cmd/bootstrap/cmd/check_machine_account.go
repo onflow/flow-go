@@ -62,7 +62,7 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 		Str("hash_algo", machineAccountInfo.HashAlgorithm.String()).
 		Msg("read machine account info from disk")
 
-	flowClient, err := client.New(flagAccessAPIAddress, grpc.WithInsecure())
+	flowClient, err := client.New(flagAccessAPIAddress, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not connect to access API at address %s", flagAccessAPIAddress)
 	}
