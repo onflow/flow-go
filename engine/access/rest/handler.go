@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
@@ -18,6 +17,8 @@ import (
 
 	"github.com/onflow/flow-go/access"
 )
+
+const MaxRequestSize = 2 << 20 // 2MB
 
 // ApiHandlerFunc is a function that contains endpoint handling logic,
 // it fetches necessary resources and returns an error or response model.
@@ -58,11 +59,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	errLog := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// limit requested body size
-	maxRequestBodySize := int64(2 * math.Pow(10, 7)) // limit to 2MB
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+	r.Body = http.MaxBytesReader(w, r.Body, MaxRequestSize)
 	err := r.ParseForm()
 	if err != nil {
-		errLog.Error().Msg("requested body size too big")
+		h.errorHandler(w, err, errLog)
 		return
 	}
 

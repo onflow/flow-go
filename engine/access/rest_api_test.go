@@ -308,6 +308,19 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 	})
 }
 
+func (suite *RestAPITestSuite) TestRequestSizeRestriction() {
+	client := suite.restAPIClient()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	// make a request of size larger than the max permitted size
+	requestBytes := make([]byte, rest.MaxRequestSize+1)
+	script := restclient.ScriptsBody{
+		Script: string(requestBytes),
+	}
+	_, resp, err := client.ScriptsApi.ScriptsPost(ctx, script, nil)
+	assertError(suite.T(), resp, err, http.StatusBadRequest, "request body too large")
+}
+
 func (suite *RestAPITestSuite) TearDownTest() {
 	// close the server
 	if suite.rpcEng != nil {
