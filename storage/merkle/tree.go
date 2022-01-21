@@ -287,7 +287,7 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 	index := 0
 
 	// init proof params
-	interimHashes := make([][]byte, 0)
+	siblingHashes := make([][]byte, 0)
 	skipBits := make([]uint16, 0)
 
 	steps := 0
@@ -311,7 +311,7 @@ ProveLoop:
 			}
 
 			index++
-			interimHashes = append(interimHashes, sibling.Hash())
+			siblingHashes = append(siblingHashes, sibling.Hash())
 			shortNodeVisited = append(shortNodeVisited, false)
 			steps++
 
@@ -341,20 +341,20 @@ ProveLoop:
 
 		// if we have a leaf, we found the key, return value and true
 		case *leaf:
-			// compress isAShortNode
-			isAShortNode := bitutils.MakeBitVector(len(shortNodeVisited))
+			// compress interimNodeTypes
+			interimNodeTypes := bitutils.MakeBitVector(len(shortNodeVisited))
 			for i, b := range shortNodeVisited {
 				if b {
-					bitutils.SetBit(isAShortNode, i)
+					bitutils.SetBit(interimNodeTypes, i)
 				}
 			}
 
 			return &Proof{
-				Key:           key,
-				Value:         n.val,
-				IsAShortNode:  isAShortNode,
-				SkipBits:      skipBits,
-				InterimHashes: interimHashes,
+				Key:              key,
+				Value:            n.val,
+				InterimNodeTypes: interimNodeTypes,
+				SkipBits:         skipBits,
+				SiblingHashes:    siblingHashes,
 			}, true
 
 		// the only possible nil node is the root node of an empty trie

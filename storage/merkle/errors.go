@@ -12,8 +12,8 @@ type MalformedProofError struct {
 	err error
 }
 
-// NewErrorMalformedProoff constructs a new MalformedProofError
-func NewErrorMalformedProoff(msg string, args ...interface{}) *MalformedProofError {
+// NewMalformedProofErrorf constructs a new MalformedProofError
+func NewMalformedProofErrorf(msg string, args ...interface{}) *MalformedProofError {
 	return &MalformedProofError{err: fmt.Errorf(msg, args...)}
 }
 
