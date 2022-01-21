@@ -228,14 +228,3 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 		require.Equal(t, id, items[i])
 	}
 }
-
-// MockEntity is a mocked entity type used in internal testing of ejectors.
-type MockEntity struct{}
-
-func (m MockEntity) ID() flow.Identifier {
-	return flow.Identifier{}
-}
-
-func (m MockEntity) Checksum() flow.Identifier {
-	return flow.Identifier{}
-}
