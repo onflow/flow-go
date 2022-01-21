@@ -40,7 +40,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 		return false, NewMalformedProofErrorf("length of SkipBits pluse length of SiblingHashes is larger than max key lenght allowed (%d > %d)", steps, maxKeyLength)
 	}
 	// number of steps should be smaller than number of bits in the InterimNodeTypes
-	if steps > len(p.InterimNodeTypes)*8 {
+	if len(p.InterimNodeTypes) != (steps+7)>>3 {
 		return false, NewMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of SkipBits and SiblingHashes")
 	}
 
@@ -81,14 +81,14 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 			sibling := p.SiblingHashes[interimHashIndex]
 			interimHashIndex--
 
-			// based on the bit at pathIndex of the key compute the hash
+			// based on the bit at keyIndex, compute the hash
 			if bitutils.ReadBit(p.Key, keyIndex) == 0 { // left branching
 				currentHash = computeFullHash(currentHash, sibling)
 			} else {
 				currentHash = computeFullHash(sibling, currentHash) // right branching
 			}
 
-			// decrement the keyindex by 1
+			// move to the parent vertex along the path
 			keyIndex--
 
 			continue
@@ -104,19 +104,15 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 		skipBitIndex--
 
 		// construct the common path
-		startIndexOfCommonPath := keyIndex - skipBits + 1
 		commonPath := bitutils.MakeBitVector(skipBits)
-		for j := 0; j < skipBits; j++ {
-			if bitutils.ReadBit(p.Key, startIndexOfCommonPath+j) == 1 {
-				bitutils.SetBit(commonPath, j)
+		for c := skipBits - 1; c >= 0; c-- {
+			if bitutils.ReadBit(p.Key, keyIndex) == 1 {
+				bitutils.SetBit(commonPath, c)
 			}
+			keyIndex--
 		}
-
 		// compute the hash for the short node
 		currentHash = computeShortHash(skipBits, commonPath, currentHash)
-
-		// decrement the keyIndex by the number of bits that were skiped in the short node
-		keyIndex -= skipBits
 	}
 
 	// in the end we should have used all the path space available
