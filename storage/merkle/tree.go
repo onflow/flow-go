@@ -288,7 +288,7 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 
 	// init proof params
 	siblingHashes := make([][]byte, 0)
-	skipBits := make([]uint16, 0)
+	shortPathLengths := make([]uint16, 0)
 
 	steps := 0
 	shortNodeVisited := make([]bool, 0, len(key))
@@ -333,7 +333,7 @@ ProveLoop:
 			if n.count > 65535 {
 				panic("short node count not fitting a uint16")
 			}
-			skipBits = append(skipBits, uint16(n.count))
+			shortPathLengths = append(shortPathLengths, uint16(n.count))
 			shortNodeVisited = append(shortNodeVisited, true)
 			steps++
 
@@ -353,7 +353,7 @@ ProveLoop:
 				Key:              key,
 				Value:            n.val,
 				InterimNodeTypes: interimNodeTypes,
-				SkipBits:         skipBits,
+				ShortPathLengths: shortPathLengths,
 				SiblingHashes:    siblingHashes,
 			}, true
 

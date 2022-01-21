@@ -16,9 +16,9 @@ type Proof struct {
 	// trie downward. if the bit is set to 1, it means that we have reached to a short node, and
 	// if is set to 0 means we have reached a full node.
 	InterimNodeTypes []byte
-	// SkipBits is read when we reach a short node, and the value represents number of bits that were skipped
-	// by the short node (shortNode.count)
-	SkipBits []uint16
+	// ShortPathLengths is read when we reach a short node, and the value represents number of common bits that were included
+	// in the short node (shortNode.count)
+	ShortPathLengths []uint16
 	// SiblingHashes is a slice of hash values, every value is read when we reach a full node (hash value of the siblings)
 	SiblingHashes [][]byte
 }
@@ -59,14 +59,14 @@ func (p *Proof) formatIsValid() (bool, error) {
 	}
 
 	// number of steps
-	steps := len(p.SkipBits) + len(p.SiblingHashes)
+	steps := len(p.ShortPathLengths) + len(p.SiblingHashes)
 	// number of steps should be smaller or equal to the max key length
 	if steps > maxKeyLength {
-		return false, NewMalformedProofErrorf("length of SkipBits plus length of SiblingHashes is larger than max key lenght allowed (%d > %d)", steps, maxKeyLength)
+		return false, NewMalformedProofErrorf("length of ShortPathLengths plus length of SiblingHashes is larger than max key lenght allowed (%d > %d)", steps, maxKeyLength)
 	}
 	// number of steps should be smaller than number of bits in the InterimNodeTypes
 	if len(p.InterimNodeTypes) != (steps+7)>>3 {
-		return false, NewMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of SkipBits and SiblingHashes")
+		return false, NewMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
 	}
 
 	// For deterministic proof: require that tailing auxiliary bits (to make a complete full byte) are all zero
@@ -78,12 +78,12 @@ func (p *Proof) formatIsValid() (bool, error) {
 
 	// validate number of bits that is going to be checked matches the size of the given key
 	keyBitCount := len(p.SiblingHashes)
-	for _, sc := range p.SkipBits {
+	for _, sc := range p.ShortPathLengths {
 		keyBitCount += int(sc)
 	}
 
 	if len(p.Key)*8 != keyBitCount {
-		return false, NewMalformedProofErrorf("key length doesn't match the length of SkipBits and SiblingHashes")
+		return false, NewMalformedProofErrorf("key length doesn't match the length of ShortPathLengths and SiblingHashes")
 	}
 
 	return true, nil
@@ -99,11 +99,11 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 		return valid, err
 	}
 
-	// an index to consume interim hashes from the last element to the first element
+	// an index to consume SiblingHashes from the last element to the first element
 	siblingHashIndex := len(p.SiblingHashes) - 1
 
-	// an index to consume shortBits from the last element to the first element
-	skipBitIndex := len(p.SkipBits) - 1
+	// an index to consume ShortPathLengths from the last element to the first element
+	shortPathLengthIndex := len(p.ShortPathLengths) - 1
 
 	// keyIndex keeps track of the largest index of the key that is unchecked.
 	// note that traverse bottom up here, so we start with the largest key index
@@ -114,7 +114,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 	currentHash := computeLeafHash(p.Value)
 
 	// number of steps
-	steps := len(p.SkipBits) + len(p.SiblingHashes)
+	steps := len(p.ShortPathLengths) + len(p.SiblingHashes)
 
 	// for each step (level from bottom to top) check if its a full node or a short node and compute the
 	// hash value accordingly; for full node having the sibling hash helps to compute the hash value
@@ -147,23 +147,23 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 		// Short node
 
-		// read and pop from SkipBits
-		if skipBitIndex < 0 {
-			return false, NewMalformedProofErrorf("no more SkipBits available to read")
+		// read and pop from ShortPathLengths
+		if shortPathLengthIndex < 0 {
+			return false, NewMalformedProofErrorf("no more ShortPathLengths available to read")
 		}
-		skipBits := int(p.SkipBits[skipBitIndex])
-		skipBitIndex--
+		shortPathLengths := int(p.ShortPathLengths[shortPathLengthIndex])
+		shortPathLengthIndex--
 
 		// construct the common path
-		commonPath := bitutils.MakeBitVector(skipBits)
-		for c := skipBits - 1; c >= 0; c-- {
+		commonPath := bitutils.MakeBitVector(shortPathLengths)
+		for c := shortPathLengths - 1; c >= 0; c-- {
 			if bitutils.ReadBit(p.Key, keyIndex) == 1 {
 				bitutils.SetBit(commonPath, c)
 			}
 			keyIndex--
 		}
 		// compute the hash for the short node
-		currentHash = computeShortHash(skipBits, commonPath, currentHash)
+		currentHash = computeShortHash(shortPathLengths, commonPath, currentHash)
 	}
 
 	// in the end we should have checked all the bits of the key
