@@ -310,7 +310,7 @@ func TestKeyAggregator(t *testing.T) {
 				var key, expectedKey crypto.PublicKey
 				var err error
 				key, err = aggregator.KeyAggregate(indices[low:high])
-				t.Logf("%d-%d", low, high)
+
 				require.NoError(t, err)
 				if low == high {
 					expectedKey = crypto.NeutralBLSPublicKey()
