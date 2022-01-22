@@ -326,7 +326,7 @@ func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, err
 	if deltaIsLarger {
 		// it is faster to aggregate the keys from scratch in this case
 		newSigners := make([]crypto.PublicKey, 0, len(updatedSignerSet))
-		for signer, _ := range updatedSignerSet {
+		for signer := range updatedSignerSet {
 			newSigners = append(newSigners, p.publicKeys[signer])
 		}
 		updatedKey, err = crypto.AggregateBLSPublicKeys(newSigners)
