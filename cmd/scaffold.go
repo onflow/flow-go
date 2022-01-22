@@ -222,11 +222,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
 
-		top, err := topology.NewTopicBasedTopology(
-			fnb.NodeID,
-			fnb.Logger,
-			fnb.State,
-		)
+		topologyFactory, err := topology.Factory(topology.Name(fnb.topology))
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.topology, err)
+		}
+		top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, 1)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
