@@ -133,7 +133,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 	fnb.flags.StringVar(&fnb.BaseConfig.topologyProtocolName, "topology", defaultConfig.topologyProtocolName, "networking overlay topology")
-	fnb.flags.Float64Var(&fnb.BaseConfig.topologyEdgeProbability, "topology-edge-probability", defaultConfig.topologyEdgeProbability, "pariwise edge probability between nodes in topology")
+	fnb.flags.Float64Var(&fnb.BaseConfig.topologyEdgeProbability, "topology-edge-probability", defaultConfig.topologyEdgeProbability,
+		"pairwise edge probability between nodes in topology")
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
