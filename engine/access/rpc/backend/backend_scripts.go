@@ -108,7 +108,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	}
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
-		b.log.Error().Stack().Err(err).Msg("Script execution failed for Nodes")
+		b.log.Error().Err(err).Msg("script execution failed")
 	}
 	return nil, errToReturn
 }
