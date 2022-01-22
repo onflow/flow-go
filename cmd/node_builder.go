@@ -131,7 +131,8 @@ type BaseConfig struct {
 	db                              *badger.DB
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize int
-	topology                        string
+	topologyProtocolName            string
+	topologyEdgeProbability         float64
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -202,6 +203,7 @@ func DefaultBaseConfig() *BaseConfig {
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
-		topology:                        string(topology.TopicBased),
+		topologyProtocolName:            string(topology.TopicBased),
+		topologyEdgeProbability:         topology.MaximumEdgeProbability,
 	}
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+const MaximumEdgeProbability = float64(1)
+
 type Name string
 
 type FactoryFunction func(flow.Identifier, zerolog.Logger, protocol.State, float64) (network.Topology, error)
