@@ -10,6 +10,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// MaximumEdgeProbability defines the maximum value of probability for existing an edge between any arbitrary pair of nodes.
+// Edge probability is utilized selectively in some topology protocols, e.g., RandomizedTopology.
 const MaximumEdgeProbability = float64(1)
 
 type Name string
