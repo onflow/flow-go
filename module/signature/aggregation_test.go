@@ -8,7 +8,7 @@ import (
 	mrand "math/rand"
 	"sort"
 	"testing"
-	_ "time"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -221,7 +221,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 }
 
 func TestKeyAggregator(t *testing.T) {
-	r := int64(1642805485791537000) //time.Now().UnixNano()
+	r := time.Now().UnixNano()
 	mrand.Seed(r)
 	t.Logf("math rand seed is %d", r)
 
