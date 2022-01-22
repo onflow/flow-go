@@ -41,6 +41,7 @@ type nodeUpdateValidation func(ctx context.Context, env templates.Environment, r
 type Suite struct {
 	suite.Suite
 	common.TestnetStateTracker
+	ctx         context.Context
 	cancel      context.CancelFunc
 	net         *testnet.FlowNetwork
 	nodeConfigs []testnet.NodeConfig
@@ -53,7 +54,9 @@ type Suite struct {
 	EpochLen          uint64
 }
 
+// SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 	// set default values for epoch length config - use a longer staking auction length
 	// by default to allow time for staking nodes to join at the first epoch boundary
 	s.StakingAuctionLen = 200
@@ -102,12 +105,11 @@ func (s *Suite) StartNetwork() {
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
 
 	// start the network
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
-	s.net.Start(ctx)
+
+	s.net.Start(s.ctx)
 
 	// start tracking blocks
-	s.Track(s.T(), ctx, s.Ghost())
+	s.Track(s.T(), s.ctx, s.Ghost())
 
 	addr := fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort])
 	client, err := testnet.NewClient(addr, s.net.Root().Header.ChainID.Chain())
@@ -687,8 +689,6 @@ func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
 // head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
 // 3. Check that we can execute a script on the AN
 func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
-	// assert atleast 20 blocks have been finalized since the node replacement
-	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
@@ -696,11 +696,15 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	client, err := testnet.NewClient(clientAddr, s.net.Root().Header.ChainID.Chain())
 	require.NoError(s.T(), err)
 
+	// overwrite client to point to the new AN (since we have stopped the initial AN at this point)
+	s.client = client
+	// assert atleast 20 blocks have been finalized since the node replacement
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
+
 	// execute script directly on new AN to ensure it's functional
 	proposedTable, err := client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
-
 }
 
 // assertNetworkHealthyAfterVNChange after an verification node is removed or added to the network

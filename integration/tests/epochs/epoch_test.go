@@ -1,7 +1,6 @@
 package epochs
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,9 +33,6 @@ func (s *Suite) TestStaticEpochTransition() {
 	s.StartNetwork()
 	defer s.StopNetwork()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// phaseCheck is a utility struct that contains information about the
 	// final view of each epoch/phase.
 	type phaseCheck struct {
@@ -53,7 +49,7 @@ func (s *Suite) TestStaticEpochTransition() {
 		var epoch protocol.Epoch
 		var epochCounter uint64
 		for epoch == nil || epochCounter != uint64(counter) {
-			snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+			snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
 			require.NoError(s.T(), err)
 			epoch = snapshot.Epochs().Current()
 			epochCounter, err = epoch.Counter()
@@ -184,8 +180,6 @@ func (s *Suite) TestEpochJoinAndLeaveSN() {
 // * that nodes can unstake and leave the network at an epoch boundary
 // * role-specific network health validation after the swap has completed
 func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth nodeUpdateValidation) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	env := utils.LocalnetEnv()
 
@@ -194,19 +188,19 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	require.NotNil(s.T(), containerToReplace)
 
 	// staking our new node and add get the corresponding container for that node
-	info, testContainer := s.StakeNewNode(ctx, env, role)
+	info, testContainer := s.StakeNewNode(s.ctx, env, role)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
-	s.removeNodeFromProtocol(ctx, env, containerToReplace.Config.NodeID)
+	s.removeNodeFromProtocol(s.ctx, env, containerToReplace.Config.NodeID)
 
 	// wait for epoch setup phase before we start our container and pause the old container
-	s.WaitForPhase(ctx, flow.EpochPhaseSetup)
+	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
 
 	// get latest snapshot and start new container
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
 	require.NoError(s.T(), err)
 	testContainer.WriteRootSnapshot(snapshot)
-	testContainer.Container.Start(ctx)
+	testContainer.Container.Start(s.ctx)
 
 	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
@@ -215,11 +209,11 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+5)
 
 	//make sure container to replace removed from smart contract state
-	s.assertNodeNotApprovedOrProposed(ctx, env, containerToReplace.Config.NodeID)
+	s.assertNodeNotApprovedOrProposed(s.ctx, env, containerToReplace.Config.NodeID)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
-	s.assertEpochCounter(ctx, 1)
+	s.assertEpochCounter(s.ctx, 1)
 
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
@@ -228,7 +222,5 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+10)
 
 	// make sure the network is healthy after adding new node
-	checkNetworkHealth(ctx, env, snapshot, info)
-
-	s.net.StopContainers()
+	checkNetworkHealth(s.ctx, env, snapshot, info)
 }
