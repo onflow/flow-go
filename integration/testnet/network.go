@@ -466,6 +466,7 @@ func WithDebugImage(debug bool) func(config *NodeConfig) {
 func AsGhost() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.Ghost = true
+		config.AdditionalFlags = append(config.AdditionalFlags, "--topology=fully-connected")
 	}
 }
 
