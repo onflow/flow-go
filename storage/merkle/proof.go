@@ -2,6 +2,7 @@ package merkle
 
 import (
 	"bytes"
+	"math/bits"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
@@ -22,6 +23,8 @@ type Proof struct {
 	// SiblingHashes is a slice of hash values, every value is read when we reach a full node (hash value of the siblings)
 	SiblingHashes [][]byte
 }
+
+const maxStepsForProofVerification = maxKeyLength * 8
 
 // formatIsValid validates the format and size of elements of the proof
 //
@@ -50,7 +53,7 @@ type Proof struct {
 //    Hence, the total key length _in bits_ should be: len(SiblingHashes) + sum(ShortPathLengths)
 func (p *Proof) formatIsValid() (bool, error) {
 
-	// validate the key size
+	// step1 - validate the key as the very first step
 	if len(p.Key) == 0 {
 		return false, NewMalformedProofErrorf("key is empty")
 	}
@@ -58,22 +61,12 @@ func (p *Proof) formatIsValid() (bool, error) {
 		return false, NewMalformedProofErrorf("key length is larger than max key lenght allowed (%d > %d)", len(p.Key), maxKeyLength)
 	}
 
-	// number of steps
-	steps := len(p.ShortPathLengths) + len(p.SiblingHashes)
-	// number of steps should be smaller or equal to the max key length
-	if steps > maxKeyLength {
-		return false, NewMalformedProofErrorf("length of ShortPathLengths plus length of SiblingHashes is larger than max key lenght allowed (%d > %d)", steps, maxKeyLength)
-	}
-	// number of steps should be smaller than number of bits in the InterimNodeTypes
-	if len(p.InterimNodeTypes) != (steps+7)>>3 {
-		return false, NewMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
-	}
+	// step2 - check ShortPathLengths and SiblingHashes
 
-	// For deterministic proof: require that tailing auxiliary bits (to make a complete full byte) are all zero
-	for i := len(p.InterimNodeTypes) - 1; i >= steps; i-- {
-		if bitutils.ReadBit(p.InterimNodeTypes, i) != 0 {
-			return false, NewMalformedProofErrorf("tailing auxiliary bits in InterimNodeTypes should all be zero")
-		}
+	steps := len(p.ShortPathLengths) + len(p.SiblingHashes)
+	// check number of steps based on the max key length
+	if steps > maxStepsForProofVerification {
+		return false, NewMalformedProofErrorf("number of steps (len(ShortPathLengths)+ len(SiblingHashes) are larger than the max steps allowed (%d > %d)", steps, maxStepsForProofVerification)
 	}
 
 	// validate number of bits that is going to be checked matches the size of the given key
@@ -84,6 +77,44 @@ func (p *Proof) formatIsValid() (bool, error) {
 
 	if len(p.Key)*8 != keyBitCount {
 		return false, NewMalformedProofErrorf("key length doesn't match the length of ShortPathLengths and SiblingHashes")
+	}
+
+	// step3 - check InterimNodeTypes
+
+	// size checks
+	if len(p.InterimNodeTypes) == 0 {
+		return false, NewMalformedProofErrorf("InterimNodeTypes is empty")
+	}
+	if len(p.InterimNodeTypes) > maxKeyLength {
+		return false, NewMalformedProofErrorf("InterimNodeTypes is larger than max key lenght allowed (%d > %d)", len(p.Key), maxKeyLength)
+	}
+	// InterimNodeTypes should only use the smallest number of bytes needed for steps
+	if len(p.InterimNodeTypes) != (steps+7)>>3 {
+		return false, NewMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
+	}
+
+	// semantic checks
+
+	// count number of bits that are set returns number of full nodes
+	numberOfShortNodes := 0
+	for _, d := range p.InterimNodeTypes {
+		numberOfShortNodes += bits.OnesCount8(d)
+	}
+
+	if numberOfShortNodes != len(p.ShortPathLengths) {
+		return false, NewMalformedProofErrorf("not enough short path lengths are provided")
+	}
+
+	numberOfFullNodes := steps - numberOfShortNodes
+	if numberOfFullNodes != len(p.SiblingHashes) {
+		return false, NewMalformedProofErrorf("not enough sibling hashes are provided")
+	}
+
+	// check that tailing auxiliary bits (to make a complete full byte) are all zero
+	for i := len(p.InterimNodeTypes) - 1; i >= steps; i-- {
+		if bitutils.ReadBit(p.InterimNodeTypes, i) != 0 {
+			return false, NewMalformedProofErrorf("tailing auxiliary bits in InterimNodeTypes should all be zero")
+		}
 	}
 
 	return true, nil
@@ -126,9 +157,6 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 		if bitutils.ReadBit(p.InterimNodeTypes, interimNodeTypesIndex) == 0 {
 
 			// read and pop the sibling hash value from SiblingHashes
-			if siblingHashIndex < 0 {
-				return false, NewMalformedProofErrorf("no more SiblingHashes available to read")
-			}
 			sibling := p.SiblingHashes[siblingHashIndex]
 			siblingHashIndex--
 
@@ -148,9 +176,6 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 		// Short node
 
 		// read and pop from ShortPathLengths
-		if shortPathLengthIndex < 0 {
-			return false, NewMalformedProofErrorf("no more ShortPathLengths available to read")
-		}
 		shortPathLengths := countUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
 		shortPathLengthIndex--
 
@@ -164,11 +189,6 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 		}
 		// compute the hash for the short node
 		currentHash = computeShortHash(shortPathLengths, commonPath, currentHash)
-	}
-
-	// in the end we should have checked all the bits of the key
-	if keyIndex >= 0 {
-		return false, NewMalformedProofErrorf("a subset of the key is not checked (keyIndex: %d)", keyIndex)
 	}
 
 	// the final hash value should match whith what was expected
