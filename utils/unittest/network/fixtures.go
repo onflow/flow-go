@@ -1,4 +1,4 @@
-package unittestnet
+package network
 
 import (
 	"fmt"
