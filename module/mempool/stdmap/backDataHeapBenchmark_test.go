@@ -28,12 +28,12 @@ func BenchmarkBaselineLRU(b *testing.B) {
 	}
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 
-	limit := uint(50_000)
+	limit := uint(50)
 	backData := stdmap.NewBackendWithBackData(
 		newBaselineLRU(int(limit)),
 		stdmap.WithLimit(limit))
 
-	entities := unittest.EntityListFixture(uint(100_000_000))
+	entities := unittest.EntityListFixture(uint(100_000))
 	testAddEntities(b, limit, backData, entities)
 
 	unittest.PrintHeapInfo(unittest.Logger()) // heap info after writing 100M entities
@@ -203,23 +203,24 @@ func (b baselineLRU) All() map[flow.Identifier]flow.Entity {
 
 func (b baselineLRU) Identifiers() flow.IdentifierList {
 	ids := make(flow.IdentifierList, b.c.Len())
-	i := 0
-	for _, entityID := range b.c.Keys() {
-		id, ok := entityID.(flow.Identifier)
+	entityIds := b.c.Keys()
+	total := len(entityIds)
+	for i := 0; i < total; i++ {
+		id, ok := entityIds[i].(flow.Identifier)
 		if !ok {
 			panic("could not assert to entity id")
 		}
 		ids[i] = id
-		i++
 	}
 	return ids
 }
 
 func (b baselineLRU) Entities() []flow.Entity {
 	entities := make([]flow.Entity, b.c.Len())
-	i := 0
-	for _, entityID := range b.c.Keys() {
-		id, ok := entityID.(flow.Identifier)
+	entityIds := b.c.Keys()
+	total := len(entityIds)
+	for i := 0; i < total; i++ {
+		id, ok := entityIds[i].(flow.Identifier)
 		if !ok {
 			panic("could not assert to entity id")
 		}
@@ -229,7 +230,6 @@ func (b baselineLRU) Entities() []flow.Entity {
 			panic("could not retrieve entity from mempool")
 		}
 		entities[i] = entity
-		i++
 	}
 	return entities
 }

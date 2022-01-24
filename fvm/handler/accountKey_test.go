@@ -2,6 +2,7 @@ package handler
 
 import (
 	errors2 "errors"
+	"fmt"
 	"testing"
 	"unicode/utf8"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -48,6 +50,100 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 
 	err = akh.AddEncodedAccountKey(runtime.Address(address), encodedPublicKey)
 	require.Error(t, err)
+
+	err = errors2.Unwrap(err)
+	require.IsType(t, &errors.ValueError{}, err)
+
+	errorString := err.Error()
+	assert.True(t, utf8.ValidString(errorString))
+
+	// check if they can encoded and decoded using CBOR
+	marshalledBytes, err := cbor.Marshal(errorString)
+	require.NoError(t, err)
+
+	var unmarshalledString string
+
+	err = cbor.Unmarshal(marshalledBytes, &unmarshalledString)
+	require.NoError(t, err)
+
+	require.Equal(t, errorString, unmarshalledString)
+}
+
+func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testing.T) {
+
+	invalidSignAlgo := runtime.SignatureAlgorithm(254)
+	publicKey := &runtime.PublicKey{
+		PublicKey: nil,
+		SignAlgo:  invalidSignAlgo,
+		IsValid:   false,
+		Validated: false,
+	}
+
+	_, err := NewAccountPublicKey(publicKey, sema.HashAlgorithmSHA2_384, 0, 0)
+
+	err = errors2.Unwrap(err)
+	require.IsType(t, &errors.ValueError{}, err)
+
+	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidSignAlgo))
+
+	errorString := err.Error()
+	assert.True(t, utf8.ValidString(errorString))
+
+	// check if they can encoded and decoded using CBOR
+	marshalledBytes, err := cbor.Marshal(errorString)
+	require.NoError(t, err)
+
+	var unmarshalledString string
+
+	err = cbor.Unmarshal(marshalledBytes, &unmarshalledString)
+	require.NoError(t, err)
+
+	require.Equal(t, errorString, unmarshalledString)
+}
+
+func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testing.T) {
+
+	publicKey := &runtime.PublicKey{
+		PublicKey: nil,
+		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
+		IsValid:   false,
+		Validated: false,
+	}
+
+	invalidHashAlgo := sema.HashAlgorithm(112)
+
+	_, err := NewAccountPublicKey(publicKey, invalidHashAlgo, 0, 0)
+
+	err = errors2.Unwrap(err)
+	require.IsType(t, &errors.ValueError{}, err)
+
+	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidHashAlgo))
+
+	errorString := err.Error()
+	assert.True(t, utf8.ValidString(errorString))
+
+	// check if they can encoded and decoded using CBOR
+	marshalledBytes, err := cbor.Marshal(errorString)
+	require.NoError(t, err)
+
+	var unmarshalledString string
+
+	err = cbor.Unmarshal(marshalledBytes, &unmarshalledString)
+	require.NoError(t, err)
+
+	require.Equal(t, errorString, unmarshalledString)
+}
+
+func TestNewAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
+
+	publicKey := &runtime.PublicKey{
+		PublicKey: []byte{0xc3, 0x28}, //some invalid UTF8
+		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
+		IsValid:   false,
+		Validated: false,
+	}
+
+	_, err := NewAccountPublicKey(publicKey, runtime.HashAlgorithmSHA2_256, 0, 0)
 
 	err = errors2.Unwrap(err)
 	require.IsType(t, &errors.ValueError{}, err)

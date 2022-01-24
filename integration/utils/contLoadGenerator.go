@@ -29,9 +29,8 @@ const (
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
 )
 
-var accountCreationBatchSize int = 100
-
-const tokensPerTransfer = 0.01 // flow testnets only have 10e6 total supply, so we choose a small amount here
+var accountCreationBatchSize = 50 // a higher number would hit max storage interaction limit
+const tokensPerTransfer = 0.01    // flow testnets only have 10e6 total supply, so we choose a small amount here
 
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them

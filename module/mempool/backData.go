@@ -10,37 +10,37 @@ import (
 // model layer of the mempool, the safety against concurrent operations are guaranteed by the Backend that
 // is the control layer.
 type BackData interface {
-	// Has checks if we already contain the item with the given hash.
+	// Has checks if backdata already contains the entity with the given identifier.
 	Has(entityID flow.Identifier) bool
 
-	// Add adds the given item to the pool.
+	// Add adds the given entity to the backdata.
 	Add(entityID flow.Identifier, entity flow.Entity) bool
 
-	// Rem will remove the item with the given hash.
+	// Rem removes the entity with the given identifier.
 	Rem(entityID flow.Identifier) (flow.Entity, bool)
 
-	// Adjust will adjust the value item using the given function if the given key can be found.
-	// Returns a bool which indicates whether the value was updated as well as the updated value
+	// Adjust adjusts the entity using the given function if the given identifier can be found.
+	// Returns a bool which indicates whether the entity was updated as well as the updated entity.
 	Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool)
 
-	// ByID returns the given item from the pool.
+	// ByID returns the given entity from the backdata.
 	ByID(entityID flow.Identifier) (flow.Entity, bool)
 
-	// Size will return the size of the backend.
+	// Size returns the size of the backdata, i.e., total number of stored (entityId, entity) pairs.
 	Size() uint
 
-	// All returns all entities from the pool.
+	// All returns all entities stored in the backdata.
 	All() map[flow.Identifier]flow.Entity
 
-	// Identifiers returns the list of identifiers (keys) of entities stored in the backdata.
+	// Identifiers returns the list of identifiers of entities stored in the backdata.
 	Identifiers() flow.IdentifierList
 
 	// Entities returns the list of entities stored in the backdata.
 	Entities() []flow.Entity
 
-	// Clear removes all entities from the pool.
+	// Clear removes all entities from the backdata.
 	Clear()
 
-	// Hash will use a merkle root hash to hash all items.
+	// Hash returns the merkle root hash of all entities.
 	Hash() flow.Identifier
 }
