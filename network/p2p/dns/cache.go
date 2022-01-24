@@ -27,7 +27,7 @@ type cache struct {
 	dCache mempool.DNSCache
 }
 
-func newCache(logger zerolog.Logger) *cache {
+func newCache(sizeLimit uint32, logger zerolog.Logger) *cache {
 	return &cache{
 		ttl:    DefaultTimeToLive,
 		dCache: stdmap.NewDNSCache(DefaultCacheSize, logger),

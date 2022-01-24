@@ -335,7 +335,7 @@ func generateLibP2PNode(t *testing.T,
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
 	// dns resolver
-	resolver := dns.NewResolver(noopMetrics)
+	resolver := dns.NewResolver(dns.DefaultCacheSize, unittest.Logger(), noopMetrics)
 
 	builder := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
 		SetSporkID(sporkID).

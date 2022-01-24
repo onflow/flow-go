@@ -53,7 +53,7 @@ func DefaultLibP2PNodeFactory(
 
 	connGater := NewConnGater(log)
 
-	resolver := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
+	resolver := dns.NewResolver(dns.DefaultCacheSize, log, metrics, dns.WithTTL(dnsResolverTTL))
 
 	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
 

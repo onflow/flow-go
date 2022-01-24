@@ -8,6 +8,7 @@ import (
 	_ "unsafe" // for linking runtimeNano
 
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
@@ -55,10 +56,10 @@ func WithTTL(ttl time.Duration) optFunc {
 }
 
 // NewResolver is the factory function for creating an instance of this resolver.
-func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
+func NewResolver(sizeLimit uint32, logger zerolog.Logger, collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
 		res:            madns.DefaultResolver,
-		c:              newCache(unittest.Logger()),
+		c:              newCache(sizeLimit, logger),
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},
