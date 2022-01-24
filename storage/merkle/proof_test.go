@@ -37,21 +37,89 @@ func TestProofWithASingleKey(t *testing.T) {
 	proof, existed = tree1.Prove(key2)
 	require.False(t, existed)
 	require.Nil(t, proof)
+}
 
-	// malformed proof - issue with the key
-	proof, existed = tree1.Prove(key)
+// TestValididateFormat tests cases a proof can not be valid
+func TestValididateFormat(t *testing.T) {
+
+	// construct a valid proof
+	keyLength := 32
+	key := make([]byte, keyLength)
+	key[0] = uint8(5)
+	value := make([]byte, 128)
+	value[0] = uint8(6)
+
+	key2 := make([]byte, keyLength)
+	key2[0] = uint8(4)
+	value2 := make([]byte, 128)
+
+	tree1, err := NewTree(keyLength)
+	assert.NoError(t, err)
+	replaced, err := tree1.Put(key, value)
+	assert.NoError(t, err)
+	require.False(t, replaced)
+	replaced, err = tree1.Put(key2, value2)
+	assert.NoError(t, err)
+	require.False(t, replaced)
+	proof, existed := tree1.Prove(key)
 	require.True(t, existed)
-	proof.Key = key2
 
-	isValid, err = proof.Verify(tree1.Hash())
+	// invalid key size
+	proof.Key = make([]byte, 0)
+	err = proof.valididateFormat()
 	assert.Error(t, err)
-	require.False(t, isValid)
+	require.Equal(t, err.Error(), "malformed proof, key is empty")
 
-	// malformed proof - issue with the expected state commitment
+	// invalid key size (too large)
+	proof.Key = make([]byte, maxKeyLength+1)
+	err = proof.valididateFormat()
+	assert.Error(t, err)
+	require.Equal(t, err.Error(), "malformed proof, key length is larger than max key length allowed (8193 > 8192)")
+
+	// issue with the key size not matching the rest of the proof
+	proof.Key = make([]byte, 64)
+	err = proof.valididateFormat()
+	assert.Error(t, err)
+	require.Equal(t, err.Error(), "malformed proof, key length doesn't match the length of ShortPathLengths and SiblingHashes")
+
+	// reset the key back to its original value
 	proof.Key = key
-	isValid, err = proof.Verify(nil)
+
+	// empty InterimNodeTypes
+	InterimNodeTypesBackup := proof.InterimNodeTypes
+	proof.InterimNodeTypes = make([]byte, 0)
+	err = proof.valididateFormat()
 	assert.Error(t, err)
-	require.False(t, isValid)
+	require.Equal(t, err.Error(), "malformed proof, InterimNodeTypes is empty")
+
+	// empty InterimNodeTypes
+	proof.InterimNodeTypes = make([]byte, maxKeyLength+1)
+	err = proof.valididateFormat()
+	assert.Error(t, err)
+	require.Equal(t, err.Error(), "malformed proof, InterimNodeTypes is larger than max key length allowed (8193 > 8192)")
+
+	// issue with the size of InterimNodeTypes
+	proof.InterimNodeTypes = append(InterimNodeTypesBackup, byte(0))
+	err = proof.valididateFormat()
+	assert.Error(t, err)
+	require.Equal(t, err.Error(), "malformed proof, the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
+
+	proof.InterimNodeTypes = InterimNodeTypesBackup
+
+	// issue with a short count
+	backupShortPathLengths := proof.ShortPathLengths
+	proof.ShortPathLengths[0] = uint16(10)
+	err = proof.valididateFormat()
+	assert.Error(t, err)
+	require.Equal(t, err.Error(), "malformed proof, key length doesn't match the length of ShortPathLengths and SiblingHashes")
+
+	// drop a shortpathlength - index out of bound
+	proof.ShortPathLengths = proof.ShortPathLengths[:1]
+	proof.ShortPathLengths[0] = uint16(255)
+	err = proof.valididateFormat()
+	assert.Error(t, err)
+	require.Equal(t, err.Error(), "malformed proof, not enough short path lengths are provided")
+	proof.ShortPathLengths = backupShortPathLengths
 }
 
 // TestProofsWithRandomKeys tests proof generation and verification

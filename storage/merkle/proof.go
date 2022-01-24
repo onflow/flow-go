@@ -26,7 +26,7 @@ type Proof struct {
 
 const maxStepsForProofVerification = maxKeyLength * 8
 
-// formatIsValid validates the format and size of elements of the proof
+// valididateFormat validates the format and size of elements of the proof (syntax check)
 //
 // A valid proof as to satisfy the following consistency conditions:
 // 1. A valid inclusion proof represents a full path through the merkle tree.
@@ -51,14 +51,14 @@ const maxStepsForProofVerification = maxKeyLength * 8
 //      we expect InterimNodeTypes[i] == 1
 //      and the number of bits is encoded in the respective element of ShortPathLengths
 //    Hence, the total key length _in bits_ should be: len(SiblingHashes) + sum(ShortPathLengths)
-func (p *Proof) formatIsValid() (bool, error) {
+func (p *Proof) valididateFormat() error {
 
 	// step1 - validate the key as the very first step
 	if len(p.Key) == 0 {
-		return false, NewMalformedProofErrorf("key is empty")
+		return NewMalformedProofErrorf("key is empty")
 	}
 	if len(p.Key) > maxKeyLength {
-		return false, NewMalformedProofErrorf("key length is larger than max key lenght allowed (%d > %d)", len(p.Key), maxKeyLength)
+		return NewMalformedProofErrorf("key length is larger than max key length allowed (%d > %d)", len(p.Key), maxKeyLength)
 	}
 
 	// step2 - check ShortPathLengths and SiblingHashes
@@ -66,7 +66,7 @@ func (p *Proof) formatIsValid() (bool, error) {
 	steps := len(p.ShortPathLengths) + len(p.SiblingHashes)
 	// check number of steps based on the max key length
 	if steps > maxStepsForProofVerification {
-		return false, NewMalformedProofErrorf("number of steps (len(ShortPathLengths)+ len(SiblingHashes) are larger than the max steps allowed (%d > %d)", steps, maxStepsForProofVerification)
+		return NewMalformedProofErrorf("number of steps (len(ShortPathLengths)+ len(SiblingHashes) are larger than the max steps allowed (%d > %d)", steps, maxStepsForProofVerification)
 	}
 
 	// validate number of bits that is going to be checked matches the size of the given key
@@ -76,21 +76,21 @@ func (p *Proof) formatIsValid() (bool, error) {
 	}
 
 	if len(p.Key)*8 != keyBitCount {
-		return false, NewMalformedProofErrorf("key length doesn't match the length of ShortPathLengths and SiblingHashes")
+		return NewMalformedProofErrorf("key length doesn't match the length of ShortPathLengths and SiblingHashes")
 	}
 
 	// step3 - check InterimNodeTypes
 
 	// size checks
 	if len(p.InterimNodeTypes) == 0 {
-		return false, NewMalformedProofErrorf("InterimNodeTypes is empty")
+		return NewMalformedProofErrorf("InterimNodeTypes is empty")
 	}
 	if len(p.InterimNodeTypes) > maxKeyLength {
-		return false, NewMalformedProofErrorf("InterimNodeTypes is larger than max key lenght allowed (%d > %d)", len(p.Key), maxKeyLength)
+		return NewMalformedProofErrorf("InterimNodeTypes is larger than max key length allowed (%d > %d)", len(p.InterimNodeTypes), maxKeyLength)
 	}
 	// InterimNodeTypes should only use the smallest number of bytes needed for steps
 	if len(p.InterimNodeTypes) != (steps+7)>>3 {
-		return false, NewMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
+		return NewMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
 	}
 
 	// semantic checks
@@ -102,22 +102,22 @@ func (p *Proof) formatIsValid() (bool, error) {
 	}
 
 	if numberOfShortNodes != len(p.ShortPathLengths) {
-		return false, NewMalformedProofErrorf("not enough short path lengths are provided")
+		return NewMalformedProofErrorf("not enough short path lengths are provided")
 	}
 
 	numberOfFullNodes := steps - numberOfShortNodes
 	if numberOfFullNodes != len(p.SiblingHashes) {
-		return false, NewMalformedProofErrorf("not enough sibling hashes are provided")
+		return NewMalformedProofErrorf("not enough sibling hashes are provided")
 	}
 
 	// check that tailing auxiliary bits (to make a complete full byte) are all zero
 	for i := len(p.InterimNodeTypes) - 1; i >= steps; i-- {
 		if bitutils.ReadBit(p.InterimNodeTypes, i) != 0 {
-			return false, NewMalformedProofErrorf("tailing auxiliary bits in InterimNodeTypes should all be zero")
+			return NewMalformedProofErrorf("tailing auxiliary bits in InterimNodeTypes should all be zero")
 		}
 	}
 
-	return true, nil
+	return nil
 }
 
 // Verify verifies the proof by constructing the hash values bottom up and cross check
@@ -126,8 +126,8 @@ func (p *Proof) formatIsValid() (bool, error) {
 func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 
 	// first validate the format of the proof
-	if valid, err := p.formatIsValid(); !valid {
-		return valid, err
+	if err := p.valididateFormat(); err != nil {
+		return false, err
 	}
 
 	// an index to consume SiblingHashes from the last element to the first element
