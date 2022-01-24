@@ -22,7 +22,6 @@ func TestEpochs(t *testing.T) {
 // TestStaticEpochTransition asserts epoch state transitions over two full epochs
 // without any nodes joining or leaving.
 func (s *Suite) TestStaticEpochTransition() {
-	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky test")
 
 	// use shorter epoch phases as no staking operations need to occur in the
 	// staking phase for this test
