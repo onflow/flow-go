@@ -26,6 +26,7 @@ func NewDNSCache(sizeLimit uint32, logger zerolog.Logger) *DNSCache {
 
 func (d *DNSCache) PutIpDomain(domain string, timestamp int64, addresses []net.IPAddr) bool {
 	i := ipEntity{
+		id:        domainToIdentifier(domain),
 		domain:    domain,
 		addresses: addresses,
 		timestamp: timestamp,
@@ -37,6 +38,7 @@ func (d *DNSCache) PutIpDomain(domain string, timestamp int64, addresses []net.I
 // PutTxtDomain adds the given txt domain into the cache.
 func (d *DNSCache) PutTxtDomain(domain string, timestamp int64, addresses []string) bool {
 	t := txtEntity{
+		id:        domainToIdentifier(domain),
 		domain:    domain,
 		addresses: addresses,
 		timestamp: timestamp,
@@ -108,11 +110,7 @@ type ipEntity struct {
 	timestamp int64
 }
 
-func (i *ipEntity) ID() flow.Identifier {
-	if i.id == flow.ZeroID {
-		i.id = domainToIdentifier(i.domain)
-	}
-
+func (i ipEntity) ID() flow.Identifier {
 	return i.id
 }
 
@@ -130,10 +128,7 @@ type txtEntity struct {
 	timestamp int64
 }
 
-func (t *txtEntity) ID() flow.Identifier {
-	if t.id == flow.ZeroID {
-		t.id = domainToIdentifier(t.domain)
-	}
+func (t txtEntity) ID() flow.Identifier {
 	return t.id
 }
 
