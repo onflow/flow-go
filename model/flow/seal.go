@@ -42,13 +42,6 @@ type Seal struct {
 	ResultID               Identifier
 	FinalState             StateCommitment
 	AggregatedApprovalSigs []AggregatedSignature // one AggregatedSignature per chunk
-
-	// Service Events are copied from the Execution Result. Therefore, repeating the
-	// the service events here opens the possibility for a data-inconsistency attack.
-	// It is _not_ necessary to repeat the ServiceEvents here, as an Execution Result
-	// must be incorporated into the fork before it can be sealed.
-	// TODO: include ServiceEvents in Execution Result and remove from Seal
-	ServiceEvents []ServiceEvent
 }
 
 func (s Seal) Body() interface{} {

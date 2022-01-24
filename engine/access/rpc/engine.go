@@ -103,9 +103,6 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
 
-	// add the logging interceptor
-	interceptors = append(interceptors, loggingInterceptor(log)...)
-
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
 		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).unaryServerInterceptor
@@ -113,11 +110,12 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
 
-	if len(interceptors) > 0 {
-		// create a chained unary interceptor
-		chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
-		grpcOpts = append(grpcOpts, chainedInterceptors)
-	}
+	// add the logging interceptor, ensure it is innermost wrapper
+	interceptors = append(interceptors, loggingInterceptor(log)...)
+
+	// create a chained unary interceptor
+	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+	grpcOpts = append(grpcOpts, chainedInterceptors)
 
 	// create an unsecured grpc server
 	unsecureGrpcServer := grpc.NewServer(grpcOpts...)
@@ -332,8 +330,7 @@ func (e *Engine) serveREST() {
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	restAPIHandler := rest.NewHandlers(e.backend, e.log)
-	e.restServer = rest.NewServer(restAPIHandler, e.config.RESTListenAddr, e.log)
+	e.restServer = rest.NewServer(e.backend, e.config.RESTListenAddr, e.log)
 
 	l, err := net.Listen("tcp", e.config.RESTListenAddr)
 	if err != nil {

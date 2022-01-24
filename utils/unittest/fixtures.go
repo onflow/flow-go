@@ -127,6 +127,25 @@ func AccountKeyFixture(
 	}, nil
 }
 
+// AccountFixture returns a randomly generated account.
+func AccountFixture() (*flow.Account, error) {
+	key, err := AccountKeyFixture(128, crypto.ECDSAP256, hash.SHA3_256)
+	if err != nil {
+		return nil, err
+	}
+
+	contracts := make(map[string][]byte, 2)
+	contracts["contract1"] = []byte("contract1")
+	contracts["contract2"] = []byte("contract2")
+
+	return &flow.Account{
+		Address:   RandomAddressFixture(),
+		Balance:   100,
+		Keys:      []flow.AccountPublicKey{key.PublicKey(1000)},
+		Contracts: contracts,
+	}, nil
+}
+
 func BlockFixture() flow.Block {
 	header := BlockHeaderFixture()
 	return *BlockWithParentFixture(&header)
@@ -689,7 +708,7 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 	}
 }
 
-func WIthServiceEvents(n int) func(result *flow.ExecutionResult) {
+func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
 	}
@@ -752,12 +771,6 @@ func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
 func WithChunk(chunkIdx uint64) func(*flow.ResultApproval) {
 	return func(approval *flow.ResultApproval) {
 		approval.Body.ChunkIndex = chunkIdx
-	}
-}
-
-func WithServiveEvents(events ...flow.ServiceEvent) func(*flow.ExecutionResult) {
-	return func(result *flow.ExecutionResult) {
-		result.ServiceEvents = events
 	}
 }
 
@@ -1376,8 +1389,25 @@ func SeedFixtures(m int, n int) [][]byte {
 	return seeds
 }
 
+// BlockEventsFixture returns a block events model populated with random events of length n.
+func BlockEventsFixture(header flow.Header, n int) flow.BlockEvents {
+	types := []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
+
+	events := make([]flow.Event, n)
+	for i := 0; i < n; i++ {
+		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
+	}
+
+	return flow.BlockEvents{
+		BlockID:        header.ID(),
+		BlockHeight:    header.Height,
+		BlockTimestamp: header.Timestamp,
+		Events:         events,
+	}
+}
+
 // EventFixture returns an event
-func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier, payloadSize int) flow.Event {
+func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier, _ int) flow.Event {
 	return flow.Event{
 		Type:             eType,
 		TransactionIndex: transactionIndex,
