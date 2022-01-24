@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -57,7 +58,7 @@ func WithTTL(ttl time.Duration) optFunc {
 func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
 		res:            madns.DefaultResolver,
-		c:              newCache(),
+		c:              newCache(unittest.Logger()),
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},
