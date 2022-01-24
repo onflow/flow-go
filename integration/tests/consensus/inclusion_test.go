@@ -118,10 +118,8 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	is.T().Logf("seen a proposal")
 
-	// send collection to each consensus node, ensure they are received the guarantee
-	for _, colID := range is.conIDs {
-		is.sendCollectionToConsensus(deadline, sentinel, colID)
-	}
+	// send collection to one consensus node
+	is.sendCollectionToConsensus(deadline, sentinel, is.conIDs[0])
 
 	proposal := is.waitUntilCollectionIncludeInProposal(deadline, sentinel)
 
