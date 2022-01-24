@@ -103,9 +103,6 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
 
-	// add the logging interceptor
-	interceptors = append(interceptors, loggingInterceptor(log)...)
-
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
 		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).unaryServerInterceptor
@@ -113,11 +110,12 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
 
-	if len(interceptors) > 0 {
-		// create a chained unary interceptor
-		chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
-		grpcOpts = append(grpcOpts, chainedInterceptors)
-	}
+	// add the logging interceptor, ensure it is innermost wrapper
+	interceptors = append(interceptors, loggingInterceptor(log)...)
+
+	// create a chained unary interceptor
+	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+	grpcOpts = append(grpcOpts, chainedInterceptors)
 
 	// create an unsecured grpc server
 	unsecureGrpcServer := grpc.NewServer(grpcOpts...)
