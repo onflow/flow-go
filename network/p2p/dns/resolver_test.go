@@ -3,7 +3,6 @@ package dns
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 	"testing"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
+	testnetwork "github.com/onflow/flow-go/utils/unittest/network"
 )
 
 const happyPath = true
@@ -29,8 +29,8 @@ func TestResolver_HappyPath(t *testing.T) {
 
 	size := 10 // 10 text and 10 ip domains.
 	times := 5 // each domain is queried 5 times.
-	txtTestCases := txtLookupFixture(size)
-	ipTestCases := ipLookupFixture(size)
+	txtTestCases := testnetwork.TxtLookupFixture(size)
+	ipTestCases := testnetwork.IpLookupFixture(size)
 
 	// each domain is resolved only once through the underlying resolver, and then is cached for subsequent times.
 	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, happyPath, 1)
@@ -56,8 +56,8 @@ func TestResolver_CacheExpiry(t *testing.T) {
 
 	size := 10 // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 5 times
-	txtTestCases := txtLookupFixture(size)
-	ipTestCase := ipLookupFixture(size)
+	txtTestCases := testnetwork.TxtLookupFixture(size)
+	ipTestCase := testnetwork.IpLookupFixture(size)
 
 	// each domain gets resolved through underlying resolver twice: once initially, and once after expiry.
 	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2)
@@ -87,8 +87,8 @@ func TestResolver_Error(t *testing.T) {
 
 	// one test case for txt and one for ip
 	times := 5 // each test case tried 5 times
-	txtTestCases := txtLookupFixture(1)
-	ipTestCase := ipLookupFixture(1)
+	txtTestCases := testnetwork.TxtLookupFixture(1)
+	ipTestCase := testnetwork.IpLookupFixture(1)
 
 	// mocks underlying basic resolver invoked 5 times per domain and returns an error each time.
 	// this evaluates that upon returning an error, the result is not cached, so the next invocation again goes
@@ -121,8 +121,8 @@ func TestResolver_Expired_Invalidated(t *testing.T) {
 	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start dns resolver on time")
 
 	// one test case for txt and one for ip
-	txtTestCases := txtLookupFixture(1)
-	ipTestCase := ipLookupFixture(1)
+	txtTestCases := testnetwork.TxtLookupFixture(1)
+	ipTestCase := testnetwork.IpLookupFixture(1)
 
 	// mocks test cases cached in resolver and waits for their expiry
 	mockCacheForDomains(resolver, ipTestCase, txtTestCases)
@@ -146,23 +146,13 @@ func TestResolver_Expired_Invalidated(t *testing.T) {
 	require.Zero(t, txtSize)
 }
 
-type ipLookupTestCase struct {
-	domain string
-	result []net.IPAddr
-}
-
-type txtLookupTestCase struct {
-	domain string
-	result []string
-}
-
 // syncThenAsyncQuery concurrently requests each test case for the specified number of times. The returned wait group will be released when
 // all queries have been resolved.
 func syncThenAsyncQuery(t *testing.T,
 	times int,
 	resolver *Resolver,
-	txtTestCases map[string]*txtLookupTestCase,
-	ipTestCases map[string]*ipLookupTestCase,
+	txtTestCases map[string]*testnetwork.TxtLookupTestCase,
+	ipTestCases map[string]*testnetwork.IpLookupTestCase,
 	happyPath bool) *sync.WaitGroup {
 
 	ctx := context.Background()
@@ -172,13 +162,13 @@ func syncThenAsyncQuery(t *testing.T,
 	for _, txttc := range txtTestCases {
 		cacheAndQuery(t, func(domain string) (interface{}, error) {
 			return resolver.LookupTXT(ctx, domain)
-		}, txttc.domain, txttc.result, times, wg, happyPath)
+		}, txttc.Domain, txttc.Result, times, wg, happyPath)
 	}
 
 	for _, iptc := range ipTestCases {
 		cacheAndQuery(t, func(domain string) (interface{}, error) {
 			return resolver.LookupIPAddr(ctx, domain)
-		}, iptc.domain, iptc.result, times, wg, happyPath)
+		}, iptc.Domain, iptc.Result, times, wg, happyPath)
 	}
 
 	return wg
@@ -230,8 +220,8 @@ func cacheAndQuery(t *testing.T,
 // Returned wait group is released when resolver is queried for `times * (len(ipLookupTestCases) + len(txtLookupTestCases))` times.
 func mockBasicResolverForDomains(t *testing.T,
 	resolver *mocknetwork.BasicResolver,
-	ipLookupTestCases map[string]*ipLookupTestCase,
-	txtLookupTestCases map[string]*txtLookupTestCase,
+	ipLookupTestCases map[string]*testnetwork.IpLookupTestCase,
+	txtLookupTestCases map[string]*testnetwork.TxtLookupTestCase,
 	happyPath bool,
 	times int) *sync.WaitGroup {
 
@@ -273,7 +263,7 @@ func mockBasicResolverForDomains(t *testing.T,
 			if !happyPath {
 				return nil
 			}
-			return ipLookupTestCases[domain].result
+			return ipLookupTestCases[domain].Result
 		},
 		func(ctx context.Context, domain string) error {
 			if !happyPath {
@@ -313,7 +303,7 @@ func mockBasicResolverForDomains(t *testing.T,
 			if !happyPath {
 				return nil
 			}
-			return txtLookupTestCases[domain].result
+			return txtLookupTestCases[domain].Result
 		},
 		func(ctx context.Context, domain string) error {
 			if !happyPath {
@@ -327,71 +317,14 @@ func mockBasicResolverForDomains(t *testing.T,
 
 // mockCacheForDomains updates cache of resolver with the test cases.
 func mockCacheForDomains(resolver *Resolver,
-	ipLookupTestCases map[string]*ipLookupTestCase,
-	txtLookupTestCases map[string]*txtLookupTestCase) {
+	ipLookupTestCases map[string]*testnetwork.IpLookupTestCase,
+	txtLookupTestCases map[string]*testnetwork.TxtLookupTestCase) {
 
 	for _, iptc := range ipLookupTestCases {
-		resolver.c.updateIPCache(iptc.domain, iptc.result)
+		resolver.c.updateIPCache(iptc.Domain, iptc.Result)
 	}
 
 	for _, txttc := range txtLookupTestCases {
-		resolver.c.updateTXTCache(txttc.domain, txttc.result)
+		resolver.c.updateTXTCache(txttc.Domain, txttc.Result)
 	}
-}
-
-func ipLookupFixture(count int) map[string]*ipLookupTestCase {
-	tt := make(map[string]*ipLookupTestCase)
-	for i := 0; i < count; i++ {
-		ipTestCase := &ipLookupTestCase{
-			domain: fmt.Sprintf("example%d.com", i),
-			result: []net.IPAddr{ // resolves each domain to 4 addresses.
-				netIPAddrFixture(),
-				netIPAddrFixture(),
-				netIPAddrFixture(),
-				netIPAddrFixture(),
-			},
-		}
-
-		tt[ipTestCase.domain] = ipTestCase
-	}
-
-	return tt
-}
-
-func txtLookupFixture(count int) map[string]*txtLookupTestCase {
-	tt := make(map[string]*txtLookupTestCase)
-
-	for i := 0; i < count; i++ {
-		ttTestCase := &txtLookupTestCase{
-			domain: fmt.Sprintf("_dnsaddr.example%d.com", i),
-			result: []string{ // resolves each domain to 4 addresses.
-				txtIPFixture(),
-				txtIPFixture(),
-				txtIPFixture(),
-				txtIPFixture(),
-			},
-		}
-
-		tt[ttTestCase.domain] = ttTestCase
-	}
-
-	return tt
-}
-
-func netIPAddrFixture() net.IPAddr {
-	token := make([]byte, 4)
-	rand.Read(token)
-
-	ip := net.IPAddr{
-		IP:   net.IPv4(token[0], token[1], token[2], token[3]),
-		Zone: "flow0",
-	}
-
-	return ip
-}
-
-func txtIPFixture() string {
-	token := make([]byte, 4)
-	rand.Read(token)
-	return "dnsaddr=" + net.IPv4(token[0], token[1], token[2], token[3]).String()
 }

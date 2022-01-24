@@ -1,4 +1,4 @@
-package network
+package testnetwork
 
 import (
 	"fmt"
