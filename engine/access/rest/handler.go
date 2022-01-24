@@ -132,10 +132,11 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 func (h *Handler) jsonResponse(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	// serialise response to JSON and handler errors
+	// serialize response to JSON and handler errors
 	encodedResponse, err := json.MarshalIndent(response, "", "\t")
 	if err != nil {
-		h.errorHandler(w, err, errLogger)
+		w.WriteHeader(http.StatusInternalServerError)
+		errLogger.Error().Err(err).Str("response", string(encodedResponse)).Msg("failed to indent response")
 		return
 	}
 
@@ -143,8 +144,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, code int, response interfa
 	// write response to response stream
 	_, err = w.Write(encodedResponse)
 	if err != nil {
-		h.errorHandler(w, err, errLogger)
-		return
+		errLogger.Error().Err(err).Str("response", string(encodedResponse)).Msg("failed to write http response")
 	}
 }
 
