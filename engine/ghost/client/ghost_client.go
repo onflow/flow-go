@@ -31,7 +31,7 @@ type GhostClient struct {
 
 func NewGhostClient(addr string) (*GhostClient, error) {
 
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(addr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}

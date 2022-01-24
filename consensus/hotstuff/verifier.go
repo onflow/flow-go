@@ -20,24 +20,33 @@ import (
 // repeated Identity lookups in the implementation, which increases performance.
 type Verifier interface {
 
-	// VerifyVote checks the validity of a vote for the given block.
-	// The first return value indicates whether `sigData` is a valid signature
-	// from the provided voter identity. It is the responsibility of the
-	// calling code to ensure that `voter` is authorized to vote.
-	// The implementation returns the following sentinel errors:
-	// * signature.ErrInvalidFormat if the signature has an incompatible format.
-	// * model.ErrInvalidSignature is the signature is invalid
-	// * unexpected errors should be treated as symptoms of bugs or uncovered
-	//   edge cases in the logic (i.e. as fatal)
+	// VerifyVote checks the cryptographic validity of a vote's `SigData` w.r.t.
+	// the given block. It is the responsibility of the calling code to ensure
+	// that `voter` is authorized to vote.
+	// Return values:
+	//  * nil if `sigData` is cryptographically valid
+	//  * model.ErrInvalidFormat if the signature has an incompatible format.
+	//  * model.ErrInvalidSignature is the signature is invalid
+	//  * model.InvalidSignerError is only relevant for extended signature schemes,
+	//    where special signing authority is only given to a _subset_ of consensus
+	//    participants (e.g. random beacon). In case a participant signed despite not
+	//    being authorized, an InvalidSignerError is returned.
+	//  * unexpected errors should be treated as symptoms of bugs or uncovered
+	//    edge cases in the logic (i.e. as fatal)
 	VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) error
 
-	// VerifyQC checks the validity of a QC for the given block.
-	// It returns:
-	//  - `nil` to indicate the given `sigData` is a valid signature from the
-	//          provided voter identity. It is the responsibility of the
-	//          calling code to ensure that `voter` is authorized to vote,
-	//          and the `voters` only contains authorized nodes (without duplicates).
-	//  - `signature.ErrInvalidFormat` if the signature has an incompatible format.
-	//  - error if running into any unexpected exception (i.e. fatal error)
+	// VerifyQC checks the cryptographic validity of a QC's `SigData` w.r.t. the
+	// given block. It is the responsibility of the calling code to ensure that
+	// all `voters` are authorized, without duplicates.
+	// Return values:
+	//  * nil if `sigData` is cryptographically valid
+	//  * model.ErrInvalidFormat if `sigData` has an incompatible format
+	//  * model.ErrInvalidSignature if a signature is invalid
+	//  * model.InvalidSignerError is only relevant for extended signature schemes,
+	//    where special signing authority is only given to a _subset_ of consensus
+	//    participants (e.g. random beacon). In case a participant signed despite not
+	//    being authorized, an InvalidSignerError is returned.
+	//  * unexpected errors should be treated as symptoms of bugs or uncovered
+	//	  edge cases in the logic (i.e. as fatal)
 	VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) error
 }

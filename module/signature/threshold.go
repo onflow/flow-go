@@ -5,7 +5,7 @@ package signature
 //   m<=t for unforgeability
 //   n-m>=t+1 for robustness
 func RandomBeaconThreshold(size int) int {
-	// avoid initializing the thershold to 0 when n=2
+	// avoid initializing the threshold to 0 when n=2
 	if size == 2 {
 		return 1
 	}

@@ -2,9 +2,10 @@ package epochs
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"testing"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -107,12 +108,12 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		s.Require().NoError(err)
 	}
 
-	// stop voting
-	s.StopVoting()
-
 	// check if each node has voted
 	for _, node := range nodes {
 		hasVoted := s.NodeHasVoted(node.NodeID)
 		s.Assert().True(hasVoted)
 	}
+
+	// stop voting
+	s.StopVoting()
 }

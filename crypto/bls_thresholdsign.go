@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -136,7 +137,7 @@ func NewBLSThresholdSignatureParticipant(
 // where n is the length of the public key shares slice.
 // The function errors with InvalidInputsError if:
 //  - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`
-//  - threshold value is not between 0 and n-1
+//  - threshold value is not in interval [1, n-1]
 //  - any input public key is not a BLS key
 func NewBLSThresholdSignatureInspector(
 	groupPublicKey PublicKey,

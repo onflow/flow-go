@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
-	msig "github.com/onflow/flow-go/module/signature"
 )
 
 const SigLen = crypto.SignatureLenBLSBLS12381
@@ -26,12 +26,12 @@ func EncodeSingleSig(sigType hotstuff.SigType, sig crypto.Signature) []byte {
 //  - sigType, signature, nil if the sig type is valid and the decoding is done successfully.
 func DecodeSingleSig(sigData []byte) (hotstuff.SigType, crypto.Signature, error) {
 	if len(sigData) == 0 {
-		return 0, nil, fmt.Errorf("empty sig data: %w", msig.ErrInvalidFormat)
+		return 0, nil, fmt.Errorf("empty sig data: %w", model.ErrInvalidFormat)
 	}
 
 	sigType := hotstuff.SigType(sigData[0])
 	if !sigType.Valid() {
-		return 0, nil, fmt.Errorf("invalid sig type %v: %w", sigType, msig.ErrInvalidFormat)
+		return 0, nil, fmt.Errorf("invalid sig type %v: %w", sigType, model.ErrInvalidFormat)
 	}
 
 	sig := crypto.Signature(sigData[1:])
@@ -69,5 +69,5 @@ func DecodeDoubleSig(sigData []byte) (crypto.Signature, crypto.Signature, error)
 		return sigData[:SigLen], sigData[SigLen:], nil
 	}
 
-	return nil, nil, fmt.Errorf("invalid sig data length %d: %w", sigLength, msig.ErrInvalidFormat)
+	return nil, nil, fmt.Errorf("invalid sig data length %d: %w", sigLength, model.ErrInvalidFormat)
 }

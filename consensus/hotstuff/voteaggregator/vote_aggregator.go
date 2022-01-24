@@ -124,10 +124,18 @@ func (va *VoteAggregator) processQueuedVoteEvents(ctx context.Context) error {
 
 		msg, ok := va.queuedVotes.Pop()
 		if ok {
-			err := va.processQueuedVote(msg.(*model.Vote))
+			vote := msg.(*model.Vote)
+			err := va.processQueuedVote(vote)
 			if err != nil {
-				return fmt.Errorf("could not process pending vote: %w", err)
+				return fmt.Errorf("could not process pending vote %v: %w", vote.ID(), err)
 			}
+
+			va.log.Info().
+				Uint64("view", vote.View).
+				Hex("block_id", vote.BlockID[:]).
+				Str("vote_id", vote.ID().String()).
+				Msg("vote has been processed successfully")
+
 			continue
 		}
 
@@ -140,8 +148,11 @@ func (va *VoteAggregator) processQueuedVoteEvents(ctx context.Context) error {
 // processQueuedVote performs actual processing of queued votes, this method is called from multiple
 // concurrent goroutines.
 func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
-	// TODO: log created
-	collector, _, err := va.collectors.GetOrCreateCollector(vote.View)
+	collector, created, err := va.collectors.GetOrCreateCollector(vote.View)
+	if created {
+		va.log.Info().Uint64("view", vote.View).Msg("vote collector is created by processing vote")
+	}
+
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
 		if mempool.IsDecreasingPruningHeightError(err) {
@@ -170,6 +181,14 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 func (va *VoteAggregator) AddVote(vote *model.Vote) {
 	// drop stale votes
 	if vote.View < va.lowestRetainedView.Value() {
+
+		va.log.Info().
+			Uint64("block_view", vote.View).
+			Hex("block_id", vote.BlockID[:]).
+			Hex("voter", vote.SignerID[:]).
+			Str("vote_id", vote.ID().String()).
+			Msg("drop stale votes")
+
 		return
 	}
 
@@ -192,9 +211,16 @@ func (va *VoteAggregator) AddBlock(block *model.Proposal) error {
 		return mempool.NewDecreasingPruningHeightErrorf("block proposal for view %d is stale, lowestRetainedView is %d", block.Block.View, va.lowestRetainedView.Value())
 	}
 
-	collector, _, err := va.collectors.GetOrCreateCollector(block.Block.View)
+	collector, created, err := va.collectors.GetOrCreateCollector(block.Block.View)
 	if err != nil {
 		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
+	}
+
+	if created {
+		va.log.Info().
+			Uint64("view", block.Block.View).
+			Hex("block_id", block.Block.BlockID[:]).
+			Msg("vote collector is created by processing block")
 	}
 
 	err = collector.ProcessBlock(block)
