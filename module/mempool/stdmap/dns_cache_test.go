@@ -2,9 +2,11 @@ package stdmap_test
 
 import (
 	"testing"
+
+	testnetwork "github.com/onflow/flow-go/utils/unittest/network"
 )
 
 func TestDNSCache(t *testing.T) {
-	// cache := stdmap.NewDNSCache(500, unittest.Logger())
+	ipFixtures := testnetwork.IpLookupTestCase{}
 
 }
