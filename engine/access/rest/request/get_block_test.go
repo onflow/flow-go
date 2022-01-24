@@ -10,9 +10,9 @@ import (
 func TestGetBlock_InvalidParse(t *testing.T) {
 	var getBlock GetBlock
 
-	tooLong := make([]string, MaxAllowedHeights+2)
+	tooLong := make([]string, MaxAllowedHeights+1)
 	for i := range tooLong {
-		tooLong[i] = "1"
+		tooLong[i] = fmt.Sprintf("%d", i)
 	}
 
 	tests := []struct {
