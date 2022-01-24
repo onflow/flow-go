@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 //go:linkname runtimeNano runtime.nanotime
