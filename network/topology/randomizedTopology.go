@@ -13,6 +13,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+const Randomized = Name("randomized")
+
+func RandomizedTopologyFactory() FactoryFunction {
+	return func(nodeId flow.Identifier, logger zerolog.Logger, state protocol.State, edgeProb float64) (network.Topology, error) {
+		return NewRandomizedTopology(nodeId, logger, edgeProb, state)
+	}
+}
+
 // RandomizedTopology generates a random topology per channel.
 // By random topology we mean a node is connected to any other co-channel nodes with some
 // edge probability.

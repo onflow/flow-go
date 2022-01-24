@@ -99,7 +99,7 @@ func TestUint(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("basic randomness", func(t *testing.T) {
-		sampleSize := 50000
+		sampleSize := 80000
 		tolerance := 0.05
 		sampleSpace := uint64(10 + mrand.Intn(100))
 		distribution := make([]float64, sampleSpace)
@@ -220,7 +220,7 @@ func TestShuffle(t *testing.T) {
 	t.Run("basic randomness", func(t *testing.T) {
 		listSize := 100
 		// test parameters
-		sampleSize := 50000
+		sampleSize := 80000
 		tolerance := 0.05
 		// the distribution of a particular element of the list, testElement
 		distribution := make([]float64, listSize)
@@ -305,7 +305,7 @@ func TestSamples(t *testing.T) {
 		samplesSize := 20
 
 		// statictics parameters
-		sampleSize := 50000
+		sampleSize := 100000
 		tolerance := 0.05
 		// tests the subset sampling randomness
 		samplingDistribution := make([]float64, listSize)
