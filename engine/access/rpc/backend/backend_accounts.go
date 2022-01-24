@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -42,7 +41,7 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 
 	account, err := b.getAccountAtBlockID(ctx, address, latestBlockID)
 	if err != nil {
-		b.log.Error().Err(err).Msg(fmt.Sprintf("failed to get account at blockID: %v", latestBlockID))
+		b.log.Error().Err(err).Msgf("failed to get account at blockID: %v", latestBlockID)
 		return nil, err
 	}
 
