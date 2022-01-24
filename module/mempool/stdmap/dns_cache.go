@@ -100,13 +100,20 @@ func (d DNSCache) Size() (uint, uint) {
 
 // ipEntity is a dns cache entry for ip records.
 type ipEntity struct {
+	// caching identifier to avoid cpu overhead
+	// per query.
+	id        flow.Identifier
 	domain    string
 	addresses []net.IPAddr
 	timestamp int64
 }
 
-func (i ipEntity) ID() flow.Identifier {
-	return domainToIdentifier(i.domain)
+func (i *ipEntity) ID() flow.Identifier {
+	if i.id == flow.ZeroID {
+		i.id = domainToIdentifier(i.domain)
+	}
+
+	return i.id
 }
 
 func (i ipEntity) Checksum() flow.Identifier {
@@ -115,13 +122,19 @@ func (i ipEntity) Checksum() flow.Identifier {
 
 // txtEntity is a dns cache entry for txt records.
 type txtEntity struct {
+	// caching identifier to avoid cpu overhead
+	// per query.
+	id        flow.Identifier
 	domain    string
 	addresses []string
 	timestamp int64
 }
 
-func (t txtEntity) ID() flow.Identifier {
-	return domainToIdentifier(t.domain)
+func (t *txtEntity) ID() flow.Identifier {
+	if t.id == flow.ZeroID {
+		t.id = domainToIdentifier(t.domain)
+	}
+	return t.id
 }
 
 func (t txtEntity) Checksum() flow.Identifier {
