@@ -47,11 +47,15 @@ func NewClusterCommittee(
 	}
 
 	com := &Cluster{
-		state:                 state,
-		payloads:              payloads,
-		me:                    me,
-		selection:             selection,
-		clusterMemberFilter:   cluster.Members().Selector(),
+		state:     state,
+		payloads:  payloads,
+		me:        me,
+		selection: selection,
+		clusterMemberFilter: filter.And(
+			cluster.Members().Selector(),
+			filter.Not(filter.Ejected),
+			filter.HasStake(true),
+		),
 		initialClusterMembers: cluster.Members(),
 	}
 	return com, nil

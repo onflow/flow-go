@@ -517,3 +517,19 @@ func (il IdentityList) EqualTo(other IdentityList) bool {
 	}
 	return true
 }
+
+// GetIndex returns the index of the identifier in the IdentityList and true
+// if the identifier is found.
+func (il IdentityList) GetIndex(identifier Identifier) (uint, bool) {
+	index := 0
+	ok := false
+	for i, id := range il.NodeIDs() {
+		if id == identifier {
+			index = i
+			ok = true
+			break
+		}
+	}
+
+	return uint(index), ok
+}

@@ -307,3 +307,19 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		require.True(t, b.EqualTo(a))
 	})
 }
+
+func TestIdentityList_GetIndex(t *testing.T) {
+	t.Run("should return expected index of identifier in identity list and true", func(t *testing.T) {
+		participants := unittest.IdentityListFixture(3)
+		index, ok := participants.GetIndex(participants[1].NodeID)
+		require.True(t, ok)
+		require.Equal(t, uint(1), index)
+	})
+
+	t.Run("should return 0 and false for identifier not found in identity list", func(t *testing.T) {
+		participants := unittest.IdentityListFixture(3)
+		index, ok := participants.GetIndex(unittest.IdentifierFixture())
+		require.False(t, ok)
+		require.Equal(t, uint(0), index)
+	})
+}

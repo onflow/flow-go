@@ -181,6 +181,11 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		Interface("members", committee.NodeIDs()).
 		Msg("epoch info")
 
+	if _, ok := committee.GetIndex(e.me.NodeID()); !ok {
+		// node not found in DKG committee bypass starting the DKG
+		log.Warn().Str("node_id", e.me.NodeID().String()).Msg("failed to find our node ID in the DKG committee skip starting DKG engine, this node will not participate in consensus after the next epoch starts")
+		return
+	}
 	controller, err := e.controllerFactory.Create(
 		dkgmodule.CanonicalInstanceID(first.ChainID, nextEpochCounter),
 		committee,

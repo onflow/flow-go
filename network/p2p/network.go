@@ -315,9 +315,10 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	defer n.Unlock()
 
 	subscribedChannels := n.subMngr.Channels()
+
 	top, err := n.top.GenerateFanout(n.Identities(), subscribedChannels)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate topology: %w", err)
+		return nil, fmt.Errorf("could not generate topology: %w, subscribed: %d", err, len(subscribedChannels))
 	}
 	return top, nil
 }
