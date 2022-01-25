@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -63,10 +64,18 @@ func TestTopicValidator(t *testing.T) {
 
 	// assert that the nodes are connected as expected
 	require.Eventually(t, func() bool {
+		fmt.Println()
+		fmt.Println(node1.host.ID().String())
+		fmt.Println(node1.pubSub.ListPeers(badTopic.String()))
+		fmt.Println(node2.host.ID().String())
+		fmt.Println(node2.pubSub.ListPeers(badTopic.String()))
+		fmt.Println(unstakedNode.host.ID().String())
+		fmt.Println(unstakedNode.pubSub.ListPeers(badTopic.String()))
+		fmt.Println()
 		return len(node1.pubSub.ListPeers(badTopic.String())) > 0 &&
 			len(node2.pubSub.ListPeers(badTopic.String())) > 0 &&
 			len(unstakedNode.pubSub.ListPeers(badTopic.String())) > 0
-	}, 3*time.Second, 100*time.Millisecond)
+	}, 5*time.Second, 100*time.Millisecond)
 
 	m := message.Message{
 		Payload: []byte("hello"),
@@ -81,15 +90,25 @@ func TestTopicValidator(t *testing.T) {
 	err = node2.Publish(timedCtx, badTopic, data)
 	require.NoError(t, err)
 
+	timedCtx, cancel5s = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel5s()
+
 	// node1 gets the message
 	msg, err := sub1.Next(timedCtx)
 	require.NoError(t, err)
 	require.Equal(t, msg.Data, data)
 
+
+	timedCtx, cancel5s = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel5s()
+
 	// node2 also gets the message (as part of the libp2p loopback of published topic messages)
 	msg, err = sub2.Next(timedCtx)
 	require.NoError(t, err)
 	require.Equal(t, msg.Data, data)
+
+	timedCtx, cancel5s = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel5s()
 
 	// the unstaked node also gets the message since it subscribed to the channel without the topic validator
 	msg, err = unstakedSub.Next(timedCtx)
@@ -103,6 +122,10 @@ func TestTopicValidator(t *testing.T) {
 	err = unstakedNode.Publish(timedCtx, badTopic, data)
 	require.NoError(t, err)
 
+
+	timedCtx, cancel2s = context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel2s()
+
 	// it receives its own message
 	msg, err = unstakedSub.Next(timedCtx)
 	require.NoError(t, err)
@@ -111,23 +134,23 @@ func TestTopicValidator(t *testing.T) {
 	// node 1 does NOT receive the message due to the topic validator
 	var wg sync.WaitGroup
 	wg.Add(1)
-	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	timedCtx1, cancel1 := context.WithTimeout(context.Background(), time.Second)
+	defer cancel1()
 	go func() {
-		msg, err = sub1.Next(timedCtx)
+		_, err := sub1.Next(timedCtx1)
 		require.Error(t, err)
 		wg.Done()
 	}()
 
-	// node 2 also does not receive the message via gossip from the node1 (event after the 1 second hearbeat)
+	// node 2 also does not receive the message via gossip from the node1 (event after the 1 second heartbeat)
 	wg.Add(1)
-	timedCtx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	timedCtx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel2()
 	go func() {
-		msg, err = sub2.Next(timedCtx)
+		defer wg.Done()
+		_, err := sub2.Next(timedCtx2)
 		require.Error(t, err)
-		wg.Done()
 	}()
 
-	wg.Wait()
+	unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 }
