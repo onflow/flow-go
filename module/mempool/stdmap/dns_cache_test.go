@@ -51,12 +51,6 @@ func testAddToCache(t *testing.T,
 	for _, fixture := range ipTestCases {
 		go func(fixture *network.IpLookupTestCase) {
 			require.True(t, cache.PutIpDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
-			addresses, timestamp, ok := cache.GetIpDomain(fixture.Domain)
-			require.True(t, ok)
-
-			require.Equal(t, fixture.TimeStamp, timestamp)
-			require.Equal(t, fixture.Result, addresses)
-
 			wg.Done()
 		}(fixture)
 	}
@@ -64,12 +58,6 @@ func testAddToCache(t *testing.T,
 	for _, fixture := range txtTestCases {
 		go func(fixture *network.TxtLookupTestCase) {
 			require.True(t, cache.PutTxtDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
-
-			addresses, timestamp, ok := cache.GetTxtDomain(fixture.Domain)
-			require.True(t, ok)
-
-			require.Equal(t, fixture.TimeStamp, timestamp)
-			require.Equal(t, fixture.Result, addresses)
 			wg.Done()
 		}(fixture)
 	}
