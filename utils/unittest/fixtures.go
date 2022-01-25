@@ -321,18 +321,18 @@ func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identi
 	return *block
 }
 
-func BlockWithParentAndSeal(
-	parent *flow.Header, sealed *flow.Header) *flow.Block {
+func BlockWithParentAndSeals(parent *flow.Header, seals []*flow.Header) *flow.Block {
 	block := BlockWithParentFixture(parent)
 	payload := flow.Payload{
 		Guarantees: nil,
 	}
 
-	if sealed != nil {
-		payload.Seals = []*flow.Seal{
-			Seal.Fixture(
-				Seal.WithBlockID(sealed.ID()),
-			),
+	if len(seals) > 0 {
+		payload.Seals = make([]*flow.Seal, len(seals))
+		for i, seal := range seals {
+			payload.Seals[i] = Seal.Fixture(
+				Seal.WithBlockID(seal.ID()),
+			)
 		}
 	}
 
@@ -719,6 +719,12 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
+	}
+}
+
+func WithExecutionDataID(id flow.Identifier) func(result *flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.ExecutionDataID = id
 	}
 }
 
