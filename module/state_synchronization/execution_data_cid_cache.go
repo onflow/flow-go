@@ -50,7 +50,7 @@ type BlobRecord struct {
 
 func (e *ExecutionDataCIDCacheImpl) Get(c cid.Cid) (BlobRecord, error) {
 	e.mu.RLock()
-	defer e.mu.Unlock()
+	defer e.mu.RUnlock()
 
 	if record, ok := e.blobs[c]; ok {
 		return record, nil
