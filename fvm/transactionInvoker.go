@@ -212,7 +212,7 @@ func (i *TransactionInvoker) Process(
 			// drop delta
 			childState.View().DropDelta()
 			programs.Cleanup(nil)
-			i.logger.Warn().
+			i.logger.Info().
 				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
