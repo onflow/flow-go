@@ -393,11 +393,17 @@ func main() {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
 
+			// disable balance checks for transient networks, which do not have transaction fees
+			var opts []epochs.MachineAccountValidatorConfigOption
+			if node.RootChainID.Transient() {
+				opts = append(opts, epochs.WithoutBalanceChecks)
+			}
 			validator, err := epochs.NewMachineAccountConfigValidator(
 				node.Logger,
 				flowClient,
 				flow.RoleCollection,
 				*machineAccountInfo,
+				opts...,
 			)
 			return validator, err
 		}).
