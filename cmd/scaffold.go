@@ -132,6 +132,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
+	fnb.flags.StringVar(&fnb.BaseConfig.topologyProtocolName, "topology", defaultConfig.topologyProtocolName, "networking overlay topology")
+	fnb.flags.Float64Var(&fnb.BaseConfig.topologyEdgeProbability, "topology-edge-probability", defaultConfig.topologyEdgeProbability,
+		"pairwise edge probability between nodes in topology")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -198,11 +201,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
 
-		top, err := topology.NewTopicBasedTopology(
-			fnb.NodeID,
-			fnb.Logger,
-			fnb.State,
-		)
+		topologyFactory, err := topology.Factory(topology.Name(fnb.topologyProtocolName))
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.topologyProtocolName, err)
+		}
+		top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.topologyEdgeProbability)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
