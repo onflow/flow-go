@@ -63,13 +63,6 @@ func (d *spongeState) Write(p []byte) (int, error) {
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-const (
-	// maxRate is the maximum size of the internal buffer. SHA3-256
-	// currently needs the largest buffer among supported sponge-based
-	// algorithms.
-	maxRate = rateSHA3_256
-)
-
 type spongeState struct {
 	// the hashing algorithm name
 	algo HashingAlgorithm
@@ -96,6 +89,16 @@ type spongeState struct {
 	outputLen int  // the default output size in bytes
 }
 
+const (
+	// maxRate is the maximum size of the internal buffer. SHA3-256
+	// currently needs the largest buffer among supported sponge-based
+	// algorithms.
+	maxRate = rateSHA3_256
+
+	// initialization value of the buffer index
+	bufNilValue = -1
+)
+
 // returns the current buf
 func (d *spongeState) buf() []byte {
 	return d.storage.asBytes()[d.bufIndex : d.bufIndex+d.bufSize]
@@ -107,8 +110,6 @@ func (d *spongeState) setBuf(start, size int) {
 	d.bufIndex = start
 	d.bufSize = size
 }
-
-const bufNilValue = -1
 
 // checks if `buf` is nil (not yet set)
 func (d *spongeState) bufIsNil() bool {

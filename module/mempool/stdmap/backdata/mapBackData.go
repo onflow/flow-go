@@ -18,13 +18,13 @@ func NewMapBackData() *MapBackData {
 	return bd
 }
 
-// Has checks if we already contain the item with the given identifier.
+// Has checks if backdata already contains the entity with the given identifier.
 func (b MapBackData) Has(entityID flow.Identifier) bool {
 	_, exists := b.entities[entityID]
 	return exists
 }
 
-// Add adds the given entity to the BackData.
+// Add adds the given entity to the backdata.
 func (b *MapBackData) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	_, exists := b.entities[entityID]
 	if exists {
@@ -34,7 +34,7 @@ func (b *MapBackData) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	return true
 }
 
-// Rem will remove the entity with the given identifier.
+// Rem removes the entity with the given identifier.
 func (b *MapBackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 	entity, exists := b.entities[entityID]
 	if !exists {
@@ -44,8 +44,8 @@ func (b *MapBackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 	return entity, true
 }
 
-// Adjust will adjust the value item using the given function if the given key can be found.
-// Returns a bool which indicates whether the value was updated as well as the updated value
+// Adjust adjusts the entity using the given function if the given identifier can be found.
+// Returns a bool which indicates whether the entity was updated as well as the updated entity.
 func (b *MapBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
 	entity, ok := b.entities[entityID]
 	if !ok {
@@ -59,7 +59,7 @@ func (b *MapBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.
 	return newentity, true
 }
 
-// ByID returns the given item from the BackData.
+// ByID returns the given entity from the backdata.
 func (b MapBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	entity, exists := b.entities[entityID]
 	if !exists {
@@ -68,12 +68,12 @@ func (b MapBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	return entity, true
 }
 
-// Size will return the size of the BackData.
+// Size returns the size of the backdata, i.e., total number of stored (entityId, entity)
 func (b MapBackData) Size() uint {
 	return uint(len(b.entities))
 }
 
-// All returns all entities from the BackData.
+// All returns all entities stored in the backdata.
 func (b MapBackData) All() map[flow.Identifier]flow.Entity {
 	entities := make(map[flow.Identifier]flow.Entity)
 	for entityID, entity := range b.entities {
@@ -82,12 +82,34 @@ func (b MapBackData) All() map[flow.Identifier]flow.Entity {
 	return entities
 }
 
-// Clear removes all entities from the BackData.
+// Identifiers returns the list of identifiers of entities stored in the backdata.
+func (b MapBackData) Identifiers() flow.IdentifierList {
+	ids := make(flow.IdentifierList, len(b.entities))
+	i := 0
+	for entityID := range b.entities {
+		ids[i] = entityID
+		i++
+	}
+	return ids
+}
+
+// Entities returns the list of entities stored in the backdata.
+func (b MapBackData) Entities() []flow.Entity {
+	entities := make([]flow.Entity, len(b.entities))
+	i := 0
+	for _, entity := range b.entities {
+		entities[i] = entity
+		i++
+	}
+	return entities
+}
+
+// Clear removes all entities from the backdata.
 func (b *MapBackData) Clear() {
 	b.entities = make(map[flow.Identifier]flow.Entity)
 }
 
-// Hash will use a merkle root hash to hash all entities.
+// Hash returns the merkle root hash of all entities.
 func (b *MapBackData) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
 }

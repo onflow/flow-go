@@ -206,14 +206,13 @@ func TestKeccak(t *testing.T) {
 	r := time.Now().UnixNano()
 	rand.Seed(r)
 	t.Logf("math rand seed is %d", r)
-	var expected [HashLenKeccak_256]byte
 
 	for i := 0; i < 5000; i++ {
 		value := make([]byte, i)
 		rand.Read(value)
 		k := sha3.NewLegacyKeccak256()
 		k.Write(value)
-		k.Sum(expected[:0])
+		expected := k.Sum(nil)
 
 		// test hash computation using the hasher
 		hasher := NewKeccak_256()
