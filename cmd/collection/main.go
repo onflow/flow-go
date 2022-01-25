@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
-
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go-sdk/client"
@@ -91,6 +91,13 @@ func main() {
 		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
+
+		// dynamic start up
+		dynamicStartup    bool
+		initANAddress     string
+		initANPubkey      string
+		startupEpochPhase string
+		startupEpoch      int
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
@@ -147,6 +154,14 @@ func main() {
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+
+		// dynamic node startup flags
+		flags.BoolVar(&dynamicStartup, "dynamic-startup", false, "when set to true the node will attempt to wait for a specified epoch counter & phase before initializing")
+		flags.StringVar(&initANPubkey, "init-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+		flags.StringVar(&initANAddress, "init-access-address", "", "the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+		flags.StringVar(&startupEpochPhase, "startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase in integer form for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
+		flags.IntVar(&startupEpoch, "startup-epoch", 0, "the epoch the node will wait for before initializing modules when using dynamic-startup")
+
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -163,6 +178,18 @@ func main() {
 	}
 
 	nodeBuilder.
+		PreInit(func(nodeConfig *cmd.NodeConfig) error {
+			if !dynamicStartup {
+				return nil
+			}
+
+			err := cmd.DynamicStartup(nodeConfig.Logger, initANAddress, initANPubkey, uint64(startupEpoch), flow.GetEpochPhase(startupEpochPhase), filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+			if err != nil {
+				return fmt.Errorf("dynamic startup pre-init failed: %w", err)
+			}
+
+			return nil
+		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory

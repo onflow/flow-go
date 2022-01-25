@@ -117,6 +117,13 @@ func main() {
 		finalizedHeader         *synceng.FinalizedHeaderCache
 		dkgState                *bstorage.DKGState
 		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
+
+		// dynamic start up
+		dynamicStartup    bool
+		initANAddress     string
+		initANPubkey      string
+		startupEpochPhase string
+		startupEpoch      int
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -148,6 +155,14 @@ func main() {
 		flags.DurationVar(&dkgControllerConfig.BaseHandleFirstBroadcastDelay, "dkg-controller-base-handle-first-broadcast-delay", dkgmodule.DefaultBaseHandleFirstBroadcastDelay, "used to define the range for jitter prior to DKG handling the first broadcast messages (eg. 50ms) - the base value is scaled quadratically with the # of DKG participants")
 		flags.DurationVar(&dkgControllerConfig.HandleSubsequentBroadcastDelay, "dkg-controller-handle-subsequent-broadcast-delay", dkgmodule.DefaultHandleSubsequentBroadcastDelay, "used to define the constant delay introduced prior to DKG handling subsequent broadcast messages (eg. 2s)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
+
+		// dynamic node startup flags
+		flags.BoolVar(&dynamicStartup, "dynamic-startup", false, "when set to true the node will attempt to wait for a specified epoch counter & phase before initializing")
+		flags.StringVar(&initANPubkey, "init-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+		flags.StringVar(&initANAddress, "init-access-address", "", "the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+		flags.StringVar(&startupEpochPhase, "startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase in integer form for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
+		flags.IntVar(&startupEpoch, "startup-epoch", 0, "the epoch the node will wait for before initializing modules when using dynamic-startup")
+
 	}).ValidateFlags(func() error {
 		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
 		if startupTimeString != cmd.NotSet {
@@ -166,6 +181,18 @@ func main() {
 	}
 
 	nodeBuilder.
+		PreInit(func(nodeConfig *cmd.NodeConfig) error {
+			if !dynamicStartup {
+				return nil
+			}
+
+			err := cmd.DynamicStartup(nodeConfig.Logger, initANAddress, initANPubkey, uint64(startupEpoch), flow.GetEpochPhase(startupEpochPhase), filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+			if err != nil {
+				return fmt.Errorf("dynamic startup pre-init failed: %w", err)
+			}
+
+			return nil
+		}).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
