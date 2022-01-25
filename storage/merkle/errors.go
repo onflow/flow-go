@@ -27,6 +27,12 @@ func (e MalformedProofError) Unwrap() error {
 	return e.err
 }
 
+// IsMalformedProofError checks if err is a MalformedProofError
+func IsMalformedProofError(err error) bool {
+	var target *MalformedProofError
+	return errors.As(err, &target)
+}
+
 // InvalidProofError is returned when proof
 // verification has failed (semantic check).
 // The most common case for this error is when the computed root hash
@@ -47,4 +53,10 @@ func (e InvalidProofError) Error() string {
 // Unwrap unwraps the error
 func (e InvalidProofError) Unwrap() error {
 	return e.err
+}
+
+// IsInvalidProofError checks if err is a InvalidProofError
+func IsInvalidProofError(err error) bool {
+	var target *InvalidProofError
+	return errors.As(err, &target)
 }

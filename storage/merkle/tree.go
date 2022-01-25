@@ -269,7 +269,8 @@ GetLoop:
 }
 
 // Prove constructs an inclusion proof for the given key, provided the key exists in the trie.
-// It traverses the trie from top to down and collects data for proof as follows:
+// It returns a proof and a boolean (true if key exist and false if key not found)
+// Proof is constructed by traversing the trie from top to down and collects data for proof as follows:
 //  - if full node, capture the sibling node hash value and append zero to short counts
 //  - if short node, appends the node.shortCount to the short count list
 //  - if leaf, would capture the leaf value
@@ -317,8 +318,8 @@ ProveLoop:
 
 			continue ProveLoop
 
-		// if we have a short node, we can only follow the path if the key's subsequent 
-		// bits match the entire path segment of the short node. 
+		// if we have a short node, we can only follow the path if the key's subsequent
+		// bits match the entire path segment of the short node.
 		case *short:
 
 			// if any part of the path doesn't match, key doesn't exist
