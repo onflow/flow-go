@@ -72,16 +72,13 @@ func (p *Proof) validateFormat() error {
 
 	// step2 - check ShortPathLengths and SiblingHashes
 
-	steps := len(p.ShortPathLengths) + len(p.SiblingHashes)
-	// check number of steps based on the max key length
-	if steps > maxStepsForProofVerification {
-		return NewMalformedProofErrorf("number of steps (len(ShortPathLengths)+ len(SiblingHashes) are larger than the max steps allowed (%d > %d)", steps, maxStepsForProofVerification)
-	}
-
 	// validate number of bits that is going to be checked matches the size of the given key
 	keyBitCount := len(p.SiblingHashes)
 	for _, sc := range p.ShortPathLengths {
-		keyBitCount += int(sc)
+		if keyBitCount > maxStepsForProofVerification {
+			return NewMalformedProofErrorf("number of key bits (%d) exceed limit (%d)", keyBitCount, maxStepsForProofVerification)
+		}
+		keyBitCount += CountUint16EncodingToInt(sc)
 	}
 
 	if len(p.Key)*8 != keyBitCount {
@@ -98,6 +95,7 @@ func (p *Proof) validateFormat() error {
 		return NewMalformedProofErrorf("InterimNodeTypes is larger than max key length allowed (%d > %d)", len(p.InterimNodeTypes), maxKeyLength)
 	}
 	// InterimNodeTypes should only use the smallest number of bytes needed for steps
+	steps := len(p.ShortPathLengths) + len(p.SiblingHashes)
 	if len(p.InterimNodeTypes) != (steps+7)>>3 {
 		return NewMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
 	}
