@@ -192,7 +192,7 @@ func (e *blockComputer) executeBlock(
 		colView := stateView.NewChild()
 		txIndex, err = e.executeCollection(blockSpan, collectionIndex, txIndex, blockCtx, colView, programs, collection, res)
 		if err != nil {
-			return nil, fmt.Errorf("failed to execute collection: %w", err)
+			return nil, fmt.Errorf("failed to execute collection at txIndex %v: %w", txIndex, err)
 		}
 		bc.Commit(colView)
 		eh.Hash(res.Events[i])
@@ -363,7 +363,7 @@ func (e *blockComputer) executeTransaction(
 	txView := collectionView.NewChild()
 	err := e.vm.Run(ctx, tx, txView, programs)
 	if err != nil {
-		return fmt.Errorf("failed to execute transaction: %w", err)
+		return fmt.Errorf("failed to execute transaction for tx hash %s: %w", txID.String(), err)
 	}
 
 	txResult := flow.TransactionResult{
