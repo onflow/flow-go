@@ -119,7 +119,7 @@ func TestValidateFormat(t *testing.T) {
 	proof.ShortPathLengths[0] = uint16(255)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, not enough short path lengths are provided")
+	require.Equal(t, err.Error(), "malformed proof, len(ShortPathLengths) does not match number of set bits in InterimNodeTypes")
 	proof.ShortPathLengths = backupShortPathLengths
 }
 
