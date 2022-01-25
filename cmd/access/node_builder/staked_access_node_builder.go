@@ -105,7 +105,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 }
 
 func (builder *StakedAccessNodeBuilder) enqueueUnstakedResolver() {
-	builder.Component("resolver", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("public network resolver", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		resolver := dns.NewResolver(builder.Logger, builder.PublicNetworkConfig.Metrics, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 		builder.PublicNetworkConfig.Resolver = resolver
 		return resolver, nil
@@ -318,7 +318,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
 
-		msgValidators := unstakedNetworkMsgValidators(node.Logger.With().Bool("staked", false).Logger(), node.IdentityProvider, builder.NodeID)
+		msgValidators := unstakedNetworkMsgValidators(node.Logger.With().Bool("unstaked", true).Logger(), node.IdentityProvider, builder.NodeID)
 
 		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, msgValidators...)
 
