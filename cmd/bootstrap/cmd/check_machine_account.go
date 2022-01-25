@@ -79,6 +79,7 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 	// this will log non-critical warnings, and return an error for critical problems
 	err = epochs.CheckMachineAccountInfo(
 		log,
+		epochs.DefaultMachineAccountValidatorConfig(),
 		nodeInfoPriv.Role,
 		machineAccountInfo,
 		onChainAccount,
