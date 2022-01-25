@@ -163,4 +163,8 @@ func TestProofsWithRandomKeys(t *testing.T) {
 		err := proof.Verify(tree1.Hash())
 		assert.NoError(t, err)
 	}
+	// pass a malformed proof and expect the verify to call the validate
+	malformedProof := &Proof{}
+	err = malformedProof.Verify(tree1.Hash())
+	assert.True(t, IsMalformedProofError(err))
 }
