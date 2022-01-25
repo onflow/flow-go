@@ -268,7 +268,7 @@ GetLoop:
 	}
 }
 
-// Prove constructs inclusion proof for a given key if the key exists in the trie.
+// Prove constructs an inclusion proof for the given key, provided the key exists in the trie.
 // It traverses the trie from top to down and collects data for proof as follows:
 //  - if full node, capture the sibling node hash value and append zero to short counts
 //  - if short node, appends the node.shortCount to the short count list
@@ -317,8 +317,8 @@ ProveLoop:
 
 			continue ProveLoop
 
-		// if we have a short path, we can only follow the path if we have all
-		// of the short node path in common with the key
+		// if we have a short node, we can only follow the path if the key's subsequent 
+		// bits match the entire path segment of the short node. 
 		case *short:
 
 			// if any part of the path doesn't match, key doesn't exist
@@ -336,7 +336,7 @@ ProveLoop:
 
 			continue ProveLoop
 
-		// if we have a leaf, we found the key, return value and true
+		// if we have a leaf, we found the key, return proof and true
 		case *leaf:
 			// compress interimNodeTypes
 			interimNodeTypes := bitutils.MakeBitVector(len(shortNodeVisited))

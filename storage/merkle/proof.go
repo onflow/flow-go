@@ -17,19 +17,19 @@ type Proof struct {
 	Value []byte
 	// InterimNodeTypes is designed to be consumed bit by bit to determine if the next node
 	// is a short nodes or full nodes while traversing the trie downward (0: fullnode, 1: shortnode).
-	// the very first bit coresponds to the root of the trie and last bit is the last
+	// The very first bit corresponds to the root of the trie and last bit is the last
 	// interim node before reaching to the leaf.
-	// note that, we always allocated smallest number of bytes needed to capture all
+	// Note that we always allocated the minimal number of bytes needed to capture all
 	// the nodes in the path (padded with zero)
 	InterimNodeTypes []byte
 	// ShortPathLengths is read when we reach a short node, and the value represents number of common bits that were included
-	// in the short node (shortNode.count).
-	// WARNING, similar to the serializedPathSegmentLength method using by the trie, the uint16 encoding here requires special handling of value zero.
+	// in the short node (shortNode.count). Elements are ordered from root to leaf.
+	// WARNING, similar to the serializedPathSegmentLength method using by the trie, the uint16 encoding here requires special handling of value zero,
 	// since shortNode.count can only have values in the range of [1, 65536], and a uint16 supports range of [0, 65535],
 	// zero should be mapped to 65536 (all other values are the same)
 	ShortPathLengths []uint16
-	// SiblingHashes is a slice of hash values, every value is read when we reach a full node, which is the hash value of the
-	// sibling node needed to compute the hash value of the parent node.
+	// SiblingHashes is read when we reach a full node. The corresponding element represents 
+	// the hash of the non-visited sibling node for each full node on the path. Elements are ordered from root to leaf. 
 	SiblingHashes [][]byte
 }
 
@@ -60,7 +60,7 @@ const maxStepsForProofVerification = maxKeyLength * 8
 //      we expect InterimNodeTypes[i] == 1
 //      and the number of bits is encoded in the respective element of ShortPathLengths
 //    Hence, the total key length _in bits_ should be: len(SiblingHashes) + sum(ShortPathLengths)
-func (p *Proof) valididateFormat() error {
+func (p *Proof) validateFormat() error {
 
 	// step1 - validate the key as the very first step
 	if len(p.Key) == 0 {
@@ -104,7 +104,7 @@ func (p *Proof) valididateFormat() error {
 
 	// semantic checks
 
-	// count number of bits that are set returns number of full nodes
+	// Verify that number of bits that are set to 1 equals to the number of full nodes, i.e. len(SiblingHashes).
 	numberOfShortNodes := 0
 	for _, d := range p.InterimNodeTypes {
 		numberOfShortNodes += bits.OnesCount8(d)
@@ -129,10 +129,13 @@ func (p *Proof) valididateFormat() error {
 	return nil
 }
 
-// Verify verifies the proof by constructing the hash values bottom up and cross check
-// the constructed root hash with the given one.
-// if the proof is valid it returns true and false otherwise
-func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
+// Verify verifies the proof by constructing the hash values bottom up and cross-check
+// the constructed root hash with the given one. For valid proofs, `nil` is returned.
+// During normal operations, the following error returns are expected:
+//  * MalformedProofError if the proof has a syntactically invalid structure
+//  * InvalidProofError if the proof is syntactically valid, but the reconstructed
+//    root hash does not match the expected value.
+func (p *Proof) Verify(expectedRootHash []byte) error {
 
 	// first validate the format of the proof
 	if err := p.valididateFormat(); err != nil {
@@ -146,7 +149,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 	shortPathLengthIndex := len(p.ShortPathLengths) - 1
 
 	// keyIndex keeps track of the largest index of the key that is unchecked.
-	// note that traverse bottom up here, so we start with the largest key index
+	// Note that we traverse bottom up, so we start with the largest key index
 	// build hashes until we reach to the root.
 	keyIndex := len(p.Key)*8 - 1
 
@@ -156,9 +159,9 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 	// number of steps
 	steps := len(p.ShortPathLengths) + len(p.SiblingHashes)
 
-	// for each step (level from bottom to top) check if its a full node or a short node and compute the
+	// for each step (level from bottom to top) check if it's a full node or a short node and compute the
 	// hash value accordingly; for full node having the sibling hash helps to compute the hash value
-	// of the next level, for short nodes compute the hash using the common path constructed based on
+	// of the next level; for short nodes compute the hash using the common path constructed based on
 	// the given short count
 	for interimNodeTypesIndex := steps - 1; interimNodeTypesIndex >= 0; interimNodeTypesIndex-- {
 

@@ -39,8 +39,8 @@ func TestProofWithASingleKey(t *testing.T) {
 	require.Nil(t, proof)
 }
 
-// TestValididateFormat tests cases a proof can not be valid
-func TestValididateFormat(t *testing.T) {
+// TestValidateFormat tests cases a proof can not be valid
+func TestValidateFormat(t *testing.T) {
 
 	// construct a valid proof
 	keyLength := 32
@@ -92,7 +92,7 @@ func TestValididateFormat(t *testing.T) {
 	assert.Error(t, err)
 	require.Equal(t, err.Error(), "malformed proof, InterimNodeTypes is empty")
 
-	// empty InterimNodeTypes
+	// too many interim nodes
 	proof.InterimNodeTypes = make([]byte, maxKeyLength+1)
 	err = proof.valididateFormat()
 	assert.Error(t, err)
