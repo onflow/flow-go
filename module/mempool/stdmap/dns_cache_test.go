@@ -29,11 +29,11 @@ func TestDNSCache(t *testing.T) {
 
 	for _, fixture := range ipFixtures {
 		go func(fixture *network.IpLookupTestCase) {
-			require.True(t, cache.PutIpDomain(fixture.Domain, 1, fixture.Result))
+			require.True(t, cache.PutIpDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
 			addresses, timestamp, ok := cache.GetIpDomain(fixture.Domain)
 			require.True(t, ok)
 
-			require.Equal(t, timestamp, int64(1))
+			require.Equal(t, fixture.TimeStamp, timestamp)
 			require.Equal(t, fixture.Result, addresses)
 
 			wg.Done()
@@ -42,12 +42,12 @@ func TestDNSCache(t *testing.T) {
 
 	for _, fixture := range txtFixtures {
 		go func(fixture *network.TxtLookupTestCase) {
-			require.True(t, cache.PutTxtDomain(fixture.Domain, 1, fixture.Result))
+			require.True(t, cache.PutTxtDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
 
 			addresses, timestamp, ok := cache.GetTxtDomain(fixture.Domain)
 			require.True(t, ok)
 
-			require.Equal(t, timestamp, int64(1))
+			require.Equal(t, fixture.TimeStamp, timestamp)
 			require.Equal(t, fixture.Result, addresses)
 			wg.Done()
 		}(fixture)
