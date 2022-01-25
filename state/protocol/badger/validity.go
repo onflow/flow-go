@@ -190,9 +190,9 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	return nil
 }
 
-// isValidRootSnapshot checks internal consistency of root state snapshot
+// IsValidRootSnapshot checks internal consistency of root state snapshot
 // if verifyResultID allows/disallows Result ID verification
-func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
+func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 
 	segment, err := snap.SealingSegment()
 	if err != nil {

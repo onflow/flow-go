@@ -8,16 +8,28 @@ type HashingAlgorithm int
 const (
 	// Supported hashing algorithms
 	UnknownHashingAlgorithm HashingAlgorithm = iota
+	// SHA-2
 	SHA2_256
 	SHA2_384
+	// SHA-3
 	SHA3_256
 	SHA3_384
+	// KMAC (Keccak based MAC algorithm)
 	KMAC128
+	// legacy Keccak
+	Keccak_256
 )
 
 // String returns the string representation of this hashing algorithm.
-func (f HashingAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384", "KMAC128"}[f]
+func (h HashingAlgorithm) String() string {
+	return [...]string{
+		"UNKNOWN",
+		"SHA2_256",
+		"SHA2_384",
+		"SHA3_256",
+		"SHA3_384",
+		"KMAC128",
+		"Keccak_256"}[h]
 }
 
 const (
@@ -25,10 +37,11 @@ const (
 	securityBits = 128
 
 	// Lengths of hash outputs in bytes
-	HashLenSha2_256 = 32
-	HashLenSha2_384 = 48
-	HashLenSha3_256 = 32
-	HashLenSha3_384 = 48
+	HashLenSHA2_256   = 32
+	HashLenSHA2_384   = 48
+	HashLenSHA3_256   = 32
+	HashLenSHA3_384   = 48
+	HashLenKeccak_256 = 32
 
 	// KMAC
 	// the minimum key length in bytes

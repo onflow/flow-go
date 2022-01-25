@@ -50,7 +50,7 @@ func (b *storageBuf) asBytes() *[maxRate]byte {
 
 // xorIn uses unaligned reads and writes to update d.a to contain d.a
 // XOR buf.
-func xorIn(d *sha3State, buf []byte) {
+func xorIn(d *spongeState, buf []byte) {
 	n := len(buf)
 	bw := (*[maxRate / 8]uint64)(unsafe.Pointer(&buf[0]))[: n/8 : n/8]
 
@@ -75,7 +75,7 @@ func xorIn(d *sha3State, buf []byte) {
 	}
 }
 
-func copyOut(buf []byte, d *sha3State) {
+func copyOut(buf []byte, d *spongeState) {
 	ab := (*[maxRate]uint8)(unsafe.Pointer(&d.a[0]))
 	copy(buf, ab[:])
 }
