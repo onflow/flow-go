@@ -185,7 +185,7 @@ func (p *Proof) Verify(expectedRootHash []byte) (bool, error) {
 		// Short node
 
 		// read and pop from ShortPathLengths
-		shortPathLengths := countUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
+		shortPathLengths := CountUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
 		shortPathLengthIndex--
 
 		// construct the common path

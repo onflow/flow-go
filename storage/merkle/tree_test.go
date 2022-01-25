@@ -338,7 +338,6 @@ func TestRandomOrder(t *testing.T) {
 	rand.Shuffle(len(keys), func(i int, j int) {
 		keys[i], keys[j] = keys[j], keys[i]
 	})
-
 	for _, key := range keys {
 		val := vals[string(key)]
 		replaced, err := tree2.Put(key, val)

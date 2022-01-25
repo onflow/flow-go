@@ -7,7 +7,8 @@ import (
 
 var ErrorIncompatibleKeyLength = errors.New("key has incompatible size")
 
-// MalformedProofError is returned when the proof format has an issue
+// MalformedProofError is returned when a proof format
+// has some issues (syntax checks).
 type MalformedProofError struct {
 	err error
 }
@@ -26,8 +27,10 @@ func (e MalformedProofError) Unwrap() error {
 	return e.err
 }
 
-// InvalidProofError is returned when the proof format is right but
-// verification has failed given other data parts (e.g. it doesn't match the given root hash)
+// InvalidProofError is returned when proof
+// verification has failed (semantic check).
+// The most common case for this error is when the computed root hash
+// doesn't match the root hash provided to the Verify method.
 type InvalidProofError struct {
 	err error
 }
