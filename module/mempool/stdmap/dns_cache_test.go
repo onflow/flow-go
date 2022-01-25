@@ -14,10 +14,11 @@ import (
 )
 
 func TestDNSCache(t *testing.T) {
-	count := 501
-	ipFixtures := network.IpLookupFixture(count)
-	txtFixtures := network.TxtLookupFixture(count)
-	cache := stdmap.NewDNSCache(500, unittest.Logger())
+	total := 501
+	sizeLimit := uint32(500)
+	ipFixtures := network.IpLookupFixture(total)
+	txtFixtures := network.TxtLookupFixture(total)
+	cache := stdmap.NewDNSCache(sizeLimit, unittest.Logger())
 
 	// cache must be initially empty
 	ips, txts := cache.Size()
@@ -25,7 +26,7 @@ func TestDNSCache(t *testing.T) {
 	require.Equal(t, uint(0), txts)
 
 	wg := sync.WaitGroup{}
-	wg.Add(2 * count)
+	wg.Add(2 * total)
 
 	for _, fixture := range ipFixtures {
 		go func(fixture *network.IpLookupTestCase) {
@@ -58,6 +59,49 @@ func TestDNSCache(t *testing.T) {
 	// cache must be full up to its limit
 	ips, txts = cache.Size()
 	fmt.Println("ips", ips, "txts", txts)
-	require.Equal(t, uint(500), ips)
-	require.Equal(t, uint(500), txts)
+	require.Equal(t, uint(sizeLimit), ips)
+	require.Equal(t, uint(sizeLimit), txts)
+
+	// 500 txt and 500 ip domains must be retrievable
+	testMatchCount(t, cache, ipFixtures, txtFixtures, int(sizeLimit))
+}
+
+// testMatchCount is a test helper that checks specified number of txt and ip domains are retrievable from the cache.
+// The `count` parameter specifies number of expected matches from txt and ip domains, separately.
+func testMatchCount(t *testing.T,
+	cache *stdmap.DNSCache,
+	ipTestCases map[string]*network.IpLookupTestCase,
+	txtTestCases map[string]*network.TxtLookupTestCase,
+	count int) {
+
+	// checking ip domains
+	actualCount := 0
+	for _, tc := range ipTestCases {
+		addresses, timestamp, ok := cache.GetIpDomain(tc.Domain)
+		if !ok {
+			continue
+		}
+		require.True(t, ok)
+
+		require.Equal(t, tc.TimeStamp, timestamp)
+		require.Equal(t, tc.Result, addresses)
+		actualCount++
+	}
+	require.Equal(t, count, actualCount)
+
+	// checking txt domains
+	actualCount = 0
+	for _, tc := range txtTestCases {
+		addresses, timestamp, ok := cache.GetTxtDomain(tc.Domain)
+		if !ok {
+			continue
+		}
+		require.True(t, ok)
+
+		require.Equal(t, tc.TimeStamp, timestamp)
+		require.Equal(t, tc.Result, addresses)
+		actualCount++
+	}
+	require.Equal(t, count, actualCount)
+
 }
