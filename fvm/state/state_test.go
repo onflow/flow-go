@@ -219,10 +219,12 @@ func TestAccounts_PrintableKey(t *testing.T) {
 	require.False(t, utf8.ValidString(key))
 	printable := state.PrintableKey(key)
 	require.True(t, utf8.ValidString(printable))
+	require.Equal(t, "$189", printable)
 
 	// non slab invalid utf-8
 	key = "a\xc5z"
 	require.False(t, utf8.ValidString(key))
 	printable = state.PrintableKey(key)
 	require.True(t, utf8.ValidString(printable))
+	require.Equal(t, "#61c57a", printable)
 }
