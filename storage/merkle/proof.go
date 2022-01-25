@@ -7,20 +7,29 @@ import (
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
-// Proof captures all data needed for proving inclusion of a single value inserted under key `Key` into the merkle trie
+// Proof captures all data needed for proving inclusion of a single key/value pair inside a merkle trie
+// verifying proof requires knowledge of the trie path structure (node types) and traversing
+// the trie from the leaf to the root and computing hash values.
 type Proof struct {
 	// Key used to insert and look up the value
 	Key []byte
 	// Value stored in the trie for the given key
 	Value []byte
-	// InterimNodeTypes holds bits of data to determine short nodes versus full nodes while traversing the
-	// trie downward. if the bit is set to 1, it means that we have reached to a short node, and
-	// if is set to 0 means we have reached a full node.
+	// InterimNodeTypes is designed to be consumed bit by bit to determine if the next node
+	// is a short nodes or full nodes while traversing the trie downward (0: fullnode, 1: shortnode).
+	// the very first bit coresponds to the root of the trie and last bit is the last
+	// interim node before reaching to the leaf.
+	// note that, we always allocated smallest number of bytes needed to capture all
+	// the nodes in the path (padded with zero)
 	InterimNodeTypes []byte
 	// ShortPathLengths is read when we reach a short node, and the value represents number of common bits that were included
-	// in the short node (shortNode.count)
+	// in the short node (shortNode.count).
+	// WARNING, similar to the serializedPathSegmentLength method using by the trie, the uint16 encoding here requires special handling of value zero.
+	// since shortNode.count can only have values in the range of [1, 65536], and a uint16 supports range of [0, 65535],
+	// zero should be mapped to 65536 (all other values are the same)
 	ShortPathLengths []uint16
-	// SiblingHashes is a slice of hash values, every value is read when we reach a full node (hash value of the siblings)
+	// SiblingHashes is a slice of hash values, every value is read when we reach a full node, which is the hash value of the
+	// sibling node needed to compute the hash value of the parent node.
 	SiblingHashes [][]byte
 }
 
