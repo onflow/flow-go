@@ -5,9 +5,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/spf13/pflag"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"

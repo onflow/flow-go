@@ -9,10 +9,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/rs/zerolog"
 )
 
 const sleepInterval = time.Minute
@@ -62,7 +63,7 @@ func DynamicStartup(logger zerolog.Logger, initANAddress, initANPubkey string, s
 		if currEpochCounter == startupEpoch && currEpochPhase == startupEpochPhase {
 			logger.Info().
 				Str("time-waiting", time.Since(start).String()).
-				Str("current-epoch", string(currEpochCounter)).
+				Str("current-epoch", fmt.Sprintf("%d", currEpochCounter)).
 				Str("current-epoch-phase", currEpochPhase.String()).
 				Msg("reached desired epoch and phase in dynamic startup pre-init")
 
@@ -71,7 +72,7 @@ func DynamicStartup(logger zerolog.Logger, initANAddress, initANPubkey string, s
 
 		logger.Info().
 			Str("time-waiting", time.Since(start).String()).
-			Str("current-epoch", string(currEpochCounter)).
+			Str("current-epoch", fmt.Sprintf("%d", currEpochCounter)).
 			Str("current-epoch-phase", currEpochPhase.String()).
 			Msg(fmt.Sprintf("waiting for epoch %d and phase %s", startupEpoch, startupEpochPhase.String()))
 
