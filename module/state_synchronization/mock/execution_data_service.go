@@ -17,7 +17,7 @@ type ExecutionDataService struct {
 }
 
 // Add provides a mock function with given fields: ctx, sd
-func (_m *ExecutionDataService) Add(ctx context.Context, sd *state_synchronization.ExecutionData) (flow.Identifier, error) {
+func (_m *ExecutionDataService) Add(ctx context.Context, sd *state_synchronization.ExecutionData) (flow.Identifier, state_synchronization.BlobTree, error) {
 	ret := _m.Called(ctx, sd)
 
 	var r0 flow.Identifier
@@ -29,14 +29,23 @@ func (_m *ExecutionDataService) Add(ctx context.Context, sd *state_synchronizati
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *state_synchronization.ExecutionData) error); ok {
+	var r1 state_synchronization.BlobTree
+	if rf, ok := ret.Get(1).(func(context.Context, *state_synchronization.ExecutionData) state_synchronization.BlobTree); ok {
 		r1 = rf(ctx, sd)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(state_synchronization.BlobTree)
+		}
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(context.Context, *state_synchronization.ExecutionData) error); ok {
+		r2 = rf(ctx, sd)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // Get provides a mock function with given fields: ctx, rootID

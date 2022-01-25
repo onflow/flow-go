@@ -211,8 +211,9 @@ func TestExecuteScript(t *testing.T) {
 	))
 
 	eds := new(state_synchronization.ExecutionDataService)
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	engine, err := New(logger, metrics.NewNoopCollector(), nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds)
+	engine, err := New(logger, metrics.NewNoopCollector(), nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds, edCache)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -235,8 +236,9 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 
 	eds := new(state_synchronization.ExecutionDataService)
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds, edCache)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -261,8 +263,9 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 
 	eds := new(state_synchronization.ExecutionDataService)
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond, nil, eds)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond, nil, eds, edCache)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -287,8 +290,9 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 
 	eds := new(state_synchronization.ExecutionDataService)
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second, nil, eds)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second, nil, eds, edCache)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)

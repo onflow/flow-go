@@ -125,7 +125,9 @@ func addExecutionData(eds ExecutionDataService, ed *ExecutionData, timeout time.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return eds.Add(ctx, ed)
+	id, _, err := eds.Add(ctx, ed)
+
+	return id, err
 }
 
 func putBlob(bs blockstore.Blockstore, data []byte, timeout time.Duration) (cid.Cid, error) {

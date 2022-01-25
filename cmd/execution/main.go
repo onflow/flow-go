@@ -11,6 +11,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/ipfs/go-bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/spf13/pflag"
 
@@ -57,6 +58,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -118,6 +120,8 @@ func main() {
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
 		executionDataService          state_synchronization.ExecutionDataService
+		executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
+		executionDataCIDCacheSize     uint = 100
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -338,9 +342,41 @@ func main() {
 				return nil, err
 			}
 
-			// TODO: we should implement the TaskComparator here once we have a way to map from CID to block ID
-			// This will allow execution nodes to prioritize requests for more recent CIDs over older ones.
-			bs, err := node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
+			// TODO: if the node is not starting from the beginning of the spork, it may be useful to prepopulate
+			// the cache with the existing Execution Data blob trees. Currently, the cache is empty every time the
+			// node restarts, meaning that there will initially be no prioritization of requests.
+			executionDataCIDCache = state_synchronization.NewExecutionDataCIDCache(executionDataCIDCacheSize)
+
+			bs, err := node.Network.RegisterBlobService(
+				engine.ExecutionDataService,
+				ds,
+				network.WithBitswapOptions(
+					bitswap.WithTaskComparator(
+						func(ta, tb *bitswap.TaskInfo) bool {
+							ra, err := executionDataCIDCache.Get(ta.Cid)
+
+							if err != nil {
+								return false
+							}
+
+							rb, err := executionDataCIDCache.Get(tb.Cid)
+
+							if err != nil {
+								return true
+							}
+
+							if ra.BlobTreeRecord.BlockHeight > rb.BlobTreeRecord.BlockHeight {
+								// more recent block has higher priority
+								return true
+							} else if ra.BlobTreeRecord.BlockID == rb.BlobTreeRecord.BlockID {
+								// deeper node in the same blob tree has higher priority
+								return ra.BlobTreeLocation.Height < rb.BlobTreeLocation.Height
+							} else {
+								return false
+							}
+						},
+					),
+				))
 
 			if err != nil {
 				return nil, err
@@ -386,6 +422,7 @@ func main() {
 				scriptLogThreshold,
 				blockDataUploaders,
 				executionDataService,
+				executionDataCIDCache,
 			)
 			if err != nil {
 				return nil, err

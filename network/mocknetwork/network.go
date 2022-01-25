@@ -70,13 +70,20 @@ func (_m *Network) Register(channel network.Channel, messageProcessor network.Me
 	return r0, r1
 }
 
-// RegisterBlobService provides a mock function with given fields: channel, store
-func (_m *Network) RegisterBlobService(channel network.Channel, store datastore.Batching) (network.BlobService, error) {
-	ret := _m.Called(channel, store)
+// RegisterBlobService provides a mock function with given fields: channel, store, opts
+func (_m *Network) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, channel, store)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 network.BlobService
-	if rf, ok := ret.Get(0).(func(network.Channel, datastore.Batching) network.BlobService); ok {
-		r0 = rf(channel, store)
+	if rf, ok := ret.Get(0).(func(network.Channel, datastore.Batching, ...network.BlobServiceOption) network.BlobService); ok {
+		r0 = rf(channel, store, opts...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(network.BlobService)
@@ -84,8 +91,8 @@ func (_m *Network) RegisterBlobService(channel network.Channel, store datastore.
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(network.Channel, datastore.Batching) error); ok {
-		r1 = rf(channel, store)
+	if rf, ok := ret.Get(1).(func(network.Channel, datastore.Batching, ...network.BlobServiceOption) error); ok {
+		r1 = rf(channel, store, opts...)
 	} else {
 		r1 = ret.Error(1)
 	}

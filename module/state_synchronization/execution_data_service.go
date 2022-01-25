@@ -24,11 +24,14 @@ const (
 
 var ErrBlobTreeDepthExceeded = errors.New("blob tree depth exceeded")
 
+type BlobTree [][]cid.Cid
+
 // ExecutionDataService handles adding/getting execution data to/from a blobservice
 type ExecutionDataService interface {
 	// Add constructs a blob tree for the given ExecutionData and
-	// adds it to the blobservice, and then returns the root CID.
-	Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, error)
+	// adds it to the blobservice, and then returns the root CID
+	// and list of all CIDs.
+	Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, BlobTree, error)
 
 	// Get gets the ExecutionData for the given root CID from the blobservice.
 	Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error)
@@ -185,7 +188,7 @@ func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, 
 }
 
 // Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
-func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, error) {
+func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, BlobTree, error) {
 	logger := s.logger.With().Str("block_id", sd.BlockID.String()).Logger()
 	logger.Debug().Msg("adding execution data")
 
@@ -197,10 +200,11 @@ func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (
 	if err != nil {
 		s.metrics.ExecutionDataAddFinished(time.Since(start), false, 0)
 
-		return flow.ZeroID, fmt.Errorf("failed to add execution data blobs: %w", err)
+		return flow.ZeroID, nil, fmt.Errorf("failed to add execution data blobs: %w", err)
 	}
 
-	var blobTreeNodes int
+	var blobTreeSize int
+	var blobTree BlobTree
 
 	for {
 		cidArr := zerolog.Arr()
@@ -211,18 +215,20 @@ func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (
 
 		logger.Debug().Array("cids", cidArr).Msg("added blobs")
 
-		blobTreeNodes += len(cids)
+		blobTree = append(blobTree, cids)
+		blobTreeSize += len(cids)
 
 		if len(cids) == 1 {
-			s.metrics.ExecutionDataAddFinished(time.Since(start), true, blobTreeNodes)
+			s.metrics.ExecutionDataAddFinished(time.Since(start), true, blobTreeSize)
 
-			return flow.CidToFlowID(cids[0])
+			root, err := flow.CidToFlowID(cids[0])
+			return root, blobTree, err
 		}
 
 		if cids, err = s.addBlobs(ctx, cids, logger); err != nil {
-			s.metrics.ExecutionDataAddFinished(time.Since(start), false, blobTreeNodes)
+			s.metrics.ExecutionDataAddFinished(time.Since(start), false, blobTreeSize)
 
-			return flow.ZeroID, fmt.Errorf("failed to add cid blobs: %w", err)
+			return flow.ZeroID, nil, fmt.Errorf("failed to add cid blobs: %w", err)
 		}
 	}
 }

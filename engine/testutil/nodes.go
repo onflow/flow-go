@@ -570,6 +570,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	eds := new(state_synchronization.ExecutionDataService)
 	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil)
 
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
+
 	computationEngine, err := computation.New(
 		node.Log,
 		node.Metrics,
@@ -583,6 +586,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultScriptLogThreshold,
 		nil,
 		eds,
+		edCache,
 	)
 	require.NoError(t, err)
 

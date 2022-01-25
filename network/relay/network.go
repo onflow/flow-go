@@ -68,6 +68,6 @@ func (r *RelayNetwork) Done() <-chan struct{} {
 	return util.AllDone(r.originNet, r.destinationNet)
 }
 
-func (r *RelayNetwork) RegisterBlobService(channel network.Channel, store datastore.Batching) (network.BlobService, error) {
-	return r.originNet.RegisterBlobService(channel, store)
+func (r *RelayNetwork) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
+	return r.originNet.RegisterBlobService(channel, store, opts...)
 }
