@@ -1548,21 +1548,15 @@ func TestSignatureVerification(t *testing.T) {
 	hashAlgorithms := []hashAlgorithm{
 		{
 			"SHA3_256",
-			func() hash.Hasher {
-				return hash.NewSHA3_256()
-			},
+			hash.NewSHA3_256,
 		},
 		{
 			"SHA2_256",
-			func() hash.Hasher {
-				return hash.NewSHA2_256()
-			},
+			hash.NewSHA2_256,
 		},
 		{
 			"KECCAK_256",
-			func() hash.Hasher {
-				return hash.NewKeccak_256()
-			},
+			hash.NewKeccak_256,
 		},
 	}
 
