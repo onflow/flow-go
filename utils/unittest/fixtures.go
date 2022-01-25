@@ -395,7 +395,7 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) flow.Header {
 }
 
 func CidFixture() cid.Cid {
-	data := make([]byte, 1000)
+	data := make([]byte, 1024)
 	rand.Read(data)
 	return blocks.NewBlock(data).Cid()
 }
