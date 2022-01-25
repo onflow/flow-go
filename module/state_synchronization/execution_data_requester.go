@@ -26,7 +26,11 @@ import (
 )
 
 const (
-	defaultMissingBlockCheckInterval = 15 * time.Minute
+	// Frequency at which to check for missing blocks
+	missingBlockCheckInterval = 15 * time.Minute
+
+	// Timeout for fetching ExecutionData from the db/network
+	edFetchTimeout = time.Minute
 )
 
 // ExecutionDataRequester is a Components that receives block finalization events, and requests
@@ -89,7 +93,7 @@ func NewExecutionDataRequester(
 		blocks:               blocks,
 		results:              results,
 		missingBlocks:        make(map[flow.Identifier]struct{}),
-		missingCheckInterval: defaultMissingBlockCheckInterval,
+		missingCheckInterval: missingBlockCheckInterval,
 		finalizedBlocks:      make(chan flow.Identifier),
 	}
 
@@ -252,12 +256,15 @@ func (e *ExecutionDataRequester) addMissing(blockID flow.Identifier) {
 }
 
 // byBlockID fetches the ExecutionData for a block by its ID
-func (e *ExecutionDataRequester) byBlockID(ctx irrecoverable.SignalerContext, blockID flow.Identifier) (*ExecutionData, error) {
+func (e *ExecutionDataRequester) byBlockID(signalerCtx irrecoverable.SignalerContext, blockID flow.Identifier) (*ExecutionData, error) {
 	// Get the ExecutionResult, which contains the root CID for the execution data
 	result, err := e.results.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup execution result for block %v: %w", blockID, err)
 	}
+
+	ctx, cancel := context.WithTimeout(signalerCtx, edFetchTimeout)
+	defer cancel()
 
 	// Fetch the ExecutionData for blockID from the blobstore. If it doesn't exist locally, it will
 	// be fetched from the network.
@@ -268,11 +275,10 @@ func (e *ExecutionDataRequester) byBlockID(ctx irrecoverable.SignalerContext, bl
 	var blobSizeLimitExceededError *BlobSizeLimitExceededError
 	if errors.Is(err, malformedDataError) || errors.Is(err, blobSizeLimitExceededError) {
 		cid := flow.FlowIDToCid(result.ExecutionDataID)
-		e.bs.DeleteBlob(ctx, cid)
+		e.bs.DeleteBlob(signalerCtx, cid)
 	}
 
-	// Otherwise, blob was not available on the network. Try again later
-
+	// Otherwise, blob was not available on the network.
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data for block %v: %w", blockID, err)
 	}
