@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -129,4 +131,46 @@ func TestRemovePeers(t *testing.T) {
 		require.NoError(t, nodes[0].RemovePeer(pInfo.ID))
 		assert.Equal(t, network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
 	}
+}
+
+func TestConnGater(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sporkID := unittest.IdentifierFixture()
+
+	node1Peers := make(map[peer.ID]struct{})
+	node1, identity1 := nodeFixture(t, ctx, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
+		_, ok := node1Peers[pid]
+		return ok
+	}))
+	defer stopNode(t, node1)
+	node1Info, err := PeerAddressInfo(identity1)
+	assert.NoError(t, err)
+
+	node2Peers := make(map[peer.ID]struct{})
+	node2, identity2 := nodeFixture(t, ctx, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
+		_, ok := node2Peers[pid]
+		return ok
+	}))
+	defer stopNode(t, node2)
+	node2Info, err := PeerAddressInfo(identity2)
+	assert.NoError(t, err)
+
+	node1.host.Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)
+	node2.host.Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.PermanentAddrTTL)
+
+	_, err = node1.CreateStream(ctx, node2Info.ID)
+	assert.Error(t, err, "connection should not be possible")
+
+	_, err = node2.CreateStream(ctx, node1Info.ID)
+	assert.Error(t, err, "connection should not be possible")
+
+	node1Peers[node2Info.ID] = struct{}{}
+	_, err = node1.CreateStream(ctx, node2Info.ID)
+	assert.Error(t, err, "connection should not be possible")
+
+	node2Peers[node1Info.ID] = struct{}{}
+	_, err = node1.CreateStream(ctx, node2Info.ID)
+	assert.NoError(t, err, "connection should not be blocked")
 }
