@@ -7,13 +7,15 @@ import (
 )
 
 type IpLookupTestCase struct {
-	Domain string
-	Result []net.IPAddr
+	Domain    string
+	Result    []net.IPAddr
+	TimeStamp int64
 }
 
 type TxtLookupTestCase struct {
-	Domain string
-	Result []string
+	Domain    string
+	Result    []string
+	TimeStamp int64
 }
 
 func NetIPAddrFixture() net.IPAddr {
@@ -45,6 +47,7 @@ func IpLookupFixture(count int) map[string]*IpLookupTestCase {
 				NetIPAddrFixture(),
 				NetIPAddrFixture(),
 			},
+			TimeStamp: rand.Int63(),
 		}
 
 		tt[ipTestCase.Domain] = ipTestCase
@@ -65,6 +68,7 @@ func TxtLookupFixture(count int) map[string]*TxtLookupTestCase {
 				TxtIPFixture(),
 				TxtIPFixture(),
 			},
+			TimeStamp: rand.Int63(),
 		}
 
 		tt[ttTestCase.Domain] = ttTestCase
