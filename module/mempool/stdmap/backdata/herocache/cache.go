@@ -107,7 +107,7 @@ func NewCache(sizeLimit uint32, oversizeFactor uint32, ejectionMode heropool.Eje
 	return bd
 }
 
-// Has checks if we already contain the entity with the given identifier.
+// Has checks if backdata already contains the entity with the given identifier.
 func (c *Cache) Has(entityID flow.Identifier) bool {
 	defer c.logTelemetry()
 
@@ -115,14 +115,14 @@ func (c *Cache) Has(entityID flow.Identifier) bool {
 	return ok
 }
 
-// Add adds the given item to the BackData.
+// Add adds the given entity to the backdata.
 func (c *Cache) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	defer c.logTelemetry()
 
 	return c.put(entityID, entity)
 }
 
-// Rem will remove the item with the given identity.
+// Rem removes the entity with the given identifier.
 func (c *Cache) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 	defer c.logTelemetry()
 
@@ -139,8 +139,8 @@ func (c *Cache) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 	return entity, true
 }
 
-// Adjust will adjust the value item using the given function if the given identifier can be found.
-// Returns a bool which indicates whether the value was updated as well as the updated value.
+// Adjust adjusts the entity using the given function if the given identifier can be found.
+// Returns a bool which indicates whether the entity was updated as well as the updated entity.
 func (c *Cache) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
 	defer c.logTelemetry()
 
@@ -157,7 +157,7 @@ func (c *Cache) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity
 	return newEntity, true
 }
 
-// ByID returns the given entity from the BackData.
+// ByID returns the given entity from the backdata.
 func (c *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	defer c.logTelemetry()
 
@@ -165,34 +165,49 @@ func (c *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	return entity, ok
 }
 
-// Size will return the total size of BackData, i.e., total number of valid (entityId, entity) pairs.
+// Size returns the size of the backdata, i.e., total number of stored (entityId, entity) pairs.
 func (c Cache) Size() uint {
 	defer c.logTelemetry()
 
 	return uint(c.entities.Size())
 }
 
-// All returns all entities from the BackData.
+// All returns all entities stored in the backdata.
 func (c Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
+	entitiesList := c.entities.All()
+	all := make(map[flow.Identifier]flow.Entity, len(c.entities.All()))
 
-	all := make(map[flow.Identifier]flow.Entity)
-	for b, bucket := range c.buckets {
-		for s := range bucket.slots {
-			id, entity, linked := c.linkedEntityOf(bucketIndex(b), slotIndex(s))
-			if !linked {
-				// slot may never be used, or recently invalidated
-				continue
-			}
-
-			all[id] = entity
-		}
+	total := len(entitiesList)
+	for i := 0; i < total; i++ {
+		p := entitiesList[i]
+		all[p.Id()] = p.Entity()
 	}
 
 	return all
 }
 
-// Clear removes all entities from the BackData.
+// Identifiers returns the list of identifiers of entities stored in the backdata.
+func (c Cache) Identifiers() flow.IdentifierList {
+	ids := make(flow.IdentifierList, c.entities.Size())
+	for i, p := range c.entities.All() {
+		ids[i] = p.Id()
+	}
+
+	return ids
+}
+
+// Entities returns the list of entities stored in the backdata.
+func (c Cache) Entities() []flow.Entity {
+	entities := make([]flow.Entity, c.entities.Size())
+	for i, p := range c.entities.All() {
+		entities[i] = p.Entity()
+	}
+
+	return entities
+}
+
+// Clear removes all entities from the backdata.
 func (c *Cache) Clear() {
 	defer c.logTelemetry()
 
@@ -204,7 +219,7 @@ func (c *Cache) Clear() {
 	c.slotCount = 0
 }
 
-// Hash will use a merkle root hash to hash all items.
+// Hash returns the merkle root hash of all entities.
 func (c *Cache) Hash() flow.Identifier {
 	defer c.logTelemetry()
 
