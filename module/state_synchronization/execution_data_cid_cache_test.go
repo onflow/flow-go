@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	"github.com/ipfs/go-cid"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
 )
 
 // test cache eviction (size)
