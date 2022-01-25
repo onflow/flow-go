@@ -44,7 +44,7 @@ func TestProofWithASingleKey(t *testing.T) {
 func TestValidateFormat(t *testing.T) {
 
 	// construct a valid proof
-	keyLength := 32
+	keyLength := 31
 	key := make([]byte, keyLength)
 	key[0] = uint8(5)
 	value := make([]byte, 128)
@@ -116,11 +116,21 @@ func TestValidateFormat(t *testing.T) {
 
 	// drop a shortpathlength - index out of bound
 	proof.ShortPathLengths = proof.ShortPathLengths[:1]
-	proof.ShortPathLengths[0] = uint16(255)
+	proof.ShortPathLengths[0] = uint16(247)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, len(ShortPathLengths) does not match number of set bits in InterimNodeTypes")
+	require.Equal(t, err.Error(), "malformed proof, len(ShortPathLengths) (1) does not match number of set bits in InterimNodeTypes (2)")
 	proof.ShortPathLengths = backupShortPathLengths
+
+	// construct a new proof
+	proof, existed = tree1.Prove(key)
+	require.True(t, existed)
+
+	// trailing zero test
+	proof.InterimNodeTypes[len(proof.InterimNodeTypes)-1] = byte(129)
+	err = proof.validateFormat()
+	assert.True(t, IsMalformedProofError(err))
+	require.Equal(t, err.Error(), "malformed proof, tailing auxiliary bits in InterimNodeTypes should all be zero")
 }
 
 // TestProofsWithRandomKeys tests proof generation and verification
