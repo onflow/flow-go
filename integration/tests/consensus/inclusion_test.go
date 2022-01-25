@@ -104,9 +104,9 @@ func (is *InclusionSuite) TearDownTest() {
 }
 
 func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
-	is.T().Logf("%v ------ test started", time.Now())
 	// fix the deadline for the test as a whole
 	deadline := time.Now().Add(30 * time.Second)
+	is.T().Logf("%s ------ test started, deadline %s", time.Now(), deadline)
 
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()
@@ -152,7 +152,7 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 			return
 		}
 	}
-	is.T().Fatal("timeout waiting to see proposal")
+	is.T().Fatal("%s timeout (deadline %s) waiting to see proposal", time.Now(), deadline)
 }
 
 func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel *flow.CollectionGuarantee, conID flow.Identifier) {
@@ -195,7 +195,8 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		}
 
 		guarantees := proposal.Payload.Guarantees
-		is.T().Logf("receive block proposal from %v, %v guarantees included in the payload!", originID, len(guarantees))
+		height := proposal.Header.Height
+		is.T().Logf("receive block proposal height %v from %v, %v guarantees included in the payload!", height, originID, len(guarantees))
 
 		// check if the collection guarantee is included
 		for _, guarantee := range guarantees {
@@ -207,7 +208,7 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		}
 	}
 
-	is.T().Fatalf("timeout checking collection guarantee %x included\n", colID)
+	is.T().Fatalf("%s timeout (deadline %s) checking collection guarantee %x included\n", time.Now(), deadline, colID)
 	return nil
 }
 
@@ -259,5 +260,5 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		}
 	}
 
-	is.T().Fatalf("timeout, collection guarantee %x not confirmed\n", colID)
+	is.T().Fatalf("%s timeout (deadline %s) collection guarantee %x not confirmed\n", time.Now(), deadline, colID)
 }
