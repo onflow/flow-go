@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/admin/commands/common"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -141,8 +142,25 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
 
+		var opts []p2p.PingServiceOption
+
+		// only consensus roles will need to report hotstuff view
+		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
+			// initialize the persister
+			persist := persister.New(node.DB, node.RootChainID)
+
+			opts = append(opts, p2p.WithHotstuffViewFn(func() (uint64, error) {
+				curView, err := persist.GetStarted()
+				if err != nil {
+					return 0, err
+				}
+
+				return curView, nil
+			}))
+		}
+
 		// needed to setup ping handler, but the returned value is unused
-		_ = p2p.NewPingService(node.Middleware.Host(), pingLibP2PProtocolID, node.State, node.Logger)
+		_ = p2p.NewPingService(node.Middleware.Host(), pingLibP2PProtocolID, node.State, node.Logger, opts...)
 
 		return &module.NoopReadyDoneAware{}, nil
 	})
