@@ -28,6 +28,7 @@ type BlobTree [][]cid.Cid
 
 // ExecutionDataService handles adding/getting execution data to/from a blobservice
 type ExecutionDataService interface {
+	module.ReadyDoneAware
 	// Add constructs a blob tree for the given ExecutionData and
 	// adds it to the blobservice, and then returns the root CID
 	// and list of all CIDs.
@@ -348,7 +349,7 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 		return nil, 0, &MalformedDataError{deserializeErr}
 	}
 
-	// TODO: deserialization succeeds even if the blob channel reader has still has unconsumed data, meaning that a malicious actor
+	// TODO: deserialization succeeds even if the blob channel reader still has unconsumed data, meaning that a malicious actor
 	// could fill the blob tree with lots of unnecessary data by appending it at the end of the serialized data for each level.
 	// It's possible that we could detect this and fail deserialization using something like the following:
 	// https://github.com/onflow/flow-go/blob/bd5320719266b045ae2cac954f6a56e1e79560eb/engine/access/rest/handlers.go#L189-L193

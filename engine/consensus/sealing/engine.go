@@ -161,12 +161,12 @@ func (e *Engine) setupTrustedInboundQueues() error {
 	var err error
 	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated results: %w", err)
 	}
 	e.pendingIncorporatedBlocks, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
 	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated blocks: %w", err)
+		return fmt.Errorf("failed to create queue for incorporated blocks: %w", err)
 	}
 	return nil
 }
