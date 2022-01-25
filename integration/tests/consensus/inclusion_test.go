@@ -152,7 +152,7 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 			return
 		}
 	}
-	is.T().Fatal("%s timeout (deadline %s) waiting to see proposal", time.Now(), deadline)
+	is.T().Fatalf("%s timeout (deadline %s) waiting to see proposal", time.Now(), deadline)
 }
 
 func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel *flow.CollectionGuarantee, conID flow.Identifier) {
