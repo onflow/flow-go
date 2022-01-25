@@ -28,8 +28,8 @@ type Proof struct {
 	// since shortNode.count can only have values in the range of [1, 65536], and a uint16 supports range of [0, 65535],
 	// zero should be mapped to 65536 (all other values are the same)
 	ShortPathLengths []uint16
-	// SiblingHashes is read when we reach a full node. The corresponding element represents 
-	// the hash of the non-visited sibling node for each full node on the path. Elements are ordered from root to leaf. 
+	// SiblingHashes is read when we reach a full node. The corresponding element represents
+	// the hash of the non-visited sibling node for each full node on the path. Elements are ordered from root to leaf.
 	SiblingHashes [][]byte
 }
 
@@ -138,8 +138,8 @@ func (p *Proof) validateFormat() error {
 func (p *Proof) Verify(expectedRootHash []byte) error {
 
 	// first validate the format of the proof
-	if err := p.valididateFormat(); err != nil {
-		return false, err
+	if err := p.validateFormat(); err != nil {
+		return err
 	}
 
 	// an index to consume SiblingHashes from the last element to the first element
@@ -205,8 +205,8 @@ func (p *Proof) Verify(expectedRootHash []byte) error {
 
 	// the final hash value should match whith what was expected
 	if !bytes.Equal(currentHash, expectedRootHash) {
-		return false, NewInvalidProofErrorf("root hash doesn't match, expected %X, computed %X", expectedRootHash, currentHash)
+		return NewInvalidProofErrorf("root hash doesn't match, expected %X, computed %X", expectedRootHash, currentHash)
 	}
 
-	return true, nil
+	return nil
 }
