@@ -220,14 +220,6 @@ func (i *TransactionInvoker) Process(
 
 			return feesError
 		}
-	} else {
-		// transaction is ok, log as successful
-		i.logger.Info().
-			Str("txHash", txIDStr).
-			Uint64("blockHeight", blockHeight).
-			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
-			Int("retried", proc.Retried).
-			Msg("transaction executed successfully")
 	}
 
 	// if tx failed this will only contain fee deduction logs and computation
