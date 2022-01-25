@@ -62,7 +62,7 @@ func (ss *SealingSuite) Verification() *client.GhostClient {
 }
 
 func (ss *SealingSuite) SetupTest() {
-	ss.T().Logf("test case setup sealing")
+	ss.T().Logf("%s test case setup sealing", time.Now())
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -150,6 +150,7 @@ func (ss *SealingSuite) TestBlockSealCreation() {
 
 	// fix the deadline of the entire test
 	deadline := time.Now().Add(30 * time.Second)
+	ss.T().Logf("seal creation deadline: %s", deadline)
 
 	// first, we listen to see which block proposal is the first one to be
 	// confirmed three times (finalized)
