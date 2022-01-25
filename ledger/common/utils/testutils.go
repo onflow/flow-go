@@ -128,6 +128,7 @@ func ReadShortData(input []byte) (data []byte, rest []byte, err error) {
 		return nil, rest, err
 	}
 	data = rest[:size]
+	rest = rest[size:]
 	return
 }
 
@@ -180,6 +181,15 @@ func ReadFromBuffer(reader io.Reader, length int) ([]byte, error) {
 		return nil, fmt.Errorf("cannot read data: %w", err)
 	}
 	return buf, nil
+}
+
+// TrieUpdateFixture returns a trie update fixture
+func TrieUpdateFixture(n int, minPayloadByteSize int, maxPayloadByteSize int) *l.TrieUpdate {
+	return &l.TrieUpdate{
+		RootHash: RootHashFixture(),
+		Paths:    RandomPaths(n),
+		Payloads: RandomPayloads(n, minPayloadByteSize, maxPayloadByteSize),
+	}
 }
 
 // QueryFixture returns a query fixture
@@ -329,7 +339,7 @@ func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 	keyByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	keydata := make([]byte, keyByteSize)
 	rand.Read(keydata)
-	key := l.Key{KeyParts: []l.KeyPart{l.KeyPart{Type: 0, Value: keydata}}}
+	key := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: keydata}}}
 	valueByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	valuedata := make([]byte, valueByteSize)
 	rand.Read(valuedata)

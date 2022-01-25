@@ -17,9 +17,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -27,10 +27,11 @@ import (
 
 const NotSet = "not set"
 
+type BuilderFunc func(nodeConfig *NodeConfig) error
+type ReadyDoneFactory func(node *NodeConfig) (module.ReadyDoneAware, error)
+
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
-	module.ReadyDoneAware
-
 	// BaseFlags reads the command line arguments common to all nodes
 	BaseFlags()
 
@@ -59,15 +60,15 @@ type NodeBuilder interface {
 	EnqueueTracer()
 
 	// Module enables setting up dependencies of the engine with the builder context
-	Module(name string, f func(builder NodeBuilder, node *NodeConfig) error) NodeBuilder
+	Module(name string, f BuilderFunc) NodeBuilder
 
-	// Component adds a new component to the node that conforms to the ReadyDone
-	// interface.
+	// Component adds a new component to the node that conforms to the ReadyDoneAware
+	// interface, and throws a Fatal() when an irrecoverable error is encountered.
 	//
-	// When the node is run, this component will be started with `Ready`. When the
-	// node is stopped, we will wait for the component to exit gracefully with
-	// `Done`.
-	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
+	// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+	// In both cases, the object is started according to its interface when the node is run,
+	// and the node will wait for the component to exit gracefully.
+	Component(name string, f ReadyDoneFactory) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
@@ -77,19 +78,18 @@ type NodeBuilder interface {
 	// If the error is not nil, returns a fatal log event containing the error.
 	MustNot(err error) *zerolog.Event
 
-	// Run initiates all common components (logger, database, protocol state etc.)
-	// then starts each component. It also sets up a channel to gracefully shut
-	// down each component if a SIGINT is received.
-	Run()
+	// Build finalizes the node configuration in preparation for start and returns a Node
+	// object that can be run
+	Build() (Node, error)
 
 	// PreInit registers a new PreInit function.
 	// PreInit functions run before the protocol state is initialized or any other modules or components are initialized
-	PreInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder
+	PreInit(f BuilderFunc) NodeBuilder
 
 	// PostInit registers a new PreInit function.
 	// PostInit functions run after the protocol state has been initialized but before any other modules or components
 	// are initialized
-	PostInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder
+	PostInit(f BuilderFunc) NodeBuilder
 
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics() error
@@ -131,6 +131,8 @@ type BaseConfig struct {
 	db                              *badger.DB
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize int
+	topologyProtocolName            string
+	topologyEdgeProbability         float64
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -141,7 +143,7 @@ type NodeConfig struct {
 	BaseConfig
 	Logger            zerolog.Logger
 	NodeID            flow.Identifier
-	Me                *local.Local
+	Me                module.Local
 	Tracer            module.Tracer
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
@@ -201,5 +203,7 @@ func DefaultBaseConfig() *BaseConfig {
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
+		topologyProtocolName:            string(topology.TopicBased),
+		topologyEdgeProbability:         topology.MaximumEdgeProbability,
 	}
 }

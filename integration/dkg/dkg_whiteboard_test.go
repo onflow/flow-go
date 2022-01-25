@@ -1,11 +1,12 @@
 package dkg
 
 import (
-	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +83,7 @@ func createNode(
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgKeys, err := badger.NewBeaconPrivateKeys(core.Metrics, core.SecretsDB)
+	dkgState, err := badger.NewDKGState(core.Metrics, core.SecretsDB)
 	require.NoError(t, err)
 
 	// configure the state snapthost at firstBlock to return the desired
@@ -105,8 +106,11 @@ func createNode(
 	epochQuery.Add(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
+	snapshot.On("Phase").Return(flow.EpochPhaseStaking, nil)
+	snapshot.On("Head").Return(firstBlock, nil)
 	state := new(protocolmock.MutableState)
 	state.On("AtBlockID", firstBlock).Return(snapshot)
+	state.On("Final").Return(snapshot)
 	core.State = state
 
 	// brokerTunnel is used to communicate between the messaging engine and the
@@ -144,7 +148,7 @@ func createNode(
 		core.Log,
 		core.Me,
 		core.State,
-		dkgKeys,
+		dkgState,
 		dkg.NewControllerFactory(
 			controllerFactoryLogger,
 			core.Me,
@@ -160,7 +164,7 @@ func createNode(
 
 	node := node{
 		GenericNode:     core,
-		keyStorage:      dkgKeys,
+		dkgState:        dkgState,
 		messagingEngine: messagingEngine,
 		reactorEngine:   reactorEngine,
 	}
@@ -177,7 +181,6 @@ func TestWithWhiteboard(t *testing.T) {
 	// whiteboard is a shared object where DKG nodes can publish/read broadcast
 	// messages, as well as publish end results, using a special
 	// DKGContractClient.
-	// TODO: replace with a real smart-contract and emulator
 	whiteboard := newWhiteboard()
 
 	chainID := flow.Testnet
@@ -278,7 +281,7 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []uint{}
 	for i, n := range nodes {
-		priv, err := n.keyStorage.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		priv, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
 
 		signer := signature.NewThresholdProvider("TAG", priv)

@@ -29,6 +29,8 @@ func (suite *Suite) TestTransactionRetry() {
 	transactionBody.SetReferenceBlockID(block.ID())
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+
 	suite.snapshot.On("Head").Return(headBlock.Header, nil)
 	snapshotAtBlock := new(protocol.Snapshot)
 	snapshotAtBlock.On("Head").Return(block.Header, nil)
@@ -81,6 +83,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	transactionBody.SetReferenceBlockID(block.ID())
 
 	light := collection.Light()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	// transaction storage returns the corresponding transaction
 	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
 	// collection storage returns the corresponding collection

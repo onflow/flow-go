@@ -54,17 +54,17 @@ cmd/util/util:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v1.1.2; \
-    GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1;
+    GO111MODULE=on go install github.com/vektra/mockery/cmd/mockery@v1.1.2; \
+    GO111MODULE=on go install github.com/golang/mock/mockgen@v1.3.1;
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version install-mock-generators
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.41.1; \
 	cd ${GOPATH}; \
-	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
-	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
-	GO111MODULE=on go get github.com/gogo/protobuf/protoc-gen-gofast; \
-	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master;
+	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
+	GO111MODULE=on go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
+	GO111MODULE=on go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
+	GO111MODULE=on go install golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: unittest-main
 unittest-main:
@@ -74,7 +74,6 @@ unittest-main:
 .PHONY: unittest
 unittest: unittest-main
 	$(MAKE) -C crypto test
-	$(MAKE) -C crypto cross-blst-test
 	$(MAKE) -C integration test
 
 .PHONY: test
@@ -137,6 +136,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'Vertex' -dir="./module/forest" -case=underscore -output="./module/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'API' -dir="./access" -case=underscore -output="./access/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ConnectionFactory' -dir="./engine/access/rpc/backend" -case=underscore -output="./engine/access/rpc/backend/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
@@ -285,7 +285,7 @@ tool-transit: docker-build-bootstrap-transit
 
 .PHONY: docker-build-loader
 docker-build-loader:
-	docker build -f ./integration/loader/Dockerfile  --build-arg TARGET=loader --target production \
+	docker build -f ./integration/loader/Dockerfile --ssh default --build-arg TARGET=loader --target production \
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow

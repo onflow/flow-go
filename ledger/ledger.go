@@ -223,9 +223,9 @@ func (k *Key) String() string {
 
 // DeepCopy returns a deep copy of the key
 func (k *Key) DeepCopy() Key {
-	newKPs := make([]KeyPart, 0, len(k.KeyParts))
-	for _, kp := range k.KeyParts {
-		newKPs = append(newKPs, *kp.DeepCopy())
+	newKPs := make([]KeyPart, len(k.KeyParts))
+	for i, kp := range k.KeyParts {
+		newKPs[i] = *kp.DeepCopy()
 	}
 	return Key{KeyParts: newKPs}
 }
@@ -270,12 +270,12 @@ func (kp *KeyPart) Equals(other *KeyPart) bool {
 
 // DeepCopy returns a deep copy of the key part
 func (kp *KeyPart) DeepCopy() *KeyPart {
-	newV := make([]byte, 0, len(kp.Value))
-	newV = append(newV, kp.Value...)
+	newV := make([]byte, len(kp.Value))
+	copy(newV, kp.Value)
 	return &KeyPart{Type: kp.Type, Value: newV}
 }
 
-func (kp *KeyPart) MarshalJSON() ([]byte, error) {
+func (kp KeyPart) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type  uint16
 		Value string
@@ -299,8 +299,8 @@ func (v Value) String() string {
 
 // DeepCopy returns a deep copy of the value
 func (v Value) DeepCopy() Value {
-	newV := make([]byte, 0, len(v))
-	newV = append(newV, []byte(v)...)
+	newV := make([]byte, len(v))
+	copy(newV, v)
 	return newV
 }
 
@@ -321,7 +321,7 @@ type Migration func(payloads []Payload) ([]Payload, error)
 
 // Reporter reports on data from the state
 type Reporter interface {
-	// Name returns the name of the reporter
+	// Name returns the name of the reporter. Only used for logging.
 	Name() string
 	// Report accepts slice ledger payloads and reports the state of the ledger
 	Report(payloads []Payload) error

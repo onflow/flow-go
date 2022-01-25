@@ -29,6 +29,20 @@ func TestComputationMeteringHandler(t *testing.T) {
 		require.Equal(t, used, u)
 	})
 
+	t.Run("Set/Get Used twice", func(t *testing.T) {
+		h := NewComputationMeteringHandler(limit)
+
+		err := h.AddUsed(used)
+		require.NoError(t, err)
+
+		err = h.AddUsed(used)
+		require.NoError(t, err)
+
+		u := h.Used()
+
+		require.Equal(t, 2*used, u)
+	})
+
 	t.Run("Sub Meter", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit)
 

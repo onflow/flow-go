@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -102,6 +103,12 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	}
 }
 
+func WithConnectionGating(enabled bool) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.connectionGating = enabled
+	}
+}
+
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
@@ -118,7 +125,6 @@ func NewMiddleware(
 	metrics module.NetworkMetrics,
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
-	connectionGating bool,
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
@@ -137,7 +143,7 @@ func NewMiddleware(
 		rootBlockID:           rootBlockID,
 		validators:            DefaultValidators(log, flowID),
 		unicastMessageTimeout: unicastMessageTimeout,
-		connectionGating:      connectionGating,
+		connectionGating:      false,
 		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
 	}
@@ -266,7 +272,6 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	// create and use a peer manager if a peer manager factory was passed in during initialization
 	if m.peerManagerFactory != nil {
-
 		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
 		if err != nil {
 			return fmt.Errorf("failed to create peer manager: %w", err)
@@ -392,7 +397,12 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	_, isStaked := m.ov.Identities().ByNodeID(nodeID)
 
 	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize, isStaked)
+	conn := newReadConnection(m.ctx,
+		s, m.processAuthenticatedMessage,
+		log.With().Hex("remote_flow_id", logging.ID(nodeID)).Logger(),
+		m.metrics,
+		LargeMsgMaxUnicastMsgSize,
+		isStaked)
 
 	// kick off the reception loop to continuously receive messages
 	m.wg.Add(1)

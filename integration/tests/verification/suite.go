@@ -28,6 +28,7 @@ type Suite struct {
 	exe1ID                     flow.Identifier
 	exe2ID                     flow.Identifier
 	verID                      flow.Identifier // represents id of verification node
+	preferredUnicasts          string          // preferred unicast protocols between execution and verification nodes.
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -64,12 +65,7 @@ func (s *Suite) MetricsPort() string {
 func (s *Suite) SetupSuite() {
 	blockRateFlag := "--block-rate-delay=1ms"
 
-	// setup two access nodes, minimum needed for LN/SN access API and fallback
-	anConfigs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
-	}
-	s.nodeConfigs = append(s.nodeConfigs, anConfigs...)
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
@@ -89,20 +85,26 @@ func (s *Suite) SetupSuite() {
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.WarnLevel))
+		testnet.WithLogLevel(zerolog.WarnLevel),
+		// only verification and execution nodes run with preferred unicast protocols
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.FatalLevel))
+		testnet.WithLogLevel(zerolog.InfoLevel),
+		// only verification and execution nodes run with preferred unicast protocols
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
-		testnet.WithLogLevel(zerolog.FatalLevel))
+		testnet.WithLogLevel(zerolog.InfoLevel),
+		// only verification and execution nodes run with preferred unicast protocols
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node

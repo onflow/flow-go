@@ -3,6 +3,8 @@
 package local
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,6 +17,11 @@ type Local struct {
 }
 
 func New(id *flow.Identity, sk crypto.PrivateKey) (*Local, error) {
+	if !sk.PublicKey().Equals(id.StakingPubKey) {
+		return nil, fmt.Errorf("cannot initialize with mismatching keys, expect %v, but got %v",
+			id.StakingPubKey, sk.PublicKey())
+	}
+
 	l := &Local{
 		me: id,
 		sk: sk,

@@ -306,11 +306,11 @@ func TestExtendInvalidChainID(t *testing.T) {
 }
 
 func TestExtendReceiptsNotSorted(t *testing.T) {
-	// Todo: this test needs to be updated:
+	// TODO: this test needs to be updated:
 	// We don't require the receipts to be sorted by height anymore
 	// We could require an "parent first" ordering, which is less strict than
 	// a full ordering by height
-	t.Skip()
+	unittest.SkipUnless(t, unittest.TEST_WIP, "needs update")
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
@@ -702,18 +702,22 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseStaking).Once()
-		metrics.On("CurrentEpochFinalView", epoch1Setup.FinalView)
-		metrics.On("CurrentDKGPhase1FinalView", epoch2Setup.DKGPhase1FinalView)
-		metrics.On("CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView)
-		metrics.On("CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView)
+		metrics.On("CurrentEpochFinalView", epoch2Setup.FinalView).Once()
+		metrics.On("CurrentDKGPhase1FinalView", epoch2Setup.DKGPhase1FinalView).Once()
+		metrics.On("CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView).Once()
+		metrics.On("CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView).Once()
 
 		err = state.Finalize(context.Background(), block8.ID())
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block9.ID())
 		require.NoError(t, err)
+		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
 		metrics.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseStaking)
-		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
+		metrics.AssertCalled(t, "CurrentEpochFinalView", epoch2Setup.FinalView)
+		metrics.AssertCalled(t, "CurrentDKGPhase1FinalView", epoch2Setup.DKGPhase1FinalView)
+		metrics.AssertCalled(t, "CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView)
+		metrics.AssertCalled(t, "CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView)
 
 		metrics.AssertExpectations(t)
 	})

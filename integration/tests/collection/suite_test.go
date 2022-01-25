@@ -74,7 +74,6 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 		exeNode,
 		verNode,
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	}
 	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.WarnLevel),

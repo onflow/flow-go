@@ -235,7 +235,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("invalid signature", func() {
 		// TODO cannot check signatures in MVP
-		suite.T().Skip()
+		unittest.SkipUnless(suite.T(), unittest.TEST_WIP, "skipping unimplemented test")
 	})
 
 	suite.Run("invalid address", func() {

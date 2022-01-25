@@ -147,3 +147,7 @@ func (nc *NoopCollector) ExecutionSync(syncing bool)                            
 func (nc *NoopCollector) DiskSize(uint64)                                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
 func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)                    {}
+func (nc *NoopCollector) ExecutionDataAddStarted()                                              {}
+func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, int)                     {}
+func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
+func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, int)                     {}

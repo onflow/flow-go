@@ -2,8 +2,8 @@
 
 package crypto
 
-// #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/include -I./relic/include/low
-// #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
+// #cgo CFLAGS: -g -Wall -std=c99 -I${SRCDIR}/ -I${SRCDIR}/relic/include -I${SRCDIR}/relic/include/low
+// #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "dkg_include.h"
 import "C"
 
@@ -134,6 +134,10 @@ func (s *JointFeldmanState) NextTimeout() error {
 // - all the public key shares corresponding to the nodes private
 // key shares.
 // - the finalized private key which is the current node's own private key share
+// - the returned erorr is :
+//    - dkgFailureError if the disqualified leaders exceeded the threshold.
+//    - other error if Start() was not called, or NextTimeout() was not called twice
+//    - nil otherwise.
 func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.jointRunning {
 		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
@@ -168,8 +172,8 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	// check failing dkg
 	if disqualifiedTotal > s.threshold || s.size-disqualifiedTotal <= s.threshold {
 		return nil, nil, nil,
-			fmt.Errorf(
-				"DKG failed because the diqualified nodes number is high: %d disqualified, threshold is %d, size is %d",
+			dkgFailureErrorf(
+				"Joint-Feldman failed because the diqualified nodes number is high: %d disqualified, threshold is %d, size is %d",
 				disqualifiedTotal, s.threshold, s.size)
 	}
 

@@ -10,34 +10,52 @@ import (
 )
 
 const tokenTransferTransactionTemplate = `
-import FungibleToken from 0x02
-import FlowToken from 0x03
+import FungibleToken from 0xFUNGIBLETOKENADDRESS
+import FlowToken from 0xTOKENADDRESS
 
-transaction {
+transaction(amount: UFix64, to: Address) {
     let sentVault: @FungibleToken.Vault
+
     prepare(signer: AuthAccount) {
-        let storedVault = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-            ?? panic("Unable to borrow a reference to the sender's Vault")
-        self.sentVault <- storedVault.withdraw(amount: 10.0)
+        let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+			?? panic("Could not borrow reference to the owner's Vault!")
+        self.sentVault <- vaultRef.withdraw(amount: amount)
     }
+
     execute {
-        let recipient = getAccount(0x04)
-        let receiver = recipient
+        let receiverRef =  getAccount(to)
             .getCapability(/public/flowTokenReceiver)
-            .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
-            ?? panic("Unable to borrow receiver reference for recipient")
-        receiver.deposit(from: <-self.sentVault)
+            .borrow<&{FungibleToken.Receiver}>()
+			?? panic("Could not borrow receiver reference to the recipient's Vault")
+        receiverRef.deposit(from: <-self.sentVault)
     }
 }
 `
 
-// TokenTransferScript returns a transaction script for transfering `amount` flow tokens to `toAddr` address
-func TokenTransferScript(ftAddr, flowToken, toAddr *flowsdk.Address, amount float64) ([]byte, error) {
-	withFTAddr := strings.ReplaceAll(string(tokenTransferTransactionTemplate), "0x02", "0x"+ftAddr.Hex())
-	withFlowTokenAddr := strings.Replace(string(withFTAddr), "0x03", "0x"+flowToken.Hex(), 1)
-	withToAddr := strings.Replace(string(withFlowTokenAddr), "0x04", "0x"+toAddr.Hex(), 1)
-	withAmount := strings.Replace(string(withToAddr), fmt.Sprintf("%f", amount), "0.01", 1)
-	return []byte(withAmount), nil
+// TokenTransferTransaction returns a transaction script for transferring `amount` flow tokens to `toAddr` address
+func TokenTransferTransaction(ftAddr, flowToken, toAddr *flowsdk.Address, amount float64) (*flowsdk.Transaction, error) {
+
+	withFTAddr := strings.Replace(tokenTransferTransactionTemplate, "0xFUNGIBLETOKENADDRESS", "0x"+ftAddr.Hex(), 1)
+	withFlowTokenAddr := strings.Replace(withFTAddr, "0xTOKENADDRESS", "0x"+flowToken.Hex(), 1)
+
+	tx := flowsdk.NewTransaction().
+		SetScript([]byte(withFlowTokenAddr))
+
+	cadAmount, err := cadence.NewUFix64(fmt.Sprintf("%f", amount))
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.AddArgument(cadAmount)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.AddArgument(cadence.BytesToAddress(toAddr.Bytes()))
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }
 
 // AddKeyToAccountScript returns a transaction script to add keys to an account

@@ -23,7 +23,7 @@ import (
 // TestNetwork tests the 1-k messaging at the network layer using the default Flow network topology
 // No real nodes are created, instead only Ghost nodes are used to restrict testing to only the network module
 func TestNetwork(t *testing.T) {
-	t.Skip("flaky")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
 	// define what nodes and how many instances of each need to be created (role => count e.g. consensus = 3, creates 3 ghost consensus nodes)
 	nodeCounts := map[flow.Role]int{flow.RoleAccess: 1, flow.RoleCollection: 1, flow.RoleConsensus: 3, flow.RoleExecution: 2, flow.RoleVerification: 1}
