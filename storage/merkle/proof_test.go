@@ -12,30 +12,32 @@ import (
 // TestProofWithASingleKey tests proof generation and verification
 // when trie includes only a single value
 func TestProofWithASingleKey(t *testing.T) {
+	minKeyLength := 1
+	keyLengths := []int{minKeyLength, 32, maxKeyLength}
+	for _, keyLength := range keyLengths {
+		tree1, err := NewTree(keyLength)
+		assert.NoError(t, err)
 
-	keyLength := 32
-	tree1, err := NewTree(keyLength)
-	assert.NoError(t, err)
+		key, val := randomKeyValuePair(keyLength, 128)
 
-	key, val := randomKeyValuePair(32, 128)
+		replaced, err := tree1.Put(key, val)
+		assert.NoError(t, err)
+		require.False(t, replaced)
 
-	replaced, err := tree1.Put(key, val)
-	assert.NoError(t, err)
-	require.False(t, replaced)
+		// work for an existing key
+		proof, existed := tree1.Prove(key)
+		require.True(t, existed)
 
-	// work for an existing key
-	proof, existed := tree1.Prove(key)
-	require.True(t, existed)
+		err = proof.Verify(tree1.Hash())
+		assert.NoError(t, err)
 
-	err = proof.Verify(tree1.Hash())
-	assert.NoError(t, err)
+		// fail for non-existing key
+		key2, _ := randomKeyValuePair(keyLength, 128)
 
-	// fail for non-existing key
-	key2, _ := randomKeyValuePair(32, 128)
-
-	proof, existed = tree1.Prove(key2)
-	require.False(t, existed)
-	require.Nil(t, proof)
+		proof, existed = tree1.Prove(key2)
+		require.False(t, existed)
+		require.Nil(t, proof)
+	}
 }
 
 // TestValidateFormat tests cases a proof can not be valid
