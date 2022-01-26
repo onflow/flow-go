@@ -111,9 +111,9 @@ func EventsListMerkleHash(el EventsList) (Identifier, error) {
 	for _, event := range el {
 		// event fingerprint is the rlp encoding of the wrapperevent
 		// eventID is the standard sha3 hash of the event fingerprint
-		e := event
-		eventID := MakeID(e)
-		_, err = tree.Put(eventID[:], e.Fingerprint())
+		fingerPrint := event.Fingerprint()
+		eventID := MakeID(fingerPrint)
+		_, err = tree.Put(eventID[:], fingerPrint)
 		if err != nil {
 			return root, err
 		}
