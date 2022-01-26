@@ -1,4 +1,4 @@
-package stdmap
+package herocache
 
 import (
 	"net"
@@ -6,8 +6,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/heropool"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 )
 
 type DNSCache struct {

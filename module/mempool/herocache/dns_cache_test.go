@@ -1,4 +1,4 @@
-package stdmap_test
+package herocache_test
 
 import (
 	"sync"
