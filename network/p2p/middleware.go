@@ -11,11 +11,10 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/ipfs/go-datastore"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -173,12 +172,8 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-func (m *Middleware) RoutingSystem() routing.Routing {
-	return m.libP2PNode.routing
-}
-
-func (m *Middleware) Host() host.Host {
-	return m.libP2PNode.host
+func (m *Middleware) NewBlobService(channel network.Channel, ds datastore.Batching) network.BlobService {
+	return NewBlobService(m.libP2PNode.host, m.libP2PNode.routing, channel.String(), ds)
 }
 
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {

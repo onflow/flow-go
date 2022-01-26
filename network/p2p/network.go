@@ -228,7 +228,7 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 }
 
 func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
-	bs := network.NewBlobService(n.mw.Host(), n.mw.RoutingSystem(), channel.String(), ds)
+	bs := n.mw.NewBlobService(channel, ds)
 
 	// start the blob service using the network's context
 	bs.Start(parent)
