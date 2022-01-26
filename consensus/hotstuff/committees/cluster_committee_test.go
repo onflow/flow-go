@@ -126,7 +126,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		})
 	})
 
-	suite.Run("should return InvalidSignerError for existent but ejected cluster member", func() {
+	suite.Run("should return ErrInvalidSigner for existent but ejected cluster member", func() {
 		// at the root block, the cluster member is not ejected yet
 		suite.Run("root block", func() {
 			actual, err := suite.com.Identity(rootBlockID, realEjectedClusterMember.NodeID)
@@ -139,7 +139,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		})
 	})
 
-	suite.Run("should return InvalidSignerError for existent but zero-weight cluster member", func() {
+	suite.Run("should return ErrInvalidSigner for existent but zero-weight cluster member", func() {
 		// at the root block, the cluster member has its initial weight
 		suite.Run("root block", func() {
 			actual, err := suite.com.Identity(rootBlockID, realNoWeightClusterMember.NodeID)

@@ -159,8 +159,14 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
 
 			if err != nil {
-				return fmt.Errorf("could not process proposal: %w", err)
+				return fmt.Errorf("could not process proposal %v: %w", p.Block.BlockID, err)
 			}
+
+			el.log.Info().
+				Dur("dur_ms", time.Since(processStart)).
+				Uint64("view", p.Block.View).
+				Hex("block_id", p.Block.BlockID[:]).
+				Msg("block proposal has been processed successfully")
 
 		// if we have a new QC, process it
 		case qc := <-el.quorumCertificates:
