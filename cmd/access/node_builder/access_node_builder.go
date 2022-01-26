@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -106,7 +105,6 @@ type PublicNetworkConfig struct {
 	BindAddress string
 	Network     network.Network
 	Metrics     module.NetworkMetrics
-	Resolver    madns.BasicResolver
 }
 
 // DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
