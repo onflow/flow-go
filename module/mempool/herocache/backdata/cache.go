@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/heropool"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 )
 
 //go:linkname runtimeNano runtime.nanotime
