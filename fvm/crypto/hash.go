@@ -45,6 +45,8 @@ func NewPrefixedHashing(shaAlgo hash.HashingAlgorithm, tag string) (hash.Hasher,
 		hasher = hash.NewSHA2_384()
 	case hash.SHA3_384:
 		hasher = hash.NewSHA3_384()
+	case hash.Keccak_256:
+		hasher = hash.NewKeccak_256()
 	default:
 		return nil, errors.New("hashing algorithm is not a supported for prefixed algorithm")
 	}

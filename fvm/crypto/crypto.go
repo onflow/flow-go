@@ -17,7 +17,7 @@ func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byt
 	var hasher hash.Hasher
 
 	switch hashAlgo {
-	case hash.SHA2_256, hash.SHA3_256, hash.SHA2_384, hash.SHA3_384:
+	case hash.SHA2_256, hash.SHA3_256, hash.SHA2_384, hash.SHA3_384, hash.Keccak_256:
 		var err error
 		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
 			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
@@ -73,6 +73,8 @@ func RuntimeToCryptoHashingAlgorithm(s runtime.HashAlgorithm) hash.HashingAlgori
 		return hash.SHA3_384
 	case runtime.HashAlgorithmKMAC128_BLS_BLS12_381:
 		return hash.KMAC128
+	case runtime.HashAlgorithmKECCAK_256:
+		return hash.Keccak_256
 	default:
 		return hash.UnknownHashingAlgorithm
 	}
@@ -91,6 +93,8 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 		return runtime.HashAlgorithmSHA3_384
 	case hash.KMAC128:
 		return runtime.HashAlgorithmKMAC128_BLS_BLS12_381
+	case hash.Keccak_256:
+		return runtime.HashAlgorithmKECCAK_256
 	default:
 		return runtime.HashAlgorithmUnknown
 	}
@@ -136,7 +140,7 @@ func VerifySignatureFromRuntime(
 	// check ECDSA compatibilites
 	if sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1 {
 		// hashing compatibility
-		if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
+		if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 && hashAlgo != hash.Keccak_256 {
 			return false, errors.NewValueErrorf(sigAlgo.String(), "cannot use hashing algorithm type %s with signature signature algorithm type %s",
 				hashAlgo, sigAlgo)
 		}
@@ -222,7 +226,7 @@ func (DefaultSignatureVerifier) Verify(
 	var hasher hash.Hasher
 
 	switch hashAlgo {
-	case hash.SHA2_256, hash.SHA3_256:
+	case hash.SHA2_256, hash.SHA3_256, hash.Keccak_256:
 		var err error
 		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
 			return false, errors.NewValueErrorf(err.Error(), "verification failed")
