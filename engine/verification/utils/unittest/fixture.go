@@ -310,14 +310,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
 				collection := completeCollection.Collection()
 
-				eventsHash, err := flow.EventsListMerkleHash(computationResult.Events[i])
+				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
 				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(len(completeCollection.Transactions)))
 				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
 			} else {
 				// generates chunk data pack fixture for system chunk
-				eventsHash, err := flow.EventsListMerkleHash(computationResult.Events[i])
+				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
 				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(1))

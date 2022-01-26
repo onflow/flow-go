@@ -99,9 +99,9 @@ type BlockEvents struct {
 
 type EventsList []Event
 
-// EventsListMerkleHash calculates the root hash of events inserted into a
+// EventsMerkleRootHash calculates the root hash of events inserted into a
 // merkle trie with the hash of event as the key and encoded event as value
-func EventsListMerkleHash(el EventsList) (Identifier, error) {
+func EventsMerkleRootHash(el EventsList) (Identifier, error) {
 	var root Identifier
 	tree, err := merkle.NewTree(IdentifierLen)
 	if err != nil {

@@ -452,7 +452,7 @@ type eventHasher struct {
 func (eh *eventHasher) Run() {
 	for data := range eh.data {
 		span := eh.tracer.StartSpanFromParent(eh.blockSpan, trace.EXEHashEvents)
-		data, err := flow.EventsListMerkleHash(data)
+		data, err := flow.EventsMerkleRootHash(data)
 		eh.callBack(data, err)
 		span.Finish()
 	}
