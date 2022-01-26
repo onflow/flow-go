@@ -1,53 +1,23 @@
 package rest
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func executeRequest(req *http.Request, backend *mock.API) *httptest.ResponseRecorder {
-	var b bytes.Buffer
-	logger := zerolog.New(&b)
-	router := initRouter(backend, logger)
-
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-
-	return rr
-}
-
-func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
-	assertResponse(t, req, http.StatusOK, expectedRespBody, backend)
-}
-
-func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
-	rr := executeRequest(req, backend)
-	require.Equal(t, status, rr.Code)
-	actualResponseBody := rr.Body.String()
-	require.JSONEq(t,
-		expectedRespBody,
-		actualResponseBody,
-		fmt.Sprintf("failed for req: %s,\ngot response:\n%s\nexpected response:%s\n", req.URL, actualResponseBody, expectedRespBody),
-	)
-}
 
 func getCollectionReq(id string, expandTransactions bool) *http.Request {
 	url := fmt.Sprintf("/v1/collections/%s", id)
@@ -117,14 +87,15 @@ func TestGetCollections(t *testing.T) {
 			Once()
 
 		req := getCollectionReq(col.ID().String(), true)
-		rr := executeRequest(req, backend)
+		rr, err := executeRequest(req, backend)
+		assert.NoError(t, err)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		// really hacky but we can't build whole response since it's really complex
 		// so we just make sure the transactions are included and have defined values
 		// anyhow we already test transaction responses in transaction tests
 		var res map[string]interface{}
-		err := json.Unmarshal(rr.Body.Bytes(), &res)
+		err = json.Unmarshal(rr.Body.Bytes(), &res)
 		assert.NoError(t, err)
 		resTx := res["transactions"].([]interface{})
 		for i, r := range resTx {
@@ -148,7 +119,7 @@ func TestGetCollections(t *testing.T) {
 			testID.String(),
 			nil,
 			status.Error(codes.NotFound, "not found"),
-			`{"code":404,"message":"not found"}`,
+			`{"code":404,"message":"Flow resource not found: not found"}`,
 			http.StatusNotFound,
 		}, {
 			"invalidID",
@@ -160,9 +131,9 @@ func TestGetCollections(t *testing.T) {
 			{
 				unittest.IdentifierFixture().String(),
 				nil,
-				status.Errorf(codes.Internal, ""),
-				`{"code":500,"message":"internal server error"}`,
-				http.StatusInternalServerError,
+				status.Errorf(codes.Internal, "block not found"),
+				`{"code":400,"message":"Invalid Flow request: block not found"}`,
+				http.StatusBadRequest,
 			},
 		}
 
