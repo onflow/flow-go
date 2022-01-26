@@ -35,7 +35,7 @@ type Proof struct {
 
 const maxStepsForProofVerification = maxKeyLength * 8
 
-// valididateFormat validates the format and size of elements of the proof (syntax check)
+// validateFormat validates the format and size of elements of the proof (syntax check)
 //
 // A valid proof as to satisfy the following consistency conditions:
 // 1. A valid inclusion proof represents a full path through the merkle tree.
