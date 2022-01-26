@@ -12,11 +12,13 @@ import (
 
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
-		IDTableAddress:       "f8d6e0586b0a20c7",
-		FungibleTokenAddress: "ee82856bf20e2aa6",
-		FlowTokenAddress:     "0ae53cb6e3f42a79",
-		LockedTokensAddress:  "f8d6e0586b0a20c7",
-		StakingProxyAddress:  "f8d6e0586b0a20c7",
+		IDTableAddress:           "f8d6e0586b0a20c7",
+		FungibleTokenAddress:     "ee82856bf20e2aa6",
+		FlowTokenAddress:         "0ae53cb6e3f42a79",
+		LockedTokensAddress:      "f8d6e0586b0a20c7",
+		StakingProxyAddress:      "f8d6e0586b0a20c7",
+		DkgAddress:               "f8d6e0586b0a20c7",
+		QuorumCertificateAddress: "f8d6e0586b0a20c7",
 	}
 }
 

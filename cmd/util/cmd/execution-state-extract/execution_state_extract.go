@@ -72,7 +72,11 @@ func extractExecutionState(
 		}
 
 	}
+
+	// generating reports at the end, so that the checkpoint file can be used
+	// for sporking as soon as it's generated.
 	if report {
+		log.Info().Msgf("preparing reporter files")
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
 		rs = []ledger.Reporter{
@@ -92,6 +96,7 @@ func extractExecutionState(
 			},
 		}
 	}
+
 	newState, err := led.ExportCheckpointAt(
 		ledger.State(targetHash),
 		migrations,

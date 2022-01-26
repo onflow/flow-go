@@ -3,14 +3,11 @@
 package merkle
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/ledger/common/bitutils"
-)
+	"golang.org/x/crypto/blake2b"
 
-var (
-	ErrorIncompatibleKeyLength = errors.New("key has incompatible size")
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
 // maxKeyLength in bytes:
@@ -23,6 +20,13 @@ var (
 // This convention organically utilizes the natural occurring overflow and is therefore extremely
 // efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
 const maxKeyLength = 8192
+
+var EmptyTreeRootHash []byte
+
+func init() {
+	h, _ := blake2b.New256([]byte{})
+	EmptyTreeRootHash = h.Sum(nil)
+}
 
 // Tree represents a binary patricia merkle tree. The difference with a normal
 // merkle tree is that it compresses paths that lead to a single leaf into a
@@ -215,7 +219,7 @@ PutLoop:
 // Get will retrieve the value associated with the given key. It returns true
 // if the key was found and false otherwise.
 func (t *Tree) Get(key []byte) ([]byte, bool) {
-	if t.root == nil || t.keyLength != len(key) {
+	if t.keyLength != len(key) {
 		return nil, false
 	}
 	return t.unsafeGet(key)
@@ -273,30 +277,31 @@ GetLoop:
 	}
 }
 
-// Prove constructs inclusion proof for a given key if the key exists in the trie.
-// it traverse the trie from top to down and collect data for proof as follows:
-//  - if full node, capture the sibling node hash value and append zero to short counts
+// Prove constructs an inclusion proof for the given key, provided the key exists in the trie.
+// It returns a proof and a boolean (true if key exist and false if key not found)
+// Proof is constructed by traversing the trie from top to down and collects data for proof as follows:
+//  - if full node, append the sibling node hash value to sibling hash list
 //  - if short node, appends the node.shortCount to the short count list
-//  - if leaf, would capture the hash of the value
+//  - if leaf, would capture the leaf value
 func (t *Tree) Prove(key []byte) (*Proof, bool) {
+
+	// check the len of key first
+	if t.keyLength != len(key) {
+		return nil, false
+	}
 
 	// we start at the root again
 	cur := &t.root
-
-	// we use the given key as path again
-	path := bitutils.MakeBitVector(t.keyLength)
-	for i := 0; i < t.keyLength; i++ {
-		if bitutils.ReadBit(key, i) == 1 {
-			bitutils.SetBit(path, i)
-		}
-	}
 
 	// and we start at a zero index in the path
 	index := 0
 
 	// init proof params
-	hashValues := make([][]byte, 0)
-	shortCounts := make([]int, 0)
+	siblingHashes := make([][]byte, 0)
+	shortPathLengths := make([]uint16, 0)
+
+	steps := 0
+	shortNodeVisited := make([]bool, 0, len(key))
 
 ProveLoop:
 	for {
@@ -315,16 +320,15 @@ ProveLoop:
 				cur = &n.right
 			}
 
-			// capturing short count as zero hints that we had a full node
-			// so we can read a hashValue from hashValues
-			shortCounts = append(shortCounts, 0)
-			hashValues = append(hashValues, sibling.Hash())
-
 			index++
+			siblingHashes = append(siblingHashes, sibling.Hash())
+			shortNodeVisited = append(shortNodeVisited, false)
+			steps++
+
 			continue ProveLoop
 
-		// if we have a short path, we can only follow the path if we have all
-		// of the short node path in common with the key
+		// if we have a short node, we can only follow the path if the key's subsequent
+		// bits match the entire path segment of the short node.
 		case *short:
 
 			// if any part of the path doesn't match, key doesn't exist
@@ -334,27 +338,33 @@ ProveLoop:
 				}
 			}
 
-			// capturing a non-zero short counts hints that we had a short node
-			// during traverse and also capturing is needed to compute hash value
-			// for a short node.
-			shortCounts = append(shortCounts, n.count)
-
-			// forward pointer and index to child
 			cur = &n.child
 			index += n.count
+			shortPathLengths = append(shortPathLengths, n.CountAsUint16Encoding())
+			shortNodeVisited = append(shortNodeVisited, true)
+			steps++
 
 			continue ProveLoop
 
-		// if we have a leaf, we found the key, return value and true
+		// if we have a leaf, we found the key, return proof and true
 		case *leaf:
+			// compress interimNodeTypes
+			interimNodeTypes := bitutils.MakeBitVector(len(shortNodeVisited))
+			for i, b := range shortNodeVisited {
+				if b {
+					bitutils.SetBit(interimNodeTypes, i)
+				}
+			}
+
 			return &Proof{
-				Key:           key[:],
-				Value:         n.val,
-				ShortCounts:   shortCounts,
-				InterimHashes: hashValues,
+				Key:              key,
+				Value:            n.val,
+				InterimNodeTypes: interimNodeTypes,
+				ShortPathLengths: shortPathLengths,
+				SiblingHashes:    siblingHashes,
 			}, true
 
-		// if we have a nil node, key doesn't exist, return nil and false
+		// the only possible nil node is the root node of an empty trie
 		case nil:
 			return nil, false
 		}
@@ -367,7 +377,7 @@ ProveLoop:
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
 func (t *Tree) Del(key []byte) bool {
-	if t.root == nil || t.keyLength != len(key) {
+	if t.keyLength != len(key) {
 		return false
 	}
 	return t.unsafeDel(key)
@@ -498,7 +508,7 @@ DelLoop:
 // Per convention, an empty trie has an empty hash.
 func (t *Tree) Hash() []byte {
 	if t.root == nil {
-		return []byte{}
+		return EmptyTreeRootHash
 	}
 	return t.root.Hash()
 }
