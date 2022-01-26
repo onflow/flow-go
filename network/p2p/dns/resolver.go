@@ -178,6 +178,7 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 		case r.ipRequests <- &lookupIPRequest{domain}:
 		default:
 			r.logger.Warn().Str("domain", domain).Msg("IP lookup request queue is full, dropping request")
+			r.collector.OnDNSLookupRequestDropped()
 		}
 	}
 
@@ -226,6 +227,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 		case r.txtRequests <- &lookupTXTRequest{txt}:
 		default:
 			r.logger.Warn().Str("txt", txt).Msg("TXT lookup request queue is full, dropping request")
+			r.collector.OnDNSLookupRequestDropped()
 		}
 	}
 
