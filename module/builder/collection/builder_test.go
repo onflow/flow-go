@@ -524,7 +524,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	}
 
 	// reset the pool and builder
-	suite.pool = stdmap.NewTransactions(10)
+	suite.pool = herocache.NewTransactions(10, unittest.Logger())
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	// insert a transaction referring genesis (now expired)
