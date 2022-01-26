@@ -17,7 +17,6 @@ import (
 	builder "github.com/onflow/flow-go/module/builder/collection"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/herocache"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
@@ -566,7 +565,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 
 	// start with an empty mempool
-	suite.pool = stdmap.NewTransactions(1000)
+	suite.pool = herocache.NewTransactions(1000, unittest.Logger())
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
