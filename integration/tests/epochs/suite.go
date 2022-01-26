@@ -52,7 +52,7 @@ func (s *Suite) SetupTest() {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -60,7 +60,7 @@ func (s *Suite) SetupTest() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	// a ghost node masquerading as a consensus node
@@ -73,13 +73,12 @@ func (s *Suite) SetupTest() {
 
 	confs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		ghostConNode,
 	}
 
@@ -126,7 +125,7 @@ type StakedNodeOperationInfo struct {
 	StakingAccountKey       sdkcrypto.PrivateKey
 	NetworkingKey           sdkcrypto.PrivateKey
 	StakingKey              sdkcrypto.PrivateKey
-	MachineAccountAddress   flow.Address
+	MachineAccountAddress   sdk.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
 	MachineAccountPublicKey flow.AccountPublicKey
 	ContainerName           string
@@ -182,7 +181,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	containerName := s.getTestContainerName(role)
 
 	// register node using staking collection
-	result, err = s.SubmitStakingCollectionRegisterNodeTx(
+	result, machineAccountAddr, err := s.SubmitStakingCollectionRegisterNodeTx(
 		ctx,
 		env,
 		stakingAccountKey,
@@ -215,6 +214,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		NetworkingKey:           networkingKey,
 		MachineAccountKey:       machineAccountKey,
 		MachineAccountPublicKey: machineAccountPubKey,
+		MachineAccountAddress:   machineAccountAddr,
 		ContainerName:           containerName,
 	}
 }
@@ -345,7 +345,7 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	stakingKey string,
 	amount string,
 	machineKey string,
-) (*sdk.TransactionResult, error) {
+) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -374,7 +374,22 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	result, err := s.client.WaitForSealed(ctx, registerNodeTx.ID())
 	require.NoError(s.T(), err)
 	stakingAccount.Keys[0].SequenceNumber++
-	return result, nil
+
+	if role == flow.RoleCollection || role == flow.RoleConsensus {
+		var machineAccountAddr sdk.Address
+		for _, event := range result.Events {
+			if event.Type == sdk.EventAccountCreated { // assume only one account created (safe because we control the transaction)
+				accountCreatedEvent := sdk.AccountCreatedEvent(event)
+				machineAccountAddr = accountCreatedEvent.Address()
+				break
+			}
+		}
+
+		require.NotZerof(s.T(), machineAccountAddr, "failed to create the machine account: %s", machineAccountAddr)
+		return result, machineAccountAddr, nil
+	}
+
+	return result, sdk.Address{}, nil
 }
 
 // SubmitStakingCollectionCloseStakeTx submits tx that calls StakingCollection.closeStake
@@ -526,18 +541,34 @@ func (s *Suite) assertNodeNotApprovedOrProposed(ctx context.Context, env templat
 // newTestContainerOnNetwork configures a new container on the suites network
 func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 		testnet.WithID(info.NodeID),
 	}
 
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
 	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
-	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
+	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
 	//add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
+
+	// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
+	if role == flow.RoleConsensus || role == flow.RoleCollection {
+		// ghost containers don't participate in the network skip any SN/LN ghost containers
+		nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
+		nodeContainer.AddFlag("insecure-access-api", "false")
+
+		accessNodeIDS := make([]string, 0)
+		for _, c := range s.net.ContainersByRole(flow.RoleAccess) {
+			if c.Config.Role == flow.RoleAccess && !c.Config.Ghost {
+				accessNodeIDS = append(accessNodeIDS, c.Config.NodeID.String())
+			}
+		}
+		nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
+	}
+
 	return s.net.ContainerByID(info.NodeID)
 }
 
@@ -587,6 +618,51 @@ func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) 
 	require.Equalf(s.T(), expectedCounter, actualCounter, "expected to be in epoch %d got %d", expectedCounter, actualCounter)
 }
 
+// assertQCVotingSuccessful asserts that the QC has completed successfully
+func (s *Suite) assertQCVotingSuccessful(ctx context.Context, env templates.Environment) {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetVotingCompletedScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected qc voting to have completed successfully")
+}
+
+// assertDKGSuccessful asserts that the DKG has completed successfully
+func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environment) {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetDKGCompletedScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")
+}
+
+// assertLatestFinalizedBlockHeightHigher will assert that the difference between snapshot height and latest finalized height
+// is greater than numOfBlocks.
+func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snapshot *inmem.Snapshot, numOfBlocks uint64) {
+	bootstrapHead, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	header, err := s.client.GetLatestSealedBlockHeader(ctx)
+	require.NoError(s.T(), err)
+
+	// head should now be at-least numOfBlocks blocks higher from when we started
+	require.True(s.T(), header.Height-bootstrapHead.Height >= numOfBlocks, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
+}
+
+// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// This ensures a single transaction can be sealed by the network.
+func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	// createAccount will submit a create account transaction and wait for it to be sealed
+	_, err := s.createAccount(
+		ctx,
+		fullAccountKey,
+		s.client.Account(),
+		s.client.SDKServiceAddress(),
+	)
+	require.NoError(s.T(), err)
+}
+
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
@@ -594,22 +670,14 @@ func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) 
 // head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
 // 3. Check that we can execute a script on the AN
 func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
-	bootstrapHead, err := rootSnapshot.Head()
-	require.NoError(s.T(), err)
+	// assert atleast 20 blocks have been finalized since the node replacement
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
 	clientAddr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName[info.ContainerName])
 	client, err := testnet.NewClient(clientAddr, s.net.Root().Header.ChainID.Chain())
 	require.NoError(s.T(), err)
-	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-
-	head, err := snapshot.Head()
-	require.NoError(s.T(), err)
-
-	// head should now be at-least 20 blocks higher from when we started
-	require.True(s.T(), head.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
 
 	// execute script directly on new AN to ensure it's functional
 	proposedTable, err := client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
@@ -622,12 +690,28 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	bootstrapHead, err := rootSnapshot.Head()
-	require.NoError(s.T(), err)
+	// assert atleast 20 blocks have been finalized since the node replacement
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
+}
 
-	header, err := s.client.GetLatestSealedBlockHeader(ctx)
-	require.NoError(s.T(), err)
+// assertNetworkHealthyAfterLNChange after an collection node is removed or added to the network
+// this func can be used to perform sanity.
+// 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
+// is after the first epoch.
+func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
+	// To validate the LN joined the network successfully and is processing transactions we submit a
+	// create account transaction and assert there are no errors.
+	s.submitSmokeTestTransaction(ctx)
+}
 
-	// head should now be at-least 20 blocks higher from when we started
-	require.True(s.T(), header.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
+// assertNetworkHealthyAfterSNChange after replacing a consensus node in the test and waiting until
+// the epoch transition we should observe blocks finalizing and we should be able to submit a transaction
+// that will indicate overall network health
+// 1. Submit transaction to network
+func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	// At this point we can assure that our SN node is participating in finalization and sealing because
+	// there are only 2 SN nodes in the network now we will submit a transaction to the
+	// network to ensure the network is overall healthy.
+	s.submitSmokeTestTransaction(ctx)
 }

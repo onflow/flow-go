@@ -216,6 +216,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 	s.Run("invalid-verifier-identities", func() {
 		// delete identities for Result.BlockID
 		delete(s.IdentitiesCache, s.IncorporatedResult.Result.BlockID)
+		s.Snapshots[s.IncorporatedResult.Result.BlockID] = unittest.StateSnapshotForKnownBlock(&s.Block, nil)
 		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
 			s.Assigner, s.SealsPL, s.SigVerifier, s.Conduit, s.RequestTracker, 1)
 		require.Error(s.T(), err)

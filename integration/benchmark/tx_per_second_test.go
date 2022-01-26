@@ -141,7 +141,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	gs.signers = map[flowsdk.Address]crypto.InMemorySigner{}
 
 	// Setup the client, not using the suite to generate client since we may want to call external testnets
-	flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure())
+	flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	require.NoError(gs.T(), err, "could not get client")
 	gs.flowClient = flowClient
 

@@ -38,7 +38,6 @@ func TestCommonQueryParamMiddlewares(t *testing.T) {
 			query.Add(selectQueryParam, strings.Join(selectList, ","))
 		}
 		req.URL.RawQuery = query.Encode()
-		// fmt.Println(req.URL.String())
 
 		// We create a ResponseRecorder (which satisfies http.ResponseWriter) to record the response.
 		rr := httptest.NewRecorder()

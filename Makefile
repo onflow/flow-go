@@ -54,17 +54,17 @@ cmd/util/util:
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v1.1.2; \
-    GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1;
+    GO111MODULE=on go install github.com/vektra/mockery/cmd/mockery@v1.1.2; \
+    GO111MODULE=on go install github.com/golang/mock/mockgen@v1.3.1;
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version install-mock-generators
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.41.1; \
 	cd ${GOPATH}; \
-	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
-	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
-	GO111MODULE=on go get github.com/gogo/protobuf/protoc-gen-gofast; \
-	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master;
+	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
+	GO111MODULE=on go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
+	GO111MODULE=on go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
+	GO111MODULE=on go install golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: unittest-main
 unittest-main:
@@ -285,7 +285,7 @@ tool-transit: docker-build-bootstrap-transit
 
 .PHONY: docker-build-loader
 docker-build-loader:
-	docker build -f ./integration/loader/Dockerfile  --build-arg TARGET=loader --target production \
+	docker build -f ./integration/loader/Dockerfile --ssh default --build-arg TARGET=loader --target production \
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow

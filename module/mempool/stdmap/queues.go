@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
@@ -14,7 +15,7 @@ type Queues struct {
 
 // QueuesBackdata is mempool map for ingestion.Queues (head Node ID -> Queues)
 type QueuesBackdata struct {
-	*Backdata
+	mempool.BackData
 }
 
 func NewQueues() *Queues {
@@ -22,7 +23,7 @@ func NewQueues() *Queues {
 }
 
 func (b *QueuesBackdata) ByID(queueID flow.Identifier) (*queue.Queue, bool) {
-	entity, exists := b.Backdata.ByID(queueID)
+	entity, exists := b.BackData.ByID(queueID)
 	if !exists {
 		return nil, false
 	}
@@ -31,15 +32,17 @@ func (b *QueuesBackdata) ByID(queueID flow.Identifier) (*queue.Queue, bool) {
 }
 
 func (b *QueuesBackdata) All() []*queue.Queue {
-	entities := b.Backdata.All()
+	entities := b.BackData.All()
 
 	queues := make([]*queue.Queue, len(entities))
-	for i, entity := range entities {
+	i := 0
+	for _, entity := range entities {
 		queue, ok := entity.(*queue.Queue)
 		if !ok {
 			panic(fmt.Sprintf("invalid entity in queue mempool (%T)", entity))
 		}
 		queues[i] = queue
+		i++
 	}
 	return queues
 }
@@ -49,7 +52,7 @@ func (b *Queues) Add(queue *queue.Queue) bool {
 }
 
 func (b *Queues) Get(queueID flow.Identifier) (*queue.Queue, bool) {
-	backdata := &QueuesBackdata{&b.Backdata}
+	backdata := &QueuesBackdata{b.backData}
 	return backdata.ByID(queueID)
 }
 
@@ -60,7 +63,7 @@ func (b *Queues) Run(f func(backdata *QueuesBackdata) error) error {
 
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Queues)Run")
 	defer b.Unlock()
-	err := f(&QueuesBackdata{&b.Backdata})
+	err := f(&QueuesBackdata{b.backData})
 	//binstat.Leave(bs2)
 
 	if err != nil {
