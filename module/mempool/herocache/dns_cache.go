@@ -25,6 +25,7 @@ func NewDNSCache(sizeLimit uint32, logger zerolog.Logger) *DNSCache {
 	}
 }
 
+// PutIpDomain adds the given ip domain into the cache.
 func (d *DNSCache) PutIpDomain(domain string, timestamp int64, addresses []net.IPAddr) bool {
 	i := ipEntity{
 		id:        domainToIdentifier(domain),
