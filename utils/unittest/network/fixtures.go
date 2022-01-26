@@ -76,3 +76,44 @@ func TxtLookupFixture(count int) map[string]*TxtLookupTestCase {
 
 	return tt
 }
+
+func IpLookupListFixture(count int) []*IpLookupTestCase {
+	tt := make([]*IpLookupTestCase, 0)
+	for i := 0; i < count; i++ {
+		ipTestCase := &IpLookupTestCase{
+			Domain: fmt.Sprintf("example%d.com", i),
+			Result: []net.IPAddr{ // resolves each Domain to 4 addresses.
+				NetIPAddrFixture(),
+				NetIPAddrFixture(),
+				NetIPAddrFixture(),
+				NetIPAddrFixture(),
+			},
+			TimeStamp: rand.Int63(),
+		}
+
+		tt = append(tt, ipTestCase)
+	}
+
+	return tt
+}
+
+func TxtLookupListFixture(count int) []*TxtLookupTestCase {
+	tt := make([]*TxtLookupTestCase, 0)
+
+	for i := 0; i < count; i++ {
+		ttTestCase := &TxtLookupTestCase{
+			Domain: fmt.Sprintf("_dnsaddr.example%d.com", i),
+			Result: []string{ // resolves each Domain to 4 addresses.
+				TxtIPFixture(),
+				TxtIPFixture(),
+				TxtIPFixture(),
+				TxtIPFixture(),
+			},
+			TimeStamp: rand.Int63(),
+		}
+
+		tt = append(tt, ttTestCase)
+	}
+
+	return tt
+}
