@@ -68,20 +68,44 @@ func TestDNSCache_LRU(t *testing.T) {
 	require.Equal(t, uint(sizeLimit), txts)
 
 	// only last 500 ip domains and txt must be retained in the DNS cache
-	for i := 0; i < total; i++{
+	for i := 0; i < total; i++ {
 		if i < total-int(sizeLimit) {
 			// old dns entries must be ejected
-			ip, _, ok := cache.GetIpDomain(ipFixtures[].Domain)
+			// ip
+			ip, _, ok := cache.GetIpDomain(ipFixtures[i].Domain)
+			require.False(t, ok)
+			require.Nil(t, ip)
+			// txt
+			txt, _, ok := cache.GetTxtDomain(txtFixtures[i].Domain)
+			require.False(t, ok)
+			require.Nil(t, txt)
+
+			continue
 		}
+
+		// new dns entries must be persisted
+		// ip
+		ip, ts, ok := cache.GetIpDomain(ipFixtures[i].Domain)
+		require.True(t, ok)
+		require.Equal(t, ipFixtures[i].Domain, ip)
+		require.Equal(t, ipFixtures[i].TimeStamp, ts)
+		// txt
+		txt, ts, ok := cache.GetTxtDomain(txtFixtures[i].Domain)
+		require.True(t, ok)
+		require.Equal(t, txtFixtures[i].Domain, txt)
+		require.Equal(t, txtFixtures[i].TimeStamp, ts)
 	}
 }
 
 // testConcurrentAddToCache is a test helper that concurrently adds ip and txt domains concurrently to the cache and evaluates
 // each domain is retrievable right after it has been added.
-func testSequentialAddToCache(t *testing.T,
+func testConcurrentAddToCache(t *testing.T,
 	cache *herocache.DNSCache,
 	ipTestCases map[string]*network.IpLookupTestCase,
 	txtTestCases map[string]*network.TxtLookupTestCase) {
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(ipTestCases) + len(txtTestCases))
 
 	for _, fixture := range ipTestCases {
 		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
