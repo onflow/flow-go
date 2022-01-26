@@ -196,7 +196,7 @@ func computeID(view uint64, qc *flow.QuorumCertificate, payloadHash flow.Identif
 
 	id = append(id, payloadHash[:]...)
 
-	var h [hash.HashLenSha3_256]byte
+	var h [hash.HashLenSHA3_256]byte
 	hash.ComputeSHA3_256(&h, id)
 
 	return flow.HashToID(h[:])

@@ -53,8 +53,9 @@ go test -tags=relic
 
 `crypto/hash` provides the hashing and MAC algorithms required for Flow. All algorithm implement the generic interface `Hasher`. All digests are of the generic type `Hash`.
 
- * Sha3: 256 and 384 output sizes
- * Sha2: 256 and 384 output sizes
+ * SHA-3: 256 and 384 output sizes
+ * Legacy Kaccak: 256 output size
+ * SHA-2: 256 and 384 output sizes
  * KMAC: 128 variant
 
 ### Signature schemes
@@ -89,7 +90,7 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
 
 ### PRNG
 
- * Xorshift128+
+ * ChaCha20-based CSPRNG
 
 ## Protocols
 
