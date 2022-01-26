@@ -43,6 +43,11 @@ func (suite *Suite) SetupTest() {
 	suite.blocks = new(storage.Blocks)
 }
 
+// TestExecuteScriptAtBlockID tests the TestExecuteScriptAtBlockID API call
+func (suite *Suite) TestExecuteScriptAtBlockID() {
+
+}
+
 // TestGetEventsForBlockIDs tests the GetEventsForBlockIDs API call
 func (suite *Suite) TestGetEventsForBlockIDs() {
 

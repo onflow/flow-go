@@ -164,7 +164,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 
 	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute script: %v", err)
+		return nil, status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
 	}
 
 	res := &execution.ExecuteScriptAtBlockIDResponse{

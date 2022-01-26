@@ -88,7 +88,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
 	}
 
 	// try each of the execution nodes found
@@ -121,7 +121,10 @@ func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Id
 	defer closer.Close()
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+		if status.Code(err) == codes.InvalidArgument {
+			return nil, status.Errorf(codes.OK, "script execution failed on execution node %s: %v", execNode.String(), err)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s for node-internal reasons: %v", execNode.String(), err)
 	}
 	return execResp.GetValue(), nil
 }
