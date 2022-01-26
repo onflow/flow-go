@@ -214,7 +214,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
-	b.deployEpoch(service, fungibleToken, flowToken)
+	b.deployEpoch(service, fungibleToken, flowToken, feeContract)
 
 	// deploy staking proxy contract to the service account
 	b.deployStakingProxyContract(service)
@@ -386,7 +386,7 @@ func (b *BootstrapProcedure) deployIDTableStaking(service, fungibleToken, flowTo
 	panicOnMetaInvokeErrf("failed to deploy IDTableStaking contract: %s", txError, err)
 }
 
-func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken flow.Address) {
+func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken, flowFees flow.Address) {
 
 	contract := contracts.FlowEpoch(
 		fungibleToken.HexWithPrefix(),
@@ -394,6 +394,7 @@ func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken flow.
 		service.HexWithPrefix(),
 		service.HexWithPrefix(),
 		service.HexWithPrefix(),
+		flowFees.HexWithPrefix(),
 	)
 
 	context := NewContextFromParent(b.ctx,

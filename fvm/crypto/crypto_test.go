@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"unicode/utf8"
 
+	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/cadence/runtime"
 
 	gocrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -23,6 +25,7 @@ func TestHashWithTag(t *testing.T) {
 			hash.SHA2_384,
 			hash.SHA3_256,
 			hash.SHA3_384,
+			hash.Keccak_256,
 		}
 
 		okTag := [flow.DomainTagLength / 2]byte{}   // tag does not exceed 32 bytes
@@ -54,12 +57,14 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				runtime.HashAlgorithmKMAC128_BLS_BLS12_381: struct{}{},
 			},
 			runtime.SignatureAlgorithmECDSA_P256: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256: struct{}{},
-				runtime.HashAlgorithmSHA3_256: struct{}{},
+				runtime.HashAlgorithmSHA2_256:   struct{}{},
+				runtime.HashAlgorithmSHA3_256:   struct{}{},
+				runtime.HashAlgorithmKECCAK_256: struct{}{},
 			},
 			runtime.SignatureAlgorithmECDSA_secp256k1: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256: struct{}{},
-				runtime.HashAlgorithmSHA3_256: struct{}{},
+				runtime.HashAlgorithmSHA2_256:   struct{}{},
+				runtime.HashAlgorithmSHA3_256:   struct{}{},
+				runtime.HashAlgorithmKECCAK_256: struct{}{},
 			},
 		}
 
@@ -74,6 +79,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			runtime.HashAlgorithmSHA3_256,
 			runtime.HashAlgorithmSHA3_384,
 			runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+			runtime.HashAlgorithmKECCAK_256,
 		}
 
 		for _, s := range signatureAlgos {
@@ -216,6 +222,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 		hashAlgos := []runtime.HashAlgorithm{
 			runtime.HashAlgorithmSHA2_256,
 			runtime.HashAlgorithmSHA3_256,
+			runtime.HashAlgorithmKECCAK_256,
 		}
 
 		for _, c := range cases {
@@ -312,6 +319,7 @@ func TestHashingAlgorithmConversion(t *testing.T) {
 		runtime.HashAlgorithmSHA2_384:              hash.SHA2_384,
 		runtime.HashAlgorithmSHA3_384:              hash.SHA3_384,
 		runtime.HashAlgorithmKMAC128_BLS_BLS12_381: hash.KMAC128,
+		runtime.HashAlgorithmKECCAK_256:            hash.Keccak_256,
 	}
 
 	for runtimeAlgo, cryptoAlgo := range hashingAlgoMapping {
@@ -331,4 +339,85 @@ func TestSigningAlgorithmConversion(t *testing.T) {
 		assert.Equal(t, cryptoAlgo, crypto.RuntimeToCryptoSigningAlgorithm(runtimeAlgo))
 		assert.Equal(t, runtimeAlgo, crypto.CryptoToRuntimeSigningAlgorithm(cryptoAlgo))
 	}
+}
+
+func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_invalid_sign_algo(t *testing.T) {
+
+	invalidSignatureAlgo := runtime.SignatureAlgorithm(164)
+
+	_, err := crypto.VerifySignatureFromRuntime(
+		nil, nil, "", nil, nil, invalidSignatureAlgo, 0,
+	)
+
+	require.IsType(t, &errors.ValueError{}, err)
+
+	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidSignatureAlgo))
+
+	errorString := err.Error()
+	assert.True(t, utf8.ValidString(errorString))
+
+	// check if they can encoded and decoded using CBOR
+	marshalledBytes, err := cbor.Marshal(errorString)
+	require.NoError(t, err)
+
+	var unmarshalledString string
+
+	err = cbor.Unmarshal(marshalledBytes, &unmarshalledString)
+	require.NoError(t, err)
+
+	require.Equal(t, errorString, unmarshalledString)
+}
+
+func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_invalid_hash_algo(t *testing.T) {
+
+	invalidHashAlgo := runtime.HashAlgorithm(164)
+
+	_, err := crypto.VerifySignatureFromRuntime(
+		nil, nil, "", nil, nil, runtime.SignatureAlgorithmECDSA_P256, invalidHashAlgo,
+	)
+
+	require.IsType(t, &errors.ValueError{}, err)
+
+	require.Contains(t, err.Error(), fmt.Sprintf("%d", invalidHashAlgo))
+
+	errorString := err.Error()
+	assert.True(t, utf8.ValidString(errorString))
+
+	// check if they can encoded and decoded using CBOR
+	marshalledBytes, err := cbor.Marshal(errorString)
+	require.NoError(t, err)
+
+	var unmarshalledString string
+
+	err = cbor.Unmarshal(marshalledBytes, &unmarshalledString)
+	require.NoError(t, err)
+
+	require.Equal(t, errorString, unmarshalledString)
+}
+
+func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_invalid_public_key(t *testing.T) {
+
+	invalidPublicKey := []byte{0xc3, 0x28} //some invalid UTF8
+
+	_, err := crypto.VerifySignatureFromRuntime(
+		nil, nil, flow.UserTagString, nil, invalidPublicKey, runtime.SignatureAlgorithmECDSA_P256, runtime.HashAlgorithmSHA2_256,
+	)
+
+	require.IsType(t, &errors.ValueError{}, err)
+	errorString := err.Error()
+
+	require.Contains(t, errorString, fmt.Sprintf("%x", invalidPublicKey))
+
+	assert.True(t, utf8.ValidString(errorString))
+
+	// check if they can encoded and decoded using CBOR
+	marshalledBytes, err := cbor.Marshal(errorString)
+	require.NoError(t, err)
+
+	var unmarshalledString string
+
+	err = cbor.Unmarshal(marshalledBytes, &unmarshalledString)
+	require.NoError(t, err)
+
+	require.Equal(t, errorString, unmarshalledString)
 }

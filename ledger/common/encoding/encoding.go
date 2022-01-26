@@ -70,7 +70,7 @@ func CheckVersion(rawInput []byte) (rest []byte, version uint16, err error) {
 }
 
 // CheckType extracts encoding byte from a raw encoded message
-// checks it against the supported versions and returns the rest of rawInput (excluding encDecVersion bytes)
+// checks it against expected type and returns the rest of rawInput (excluding type byte)
 func CheckType(rawInput []byte, expectedType uint8) (rest []byte, err error) {
 	t, r, err := utils.ReadUint8(rawInput)
 	if err != nil {

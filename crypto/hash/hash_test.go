@@ -11,8 +11,8 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// Sanity checks of SHA3_256
-func TestSanitySha3_256(t *testing.T) {
+// Sanity check of SHA3_256
+func TestSanitySHA3_256(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
 
@@ -21,8 +21,8 @@ func TestSanitySha3_256(t *testing.T) {
 	assert.Equal(t, Hash(expected), hash)
 }
 
-// Sanity checks of SHA3_384
-func TestSanitySha3_384(t *testing.T) {
+// Sanity check of SHA3_384
+func TestSanitySHA3_384(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("e516dabb23b6e30026863543282780a3ae0dccf05551cf0295178d7ff0f1b41eecb9db3ff219007c4e097260d58621bd")
 
@@ -31,8 +31,8 @@ func TestSanitySha3_384(t *testing.T) {
 	assert.Equal(t, Hash(expected), hash)
 }
 
-// Sanity checks of SHA2_256
-func TestSanitySha2_256(t *testing.T) {
+// Sanity check of SHA2_256
+func TestSanitySHA2_256(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 
@@ -41,12 +41,22 @@ func TestSanitySha2_256(t *testing.T) {
 	assert.Equal(t, Hash(expected), hash)
 }
 
-// Sanity checks of SHA2_256
-func TestSanitySha2_384(t *testing.T) {
+// Sanity check of SHA2_384
+func TestSanitySHA2_384(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("768412320f7b0aa5812fce428dc4706b3cae50e02a64caa16a782249bfe8efc4b7ef1ccb126255d196047dfedf17a0a9")
 
 	alg := NewSHA2_384()
+	hash := alg.ComputeHash(input)
+	assert.Equal(t, Hash(expected), hash)
+}
+
+// Sanity check of Keccak_256
+func TestSanityKeccak_256(t *testing.T) {
+	input := []byte("test")
+	expected, _ := hex.DecodeString("9c22ff5f21f0b81b113e63f7db6da94fedef11b2119b4088b89664fb9a3cb658")
+
+	alg := NewKeccak_256()
 	hash := alg.ComputeHash(input)
 	assert.Equal(t, Hash(expected), hash)
 }
@@ -107,6 +117,7 @@ func TestHashersAPI(t *testing.T) {
 		NewSHA3_256,
 		NewSHA3_384,
 		newKmac128,
+		NewKeccak_256,
 	}
 
 	r := time.Now().UnixNano()
@@ -149,10 +160,10 @@ func TestHashersAPI(t *testing.T) {
 	}
 }
 
-// TestSha3 is a specific test of SHA3-256 and SHA3-388.
+// TestSHA3 is a specific test of SHA3-256 and SHA3-388.
 // It compares the hashes of random data of different lengths to
 // the output of standard Go sha3.
-func TestSha3(t *testing.T) {
+func TestSHA3(t *testing.T) {
 	r := time.Now().UnixNano()
 	rand.Seed(r)
 	t.Logf("math rand seed is %d", r)
@@ -169,7 +180,7 @@ func TestSha3(t *testing.T) {
 			assert.Equal(t, expected[:], []byte(h))
 
 			// test hash computation using the light api
-			var res [HashLenSha3_256]byte
+			var res [HashLenSHA3_256]byte
 			ComputeSHA3_256(&res, value)
 			assert.Equal(t, expected[:], res[:])
 		}
@@ -186,6 +197,28 @@ func TestSha3(t *testing.T) {
 			assert.Equal(t, expected[:], []byte(h))
 		}
 	})
+}
+
+// TestKeccak is a specific test of Keccak-256.
+// It compares the hashes of random data of different lengths to
+// the output of Go LegacyKeccak.
+func TestKeccak(t *testing.T) {
+	r := time.Now().UnixNano()
+	rand.Seed(r)
+	t.Logf("math rand seed is %d", r)
+
+	for i := 0; i < 5000; i++ {
+		value := make([]byte, i)
+		rand.Read(value)
+		k := sha3.NewLegacyKeccak256()
+		k.Write(value)
+		expected := k.Sum(nil)
+
+		// test hash computation using the hasher
+		hasher := NewKeccak_256()
+		h := hasher.ComputeHash(value)
+		assert.Equal(t, expected[:], []byte(h))
+	}
 }
 
 // Benchmark of all hashers' ComputeHash function
@@ -222,7 +255,7 @@ func BenchmarkComputeHash(b *testing.B) {
 	})
 
 	b.Run("SHA3_256_light", func(b *testing.B) {
-		var h [HashLenSha3_256]byte
+		var h [HashLenSHA3_256]byte
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			ComputeSHA3_256(&h, m)
@@ -235,6 +268,15 @@ func BenchmarkComputeHash(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			alg := NewSHA3_384()
 			_ = alg.ComputeHash(m)
+		}
+		b.StopTimer()
+	})
+
+	b.Run("Keccak_256", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			alg := NewKeccak_256()
+			alg.ComputeHash(m)
 		}
 		b.StopTimer()
 	})
