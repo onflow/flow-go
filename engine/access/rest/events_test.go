@@ -33,25 +33,25 @@ func TestGetEvents(t *testing.T) {
 		// valid
 		{
 			description:      "Get events for a single block by ID",
-			request:          getEventReq(t, "A.Foo.Bar", "", "", []string{events[0].BlockID.String()}),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "", "", []string{events[0].BlockID.String()}),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse([]flow.BlockEvents{events[0]}),
 		},
 		{
 			description:      "Get events by all block IDs",
-			request:          getEventReq(t, "A.Foo.Bar", "", "", allBlockIDs),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "", "", allBlockIDs),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(events),
 		},
 		{
 			description:      "Get events for height range",
-			request:          getEventReq(t, "A.Foo.Bar", startHeight, endHeight, nil),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", startHeight, endHeight, nil),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(events),
 		},
 		{
 			description:      "Get invalid - invalid height format",
-			request:          getEventReq(t, "A.Bar", "0", "sealed", nil),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", "sealed", nil),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: testBlockEventResponse(events),
 		},
@@ -70,39 +70,39 @@ func TestGetEvents(t *testing.T) {
 		},
 		{
 			description:      "Get invalid - missing end height",
-			request:          getEventReq(t, "A.Bar", "100", "", nil),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100", "", nil),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"must provide either block IDs or start and end height range"}`,
 		},
 		{
 			description:      "Get invalid - start height bigger than end height",
-			request:          getEventReq(t, "A.Bar", "100", "50", nil),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100", "50", nil),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"start height must be less than or equal to end height"}`,
 		},
 		{
 			description:      "Get invalid - too big interval",
-			request:          getEventReq(t, "A.Bar", "0", "5000", nil),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", "5000", nil),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"height range 5000 exceeds maximum allowed of 50"}`,
 		},
 		{
 			description:      "Get invalid - can not provide all params",
-			request:          getEventReq(t, "A.Bar", "100", "120", []string{"123"}),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100", "120", []string{"10e782612a014b5c9c7d17994d7e67157064f3dd42fa92cd080bfb0fe22c3f71"}),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"can only provide either block IDs or start and end height range"}`,
 		},
 		{
 			description:      "Get invalid - invalid height format",
-			request:          getEventReq(t, "A.Bar", "foo", "120", nil),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "foo", "120", nil),
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400,"message":"invalid start height: invalid height format"}`,
 		},
 		{
 			description:      "Get invalid - latest block smaller than start",
-			request:          getEventReq(t, "A.Bar", "100", "sealed", nil),
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "100000", "sealed", nil),
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: `{"code":400,"message":"start height must be less than or equal to end height"}`,
+			expectedResponse: `{"code":400,"message":"current retrieved end height value is lower than start height"}`,
 		},
 	}
 
@@ -164,12 +164,8 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[len(events)-1].BlockHeight,
 	).Return(events, nil)
 
-	latestBlock := unittest.BlockFixture()
-	latestBlock.Header.Height = uint64(n - 1)
-	// sealed block
-	backend.Mock.
-		On("GetLatestBlock", mocks.Anything, mocks.Anything).
-		Return(&latestBlock, nil)
+	latestBlock := unittest.BlockHeaderFixture()
+	latestBlock.Height = uint64(n - 1)
 
 	// default not found
 	backend.Mock.
@@ -179,6 +175,10 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 	backend.Mock.
 		On("GetEventsForHeightRange", mocks.Anything, mocks.Anything).
 		Return(nil, status.Error(codes.NotFound, "not found"))
+
+	backend.Mock.
+		On("GetLatestBlockHeader", mocks.Anything, true).
+		Return(&latestBlock, nil)
 
 	return events
 }
