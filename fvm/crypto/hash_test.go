@@ -37,6 +37,12 @@ func TestPrefixedHash(t *testing.T) {
 			h := sha3.Sum384(data)
 			return h[:]
 		},
+		hash.Keccak_256: func(data []byte) []byte {
+			var output [hash.HashLenKeccak_256]byte
+			h := sha3.NewLegacyKeccak256()
+			h.Write(data)
+			return h.Sum(output[:0])[:]
+		},
 	}
 
 	r := time.Now().UnixNano()
