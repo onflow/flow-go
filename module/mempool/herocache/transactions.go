@@ -36,6 +36,8 @@ func (t Transactions) Has(id flow.Identifier) bool {
 
 // Add adds a transaction to the mempool.
 func (t *Transactions) Add(tx *flow.TransactionBody) bool {
+	// Warning! reference pointer must be dereferenced before adding to HeroCache.
+	// This is crucial for its heap object optimizations.
 	return t.c.Add(tx.ID(), *tx)
 }
 
