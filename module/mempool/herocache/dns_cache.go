@@ -8,18 +8,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
 type DNSCache struct {
-	ipCache  *Backend
-	txtCache *Backend
+	ipCache  *stdmap.Backend
+	txtCache *stdmap.Backend
 }
 
 func NewDNSCache(sizeLimit uint32, logger zerolog.Logger) *DNSCache {
 	return &DNSCache{
-		txtCache: NewBackendWithBackData(
+		txtCache: stdmap.NewBackendWithBackData(
 			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger)),
-		ipCache: NewBackendWithBackData(
+		ipCache: stdmap.NewBackendWithBackData(
 			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger)),
 	}
 }

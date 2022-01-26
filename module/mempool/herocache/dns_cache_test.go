@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/network"
 )
@@ -20,7 +20,7 @@ func TestDNSCache_Concurrent(t *testing.T) {
 	ipFixtures := network.IpLookupFixture(total)
 	txtFixtures := network.TxtLookupFixture(total)
 
-	cache := stdmap.NewDNSCache(sizeLimit, unittest.Logger())
+	cache := herocache.NewDNSCache(sizeLimit, unittest.Logger())
 
 	// cache must be initially empty
 	ips, txts := cache.Size()
@@ -42,7 +42,7 @@ func TestDNSCache_Concurrent(t *testing.T) {
 // testConcurrentAddToCache is a test helper that adds ip and txt domains concurrently to the cache and evaluates
 // each domain is retrievable right after it has been added.
 func testConcurrentAddToCache(t *testing.T,
-	cache *stdmap.DNSCache,
+	cache *herocache.DNSCache,
 	ipTestCases map[string]*network.IpLookupTestCase,
 	txtTestCases map[string]*network.TxtLookupTestCase) {
 
@@ -69,7 +69,7 @@ func testConcurrentAddToCache(t *testing.T,
 // testMatchCount is a test helper that checks specified number of txt and ip domains are retrievable from the cache.
 // The `count` parameter specifies number of expected matches from txt and ip domains, separately.
 func testRetrievalMatchCount(t *testing.T,
-	cache *stdmap.DNSCache,
+	cache *herocache.DNSCache,
 	ipTestCases map[string]*network.IpLookupTestCase,
 	txtTestCases map[string]*network.TxtLookupTestCase,
 	count int) {
