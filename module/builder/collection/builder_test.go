@@ -377,7 +377,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	t := suite.T()
 
 	// use a mempool with 2000 transactions, one per block
-	suite.pool = stdmap.NewTransactions(2000)
+	suite.pool = herocache.NewTransactions(2000, unittest.Logger())
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
