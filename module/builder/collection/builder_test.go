@@ -66,7 +66,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 
-	suite.pool = stdmap.NewTransactions(1000)
+	suite.pool = herocache.NewTransactions(1000, unittest.Logger())
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
