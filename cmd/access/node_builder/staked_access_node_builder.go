@@ -348,7 +348,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Priv
 			).
 			SetConnectionManager(connManager).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID), p2p.AsServer(true))
+				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID), p2p.AsServer())
 			}).
 			SetPubSub(pubsub.NewGossipSub).
 			Build(ctx)
