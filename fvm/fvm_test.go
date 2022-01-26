@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1303,11 +1302,8 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		assert.PanicsWithValue(t, interpreter.ExternalError{
-			Recovered: logPanic{},
-		}, func() {
-			_ = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger, programs.NewEmptyPrograms())
-		})
+		err = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger, programs.NewEmptyPrograms())
+		require.Error(t, err)
 	})
 
 	t.Run("panics if external function panics in script", func(t *testing.T) {
@@ -1319,12 +1315,8 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
         `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
-		assert.PanicsWithValue(t, interpreter.ExternalError{
-			Recovered: logPanic{},
-		}, func() {
-			_ = vm.Run(blockCtx, fvm.Script(script), ledger, programs.NewEmptyPrograms())
-		})
+		err := vm.Run(blockCtx, fvm.Script(script), ledger, programs.NewEmptyPrograms())
+		require.Error(t, err)
 	})
 }
 
