@@ -36,7 +36,9 @@ type NetworkCollectorOpt func(*NetworkCollector)
 
 func WithNetworkPrefix(prefix string) NetworkCollectorOpt {
 	return func(nc *NetworkCollector) {
-		nc.prefix = prefix
+		if prefix != "" {
+			nc.prefix = prefix + "_"
+		}
 	}
 }
 
