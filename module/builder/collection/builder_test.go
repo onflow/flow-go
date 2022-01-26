@@ -15,6 +15,8 @@ import (
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	builder "github.com/onflow/flow-go/module/builder/collection"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -50,7 +52,7 @@ type BuilderSuite struct {
 	// protocol state for reference blocks for transactions
 	protoState protocol.MutableState
 
-	pool    *stdmap.Transactions
+	pool    mempool.Transactions
 	builder *builder.Builder
 }
 
@@ -828,7 +830,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.genesis = model.Genesis()
 		suite.chainID = suite.genesis.Header.ChainID
 
-		suite.pool = stdmap.NewTransactions(1000)
+		suite.pool = herocache.NewTransactions(1000, unittest.Logger())
 
 		suite.dbdir = unittest.TempDir(b)
 		suite.db = unittest.BadgerDB(b, suite.dbdir)
