@@ -119,7 +119,7 @@ func (c *Compactor) createCheckpoints() (int, error) {
 		startTime := time.Now()
 
 		checkpointNumber := to - 1
-		c.logger.Info().Msgf("creating checkpoint %d from segment %d to segment %d\n", checkpointNumber, from, checkpointNumber)
+		c.logger.Info().Msgf("creating checkpoint %d from segment %d to segment %d", checkpointNumber, from, checkpointNumber)
 		err = c.checkpointer.Checkpoint(checkpointNumber, func() (io.WriteCloser, error) {
 			return c.checkpointer.CheckpointWriter(checkpointNumber)
 		})
@@ -129,7 +129,7 @@ func (c *Compactor) createCheckpoints() (int, error) {
 		newLatestCheckpoint = checkpointNumber
 
 		duration := time.Since(startTime)
-		c.logger.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d from segment %d to segment %d\n", checkpointNumber, from, checkpointNumber)
+		c.logger.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d from segment %d to segment %d", checkpointNumber, from, checkpointNumber)
 	}
 	return newLatestCheckpoint, nil
 }
