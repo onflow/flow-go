@@ -281,7 +281,7 @@ func (w *DiskWAL) replay(
 		}
 	}
 
-	w.log.Debug().Msgf("finished replaying WAL from %d to %d", from, to)
+	w.log.Info().Msgf("finished replaying WAL from %d to %d", from, to)
 
 	return nil
 }

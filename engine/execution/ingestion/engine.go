@@ -559,6 +559,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
+		Uint64("height", executableBlock.Block.Header.Height).
 		Msg("executing block")
 
 	startedAt := time.Now()
