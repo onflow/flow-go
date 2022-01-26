@@ -5,8 +5,9 @@ package merkle
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"golang.org/x/crypto/blake2b"
+
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
 // maxKeyLength in bytes:
