@@ -2,26 +2,26 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const transactionsExpandable = "transactions"
-
-// getCollectionByID retrieves a collection by ID and builds a response
-func getCollectionByID(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
-	id, err := r.id()
+// GetCollectionByID retrieves a collection by ID and builds a response
+func GetCollectionByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+	req, err := r.GetCollectionRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
-	collection, err := backend.GetCollectionByID(r.Context(), id)
+	collection, err := backend.GetCollectionByID(r.Context(), req.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	// if we expand transactions in the query retrieve each transaction data
 	transactions := make([]*flow.TransactionBody, 0)
-	if r.expands(transactionsExpandable) {
+	if req.ExpandsTransactions {
 		for _, tid := range collection.Transactions {
 			tx, err := backend.GetTransaction(r.Context(), tid)
 			if err != nil {
@@ -32,5 +32,11 @@ func getCollectionByID(r *request, backend access.API, link LinkGenerator) (inte
 		}
 	}
 
-	return collectionResponse(collection, transactions, link, r.expandFields)
+	var response models.Collection
+	err = response.Build(collection, transactions, link, r.ExpandFields)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }

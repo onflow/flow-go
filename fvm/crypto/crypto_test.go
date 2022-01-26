@@ -7,16 +7,14 @@ import (
 	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/fvm/errors"
-
-	"github.com/onflow/cadence/runtime"
 
 	gocrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -27,6 +25,7 @@ func TestHashWithTag(t *testing.T) {
 			hash.SHA2_384,
 			hash.SHA3_256,
 			hash.SHA3_384,
+			hash.Keccak_256,
 		}
 
 		okTag := [flow.DomainTagLength / 2]byte{}   // tag does not exceed 32 bytes
@@ -58,12 +57,14 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				runtime.HashAlgorithmKMAC128_BLS_BLS12_381: struct{}{},
 			},
 			runtime.SignatureAlgorithmECDSA_P256: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256: struct{}{},
-				runtime.HashAlgorithmSHA3_256: struct{}{},
+				runtime.HashAlgorithmSHA2_256:   struct{}{},
+				runtime.HashAlgorithmSHA3_256:   struct{}{},
+				runtime.HashAlgorithmKECCAK_256: struct{}{},
 			},
 			runtime.SignatureAlgorithmECDSA_secp256k1: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256: struct{}{},
-				runtime.HashAlgorithmSHA3_256: struct{}{},
+				runtime.HashAlgorithmSHA2_256:   struct{}{},
+				runtime.HashAlgorithmSHA3_256:   struct{}{},
+				runtime.HashAlgorithmKECCAK_256: struct{}{},
 			},
 		}
 
@@ -78,6 +79,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			runtime.HashAlgorithmSHA3_256,
 			runtime.HashAlgorithmSHA3_384,
 			runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+			runtime.HashAlgorithmKECCAK_256,
 		}
 
 		for _, s := range signatureAlgos {
@@ -220,6 +222,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 		hashAlgos := []runtime.HashAlgorithm{
 			runtime.HashAlgorithmSHA2_256,
 			runtime.HashAlgorithmSHA3_256,
+			runtime.HashAlgorithmKECCAK_256,
 		}
 
 		for _, c := range cases {
@@ -316,6 +319,7 @@ func TestHashingAlgorithmConversion(t *testing.T) {
 		runtime.HashAlgorithmSHA2_384:              hash.SHA2_384,
 		runtime.HashAlgorithmSHA3_384:              hash.SHA3_384,
 		runtime.HashAlgorithmKMAC128_BLS_BLS12_381: hash.KMAC128,
+		runtime.HashAlgorithmKECCAK_256:            hash.Keccak_256,
 	}
 
 	for runtimeAlgo, cryptoAlgo := range hashingAlgoMapping {
