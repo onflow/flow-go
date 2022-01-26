@@ -453,7 +453,7 @@ func (eh *eventHasher) Run() {
 	for data := range eh.data {
 		span := eh.tracer.StartSpanFromParent(eh.blockSpan, trace.EXEHashEvents)
 		rootHash, err := flow.EventsMerkleRootHash(data)
-		eh.callBack(hash, err)
+		eh.callBack(rootHash, err)
 		span.Finish()
 	}
 }
