@@ -25,7 +25,7 @@ const happyPath = true
 // instead of going through the underlying basic resolver, and hence through the network.
 func TestResolver_HappyPath(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
-	resolver := NewResolver(zerolog.Nop(), metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
+	resolver := NewResolver(unittest.Logger(), metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
