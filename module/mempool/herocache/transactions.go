@@ -8,21 +8,20 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
-const DefaultOversizeFactor = uint32(8)
-
 type Transactions struct {
-	c *herocache.Cache
+	c *stdmap.Backend
 }
 
 // NewTransactions implements a transactions mempool based on hero cache.
 func NewTransactions(limit uint32, logger zerolog.Logger) *Transactions {
 	t := &Transactions{
-		c: herocache.NewCache(limit,
-			DefaultOversizeFactor,
+		c: stdmap.NewBackendWithBackData(herocache.NewCache(limit,
+			herocache.DefaultOversizeFactor,
 			heropool.LRUEjection,
-			logger.With().Str("mempool", "transactions").Logger()),
+			logger.With().Str("mempool", "transactions").Logger())),
 	}
 
 	return t
@@ -38,7 +37,7 @@ func (t Transactions) Has(id flow.Identifier) bool {
 func (t *Transactions) Add(tx *flow.TransactionBody) bool {
 	// Warning! reference pointer must be dereferenced before adding to HeroCache.
 	// This is crucial for its heap object optimizations.
-	return t.c.Add(tx.ID(), *tx)
+	return t.c.Add(*tx)
 }
 
 // ByID returns the transaction with the given ID from the mempool.
@@ -57,7 +56,7 @@ func (t Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
 // All returns all transactions from the mempool. Since it is using the HeroCache, all guarantees returning
 // all transactions in the same order as they are added.
 func (t Transactions) All() []*flow.TransactionBody {
-	entities := t.c.Entities()
+	entities := t.c.All()
 	txs := make([]*flow.TransactionBody, 0, len(entities))
 	for _, entity := range entities {
 		tx, ok := entity.(flow.TransactionBody)
@@ -81,8 +80,7 @@ func (t Transactions) Size() uint {
 
 // Rem removes transaction from mempool.
 func (t *Transactions) Rem(id flow.Identifier) bool {
-	_, ok := t.c.Rem(id)
-	return ok
+	return t.c.Rem(id)
 }
 
 // Hash will return a fingerprint hash representing the contents of the

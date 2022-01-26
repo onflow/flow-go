@@ -85,6 +85,8 @@ type Cache struct {
 	lastTelemetryDump int64
 }
 
+const DefaultOversizeFactor = uint32(8)
+
 func NewCache(sizeLimit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, logger zerolog.Logger) *Cache {
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
