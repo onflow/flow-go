@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/onflow/flow-go/engine/access/rest/util"
+
 	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -40,8 +42,8 @@ func TestScripts(t *testing.T) {
 	validCode := []byte(`pub fun main(foo: String): String { return foo }`)
 	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
 	validBody := map[string]interface{}{
-		"script":    toBase64(validCode),
-		"arguments": []string{toBase64(validArgs)},
+		"script":    util.ToBase64(validCode),
+		"arguments": []string{util.ToBase64(validArgs)},
 	}
 
 	t.Run("get by Latest height", func(t *testing.T) {
@@ -97,8 +99,8 @@ func TestScripts(t *testing.T) {
 		assertResponse(
 			t,
 			req,
-			http.StatusInternalServerError,
-			`{"code":500, "message":"internal server error"}`,
+			http.StatusBadRequest,
+			`{"code":400, "message":"Invalid Flow request: internal server error"}`,
 			backend,
 		)
 	})
