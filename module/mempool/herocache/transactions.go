@@ -53,7 +53,7 @@ func (t Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
 	return &tx, true
 }
 
-// All returns all transactions from the mempool. Since it is using the HeroCache, all guarantees returning
+// All returns all transactions from the mempool. Since it is using the HeroCache, All guarantees returning
 // all transactions in the same order as they are added.
 func (t Transactions) All() []*flow.TransactionBody {
 	entities := t.c.All()
