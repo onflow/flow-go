@@ -85,6 +85,22 @@ type Cache struct {
 	lastTelemetryDump int64
 }
 
+// DefaultOversizeFactor determines the default oversizing factor of HeroCache.
+// What is oversize factor?
+// Imagine adding n keys, rounds times to a hash table with a fixed number slots per bucket.
+// The number of buckets can be chosen upon initialization and then never changes.
+// If a bucket is full then the oldest key is ejected, and if that key is too new, this is a bucket overflow.
+// How many buckets are needed to avoid a bucket overflow assuming cryptographic key hashing is used?
+// The overSizeFactor is used to determine the number of buckets.
+// Assume n 16, rounds 3, & slotsPerBucket 3 for the tiny example below showing overSizeFactor 1 thru 6.
+// As overSizeFactor is increased the chance of overflowing a bucket is decreased.
+// With overSizeFactor 1: 8 from 48 keys can be added before bucket overflow.
+// With overSizeFactor 2:  10 from 48 keys can be added before bucket overflow.
+// With overSizeFactor 3:  13 from 48 keys can be added before bucket overflow.
+// With overSizeFactor 4:  15 from 48 keys can be added before bucket overflow.
+// With overSizeFactor 5:  27 from 48 keys can be added before bucket overflow.
+// With overSizeFactor 6:  48 from 48 keys can be added.
+// The default overSizeFactor factor is different in the package code because slotsPerBucket is > 3.
 const DefaultOversizeFactor = uint32(8)
 
 func NewCache(sizeLimit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, logger zerolog.Logger) *Cache {
