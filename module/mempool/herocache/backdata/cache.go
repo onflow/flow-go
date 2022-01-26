@@ -94,7 +94,7 @@ type Cache struct {
 // The overSizeFactor is used to determine the number of buckets.
 // Assume n 16, rounds 3, & slotsPerBucket 3 for the tiny example below showing overSizeFactor 1 thru 6.
 // As overSizeFactor is increased the chance of overflowing a bucket is decreased.
-// With overSizeFactor 1: 8 from 48 keys can be added before bucket overflow.
+// With overSizeFactor 1:  8 from 48 keys can be added before bucket overflow.
 // With overSizeFactor 2:  10 from 48 keys can be added before bucket overflow.
 // With overSizeFactor 3:  13 from 48 keys can be added before bucket overflow.
 // With overSizeFactor 4:  15 from 48 keys can be added before bucket overflow.
