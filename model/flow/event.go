@@ -102,10 +102,9 @@ type EventsList []Event
 // EventsMerkleRootHash calculates the root hash of events inserted into a
 // merkle trie with the hash of event as the key and encoded event as value
 func EventsMerkleRootHash(el EventsList) (Identifier, error) {
-	var root Identifier
 	tree, err := merkle.NewTree(IdentifierLen)
 	if err != nil {
-		return root, err
+		return ZeroID, fmt.Errorf("instantiating payload trie for key length of %d bytes failed: %w", IdentifierLen, err)
 	}
 
 	for _, event := range el {
@@ -115,12 +114,11 @@ func EventsMerkleRootHash(el EventsList) (Identifier, error) {
 		eventID := MakeID(fingerPrint)
 		_, err = tree.Put(eventID[:], fingerPrint)
 		if err != nil {
-			return root, err
+			return ZeroID, err
 		}
 	}
 
-	hash := tree.Hash()
-	copy(root[:], hash)
-
+	var root Identifier
+	copy(root[:], tree.Hash())
 	return root, nil
 }
