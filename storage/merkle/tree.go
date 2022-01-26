@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
-	"golang.org/x/crypto/blake2b"
 )
 
 var (
@@ -24,13 +23,6 @@ var (
 // This convention organically utilizes the natural occurring overflow and is therefore extremely
 // efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
 const maxKeyLength = 8192
-
-var EmptyTreeRootHash []byte
-
-func init() {
-	h, _ := blake2b.New256([]byte{})
-	EmptyTreeRootHash = h.Sum(nil)
-}
 
 // Tree represents a binary patricia merkle tree. The difference with a normal
 // merkle tree is that it compresses paths that lead to a single leaf into a
@@ -418,7 +410,7 @@ DelLoop:
 // Per convention, an empty trie has an empty hash.
 func (t *Tree) Hash() []byte {
 	if t.root == nil {
-		return EmptyTreeRootHash
+		return []byte{}
 	}
 	return t.root.Hash()
 }

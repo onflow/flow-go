@@ -15,13 +15,6 @@ import (
 
 const TreeTestLength = 100000
 
-var expectedEmptyHash = []byte{
-	14, 87, 81, 192, 38, 229, 67,
-	178, 232, 171, 46, 176, 96, 153,
-	218, 161, 209, 229, 223, 71, 119,
-	143, 119, 135, 250, 171, 69, 205,
-	241, 47, 227, 168}
-
 // TestTreeInitialization verifies that tree initialization only accepts
 // compatible key lengths.
 func TestTreeInitialization(t *testing.T) {
@@ -60,7 +53,7 @@ func TestTreeInitialization(t *testing.T) {
 func TestEmptyTreeHash(t *testing.T) {
 	for _, keyLength := range []int{1, 32, 8192} {
 		tree, _ := NewTree(keyLength)
-		assert.Equal(t, tree.Hash(), expectedEmptyHash)
+		assert.Empty(t, tree.Hash())
 
 		// generate random key-value pair
 		key := make([]byte, keyLength)
@@ -76,7 +69,7 @@ func TestEmptyTreeHash(t *testing.T) {
 		// remove key: hash should now be empty again
 		removed := tree.Del(key)
 		assert.True(t, removed)
-		assert.Equal(t, tree.Hash(), expectedEmptyHash)
+		assert.Empty(t, tree.Hash())
 	}
 }
 
@@ -264,7 +257,7 @@ func TestTreeSingle(t *testing.T) {
 		assert.False(t, retrieved)
 
 		// get the root hash and make sure it's empty again as the tree is empty
-		assert.Equal(t, tree.Hash(), expectedEmptyHash)
+		assert.Empty(t, tree.Hash())
 	}
 }
 
@@ -310,7 +303,7 @@ func TestTreeBatch(t *testing.T) {
 	}
 
 	// get the root hash and make sure it's empty again as the tree is empty
-	assert.Equal(t, tree.Hash(), EmptyTreeRootHash)
+	assert.Empty(t, tree.Hash())
 }
 
 // TestRandomOrder tests that root hash of tree is independent of the order
@@ -362,7 +355,7 @@ func TestRandomOrder(t *testing.T) {
 	}
 
 	// get the root hash and make sure it's empty again as the tree is empty
-	assert.Equal(t, tree1.Hash(), expectedEmptyHash)
+	assert.Empty(t, tree1.Hash())
 }
 
 func BenchmarkTree(b *testing.B) {
