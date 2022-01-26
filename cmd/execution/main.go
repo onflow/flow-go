@@ -94,6 +94,7 @@ func main() {
 		triedir                       string
 		executionDataDir              string
 		collector                     module.ExecutionMetrics
+		executionDataServiceCollector module.ExecutionDataServiceMetrics
 		mTrieCacheSize                uint32
 		transactionResultsCacheSize   uint
 		checkpointDistance            uint
@@ -188,6 +189,10 @@ func main() {
 		}).
 		Module("execution metrics", func(node *cmd.NodeConfig) error {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
+			return nil
+		}).
+		Module("execution data service metrics", func(node *cmd.NodeConfig) error {
+			executionDataServiceCollector = metrics.NewExecutionDataServiceCollector()
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
@@ -386,7 +391,7 @@ func main() {
 				&cbor.Codec{},
 				compressor.NewLz4Compressor(),
 				bs,
-				metrics.NewExecutionDataServiceCollector(),
+				executionDataServiceCollector,
 				node.Logger,
 			)
 
