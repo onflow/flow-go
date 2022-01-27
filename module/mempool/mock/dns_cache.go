@@ -13,7 +13,7 @@ type DNSCache struct {
 	mock.Mock
 }
 
-// GetIpDomain provides a mock function with given fields: _a0
+// GetDomainIp provides a mock function with given fields: _a0
 func (_m *DNSCache) GetDomainIp(_a0 string) ([]net.IPAddr, int64, bool) {
 	ret := _m.Called(_a0)
 
@@ -43,7 +43,7 @@ func (_m *DNSCache) GetDomainIp(_a0 string) ([]net.IPAddr, int64, bool) {
 	return r0, r1, r2
 }
 
-// GetTxtDomain provides a mock function with given fields: _a0
+// GetTxtRecord provides a mock function with given fields: _a0
 func (_m *DNSCache) GetTxtRecord(_a0 string) ([]string, int64, bool) {
 	ret := _m.Called(_a0)
 
@@ -73,12 +73,12 @@ func (_m *DNSCache) GetTxtRecord(_a0 string) ([]string, int64, bool) {
 	return r0, r1, r2
 }
 
-// PutIpDomain provides a mock function with given fields: _a0, _a1, _a2
-func (_m *DNSCache) PutDomainIp(_a0 string, _a2 []net.IPAddr, _a1 int64) bool {
+// PutDomainIp provides a mock function with given fields: _a0, _a1, _a2
+func (_m *DNSCache) PutDomainIp(_a0 string, _a1 []net.IPAddr, _a2 int64) bool {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(string, int64, []net.IPAddr) bool); ok {
+	if rf, ok := ret.Get(0).(func(string, []net.IPAddr, int64) bool); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -87,12 +87,12 @@ func (_m *DNSCache) PutDomainIp(_a0 string, _a2 []net.IPAddr, _a1 int64) bool {
 	return r0
 }
 
-// PutTxtDomain provides a mock function with given fields: _a0, _a1, _a2
-func (_m *DNSCache) PutTxtRecord(_a0 string, _a2 []string, _a1 int64) bool {
+// PutTxtRecord provides a mock function with given fields: _a0, _a1, _a2
+func (_m *DNSCache) PutTxtRecord(_a0 string, _a1 []string, _a2 int64) bool {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(string, int64, []string) bool); ok {
+	if rf, ok := ret.Get(0).(func(string, []string, int64) bool); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Get(0).(bool)
