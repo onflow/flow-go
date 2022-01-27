@@ -104,7 +104,7 @@ func (p *Proof) validateFormat() error {
 
 	// semantic checks
 
-	// Verify that number of bits that are set to 1 equals to the number of full nodes, i.e. len(SiblingHashes).
+	// Verify that number of bits that are set to 1 equals to the number of short nodes, i.e. len(ShortPathLengths).
 	numberOfShortNodes := 0
 	for _, d := range p.InterimNodeTypes {
 		numberOfShortNodes += bits.OnesCount8(d)
@@ -188,19 +188,19 @@ func (p *Proof) Verify(expectedRootHash []byte) error {
 		// Short node
 
 		// read and pop from ShortPathLengths
-		shortPathLengths := CountUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
+		shortPathLength := CountUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
 		shortPathLengthIndex--
 
 		// construct the common path
-		commonPath := bitutils.MakeBitVector(shortPathLengths)
-		for c := shortPathLengths - 1; c >= 0; c-- {
+		commonPath := bitutils.MakeBitVector(shortPathLength)
+		for c := shortPathLength - 1; c >= 0; c-- {
 			if bitutils.ReadBit(p.Key, keyIndex) == 1 {
 				bitutils.SetBit(commonPath, c)
 			}
 			keyIndex--
 		}
 		// compute the hash for the short node
-		currentHash = computeShortHash(shortPathLengths, commonPath, currentHash)
+		currentHash = computeShortHash(shortPathLength, commonPath, currentHash)
 	}
 
 	// the final hash value should match whith what was expected
