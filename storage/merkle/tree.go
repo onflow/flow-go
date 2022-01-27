@@ -13,13 +13,10 @@ import (
 // maxKeyLength in bytes:
 // For any key, we need to ensure that the entire path can be stored in a short node.
 // A short node stores the _number of bits_ for the path segment it represents in 2 bytes.
-// However, a short node with zero path length is not part of our storage model. Therefore,
-// we use the convention:
-//  * for path length l with 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
-//  * for l = 65536: we represent l as binary 00000000 00000000
-// This convention organically utilizes the natural occurring overflow and is therefore extremely
-// efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
-const maxKeyLength = 8192
+// Note that a short node with zero path length is not part of our storage model.
+// In summary, we are able to represent key lengths multiple of 8 of up to 65535 bits, i.e. less than 8191 bytes.
+const maxKeyLenBits = 65535
+const maxKeyLength = maxKeyLenBits / 8
 
 var EmptyTreeRootHash []byte
 
@@ -48,7 +45,7 @@ type Tree struct {
 
 // NewTree creates a new empty patricia merkle tree, with keys of the given
 // `keyLength` (length measured in bytes).
-// The current implementation only works with 1 ≤ keyLength ≤ 8192. Otherwise,
+// The current implementation only works with 1 ≤ keyLength ≤ 8191. Otherwise,
 // the sentinel error `ErrorIncompatibleKeyLength` is returned.
 func NewTree(keyLength int) (*Tree, error) {
 	if keyLength < 1 || maxKeyLength < keyLength {
@@ -119,9 +116,8 @@ PutLoop:
 		// node; in that case, we use as much of the shared path as possible
 		case *short:
 			// first, we find out how many bits we have in common
-			commonCount := 0
-			shortPathCount := n.count
-			for i := 0; i < shortPathCount; i++ {
+			commonCount := uint16(0)
+			for i := 0; i < int(n.count); i++ {
 				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					break
 				}
@@ -130,23 +126,23 @@ PutLoop:
 
 			// if the common and node count are equal, we share all of the path
 			// we can simply forward to the child of the short node and continue
-			if commonCount == shortPathCount {
+			if commonCount == n.count {
 				cur = &n.child
-				index += commonCount
+				index += int(commonCount)
 				continue PutLoop
 			}
 
 			// if the common count is non-zero, we share some of the path;
 			// first, we insert a common short node for the shared path
 			if commonCount > 0 {
-				commonPath := bitutils.MakeBitVector(commonCount)
-				for i := 0; i < commonCount; i++ {
+				commonPath := bitutils.MakeBitVector(int(commonCount))
+				for i := 0; i < int(commonCount); i++ {
 					bitutils.WriteBit(commonPath, i, bitutils.ReadBit(key, i+index))
 				}
 				commonNode := &short{count: commonCount, path: commonPath}
 				*cur = commonNode
 				cur = &commonNode.child
-				index = index + commonCount
+				index += int(commonCount)
 			}
 
 			// we then insert a full node that splits the tree after the shared
@@ -155,7 +151,7 @@ PutLoop:
 			var remain *node
 			splitNode := &full{}
 			*cur = splitNode
-			if bitutils.ReadBit(n.path, commonCount) == 1 {
+			if bitutils.ReadBit(n.path, int(commonCount)) == 1 {
 				cur = &splitNode.left
 				remain = &splitNode.right
 			} else {
@@ -170,9 +166,9 @@ PutLoop:
 			// forward to its path; finally, we set the leaf to original leaf
 			remainCount := n.count - commonCount - 1
 			if remainCount > 0 {
-				remainPath := bitutils.MakeBitVector(remainCount)
-				for i := 0; i < remainCount; i++ {
-					bitutils.WriteBit(remainPath, i, bitutils.ReadBit(n.path, i+commonCount+1))
+				remainPath := bitutils.MakeBitVector(int(remainCount))
+				for i := 0; i < int(remainCount); i++ {
+					bitutils.WriteBit(remainPath, i, bitutils.ReadBit(n.path, i+int(commonCount)+1))
 				}
 				remainNode := &short{count: remainCount, path: remainPath}
 				*remain = remainNode
@@ -206,7 +202,7 @@ PutLoop:
 			for i := 0; i < finalCount; i++ {
 				bitutils.WriteBit(finalPath, i, bitutils.ReadBit(key, index+i))
 			}
-			finalNode := &short{count: finalCount, path: []byte(finalPath)}
+			finalNode := &short{count: uint16(finalCount), path: []byte(finalPath)}
 			*cur = finalNode
 			cur = &finalNode.child
 			index += finalCount
@@ -254,7 +250,7 @@ GetLoop:
 		// its paths has all bits in common with the key we are retrieving
 		case *short:
 			// if any part of the path doesn't match, key doesn't exist
-			for i := 0; i < n.count; i++ {
+			for i := 0; i < int(n.count); i++ {
 				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					return nil, false
 				}
@@ -262,7 +258,7 @@ GetLoop:
 
 			// forward pointer and index to child
 			cur = &n.child
-			index += n.count
+			index += int(n.count)
 
 			continue GetLoop
 
@@ -334,15 +330,15 @@ ProveLoop:
 		case *short:
 
 			// if any part of the path doesn't match, key doesn't exist
-			for i := 0; i < n.count; i++ {
+			for i := 0; i < int(n.count); i++ {
 				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					return nil, false
 				}
 			}
 
 			cur = &n.child
-			index += n.count
-			shortPathLengths = append(shortPathLengths, n.countAsUint16Encoding())
+			index += int(n.count)
+			shortPathLengths = append(shortPathLengths, n.count)
 			shortNodeVisited = append(shortNodeVisited, true)
 			steps++
 
@@ -435,7 +431,7 @@ DelLoop:
 			last = cur
 
 			// if the path doesn't match at any point, we can't find the node
-			for i := 0; i < n.count; i++ {
+			for i := 0; i < int(n.count); i++ {
 				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					return false
 				}
@@ -443,7 +439,7 @@ DelLoop:
 
 			// forward pointer and index to the node child
 			cur = &n.child
-			index += n.count
+			index += int(n.count)
 
 			continue DelLoop
 
@@ -518,12 +514,12 @@ func (t *Tree) Hash() []byte {
 // merge will merge a child short node into a parent short node.
 func merge(p *short, c *short) {
 	totalCount := p.count + c.count
-	totalPath := bitutils.MakeBitVector(totalCount)
-	for i := 0; i < p.count; i++ {
+	totalPath := bitutils.MakeBitVector(int(totalCount))
+	for i := 0; i < int(p.count); i++ {
 		bitutils.WriteBit(totalPath, i, bitutils.ReadBit(p.path, i))
 	}
-	for i := 0; i < c.count; i++ {
-		bitutils.WriteBit(totalPath, i+p.count, bitutils.ReadBit(c.path, i))
+	for i := 0; i < int(c.count); i++ {
+		bitutils.WriteBit(totalPath, i+int(p.count), bitutils.ReadBit(c.path, i))
 	}
 	p.count = totalCount
 	p.path = totalPath

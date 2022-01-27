@@ -75,7 +75,7 @@ func TestValidateFormat(t *testing.T) {
 	proof.Key = make([]byte, maxKeyLength+1)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, key length is larger than max key length allowed (8193 > 8192)")
+	require.Equal(t, err.Error(), "malformed proof, key length is larger than max key length allowed (8192 > 8191)")
 
 	// issue with the key size not matching the rest of the proof
 	proof.Key = make([]byte, 64)
@@ -97,7 +97,7 @@ func TestValidateFormat(t *testing.T) {
 	proof.InterimNodeTypes = make([]byte, maxKeyLength+1)
 	err = proof.validateFormat()
 	assert.True(t, IsMalformedProofError(err))
-	require.Equal(t, err.Error(), "malformed proof, InterimNodeTypes is larger than max key length allowed (8193 > 8192)")
+	require.Equal(t, err.Error(), "malformed proof, InterimNodeTypes is larger than max key length allowed (8192 > 8191)")
 
 	// issue with the size of InterimNodeTypes
 	proof.InterimNodeTypes = append(InterimNodeTypesBackup, byte(0))

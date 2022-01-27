@@ -26,9 +26,6 @@ type Proof struct {
 	InterimNodeTypes []byte
 	// ShortPathLengths is read when we reach a short node, and the value represents number of common bits that were included
 	// in the short node (shortNode.count). Elements are ordered from root to leaf.
-	// WARNING, similar to the serializedPathSegmentLength method using by the trie, the uint16 encoding here requires special handling of value zero,
-	// since shortNode.count can only have values in the range of [1, 65536], and a uint16 supports range of [0, 65535],
-	// zero should be mapped to 65536 (all other values are the same)
 	ShortPathLengths []uint16
 	// SiblingHashes is read when we reach a full node. The corresponding element represents
 	// the hash of the non-visited sibling node for each full node on the path. Elements are ordered from root to leaf.
@@ -54,7 +51,7 @@ const maxStepsForProofVerification = maxKeyLength * 8
 //    vertices are on the merkle path. Consequently, we require the same number of _bits_
 //    in InterimNodeTypes. Therefore, we know that InterimNodeTypes should have a length
 //    of `(numberBits+7)>>3` _bytes_, and the remaining padding bits are zeros.
-// 2. The key length (measured in bytes) has to be in the interval [1, 8192].
+// 2. The key length (measured in bytes) has to be in the interval [1, maxKeyLength].
 //    Furthermore, each interim vertex on the merkle path represents:
 //    * either a single bit in case of a full node:
 //      we expect InterimNodeTypes[i] == 0
@@ -80,7 +77,7 @@ func (p *Proof) validateFormat() error {
 		if keyBitCount > maxStepsForProofVerification {
 			return newMalformedProofErrorf("number of key bits (%d) exceed limit (%d)", keyBitCount, maxStepsForProofVerification)
 		}
-		keyBitCount += countUint16EncodingToInt(sc)
+		keyBitCount += int(sc)
 	}
 
 	if len(p.Key)*8 != keyBitCount {
@@ -183,12 +180,12 @@ func (p *Proof) Verify(expectedRootHash []byte) error {
 		// Short node
 
 		// read and pop from ShortPathLengths
-		shortPathLength := countUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
+		shortPathLength := p.ShortPathLengths[shortPathLengthIndex]
 		shortPathLengthIndex--
 
 		// construct the common path
-		commonPath := bitutils.MakeBitVector(shortPathLength)
-		for c := shortPathLength - 1; c >= 0; c-- {
+		commonPath := bitutils.MakeBitVector(int(shortPathLength))
+		for c := int(shortPathLength) - 1; c >= 0; c-- {
 			if bitutils.ReadBit(p.Key, keyIndex) == 1 {
 				bitutils.SetBit(commonPath, c)
 			}
