@@ -2,7 +2,6 @@ package dns
 
 import (
 	"net"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -22,7 +21,6 @@ const (
 
 // cache is a ttl-based cache for dns entries
 type cache struct {
-	sync.RWMutex
 	ttl    time.Duration // time-to-live for cache entry
 	dCache mempool.DNSCache
 }
@@ -30,7 +28,7 @@ type cache struct {
 func newCache(sizeLimit uint32, logger zerolog.Logger) *cache {
 	return &cache{
 		ttl:    DefaultTimeToLive,
-		dCache: herocache.NewDNSCache(sizeLimit, logger),
+		dCache: herocache.NewDNSCache(sizeLimit, logger.With().Str("mempool", "dns-cache").Logger()),
 	}
 }
 
