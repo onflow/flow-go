@@ -481,6 +481,13 @@ func (fnb *FlowNodeBuilder) initDB() {
 	publicDB, err := bstorage.InitPublic(opts)
 	fnb.MustNot(err).Msg("could not open public db")
 	fnb.DB = publicDB
+
+	fnb.ShutdownFunc(func() error {
+		if err := fnb.DB.Close(); err != nil {
+			return fmt.Errorf("error closing protocol database: %w", err)
+		}
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initSecretsDB() {
@@ -515,6 +522,13 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 	secretsDB, err := bstorage.InitSecret(opts)
 	fnb.MustNot(err).Msg("could not open secrets db")
 	fnb.SecretsDB = secretsDB
+
+	fnb.ShutdownFunc(func() error {
+		if err := fnb.SecretsDB.Close(); err != nil {
+			return fmt.Errorf("error closing secrets database: %w", err)
+		}
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -1018,9 +1032,6 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 }
 
 func (fnb *FlowNodeBuilder) Build() (Node, error) {
-	// setup db close handlers to run last
-	fnb.ShutdownFunc(fnb.closeDatabase)
-
 	// Run the prestart initialization. This includes anything that should be done before
 	// starting the components.
 	if err := fnb.onStart(); err != nil {
@@ -1117,20 +1128,6 @@ func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {
 
 func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
 	return f(fnb.NodeConfig)
-}
-
-func (fnb *FlowNodeBuilder) closeDatabase() error {
-	var errs *multierror.Error
-
-	if err := fnb.SecretsDB.Close(); err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("error closing secrets database: %w", err))
-	}
-
-	if err := fnb.DB.Close(); err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("error closing protocol database: %w", err))
-	}
-
-	return errs.ErrorOrNil()
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
