@@ -184,8 +184,13 @@ func TestPostShutdown(t *testing.T) {
 	nb := FlowNode("scaffold test")
 	nb.componentBuilder = component.NewComponentManagerBuilder()
 
-	nb.DB, _ = unittest.TempBadgerDB(t)
-	nb.SecretsDB, _ = unittest.TempBadgerDB(t)
+	var dbDir, secretsDBDir string
+	nb.DB, dbDir = unittest.TempBadgerDB(t)
+	nb.SecretsDB, secretsDBDir = unittest.TempBadgerDB(t)
+	defer func() {
+		_ = os.RemoveAll(dbDir)
+		_ = os.RemoveAll(secretsDBDir)
+	}()
 
 	logger := testLog{}
 
