@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -47,7 +48,7 @@ type Network struct {
 	mw                          network.Middleware
 	top                         network.Topology // used to determine fanout connections
 	metrics                     module.NetworkMetrics
-	rcache                      *RcvCache // used to deduplicate incoming messages
+	rcache                      *netcache.RcvCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
 	subMngr                     network.SubscriptionManager // used to keep track of subscribed channels
 	registerEngineRequests      chan *registerEngineRequest
@@ -97,7 +98,7 @@ func NewNetwork(
 	identityProvider id.IdentityProvider,
 ) (*Network, error) {
 
-	rcache, err := newRcvCache(csize)
+	rcache, err := netcache.NewRcvCache(csize)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
@@ -333,7 +334,7 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if n.rcache.add(message.EventID, network.Channel(message.ChannelID)) {
+	if n.rcache.Add(message.EventID, network.Channel(message.ChannelID)) {
 		log := n.logger.With().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
@@ -383,19 +384,10 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
 	//defer binstat.Leave(bs)
 
-	// use a hash with an engine-specific salt to get the payload hash
-	h := hash.NewSHA3_384()
-	_, err = h.Write([]byte("libp2ppacking" + channel))
+	eventId, err := EventId(channel, payload)
 	if err != nil {
-		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
+		return nil, fmt.Errorf("could not generate event id for message: %x", err)
 	}
-
-	_, err = h.Write(payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not hash event: %w", err)
-	}
-
-	payloadHash := h.SumHash()
 
 	var emTargets [][]byte
 	for _, targetID := range targetIDs {
@@ -413,7 +405,7 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: channel.String(),
-		EventID:   payloadHash,
+		EventID:   eventId,
 		OriginID:  originID,
 		TargetIDs: emTargets,
 		Payload:   payload,
@@ -544,4 +536,20 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	}
 
 	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
+}
+
+func EventId(channel network.Channel, payload []byte) (hash.Hash, error) {
+	// use a hash with an engine-specific salt to get the payload hash
+	h := hash.NewSHA3_384()
+	_, err := h.Write([]byte("libp2ppacking" + channel))
+	if err != nil {
+		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
+	}
+
+	_, err = h.Write(payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not hash event: %w", err)
+	}
+
+	return h.SumHash(), nil
 }

@@ -1,4 +1,4 @@
-package p2p
+package netcache_test
 
 import (
 	"fmt"
@@ -10,11 +10,12 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 )
 
 type RcvCacheTestSuite struct {
 	suite.Suite
-	c    *RcvCache
+	c    *netcache.RcvCache
 	size int
 }
 
@@ -26,7 +27,7 @@ func TestRcvCacheTestSuite(t *testing.T) {
 func (r *RcvCacheTestSuite) SetupTest() {
 	const size = 10
 
-	c, err := newRcvCache(size)
+	c, err := netcache.NewRcvCache(size)
 	require.NoError(r.Suite.T(), err)
 
 	r.c = c
@@ -37,16 +38,16 @@ func (r *RcvCacheTestSuite) SetupTest() {
 func (r *RcvCacheTestSuite) TestSingleElementAdd() {
 	eventID := []byte("event-1")
 	channel := network.Channel("0")
-	assert.False(r.Suite.T(), r.c.add(eventID, channel))
+	assert.False(r.Suite.T(), r.c.Add(eventID, channel))
 
-	assert.True(r.Suite.T(), r.c.add(eventID, channel))
+	assert.True(r.Suite.T(), r.c.Add(eventID, channel))
 }
 
 // TestNoneExistence evaluates the correctness of cache operation against non-existing element
 func (r *RcvCacheTestSuite) TestNoneExistence() {
 	eventID := []byte("non-existing event")
 	channel := network.Channel("1")
-	assert.False(r.Suite.T(), r.c.add(eventID, channel))
+	assert.False(r.Suite.T(), r.c.Add(eventID, channel))
 }
 
 // TestMultipleElementAdd adds several eventIDs to th cache and evaluates their xistence
@@ -60,11 +61,11 @@ func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 
 	// adds all events to the cache
 	for i := range events {
-		assert.False(r.Suite.T(), r.c.add(events[i], network.Channel(strconv.Itoa(i))))
+		assert.False(r.Suite.T(), r.c.Add(events[i], network.Channel(strconv.Itoa(i))))
 	}
 
 	// checks for the existence of the added events
 	for i := range events {
-		assert.True(r.Suite.T(), r.c.add(events[i], network.Channel(strconv.Itoa(i))))
+		assert.True(r.Suite.T(), r.c.Add(events[i], network.Channel(strconv.Itoa(i))))
 	}
 }
