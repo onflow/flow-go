@@ -10,6 +10,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -256,6 +257,15 @@ func (n *Network) Register(channel network.Channel, messageProcessor network.Mes
 		case resp := <-respChan:
 			return resp.conduit, resp.err
 		}
+	}
+}
+
+func (n *Network) RegisterPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) (network.PingService, error) {
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	default:
+		return n.mw.NewPingService(pingProtocol, provider), nil
 	}
 }
 

@@ -89,6 +89,8 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 		builder.enqueueRelayNetwork()
 	}
 
+	builder.EnqueuePingService()
+
 	builder.EnqueueMetricsServerInit()
 
 	if err := builder.RegisterBadgerMetrics(); err != nil {
@@ -277,9 +279,6 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 	}
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
-		pingService := p2p.NewPingService(node.Middleware.Host(), pingLibP2PProtocolID, node.State, node.Logger)
-
 		ping, err := pingeng.New(
 			node.Logger,
 			node.IdentityProvider,
@@ -288,7 +287,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.PingMetrics,
 			builder.pingEnabled,
 			builder.nodeInfoFile,
-			pingService,
+			node.PingService,
 		)
 
 		if err != nil {

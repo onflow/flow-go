@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
@@ -28,7 +29,7 @@ type Engine struct {
 	metrics      module.PingMetrics
 
 	pingEnabled bool
-	pingService *p2p.PingService
+	pingService network.PingService
 	nodeInfo    map[flow.Identifier]string // additional details about a node such as operator name
 }
 
@@ -40,9 +41,8 @@ func New(
 	metrics module.PingMetrics,
 	pingEnabled bool,
 	nodeInfoFile string,
-	pingService *p2p.PingService,
+	pingService network.PingService,
 ) (*Engine, error) {
-
 	eng := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "ping").Logger(),

@@ -15,6 +15,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -173,7 +174,11 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 }
 
 func (m *Middleware) NewBlobService(channel network.Channel, ds datastore.Batching) network.BlobService {
-	return NewBlobService(m.libP2PNode.host, m.libP2PNode.routing, channel.String(), ds)
+	return NewBlobService(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String(), ds)
+}
+
+func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) network.PingService {
+	return NewPingService(m.libP2PNode.Host(), pingProtocol, m.log, provider)
 }
 
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {

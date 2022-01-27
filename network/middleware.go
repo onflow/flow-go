@@ -5,6 +5,7 @@ package network
 import (
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -53,6 +54,9 @@ type Middleware interface {
 
 	// NewBlobService creates a new BlobService for the given channel.
 	NewBlobService(channel Channel, store datastore.Batching) BlobService
+
+	// NewPingService creates a new PingService for the given ping protocol ID.
+	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService
 
 	IsConnected(nodeID flow.Identifier) (bool, error)
 }

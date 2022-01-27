@@ -142,27 +142,43 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
 
-		var opts []p2p.PingServiceOption
+		// setup the Ping provider to return the software version and the sealed block height
+		pingInfoProvider := &p2p.PingInfoProviderImpl{
+			SoftwareVersionFun: func() string {
+				return build.Semver()
+			},
+			SealedBlockHeightFun: func() (uint64, error) {
+				head, err := node.State.Sealed().Head()
+				if err != nil {
+					return 0, err
+				}
+				return head.Height, nil
+			},
+			HotstuffViewFun: func() (uint64, error) {
+				return 0, fmt.Errorf("hotstuff view reporting disabled")
+			},
+		}
 
 		// only consensus roles will need to report hotstuff view
 		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
-			opts = append(opts, p2p.WithHotstuffViewFn(func() (uint64, error) {
+			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
 				curView, err := persist.GetStarted()
 				if err != nil {
 					return 0, err
 				}
 
 				return curView, nil
-			}))
+			}
 		}
 
-		// needed to setup ping handler, but the returned value is unused
-		_ = p2p.NewPingService(node.Middleware.Host(), pingLibP2PProtocolID, node.State, node.Logger, opts...)
+		pingService, err := node.Network.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
 
-		return &module.NoopReadyDoneAware{}, nil
+		node.PingService = pingService
+
+		return &module.NoopReadyDoneAware{}, err
 	})
 }
 

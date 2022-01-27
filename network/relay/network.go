@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-datastore"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -70,4 +71,8 @@ func (r *RelayNetwork) Done() <-chan struct{} {
 
 func (r *RelayNetwork) RegisterBlobService(channel network.Channel, store datastore.Batching) (network.BlobService, error) {
 	return r.originNet.RegisterBlobService(channel, store)
+}
+
+func (r *RelayNetwork) RegisterPingService(pid protocol.ID, provider network.PingInfoProvider) (network.PingService, error) {
+	return r.originNet.RegisterPingService(pid, provider)
 }

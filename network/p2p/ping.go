@@ -13,9 +13,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/build"
+	fnetwork "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
-	fprotocol "github.com/onflow/flow-go/state/protocol"
 )
 
 const maxPingMessageSize = 5 * kb
@@ -26,16 +25,8 @@ const pingTimeout = time.Second * 60
 type PingService struct {
 	host             host.Host
 	pingProtocolID   protocol.ID
-	pingInfoProvider *PingInfoProviderImpl
+	pingInfoProvider fnetwork.PingInfoProvider
 	logger           zerolog.Logger
-}
-
-// PingInfoProvider is the interface used by the PingService to respond to incoming PingRequest with a PingResponse
-// populated with the necessary details
-type PingInfoProvider interface {
-	SoftwareVersion() string
-	SealedBlockHeight() uint64
-	HotstuffView() uint64
 }
 
 type PingInfoProviderImpl struct {
@@ -64,49 +55,20 @@ func (p PingInfoProviderImpl) HotstuffView() uint64 {
 	return view
 }
 
-type PingServiceOption func(*PingService)
-
-func WithHotstuffViewFn(fn func() (uint64, error)) PingServiceOption {
-	return func(e *PingService) {
-		e.pingInfoProvider.HotstuffViewFun = fn
-	}
-}
-
 func NewPingService(
 	h host.Host,
 	pingProtocolID protocol.ID,
-	state fprotocol.State,
 	logger zerolog.Logger,
-	options ...PingServiceOption,
+	pingProvider fnetwork.PingInfoProvider,
 ) *PingService {
-	// setup the Ping provider to return the software version and the sealed block height
-	pingInfoProvider := &PingInfoProviderImpl{
-		SoftwareVersionFun: func() string {
-			return build.Semver()
-		},
-		SealedBlockHeightFun: func() (uint64, error) {
-			head, err := state.Sealed().Head()
-			if err != nil {
-				return 0, err
-			}
-			return head.Height, nil
-		},
-		HotstuffViewFun: func() (uint64, error) {
-			return 0, fmt.Errorf("hotstuff view reporting disabled")
-		},
-	}
-	ps := &PingService{host: h, pingProtocolID: pingProtocolID, pingInfoProvider: pingInfoProvider, logger: logger}
+	ps := &PingService{host: h, pingProtocolID: pingProtocolID, pingInfoProvider: pingProvider, logger: logger}
 
-	for _, option := range options {
-		option(ps)
-	}
-
-	h.SetStreamHandler(pingProtocolID, ps.PingHandler)
+	h.SetStreamHandler(pingProtocolID, ps.pingHandler)
 	return ps
 }
 
 // PingHandler receives the inbound stream for Flow ping protocol and respond back with the PingResponse message
-func (ps *PingService) PingHandler(s network.Stream) {
+func (ps *PingService) pingHandler(s network.Stream) {
 
 	errCh := make(chan error, 1)
 	defer close(errCh)

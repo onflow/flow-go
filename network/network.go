@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/ipfs/go-datastore"
+	"github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/onflow/flow-go/module/component"
 )
@@ -22,4 +23,7 @@ type Network interface {
 	// The returned BlobService can be used to request blocks from the network.
 	// TODO: We should return a function that can be called to unregister / close the BlobService
 	RegisterBlobService(channel Channel, store datastore.Batching) (BlobService, error)
+
+	// RegisterPingService registers a ping protocol handler for the given protocol ID
+	RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error)
 }
