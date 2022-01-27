@@ -6,22 +6,21 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/ipfs/go-datastore"
 	ipfsds "github.com/ipfs/go-datastore"
-	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -39,7 +38,7 @@ const (
 type ExecutionDataRequester struct {
 	component.Component
 	cm  *component.ComponentManager
-	ds  *badger.Datastore
+	ds  datastore.Batching
 	bs  network.BlobService
 	eds ExecutionDataService
 	log zerolog.Logger
@@ -52,10 +51,10 @@ type ExecutionDataRequester struct {
 	rootBlock *flow.Block
 
 	// The highest height block for which ExecutionData exists in the blobstore
-	last uint64
+	last lastProcessedHeight
 
 	// List of block IDs that are missing from the blobstore
-	missingBlocks map[flow.Identifier]struct{}
+	missingBlocks missingBlocksList
 
 	// List of callbacks to call when ExecutionData is successfully fetched for a block
 	consumers []ExecutionDataReceivedCallback
@@ -63,47 +62,44 @@ type ExecutionDataRequester struct {
 	// Interval at which to retry downloads for missing blocks
 	missingCheckInterval time.Duration
 
-	// Mutex to protect access to state
-	missingMu sync.Mutex
-	stateMu   sync.Mutex
-
 	// Channel used to pass finalized block IDs to the finalization processor worker routine
 	finalizedBlocks chan flow.Identifier
+
+	// Channel used to signal that the config has been loaded from the db
+	configLoaded chan struct{}
+
+	consumerMu sync.RWMutex
 }
 
 type ExecutionDataReceivedCallback func(*ExecutionData)
 
 // NewExecutionDataRequester creates a new execution data requester engine
 func NewExecutionDataRequester(
+	log zerolog.Logger,
+	edsMetrics module.ExecutionDataServiceMetrics,
 	finalizationDistributor *pubsub.FinalizationDistributor,
-	datastore *badger.Datastore,
+	datastore datastore.Batching,
 	blobservice network.BlobService,
+	eds ExecutionDataService,
 	rootBlock *flow.Block,
 	blocks storage.Blocks,
 	results storage.ExecutionResults,
-	edsMetrics module.ExecutionDataServiceMetrics,
-	log zerolog.Logger,
 ) (*ExecutionDataRequester, error) {
 
 	e := &ExecutionDataRequester{
 		log:                  log.With().Str("engine", "executiondata_requester").Logger(),
 		ds:                   datastore,
 		bs:                   blobservice,
+		eds:                  eds,
 		rootBlock:            rootBlock,
 		blocks:               blocks,
 		results:              results,
-		missingBlocks:        make(map[flow.Identifier]struct{}),
 		missingCheckInterval: missingBlockCheckInterval,
 		finalizedBlocks:      make(chan flow.Identifier),
+		configLoaded:         make(chan struct{}),
 	}
 
 	finalizationDistributor.AddOnBlockFinalizedConsumer(e.onBlockFinalized)
-
-	// setup execution data service
-	codec := new(cbor.Codec)
-	compressor := compressor.NewLz4Compressor()
-
-	e.eds = NewExecutionDataService(codec, compressor, blobservice, edsMetrics, e.log)
 
 	e.cm = component.NewComponentManagerBuilder().
 		AddWorker(e.finalizedBlockProcessor).
@@ -126,7 +122,20 @@ func (e *ExecutionDataRequester) onBlockFinalized(blockID flow.Identifier) {
 // finalizedBlockProcessor runs the main process that processes finalized block notifications and
 // requests ExecutionData for each block seal
 func (e *ExecutionDataRequester) finalizedBlockProcessor(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	_, _ = e.loadLastProcessedHeight(ctx)
+	e.last = lastProcessedHeight{ds: e.ds}
+	if err := e.last.load(ctx); err != nil {
+		e.log.Debug().Err(err).Msg("last processed height not found in db")
+		e.last.set(ctx, e.rootBlock.Header.Height)
+	}
+	e.log.Debug().Msgf("starting with last processed height %d", e.last.height())
+
+	e.missingBlocks = missingBlocksList{ds: e.ds}
+	if err := e.missingBlocks.load(ctx); err != nil {
+		e.log.Debug().Err(err).Msg("missing blocks list not found in db. using empty list")
+	}
+
+	close(e.configLoaded)
+
 	<-e.eds.Ready()
 	ready()
 
@@ -156,11 +165,11 @@ func (e *ExecutionDataRequester) processFinalizedBlock(ctx irrecoverable.Signale
 	// get the block
 	block, err := e.blocks.ByID(blockID)
 	if errors.Is(err, storage.ErrNotFound) {
-		logger.Error().Err(err).Msg("block is missing from protocol state db")
+		logger.Error().Err(err).Msg("finalized block is missing from protocol state db")
 		return
 	}
 	if err != nil {
-		// This means there was an issue with the db, filesystem or data stored in the db
+		// there was an issue with the db, filesystem or data stored in the db
 		logger.Error().Err(err).Msg("failed to lookup block in protocol state db")
 		return
 	}
@@ -177,15 +186,15 @@ func (e *ExecutionDataRequester) processFinalizedBlock(ctx irrecoverable.Signale
 
 		// missing blocks are enqueued for retry
 		if errors.Is(err, storage.ErrNotFound) {
-			sealLogger.Error().Err(err).Msg("block is missing from protocol state db")
-			go e.addMissing(seal.BlockID)
+			sealLogger.Error().Err(err).Msg("sealed block is missing from protocol state db")
+			e.missingBlocks.add(seal.BlockID)
 			continue
 		}
 
 		// other errors means there was an issue connecting to the db or with the stored data
 		if err != nil {
 			sealLogger.Error().Err(err).Msg("failed to lookup sealed block in protocol state db")
-			go e.addMissing(seal.BlockID)
+			e.missingBlocks.add(seal.BlockID)
 			continue
 		}
 
@@ -194,13 +203,15 @@ func (e *ExecutionDataRequester) processFinalizedBlock(ctx irrecoverable.Signale
 		executionData, err := e.byBlockID(ctx, seal.BlockID)
 		if err != nil {
 			sealLogger.Error().Err(err).Msg("failed to get execution data for block")
-			go e.addMissing(seal.BlockID)
+			e.missingBlocks.add(seal.BlockID)
 			continue
 		}
 
 		sealLogger.Debug().Msgf("fetched execution data for height %d", sealedBlock.Header.Height)
 		go e.onExecutionDataFetched(executionData)
 	}
+
+	e.missingBlocks.save(ctx)
 
 	// Finally, check if there are any heights we've missed. The set of seals in a block must be
 	// for consecutive heights, so sort the heights and then check for any that are missing before
@@ -218,18 +229,18 @@ func (e *ExecutionDataRequester) processFinalizedBlock(ctx irrecoverable.Signale
 		logger.Error().Err(err).Msg("failed to check for missing seals")
 	}
 
-	e.updateLastProcessedHeight(ctx, sealedHeights[len(sealedHeights)-1])
+	e.last.set(ctx, sealedHeights[len(sealedHeights)-1])
 }
 
-// addMissingBefore searches for blocks missed by the finalization event processor, and enqueues them
+// addMissingBefore searches for blocks missed by the finalized block processor, and enqueues them
 // to be fetched
 func (e *ExecutionDataRequester) addMissingBefore(current uint64) error {
-	next := e.last + 1
+	next := e.last.height() + 1
 	if next >= current {
+		// current is either the next block in the sequence, or one we've already seen
 		return nil
 	}
 
-	// one or more blocks were skipped, iterate over the gap and add each block to the missing list
 	for next < current {
 		e.log.Debug().Msgf("next: %d, sealed: %d", next, current)
 		nextBlock, err := e.blocks.ByHeight(next)
@@ -239,20 +250,11 @@ func (e *ExecutionDataRequester) addMissingBefore(current uint64) error {
 			//       performed.
 			return fmt.Errorf("failed to get block for height %d: %w", next, err)
 		}
-		go e.addMissing(nextBlock.ID())
+		e.missingBlocks.add(nextBlock.ID())
 		next++
 	}
 
 	return nil
-}
-
-// addMissing adds a block height to the list of missing blocks
-// This should be run in a separate goroutine since it will block on the mutex until checkMissing
-// has finished
-func (e *ExecutionDataRequester) addMissing(blockID flow.Identifier) {
-	e.missingMu.Lock()
-	defer e.missingMu.Unlock()
-	e.missingBlocks[blockID] = struct{}{}
 }
 
 // byBlockID fetches the ExecutionData for a block by its ID
@@ -260,7 +262,7 @@ func (e *ExecutionDataRequester) byBlockID(signalerCtx irrecoverable.SignalerCon
 	// Get the ExecutionResult, which contains the root CID for the execution data
 	result, err := e.results.ByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to lookup execution result for block %v: %w", blockID, err)
+		return nil, fmt.Errorf("failed to lookup execution result for block: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(signalerCtx, edFetchTimeout)
@@ -278,69 +280,33 @@ func (e *ExecutionDataRequester) byBlockID(signalerCtx irrecoverable.SignalerCon
 		e.bs.DeleteBlob(signalerCtx, cid)
 	}
 
-	// Otherwise, blob was not available on the network.
+	// Otherwise, blob was not available on the network or the fetch timed out.
 	if err != nil {
-		return nil, fmt.Errorf("failed to get execution data for block %v: %w", blockID, err)
+		return nil, fmt.Errorf("failed to get execution data for block: %w", err)
 	}
 
 	return executionData, nil
 }
 
 // AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received
+// Callback Implementations must:
+//   * be concurrency safe
+//   * be non-blocking
+//   * handle repetition of the same events (with some processing overhead).
 func (e *ExecutionDataRequester) AddOnExecutionDataFetchedConsumer(fn ExecutionDataReceivedCallback) {
+	e.consumerMu.Lock()
+	defer e.consumerMu.Unlock()
 	e.consumers = append(e.consumers, fn)
 }
 
 // onExecutionDataFetched is called when a new ExecutionData is received, and calls all registered
 // consumers
 func (e *ExecutionDataRequester) onExecutionDataFetched(executionData *ExecutionData) {
+	e.consumerMu.RLock()
+	defer e.consumerMu.RUnlock()
 	for _, fn := range e.consumers {
 		fn(executionData)
 	}
-}
-
-// loadLastProcessedHeight loads the last processed height from the db.
-// If no height is found or an error is encountered, it uses the root block's height and returns an
-// error
-func (e *ExecutionDataRequester) loadLastProcessedHeight(ctx context.Context) (uint64, error) {
-	e.stateMu.Lock()
-	defer e.stateMu.Unlock()
-	if e.last != 0 {
-		return e.last, nil
-	}
-
-	genesis := e.rootBlock.Header.Height
-
-	data, err := e.ds.Get(ctx, ipfsds.NewKey("lastProcessedHeight"))
-	if err != nil {
-		return genesis, err
-	}
-
-	last, err := strconv.ParseUint(string(data), 10, 64)
-	if err != nil {
-		return genesis, err
-	}
-
-	e.log.Debug().Msgf("loaded last processed height as %d", last)
-
-	e.last = last
-	return e.last, nil
-}
-
-// updateLastProcessedHeight caches the last processed height in the db
-func (e *ExecutionDataRequester) updateLastProcessedHeight(ctx context.Context, height uint64) error {
-	e.stateMu.Lock()
-	defer e.stateMu.Unlock()
-
-	if height <= e.last {
-		return nil
-	}
-	e.last = height
-
-	e.log.Debug().Msgf("updating last processed height to %d", height)
-
-	data := fmt.Sprintf("%d", height)
-	return e.ds.Put(ctx, ipfsds.NewKey("lastProcessedHeight"), []byte(data))
 }
 
 // The following methods make up the background process that ensures the blobstore contains data
@@ -359,16 +325,11 @@ func (e *ExecutionDataRequester) updateLastProcessedHeight(ctx context.Context, 
 // checkAndBackfill runs a single background goroutine that checks for and requests ExecutionData for
 // blocks that are missing from the blobstore.
 func (e *ExecutionDataRequester) checkAndBackfill(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	last, err := e.loadLastProcessedHeight(ctx)
+	<-e.configLoaded
 	<-e.eds.Ready()
 	ready()
 
-	// if there's an error, assume there's no data in the store and we're starting from the root
-	// block height. only check the datastore if we have already processed blocks
-	if err == nil {
-		e.checkDatastore(ctx, last)
-	}
-
+	e.checkDatastore(ctx, e.last.height())
 	e.missingBlockProcessingLoop(ctx)
 }
 
@@ -386,11 +347,10 @@ func (e *ExecutionDataRequester) missingBlockProcessingLoop(ctx irrecoverable.Si
 }
 
 // checkDatastore fetches blobs for each block since the rootBlock, and identifies any that are
-// missing ExecutionData.
+// missing.
 // Since this check requests the data from disk, it guarantees that a local copy exists, otherwise
 // it will be marked missing and refetched from the network.
 func (e *ExecutionDataRequester) checkDatastore(ctx irrecoverable.SignalerContext, lastHeight uint64) {
-
 	genesis := e.rootBlock.Header.Height
 
 	if lastHeight < genesis {
@@ -412,39 +372,186 @@ func (e *ExecutionDataRequester) checkDatastore(ctx irrecoverable.SignalerContex
 		executionData, err := e.byBlockID(ctx, block.ID())
 		if err != nil {
 			e.log.Error().Err(err).Msg("error during datastore check")
-			e.addMissing(block.ID())
+			e.missingBlocks.add(block.ID())
 			continue
 		}
 
-		// TODO: should we track downloads of missing blocks between starts?
-		if false {
+		if e.missingBlocks.delete(block.ID()) {
 			e.log.Debug().Msgf("fetched execution data for height %d", block.Header.Height)
 			go e.onExecutionDataFetched(executionData)
 		}
 	}
+	e.missingBlocks.save(ctx)
 }
 
 // checkMissing attempts to download ExecutionData for any blocks in missingBlocks
 // Any blocks that are successfully downloaded will be removed from missingBlocks and notifications
 // will be sent to all consumers
 func (e *ExecutionDataRequester) checkMissing(ctx irrecoverable.SignalerContext) {
-	// TODO: should we timeout after some number of failures?
-	for blockID := range e.missingBlocks {
-		if ctx.Err() != nil {
-			return
-		}
-
+	// TODO: timeout after some number of failures
+	e.missingBlocks.filter(ctx, func(blockID flow.Identifier) bool {
 		executionData, err := e.byBlockID(ctx, blockID)
 		if err != nil {
 			e.log.Error().Err(err).Msg("failed during check for missing block")
-			continue
+			return true
 		}
-
-		e.missingMu.Lock()
-		delete(e.missingBlocks, blockID)
-		e.missingMu.Unlock()
 
 		e.log.Debug().Msgf("fetched missing execution data for block %v", blockID)
 		go e.onExecutionDataFetched(executionData)
+		return false
+	})
+	e.missingBlocks.save(ctx)
+}
+
+type lastProcessedHeight struct {
+	last uint64
+
+	ds datastore.Batching
+	mu sync.Mutex
+}
+
+// load loads the last processed height from the db.
+func (h *lastProcessedHeight) load(ctx context.Context) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.last != 0 {
+		return nil
 	}
+
+	data, err := h.ds.Get(ctx, ipfsds.NewKey("lastProcessedHeight"))
+	if err != nil {
+		return err
+	}
+
+	height, err := strconv.ParseUint(string(data), 10, 64)
+	if err != nil {
+		return err
+	}
+
+	h.last = height
+	return nil
+}
+
+// set caches the last processed height in the db
+func (h *lastProcessedHeight) set(ctx context.Context, height uint64) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if height <= h.last {
+		return nil
+	}
+	h.last = height
+
+	value := fmt.Sprintf("%d", height)
+	return h.ds.Put(ctx, ipfsds.NewKey("lastProcessedHeight"), []byte(value))
+}
+
+// get returns the value of height
+func (h *lastProcessedHeight) height() uint64 {
+	return h.last
+}
+
+type missingBlocksList struct {
+	missingBlocks map[flow.Identifier]struct{}
+
+	ds datastore.Batching
+	mu sync.Mutex
+}
+
+// load loads the list of missing block IDs from the db.
+// If no list is found or an error is encountered, it returns an error and makes no changes
+func (l *missingBlocksList) load(ctx context.Context) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	data, err := l.ds.Get(ctx, ipfsds.NewKey("missingBlockIDs"))
+	if err != nil {
+		return err
+	}
+
+	missingHex := strings.Split(string(data), ",")
+	missing := make(map[flow.Identifier]struct{})
+	for _, idHex := range missingHex {
+		id, err := flow.HexStringToIdentifier(idHex)
+		if err != nil {
+			return err
+		}
+
+		missing[id] = struct{}{}
+	}
+
+	l.missingBlocks = missing
+	return nil
+}
+
+// set caches the list of missing block IDs in the db
+func (l *missingBlocksList) save(ctx context.Context) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.ds.Put(ctx, ipfsds.NewKey("missingBlockIDs"), []byte(l.String()))
+}
+
+// add adds an ID to the list of missing block IDs
+func (l *missingBlocksList) add(id flow.Identifier) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.missingBlocks[id] = struct{}{}
+}
+
+// has returns true if the provided ID exists in the list
+func (l *missingBlocksList) has(id flow.Identifier) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	_, has := l.missingBlocks[id]
+	return has
+}
+
+// delete attempts to remove the provided ID from the list of missing blocks and returns true if
+// the ID was removed
+func (l *missingBlocksList) delete(id flow.Identifier) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if _, has := l.missingBlocks[id]; !has {
+		return false
+	}
+
+	delete(l.missingBlocks, id)
+	return true
+
+}
+
+func (l *missingBlocksList) filter(ctx context.Context, fn func(flow.Identifier) bool) {
+	l.mu.Lock()
+	for blockID := range l.missingBlocks {
+		if ctx.Err() != nil {
+			break
+		}
+
+		l.mu.Unlock()
+		keep := fn(blockID)
+		l.mu.Lock()
+
+		if !keep {
+			delete(l.missingBlocks, blockID)
+		}
+	}
+	l.mu.Unlock()
+}
+
+func (l *missingBlocksList) String() string {
+	data := ""
+	for blockID := range l.missingBlocks {
+		if len(data) == 0 {
+			data = blockID.String()
+			continue
+		}
+		data = fmt.Sprintf("%s,%s", data, blockID)
+	}
+
+	return data
 }

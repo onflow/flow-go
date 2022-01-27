@@ -400,6 +400,36 @@ func (s *executionDataServiceImpl) Get(ctx context.Context, rootID flow.Identifi
 	return nil, ErrBlobTreeDepthExceeded
 }
 
+func (s *executionDataServiceImpl) Has(ctx context.Context, rootID flow.Identifier) (bool, error) {
+	rootCid := flow.FlowIDToCid(rootID)
+
+	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
+	logger.Debug().Msg("checking if execution data exists")
+
+	cids := []cid.Cid{rootCid}
+
+	var blobTreeNodes int
+
+	for i := uint(0); i <= defaultMaxBlobTreeDepth; i++ {
+		v, err := s.getBlobs(ctx, cids, logger)
+
+		if err != nil {
+			return false, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
+		}
+
+		blobTreeNodes += len(cids)
+
+		switch v := v.(type) {
+		case *ExecutionData:
+			return true, nil
+		case *[]cid.Cid:
+			cids = *v
+		}
+	}
+
+	return false, ErrBlobTreeDepthExceeded
+}
+
 // MalformedDataError is returned when malformed data is found at some level of the requested
 // blob tree. It likely indicates that the tree was generated incorrectly, and hence the request
 // should not be retried.
