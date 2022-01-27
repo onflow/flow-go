@@ -104,11 +104,19 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 				Msg("Successfully executed script")
 			return result, nil
 		}
-		errors = multierror.Append(errors, err)
+		// return OK status if it's just a script failure as opposed to an EN failure
+		if status.Code(err) == codes.InvalidArgument {
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", blockID[:]).
+				Str("script", string(script)).
+				Msg("script failed to execute on the execution node")
+			return nil, status.Errorf(codes.OK, "failed to execute script on execution node %v", execNode.String())
+		}
 	}
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
-		b.log.Error().Err(err).Msg("script execution failed")
+		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
 	}
 	return nil, errToReturn
 }
@@ -121,10 +129,7 @@ func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Id
 	defer closer.Close()
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
 	if err != nil {
-		if status.Code(err) == codes.InvalidArgument {
-			return nil, status.Errorf(codes.OK, "cadence script execution failed on execution node %s: %v", execNode.String(), err)
-		}
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s for node-internal reasons: %v", execNode.String(), err)
+		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", execNode.String(), err)
 	}
 	return execResp.GetValue(), nil
 }

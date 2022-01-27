@@ -20,7 +20,6 @@ import (
 	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 type Suite struct {
@@ -60,7 +59,7 @@ func (suite *Suite) TestExecuteScriptAtBlockID() {
 	suite.Require().NoError(err)
 	script := []byte("dummy script")
 	arguments := [][]byte(nil)
-	executionReq := execproto.ExecuteScriptAtBlockIDRequest{
+	executionReq := execution.ExecuteScriptAtBlockIDRequest{
 		BlockId: rawId[:],
 		Script:  script,
 	}
@@ -87,7 +86,7 @@ func (suite *Suite) TestExecuteScriptAtBlockID() {
 	})
 
 	suite.Run("invalid request with nil blockID", func() {
-		executionReqWithNilBlock := execproto.ExecuteScriptAtBlockIDRequest{
+		executionReqWithNilBlock := execution.ExecuteScriptAtBlockIDRequest{
 			BlockId: nil,
 			Script:  script,
 		}
