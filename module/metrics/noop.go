@@ -31,6 +31,7 @@ func (nc *NoopCollector) DNSLookupDuration(duration time.Duration)              
 func (nc *NoopCollector) OnDNSCacheMiss()                                                        {}
 func (nc *NoopCollector) OnDNSCacheInvalidated()                                                 {}
 func (nc *NoopCollector) OnDNSCacheHit()                                                         {}
+func (nc *NoopCollector) OnDNSLookupRequestDropped()                                             {}
 func (nc *NoopCollector) UnstakedOutboundConnections(_ uint)                                     {}
 func (nc *NoopCollector) UnstakedInboundConnections(_ uint)                                      {}
 func (nc *NoopCollector) RanGC(duration time.Duration)                                           {}

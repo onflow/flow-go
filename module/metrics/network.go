@@ -16,18 +16,19 @@ const (
 )
 
 type NetworkCollector struct {
-	outboundMessageSize       *prometheus.HistogramVec
-	inboundMessageSize        *prometheus.HistogramVec
-	duplicateMessagesDropped  *prometheus.CounterVec
-	queueSize                 *prometheus.GaugeVec
-	queueDuration             *prometheus.HistogramVec
-	inboundProcessTime        *prometheus.CounterVec
-	outboundConnectionCount   prometheus.Gauge
-	inboundConnectionCount    prometheus.Gauge
-	dnsLookupDuration         prometheus.Histogram
-	dnsCacheMissCount         prometheus.Counter
-	dnsCacheHitCount          prometheus.Counter
-	dnsCacheInvalidationCount prometheus.Counter
+	outboundMessageSize          *prometheus.HistogramVec
+	inboundMessageSize           *prometheus.HistogramVec
+	duplicateMessagesDropped     *prometheus.CounterVec
+	queueSize                    *prometheus.GaugeVec
+	queueDuration                *prometheus.HistogramVec
+	inboundProcessTime           *prometheus.CounterVec
+	outboundConnectionCount      prometheus.Gauge
+	inboundConnectionCount       prometheus.Gauge
+	dnsLookupDuration            prometheus.Histogram
+	dnsCacheMissCount            prometheus.Counter
+	dnsCacheHitCount             prometheus.Counter
+	dnsCacheInvalidationCount    prometheus.Counter
+	dnsLookupRequestDroppedCount prometheus.Counter
 
 	prefix string
 }
@@ -112,6 +113,15 @@ func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "dns_cache_hit_total",
 			Help:      "the number of dns cache hits",
+		},
+	)
+
+	nc.dnsLookupRequestDroppedCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      nc.prefix + "dns_lookup_requests_dropped_total",
+			Help:      "the number of dns lookup requests dropped",
 		},
 	)
 
@@ -227,4 +237,9 @@ func (nc *NetworkCollector) OnDNSCacheInvalidated() {
 // looking up the network.
 func (nc *NetworkCollector) OnDNSCacheHit() {
 	nc.dnsCacheHitCount.Inc()
+}
+
+// OnDNSLookupRequestDropped tracks the number of dns lookup requests that are dropped due to a full queue
+func (nc *NetworkCollector) OnDNSLookupRequestDropped() {
+	nc.dnsLookupRequestDroppedCount.Inc()
 }

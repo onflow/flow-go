@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -419,7 +420,7 @@ func createBlobService(ctx irrecoverable.SignalerContext, t *testing.T, ds datas
 	cr, err := dht.New(ctx, h, dhtOpts...)
 	require.NoError(t, err)
 
-	service := network.NewBlobService(h, cr, name, ds)
+	service := p2p.NewBlobService(h, cr, name, ds)
 	service.Start(ctx)
 	<-service.Ready()
 

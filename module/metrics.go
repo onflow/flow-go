@@ -23,6 +23,9 @@ type ResolverMetrics interface {
 
 	// OnDNSCacheInvalidated is called whenever dns cache is invalidated for an entry
 	OnDNSCacheInvalidated()
+
+	// OnDNSLookupRequestDropped tracks the number of dns lookup requests that are dropped due to a full queue
+	OnDNSLookupRequestDropped()
 }
 
 type NetworkMetrics interface {

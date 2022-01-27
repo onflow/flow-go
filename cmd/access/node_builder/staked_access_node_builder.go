@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	relaynet "github.com/onflow/flow-go/network/relay"
 	"github.com/onflow/flow-go/network/topology"
@@ -86,10 +85,11 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
 	if builder.supportsUnstakedFollower {
-		builder.enqueueUnstakedResolver()
 		builder.enqueueUnstakedNetworkInit()
 		builder.enqueueRelayNetwork()
 	}
+
+	builder.EnqueuePingService()
 
 	builder.EnqueueMetricsServerInit()
 
@@ -102,14 +102,6 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 	builder.EnqueueTracer()
 
 	return nil
-}
-
-func (builder *StakedAccessNodeBuilder) enqueueUnstakedResolver() {
-	builder.Component("public network resolver", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		resolver := dns.NewResolver(builder.Logger, builder.PublicNetworkConfig.Metrics, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
-		builder.PublicNetworkConfig.Resolver = resolver
-		return resolver, nil
-	})
 }
 
 func (builder *StakedAccessNodeBuilder) enqueueRelayNetwork() {
@@ -287,9 +279,6 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 	}
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
-		pingService := p2p.NewPingService(node.Middleware.Host(), pingLibP2PProtocolID, node.State, node.Logger)
-
 		ping, err := pingeng.New(
 			node.Logger,
 			node.IdentityProvider,
@@ -298,7 +287,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.PingMetrics,
 			builder.pingEnabled,
 			builder.nodeInfoFile,
-			pingService,
+			node.PingService,
 		)
 
 		if err != nil {
@@ -350,7 +339,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Priv
 		connManager := p2p.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
 		libp2pNode, err := p2p.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
-			SetBasicResolver(builder.PublicNetworkConfig.Resolver).
+			SetBasicResolver(builder.Resolver).
 			SetSubscriptionFilter(
 				p2p.NewRoleBasedFilter(
 					flow.RoleAccess, builder.IdentityProvider,
@@ -358,7 +347,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Priv
 			).
 			SetConnectionManager(connManager).
 			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID), p2p.AsServer(true))
+				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID), p2p.AsServer())
 			}).
 			SetPubSub(pubsub.NewGossipSub).
 			Build(ctx)

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -25,7 +24,7 @@ const happyPath = true
 // instead of going through the underlying basic resolver, and hence through the network.
 func TestResolver_HappyPath(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
-	resolver := NewResolver(zerolog.Nop(), metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
+	resolver := NewResolver(unittest.Logger(), metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -53,7 +52,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver := NewResolver(
-		zerolog.Nop(),
+		unittest.Logger(),
 		metrics.NewNoopCollector(),
 		WithBasicResolver(&basicResolver),
 		WithTTL(1*time.Second)) // cache timeout set to 1 seconds for this test
@@ -88,7 +87,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 // TestResolver_Error evaluates that when the underlying resolver returns an error, the resolver itself does not cache the result.
 func TestResolver_Error(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
-	resolver := NewResolver(zerolog.Nop(), metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
+	resolver := NewResolver(unittest.Logger(), metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -122,7 +121,7 @@ func TestResolver_Error(t *testing.T) {
 func TestResolver_Expired_Invalidated(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver := NewResolver(
-		zerolog.Nop(),
+		unittest.Logger(),
 		metrics.NewNoopCollector(),
 		WithBasicResolver(&basicResolver),
 		WithTTL(1*time.Second)) // 1 second TTL for test

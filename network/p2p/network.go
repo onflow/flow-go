@@ -10,6 +10,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -229,7 +230,7 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 }
 
 func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService, error) {
-	bs := network.NewBlobService(n.mw.Host(), n.mw.RoutingSystem(), channel.String(), ds, opts...)
+	bs := n.mw.NewBlobService(channel, ds, opts...)
 
 	// start the blob service using the network's context
 	bs.Start(parent)
@@ -257,6 +258,15 @@ func (n *Network) Register(channel network.Channel, messageProcessor network.Mes
 		case resp := <-respChan:
 			return resp.conduit, resp.err
 		}
+	}
+}
+
+func (n *Network) RegisterPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) (network.PingService, error) {
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	default:
+		return n.mw.NewPingService(pingProtocol, provider), nil
 	}
 }
 

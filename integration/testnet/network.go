@@ -98,6 +98,8 @@ const (
 	DefaultFlowPort = 2137
 	// DefaultSecureGRPCPort is the port used to access secure GRPC server running on ANs
 	DefaultSecureGRPCPort = 9001
+	// AccessNodePublicNetworkPort is the port used by access nodes for the public libp2p network
+	AccessNodePublicNetworkPort = 9876
 
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
@@ -796,11 +798,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			if nodeConf.SupportsUnstakedNodes {
 				hostExternalNetworkPort := testingdock.RandomPort(t)
-				containerExternalNetworkPort := "9876/tcp"
+				containerExternalNetworkPort := fmt.Sprintf("%d/tcp", AccessNodePublicNetworkPort)
 				nodeContainer.bindPort(hostExternalNetworkPort, containerExternalNetworkPort)
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
 				nodeContainer.AddFlag("supports-unstaked-node", "true")
-				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:9876", nodeContainer.Name()))
+				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
 			}
 
 			hostMetricsPort := testingdock.RandomPort(t)

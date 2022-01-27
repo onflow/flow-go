@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/ipfs/go-datastore"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
 	splitterEngine "github.com/onflow/flow-go/engine/common/splitter"
@@ -62,6 +63,10 @@ func NewNetwork(
 
 func (n *Network) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
 	return n.net.RegisterBlobService(channel, store, opts...)
+}
+
+func (n *Network) RegisterPingService(pid protocol.ID, provider network.PingInfoProvider) (network.PingService, error) {
+	return n.net.RegisterPingService(pid, provider)
 }
 
 // Register will subscribe the given engine with the spitter on the given channel, and all registered

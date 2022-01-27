@@ -68,6 +68,11 @@ func (_m *NetworkMetrics) OnDNSCacheMiss() {
 	_m.Called()
 }
 
+// OnDNSLookupRequestDropped provides a mock function with given fields:
+func (_m *NetworkMetrics) OnDNSLookupRequestDropped() {
+	_m.Called()
+}
+
 // OutboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) OutboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)

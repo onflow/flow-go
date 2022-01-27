@@ -31,9 +31,11 @@ func NewDHT(ctx context.Context, host host.Host, prefix protocol.ID, options ...
 // network), but is useful for improving the stability and performance of live public networks.
 // While we could force all nodes to be DHT Servers, a bunch of nodes otherwise not reachable by most of the
 // network => network partition
-func AsServer(enable bool) dht.Option {
-	if enable {
-		return dht.Mode(dht.ModeServer)
-	}
+
+func AsServer() dht.Option {
+	return dht.Mode(dht.ModeServer)
+}
+
+func AsClient() dht.Option {
 	return dht.Mode(dht.ModeClient)
 }
