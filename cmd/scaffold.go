@@ -1091,17 +1091,15 @@ func (fnb *FlowNodeBuilder) onStart() error {
 // postShutdown is called by the node before exiting
 // put any cleanup code here that should be run after all components have stopped
 func (fnb *FlowNodeBuilder) postShutdown() error {
+	// close the DBs last
+	fnb.ShutdownFunc(fnb.closeDatabase)
+
 	var errs *multierror.Error
 	for _, fn := range fnb.postShutdownFns {
 		err := fn()
 		if err != nil {
 			errs = multierror.Append(errs, err)
 		}
-	}
-
-	err := fnb.closeDatabase()
-	if err != nil {
-		errs = multierror.Append(errs, err)
 	}
 
 	return errs.ErrorOrNil()

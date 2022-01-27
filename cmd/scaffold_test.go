@@ -180,7 +180,6 @@ func TestComponentsRunSerially(t *testing.T) {
 }
 
 func TestPostShutdown(t *testing.T) {
-
 	nb := FlowNode("scaffold test")
 	nb.componentBuilder = component.NewComponentManagerBuilder()
 
