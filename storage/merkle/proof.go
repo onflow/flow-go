@@ -66,10 +66,10 @@ func (p *Proof) validateFormat() error {
 
 	// step1 - validate the key as the very first step
 	if len(p.Key) == 0 {
-		return NewMalformedProofErrorf("key is empty")
+		return newMalformedProofErrorf("key is empty")
 	}
 	if len(p.Key) > maxKeyLength {
-		return NewMalformedProofErrorf("key length is larger than max key length allowed (%d > %d)", len(p.Key), maxKeyLength)
+		return newMalformedProofErrorf("key length is larger than max key length allowed (%d > %d)", len(p.Key), maxKeyLength)
 	}
 
 	// step2 - check ShortPathLengths and SiblingHashes
@@ -78,28 +78,28 @@ func (p *Proof) validateFormat() error {
 	keyBitCount := len(p.SiblingHashes)
 	for _, sc := range p.ShortPathLengths {
 		if keyBitCount > maxStepsForProofVerification {
-			return NewMalformedProofErrorf("number of key bits (%d) exceed limit (%d)", keyBitCount, maxStepsForProofVerification)
+			return newMalformedProofErrorf("number of key bits (%d) exceed limit (%d)", keyBitCount, maxStepsForProofVerification)
 		}
 		keyBitCount += countUint16EncodingToInt(sc)
 	}
 
 	if len(p.Key)*8 != keyBitCount {
-		return NewMalformedProofErrorf("key length doesn't match the length of ShortPathLengths and SiblingHashes")
+		return newMalformedProofErrorf("key length doesn't match the length of ShortPathLengths and SiblingHashes")
 	}
 
 	// step3 - check InterimNodeTypes
 
 	// size checks
 	if len(p.InterimNodeTypes) == 0 {
-		return NewMalformedProofErrorf("InterimNodeTypes is empty")
+		return newMalformedProofErrorf("InterimNodeTypes is empty")
 	}
 	if len(p.InterimNodeTypes) > maxKeyLength {
-		return NewMalformedProofErrorf("InterimNodeTypes is larger than max key length allowed (%d > %d)", len(p.InterimNodeTypes), maxKeyLength)
+		return newMalformedProofErrorf("InterimNodeTypes is larger than max key length allowed (%d > %d)", len(p.InterimNodeTypes), maxKeyLength)
 	}
 	// InterimNodeTypes should only use the smallest number of bytes needed for steps
 	steps := len(p.ShortPathLengths) + len(p.SiblingHashes)
 	if len(p.InterimNodeTypes) != (steps+7)>>3 {
-		return NewMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
+		return newMalformedProofErrorf("the length of InterimNodeTypes doesn't match the length of ShortPathLengths and SiblingHashes")
 	}
 
 	// semantic checks
@@ -111,13 +111,13 @@ func (p *Proof) validateFormat() error {
 	}
 
 	if numberOfShortNodes != len(p.ShortPathLengths) {
-		return NewMalformedProofErrorf("len(ShortPathLengths) (%d) does not match number of set bits in InterimNodeTypes (%d)", len(p.ShortPathLengths), numberOfShortNodes)
+		return newMalformedProofErrorf("len(ShortPathLengths) (%d) does not match number of set bits in InterimNodeTypes (%d)", len(p.ShortPathLengths), numberOfShortNodes)
 	}
 
 	// check that tailing auxiliary bits (to make a complete full byte) are all zero
 	for i := len(p.InterimNodeTypes)*8 - 1; i >= steps; i-- {
 		if bitutils.ReadBit(p.InterimNodeTypes, i) != 0 {
-			return NewMalformedProofErrorf("tailing auxiliary bits in InterimNodeTypes should all be zero")
+			return newMalformedProofErrorf("tailing auxiliary bits in InterimNodeTypes should all be zero")
 		}
 	}
 
@@ -200,7 +200,7 @@ func (p *Proof) Verify(expectedRootHash []byte) error {
 
 	// the final hash value should match whith what was expected
 	if !bytes.Equal(currentHash, expectedRootHash) {
-		return NewInvalidProofErrorf("root hash doesn't match, expected %X, computed %X", expectedRootHash, currentHash)
+		return newInvalidProofErrorf("root hash doesn't match, expected %X, computed %X", expectedRootHash, currentHash)
 	}
 
 	return nil

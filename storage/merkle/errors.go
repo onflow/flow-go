@@ -13,8 +13,8 @@ type MalformedProofError struct {
 	err error
 }
 
-// NewMalformedProofErrorf constructs a new MalformedProofError
-func NewMalformedProofErrorf(msg string, args ...interface{}) *MalformedProofError {
+// newMalformedProofErrorf constructs a new MalformedProofError
+func newMalformedProofErrorf(msg string, args ...interface{}) *MalformedProofError {
 	return &MalformedProofError{err: fmt.Errorf(msg, args...)}
 }
 
@@ -41,8 +41,8 @@ type InvalidProofError struct {
 	err error
 }
 
-// NewInvalidProofErrorf constructs a new InvalidProofError
-func NewInvalidProofErrorf(msg string, args ...interface{}) *InvalidProofError {
+// newInvalidProofErrorf constructs a new InvalidProofError
+func newInvalidProofErrorf(msg string, args ...interface{}) *InvalidProofError {
 	return &InvalidProofError{err: fmt.Errorf(msg, args...)}
 }
 
