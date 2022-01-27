@@ -55,11 +55,11 @@ func TestDNSCache_LRU(t *testing.T) {
 
 	// adding 700 txt and 700 ip domains to cache
 	for _, fixture := range ipFixtures {
-		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
+		require.True(t, cache.PutDomainIp(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	for _, fixture := range txtFixtures {
-		require.True(t, cache.PutTxtDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
+		require.True(t, cache.PutDomainTxt(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	// cache must be full up to its limit
@@ -72,7 +72,7 @@ func TestDNSCache_LRU(t *testing.T) {
 		if i < total-int(sizeLimit) {
 			// old dns entries must be ejected
 			// ip
-			ip, _, ok := cache.GetIpDomain(ipFixtures[i].Domain)
+			ip, _, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 			require.False(t, ok)
 			require.Nil(t, ip)
 			// txt
@@ -85,7 +85,7 @@ func TestDNSCache_LRU(t *testing.T) {
 
 		// new dns entries must be persisted
 		// ip
-		ip, ts, ok := cache.GetIpDomain(ipFixtures[i].Domain)
+		ip, ts, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 		require.True(t, ok)
 		require.Equal(t, ipFixtures[i].Result, ip)
 		require.Equal(t, ipFixtures[i].TimeStamp, ts)
@@ -108,11 +108,11 @@ func testConcurrentAddToCache(t *testing.T,
 	wg.Add(len(ipTestCases) + len(txtTestCases))
 
 	for _, fixture := range ipTestCases {
-		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
+		require.True(t, cache.PutDomainIp(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	for _, fixture := range txtTestCases {
-		require.True(t, cache.PutTxtDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
+		require.True(t, cache.PutDomainTxt(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 }
 
@@ -133,11 +133,11 @@ func TestDNSCache_Rem(t *testing.T) {
 
 	// adding 700 txt and 700 ip domains to cache
 	for _, fixture := range ipFixtures {
-		require.True(t, cache.PutIpDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
+		require.True(t, cache.PutDomainIp(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	for _, fixture := range txtFixtures {
-		require.True(t, cache.PutTxtDomain(fixture.Domain, fixture.TimeStamp, fixture.Result))
+		require.True(t, cache.PutDomainTxt(fixture.Domain, fixture.Result, fixture.TimeStamp))
 	}
 
 	// cache must be full up to its limit
@@ -162,7 +162,7 @@ func TestDNSCache_Rem(t *testing.T) {
 		if i == 0 {
 			// removed entries must no longer exist.
 			// ip
-			ip, _, ok := cache.GetIpDomain(ipFixtures[i].Domain)
+			ip, _, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 			require.False(t, ok)
 			require.Nil(t, ip)
 			// txt
@@ -175,7 +175,7 @@ func TestDNSCache_Rem(t *testing.T) {
 
 		// other entries must be existing.
 		// ip
-		ip, ts, ok := cache.GetIpDomain(ipFixtures[i].Domain)
+		ip, ts, ok := cache.GetDomainIp(ipFixtures[i].Domain)
 		require.True(t, ok)
 		require.Equal(t, ipFixtures[i].Result, ip)
 		require.Equal(t, ipFixtures[i].TimeStamp, ts)
@@ -198,7 +198,7 @@ func testRetrievalMatchCount(t *testing.T,
 	// checking ip domains
 	actualCount := 0
 	for _, tc := range ipTestCases {
-		addresses, timestamp, ok := cache.GetIpDomain(tc.Domain)
+		addresses, timestamp, ok := cache.GetDomainIp(tc.Domain)
 		if !ok {
 			continue
 		}

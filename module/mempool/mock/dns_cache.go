@@ -14,7 +14,7 @@ type DNSCache struct {
 }
 
 // GetIpDomain provides a mock function with given fields: _a0
-func (_m *DNSCache) GetIpDomain(_a0 string) ([]net.IPAddr, int64, bool) {
+func (_m *DNSCache) GetDomainIp(_a0 string) ([]net.IPAddr, int64, bool) {
 	ret := _m.Called(_a0)
 
 	var r0 []net.IPAddr
@@ -74,7 +74,7 @@ func (_m *DNSCache) GetTxtDomain(_a0 string) ([]string, int64, bool) {
 }
 
 // PutIpDomain provides a mock function with given fields: _a0, _a1, _a2
-func (_m *DNSCache) PutIpDomain(_a0 string, _a1 int64, _a2 []net.IPAddr) bool {
+func (_m *DNSCache) PutDomainIp(_a0 string, _a2 []net.IPAddr, _a1 int64) bool {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 bool
@@ -88,7 +88,7 @@ func (_m *DNSCache) PutIpDomain(_a0 string, _a1 int64, _a2 []net.IPAddr) bool {
 }
 
 // PutTxtDomain provides a mock function with given fields: _a0, _a1, _a2
-func (_m *DNSCache) PutTxtDomain(_a0 string, _a1 int64, _a2 []string) bool {
+func (_m *DNSCache) PutDomainTxt(_a0 string, _a2 []string, _a1 int64) bool {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 bool

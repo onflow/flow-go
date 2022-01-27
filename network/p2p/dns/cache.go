@@ -36,7 +36,7 @@ func newCache(sizeLimit uint32, logger zerolog.Logger) *cache {
 // First boolean variable determines whether the domain exists in the cache.
 // Second boolean variable determines whether the domain cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
-	addresses, timeStamp, ok := c.dCache.GetIpDomain(domain)
+	addresses, timeStamp, ok := c.dCache.GetDomainIp(domain)
 	if !ok {
 		// does not exist
 		return nil, !cacheEntryExists, !cacheEntryFresh
@@ -72,12 +72,12 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 
 // updateIPCache updates the cache entry for the domain.
 func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
-	c.dCache.PutIpDomain(domain, runtimeNano(), addr)
+	c.dCache.PutDomainIp(domain, addr, runtimeNano())
 }
 
 // updateTXTCache updates the cache entry for the txt.
 func (c *cache) updateTXTCache(txt string, addr []string) {
-	c.dCache.PutTxtDomain(txt, runtimeNano(), addr)
+	c.dCache.PutDomainTxt(txt, addr, runtimeNano())
 }
 
 // invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation

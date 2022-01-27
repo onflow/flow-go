@@ -26,7 +26,7 @@ func NewDNSCache(sizeLimit uint32, logger zerolog.Logger) *DNSCache {
 }
 
 // PutIpDomain adds the given ip domain into the cache.
-func (d *DNSCache) PutIpDomain(domain string, timestamp int64, addresses []net.IPAddr) bool {
+func (d *DNSCache) PutDomainIp(domain string, addresses []net.IPAddr, timestamp int64) bool {
 	i := ipEntity{
 		id:        domainToIdentifier(domain),
 		domain:    domain,
@@ -38,7 +38,7 @@ func (d *DNSCache) PutIpDomain(domain string, timestamp int64, addresses []net.I
 }
 
 // PutTxtDomain adds the given txt domain into the cache.
-func (d *DNSCache) PutTxtDomain(domain string, timestamp int64, addresses []string) bool {
+func (d *DNSCache) PutDomainTxt(domain string, addresses []string, timestamp int64) bool {
 	t := txtEntity{
 		id:        domainToIdentifier(domain),
 		domain:    domain,
@@ -53,7 +53,7 @@ func (d *DNSCache) PutTxtDomain(domain string, timestamp int64, addresses []stri
 // The second return value determines the timestamp of adding the
 // domain to the cache.
 // The boolean return value determines if domain exists in the cache.
-func (d *DNSCache) GetIpDomain(domain string) ([]net.IPAddr, int64, bool) {
+func (d *DNSCache) GetDomainIp(domain string) ([]net.IPAddr, int64, bool) {
 	entity, ok := d.ipCache.ByID(domainToIdentifier(domain))
 	if !ok {
 		return nil, 0, false

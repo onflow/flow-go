@@ -8,17 +8,17 @@ import (
 type DNSCache interface {
 	// PutIpDomain adds the given ip domain into cache.
 	// The uint64 argument is the timestamp associated with the domain.
-	PutIpDomain(string, int64, []net.IPAddr) bool
+	PutDomainIp(string, []net.IPAddr, int64) bool
 
 	// PutTxtDomain adds the given txt domain into the cache.
 	// The uint64 argument is the timestamp associated with the domain.
-	PutTxtDomain(string, int64, []string) bool
+	PutDomainTxt(string, []string, int64) bool
 
 	// GetIpDomain returns the ip domain if exists in the cache.
 	// The second return value determines the timestamp of adding the
 	// domain to the cache.
 	// The boolean return value determines if domain exists in the cache.
-	GetIpDomain(string) ([]net.IPAddr, int64, bool)
+	GetDomainIp(string) ([]net.IPAddr, int64, bool)
 
 	// GetTxtDomain returns the txt domain if exists in the cache.
 	// The second return value determines the timestamp of adding the
