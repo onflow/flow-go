@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -90,6 +91,7 @@ type FlowNodeBuilder struct {
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
 	components               []namedComponentFunc
+	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
 	extraFlagCheck           func() error
@@ -866,6 +868,12 @@ func (fnb *FlowNodeBuilder) Module(name string, f BuilderFunc) NodeBuilder {
 	return fnb
 }
 
+// ShutdownFunc adds a callback function that is called after all components have exited.
+func (fnb *FlowNodeBuilder) ShutdownFunc(fn func() error) NodeBuilder {
+	fnb.postShutdownFns = append(fnb.postShutdownFns, fn)
+	return fnb
+}
+
 func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder {
 	fnb.adminCommands[command] = f
 	return fnb
@@ -1095,11 +1103,18 @@ func (fnb *FlowNodeBuilder) onStart() error {
 // postShutdown is called by the node before exiting
 // put any cleanup code here that should be run after all components have stopped
 func (fnb *FlowNodeBuilder) postShutdown() error {
-	err := fnb.closeDatabase()
-	if err != nil {
-		return fmt.Errorf("could not close database: %w", err)
+	// close the DBs last
+	fnb.ShutdownFunc(fnb.closeDatabase)
+
+	var errs *multierror.Error
+	for _, fn := range fnb.postShutdownFns {
+		err := fn()
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
-	return nil
+
+	return errs.ErrorOrNil()
 }
 
 // handleFatal handles irrecoverable errors by logging them and exiting the process.
@@ -1116,7 +1131,17 @@ func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
 }
 
 func (fnb *FlowNodeBuilder) closeDatabase() error {
-	return fnb.DB.Close()
+	var errs *multierror.Error
+
+	if err := fnb.SecretsDB.Close(); err != nil {
+		errs = multierror.Append(errs, fmt.Errorf("error closing secrets database: %w", err))
+	}
+
+	if err := fnb.DB.Close(); err != nil {
+		errs = multierror.Append(errs, fmt.Errorf("error closing protocol database: %w", err))
+	}
+
+	return errs.ErrorOrNil()
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
