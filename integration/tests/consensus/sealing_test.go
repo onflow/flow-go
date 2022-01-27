@@ -150,7 +150,7 @@ func (ss *SealingSuite) TestBlockSealCreation() {
 
 	// fix the deadline of the entire test
 	deadline := time.Now().Add(30 * time.Second)
-	ss.T().Logf("seal creation deadline: %s", deadline)
+	ss.T().Logf("%s seal creation deadline: %s", time.Now(), deadline)
 
 	// first, we listen to see which block proposal is the first one to be
 	// confirmed three times (finalized)

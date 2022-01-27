@@ -516,7 +516,6 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
-	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
 	if err != nil {
 		return fmt.Errorf("failed to publish the message: %w", err)

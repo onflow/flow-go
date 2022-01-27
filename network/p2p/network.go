@@ -363,10 +363,18 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		SenderID: senderID,
 	}
 
+	g, ok := decodedMessage.(*flow.CollectionGuarantee)
+	if ok {
+		n.logger.Info().Msgf("insertting queued message %v ", g.CollectionID)
+	}
 	// insert the message in the queue
 	err = n.queue.Insert(qm)
 	if err != nil {
 		return fmt.Errorf("failed to insert message in queue: %w", err)
+	}
+
+	if ok {
+		n.logger.Info().Msgf("inserted queued message %v ", g.CollectionID)
 	}
 
 	return nil
@@ -534,6 +542,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	// tracks its processing time.
 	startTimestamp := time.Now()
 
+	g, ok := qm.Payload.(*flow.CollectionGuarantee)
+	if ok {
+		n.logger.Info().Msgf("queued submitting func: %v", g.CollectionID)
+	}
 	err = eng.Process(qm.Target, qm.SenderID, qm.Payload)
 	if err != nil {
 		n.logger.Error().
@@ -544,4 +556,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	}
 
 	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
+	if ok {
+		n.logger.Info().Msgf("queued submited func: %v", g.CollectionID)
+	}
 }

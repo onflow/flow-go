@@ -298,6 +298,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 
 		for _, collID := range index.CollectionIDs {
 			receiptLookup[collID] = struct{}{}
+			fmt.Println("consensus builder found collection ", collID, "included in ", header.Height, ancestorID)
 		}
 
 		return nil
@@ -318,16 +319,19 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		}
 
 		collID := guarantee.ID()
+		fmt.Println("consensus builder adding collection to payload: ", collID)
 
 		// skip collections that are already included in a block on the fork
 		_, duplicated := receiptLookup[collID]
 		if duplicated {
+			fmt.Println("consensus builder found duplicated", collID)
 			continue
 		}
 
 		// skip collections for blocks that are not within the limit
 		_, ok := blockLookup[guarantee.ReferenceBlockID]
 		if !ok {
+			fmt.Println("consensus builder skip the collection due to out of limit", collID)
 			continue
 		}
 

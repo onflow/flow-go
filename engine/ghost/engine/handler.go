@@ -59,6 +59,11 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 		flowIDs[i] = flow.HashToID(id)
 	}
 
+	g, ok := event.(*flow.CollectionGuarantee)
+	if ok {
+		h.log.Info().Msgf("sending event: %v", g.CollectionID)
+	}
+
 	h.log.Info().
 		Interface("event", event).
 		Str("flow_ids", fmt.Sprintf("%v", flowIDs)).

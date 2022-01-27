@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -66,7 +67,7 @@ func (is *InclusionSuite) SetupTest() {
 
 	// need one controllable collection node (used ghost)
 	is.collID = unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(is.collID), testnet.AsGhost())
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithID(is.collID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	nodeConfigs = append(nodeConfigs,
@@ -98,151 +99,255 @@ func (is *InclusionSuite) SetupTest() {
 }
 
 func (is *InclusionSuite) TearDownTest() {
-	is.T().Logf("test case tear down inclusion")
+	is.T().Logf("%s test case tear down inclusion", time.Now().UTC())
 	is.net.Remove()
 	is.cancel()
 }
 
-func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
-	// fix the deadline for the test as a whole
-	deadline := time.Now().Add(30 * time.Second)
-	is.T().Logf("%s ------ test started, deadline %s", time.Now(), deadline)
-
-	// generate a sentinel collection guarantee
+func makeCollection(collectionID flow.Identifier, refBlockID flow.Identifier) *flow.CollectionGuarantee {
 	sentinel := unittest.CollectionGuaranteeFixture()
-	sentinel.SignerIDs = []flow.Identifier{is.collID}
-	sentinel.ReferenceBlockID = is.net.Root().ID()
-	colID := sentinel.CollectionID
-
-	is.waitUntilSeenProposal(deadline)
-
-	is.T().Logf("seen a proposal")
-
-	// send collection to one consensus node
-	is.sendCollectionToConsensus(deadline, sentinel, is.conIDs[0])
-
-	proposal := is.waitUntilCollectionIncludeInProposal(deadline, sentinel)
-
-	is.T().Logf("collection guarantee %x included in a proposal %x\n", colID, proposal.Header.ID())
-
-	is.waitUntilProposalConfirmed(deadline, sentinel, proposal)
-
-	is.T().Logf("collection guarantee %x is confirmed 3 times\n", colID)
+	sentinel.SignerIDs = []flow.Identifier{collectionID}
+	sentinel.ReferenceBlockID = refBlockID
+	return sentinel
 }
 
-func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
-	for time.Now().Before(deadline) {
+func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
+	t := is.T()
+	t.Logf("%s ------ test started", time.Now().UTC())
 
-		// we read the next message until we reach deadline
-		originID, msg, err := is.reader.Next()
+	// generate a sentinel collection guarantee, with root block as reference,
+	// as long as the tests can finish within 600 blocks, the collection should
+	// not be expired.
+	collection := makeCollection(is.collID, is.net.Root().ID())
+
+	t.Logf("%s collection created: %v", time.Now().UTC(), collection.ID())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	msgs1, msgs2 := dup(ctx, getMsgs(t, ctx, is.reader))
+
+	go func() {
+		t.Logf("%s waiting for ghost node %v to see any proposal with height 1", time.Now().UTC(), is.collID)
+
+		err := is.waitUntilSeenProposal(ctx, msgs1)
 		if err != nil {
-			is.T().Logf("could not read message: %s\n", err)
-			continue
-		}
-
-		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
-		if !ok {
-			continue
-		}
-
-		is.T().Logf("receive block proposal from %v, height %v", originID, proposal.Header.Height)
-		// wait until proposal finalized
-		if proposal.Header.Height >= 1 {
+			cancel()
+			t.Logf("%s did not see any proposal finalized: %v", time.Now().UTC(), err)
 			return
 		}
-	}
-	is.T().Fatalf("%s timeout (deadline %s) waiting to see proposal", time.Now(), deadline)
-}
 
-func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel *flow.CollectionGuarantee, conID flow.Identifier) {
-	colID := sentinel.CollectionID
+		t.Logf("%s have seen a proposal finalized, all consensus nodes must have been ready.", time.Now().UTC())
 
-	// keep trying to send collection guarantee to at least one consensus node
-	for time.Now().Before(deadline) {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		is.T().Logf("%s sending collection %x to consensus node %v\n", time.Now(), colID, conID)
-		err := is.Collection().Send(ctx, engine.PushGuarantees, sentinel, conID)
-		cancel()
+		// send collection to one consensus node
+		consensusID := is.conIDs[0]
+		err = is.sendCollectionToConsensus(ctx, collection, consensusID)
 		if err != nil {
-			is.T().Logf("could not send collection guarantee: %s\n", err)
-			continue
+			cancel()
+			t.Logf("%s failed to send collection %v to consensus %v", time.Now().UTC(), collection.CollectionID, consensusID)
+			return
 		}
 
-		is.T().Logf("%v sent collection %x to consensus %v", time.Now(), colID, conID)
+		t.Logf("%s successfully sent collection %v to consensus %v", time.Now().UTC(), collection.CollectionID, consensusID)
+	}()
+
+	t.Logf("%s waiting until collection %v included in any proposal", time.Now().UTC(), collection.CollectionID)
+
+	proposal, err := is.waitUntilCollectionIncludeInProposal(ctx, collection.CollectionID, msgs2)
+	if err != nil {
+		t.Errorf("%s failed to see collection %v included: %v", time.Now().UTC(), collection.CollectionID, err)
 		return
 	}
 
-	is.T().Fatalf("%v timeout (deadline %s) sendng collection %x to consensus", time.Now(), deadline, colID)
+	t.Logf("%s collection guarantee %x included is in a proposal %x", time.Now().UTC(), collection.CollectionID, proposal.Header.ID())
+
+	err = is.waitUntilProposalConfirmed(ctx, collection.CollectionID, proposal, msgs2)
+	if err != nil {
+		t.Errorf("%s failed to see proposal %v confirmed: %v", time.Now().UTC(), proposal.Header.ID(), err)
+		return
+	}
+
+	t.Logf("%s collection guarantee %x is confirmed 3 times\n", time.Now().UTC(), collection.CollectionID)
 }
 
-func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Time, sentinel *flow.CollectionGuarantee) *messages.BlockProposal {
-	colID := sentinel.CollectionID
-	// we try to find a block with the guarantee included
-	for time.Now().Before(deadline) {
+func dup(ctx context.Context, msgs <-chan *MsgWrap) (<-chan *MsgWrap, <-chan *MsgWrap) {
+	a := make(chan *MsgWrap)
+	b := make(chan *MsgWrap)
 
-		// we read the next message until we reach deadline
-		originID, msg, err := is.reader.Next()
-		if err != nil {
-			is.T().Logf("could not read message: %s\n", err)
-			continue
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				close(a)
+				close(b)
+				return
+			case msg := <-msgs:
+
+				// push message to a, but if no one is listening to a
+				// then we drop the message to prevent from being stuck
+				select {
+				case a <- msg:
+				default:
+				}
+
+				select {
+				case b <- msg:
+				default:
+				}
+			}
+		}
+	}()
+	return a, b
+}
+
+func getMsgs(t *testing.T, ctx context.Context, reader *client.FlowMessageStreamReader) <-chan *MsgWrap {
+	msgs := make(chan *MsgWrap)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				t.Logf("%v stop reading messages from reader", time.Now().UTC())
+				close(msgs)
+				return
+			default:
+			}
+
+			originID, msg, err := reader.Next()
+			msgs <- &MsgWrap{
+				Err:      err,
+				OriginID: originID,
+				Msg:      msg,
+			}
+		}
+	}()
+	return msgs
+}
+
+// processMsg takes in a function to process each message from the given channel, until the function returns true
+// which indicates it has found a specific message
+func processMsg(t *testing.T, ctx context.Context, msgs <-chan *MsgWrap, taskName string, fn func(msg *MsgWrap) (bool, error)) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%v failed to %s : %w", time.Now().UTC(), taskName, ctx.Err())
+		case msgWrap := <-msgs:
+			t.Logf("received message from task %v", taskName)
+			if msgWrap.Err != nil {
+				t.Logf("could not read message: %s\n", msgWrap.Err)
+				continue
+			}
+
+			found, err := fn(msgWrap)
+			if err != nil {
+				return err
+			}
+
+			if !found {
+				continue
+			}
+
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func (is *InclusionSuite) waitUntilSeenProposal(ctx context.Context, msgs <-chan *MsgWrap) error {
+	return processMsg(is.T(), ctx, msgs, "see any proposal incorporated", func(msg *MsgWrap) (bool, error) {
+		// we only care about block proposals at the moment
+		proposal, ok := msg.Msg.(*messages.BlockProposal)
+		if !ok {
+			return false, nil
 		}
 
+		is.T().Logf("%v seen proposal at height %v", time.Now().UTC(), proposal.Header.Height)
+
+		// wait until proposal finalized
+		if proposal.Header.Height >= 1 {
+			return true, nil
+		}
+
+		return false, nil
+	})
+}
+
+func (is *InclusionSuite) sendCollectionToConsensus(ctx context.Context, collection *flow.CollectionGuarantee, conID flow.Identifier) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
+	is.T().Logf("%s sending collection %x to consensus node %v\n", time.Now().UTC(), collection.CollectionID, conID)
+
+	err := is.Collection().Send(ctx, engine.PushGuarantees, collection, conID)
+	defer cancel()
+
+	if err != nil {
+		return fmt.Errorf("could not send collection guarantee: %w", err)
+	}
+
+	return nil
+}
+
+type MsgWrap struct {
+	Err      error
+	OriginID flow.Identifier
+	Msg      interface{}
+}
+
+func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(ctx context.Context, collectionID flow.Identifier, msgs <-chan *MsgWrap) (*messages.BlockProposal, error) {
+	var included *messages.BlockProposal
+	err := processMsg(is.T(), ctx, msgs, "wait until collection included", func(msgWrap *MsgWrap) (bool, error) {
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msgWrap.Msg.(*messages.BlockProposal)
 		if !ok {
-			continue
+			return false, nil
 		}
 
 		guarantees := proposal.Payload.Guarantees
 		height := proposal.Header.Height
+		originID := msgWrap.OriginID
+
 		is.T().Logf("receive block proposal height %v from %v, %v guarantees included in the payload!", height, originID, len(guarantees))
 
 		// check if the collection guarantee is included
 		for _, guarantee := range guarantees {
-			if guarantee.CollectionID == sentinel.CollectionID {
+			if guarantee.CollectionID == collectionID {
 				proposalID := proposal.Header.ID()
-				is.T().Logf("%x: collection guarantee %x included!\n", proposalID, colID)
-				return proposal
+				is.T().Logf("%x: collection guarantee %x included!\n", proposalID, collectionID)
+				included = proposal
+				return true, nil
 			}
 		}
-	}
+		return false, nil
+	})
 
-	is.T().Fatalf("%s timeout (deadline %s) checking collection guarantee %x included\n", time.Now(), deadline, colID)
-	return nil
+	if err != nil {
+		return nil, err
+	}
+	return included, nil
 }
 
 // checkingProposalConfirmed returns whether it has seen 3 blocks confirmations on the block
 // that contains the guarantee
-func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentinel *flow.CollectionGuarantee, proposal *messages.BlockProposal) {
-	colID := sentinel.CollectionID
+func (is *InclusionSuite) waitUntilProposalConfirmed(ctx context.Context, collectionID flow.Identifier, proposal *messages.BlockProposal, msgs <-chan *MsgWrap) error {
 	// we try to find a block with the guarantee included and three confirmations
 	confirmations := make(map[flow.Identifier]uint)
 	// add the proposal that includes the guarantee
 	confirmations[proposal.Header.ID()] = 0
 
-	for time.Now().Before(deadline) {
-
-		// we read the next message until we reach deadline
-		originID, msg, err := is.reader.Next()
-		if err != nil {
-			is.T().Logf("could not read message: %s\n", err)
-			continue
-		}
-
+	return processMsg(is.T(), ctx, msgs, "wait until proposal confirmed", func(msgWrap *MsgWrap) (bool, error) {
 		// we only care about block proposals at the moment
-		proposal, ok := msg.(*messages.BlockProposal)
+		proposal, ok := msgWrap.Msg.(*messages.BlockProposal)
 		if !ok {
-			continue
+			return false, nil
 		}
 
 		// check if the proposal was already processed
 		proposalID := proposal.Header.ID()
-		is.T().Logf("proposal %v received from %v", proposalID, originID)
+		originID := msgWrap.OriginID
+		is.T().Logf("proposal %v (height %v) received from %v", proposalID, proposal.Header.Height, originID)
 
 		_, processed := confirmations[proposalID]
 		if processed {
-			continue
+			return false, nil
 		}
 
 		// if the parent is in the map, it is on a chain that included the
@@ -251,14 +356,14 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		n, ok := confirmations[proposal.Header.ParentID]
 		if ok {
 			confirmations[proposalID] = n + 1
-			is.T().Logf("%x: collection guarantee %x confirmed! (count: %d)\n", proposalID, colID, n+1)
+			is.T().Logf("%x: collection guarantee %x confirmed! (count: %d)\n", proposalID, collectionID, n+1)
 		}
 
 		// if we reached three or more confirmations, we are done!
-		if confirmations[proposalID] >= 3 {
-			return
+		if confirmations[proposalID] < 3 {
+			return false, nil
 		}
-	}
 
-	is.T().Fatalf("%s timeout (deadline %s) collection guarantee %x not confirmed\n", time.Now(), deadline, colID)
+		return true, nil
+	})
 }
