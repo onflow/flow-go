@@ -68,45 +68,51 @@ func TestTopicValidator(t *testing.T) {
 			len(unstakedNode.pubSub.ListPeers(badTopic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
-	m := message.Message{
-		Payload: []byte("hello"),
-	}
-	data, err := m.Marshal()
-	require.NoError(t, err)
-
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
 
+	m1 := message.Message{
+		Payload: []byte("hello1"),
+	}
+	data1, err := m1.Marshal()
+	require.NoError(t, err)
+
 	// node2 publishes a message
-	err = node2.Publish(timedCtx, badTopic, data)
+	err = node2.Publish(timedCtx, badTopic, data1)
 	require.NoError(t, err)
 
 	// node1 gets the message
 	msg, err := sub1.Next(timedCtx)
 	require.NoError(t, err)
-	require.Equal(t, msg.Data, data)
+	require.Equal(t, msg.Data, data1)
 
 	// node2 also gets the message (as part of the libp2p loopback of published topic messages)
 	msg, err = sub2.Next(timedCtx)
 	require.NoError(t, err)
-	require.Equal(t, msg.Data, data)
+	require.Equal(t, msg.Data, data1)
 
 	// the unstaked node also gets the message since it subscribed to the channel without the topic validator
 	msg, err = unstakedSub.Next(timedCtx)
 	require.NoError(t, err)
-	require.Equal(t, msg.Data, data)
+	require.Equal(t, msg.Data, data1)
 
 	timedCtx, cancel2s := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel2s()
 
+	m2 := message.Message{
+		Payload: []byte("hello2"),
+	}
+	data2, err := m2.Marshal()
+	require.NoError(t, err)
+
 	// the unstaked node now publishes a message
-	err = unstakedNode.Publish(timedCtx, badTopic, data)
+	err = unstakedNode.Publish(timedCtx, badTopic, data2)
 	require.NoError(t, err)
 
 	// it receives its own message
 	msg, err = unstakedSub.Next(timedCtx)
 	require.NoError(t, err)
-	require.Equal(t, msg.Data, data)
+	require.Equal(t, msg.Data, data2)
 
 	// node 1 does NOT receive the message due to the topic validator
 	var wg sync.WaitGroup
