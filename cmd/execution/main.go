@@ -123,6 +123,7 @@ func main() {
 		executionDataService          state_synchronization.ExecutionDataService
 		executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
 		executionDataCIDCacheSize     uint = 100
+		edsDatastoreTTL               time.Duration
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -155,6 +156,7 @@ func main() {
 			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
 			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
+			flags.DurationVar(&edsDatastoreTTL, "execution-data-service-datastore-ttl", 0, "TTL for new blobs added to the execution data service blobstore")
 		}).
 		ValidateFlags(func() error {
 			if enableBlockDataUpload {
@@ -341,7 +343,10 @@ func main() {
 				return nil, err
 			}
 
-			ds, err := badger.NewDatastore(executionDataDir, &badger.DefaultOptions)
+			dsOpts := &badger.DefaultOptions
+			dsOpts.TTL = edsDatastoreTTL
+
+			ds, err := badger.NewDatastore(executionDataDir, dsOpts)
 
 			if err != nil {
 				return nil, err
