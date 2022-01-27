@@ -113,6 +113,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 				Msg("script failed to execute on the execution node")
 			return nil, status.Errorf(codes.OK, "failed to execute script on execution node %v", execNode.String())
 		}
+		errors = multierror.Append(errors, err)
 	}
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
