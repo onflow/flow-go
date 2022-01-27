@@ -6,6 +6,6 @@ import (
 
 // DeduplicationCache is a memory pool that tracks duplicate entities through their identifier.
 type DeduplicationCache interface {
-	// Add puts the identifier in the cache if it does not exist and returns true, otherwise, returns false.
-	Add(flow.Identifier) bool
+	// Add puts the entity in the cache if it does not exist and returns true, otherwise, returns false.
+	Add(flow.Entity) bool
 }
