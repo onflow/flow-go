@@ -11,14 +11,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/epochs"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // subsequent calls to Get should return the same transaction pool
 func TestConsistency(t *testing.T) {
 
-	create := func() mempool.Transactions { return stdmap.NewTransactions(100) }
+	create := func() mempool.Transactions { return herocache.NewTransactions(100, unittest.Logger()) }
 	pools := epochs.NewTransactionPools(create)
 	epoch := rand.Uint64()
 
@@ -29,7 +29,7 @@ func TestConsistency(t *testing.T) {
 // test that different epochs don't interfere, also test concurrent access
 func TestMultipleEpochs(t *testing.T) {
 
-	create := func() mempool.Transactions { return stdmap.NewTransactions(100) }
+	create := func() mempool.Transactions { return herocache.NewTransactions(100, unittest.Logger()) }
 	pools := epochs.NewTransactionPools(create)
 
 	var wg sync.WaitGroup
@@ -58,7 +58,7 @@ func TestMultipleEpochs(t *testing.T) {
 
 func TestCombinedSize(t *testing.T) {
 
-	create := func() mempool.Transactions { return stdmap.NewTransactions(100) }
+	create := func() mempool.Transactions { return herocache.NewTransactions(100, unittest.Logger()) }
 	pools := epochs.NewTransactionPools(create)
 
 	nEpochs := rand.Uint64() % 10

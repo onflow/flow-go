@@ -3,14 +3,11 @@
 package merkle
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/ledger/common/bitutils"
-)
+	"golang.org/x/crypto/blake2b"
 
-var (
-	ErrorIncompatibleKeyLength = errors.New("key has incompatible size")
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
 // maxKeyLength in bytes:
@@ -23,6 +20,13 @@ var (
 // This convention organically utilizes the natural occurring overflow and is therefore extremely
 // efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
 const maxKeyLength = 8192
+
+var EmptyTreeRootHash []byte
+
+func init() {
+	h, _ := blake2b.New256([]byte{})
+	EmptyTreeRootHash = h.Sum(nil)
+}
 
 // Tree represents a binary patricia merkle tree. The difference with a normal
 // merkle tree is that it compresses paths that lead to a single leaf into a
@@ -273,6 +277,100 @@ GetLoop:
 	}
 }
 
+// Prove constructs an inclusion proof for the given key, provided the key exists in the trie.
+// It returns a proof and a boolean (true if key exist and false if key not found)
+// Proof is constructed by traversing the trie from top to down and collects data for proof as follows:
+//  - if full node, append the sibling node hash value to sibling hash list
+//  - if short node, appends the node.shortCount to the short count list
+//  - if leaf, would capture the leaf value
+func (t *Tree) Prove(key []byte) (*Proof, bool) {
+
+	// check the len of key first
+	if t.keyLength != len(key) {
+		return nil, false
+	}
+
+	// we start at the root again
+	cur := &t.root
+
+	// and we start at a zero index in the path
+	index := 0
+
+	// init proof params
+	siblingHashes := make([][]byte, 0)
+	shortPathLengths := make([]uint16, 0)
+
+	steps := 0
+	shortNodeVisited := make([]bool, 0, len(key))
+
+ProveLoop:
+	for {
+		switch n := (*cur).(type) {
+
+		// if we have a full node, we can follow the path for at least one more
+		// bit, so go left or right depending on whether it's set or not
+		case *full:
+			var sibling node
+			// forward pointer and index to the correct child
+			if bitutils.ReadBit(key, index) == 0 {
+				sibling = n.right
+				cur = &n.left
+			} else {
+				sibling = n.left
+				cur = &n.right
+			}
+
+			index++
+			siblingHashes = append(siblingHashes, sibling.Hash())
+			shortNodeVisited = append(shortNodeVisited, false)
+			steps++
+
+			continue ProveLoop
+
+		// if we have a short node, we can only follow the path if the key's subsequent
+		// bits match the entire path segment of the short node.
+		case *short:
+
+			// if any part of the path doesn't match, key doesn't exist
+			for i := 0; i < n.count; i++ {
+				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
+					return nil, false
+				}
+			}
+
+			cur = &n.child
+			index += n.count
+			shortPathLengths = append(shortPathLengths, n.CountAsUint16Encoding())
+			shortNodeVisited = append(shortNodeVisited, true)
+			steps++
+
+			continue ProveLoop
+
+		// if we have a leaf, we found the key, return proof and true
+		case *leaf:
+			// compress interimNodeTypes
+			interimNodeTypes := bitutils.MakeBitVector(len(shortNodeVisited))
+			for i, b := range shortNodeVisited {
+				if b {
+					bitutils.SetBit(interimNodeTypes, i)
+				}
+			}
+
+			return &Proof{
+				Key:              key,
+				Value:            n.val,
+				InterimNodeTypes: interimNodeTypes,
+				ShortPathLengths: shortPathLengths,
+				SiblingHashes:    siblingHashes,
+			}, true
+
+		// the only possible nil node is the root node of an empty trie
+		case nil:
+			return nil, false
+		}
+	}
+}
+
 // Del removes the value associated with the given key from the patricia
 // merkle trie. It returns true if they key was found and false otherwise.
 // Internally, any parent nodes between the leaf up to the closest shared path
@@ -410,7 +508,7 @@ DelLoop:
 // Per convention, an empty trie has an empty hash.
 func (t *Tree) Hash() []byte {
 	if t.root == nil {
-		return []byte{}
+		return EmptyTreeRootHash
 	}
 	return t.root.Hash()
 }
