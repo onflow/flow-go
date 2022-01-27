@@ -30,7 +30,7 @@ type cache struct {
 func newCache(sizeLimit uint32, logger zerolog.Logger) *cache {
 	return &cache{
 		ttl:    DefaultTimeToLive,
-		dCache: herocache.NewDNSCache(DefaultCacheSize, logger),
+		dCache: herocache.NewDNSCache(sizeLimit, logger),
 	}
 }
 
