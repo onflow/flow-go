@@ -55,10 +55,10 @@ func WithTTL(ttl time.Duration) optFunc {
 }
 
 // NewResolver is the factory function for creating an instance of this resolver.
-func NewResolver(sizeLimit uint32, logger zerolog.Logger, collector module.ResolverMetrics, opts ...optFunc) *Resolver {
+func NewResolver(cacheSizeLimit uint32, logger zerolog.Logger, collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
 		res:            madns.DefaultResolver,
-		c:              newCache(sizeLimit, logger),
+		c:              newCache(cacheSizeLimit, logger),
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},
