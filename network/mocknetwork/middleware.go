@@ -59,13 +59,20 @@ func (_m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 	return r0, r1
 }
 
-// NewBlobService provides a mock function with given fields: channel, store
-func (_m *Middleware) NewBlobService(channel network.Channel, store datastore.Batching) network.BlobService {
-	ret := _m.Called(channel, store)
+// NewBlobService provides a mock function with given fields: channel, store, opts
+func (_m *Middleware) NewBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, channel, store)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 network.BlobService
-	if rf, ok := ret.Get(0).(func(network.Channel, datastore.Batching) network.BlobService); ok {
-		r0 = rf(channel, store)
+	if rf, ok := ret.Get(0).(func(network.Channel, datastore.Batching, ...network.BlobServiceOption) network.BlobService); ok {
+		r0 = rf(channel, store, opts...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(network.BlobService)
