@@ -118,7 +118,7 @@ func (suite *ExecutionDataTestSuite) SetupTest() {
 		}
 
 		ed := executionDataFixture(block)
-		cid, err := suite.eds.Add(suite.ctx, ed)
+		cid, _, err := suite.eds.Add(suite.ctx, ed)
 		require.NoError(suite.T(), err)
 
 		opts := []func(result *flow.ExecutionResult){
@@ -214,14 +214,15 @@ func (suite *ExecutionDataTestSuite) TestExecutionDataRequester() {
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
 	edr, err := state_synchronization.NewExecutionDataRequester(
+		suite.logger,
+		metrics.NewNoopCollector(),
 		finalizationDistributor,
 		suite.datastore,
 		suite.blobservice,
+		suite.eds,
 		suite.allBlocks[0],
 		suite.blocks,
 		suite.results,
-		metrics.NewNoopCollector(),
-		suite.logger,
 	)
 	assert.NoError(suite.T(), err)
 
