@@ -114,11 +114,6 @@ func (p *Proof) validateFormat() error {
 		return NewMalformedProofErrorf("len(ShortPathLengths) (%d) does not match number of set bits in InterimNodeTypes (%d)", len(p.ShortPathLengths), numberOfShortNodes)
 	}
 
-	numberOfFullNodes := steps - numberOfShortNodes
-	if numberOfFullNodes != len(p.SiblingHashes) {
-		return NewMalformedProofErrorf("len(SiblingHashes) (%d) does not match number of set bits in InterimNodeTypes (%d)", numberOfFullNodes, len(p.SiblingHashes))
-	}
-
 	// check that tailing auxiliary bits (to make a complete full byte) are all zero
 	for i := len(p.InterimNodeTypes)*8 - 1; i >= steps; i-- {
 		if bitutils.ReadBit(p.InterimNodeTypes, i) != 0 {
