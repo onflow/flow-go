@@ -1153,6 +1153,15 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	return tb
 }
 
+func TransactionBodyListFixture(n int) []flow.TransactionBody {
+	l := make([]flow.TransactionBody, n)
+	for i := 0; i < n; i++ {
+		l[i] = TransactionBodyFixture()
+	}
+
+	return l
+}
+
 func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {
 	return func(tx *flow.TransactionBody) {
 		tx.Script = []byte(txDSL.ToCadence())
