@@ -58,8 +58,8 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -355,7 +355,7 @@ func main() {
 			bs, err := node.Network.RegisterBlobService(
 				engine.ExecutionDataService,
 				ds,
-				network.WithBitswapOptions(
+				p2p.WithBitswapOptions(
 					bitswap.WithTaskComparator(
 						func(ta, tb *bitswap.TaskInfo) bool {
 							ra, err := executionDataCIDCache.Get(ta.Cid)

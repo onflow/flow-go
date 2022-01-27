@@ -27,21 +27,27 @@ type blobService struct {
 	component.Component
 	blockService blockservice.BlockService
 	reprovider   provider.Reprovider
+	config       *BlobServiceConfig
 }
 
 var _ network.BlobService = (*blobService)(nil)
 var _ component.Component = (*blobService)(nil)
 
 type BlobServiceConfig struct {
-	ReprovideInterval time.Duration // the interval at which the DHT provider entries are refreshed
+	ReprovideInterval time.Duration    // the interval at which the DHT provider entries are refreshed
+	BitswapOptions    []bitswap.Option // options to pass to the Bitswap service
 }
 
-type BlobServiceOption func(*BlobServiceConfig)
-
 // WithReprovideInterval sets the interval at which DHT provider entries are refreshed
-func WithReprovideInterval(d time.Duration) BlobServiceOption {
-	return func(config *BlobServiceConfig) {
-		config.ReprovideInterval = d
+func WithReprovideInterval(d time.Duration) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		bs.(*blobService).config.ReprovideInterval = d
+	}
+}
+
+func WithBitswapOptions(opts ...bitswap.Option) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		bs.(*blobService).config.BitswapOptions = opts
 	}
 }
 
@@ -51,22 +57,22 @@ func NewBlobService(
 	r routing.ContentRouting,
 	prefix string,
 	ds datastore.Batching,
-	opts ...BlobServiceOption,
+	opts ...network.BlobServiceOption,
 ) *blobService {
-	bs := &blobService{}
 	bstore := blockstore.NewBlockstore(ds)
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
 	config := &BlobServiceConfig{
 		ReprovideInterval: 12 * time.Hour,
 	}
+	bs := &blobService{config: config}
 
 	for _, opt := range opts {
-		opt(config)
+		opt(bs)
 	}
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			bs.blockService = blockservice.New(bstore, bitswap.New(ctx, bsNetwork, bstore))
+			bs.blockService = blockservice.New(bstore, bitswap.New(ctx, bsNetwork, bstore, config.BitswapOptions...))
 
 			ready()
 		}).

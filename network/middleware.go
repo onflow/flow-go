@@ -53,7 +53,7 @@ type Middleware interface {
 	UpdateNodeAddresses()
 
 	// NewBlobService creates a new BlobService for the given channel.
-	NewBlobService(channel Channel, store datastore.Batching) BlobService
+	NewBlobService(channel Channel, store datastore.Batching, opts ...BlobServiceOption) BlobService
 
 	// NewPingService creates a new PingService for the given ping protocol ID.
 	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService
