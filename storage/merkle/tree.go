@@ -278,7 +278,9 @@ GetLoop:
 }
 
 // Prove constructs an inclusion proof for the given key, provided the key exists in the trie.
-// It returns a proof and a boolean (true if key exist and false if key not found)
+// It returns:
+// - (proof, true) if key is found
+// - (nil, false) if key is not found
 // Proof is constructed by traversing the trie from top to down and collects data for proof as follows:
 //  - if full node, append the sibling node hash value to sibling hash list
 //  - if short node, appends the node.shortCount to the short count list

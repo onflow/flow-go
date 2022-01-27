@@ -7,18 +7,20 @@ import (
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
-// Proof captures all data needed for proving inclusion of a single key/value pair inside a merkle trie
-// verifying proof requires knowledge of the trie path structure (node types) and traversing
-// the trie from the leaf to the root and computing hash values.
+// Proof captures all data needed for proving inclusion of a single key/value pair inside a merkle trie.
+// Verifying a proof requires knowledge of the trie path structure (node types), traversing
+// the trie from the leaf to the root, and computing hash values.
 type Proof struct {
 	// Key used to insert and look up the value
 	Key []byte
 	// Value stored in the trie for the given key
 	Value []byte
 	// InterimNodeTypes is designed to be consumed bit by bit to determine if the next node
-	// is a short nodes or full nodes while traversing the trie downward (0: fullnode, 1: shortnode).
+	// is a short node or full node while traversing the trie downward (0: fullnode, 1: shortnode).
 	// The very first bit corresponds to the root of the trie and last bit is the last
 	// interim node before reaching to the leaf.
+	// The slice represents a bit vector where the lowest index byte represents the first 8 node types,
+	// while the most significant bit of the byte represents the first node type (big endianness).
 	// Note that we always allocated the minimal number of bytes needed to capture all
 	// the nodes in the path (padded with zero)
 	InterimNodeTypes []byte
@@ -51,7 +53,7 @@ const maxStepsForProofVerification = maxKeyLength * 8
 //    Hence, len(ShortPathLengths) + len(SiblingHashes) specifies how many _interim_
 //    vertices are on the merkle path. Consequently, we require the same number of _bits_
 //    in InterimNodeTypes. Therefore, we know that InterimNodeTypes should have a length
-//    of `(numberBits+7)>>3` _bytes_.
+//    of `(numberBits+7)>>3` _bytes_, and the remaining padding bits are zeros.
 // 2. The key length (measured in bytes) has to be in the interval [1, 8192].
 //    Furthermore, each interim vertex on the merkle path represents:
 //    * either a single bit in case of a full node:
