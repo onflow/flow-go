@@ -480,7 +480,7 @@ func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execut
 	require.Len(t, result.EventsHashes, expectedNoOfChunks)
 
 	for i := 0; i < expectedNoOfChunks; i++ {
-		calculatedHash, err := flow.EventsListHash(result.Events[i])
+		calculatedHash, err := flow.EventsMerkleRootHash(result.Events[i])
 		require.NoError(t, err)
 
 		require.Equal(t, calculatedHash, result.EventsHashes[i])
