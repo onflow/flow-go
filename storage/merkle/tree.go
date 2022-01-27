@@ -342,7 +342,7 @@ ProveLoop:
 
 			cur = &n.child
 			index += n.count
-			shortPathLengths = append(shortPathLengths, n.CountAsUint16Encoding())
+			shortPathLengths = append(shortPathLengths, n.countAsUint16Encoding())
 			shortNodeVisited = append(shortNodeVisited, true)
 			steps++
 

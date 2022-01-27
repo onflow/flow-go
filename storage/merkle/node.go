@@ -53,11 +53,11 @@ func (n *short) Hash() []byte {
 	return computeShortHash(n.count, n.path, n.child.Hash())
 }
 
-// CountAsUint16Encoding encodes the short count as uint16,
+// countAsUint16Encoding encodes the short count as uint16,
 // it uses similar techniques to serializedPathSegmentLength,
 // to effiently utilize zero for encoding 65536.
 // (see serializedPathSegmentLength for more details)
-func (n *short) CountAsUint16Encoding() uint16 {
+func (n *short) countAsUint16Encoding() uint16 {
 	if n.count > 65536 {
 		panic("count does not fit a uint16")
 	}
@@ -67,9 +67,9 @@ func (n *short) CountAsUint16Encoding() uint16 {
 	return uint16(n.count)
 }
 
-// CountUint16EncodingToInt is the reverse method to CountAsUint16Encoding
-// see `CountAsUint16Encoding` for more details.
-func CountUint16EncodingToInt(inp uint16) int {
+// countUint16EncodingToInt is the reverse method to countAsUint16Encoding
+// see `countAsUint16Encoding` for more details.
+func countUint16EncodingToInt(inp uint16) int {
 	if inp == 0 {
 		return 65536
 	}

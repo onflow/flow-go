@@ -80,7 +80,7 @@ func (p *Proof) validateFormat() error {
 		if keyBitCount > maxStepsForProofVerification {
 			return NewMalformedProofErrorf("number of key bits (%d) exceed limit (%d)", keyBitCount, maxStepsForProofVerification)
 		}
-		keyBitCount += CountUint16EncodingToInt(sc)
+		keyBitCount += countUint16EncodingToInt(sc)
 	}
 
 	if len(p.Key)*8 != keyBitCount {
@@ -183,7 +183,7 @@ func (p *Proof) Verify(expectedRootHash []byte) error {
 		// Short node
 
 		// read and pop from ShortPathLengths
-		shortPathLength := CountUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
+		shortPathLength := countUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
 		shortPathLengthIndex--
 
 		// construct the common path
