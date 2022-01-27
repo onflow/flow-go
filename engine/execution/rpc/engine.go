@@ -164,6 +164,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 
 	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
+		// return code 3 as this passes the litmus test in our context
 		return nil, status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
 	}
 

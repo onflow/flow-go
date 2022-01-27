@@ -122,7 +122,7 @@ func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Id
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
 	if err != nil {
 		if status.Code(err) == codes.InvalidArgument {
-			return nil, status.Errorf(codes.OK, "script execution failed on execution node %s: %v", execNode.String(), err)
+			return nil, status.Errorf(codes.OK, "cadence script execution failed on execution node %s: %v", execNode.String(), err)
 		}
 		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s for node-internal reasons: %v", execNode.String(), err)
 	}

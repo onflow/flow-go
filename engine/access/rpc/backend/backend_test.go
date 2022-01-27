@@ -390,7 +390,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.assertAllExpectations()
 }
 
-// TestTransactionPendingToExpiredStatusTransition tests that the status
+// TestTransactionExpiredStatusTransition tests that the status
 // of transaction changes from Pending to Expired when enough blocks pass
 func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
