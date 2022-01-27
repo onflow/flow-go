@@ -13,8 +13,8 @@ type IpLookupTestCase struct {
 }
 
 type TxtLookupTestCase struct {
-	Domain    string
-	Result    []string
+	Txt       string
+	Records   []string
 	TimeStamp int64
 }
 
@@ -41,7 +41,7 @@ func IpLookupFixture(count int) map[string]*IpLookupTestCase {
 	for i := 0; i < count; i++ {
 		ipTestCase := &IpLookupTestCase{
 			Domain: fmt.Sprintf("example%d.com", i),
-			Result: []net.IPAddr{ // resolves each Domain to 4 addresses.
+			Result: []net.IPAddr{ // resolves each domain to 4 addresses.
 				NetIPAddrFixture(),
 				NetIPAddrFixture(),
 				NetIPAddrFixture(),
@@ -61,8 +61,8 @@ func TxtLookupFixture(count int) map[string]*TxtLookupTestCase {
 
 	for i := 0; i < count; i++ {
 		ttTestCase := &TxtLookupTestCase{
-			Domain: fmt.Sprintf("_dnsaddr.example%d.com", i),
-			Result: []string{ // resolves each Domain to 4 addresses.
+			Txt: fmt.Sprintf("_dnsaddr.example%d.com", i),
+			Records: []string{ // resolves each txt to 4 addresses.
 				TxtIPFixture(),
 				TxtIPFixture(),
 				TxtIPFixture(),
@@ -71,7 +71,7 @@ func TxtLookupFixture(count int) map[string]*TxtLookupTestCase {
 			TimeStamp: rand.Int63(),
 		}
 
-		tt[ttTestCase.Domain] = ttTestCase
+		tt[ttTestCase.Txt] = ttTestCase
 	}
 
 	return tt
@@ -82,7 +82,7 @@ func IpLookupListFixture(count int) []*IpLookupTestCase {
 	for i := 0; i < count; i++ {
 		ipTestCase := &IpLookupTestCase{
 			Domain: fmt.Sprintf("example%d.com", i),
-			Result: []net.IPAddr{ // resolves each Domain to 4 addresses.
+			Result: []net.IPAddr{ // resolves each domain to 4 addresses.
 				NetIPAddrFixture(),
 				NetIPAddrFixture(),
 				NetIPAddrFixture(),
@@ -102,8 +102,8 @@ func TxtLookupListFixture(count int) []*TxtLookupTestCase {
 
 	for i := 0; i < count; i++ {
 		ttTestCase := &TxtLookupTestCase{
-			Domain: fmt.Sprintf("_dnsaddr.example%d.com", i),
-			Result: []string{ // resolves each Domain to 4 addresses.
+			Txt: fmt.Sprintf("_dnsaddr.example%d.com", i),
+			Records: []string{ // resolves each txt to 4 addresses.
 				TxtIPFixture(),
 				TxtIPFixture(),
 				TxtIPFixture(),

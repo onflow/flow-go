@@ -25,7 +25,7 @@ func NewDNSCache(sizeLimit uint32, logger zerolog.Logger) *DNSCache {
 	}
 }
 
-// PutIpDomain adds the given ip domain into the cache.
+// PutDomainIp adds the given ip domain into the cache.
 func (d *DNSCache) PutDomainIp(domain string, addresses []net.IPAddr, timestamp int64) bool {
 	i := ipEntity{
 		id:        domainToIdentifier(domain),
@@ -37,12 +37,12 @@ func (d *DNSCache) PutDomainIp(domain string, addresses []net.IPAddr, timestamp 
 	return d.ipCache.Add(i)
 }
 
-// PutTxtDomain adds the given txt domain into the cache.
-func (d *DNSCache) PutDomainTxt(domain string, addresses []string, timestamp int64) bool {
+// PutTxtRecord adds the given txt record into the cache.
+func (d *DNSCache) PutTxtRecord(domain string, record []string, timestamp int64) bool {
 	t := txtEntity{
 		id:        domainToIdentifier(domain),
-		domain:    domain,
-		addresses: addresses,
+		txt:       domain,
+		record:    record,
 		timestamp: timestamp,
 	}
 
@@ -67,11 +67,11 @@ func (d *DNSCache) GetDomainIp(domain string) ([]net.IPAddr, int64, bool) {
 	return i.addresses, i.timestamp, true
 }
 
-// GetTxtDomain returns the txt domain if exists in the cache.
+// GetTxtRecord returns the txt record if exists in the cache.
 // The second return value determines the timestamp of adding the
-// domain to the cache.
-// The boolean return value determines if domain exists in the cache.
-func (d *DNSCache) GetTxtDomain(domain string) ([]string, int64, bool) {
+// record to the cache.
+// The boolean return value determines if record exists in the cache.
+func (d *DNSCache) GetTxtRecord(domain string) ([]string, int64, bool) {
 	entity, ok := d.txtCache.ByID(domainToIdentifier(domain))
 	if !ok {
 		return nil, 0, false
@@ -82,7 +82,7 @@ func (d *DNSCache) GetTxtDomain(domain string) ([]string, int64, bool) {
 		return nil, 0, false
 	}
 
-	return t.addresses, t.timestamp, true
+	return t.record, t.timestamp, true
 }
 
 // RemoveIp removes an ip domain from cache.
@@ -90,14 +90,14 @@ func (d *DNSCache) RemoveIp(domain string) bool {
 	return d.ipCache.Rem(domainToIdentifier(domain))
 }
 
-// RemoveTxt removes a txt domain from cache.
+// RemoveTxt removes a txt record from cache.
 func (d *DNSCache) RemoveTxt(domain string) bool {
 	return d.txtCache.Rem(domainToIdentifier(domain))
 }
 
 // Size returns total domains maintained into this cache.
 // The first returned value determines number of ip domains.
-// The second returned value determines number of txt domains.
+// The second returned value determines number of txt records.
 func (d DNSCache) Size() (uint, uint) {
 	return d.ipCache.Size(), d.txtCache.Size()
 }
@@ -125,8 +125,8 @@ type txtEntity struct {
 	// caching identifier to avoid cpu overhead
 	// per query.
 	id        flow.Identifier
-	domain    string
-	addresses []string
+	txt       string
+	record    []string
 	timestamp int64
 }
 
@@ -135,7 +135,7 @@ func (t txtEntity) ID() flow.Identifier {
 }
 
 func (t txtEntity) Checksum() flow.Identifier {
-	return domainToIdentifier(t.domain)
+	return domainToIdentifier(t.txt)
 }
 
 func domainToIdentifier(domain string) flow.Identifier {

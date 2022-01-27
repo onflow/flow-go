@@ -52,10 +52,10 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 }
 
 // resolveIPCache resolves the txt through the cache if it is available.
-// First boolean variable determines whether the txt exists in the cache.
-// Second boolean variable determines whether the txt cache is fresh, i.e., TTL has not yet reached.
+// First boolean variable determines whether the txt record exists in the cache.
+// Second boolean variable determines whether the txt record cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
-	addresses, timeStamp, ok := c.dCache.GetTxtDomain(txt)
+	records, timeStamp, ok := c.dCache.GetTxtRecord(txt)
 	if !ok {
 		// does not exist
 		return nil, !cacheEntryExists, !cacheEntryFresh
@@ -63,11 +63,11 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 
 	if time.Duration(runtimeNano()-timeStamp) > c.ttl {
 		// exists but expired
-		return addresses, cacheEntryExists, !cacheEntryFresh
+		return records, cacheEntryExists, !cacheEntryFresh
 	}
 
 	// exists and fresh
-	return addresses, cacheEntryExists, cacheEntryFresh
+	return records, cacheEntryExists, cacheEntryFresh
 }
 
 // updateIPCache updates the cache entry for the domain.
@@ -75,9 +75,9 @@ func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
 	c.dCache.PutDomainIp(domain, addr, runtimeNano())
 }
 
-// updateTXTCache updates the cache entry for the txt.
-func (c *cache) updateTXTCache(txt string, addr []string) {
-	c.dCache.PutDomainTxt(txt, addr, runtimeNano())
+// updateTXTCache updates the cache entry for the txt record.
+func (c *cache) updateTXTCache(txt string, record []string) {
+	c.dCache.PutTxtRecord(txt, record, runtimeNano())
 }
 
 // invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation

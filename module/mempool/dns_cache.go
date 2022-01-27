@@ -10,30 +10,30 @@ type DNSCache interface {
 	// The uint64 argument is the timestamp associated with the domain.
 	PutDomainIp(string, []net.IPAddr, int64) bool
 
-	// PutTxtDomain adds the given txt domain into the cache.
+	// PutTxtRecord adds the given txt record into the cache.
 	// The uint64 argument is the timestamp associated with the domain.
-	PutDomainTxt(string, []string, int64) bool
+	PutTxtRecord(string, []string, int64) bool
 
-	// GetIpDomain returns the ip domain if exists in the cache.
+	// GetDomainIp returns the ip domain if exists in the cache.
 	// The second return value determines the timestamp of adding the
 	// domain to the cache.
 	// The boolean return value determines if domain exists in the cache.
 	GetDomainIp(string) ([]net.IPAddr, int64, bool)
 
-	// GetTxtDomain returns the txt domain if exists in the cache.
+	// GetTxtRecord returns the txt record if exists in the cache.
 	// The second return value determines the timestamp of adding the
-	// domain to the cache.
-	// The boolean return value determines if domain exists in the cache.
-	GetTxtDomain(string) ([]string, int64, bool)
+	// record to the cache.
+	// The boolean return value determines if record exists in the cache.
+	GetTxtRecord(string) ([]string, int64, bool)
 
 	// RemoveIp removes an ip domain from cache.
 	RemoveIp(string) bool
 
-	// RemoveTxt removes a txt domain from cache.
+	// RemoveTxt removes a txt record from cache.
 	RemoveTxt(string) bool
 
 	// Size returns total domains maintained into this cache.
 	// The first returned value determines number of ip domains.
-	// The second returned value determines number of txt domains.
+	// The second returned value determines number of txt records.
 	Size() (uint, uint)
 }

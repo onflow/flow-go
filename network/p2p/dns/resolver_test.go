@@ -162,7 +162,7 @@ func syncThenAsyncQuery(t *testing.T,
 	for _, txttc := range txtTestCases {
 		cacheAndQuery(t, func(domain string) (interface{}, error) {
 			return resolver.LookupTXT(ctx, domain)
-		}, txttc.Domain, txttc.Result, times, wg, happyPath)
+		}, txttc.Txt, txttc.Records, times, wg, happyPath)
 	}
 
 	for _, iptc := range ipTestCases {
@@ -303,7 +303,7 @@ func mockBasicResolverForDomains(t *testing.T,
 			if !happyPath {
 				return nil
 			}
-			return txtLookupTestCases[domain].Result
+			return txtLookupTestCases[domain].Records
 		},
 		func(ctx context.Context, domain string) error {
 			if !happyPath {
@@ -325,6 +325,6 @@ func mockCacheForDomains(resolver *Resolver,
 	}
 
 	for _, txttc := range txtLookupTestCases {
-		resolver.c.updateTXTCache(txttc.Domain, txttc.Result)
+		resolver.c.updateTXTCache(txttc.Txt, txttc.Records)
 	}
 }
