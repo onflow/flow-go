@@ -352,6 +352,8 @@ func main() {
 				return nil, err
 			}
 
+			nodeBuilder.ShutdownFunc(ds.Close)
+
 			// TODO: if the node is not starting from the beginning of the spork, it may be useful to prepopulate
 			// the cache with the existing Execution Data blob trees. Currently, the cache is empty every time the
 			// node restarts, meaning that there will initially be no prioritization of requests.
