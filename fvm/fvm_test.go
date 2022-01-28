@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1303,11 +1302,8 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		assert.PanicsWithValue(t, interpreter.ExternalError{
-			Recovered: logPanic{},
-		}, func() {
-			_ = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger, programs.NewEmptyPrograms())
-		})
+		err = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger, programs.NewEmptyPrograms())
+		require.Error(t, err)
 	})
 
 	t.Run("panics if external function panics in script", func(t *testing.T) {
@@ -1319,12 +1315,8 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
         `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
-		assert.PanicsWithValue(t, interpreter.ExternalError{
-			Recovered: logPanic{},
-		}, func() {
-			_ = vm.Run(blockCtx, fvm.Script(script), ledger, programs.NewEmptyPrograms())
-		})
+		err := vm.Run(blockCtx, fvm.Script(script), ledger, programs.NewEmptyPrograms())
+		require.Error(t, err)
 	})
 }
 
@@ -1548,15 +1540,15 @@ func TestSignatureVerification(t *testing.T) {
 	hashAlgorithms := []hashAlgorithm{
 		{
 			"SHA3_256",
-			func() hash.Hasher {
-				return hash.NewSHA3_256()
-			},
+			hash.NewSHA3_256,
 		},
 		{
 			"SHA2_256",
-			func() hash.Hasher {
-				return hash.NewSHA2_256()
-			},
+			hash.NewSHA2_256,
+		},
+		{
+			"KECCAK_256",
+			hash.NewKeccak_256,
 		},
 	}
 
@@ -1949,6 +1941,25 @@ func TestHashing(t *testing.T) {
 			},
 		},
 		{
+			Algo:    runtime.HashAlgorithmKECCAK_256,
+			WithTag: false,
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "1d5ced4738dd4e0bb4628dad7a7b59b8e339a75ece97a4ad004773a49ed7b5bc", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmKECCAK_256,
+			WithTag: true,
+			Tag:     "some_tag",
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "8454ec77f76b229a473770c91e3ea6e7e852416d747805215d15d53bdc56ce5f", result)
+			},
+		},
+		{
 			Algo:    runtime.HashAlgorithmSHA2_256,
 			WithTag: true,
 			Tag:     "some_tag",
@@ -2050,6 +2061,7 @@ func TestHashing(t *testing.T) {
 		runtime.HashAlgorithmSHA2_384,
 		runtime.HashAlgorithmSHA3_384,
 		runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+		runtime.HashAlgorithmKECCAK_256,
 	}
 
 	for i, algo := range hashAlgos {

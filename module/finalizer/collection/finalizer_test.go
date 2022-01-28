@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/finalizer/collection"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	cluster "github.com/onflow/flow-go/state/cluster/badger"
@@ -34,7 +34,7 @@ func TestFinalizer(t *testing.T) {
 
 		var state *cluster.State
 
-		pool := stdmap.NewTransactions(1000)
+		pool := herocache.NewTransactions(1000, unittest.Logger())
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
