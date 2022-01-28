@@ -427,6 +427,12 @@ func createBlobService(ctx irrecoverable.SignalerContext, t *testing.T, ds datas
 	return service, h
 }
 
+func closeHost(t *testing.T, h host.Host) {
+	if err := h.Close(); err != nil {
+		require.FailNow(t, "failed to close host", err.Error())
+	}
+}
+
 func TestWithNetwork(t *testing.T) {
 	t.Parallel()
 
@@ -436,7 +442,9 @@ func TestWithNetwork(t *testing.T) {
 	ctx, errChan := irrecoverable.WithSignaler(parent)
 
 	service1, h1 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-create-store-request")
+	defer closeHost(t, h1)
 	service2, h2 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-create-store-request")
+	defer closeHost(t, h2)
 
 	done := make(chan struct{})
 
@@ -491,6 +499,7 @@ func TestReprovider(t *testing.T) {
 	require.NoError(t, err)
 
 	h1, err := libp2p.New()
+	defer closeHost(t, h1)
 	require.NoError(t, err)
 	cr1, err := dht.New(ctx, h1, dht.Mode(dht.ModeServer))
 	require.NoError(t, err)
@@ -504,7 +513,9 @@ func TestReprovider(t *testing.T) {
 	}
 
 	service2, h2 := createBlobService(ctx, t, ds, "test-reprovider", dhtOpts...)
+	defer closeHost(t, h2)
 	service3, h3 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-reprovider", dhtOpts...)
+	defer closeHost(t, h3)
 
 	require.NoError(t, h2.Connect(ctx, *host.InfoFromHost(h1)))
 	require.NoError(t, h3.Connect(ctx, *host.InfoFromHost(h1)))
