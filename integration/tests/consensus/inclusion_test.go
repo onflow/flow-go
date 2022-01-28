@@ -41,7 +41,7 @@ func (is *InclusionSuite) Collection() *client.GhostClient {
 }
 
 func (is *InclusionSuite) SetupTest() {
-	is.T().Logf("test case setup inclusion")
+	is.T().Logf("%s test case setup inclusion", time.Now().UTC())
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -122,7 +122,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	t.Logf("%s collection created: %v", time.Now().UTC(), collection.ID())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	msgs1, msgs2 := dup(ctx, getMsgs(t, ctx, is.reader))
