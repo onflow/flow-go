@@ -9,27 +9,27 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
-// RcvCache implements an LRU cache of the received eventIDs that delivered to their engines
-type RcvCache struct {
+// ReceiveCache implements an LRU cache of the received eventIDs that delivered to their engines
+type ReceiveCache struct {
 	c *stdmap.Backend
 }
 
-// rcvCacheEntry represents an entry for the RcvCache
-type rcvCacheEntry struct {
+// receiveCacheEntry represents an entry for the ReceiveCache
+type receiveCacheEntry struct {
 	eventID flow.Identifier
 }
 
-func (r rcvCacheEntry) ID() flow.Identifier {
+func (r receiveCacheEntry) ID() flow.Identifier {
 	return r.eventID
 }
 
-func (r rcvCacheEntry) Checksum() flow.Identifier {
+func (r receiveCacheEntry) Checksum() flow.Identifier {
 	return r.eventID
 }
 
-// NewRcvCache creates and returns a new RcvCache
-func NewRcvCache(sizeLimit uint32, logger zerolog.Logger) *RcvCache {
-	return &RcvCache{
+// NewReceiveCache creates and returns a new ReceiveCache
+func NewReceiveCache(sizeLimit uint32, logger zerolog.Logger) *ReceiveCache {
+	return &ReceiveCache{
 		c: stdmap.NewBackendWithBackData(herocache.NewCache(sizeLimit,
 			herocache.DefaultOversizeFactor,
 			heropool.LRUEjection, // receive cache must be LRU.
@@ -39,6 +39,6 @@ func NewRcvCache(sizeLimit uint32, logger zerolog.Logger) *RcvCache {
 
 // Add adds a new message to the cache if not already present. Returns true if the message is new and unseen, and false if message is duplicate, and
 // already has been seen by the node.
-func (r *RcvCache) Add(eventID []byte) bool {
-	return r.c.Add(rcvCacheEntry{eventID: flow.HashToID(eventID)}) // ignore eviction status
+func (r *ReceiveCache) Add(eventID []byte) bool {
+	return r.c.Add(receiveCacheEntry{eventID: flow.HashToID(eventID)}) // ignore eviction status
 }

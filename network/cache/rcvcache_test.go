@@ -17,28 +17,28 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type RcvCacheTestSuite struct {
+type ReceiveCacheTestSuite struct {
 	suite.Suite
-	c    *netcache.RcvCache
+	c    *netcache.ReceiveCache
 	size int
 }
 
-func TestRcvCacheTestSuite(t *testing.T) {
-	suite.Run(t, new(RcvCacheTestSuite))
+func TestReceiveCacheTestSuite(t *testing.T) {
+	suite.Run(t, new(ReceiveCacheTestSuite))
 }
 
 // SetupTest creates a new cache
-func (r *RcvCacheTestSuite) SetupTest() {
+func (r *ReceiveCacheTestSuite) SetupTest() {
 	const size = 10
 
-	c := netcache.NewRcvCache(size, unittest.Logger())
+	c := netcache.NewReceiveCache(size, unittest.Logger())
 
 	r.c = c
 	r.size = size
 }
 
 // TestSingleElementAdd adds a single element to the cache and verifies its existence.
-func (r *RcvCacheTestSuite) TestSingleElementAdd() {
+func (r *ReceiveCacheTestSuite) TestSingleElementAdd() {
 	eventID, err := p2p.EventId(network.Channel("0"), []byte("event-1"))
 	require.NoError(r.T(), err)
 
@@ -59,7 +59,7 @@ func (r *RcvCacheTestSuite) TestSingleElementAdd() {
 }
 
 // TestNoneExistence evaluates the correctness of cache operation against non-existing element
-func (r *RcvCacheTestSuite) TestNoneExistence() {
+func (r *ReceiveCacheTestSuite) TestNoneExistence() {
 	eventID, err := p2p.EventId(network.Channel("1"), []byte("non-existing event"))
 	require.NoError(r.T(), err)
 
@@ -68,7 +68,7 @@ func (r *RcvCacheTestSuite) TestNoneExistence() {
 }
 
 // TestMultipleElementAdd adds several eventIDs to th cache and evaluates their existence
-func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
+func (r *ReceiveCacheTestSuite) TestMultipleElementAdd() {
 	// creates and populates slice of 10 events
 	eventIDs := make([]hash.Hash, 0)
 	for i := 0; i < r.size; i++ {
@@ -106,7 +106,7 @@ func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 }
 
 // TestLRU makes sure that received cache is configured in LRU mode.
-func (r *RcvCacheTestSuite) TestLRU() {
+func (r *ReceiveCacheTestSuite) TestLRU() {
 	eventIDs := make([]hash.Hash, 0)
 	total := r.size + 1
 	for i := 0; i < total; i++ {

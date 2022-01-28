@@ -48,7 +48,7 @@ type Network struct {
 	mw                          network.Middleware
 	top                         network.Topology // used to determine fanout connections
 	metrics                     module.NetworkMetrics
-	rcache                      *netcache.RcvCache // used to deduplicate incoming messages
+	rcache                      *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
 	subMngr                     network.SubscriptionManager // used to keep track of subscribed channels
 	registerEngineRequests      chan *registerEngineRequest
@@ -98,7 +98,7 @@ func NewNetwork(
 	identityProvider id.IdentityProvider,
 ) (*Network, error) {
 
-	rcache := netcache.NewRcvCache(uint32(csize), log)
+	rcache := netcache.NewReceiveCache(uint32(csize), log)
 	mw, err := mwFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
