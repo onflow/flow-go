@@ -180,12 +180,12 @@ func (p *Proof) Verify(expectedRootHash []byte) error {
 		// Short node
 
 		// read and pop from ShortPathLengths
-		shortPathLength := p.ShortPathLengths[shortPathLengthIndex]
+		shortPathLength := int(p.ShortPathLengths[shortPathLengthIndex])
 		shortPathLengthIndex--
 
 		// construct the common path
-		commonPath := bitutils.MakeBitVector(int(shortPathLength))
-		for c := int(shortPathLength) - 1; c >= 0; c-- {
+		commonPath := bitutils.MakeBitVector(shortPathLength)
+		for c := shortPathLength - 1; c >= 0; c-- {
 			if bitutils.ReadBit(p.Key, keyIndex) == 1 {
 				bitutils.SetBit(commonPath, c)
 			}

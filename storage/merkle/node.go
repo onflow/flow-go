@@ -33,14 +33,14 @@ var (
 // a full node or a leaf.
 
 type short struct {
-	count uint16 // holds the count of bits in the path
+	count int    // holds the count of bits in the path
 	path  []byte // holds the common path to the next node
 	child node   // holds the child after the common path; never nil
 }
 
 var _ node = &short{}
 
-func computeShortHash(count uint16, path []byte, childHash []byte) []byte {
+func computeShortHash(count int, path []byte, childHash []byte) []byte {
 	c := serializedPathSegmentLength(count)
 	h, _ := blake2b.New256(shortNodeTag) // blake2b.New256(..) never errors for given MAC (verified in tests)
 	_, _ = h.Write(c[:])                 // blake2b.Write(..) never errors for _any_ input
@@ -55,7 +55,7 @@ func (n *short) Hash() []byte {
 
 // serializedPathSegmentLength serializes the bitCount into two bytes.
 // We are able to represent key length of up to 65535 bits
-func serializedPathSegmentLength(bitCount uint16) [2]byte {
+func serializedPathSegmentLength(bitCount int) [2]byte {
 	var byteCount [2]byte
 	byteCount[0] = byte(bitCount >> 8)
 	byteCount[1] = byte(bitCount)
