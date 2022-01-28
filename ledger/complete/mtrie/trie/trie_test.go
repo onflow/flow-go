@@ -585,3 +585,139 @@ func Test_Pruning(t *testing.T) {
 func hashToString(hash ledger.RootHash) string {
 	return hex.EncodeToString(hash[:])
 }
+
+// TestValueSizes tests value sizes of existent and non-existent paths for trie of different layouts.
+func TestValueSizes(t *testing.T) {
+
+	emptyTrie := trie.NewEmptyMTrie()
+
+	// Test value sizes for non-existent path in empty trie
+	t.Run("empty trie", func(t *testing.T) {
+		path := utils.PathByUint16LeftPadded(0)
+		pathsToGetValueSize := []ledger.Path{path}
+		sizes := emptyTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.Equal(t, len(pathsToGetValueSize), len(sizes))
+		require.Equal(t, 0, sizes[0])
+	})
+
+	// Test value sizes for a mix of existent and non-existent paths
+	// in trie with compact leaf as root node.
+	t.Run("compact leaf as root", func(t *testing.T) {
+		path1 := utils.PathByUint16LeftPadded(0)
+		payload1 := utils.RandomPayload(1, 100)
+
+		path2 := utils.PathByUint16LeftPadded(1) // This path will not be inserted into trie.
+
+		paths := []ledger.Path{path1}
+		payloads := []ledger.Payload{*payload1}
+
+		newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+		require.NoError(t, err)
+
+		pathsToGetValueSize := []ledger.Path{path1, path2}
+
+		sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.Equal(t, len(pathsToGetValueSize), len(sizes))
+		require.Equal(t, payload1.Value.Size(), sizes[0])
+		require.Equal(t, 0, sizes[1])
+	})
+
+	// Test value sizes for a mix of existent and non-existent paths in partial trie.
+	t.Run("partial trie", func(t *testing.T) {
+		path1 := utils.PathByUint16(1 << 12) // 000100...
+		path2 := utils.PathByUint16(1 << 13) // 001000...
+
+		payload1 := utils.RandomPayload(1, 100)
+		payload2 := utils.RandomPayload(1, 100)
+
+		paths := []ledger.Path{path1, path2}
+		payloads := []ledger.Payload{*payload1, *payload2}
+
+		// Create a new trie with 2 leaf nodes (n1 and n2) at height 253.
+		newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+		require.NoError(t, err)
+
+		//                  n5
+		//                 /
+		//                /
+		//              n4
+		//             /
+		//            /
+		//           n3
+		//        /     \
+		//      /         \
+		//   n1 (path1/     n2 (path2/
+		//       payload1)      payload2)
+		//
+
+		// Populate pathsToGetValueSize with all possible paths for the first 4 bits.
+		pathsToGetValueSize := make([]ledger.Path, 16)
+		for i := 0; i < 16; i++ {
+			pathsToGetValueSize[i] = utils.PathByUint16(uint16(i << 12))
+		}
+
+		// Test value sizes for a mix of existent and non-existent paths.
+		sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.Equal(t, len(pathsToGetValueSize), len(sizes))
+		for i, p := range pathsToGetValueSize {
+			switch p {
+			case path1:
+				require.Equal(t, payload1.Value.Size(), sizes[i])
+			case path2:
+				require.Equal(t, payload2.Value.Size(), sizes[i])
+			default:
+				// Test value size for non-existent path
+				require.Equal(t, 0, sizes[i])
+			}
+		}
+
+		// Test value size for a single existent path
+		pathsToGetValueSize = []ledger.Path{path1}
+		sizes = newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.Equal(t, len(pathsToGetValueSize), len(sizes))
+		require.Equal(t, payload1.Value.Size(), sizes[0])
+
+		// Test value size for a single non-existent path
+		pathsToGetValueSize = []ledger.Path{utils.PathByUint16(3 << 12)}
+		sizes = newTrie.UnsafeValueSizes(pathsToGetValueSize)
+		require.Equal(t, len(pathsToGetValueSize), len(sizes))
+		require.Equal(t, 0, sizes[0])
+	})
+}
+
+// TestValueSizesWithDuplicatePaths tests value sizes of duplicate existent and non-existent paths.
+func TestValueSizesWithDuplicatePaths(t *testing.T) {
+	path1 := utils.PathByUint16(0)
+	path2 := utils.PathByUint16(1)
+	path3 := utils.PathByUint16(2) // This path will not be inserted into trie.
+
+	payload1 := utils.RandomPayload(1, 100)
+	payload2 := utils.RandomPayload(1, 100)
+
+	paths := []ledger.Path{path1, path2}
+	payloads := []ledger.Payload{*payload1, *payload2}
+
+	emptyTrie := trie.NewEmptyMTrie()
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	require.NoError(t, err)
+
+	// pathsToGetValueSize is a mix of duplicate existent and nonexistent paths.
+	pathsToGetValueSize := []ledger.Path{
+		path1, path2, path3,
+		path1, path2, path3,
+	}
+
+	sizes := newTrie.UnsafeValueSizes(pathsToGetValueSize)
+	require.Equal(t, len(pathsToGetValueSize), len(sizes))
+	for i, p := range pathsToGetValueSize {
+		switch p {
+		case path1:
+			require.Equal(t, payload1.Value.Size(), sizes[i])
+		case path2:
+			require.Equal(t, payload2.Value.Size(), sizes[i])
+		default:
+			// Test payload size for non-existent path
+			require.Equal(t, 0, sizes[i])
+		}
+	}
+}
