@@ -78,12 +78,12 @@ type MiddlewareTestSuite struct {
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
 func TestMiddlewareTestSuite(t *testing.T) {
-	t.Parallel()
 	suite.Run(t, new(MiddlewareTestSuite))
 }
 
 // SetupTest initiates the test setups prior to each test
 func (m *MiddlewareTestSuite) SetupTest() {
+	fmt.Println("setup started")
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
 	m.logger = logger
@@ -134,6 +134,8 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		unittest.RequireCloseBefore(m.T(), mw.Ready(), 100*time.Millisecond, "could not start middleware on time")
 		mw.UpdateAllowList()
 	}
+
+	fmt.Println("setup ends")
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
@@ -192,6 +194,7 @@ func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mock
 }
 
 func (m *MiddlewareTestSuite) TearDownTest() {
+	fmt.Println("tear down")
 	m.stopMiddlewares()
 }
 
@@ -382,6 +385,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 // TestLargeMessageSize_SendDirect asserts that a ChunkDataResponse is treated as a large message and can be unicasted
 // successfully even though it's size is greater than the default message size.
 func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
+	fmt.Println("start test")
 	sourceIndex := 0
 	targetIndex := m.size - 1
 	sourceNode := m.ids[sourceIndex].NodeID
@@ -421,6 +425,8 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	unittest.RequireCloseBefore(m.T(), ch, 15*time.Second, "source node failed to send large message to target")
 
 	m.ov[targetIndex].AssertExpectations(m.T())
+
+	fmt.Println("test ends")
 }
 
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
@@ -528,10 +534,6 @@ func (m *MiddlewareTestSuite) stopMiddlewares() {
 	m.mwCancel()
 
 	for i := 0; i < m.size; i++ {
-		<-m.mws[i].Done()
+		unittest.RequireCloseBefore(m.T(), m.mws[i].Done(), 100*time.Millisecond, "could not stop middleware on time")
 	}
-	m.mws = nil
-	m.ov = nil
-	m.ids = nil
-	m.size = 0
 }
