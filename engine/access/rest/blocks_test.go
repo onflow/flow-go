@@ -8,6 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/util"
+
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -42,7 +47,7 @@ func TestGetBlocks(t *testing.T) {
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
 
-	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(MaxAllowedIDs + 1))
+	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(request.MaxAllowedHeights + 1))
 
 	testVectors := []testVector{
 		{
@@ -125,14 +130,15 @@ func TestGetBlocks(t *testing.T) {
 		},
 		{
 			description:      "Get block by more than maximum permissible number of IDs",
-			request:          getByHeightsExpandedURL(t, maxIDs.Strings()...), // height query param specified with no value
+			request:          getByIDsCondensedURL(t, maxIDs.Strings()), // height query param specified with no value
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: fmt.Sprintf(`{"code":400, "message": "invalid height specified: at most %d heights can be requested at a time"}`, MaxAllowedIDs),
+			expectedResponse: fmt.Sprintf(`{"code":400, "message": "at most %d IDs can be requested at a time"}`, request.MaxAllowedHeights),
 		},
 	}
 
 	for _, tv := range testVectors {
-		responseRec := executeRequest(tv.request, backend)
+		responseRec, err := executeRequest(tv.request, backend)
+		assert.NoError(t, err)
 		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
 		actualResp := responseRec.Body.String()
 		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
@@ -261,7 +267,7 @@ func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, 
 			"_self": "%s"
 		}
 	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
-			toBase64(block.Header.ParentVoterSigData), execResultID, execResult.BlockID, execLink, blockLink)
+			util.ToBase64(block.Header.ParentVoterSigData), execResultID, execResult.BlockID, execLink, blockLink)
 	}
 
 	return fmt.Sprintf(`
@@ -281,5 +287,5 @@ func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, 
 			"_self": "%s"
 		}
 	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
-		toBase64(block.Header.ParentVoterSigData), payloadLink, execLink, blockLink)
+		util.ToBase64(block.Header.ParentVoterSigData), payloadLink, execLink, blockLink)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 
 	"github.com/spf13/pflag"
 
@@ -40,7 +41,6 @@ import (
 	"github.com/onflow/flow-go/module/ingress"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
@@ -181,7 +181,7 @@ func main() {
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
-			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
+			create := func() mempool.Transactions { return herocache.NewTransactions(uint32(txLimit), node.Logger) }
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
@@ -222,11 +222,17 @@ func main() {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
 
+			// disable balance checks for transient networks, which do not have transaction fees
+			var opts []epochs.MachineAccountValidatorConfigOption
+			if node.RootChainID.Transient() {
+				opts = append(opts, epochs.WithoutBalanceChecks)
+			}
 			validator, err := epochs.NewMachineAccountConfigValidator(
 				node.Logger,
 				flowClient,
 				flow.RoleCollection,
 				*machineAccountInfo,
+				opts...,
 			)
 
 			return validator, err
