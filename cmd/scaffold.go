@@ -1087,6 +1087,7 @@ func (fnb *FlowNodeBuilder) postShutdown() error {
 	if err != nil {
 		return fmt.Errorf("could not close database: %w", err)
 	}
+	fnb.Logger.Info().Msg("database has been closed")
 	return nil
 }
 

@@ -94,6 +94,22 @@ func (_m *BackData) Clear() {
 	_m.Called()
 }
 
+// Entities provides a mock function with given fields:
+func (_m *BackData) Entities() []flow.Entity {
+	ret := _m.Called()
+
+	var r0 []flow.Entity
+	if rf, ok := ret.Get(0).(func() []flow.Entity); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.Entity)
+		}
+	}
+
+	return r0
+}
+
 // Has provides a mock function with given fields: entityID
 func (_m *BackData) Has(entityID flow.Identifier) bool {
 	ret := _m.Called(entityID)
@@ -118,6 +134,22 @@ func (_m *BackData) Hash() flow.Identifier {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	return r0
+}
+
+// Identifiers provides a mock function with given fields:
+func (_m *BackData) Identifiers() flow.IdentifierList {
+	ret := _m.Called()
+
+	var r0 flow.IdentifierList
+	if rf, ok := ret.Get(0).(func() flow.IdentifierList); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.IdentifierList)
 		}
 	}
 
