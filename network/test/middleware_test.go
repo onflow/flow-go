@@ -131,7 +131,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
 		mw.Start(m.mwCtx)
-		<-mw.Ready()
+		unittest.RequireCloseBefore(m.T(), mw.Ready(), 100*time.Millisecond, "could not start middleware on time")
 		mw.UpdateAllowList()
 	}
 }
