@@ -98,11 +98,7 @@ func NewNetwork(
 	identityProvider id.IdentityProvider,
 ) (*Network, error) {
 
-	rcache, err := netcache.NewRcvCache(csize)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize cache: %w", err)
-	}
-
+	rcache := netcache.NewRcvCache(uint32(csize), log)
 	mw, err := mwFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
@@ -334,7 +330,7 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if n.rcache.Add(message.EventID, network.Channel(message.ChannelID)) {
+	if !n.rcache.Add(message.EventID) {
 		log := n.logger.With().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
