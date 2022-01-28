@@ -181,15 +181,6 @@ func TestComponentsRunSerially(t *testing.T) {
 
 func TestPostShutdown(t *testing.T) {
 	nb := FlowNode("scaffold test")
-	nb.componentBuilder = component.NewComponentManagerBuilder()
-
-	var dbDir, secretsDBDir string
-	nb.DB, dbDir = unittest.TempBadgerDB(t)
-	nb.SecretsDB, secretsDBDir = unittest.TempBadgerDB(t)
-	defer func() {
-		_ = os.RemoveAll(dbDir)
-		_ = os.RemoveAll(secretsDBDir)
-	}()
 
 	logger := testLog{}
 
@@ -215,7 +206,7 @@ func TestPostShutdown(t *testing.T) {
 
 	logs := logger.logs
 	assert.Len(t, logs, 3)
-	assert.ElementsMatch(t, []string{
+	assert.Equal(t, []string{
 		"shutdown 1",
 		"shutdown 2",
 		"shutdown 3",
