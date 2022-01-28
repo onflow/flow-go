@@ -122,6 +122,132 @@ func TestLedger_Get(t *testing.T) {
 	})
 }
 
+func TestLedgerValueSizes(t *testing.T) {
+	t.Run("empty query", func(t *testing.T) {
+
+		wal := &fixtures.NoopWAL{}
+		led, err := complete.NewLedger(
+			wal,
+			100,
+			&metrics.NoopCollector{},
+			zerolog.Logger{},
+			complete.DefaultPathFinderVersion,
+		)
+		require.NoError(t, err)
+
+		curState := led.InitialState()
+		q, err := ledger.NewEmptyQuery(curState)
+		require.NoError(t, err)
+
+		retSizes, err := led.ValueSizes(q)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(retSizes))
+	})
+
+	t.Run("non-existent keys", func(t *testing.T) {
+
+		wal := &fixtures.NoopWAL{}
+		led, err := complete.NewLedger(
+			wal,
+			100,
+			&metrics.NoopCollector{},
+			zerolog.Logger{},
+			complete.DefaultPathFinderVersion,
+		)
+		require.NoError(t, err)
+
+		curState := led.InitialState()
+		q := utils.QueryFixture()
+		q.SetState(curState)
+
+		retSizes, err := led.ValueSizes(q)
+		require.NoError(t, err)
+		require.Equal(t, len(q.Keys()), len(retSizes))
+		for _, size := range retSizes {
+			assert.Equal(t, 0, size)
+		}
+	})
+
+	t.Run("existent keys", func(t *testing.T) {
+
+		wal := &fixtures.NoopWAL{}
+		led, err := complete.NewLedger(
+			wal,
+			100,
+			&metrics.NoopCollector{},
+			zerolog.Logger{},
+			complete.DefaultPathFinderVersion,
+		)
+		require.NoError(t, err)
+
+		curState := led.InitialState()
+		u := utils.UpdateFixture()
+		u.SetState(curState)
+
+		newState, _, err := led.Set(u)
+		require.NoError(t, err)
+		assert.NotEqual(t, curState, newState)
+
+		q, err := ledger.NewQuery(newState, u.Keys())
+		require.NoError(t, err)
+
+		retSizes, err := led.ValueSizes(q)
+		require.NoError(t, err)
+		require.Equal(t, len(q.Keys()), len(retSizes))
+		for i, size := range retSizes {
+			assert.Equal(t, u.Values()[i].Size(), size)
+		}
+	})
+
+	t.Run("mix of existent and non-existent keys", func(t *testing.T) {
+
+		wal := &fixtures.NoopWAL{}
+		led, err := complete.NewLedger(
+			wal,
+			100,
+			&metrics.NoopCollector{},
+			zerolog.Logger{},
+			complete.DefaultPathFinderVersion,
+		)
+		require.NoError(t, err)
+
+		curState := led.InitialState()
+		u := utils.UpdateFixture()
+		u.SetState(curState)
+
+		newState, _, err := led.Set(u)
+		require.NoError(t, err)
+		assert.NotEqual(t, curState, newState)
+
+		// Save expected value sizes for existent keys
+		expectedValueSizes := make(map[string]int)
+		for i, key := range u.Keys() {
+			encKey := encoding.EncodeKey(&key)
+			expectedValueSizes[string(encKey)] = len(u.Values()[i])
+		}
+
+		// Create a randomly ordered mix of existent and non-existent keys
+		var queryKeys []ledger.Key
+		queryKeys = append(queryKeys, u.Keys()...)
+		queryKeys = append(queryKeys, utils.RandomUniqueKeys(10, 2, 1, 10)...)
+
+		rand.Shuffle(len(queryKeys), func(i, j int) {
+			queryKeys[i], queryKeys[j] = queryKeys[j], queryKeys[i]
+		})
+
+		q, err := ledger.NewQuery(newState, queryKeys)
+		require.NoError(t, err)
+
+		retSizes, err := led.ValueSizes(q)
+		require.NoError(t, err)
+		require.Equal(t, len(q.Keys()), len(retSizes))
+		for i, key := range q.Keys() {
+			encKey := encoding.EncodeKey(&key)
+			assert.Equal(t, expectedValueSizes[string(encKey)], retSizes[i])
+		}
+	})
+}
+
 func TestLedger_Proof(t *testing.T) {
 	t.Run("empty query", func(t *testing.T) {
 		wal := &fixtures.NoopWAL{}
@@ -325,6 +451,14 @@ func TestLedgerFunctionality(t *testing.T) {
 				assert.NoError(t, err)
 				// byte{} is returned as nil
 				assert.True(t, valuesMatches(values, retValues))
+
+				// get value sizes and compare them
+				retSizes, err := led.ValueSizes(query)
+				assert.NoError(t, err)
+				assert.Equal(t, len(query.Keys()), len(retSizes))
+				for i, size := range retSizes {
+					assert.Equal(t, values[i].Size(), size)
+				}
 
 				// validate proofs (check individual proof and batch proof)
 				proofs, err := led.Prove(query)
