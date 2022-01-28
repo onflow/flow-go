@@ -67,11 +67,11 @@ func (r *RcvCacheTestSuite) TestNoneExistence() {
 	assert.True(r.Suite.T(), r.c.Add(eventID))
 }
 
-// TestMultipleElementAdd adds several eventIDs to th cache and evaluates their xistence
+// TestMultipleElementAdd adds several eventIDs to th cache and evaluates their existence
 func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 	// creates and populates slice of 10 events
 	eventIDs := make([]hash.Hash, 0)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < r.size; i++ {
 		eventID, err := p2p.EventId(network.Channel("1"), []byte(fmt.Sprintf("event-%d", i)))
 		require.NoError(r.T(), err)
 
@@ -80,8 +80,8 @@ func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 
 	// adding non-existing even id must return true
 	wg := sync.WaitGroup{}
-	wg.Add(10)
-	for i := 0; i < 10; i++ {
+	wg.Add(r.size)
+	for i := 0; i < r.size; i++ {
 		go func(i int) {
 			assert.True(r.Suite.T(), r.c.Add(eventIDs[i]))
 
@@ -93,8 +93,8 @@ func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 	unittest.RequireReturnsBefore(r.T(), wg.Wait, 100*time.Millisecond, "cannot add events to cache on time")
 
 	// adding duplicate event id must return false.
-	wg.Add(10)
-	for i := 0; i < 10; i++ {
+	wg.Add(r.size)
+	for i := 0; i < r.size; i++ {
 		go func(i int) {
 			assert.False(r.Suite.T(), r.c.Add(eventIDs[i]))
 
@@ -103,4 +103,28 @@ func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 	}
 
 	unittest.RequireReturnsBefore(r.T(), wg.Wait, 100*time.Millisecond, "cannot add duplicate events to cache on time")
+}
+
+// TestLRU makes sure that received cache is configured in LRU mode.
+func (r *RcvCacheTestSuite) TestLRU() {
+	eventIDs := make([]hash.Hash, 0)
+	total := r.size + 1
+	for i := 0; i < total; i++ {
+		eventID, err := p2p.EventId(network.Channel("1"), []byte(fmt.Sprintf("event-%d", i)))
+		require.NoError(r.T(), err)
+
+		eventIDs = append(eventIDs, eventID)
+	}
+
+	// adding non-existing even id must return true
+	for i := 0; i < total; i++ {
+		assert.True(r.Suite.T(), r.c.Add(eventIDs[i]))
+	}
+
+	// when adding 11th element, cache goes beyond its size,
+	// and 1st element (i.e., index 0) is ejected.
+	// Now when trying to add 1st element again, it seems
+	// new to cache and replaces 2nd element (at index 1) with it.
+	require.True(r.T(), r.c.Add(eventIDs[0]))
+
 }
