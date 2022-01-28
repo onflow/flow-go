@@ -3,7 +3,7 @@
 
 package crypto
 
-// Stubs of bls_relic.go for non relic build of flow-go.
+// Stubs of bls.go for non relic build of flow-go.
 
 import (
 	"github.com/onflow/flow-go/crypto/hash"

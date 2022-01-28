@@ -1,7 +1,7 @@
 //go:build !relic
 // +build !relic
 
-// Stubs of thresholdsign_relic.go for non relic build of flow-go.
+// Stubs of thresholdsign.go for non relic build of flow-go.
 
 package crypto
 
