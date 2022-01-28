@@ -27,7 +27,11 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-const DefaultCacheSize = 10e4
+const (
+	DefaultCacheSize = 10e4
+	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
+	eventIDPackingPrefix = "libp2ppacking"
+)
 
 // NotEjectedFilter is an identity filter that, when applied to the identity
 // table at a given snapshot, returns all nodes that we should communicate with
@@ -537,7 +541,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 func EventId(channel network.Channel, payload []byte) (hash.Hash, error) {
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
-	_, err := h.Write([]byte("libp2ppacking" + channel))
+	_, err := h.Write([]byte(eventIDPackingPrefix + channel))
 	if err != nil {
 		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
 	}
