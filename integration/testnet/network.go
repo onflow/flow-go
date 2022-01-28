@@ -170,7 +170,8 @@ func (net *FlowNetwork) Result() *flow.ExecutionResult {
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
 	// makes it easier to see logs for a specific test case
-	net.t.Logf("%v starting flow network %v with docker containers for test case [%v]", net.config.Name, net.t.Name())
+	net.t.Logf("%v starting flow network %v with docker containers for test case [%v]",
+		time.Now().UTC(), net.config.Name, net.t.Name())
 	net.suite.Start(ctx)
 }
 
