@@ -108,13 +108,17 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	require.NoError(t, err)
 
 	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil)
+	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
 
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
 		eds:           eds,
+		edCache:       edCache,
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -181,13 +185,17 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	require.NoError(t, err)
 
 	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil)
+	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
 
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
 		eds:           eds,
+		edCache:       edCache,
 	}
 
 	view := delta.NewView(ledger.Get)

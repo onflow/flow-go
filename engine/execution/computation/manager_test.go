@@ -114,13 +114,17 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil)
+	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+
+	eCache := new(state_synchronization.ExecutionDataCIDCache)
+	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
 
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
 		eds:           eds,
+		edCache:       eCache,
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -160,7 +164,10 @@ func TestComputeBlock_Uploader(t *testing.T) {
 	fakeUploader := &FakeUploader{}
 
 	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil)
+	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+
+	eCache := new(state_synchronization.ExecutionDataCIDCache)
+	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
 
 	manager := &Manager{
 		blockComputer: blockComputer,
@@ -168,6 +175,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		programsCache: programsCache,
 		uploaders:     []uploader.Uploader{fakeUploader},
 		eds:           eds,
+		edCache:       eCache,
 	}
 
 	view := delta.NewView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
