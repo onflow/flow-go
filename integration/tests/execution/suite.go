@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -58,6 +59,8 @@ func (s *Suite) MetricsPort() string {
 }
 
 func (s *Suite) SetupTest() {
+	t := s.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 	blockRateFlag := "--block-rate-delay=1ms"
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
@@ -124,4 +127,6 @@ func (s *Suite) TearDownTest() {
 	if s.cancel != nil {
 		s.cancel()
 	}
+	t := s.T()
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }

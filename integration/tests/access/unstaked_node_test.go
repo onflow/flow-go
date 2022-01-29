@@ -40,11 +40,16 @@ func TestUnstakedAccessSuite(t *testing.T) {
 }
 
 func (suite *UnstakedAccessSuite) TearDownTest() {
-	defer suite.cancel()
 	suite.net.Remove()
+	suite.cancel()
+
+	t := suite.T()
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
 func (suite *UnstakedAccessSuite) SetupTest() {
+	t := suite.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.buildNetworkConfig()
 	// start the network

@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -16,8 +19,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"strings"
-	"time"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -49,6 +50,9 @@ type Suite struct {
 }
 
 func (s *Suite) SetupTest() {
+	t := s.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
+
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -114,6 +118,9 @@ func (s *Suite) TearDownTest() {
 	if s.cancel != nil {
 		s.cancel()
 	}
+
+	t := s.T()
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)

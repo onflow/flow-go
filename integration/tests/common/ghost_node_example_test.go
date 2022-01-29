@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,7 @@ import (
 
 // TestGhostNodeExample_Subscribe demonstrates how to emulate a node and receive all inbound events for it
 func TestGhostNodeExample_Subscribe(t *testing.T) {
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
 	var (
 		// one collection node
@@ -77,10 +79,12 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 			t.Logf(" ignoring event: :%T: %v", v, v)
 		}
 	}
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
 // TestGhostNodeExample_Send demonstrates how to emulate a node and send an event from it
 func TestGhostNodeExample_Send(t *testing.T) {
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
 	var (
 		// one real collection node
@@ -127,4 +131,5 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	// send the transaction as an event to a real collection node
 	err = ghostClient.Send(ctx, engine.PushTransactions, &tx, realCollNode.Identifier)
 	assert.NoError(t, err)
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }

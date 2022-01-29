@@ -18,11 +18,20 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func logStartFinish(fn func(*testing.T)) func(*testing.T) {
+	return func(t *testing.T) {
+		t.Logf("%v ================> START RUN TESTING %v", time.Now().UTC(), t.Name())
+		fn(t)
+		t.Logf("%v ================> FINISH RUN TESTING %v", time.Now().UTC(), t.Name())
+	}
+}
+
 // Test sending various invalid transactions to a single-cluster configuration.
 // The transactions should be rejected by the collection node and not included
 // in any collection.
 func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	t := suite.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
 	suite.SetupTest("col_txingress_invalid", 3, 1)
 
@@ -32,7 +41,7 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
 	require.Nil(t, err)
 
-	t.Run("missing reference block id", func(t *testing.T) {
+	t.Run("missing reference block id", logStartFinish(func(t *testing.T) {
 		malformed := suite.NextTransaction(func(tx *sdk.Transaction) {
 			tx.SetReferenceBlockID(sdk.EmptyID)
 		})
@@ -41,9 +50,9 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 		defer cancel()
 		err := client.SendTransaction(ctx, *malformed)
 		suite.Assert().Error(err)
-	})
+	}))
 
-	t.Run("missing script", func(t *testing.T) {
+	t.Run("missing script", logStartFinish(func(t *testing.T) {
 		malformed := suite.NextTransaction(func(tx *sdk.Transaction) {
 			tx.SetScript(nil)
 		})
@@ -56,37 +65,38 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 		defer cancel()
 		err := client.SendTransaction(ctx, *malformed)
 		unittest.AssertErrSubstringMatch(t, expected, err)
-	})
-	t.Run("expired transaction", func(t *testing.T) {
+	}))
+	t.Run("expired transaction", logStartFinish(func(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
 		unittest.SkipUnless(t, unittest.TEST_WIP, "blocked by https://github.com/dapperlabs/flow-go/issues/3005")
-	})
-	t.Run("non-existent reference block ID", func(t *testing.T) {
+	}))
+	t.Run("non-existent reference block ID", logStartFinish(func(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
 		unittest.SkipUnless(t, unittest.TEST_WIP, "blocked by https://github.com/dapperlabs/flow-go/issues/3005")
-	})
-	t.Run("unparseable script", func(t *testing.T) {
+	}))
+	t.Run("unparseable script", logStartFinish(func(t *testing.T) {
 		// TODO script parsing not implemented
 		unittest.SkipUnless(t, unittest.TEST_WIP, "script parsing not implemented")
-	})
-	t.Run("invalid signature", func(t *testing.T) {
+	}))
+	t.Run("invalid signature", logStartFinish(func(t *testing.T) {
 		// TODO signature validation not implemented
 		unittest.SkipUnless(t, unittest.TEST_WIP, "signature validation not implemented")
-	})
-	t.Run("invalid sequence number", func(t *testing.T) {
+	}))
+	t.Run("invalid sequence number", logStartFinish(func(t *testing.T) {
 		// TODO nonce validation not implemented
 		unittest.SkipUnless(t, unittest.TEST_WIP, "nonce validation not implemented")
-	})
-	t.Run("insufficient payer balance", func(t *testing.T) {
+	}))
+	t.Run("insufficient payer balance", logStartFinish(func(t *testing.T) {
 		// TODO balance checking not implemented
 		unittest.SkipUnless(t, unittest.TEST_WIP, "balance checking not implemented")
-	})
+	}))
 }
 
 // Test sending a single valid transaction to a single cluster.
 // The transaction should be included in a collection.
 func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	t := suite.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
 	suite.SetupTest("col_txingress_singlecluster", 3, 1)
 
@@ -132,6 +142,7 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 // collection in only the responsible cluster.
 func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	t := suite.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
 	// NOTE: we use 3-node clusters so that proposal messages are sent 1-K
 	// as 1-1 messages are not picked up by the ghost node.
@@ -204,6 +215,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 // included in a collection in only the responsible cluster's state.
 func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
 	t := suite.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
 	// NOTE: we use 3-node clusters so that proposal messages are sent 1-K
 	// as 1-1 messages are not picked up by the ghost node.

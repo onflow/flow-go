@@ -62,7 +62,8 @@ func (ss *SealingSuite) Verification() *client.GhostClient {
 }
 
 func (ss *SealingSuite) SetupTest() {
-	ss.T().Logf("%s test case setup sealing", time.Now())
+	t := ss.T()
+	t.Logf("%v ================> RUNNING TESTING %v", time.Now().UTC(), t.Name())
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -144,9 +145,13 @@ func (ss *SealingSuite) TearDownTest() {
 	ss.T().Logf("test case tear down sealing")
 	ss.net.Remove()
 	ss.cancel()
+	t := ss.T()
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
 func (ss *SealingSuite) TestBlockSealCreation() {
+	t := ss.T()
+	t.Logf("%v ================> RUNNING TESTING %v", time.Now().UTC(), t.Name())
 
 	// fix the deadline of the entire test
 	deadline := time.Now().Add(30 * time.Second)

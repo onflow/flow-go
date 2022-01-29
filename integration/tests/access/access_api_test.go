@@ -38,9 +38,13 @@ func (suite *AccessSuite) TearDownTest() {
 	if suite.net != nil {
 		suite.net.Remove()
 	}
+	t := suite.T()
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
 func (suite *AccessSuite) SetupTest() {
+	t := suite.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 	nodeConfigs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel)),
 	}

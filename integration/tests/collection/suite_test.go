@@ -120,12 +120,14 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 func (suite *CollectorSuite) TearDownTest() {
 	suite.T().Logf("test case %v tear down", suite.T().Name())
 	// avoid nil pointer errors for skipped tests
-	if suite.cancel != nil {
-		defer suite.cancel()
-	}
 	if suite.net != nil {
 		suite.net.Remove()
 	}
+	if suite.cancel != nil {
+		suite.cancel()
+	}
+	t := suite.T()
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
 // Ghost returns a client for the ghost node.

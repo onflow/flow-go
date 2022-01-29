@@ -26,6 +26,7 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -35,9 +36,11 @@ func TestMVP_Network(t *testing.T) {
 	defer flowNetwork.Remove()
 
 	runMVPTest(t, ctx, flowNetwork)
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
 func TestMVP_Bootstrap(t *testing.T) {
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 	unittest.SkipUnless(t, unittest.TEST_WIP, "skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
 
 	testingdock.Verbose = false
@@ -97,6 +100,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 	runMVPTest(t, ctx, flowNetwork)
 
 	t.Log("@@ finished running mvp test 2")
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
 func buildMVPNetConfig() testnet.NetworkConfig {

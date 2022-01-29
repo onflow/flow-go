@@ -3,6 +3,7 @@ package verification
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -63,6 +64,9 @@ func (s *Suite) MetricsPort() string {
 // - One verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
+	t := s.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
+
 	blockRateFlag := "--block-rate-delay=1ms"
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
@@ -154,4 +158,7 @@ func (s *Suite) TearDownSuite() {
 	if s.cancel != nil {
 		s.cancel()
 	}
+
+	t := s.T()
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
