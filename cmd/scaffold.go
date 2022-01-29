@@ -1113,7 +1113,7 @@ func (fnb *FlowNodeBuilder) postShutdown() error {
 			errs = multierror.Append(errs, err)
 		}
 	}
-
+	fnb.Logger.Info().Msg("database has been closed")
 	return errs.ErrorOrNil()
 }
 

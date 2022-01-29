@@ -5,6 +5,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
@@ -30,6 +32,8 @@ type BaseApprovalsTestSuite struct {
 	Chunks              flow.ChunkList  // list of chunks of execution result
 	ChunksAssignment    *chunks.Assignment
 	AuthorizedVerifiers map[flow.Identifier]*flow.Identity // map of authorized verifier identities for execution result
+	PublicKey           *module.PublicKey                  // public key used to mock signature verifications
+	SigHasher           hash.Hasher                        // used to verify signatures
 	IncorporatedResult  *flow.IncorporatedResult
 }
 
@@ -40,13 +44,18 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
 	s.ChunksAssignment = chunks.NewAssignment()
 	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID())
+	// mock public key to mock signature verifications
+	s.PublicKey = &module.PublicKey{}
 
 	// setup identities
 	for j := 0; j < 5; j++ {
 		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 		verifiers = append(verifiers, identity.NodeID)
 		s.AuthorizedVerifiers[identity.NodeID] = identity
+		// mock all verifier's valid signatures
+		identity.StakingPubKey = s.PublicKey
 	}
+	s.SigHasher = crypto.NewBLSKMAC("test_tag")
 
 	// create assignment
 	for _, chunk := range s.Chunks {
@@ -78,7 +87,6 @@ type BaseAssignmentCollectorTestSuite struct {
 	Headers           *storage.Headers
 	Assigner          *module.ChunkAssigner
 	SealsPL           *mempool.IncorporatedResultSeals
-	SigVerifier       *module.Verifier
 	Conduit           *mocknetwork.Conduit
 	FinalizedAtHeight map[uint64]*flow.Header
 	IdentitiesCache   map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
@@ -92,7 +100,6 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.SealsPL = &mempool.IncorporatedResultSeals{}
 	s.State = &protocol.State{}
 	s.Assigner = &module.ChunkAssigner{}
-	s.SigVerifier = &module.Verifier{}
 	s.Conduit = &mocknetwork.Conduit{}
 	s.Headers = &storage.Headers{}
 
