@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // NewStaticCommittee returns a new committee with a static participant set.
@@ -66,18 +67,22 @@ func (s staticDKG) GroupKey() crypto.PublicKey {
 	return s.dkgGroupKey
 }
 
+// Index returns the index for the given node. Error Returns:
+// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 func (s staticDKG) Index(nodeID flow.Identifier) (uint, error) {
 	participant, ok := s.dkgParticipants[nodeID]
 	if !ok {
-		return 0, fmt.Errorf("could not get participant")
+		return 0, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return participant.Index, nil
 }
 
+// KeyShare returns the public key share for the given node. Error Returns:
+// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 func (s staticDKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	participant, ok := s.dkgParticipants[nodeID]
 	if !ok {
-		return nil, fmt.Errorf("could not get participant")
+		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return participant.KeyShare, nil
 }
