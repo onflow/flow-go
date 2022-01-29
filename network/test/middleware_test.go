@@ -119,6 +119,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	m.mwCancel = cancel
 	var errChan <-chan error
 	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
+
 	go func() {
 		select {
 		case err := <-errChan:
@@ -131,9 +132,10 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
 		mw.Start(m.mwCtx)
-		<-mw.Ready()
+		unittest.RequireCloseBefore(m.T(), mw.Ready(), 100*time.Millisecond, "could not start middleware on time")
 		mw.UpdateAllowList()
 	}
+
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
@@ -242,6 +244,7 @@ func (m *MiddlewareTestSuite) TestMultiPing() {
 // expectID and expectPayload are what we expect the receiver side to evaluate the
 // incoming ping against, it can be mocked or typed data
 func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
+
 	ch := make(chan struct{})
 	// extracts sender id based on the mock option
 	var err error
@@ -269,31 +272,37 @@ func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
 	for i := 1; i < m.size; i++ {
 		m.ov[i].AssertExpectations(m.T())
 	}
+
 }
 
 // Ping sends count-many distinct messages concurrently from the first middleware of the test suit to the last one
 // It evaluates the correctness of reception of the content of the messages, as well as the sender ID
 func (m *MiddlewareTestSuite) MultiPing(count int) {
-	wg := sync.WaitGroup{}
+	receiveWG := sync.WaitGroup{}
+	sendWG := sync.WaitGroup{}
 	// extracts sender id based on the mock option
 	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
 	firstNode := 0
 	lastNode := m.size - 1
 	for i := 0; i < count; i++ {
-		wg.Add(1)
+		receiveWG.Add(1)
+		sendWG.Add(1)
 		msg := createMessage(m.ids[firstNode].NodeID, m.ids[lastNode].NodeID, fmt.Sprintf("hello from: %d", i))
 		m.ov[lastNode].On("Receive", m.ids[firstNode].NodeID, msg).Return(nil).Once().
 			Run(func(args mockery.Arguments) {
-				wg.Done()
+				receiveWG.Done()
 			})
 		go func() {
 			// sends a direct message from first node to the last node
 			err := m.mws[firstNode].SendDirect(msg, m.ids[lastNode].NodeID)
 			require.NoError(m.Suite.T(), err)
+
+			sendWG.Done()
 		}()
 	}
 
-	wg.Wait()
+	unittest.RequireReturnsBefore(m.T(), sendWG.Wait, 1*time.Second, "could not send unicasts on time")
+	unittest.RequireReturnsBefore(m.T(), receiveWG.Wait, 1*time.Second, "could not receive unicasts on time")
 
 	// evaluates the mock calls
 	for i := 1; i < m.size; i++ {
@@ -340,7 +349,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 	err = m.mws[first].SendDirect(sendMsg, m.ids[last].NodeID)
 	require.NoError(m.Suite.T(), err)
 
-	wg.Wait()
+	unittest.RequireReturnsBefore(m.T(), wg.Wait, 100*time.Second, "could not receive unicast on time")
 
 	// evaluates the mock calls
 	for i := 1; i < m.size; i++ {
@@ -459,7 +468,6 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 // TestUnsubscribe tests that an engine can unsubscribe from a topic it was earlier subscribed to and stop receiving
 // messages.
 func (m *MiddlewareTestSuite) TestUnsubscribe() {
-
 	first := 0
 	last := m.size - 1
 	firstNode := m.ids[first].NodeID
@@ -528,8 +536,9 @@ func (m *MiddlewareTestSuite) stopMiddlewares() {
 	m.mwCancel()
 
 	for i := 0; i < m.size; i++ {
-		<-m.mws[i].Done()
+		unittest.RequireCloseBefore(m.T(), m.mws[i].Done(), 100*time.Millisecond, "could not stop middleware on time")
 	}
+
 	m.mws = nil
 	m.ov = nil
 	m.ids = nil
