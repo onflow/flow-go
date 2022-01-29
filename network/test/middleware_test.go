@@ -78,6 +78,7 @@ type MiddlewareTestSuite struct {
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
 func TestMiddlewareTestSuite(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(MiddlewareTestSuite))
 }
 
@@ -118,6 +119,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	m.mwCancel = cancel
 	var errChan <-chan error
 	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
+
 	go func() {
 		select {
 		case err := <-errChan:
@@ -133,6 +135,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		unittest.RequireCloseBefore(m.T(), mw.Ready(), 100*time.Millisecond, "could not start middleware on time")
 		mw.UpdateAllowList()
 	}
+
 }
 
 // TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
@@ -241,6 +244,7 @@ func (m *MiddlewareTestSuite) TestMultiPing() {
 // expectID and expectPayload are what we expect the receiver side to evaluate the
 // incoming ping against, it can be mocked or typed data
 func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
+
 	ch := make(chan struct{})
 	// extracts sender id based on the mock option
 	var err error
@@ -268,6 +272,7 @@ func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
 	for i := 1; i < m.size; i++ {
 		m.ov[i].AssertExpectations(m.T())
 	}
+
 }
 
 // Ping sends count-many distinct messages concurrently from the first middleware of the test suit to the last one
@@ -296,8 +301,8 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 		}()
 	}
 
-	unittest.RequireReturnsBefore(m.T(), sendWG.Done, 1*time.Second, "could not send unicasts on time")
-	unittest.RequireReturnsBefore(m.T(), receiveWG.Done, 1*time.Second, "could not receive unicasts on time")
+	unittest.RequireReturnsBefore(m.T(), sendWG.Wait, 1*time.Second, "could not send unicasts on time")
+	unittest.RequireReturnsBefore(m.T(), receiveWG.Wait, 1*time.Second, "could not receive unicasts on time")
 
 	// evaluates the mock calls
 	for i := 1; i < m.size; i++ {
@@ -533,4 +538,9 @@ func (m *MiddlewareTestSuite) stopMiddlewares() {
 	for i := 0; i < m.size; i++ {
 		unittest.RequireCloseBefore(m.T(), m.mws[i].Done(), 100*time.Millisecond, "could not stop middleware on time")
 	}
+
+	m.mws = nil
+	m.ov = nil
+	m.ids = nil
+	m.size = 0
 }
