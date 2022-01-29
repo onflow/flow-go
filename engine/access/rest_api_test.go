@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -28,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -99,7 +101,9 @@ func (suite *RestAPITestSuite) SetupTest() {
 		RESTListenAddr:         anyPort,
 	}
 
-	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
+	db, _ := unittest.TempBadgerDB(suite.T())
+	transactions := badger.NewTransactions(suite.metrics, db)
+	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, transactions,
 		nil, suite.executionResults, suite.chainID, suite.metrics, 0, 0, false, false, nil, nil)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
@@ -107,6 +111,46 @@ func (suite *RestAPITestSuite) SetupTest() {
 	assert.Eventually(suite.T(), func() bool {
 		return suite.rpcEng.RestApiAddress() != nil
 	}, 5*time.Second, 10*time.Millisecond)
+
+
+	fmt.Println(suite.rpcEng.RestApiAddress())
+
+}
+
+func fixedt() string {
+	return `{
+   "script":"CiAgICAgICAgICAgIHRyYW5zYWN0aW9uIHsgCiAgICAgICAgICAgICAgICBwcmVwYXJlKHNpZ25lcjogQXV0aEFjY291bnQpIHsgbG9nKHNpZ25lci5hZGRyZXNzKSB9CiAgICAgICAgICAgIH0KICAgICAgICA=",
+   "arguments":[
+      
+   ],
+   "reference_block_id":"042679467c3682a2f7622565a0d9c00d0cd3583f815876087bc72c591a9988f8",
+   "gas_limit":"100",
+   "payer":"82ed6ff029ad857d",
+   "proposal_key":{
+      "address":"82ed6ff029ad857d",
+      "key_index":"0",
+      "sequence_number":"6"
+   },
+   "authorizers":[
+      "82ed6ff029ad857d"
+   ],
+   "payload_signatures":[
+      {
+         "address":"f76a4c54f0f75ce4",
+         "signer_index":"1",
+         "key_index":"0",
+         "signature":"A2Q+Ux0AIGz8U+jGqxyI7lNjLnSV7ZI6OTO6mRlPeLfCebZJ20MGX7/BEuWFZoxQhAQ4aWD/SVXwiDm1pAR7jA=="
+      }
+   ],
+   "envelope_signatures":[
+      {
+         "address":"82ed6ff029ad857d",
+         "signer_index":"0",
+         "key_index":"0",
+         "signature":"h4P68H+/VNW9aZ5yW569ZteqvpyW1+ozBQ89P4aUjAmcCHZdSeFgZeZRJE8y/Wd0fPl7oRZrHJJeH3x3Xb/yxg=="
+      }
+   ]
+}`
 }
 
 func TestRestAPI(t *testing.T) {
@@ -114,7 +158,6 @@ func TestRestAPI(t *testing.T) {
 }
 
 func (suite *RestAPITestSuite) TestGetBlock() {
-
 	testBlockIDs := make([]string, request.MaxIDsLength)
 	testBlocks := make([]*flow.Block, request.MaxIDsLength)
 	for i := range testBlockIDs {
@@ -138,6 +181,16 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 	suite.finalizedSnapshot.On("Head").Return(finalizedBlock.Header, nil)
 
 	client := suite.restAPIClient()
+
+	suite.Run("SendTransaction", func() {
+		ctx := context.Background()
+		tb := restclient.TransactionsBody{}
+		err := json.Unmarshal([]byte(fixedt()), &tb)
+		require.NoError(suite.T(), err)
+
+		_, _, err = client.TransactionsApi.TransactionsPost(ctx, tb)
+		require.NoError(suite.T(), err)
+	})
 
 	suite.Run("GetBlockByID for a single ID - happy path", func() {
 

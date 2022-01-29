@@ -94,10 +94,10 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 		return err
 	}
 
-	err = v.checkExpiry(tx)
-	if err != nil {
-		return err
-	}
+	//err = v.checkExpiry(tx)
+	//if err != nil {
+	//	return err
+	//}
 
 	err = v.checkCanBeParsed(tx)
 	if err != nil {

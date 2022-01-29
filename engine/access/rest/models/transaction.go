@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,6 +40,7 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionRes
 	proposalKey.Build(tx.ProposalKey)
 
 	t.Id = tx.ID().String()
+	fmt.Println(t.Id)
 	t.Script = util.ToBase64(tx.Script)
 	t.Arguments = args
 	t.ReferenceBlockId = tx.ReferenceBlockID.String()

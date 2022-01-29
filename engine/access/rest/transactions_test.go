@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 
 	mocks "github.com/stretchr/testify/mock"
@@ -63,7 +67,12 @@ func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
 		},
 		"authorizers":        auth,
-		"payload_signatures": []flow.TransactionSignature{},
+		"payload_signatures": []map[string]interface{}{{
+		"address":      tx.PayloadSignatures[0].Address.String(),
+		"signer_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].SignerIndex),
+		"key_index":    fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
+		"signature":    util.ToBase64(tx.PayloadSignatures[0].Signature),
+	}},
 		"envelope_signatures": []map[string]interface{}{{
 			"address":      tx.EnvelopeSignatures[0].Address.String(),
 			"signer_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].SignerIndex),
@@ -262,14 +271,61 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 }
 
+func fixedt() string {
+	return `{
+   "script":"CiAgICAgICAgICAgIHRyYW5zYWN0aW9uIHsgCiAgICAgICAgICAgICAgICBwcmVwYXJlKHNpZ25lcjogQXV0aEFjY291bnQpIHsgbG9nKHNpZ25lci5hZGRyZXNzKSB9CiAgICAgICAgICAgIH0KICAgICAgICA=",
+   "arguments":[
+      
+   ],
+   "reference_block_id":"042679467c3682a2f7622565a0d9c00d0cd3583f815876087bc72c591a9988f8",
+   "gas_limit":"100",
+   "payer":"82ed6ff029ad857d",
+   "proposal_key":{
+      "address":"82ed6ff029ad857d",
+      "key_index":"0",
+      "sequence_number":"6"
+   },
+   "authorizers":[
+      "82ed6ff029ad857d"
+   ],
+   "payload_signatures":[
+      {
+         "address":"f76a4c54f0f75ce4",
+         "signer_index":"1",
+         "key_index":"0",
+         "signature":"A2Q+Ux0AIGz8U+jGqxyI7lNjLnSV7ZI6OTO6mRlPeLfCebZJ20MGX7/BEuWFZoxQhAQ4aWD/SVXwiDm1pAR7jA=="
+      }
+   ],
+   "envelope_signatures":[
+      {
+         "address":"82ed6ff029ad857d",
+         "signer_index":"0",
+         "key_index":"0",
+         "signature":"h4P68H+/VNW9aZ5yW569ZteqvpyW1+ozBQ89P4aUjAmcCHZdSeFgZeZRJE8y/Wd0fPl7oRZrHJJeH3x3Xb/yxg=="
+      }
+   ]
+}`
+}
+
 func TestCreateTransaction(t *testing.T) {
 
 	t.Run("create", func(t *testing.T) {
 		backend := &mock.API{}
 		tx := unittest.TransactionBodyFixture()
-		tx.PayloadSignatures = []flow.TransactionSignature{} // fix fixture nil values
+		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
 		tx.Arguments = [][]uint8{}
-		req := createTransactionReq(validCreateBody(tx))
+		validTx := fixedt()
+
+		r := strings.NewReader(validTx)
+		rt := &request.Transaction{}
+		err := rt.Parse(r)
+		require.NoError(t, err)
+		fmt.Println(rt.Flow().ID())
+
+		req := createTransactionReq(validTx)
+
+
+		//fmt.Println(tx.ID().String())
 
 		backend.Mock.
 			On("SendTransaction", mocks.Anything, &tx).
@@ -291,7 +347,14 @@ func TestCreateTransaction(t *testing.T) {
 			   "authorizers":[
 				  "8c5303eaa26202d6"
 			   ],
- 				"payload_signatures": [],
+ 				"payload_signatures": [
+				  {
+					 "address":"8c5303eaa26202d6",
+					 "signer_index":"0",
+					 "key_index":"1",
+					 "signature":"%s"
+				  }
+				],
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
@@ -307,7 +370,7 @@ func TestCreateTransaction(t *testing.T) {
 				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
-			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
+			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.PayloadSignatures[0].Signature), util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
 		assertOKResponse(t, req, expected, backend)
 	})
 

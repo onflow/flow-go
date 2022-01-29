@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/go-multierror"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -46,7 +45,7 @@ func (b *backendTransactions) SendTransaction(
 	ctx context.Context,
 	tx *flow.TransactionBody,
 ) error {
-	now := time.Now().UTC()
+	//now := time.Now().UTC()
 
 	err := b.transactionValidator.Validate(tx)
 	if err != nil {
@@ -60,7 +59,10 @@ func (b *backendTransactions) SendTransaction(
 		return status.Error(codes.Internal, fmt.Sprintf("failed to send transaction to a collection node: %v", err))
 	}
 
-	b.transactionMetrics.TransactionReceived(tx.ID(), now)
+	//b.transactionMetrics.TransactionReceived(tx.ID(), now)
+
+	fmt.Println("about to store")
+	fmt.Println(tx.ID())
 
 	// store the transaction locally
 	err = b.transactions.Store(tx)
@@ -68,9 +70,16 @@ func (b *backendTransactions) SendTransaction(
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
+	fmt.Println("after to store")
+	fmt.Println(tx.ID())
+
 	if b.retry.IsActive() {
 		go b.registerTransactionForRetry(tx)
 	}
+
+	fmt.Println("retreived")
+	rb, _ := b.transactions.ByID(tx.ID())
+	fmt.Println(rb.ID().String())
 
 	return nil
 }
@@ -158,15 +167,26 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 }
 
 func (b *backendTransactions) grpcTxSend(ctx context.Context, client accessproto.AccessAPIClient, tx *flow.TransactionBody) error {
-	colReq := &accessproto.SendTransactionRequest{
-		Transaction: convert.TransactionToMessage(*tx),
-	}
 
-	clientDeadline := time.Now().Add(time.Duration(2) * time.Second)
-	ctx, cancel := context.WithDeadline(ctx, clientDeadline)
-	defer cancel()
-	_, err := client.SendTransaction(ctx, colReq)
-	return err
+	fmt.Println(tx.PayloadSignatures[0].String())
+	cbTx := convert.TransactionToMessage(*tx)
+	//colReq := &accessproto.SendTransactionRequest{
+	//	Transaction: cbTx,
+	//}
+
+
+	cbTxcRcvd, _ := convert.MessageToTransaction(cbTx, nil)
+	fmt.Println("recvd by collection node")
+	fmt.Println(cbTxcRcvd.ID().String())
+
+	fmt.Println(cbTxcRcvd.PayloadSignatures[0].String())
+
+	return nil
+	//clientDeadline := time.Now().Add(time.Duration(2) * time.Second)
+	//ctx, cancel := context.WithDeadline(ctx, clientDeadline)
+	//defer cancel()
+	////_, err := client.SendTransaction(ctx, colReq)
+	//return err
 }
 
 // SendRawTransaction sends a raw transaction to the collection node

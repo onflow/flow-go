@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
@@ -61,7 +63,13 @@ func CreateTransaction(r *request.Request, backend access.API, link models.LinkG
 		return nil, err
 	}
 
+	t := &req.Transaction
+	fmt.Println(t.ID().String())
+
+
 	var response models.Transaction
 	response.Build(&req.Transaction, nil, link)
+
+	fmt.Println(req.Transaction.ID().String())
 	return response, nil
 }
