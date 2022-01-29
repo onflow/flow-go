@@ -142,6 +142,7 @@ func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
 	if err != nil {
 		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
 	}
+
 	builder.bootstrapIdentities = ids
 
 	return nil
@@ -195,7 +196,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 	for _, b := range builder.bootstrapIdentities {
 		pi, err := p2p.PeerAddressInfo(*b)
 		if err != nil {
-			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
+			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b.Address, err)
 		}
 		pis = append(pis, pi)
 	}
