@@ -7,12 +7,6 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
-// Wrappers around the flow-go/crypto package.
-// These functions are needed because the emulator requires the fvm package as
-// a dependency, while the emulator is not built using the "relic" build tag.
-// These functions insure the emulator is still compilable without the "relic"
-// build tag. None of these functions is run by the emulator.
-
 // The functions below are the non-Relic versions of the public APIs
 // requiring the Relic library.
 // All BLS functionalties in the package require the Relic dependency,
