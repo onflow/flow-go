@@ -1,10 +1,5 @@
-//go:build relic
-// +build relic
-
 package crypto
 
-// #cgo CFLAGS: -g -Wall -std=c99
-// #include "bls_thresholdsign_include.h"
 import "C"
 
 import (
