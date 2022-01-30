@@ -108,8 +108,8 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 	pingInfoProvider, _, _, _ := mockPingInfoProvider()
 
 	// dns resolver
-	resolver := dns.NewResolver(metrics.NewNoopCollector())
-	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start resolver")
+	resolver := dns.NewResolver(DefaultCacheSize, unittest.Logger(), metrics.NewNoopCollector())
+	unittest.RequireCloseBefore(t, resolver.Ready(), 100*time.Millisecond, "could not start resolver")
 
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(logger, noopMetrics)
