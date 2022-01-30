@@ -1,4 +1,5 @@
-// +build relic
+//go:build !relic
+// +build !relic
 
 package crypto
 
@@ -8,7 +9,8 @@ import (
 )
 
 // DKG stands for distributed key generation. In this library, DKG
-// refers to discrete-log based protocols that generate keys for a BLS-based
+// refers to discrete-log based protocols.
+// The protocols implemented in the package for now generate keys for a BLS-based
 // threshold signature scheme.
 // BLS is used with the BLS12-381 curve.
 //
