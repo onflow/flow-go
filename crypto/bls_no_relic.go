@@ -4,7 +4,7 @@
 package crypto
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // Wrappers around the flow-go/crypto package.
@@ -85,7 +85,7 @@ func NewBLSThresholdSignatureParticipant(
 	myPrivateKey PrivateKey,
 	message []byte,
 	dsTag string,
-) (*blsThresholdSignatureParticipant, error) {
+) (ThresholdSignatureParticipant, error) {
 	panic(relic_panic)
 }
 
@@ -95,7 +95,7 @@ func NewBLSThresholdSignatureInspector(
 	threshold int,
 	message []byte,
 	dsTag string,
-) (*blsThresholdSignatureInspector, error) {
+) (ThresholdSignatureInspector, error) {
 	panic(relic_panic)
 }
 
