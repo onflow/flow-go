@@ -182,7 +182,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	})
 
 	threshold := signature.RandomBeaconThreshold(numberOfNodes)
-	groupSignature, err := crypto.ReconstructThresholdSignature(numberOfNodes, threshold, signatures, indices)
+	groupSignature, err := crypto.BLSReconstructThresholdSignature(numberOfNodes, threshold, signatures, indices)
 	require.NoError(s.T(), err)
 
 	ok, err := groupPubKey.Verify(groupSignature, sigData, hasher)
