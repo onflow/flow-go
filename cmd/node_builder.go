@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -157,8 +158,10 @@ type NodeConfig struct {
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
+	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
+	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey

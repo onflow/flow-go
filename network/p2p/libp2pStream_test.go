@@ -36,6 +36,7 @@ func TestStreamClosing(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
+		"test_stream_closing",
 		2,
 		withDefaultStreamHandler(handler))
 	defer stopNodes(t, nodes)
@@ -141,6 +142,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	nodes, identities := nodesFixture(t,
 		ctx,
 		sporkId,
+		"test_create_stream",
 		count,
 		withPreferredUnicasts(unicasts))
 	defer stopNodes(t, nodes)
@@ -198,8 +200,9 @@ func TestCreateStream_FallBack(t *testing.T) {
 	thisNode, _ := nodeFixture(t,
 		ctx,
 		sporkId,
+		"test_create_stream_fallback",
 		withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
-	otherNode, otherId := nodeFixture(t, ctx, sporkId)
+	otherNode, otherId := nodeFixture(t, ctx, sporkId, "test_create_stream_fallback")
 
 	defer stopNodes(t, []*Node{thisNode, otherNode})
 
@@ -257,7 +260,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	defer cancel()
 
 	// create two nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), 2)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 2)
 	nodeInfo1, err := PeerAddressInfo(*identities[1])
@@ -299,7 +302,9 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
-		count)
+		"test_no_backoff_when_create_stream",
+		count,
+	)
 	node1 := nodes[0]
 	node2 := nodes[1]
 
@@ -375,8 +380,10 @@ func testUnicastOverStream(t *testing.T, opts ...nodeFixtureParameterOption) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
+		"test_one_to_one_comm",
 		count,
-		append(opts, withDefaultStreamHandler(streamHandler))...)
+		withDefaultStreamHandler(streamHandler),
+	)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, count)
 
@@ -402,15 +409,23 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	// node1: supports only plain unicast protocol
 	// node2: supports plain and gzip
 	sporkId := unittest.IdentifierFixture()
-	node1, id1 := nodeFixture(t,
+	node1, id1 := nodeFixture(
+		t,
 		ctx,
 		sporkId,
-		withDefaultStreamHandler(streamHandler))
-	node2, id2 := nodeFixture(t,
-		ctx,
-		sporkId,
+		"test_unicast_over_stream_fallback",
 		withDefaultStreamHandler(streamHandler),
-		withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
+	)
+
+	node2, id2 := nodeFixture(
+		t,
+		ctx,
+		sporkId,
+		"test_unicast_over_stream_fallback",
+		withDefaultStreamHandler(streamHandler),
+		withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}),
+	)
+
 	defer stopNodes(t, []*Node{node1, node2})
 
 	testUnicastOverStreamRoundTrip(t, ctx, id1, node1, id2, node2, ch)
@@ -489,7 +504,9 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
-		1)
+		"test_create_stream_timeout_with_unresponsive_node",
+		1,
+	)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 1)
 
@@ -527,7 +544,9 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	goodNodes, goodNodeIds := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
-		2)
+		"test_create_stream_is_concurrent",
+		2,
+	)
 
 	defer stopNodes(t, goodNodes)
 	require.Len(t, goodNodeIds, 2)
@@ -572,21 +591,25 @@ func TestConnectionGating(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// create 2 nodes
-	nodes, identities := nodesFixture(t,
-		ctx,
-		unittest.IdentifierFixture(),
-		2,
-		withAllowListEnabled())
+	sporkID := unittest.IdentifierFixture()
 
-	node1 := nodes[0]
-	node1Id := *identities[0]
+	// create 2 nodes
+	node1Peers := make(map[peer.ID]struct{})
+	node1, node1Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
+		_, ok := node1Peers[p]
+		return ok
+	}))
+
+	node2Peers := make(map[peer.ID]struct{})
+	node2, node2Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
+		_, ok := node2Peers[p]
+		return ok
+	}))
+
 	defer stopNode(t, node1)
 	node1Info, err := PeerAddressInfo(node1Id)
 	assert.NoError(t, err)
 
-	node2 := nodes[1]
-	node2Id := *identities[1]
 	defer stopNode(t, node2)
 	node2Info, err := PeerAddressInfo(node2Id)
 	assert.NoError(t, err)
@@ -609,7 +632,7 @@ func TestConnectionGating(t *testing.T) {
 	t.Run("inbound connection from an allowed node is rejected", func(t *testing.T) {
 
 		// node1 allowlists node2 but node2 does not allowlists node1
-		node1.UpdateAllowList(peer.IDSlice{node2Info.ID})
+		node1Peers[node2Info.ID] = struct{}{}
 
 		// node1 attempts to connect to node2
 		// node2 should reject the inbound connection
@@ -621,9 +644,9 @@ func TestConnectionGating(t *testing.T) {
 	t.Run("outbound connection to an approved node is allowed", func(t *testing.T) {
 
 		// node1 allowlists node2
-		node1.UpdateAllowList(peer.IDSlice{node2Info.ID})
+		node1Peers[node2Info.ID] = struct{}{}
 		// node2 allowlists node1
-		node2.UpdateAllowList(peer.IDSlice{node1Info.ID})
+		node2Peers[node1Info.ID] = struct{}{}
 
 		// node1 should be allowed to connect to node2
 		node1.host.Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.AddressTTL)

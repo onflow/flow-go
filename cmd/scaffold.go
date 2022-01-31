@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -139,29 +140,25 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"pairwise edge probability between nodes in topology")
 }
 
-func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-
-		codec := cborcodec.NewCodec()
-
-		myAddr := fnb.NodeConfig.Me.Address()
-		if fnb.BaseConfig.BindAddr != NotSet {
-			myAddr = fnb.BaseConfig.BindAddr
-		}
+func (fnb *FlowNodeBuilder) EnqueuePingService() {
+	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
 
 		// setup the Ping provider to return the software version and the sealed block height
-		pingProvider := p2p.PingInfoProviderImpl{
+		pingInfoProvider := &p2p.PingInfoProviderImpl{
 			SoftwareVersionFun: func() string {
 				return build.Semver()
 			},
 			SealedBlockHeightFun: func() (uint64, error) {
-				head, err := fnb.State.Sealed().Head()
+				head, err := node.State.Sealed().Head()
 				if err != nil {
 					return 0, err
 				}
 				return head.Height, nil
 			},
-			HotstuffViewFun: nil, // set in next code block, depending on role
+			HotstuffViewFun: func() (uint64, error) {
+				return 0, fmt.Errorf("hotstuff view reporting disabled")
+			},
 		}
 
 		// only consensus roles will need to report hotstuff view
@@ -169,7 +166,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
-			pingProvider.HotstuffViewFun = func() (uint64, error) {
+			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
 				curView, err := persist.GetStarted()
 				if err != nil {
 					return 0, err
@@ -177,29 +174,43 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 				return curView, nil
 			}
-		} else {
-			// non-consensus will not report any hotstuff view
-			pingProvider.HotstuffViewFun = func() (uint64, error) {
-				return 0, fmt.Errorf("non-consensus nodes do not report hotstuff view in ping")
-			}
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
+		pingService, err := node.Network.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
+
+		node.PingService = pingService
+
+		return &module.NoopReadyDoneAware{}, err
+	})
+}
+
+func (fnb *FlowNodeBuilder) EnqueueResolver() {
+	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		resolver := dns.NewResolver(dns.DefaultCacheSize, node.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+		fnb.Resolver = resolver
+		return resolver, nil
+	})
+}
+
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
+	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		codec := cborcodec.NewCodec()
+
+		myAddr := fnb.NodeConfig.Me.Address()
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
+		}
+
+		libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger,
-			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
-			pingProvider,
-			fnb.BaseConfig.DNSCacheTTL,
-			fnb.BaseConfig.NodeRole)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
-		}
+			fnb.Resolver,
+			fnb.BaseConfig.NodeRole,
+		)
 
 		var mwOpts []p2p.MiddlewareOption
 		if len(fnb.MsgValidators) > 0 {
@@ -210,8 +221,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
 		mwOpts = append(mwOpts,
 			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithConnectionGating(true),
-			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)))
+			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+		)
 
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger,
@@ -253,10 +264,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		fnb.Network = net
 
-		idEvents := gadgets.NewIdentityDeltas(func() {
-			fnb.Middleware.UpdateNodeAddresses()
-			fnb.Middleware.UpdateAllowList()
-		})
+		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
 		return net, nil
@@ -1003,7 +1011,11 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
+	fnb.EnqueueResolver()
+
 	fnb.EnqueueNetworkInit()
+
+	fnb.EnqueuePingService()
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()

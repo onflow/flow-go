@@ -22,7 +22,7 @@ type ExecutionDataServiceCollector struct {
 	executionDataBlobTreeSize prometheus.Histogram
 }
 
-func NewExecutionDataServiceCollector(registerer prometheus.Registerer) module.ExecutionDataServiceMetrics {
+func NewExecutionDataServiceCollector() module.ExecutionDataServiceMetrics {
 	executionDataAddDuration := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,
@@ -71,7 +71,7 @@ func NewExecutionDataServiceCollector(registerer prometheus.Registerer) module.E
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_blob_tree_size",
-		Help:      "the number of nodes in execution data blob tree",
+		Help:      "the size execution data blob tree",
 		Buckets:   []float64{1, 5, 10, 20, 50, 100, 200, 300, 400, 500},
 	})
 
@@ -90,13 +90,13 @@ func (ec *ExecutionDataServiceCollector) ExecutionDataAddStarted() {
 	ec.executionDataAddInProgress.Inc()
 }
 
-func (ec *ExecutionDataServiceCollector) ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeNodes int) {
+func (ec *ExecutionDataServiceCollector) ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize uint64) {
 	ec.executionDataAddInProgress.Dec()
 	ec.executionDataAddDuration.Observe(float64(duration.Milliseconds()))
 	if !success {
 		ec.executionDataAddFailCount.Inc()
 	} else {
-		ec.executionDataBlobTreeSize.Observe(float64(blobTreeNodes))
+		ec.executionDataBlobTreeSize.Observe(float64(blobTreeSize))
 	}
 }
 
@@ -104,12 +104,12 @@ func (ec *ExecutionDataServiceCollector) ExecutionDataGetStarted() {
 	ec.executionDataGetInProgress.Inc()
 }
 
-func (ec *ExecutionDataServiceCollector) ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeNodes int) {
+func (ec *ExecutionDataServiceCollector) ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64) {
 	ec.executionDataGetInProgress.Dec()
 	ec.executionDataGetDuration.Observe(float64(duration.Milliseconds()))
 	if !success {
 		ec.executionDataGetFailCount.Inc()
 	} else {
-		ec.executionDataBlobTreeSize.Observe(float64(blobTreeNodes))
+		ec.executionDataBlobTreeSize.Observe(float64(blobTreeSize))
 	}
 }
