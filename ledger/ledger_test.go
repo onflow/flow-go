@@ -9,6 +9,7 @@ import (
 // this benchmark can run with this command:
 //  go test -run=CanonicalForm -bench=.
 
+//nolint
 func BenchmarkCanonicalForm(b *testing.B) {
 
 	constant := 10
