@@ -88,7 +88,7 @@ func GetSnapshotAtEpochAndPhase(logger zerolog.Logger, startupEpoch uint64, star
 			Dur("time-waiting", time.Since(start)).
 			Uint64("current-epoch", currEpochCounter).
 			Str("current-epoch-phase", currEpochPhase.String()).
-			Msg(fmt.Sprintf("waiting for epoch %d and phase %s", startupEpoch, startupEpochPhase.String()))
+			Msgf("waiting for epoch %d and phase %s", startupEpoch, startupEpochPhase.String())
 
 		return retry.RetryableError(fmt.Errorf("dynamic startup epoch and epoch phase not reached"))
 	})
