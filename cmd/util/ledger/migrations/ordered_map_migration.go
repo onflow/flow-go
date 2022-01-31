@@ -15,11 +15,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/stdlib"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
 )
@@ -27,8 +24,6 @@ import (
 type OrderedMapMigration struct {
 	Log         zerolog.Logger
 	OutputDir   string
-	accounts    state.Accounts
-	programs    *programs.Programs
 	reportFile  *os.File
 	newStorage  *runtime.Storage
 	Interpreter *interpreter.Interpreter
@@ -87,29 +82,6 @@ func (m *OrderedMapMigration) initIntepreter() {
 		nil,
 		nil,
 		interpreter.WithStorage(m.newStorage),
-		interpreter.WithImportLocationHandler(
-			func(inter *interpreter.Interpreter, location common.Location) interpreter.Import {
-				var program *interpreter.Program
-				if location == stdlib.CryptoChecker.Location {
-					program = interpreter.ProgramFromChecker(stdlib.CryptoChecker)
-				} else {
-					var err error
-					program, err = m.loadProgram(location)
-					if err != nil {
-						panic(err)
-					}
-				}
-
-				subInterpreter, err := inter.NewSubInterpreter(program, location)
-				if err != nil {
-					panic(err)
-				}
-
-				return interpreter.InterpreterImport{
-					Interpreter: subInterpreter,
-				}
-			},
-		),
 	)
 
 	if err != nil {
@@ -120,53 +92,6 @@ func (m *OrderedMapMigration) initIntepreter() {
 	}
 
 	m.Interpreter = inter
-}
-
-func (m *OrderedMapMigration) loadProgram(
-	location common.Location,
-) (
-	*interpreter.Program,
-	error,
-) {
-	program, _, ok := m.programs.Get(location)
-	if ok {
-		return program, nil
-	}
-
-	addressLocation, ok := location.(common.AddressLocation)
-	if !ok {
-		return nil, fmt.Errorf(
-			"cannot load program for unsupported non-address location: %s",
-			location,
-		)
-	}
-
-	contractCode, err := m.accounts.GetContract(
-		addressLocation.Name,
-		flow.Address(addressLocation.Address),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	rt := runtime.NewInterpreterRuntime()
-	program, err = rt.ParseAndCheckProgram(
-		contractCode,
-		runtime.Context{
-			Interface: migrationRuntimeInterface{
-				m.accounts,
-				m.programs,
-			},
-			Location: location,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	m.programs.Set(location, program, nil)
-
-	return program, nil
 }
 
 type Pair = struct {
@@ -185,7 +110,7 @@ func (r RawStorable) ByteSize() uint32 {
 }
 
 func (r RawStorable) StoredValue(storage atree.SlabStorage) (atree.Value, error) {
-	return r, nil
+	panic("unreachable")
 }
 
 func (r RawStorable) ChildStorables() []atree.Storable {
@@ -217,13 +142,7 @@ func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storageP
 }
 
 func (m *OrderedMapMigration) initialize(payload []ledger.Payload) ([]ledger.Payload, error) {
-	fvmPayloads, storagePayloads, slabPayloads := splitPayloads(payload)
-	if len(slabPayloads) != 0 {
-		return nil, fmt.Errorf(
-			"slab storages are not empty: found %d",
-			len(slabPayloads),
-		)
-	}
+	fvmPayloads, storagePayloads, _ := splitPayloads(payload)
 
 	m.ledgerView = NewView(fvmPayloads)
 	m.initPersistentSlabStorage(m.ledgerView)
@@ -240,7 +159,9 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 			string(p.Key.KeyParts[2].Value)
 		// if the entry doesn't contain a separator, we just ignore it
 		// since it is storage metadata and does not need migration
-		if !strings.Contains(entry, "\x1f") {
+		if !strings.Contains(entry, "storage\x1f") &&
+			!strings.Contains(entry, "public\x1f") &&
+			!strings.Contains(entry, "private\x1f") {
 			continue
 		}
 		splitEntry := strings.Split(entry, "\x1f")
@@ -261,7 +182,11 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 
 	for owner, domainMaps := range groupedByOwnerAndDomain {
 		for domain, keyValuePairs := range domainMaps {
-			storageMap := m.newStorage.GetStorageMap(common.MustBytesToAddress([]byte(owner)), domain)
+			address, err := common.BytesToAddress([]byte(owner))
+			if err != nil {
+				panic(err)
+			}
+			storageMap := m.newStorage.GetStorageMap(address, domain)
 			// in the interest of not having to update Cadence and break its abstractions to allow
 			// this one-time migration, just use reflection to grab the unexported field
 			unsafeOrderedMap := reflect.ValueOf(storageMap).Elem().FieldByName("orderedMap")
@@ -270,13 +195,16 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 				unsafe.Pointer(unsafeOrderedMap.UnsafeAddr()),
 			).Elem().Interface().(*atree.OrderedMap)
 			for _, pair := range keyValuePairs {
-				orderedMap.Set(
+				_, err := orderedMap.Set(
 					// these should be rawstorables too probably
 					interpreter.StringAtreeComparator,
 					interpreter.StringAtreeHashInput,
 					interpreter.StringAtreeValue(pair.Key),
 					RawStorable(pair.Value),
 				)
+				if err != nil {
+					panic(err)
+				}
 			}
 		}
 	}
