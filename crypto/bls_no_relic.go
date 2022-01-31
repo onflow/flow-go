@@ -15,7 +15,7 @@ import (
 // BLS functions results in a runtime panic. This allows projects depending on the
 // crypto library to build successfully with or without the "relic" tag.
 
-const relic_panic = "not supported when built without relic build tag"
+const relic_panic = "function is not supported when building without \"relic\" Go build tag"
 
 // bls.go functions
 func NewBLSKMAC(tag string) hash.Hasher {
