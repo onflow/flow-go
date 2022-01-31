@@ -13,6 +13,7 @@ import (
 	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
@@ -89,7 +90,7 @@ func NewCore(
 	state protocol.State,
 	sealsDB storage.Seals,
 	assigner module.ChunkAssigner,
-	verifier module.Verifier,
+	signatureHasher hash.Hasher,
 	sealsMempool mempool.IncorporatedResultSeals,
 	approvalConduit network.Conduit,
 	config Config,
@@ -119,7 +120,7 @@ func NewCore(
 
 	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
 		base, err := approvals.NewAssignmentCollectorBase(core.log, core.workerPool, result, core.state, core.headers,
-			assigner, sealsMempool, verifier,
+			assigner, sealsMempool, signatureHasher,
 			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
 		if err != nil {
 			return nil, fmt.Errorf("could not create base collector: %w", err)

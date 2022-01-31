@@ -8,6 +8,7 @@ import (
 	_ "unsafe" // for linking runtimeNano
 
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
@@ -54,10 +55,10 @@ func WithTTL(ttl time.Duration) optFunc {
 }
 
 // NewResolver is the factory function for creating an instance of this resolver.
-func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
+func NewResolver(cacheSizeLimit uint32, logger zerolog.Logger, collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
 		res:            madns.DefaultResolver,
-		c:              newCache(),
+		c:              newCache(cacheSizeLimit, logger),
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},
@@ -155,13 +156,13 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 	if !exists {
 		r.collector.OnDNSCacheMiss()
-		return r.lookupResolverForTXTAddr(ctx, txt)
+		return r.lookupResolverForTXTRecord(ctx, txt)
 	}
 
 	if !fresh && r.shouldResolveTXT(txt) {
 		r.unit.Launch(func() {
 			defer r.doneResolvingTXT(txt)
-			_, err := r.lookupResolverForTXTAddr(ctx, txt)
+			_, err := r.lookupResolverForTXTRecord(ctx, txt)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
 				invalidated := r.c.invalidateTXTCacheEntry(txt)
@@ -177,8 +178,8 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 	return addr, nil
 }
 
-// lookupResolverForIPAddr queries the underlying resolver for the domain and updates the cache if query is successful.
-func (r *Resolver) lookupResolverForTXTAddr(ctx context.Context, txt string) ([]string, error) {
+// lookupResolverForTXTRecord queries the underlying resolver for the domain and updates the cache if query is successful.
+func (r *Resolver) lookupResolverForTXTRecord(ctx context.Context, txt string) ([]string, error) {
 	addr, err := r.res.LookupTXT(ctx, txt)
 	if err != nil {
 		return nil, err
