@@ -88,7 +88,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
 	}
 
 	// try each of the execution nodes found
@@ -104,11 +104,20 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 				Msg("Successfully executed script")
 			return result, nil
 		}
+		// return OK status if it's just a script failure as opposed to an EN failure
+		if status.Code(err) == codes.InvalidArgument {
+			b.log.Debug().Err(err).
+				Str("execution_node", execNode.String()).
+				Hex("block_id", blockID[:]).
+				Str("script", string(script)).
+				Msg("script failed to execute on the execution node")
+			return nil, status.Errorf(codes.OK, "failed to execute script on execution node %v", execNode.String())
+		}
 		errors = multierror.Append(errors, err)
 	}
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
-		b.log.Error().Err(err).Msg("script execution failed")
+		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
 	}
 	return nil, errToReturn
 }
@@ -121,7 +130,7 @@ func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Id
 	defer closer.Close()
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", execNode.String(), err)
 	}
 	return execResp.GetValue(), nil
 }
