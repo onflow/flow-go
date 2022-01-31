@@ -10,6 +10,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -63,9 +64,9 @@ type Network struct {
 var _ network.Network = (*Network)(nil)
 
 type registerEngineRequest struct {
-	channel  network.Channel
-	engine   network.Engine
-	respChan chan *registerEngineResp
+	channel          network.Channel
+	messageProcessor network.MessageProcessor
+	respChan         chan *registerEngineResp
 }
 
 type registerEngineResp struct {
@@ -76,6 +77,7 @@ type registerEngineResp struct {
 type registerBlobServiceRequest struct {
 	channel  network.Channel
 	ds       datastore.Batching
+	opts     []network.BlobServiceOption
 	respChan chan *registerBlobServiceResp
 }
 
@@ -139,7 +141,7 @@ func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerCon
 	for {
 		select {
 		case req := <-n.registerEngineRequests:
-			conduit, err := n.handleRegisterEngineRequest(parent, req.channel, req.engine)
+			conduit, err := n.handleRegisterEngineRequest(parent, req.channel, req.messageProcessor)
 			resp := &registerEngineResp{
 				conduit: conduit,
 				err:     err,
@@ -163,7 +165,7 @@ func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.Signal
 	for {
 		select {
 		case req := <-n.registerBlobServiceRequests:
-			blobService, err := n.handleRegisterBlobServiceRequest(parent, req.channel, req.ds)
+			blobService, err := n.handleRegisterBlobServiceRequest(parent, req.channel, req.ds, req.opts)
 			resp := &registerBlobServiceResp{
 				blobService: blobService,
 				err:         err,
@@ -196,7 +198,7 @@ func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready compone
 	<-n.mw.Done()
 }
 
-func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	if !channels.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
@@ -228,17 +230,8 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 	return conduit, nil
 }
 
-func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
-	// TODO: this is a hack, we should not rely on knowing the underlying implementation
-	mw, ok := n.mw.(*Middleware)
-	if !ok {
-		return nil, errors.New("middleware was of unexpected type")
-	}
-	if mw.libP2PNode.dht == nil {
-		return nil, errors.New("blob exchange is disabled because content routing is not configured")
-	}
-
-	bs := network.NewBlobService(mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), ds)
+func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService, error) {
+	bs := n.mw.NewBlobService(channel, ds, opts...)
 
 	// start the blob service using the network's context
 	bs.Start(parent)
@@ -249,16 +242,16 @@ func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.Signaler
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
 	respChan := make(chan *registerEngineResp)
 
 	select {
 	case <-n.ComponentManager.ShutdownSignal():
 		return nil, ErrNetworkShutdown
 	case n.registerEngineRequests <- &registerEngineRequest{
-		channel:  channel,
-		engine:   engine,
-		respChan: respChan,
+		channel:          channel,
+		messageProcessor: messageProcessor,
+		respChan:         respChan,
 	}:
 		select {
 		case <-n.ComponentManager.ShutdownSignal():
@@ -269,9 +262,18 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 	}
 }
 
+func (n *Network) RegisterPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) (network.PingService, error) {
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	default:
+		return n.mw.NewPingService(pingProtocol, provider), nil
+	}
+}
+
 // RegisterBlobService registers a BlobService on the given channel.
 // The returned BlobService can be used to request blobs from the network.
-func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
+func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
 	respChan := make(chan *registerBlobServiceResp)
 
 	select {
@@ -280,6 +282,7 @@ func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batc
 	case n.registerBlobServiceRequests <- &registerBlobServiceRequest{
 		channel:  channel,
 		ds:       ds,
+		opts:     opts,
 		respChan: respChan,
 	}:
 		select {
