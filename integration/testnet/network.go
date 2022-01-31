@@ -493,11 +493,11 @@ func integrationBootstrapDir() (string, error) {
 }
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
-
-	t.Logf("preparing flow network")
-
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
+
+	t.Logf("%v (%v) preparing flow network with %v nodes", time.Now().UTC(), t.Name(), nNodes)
+
 	require.NotZero(t, len(networkConf.Nodes), "must specify at least one node")
 
 	// Sort so that access nodes start up last
@@ -589,7 +589,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	flowNetwork.PrintMetricsPorts()
 
-	t.Logf("finish preparing flow network")
+	t.Logf("%v finish preparing flow network for %v", time.Now().UTC(), t.Name())
 
 	return flowNetwork
 }
