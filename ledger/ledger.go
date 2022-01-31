@@ -185,7 +185,7 @@ func (k *Key) Size() int {
 }
 
 // CanonicalForm returns a byte slice describing the key
-// Warning, Changing this has an impact on how leaf hashes are computed
+// Warning: Changing this has an impact on how leaf hashes are computed!
 // don't use this to reconstruct the key later
 func (k *Key) CanonicalForm() []byte {
 	// calculate the size of the byte array
