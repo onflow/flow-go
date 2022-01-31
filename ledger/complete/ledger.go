@@ -103,6 +103,32 @@ func (l *Ledger) InitialState() ledger.State {
 	return ledger.State(l.forest.GetEmptyRootHash())
 }
 
+// ValueSizes read the values of the given keys at the given state.
+// It returns value sizes in the same order as given registerIDs and errors (if any)
+func (l *Ledger) ValueSizes(query *ledger.Query) (valueSizes []int, err error) {
+	start := time.Now()
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
+	if err != nil {
+		return nil, err
+	}
+	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
+	valueSizes, err = l.forest.ValueSizes(trieRead)
+	if err != nil {
+		return nil, err
+	}
+
+	l.metrics.ReadValuesNumber(uint64(len(paths)))
+	readDuration := time.Since(start)
+	l.metrics.ReadDuration(readDuration)
+
+	if len(paths) > 0 {
+		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(paths))) * time.Nanosecond
+		l.metrics.ReadDurationPerItem(durationPerValue)
+	}
+
+	return valueSizes, err
+}
+
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
