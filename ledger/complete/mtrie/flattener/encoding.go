@@ -124,7 +124,7 @@ func ReadStorableNode(reader io.Reader) (*StorableNode, error) {
 
 // EncodeStorableTrie encodes StorableTrie
 func EncodeStorableTrie(storableTrie *StorableTrie) []byte {
-	length := 8 + 2 + len(storableTrie.RootHash)
+	length := 2 + 8 + 2 + len(storableTrie.RootHash)
 	buf := make([]byte, 0, length)
 	// 2-bytes encoding version
 	buf = utils.AppendUint16(buf, encodingDecodingVersion)

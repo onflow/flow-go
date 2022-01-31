@@ -196,7 +196,13 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
-		if len(values) == 0 {
+		// We expect 1 element in the returned slice of values because query is from makeSingleValueQuery()
+		if len(values) != 1 {
+			return nil, fmt.Errorf("error getting register (%s) value at %x: number of returned values (%d) != number of queried keys (%d)", key, commitment, len(values), len(query.Keys()))
+		}
+
+		// Prevent caching of value with len zero
+		if len(values[0]) == 0 {
 			return nil, nil
 		}
 

@@ -9,6 +9,9 @@ import (
 	"math/rand"
 	"reflect"
 
+	"github.com/ipfs/go-cid"
+	mh "github.com/multiformats/go-multihash"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -144,9 +147,13 @@ func GetIDs(value interface{}) []Identifier {
 
 func MerkleRoot(ids ...Identifier) Identifier {
 	var root Identifier
-	tree := merkle.NewTree()
-	for _, id := range ids {
-		tree.Put(id[:], nil)
+	tree, _ := merkle.NewTree(IdentifierLen) // we verify in a unit test that constructor does not error for this paramter
+	for i, id := range ids {
+		val := make([]byte, 8)
+		binary.BigEndian.PutUint64(val, uint64(i))
+		_, _ = tree.Put(id[:], val) // Tree copies keys and values internally
+		// `Put` only errors for keys whose length does not conform to the pre-configured length. As
+		// Identifiers are fixed-sized arrays, errors are impossible here, which we also verify in a unit test.
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)
@@ -173,7 +180,7 @@ func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 }
 
 // Sample returns random sample of length 'size' of the ids
-// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher-Yates_shuffle).
 func Sample(size uint, ids ...Identifier) []Identifier {
 	n := uint(len(ids))
 	dup := make([]Identifier, 0, n)
@@ -187,4 +194,27 @@ func Sample(size uint, ids ...Identifier) []Identifier {
 		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
 	return dup[:size]
+}
+
+func CidToFlowID(c cid.Cid) (Identifier, error) {
+	decoded, err := mh.Decode(c.Hash())
+
+	if err != nil {
+		return ZeroID, fmt.Errorf("failed to decode CID: %w", err)
+	}
+
+	if decoded.Code != mh.SHA2_256 {
+		return ZeroID, fmt.Errorf("unsupported CID hash function: %v", decoded.Name)
+	}
+
+	if decoded.Length != IdentifierLen {
+		return ZeroID, fmt.Errorf("invalid CID length: %d", decoded.Length)
+	}
+
+	return HashToID(decoded.Digest), nil
+}
+
+func FlowIDToCid(f Identifier) cid.Cid {
+	hash, _ := mh.Encode(f[:], mh.SHA2_256)
+	return cid.NewCidV0(hash)
 }

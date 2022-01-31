@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
+
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
@@ -23,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	consensus_follower "github.com/onflow/flow-go/follower"
@@ -60,6 +63,8 @@ const (
 	// DefaultExecutionRootDir is the default directory for the execution node
 	// state database.
 	DefaultExecutionRootDir = "/exedb"
+	// DefaultExecutionDataServiceDir for the execution data service blobstore.
+	DefaultExecutionDataServiceDir = "/data/execution_data"
 
 	// ColNodeAPIPort is the name used for the collection node API port.
 	ColNodeAPIPort = "col-ingress-port"
@@ -79,10 +84,24 @@ const (
 	// ExeNodeMetricsPort is the name used for the execution node metrics server port
 	ExeNodeMetricsPort = "exe-metrics-port"
 
+	// ColNodeMetricsPort is the name used for the collection node metrics server port
+	ColNodeMetricsPort = "col-metrics-port"
+
+	// AccessNodeMetricsPort is the name used for the access node metrics server port
+	AccessNodeMetricsPort = "access-metrics-port"
+
+	// VerNodeMetricsPort is the name used for the verification node metrics server port
+	VerNodeMetricsPort = "verification-metrics-port"
+
+	// ConNodeMetricsPort is the name used for the consensus node metrics server port
+	ConNodeMetricsPort = "con-metrics-port"
+
 	// DefaultFlowPort default gossip network port
 	DefaultFlowPort = 2137
 	// DefaultSecureGRPCPort is the port used to access secure GRPC server running on ANs
 	DefaultSecureGRPCPort = 9001
+	// AccessNodePublicNetworkPort is the port used by access nodes for the public libp2p network
+	AccessNodePublicNetworkPort = 9876
 
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
@@ -100,20 +119,21 @@ func init() {
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	t                          *testing.T
-	suite                      *testingdock.Suite
-	config                     NetworkConfig
-	cli                        *dockerclient.Client
-	network                    *testingdock.Network
-	Containers                 map[string]*Container
-	ConsensusFollowers         map[flow.Identifier]consensus_follower.ConsensusFollower
-	AccessPorts                map[string]string
-	AccessPortsByContainerName map[string]string
-	root                       *flow.Block
-	result                     *flow.ExecutionResult
-	seal                       *flow.Seal
-	BootstrapDir               string
-	BootstrapSnapshot          *inmem.Snapshot
+	t                           *testing.T
+	suite                       *testingdock.Suite
+	config                      NetworkConfig
+	cli                         *dockerclient.Client
+	network                     *testingdock.Network
+	Containers                  map[string]*Container
+	ConsensusFollowers          map[flow.Identifier]consensus_follower.ConsensusFollower
+	AccessPorts                 map[string]string
+	AccessPortsByContainerName  map[string]string
+	MetricsPortsByContainerName map[string]string
+	root                        *flow.Block
+	result                      *flow.ExecutionResult
+	seal                        *flow.Seal
+	BootstrapDir                string
+	BootstrapSnapshot           *inmem.Snapshot
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -154,7 +174,8 @@ func (net *FlowNetwork) Result() *flow.ExecutionResult {
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
 	// makes it easier to see logs for a specific test case
-	fmt.Println(">>>> starting network: ", net.config.Name)
+	net.t.Logf("%v starting flow network %v with docker containers for test case [%v]",
+		time.Now().UTC(), net.config.Name, net.t.Name())
 	net.suite.Start(ctx)
 }
 
@@ -241,6 +262,15 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 	container, exists := net.Containers[name]
 	require.True(net.t, exists, "container %s does not exists", name)
 	return container
+}
+
+func (net *FlowNetwork) PrintMetricsPorts() {
+	var builder strings.Builder
+	builder.WriteString("metrics endpoints by container name:\n")
+	for containerName, metricsPort := range net.MetricsPortsByContainerName {
+		builder.WriteString(fmt.Sprintf("\t%s: 0.0.0.0:%s/metrics\n", containerName, metricsPort))
+	}
+	fmt.Print(builder.String())
 }
 
 type ConsensusFollowerConfig struct {
@@ -443,6 +473,8 @@ func WithDebugImage(debug bool) func(config *NodeConfig) {
 func AsGhost() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.Ghost = true
+		// using the fully-connectred topology to ensure a ghost node is always connected to all other nodes in the network,
+		config.AdditionalFlags = append(config.AdditionalFlags, "--topology=fully-connected")
 	}
 }
 
@@ -466,6 +498,8 @@ func integrationBootstrapDir() (string, error) {
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
+	t.Logf("preparing flow network")
+
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	require.NotZero(t, len(networkConf.Nodes), "must specify at least one node")
@@ -487,30 +521,31 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		Name: networkConf.Name,
 	})
 
-	// create a temporary directory to store all bootstrapping files 
+	// create a temporary directory to store all bootstrapping files
 	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
-	fmt.Printf("BootstrapDir: %s \n", bootstrapDir)
+	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
 	root, result, seal, confs, bootstrapSnapshot, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
-		t:                          t,
-		cli:                        dockerClient,
-		config:                     networkConf,
-		suite:                      suite,
-		network:                    network,
-		Containers:                 make(map[string]*Container, nNodes),
-		ConsensusFollowers:         make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
-		AccessPorts:                make(map[string]string),
-		AccessPortsByContainerName: make(map[string]string),
-		root:                       root,
-		seal:                       seal,
-		result:                     result,
-		BootstrapDir:               bootstrapDir,
-		BootstrapSnapshot: 			bootstrapSnapshot,
+		t:                           t,
+		cli:                         dockerClient,
+		config:                      networkConf,
+		suite:                       suite,
+		network:                     network,
+		Containers:                  make(map[string]*Container, nNodes),
+		ConsensusFollowers:          make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		AccessPorts:                 make(map[string]string),
+		AccessPortsByContainerName:  make(map[string]string),
+		MetricsPortsByContainerName: make(map[string]string),
+		root:                        root,
+		seal:                        seal,
+		result:                      result,
+		BootstrapDir:                bootstrapDir,
+		BootstrapSnapshot:           bootstrapSnapshot,
 	}
 
 	// check that at-least 2 full access nodes must be configure in your test suite
@@ -521,21 +556,30 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
 		}
 	}
-	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAccessNodeIDS, fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
+	require.GreaterOrEqualf(t, len(accessNodeIDS), DefaultMinimumNumOfAccessNodeIDS,
+		"at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS)
 
-	// add each node to the network
 	for _, nodeConf := range confs {
+		var nodeType = "real"
+		if nodeConf.Ghost {
+			nodeType = "ghost"
+		}
+
+		t.Logf("add docker container type: %s, %v, node id: %v, address: %v", nodeType, nodeConf.ContainerName, nodeConf.NodeID, nodeConf.Address)
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 
+		// ghost nodes will not need any flags
+		if nodeConf.Ghost {
+			continue
+		}
+
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
-		if nodeConf.Role == flow.RoleConsensus || nodeConf.Role == flow.RoleCollection {
-			// ghost containers don't participate in the network skip any SN/LN ghost containers
-			if !nodeConf.Ghost {
-				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
-				nodeContainer.addFlag("insecure-access-api", "false")
-				nodeContainer.addFlag("access-node-ids", "*")
-			}
+		// this is required otherwise collection node will fail to startup
+		if nodeConf.Role == flow.RoleCollection || nodeConf.Role == flow.RoleConsensus {
+			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
+			nodeContainer.AddFlag("insecure-access-api", "false")
+			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
 	}
 
@@ -543,8 +587,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// add each follower to the network
 	for _, followerConf := range networkConf.ConsensusFollowers {
+		t.Logf("add consensus follower %v", followerConf.NodeID)
 		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
+
+	flowNetwork.PrintMetricsPorts()
+
+	t.Logf("finish preparing flow network")
 
 	return flowNetwork
 }
@@ -612,7 +661,6 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 // AddNode creates a node container with the given config and adds it to the
 // network.
 func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf ContainerConfig) error {
-
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
 		Name:      nodeConf.ContainerName,
@@ -637,6 +685,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	if err != nil {
 		return fmt.Errorf("could not get tmp dir: %w", err)
 	}
+
+	t.Logf("adding container %v for %v node", nodeConf.ContainerName, nodeConf.Role)
 
 	nodeContainer := &Container{
 		Config:  nodeConf,
@@ -681,11 +731,18 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
-			// set a low timeout so that all nodes agree on the current view more quickly
-			nodeContainer.addFlag("hotstuff-timeout", time.Second.String())
-			nodeContainer.addFlag("hotstuff-min-timeout", time.Second.String())
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
 
-			nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[ColNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[ColNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
+			// set a low timeout so that all nodes agree on the current view more quickly
+			nodeContainer.AddFlag("hotstuff-timeout", time.Second.String())
+			nodeContainer.AddFlag("hotstuff-min-timeout", time.Second.String())
+
+			nodeContainer.AddFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.Ports[ColNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 			net.AccessPorts[ColNodeAPIPort] = hostPort
@@ -701,8 +758,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			containerMetricsPort := "8080/tcp"
 
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
-			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
@@ -721,7 +779,17 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
 			)
 
-			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
+
+			tmpExeDataDir, err := ioutil.TempDir(tmpdir, "execution-data")
+			require.NoError(t, err)
+
+			opts.HostConfig.Binds = append(
+				opts.HostConfig.Binds,
+				fmt.Sprintf("%s:%s:rw", tmpExeDataDir, DefaultExecutionDataServiceDir),
+			)
+
+			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
 
 		case flow.RoleAccess:
 			hostGRPCPort := testingdock.RandomPort(t)
@@ -733,11 +801,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
 			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 			nodeContainer.bindPort(hostSecureGRPCPort, containerSecureGRPCPort)
-			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.AddFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
 			// uncomment line below to point the access node exclusively to a single collection node
-			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
-			nodeContainer.addFlag("collection-ingress-port", "9000")
+			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
+			nodeContainer.AddFlag("collection-ingress-port", "9000")
 			net.AccessPorts[AccessNodeAPISecurePort] = hostSecureGRPCPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
@@ -748,27 +816,49 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			if nodeConf.SupportsUnstakedNodes {
 				hostExternalNetworkPort := testingdock.RandomPort(t)
-				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
+				containerExternalNetworkPort := fmt.Sprintf("%d/tcp", AccessNodePublicNetworkPort)
+				nodeContainer.bindPort(hostExternalNetworkPort, containerExternalNetworkPort)
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
-				nodeContainer.addFlag("supports-unstaked-node", "true")
+				nodeContainer.AddFlag("supports-unstaked-node", "true")
+				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
 			}
+
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
+
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[AccessNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[AccessNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
 		case flow.RoleConsensus:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
-			nodeContainer.addFlag("chunk-alpha", "1")
+			nodeContainer.AddFlag("chunk-alpha", "1")
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
 
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[ConNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[ConNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
-			nodeContainer.addFlag("chunk-alpha", "1")
+			nodeContainer.AddFlag("chunk-alpha", "1")
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
 
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[VerNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[VerNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)
 		containerPort := "9000/tcp"
 
-		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+		nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 		nodeContainer.bindPort(hostPort, containerPort)
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 
@@ -791,6 +881,20 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	suiteContainer := net.suite.Container(*opts)
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
+
+	// start ghost node right away
+	// ghost nodes are to help testing other nodes' logic,
+	// in order to reduce tests flakyness, we try to prepare the network, so that the real node
+	// can be tested with the network that all ghost nodes are up. Therefore, we start
+	// ghost nodes right away
+	if nodeConf.Ghost {
+		net.network.After(suiteContainer)
+		return nil
+	}
+
+	// if is real node, since the node config has been sorted, execution should always
+	// be created before consensus node. so by the time we are creating access/consensus
+	// node, the execution has been created, and we can add the dependency here
 	if nodeConf.Role == flow.RoleAccess || nodeConf.Role == flow.RoleConsensus {
 		execution1 := net.ContainerByName("execution_1")
 		execution1.After(suiteContainer)
@@ -860,7 +964,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	//            this ordering defines the DKG participant's indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
 
-	// run DKG for all consensus nodes
 	dkg, err := runDKG(stakedConfs)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
@@ -963,7 +1066,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
 	}
 	epochConfig := epochs.EpochConfig{
-		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
 		NumViewsInEpoch:              cadence.UInt64(networkConf.ViewsInEpoch),
@@ -1082,7 +1184,7 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 		return dkgmod.DKGData{}, err
 	}
 
-	dkg, err := run.RunFastKG(nConsensusNodes, dkgSeed)
+	dkg, err := dkg.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return dkgmod.DKGData{}, err
 	}

@@ -246,7 +246,7 @@ func TestSafetyCheck(t *testing.T) {
 							&sema.ImportedProgramError{
 								Err: &sema.CheckerError{},
 								Location: common.AddressLocation{
-									Address: common.BytesToAddress([]byte{1, 2, 3, 4}),
+									Address: common.MustBytesToAddress([]byte{1, 2, 3, 4}),
 								},
 							},
 						},

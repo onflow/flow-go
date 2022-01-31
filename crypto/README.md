@@ -92,8 +92,9 @@ go build -tags=relic
 
 `crypto/hash` provides the hashing and MAC algorithms required for Flow. All algorithm implement the generic interface `Hasher`. All digests are of the generic type `Hash`.
 
- * Sha3: 256 and 384 output sizes
- * Sha2: 256 and 384 output sizes
+ * SHA-3: 256 and 384 output sizes
+ * Legacy Kaccak: 256 output size
+ * SHA-2: 256 and 384 output sizes
  * KMAC: 128 variant
 
 ### Signature schemes
@@ -128,7 +129,7 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
 
 ### PRNG
 
- * Xorshift128+
+ * ChaCha20-based CSPRNG
 
 ## Protocols
 
@@ -153,7 +154,7 @@ All supported Distributed Key Generation protocols are [discrete log based](http
     * simple verifiable secret sharing with a single dealer.
     * the library does not implement the communication channels between participants. The caller should implement the methods `PrivateSend` (1-to-1 messaging) and `Broadcast` (1-to-n messaging)
     * 1-to-1 messaging must be a private channel, the caller must make sure the channel preserves confidentialiy and authenticates the sender.
-    * 1-to-n broadcasting assume all destination nodes receive the same copy of the message. The channel should also authenticate the broadcaster.
+    * 1-to-n broadcasting assume all destination participants receive the same copy of the message. The channel should also authenticate the broadcaster.
     * It is recommended that both communication channels are unique per protocol instance. This could be achieved by prepending the messages to send/broadcast by a unique protocol instance ID.
  * Feldman VSS Qual.
     * an extension of the simple Feldman VSS.

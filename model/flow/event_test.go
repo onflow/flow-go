@@ -79,19 +79,18 @@ func TestEventsList(t *testing.T) {
 		eventC,
 	}
 
-	ABHash, err := flow.EventsListHash(listAB)
+	ABHash, err := flow.EventsMerkleRootHash(listAB)
 	assert.NoError(t, err)
-	ACHash, err := flow.EventsListHash(listAC)
+	ACHash, err := flow.EventsMerkleRootHash(listAC)
 	assert.NoError(t, err)
-	BAHash, err := flow.EventsListHash(listBA)
+	BAHash, err := flow.EventsMerkleRootHash(listBA)
 	assert.NoError(t, err)
 
 	t.Run("different events have different hash", func(t *testing.T) {
-
 		assert.NotEqual(t, ABHash, ACHash)
 	})
 
-	t.Run("order does matter", func(t *testing.T) {
-		assert.NotEqual(t, ABHash, BAHash)
+	t.Run("insertion order does not matter", func(t *testing.T) {
+		assert.Equal(t, ABHash, BAHash)
 	})
 }

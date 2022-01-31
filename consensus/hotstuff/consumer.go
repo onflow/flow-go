@@ -101,7 +101,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcConstructedFromVotes(*flow.QuorumCertificate)
+	OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate)
 
 	// OnStartingTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker is now waiting for the system to (receive and) process blocks or votes.
@@ -146,4 +146,29 @@ type Consumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnInvalidVoteDetected(*model.Vote)
+
+	// OnVoteForInvalidBlockDetected notifications are produced by the Vote Aggregation logic
+	// whenever vote for invalid proposal was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal)
+}
+
+// QCCreatedConsumer consumes outbound notifications produced by HotStuff and its components.
+// Notifications are consensus-internal state changes which are potentially relevant to
+// the larger node in which HotStuff is running. The notifications are emitted
+// in the order in which the HotStuff algorithm makes the respective steps.
+//
+// Implementations must:
+//   * be concurrency safe
+//   * be non-blocking
+//   * handle repetition of the same events (with some processing overhead).
+type QCCreatedConsumer interface {
+	// OnQcConstructedFromVotes notifications are produced by the VoteAggregator
+	// component, whenever it constructs a QC from votes.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnQcConstructedFromVotes(*flow.QuorumCertificate)
 }
