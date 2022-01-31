@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -21,8 +22,6 @@ import (
 	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
@@ -31,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -287,11 +285,6 @@ func main() {
 			// state when the follower detects newly finalized blocks
 			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
-			// initialize the staking & beacon verifiers, signature joiner
-			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
-			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
@@ -300,8 +293,9 @@ func main() {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
+			packer := hotsignature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(committee, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(committee, packer)
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

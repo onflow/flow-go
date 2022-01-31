@@ -88,6 +88,7 @@ func (suite *TopologyTestSuite) TestLowScaleRandomized() {
 // and builds a stateful linear fanout topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
 func (suite *TopologyTestSuite) TestModerateScaleLinearFanout() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_RESOURCE_INTENSIVE, "should be run on an machine with adequate resources")
 	suite.multiSystemEndToEndConnectedness(suite.linearFanoutTop, 1, 20, 200, 240, 10, 200, 8)
 }
 
@@ -100,6 +101,7 @@ func (suite *TopologyTestSuite) TestModerateScaleLinearFanout() {
 // and builds a stateful randomized topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
 func (suite *TopologyTestSuite) TestModerateScaleRandomized() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_RESOURCE_INTENSIVE, "should be run on an machine with adequate resources")
 	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 20, 200, 240, 10, 200, 8)
 }
 
@@ -112,6 +114,7 @@ func (suite *TopologyTestSuite) TestModerateScaleRandomized() {
 // and builds a stateful topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
 func (suite *TopologyTestSuite) TestHighScaleLinearFanout() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_RESOURCE_INTENSIVE, "should be run on an machine with adequate resources")
 	suite.multiSystemEndToEndConnectedness(suite.linearFanoutTop, 1, 40, 400, 480, 20, 400, 16)
 }
 
@@ -124,6 +127,7 @@ func (suite *TopologyTestSuite) TestHighScaleLinearFanout() {
 // and builds a stateful randomized topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
 func (suite *TopologyTestSuite) TestHighScaleRandomized() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_RESOURCE_INTENSIVE, "should be run on an machine with adequate resources")
 	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 40, 400, 480, 20, 400, 16)
 }
 

@@ -69,7 +69,7 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.Require().NoError(err)
 }
 
-// TestInvalidSigner tests that the ErrInvalidSigner sentinel is
+// TestInvalidSigner tests that the InvalidSignerError sentinel is
 // returned under the appropriate conditions.
 func (suite *ClusterSuite) TestInvalidSigner() {
 
@@ -104,25 +104,25 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	suite.snap.On("Identity", realNonClusterMember.NodeID).Return(realNonClusterMember, nil)
 	suite.snap.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
 
-	suite.Run("should return ErrInvalidSigner for non-existent signer", func() {
+	suite.Run("should return InvalidSignerError for non-existent signer", func() {
 		suite.Run("root block", func() {
 			_, err := suite.com.Identity(rootBlockID, fakeID)
-			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, fakeID)
-			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 	})
 
-	suite.Run("should return ErrInvalidSigner for existent non-cluster-member", func() {
+	suite.Run("should return InvalidSignerError for existent non-cluster-member", func() {
 		suite.Run("root block", func() {
 			_, err := suite.com.Identity(rootBlockID, realNonClusterMember.NodeID)
-			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, realNonClusterMember.NodeID)
-			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 	})
 
@@ -135,7 +135,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, realEjectedClusterMember.NodeID)
-			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 	})
 
@@ -148,7 +148,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.Identity(nonRootBlockID, realNoWeightClusterMember.NodeID)
-			suite.Assert().ErrorIs(model.ErrInvalidSigner, err)
+			suite.Assert().True(model.IsInvalidSignerError(err))
 		})
 	})
 
