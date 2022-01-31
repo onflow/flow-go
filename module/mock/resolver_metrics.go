@@ -32,3 +32,8 @@ func (_m *ResolverMetrics) OnDNSCacheInvalidated() {
 func (_m *ResolverMetrics) OnDNSCacheMiss() {
 	_m.Called()
 }
+
+// OnDNSLookupRequestDropped provides a mock function with given fields:
+func (_m *ResolverMetrics) OnDNSLookupRequestDropped() {
+	_m.Called()
+}

@@ -23,12 +23,12 @@ import (
 type Network struct {
 	ctx context.Context
 	sync.Mutex
-	state        protocol.State                     // used to represent full protocol state of the attached node.
-	me           module.Local                       // used to represent information of the attached node.
-	hub          *Hub                               // used to attach Network layers of nodes together.
-	engines      map[network.Channel]network.Engine // used to keep track of attached engines of the node.
-	seenEventIDs sync.Map                           // used to keep track of event IDs seen by attached engines.
-	qCD          chan struct{}                      // used to stop continuous delivery mode of the Network.
+	state        protocol.State                               // used to represent full protocol state of the attached node.
+	me           module.Local                                 // used to represent information of the attached node.
+	hub          *Hub                                         // used to attach Network layers of nodes together.
+	engines      map[network.Channel]network.MessageProcessor // used to keep track of attached engines of the node.
+	seenEventIDs sync.Map                                     // used to keep track of event IDs seen by attached engines.
+	qCD          chan struct{}                                // used to stop continuous delivery mode of the Network.
 	mocknetwork.Network
 }
 
@@ -41,7 +41,7 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 		state:   state,
 		me:      me,
 		hub:     hub,
-		engines: make(map[network.Channel]network.Engine),
+		engines: make(map[network.Channel]network.MessageProcessor),
 		qCD:     make(chan struct{}),
 	}
 	// AddNetwork the Network to a hub so that Networks can find each other.
@@ -56,7 +56,7 @@ func (n *Network) GetID() flow.Identifier {
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the
 // Conduit instance.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	n.Lock()
 	defer n.Unlock()
 	_, ok := n.engines[channel]
@@ -253,12 +253,9 @@ func (n *Network) sendToAllTargets(m *PendingMessage, syncOnProcess bool) error 
 			}
 		} else {
 			// sender and receiver are synced over delivery of message
-			//
-			// Call `Submit` to let receiver engine receive the event directly.
-			// Submit is supposed to process event asynchronously, but if it doesn't we are risking
-			// deadlock (if it trigger another message sending we might end up calling this very function again)
-			// Running it in Go-routine is some cheap form of defense against deadlock in tests
-			go receiverEngine.Submit(m.Channel, m.From, m.Event)
+			go func() {
+				_ = receiverEngine.Process(m.Channel, m.From, m.Event)
+			}()
 		}
 
 	}
@@ -283,7 +280,7 @@ func (n *Network) StartConDev(updateInterval time.Duration, recursive bool) {
 				n.DeliverAll(recursive)
 			case <-n.qCD:
 				// stops continuous delivery mode
-				break
+				return
 			}
 		}
 	}()

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
@@ -21,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -56,6 +58,8 @@ type Manager struct {
 	programsCache      *ProgramsCache
 	scriptLogThreshold time.Duration
 	uploaders          []uploader.Uploader
+	eds                state_synchronization.ExecutionDataService
+	edCache            state_synchronization.ExecutionDataCIDCache
 }
 
 func New(
@@ -70,6 +74,8 @@ func New(
 	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
 	uploaders []uploader.Uploader,
+	eds state_synchronization.ExecutionDataService,
+	edCache state_synchronization.ExecutionDataCIDCache,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -102,6 +108,8 @@ func New(
 		programsCache:      programsCache,
 		scriptLogThreshold: scriptLogThreshold,
 		uploaders:          uploaders,
+		eds:                eds,
+		edCache:            edCache,
 	}
 
 	return &e, nil
@@ -227,27 +235,52 @@ func (e *Manager) ComputeBlock(
 
 	e.programsCache.Set(block.ID(), toInsert)
 
-	if len(e.uploaders) > 0 {
-		var g errgroup.Group
+	group, uploadCtx := errgroup.WithContext(ctx)
+	var rootID flow.Identifier
+	var blobTree [][]cid.Cid
 
-		for _, uploader := range e.uploaders {
-			uploader := uploader
-
-			g.Go(func() error {
-				return uploader.Upload(result)
+	group.Go(func() error {
+		var collections []*flow.Collection
+		for _, collection := range result.ExecutableBlock.Collections() {
+			collections = append(collections, &flow.Collection{
+				Transactions: collection.Transactions,
 			})
 		}
 
-		err := g.Wait()
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to upload block result: %w", err)
+		ed := &state_synchronization.ExecutionData{
+			BlockID:            block.ID(),
+			Collections:        collections,
+			Events:             result.Events,
+			TrieUpdates:        result.TrieUpdates,
+			TransactionResults: result.TransactionResults,
 		}
+
+		var err error
+		rootID, blobTree, err = e.eds.Add(uploadCtx, ed)
+
+		return err
+	})
+
+	for _, uploader := range e.uploaders {
+		uploader := uploader
+
+		group.Go(func() error {
+			return uploader.Upload(result)
+		})
+	}
+
+	err = group.Wait()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload block result: %w", err)
 	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
+
+	e.edCache.Insert(block.Block.Header, blobTree)
+	result.ExecutionDataID = rootID
 
 	return result, nil
 }
