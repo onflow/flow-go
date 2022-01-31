@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
+	"github.com/onflow/flow-go/state/protocol/inmem"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -119,11 +122,11 @@ func main() {
 		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
 
 		// dynamic start up
-		dynamicStartup    bool
-		initANAddress     string
-		initANPubkey      string
-		startupEpochPhase string
-		startupEpoch      int
+		dynamicStartupANAddress     string
+		dynamicStartupANPubkey      string
+		dynamicStartupEpochPhase    string
+		dynamicStartupEpoch         int
+		dynamicStartupSleepInterval time.Duration
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -157,11 +160,11 @@ func main() {
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
 
 		// dynamic node startup flags
-		flags.BoolVar(&dynamicStartup, "dynamic-startup", false, "when set to true the node will attempt to wait for a specified epoch counter & phase before initializing")
-		flags.StringVar(&initANPubkey, "init-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-		flags.StringVar(&initANAddress, "init-access-address", "", "the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-		flags.StringVar(&startupEpochPhase, "startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase in integer form for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
-		flags.IntVar(&startupEpoch, "startup-epoch", 0, "the epoch the node will wait for before initializing modules when using dynamic-startup")
+		flags.StringVar(&dynamicStartupANPubkey, "dynamic-startup-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+		flags.StringVar(&dynamicStartupANAddress, "dynamic-startup-access-address", "", "the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+		flags.StringVar(&dynamicStartupEpochPhase, "dynamic-startup-startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
+		flags.IntVar(&dynamicStartupEpoch, "dynamic-startup-startup-epoch", 0, "the epoch the node will wait for before initializing modules when using dynamic-startup")
+		flags.DurationVar(&dynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in milliseconds in which the node will check if it can start")
 
 	}).ValidateFlags(func() error {
 		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
@@ -182,13 +185,41 @@ func main() {
 
 	nodeBuilder.
 		PreInit(func(nodeConfig *cmd.NodeConfig) error {
-			if !dynamicStartup {
+			rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
+
+			// root snapshot exists skip dynamic start up
+			if cmd.RootSnapshotExists(rootSnapshotPath) {
 				return nil
 			}
 
-			err := cmd.DynamicStartup(nodeConfig.Logger, initANAddress, initANPubkey, uint64(startupEpoch), flow.GetEpochPhase(startupEpochPhase), filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+			startupPhase := flow.GetEpochPhase(dynamicStartupEpochPhase)
+
+			// validate dynamic startup flags
+			err := cmd.ValidateDynamicStartupFlags(dynamicStartupANPubkey, dynamicStartupANAddress, startupPhase, dynamicStartupEpoch)
 			if err != nil {
-				return fmt.Errorf("dynamic startup pre-init failed: %w", err)
+				return err
+			}
+
+			ctx := context.Background()
+			getSnapshotFunc := func() (protocol.Snapshot, error) {
+				return cmd.GetSnapshot(ctx, dynamicStartupANAddress, dynamicStartupANPubkey)
+			}
+
+			snapshot, err := cmd.GetSnapshotAtEpochAndPhase(
+				nodeConfig.Logger,
+				dynamicStartupEpoch,
+				startupPhase,
+				dynamicStartupSleepInterval,
+				getSnapshotFunc,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to get snapshot at start up epoch (%d) and phase (%s): %w", dynamicStartupEpoch, startupPhase.String(), err)
+			}
+
+			nodeBuilder.Logger.Info().Str("snapshot-path", rootSnapshotPath).Msg("writing root snapshot file")
+			err = cmd.WriteRootSnapshotFile(snapshot.(*inmem.Snapshot), rootSnapshotPath)
+			if err != nil {
+				return fmt.Errorf("failed to write root snapshot file: %w", err)
 			}
 
 			return nil
