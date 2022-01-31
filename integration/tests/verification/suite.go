@@ -59,7 +59,7 @@ func (s *Suite) MetricsPort() string {
 // SetupSuite runs a bare minimum Flow network to function correctly with the following roles:
 // - Two collector nodes
 // - Four consensus nodes
-// - One execution node
+// - two execution node
 // - One verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {

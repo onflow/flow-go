@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 
 	"github.com/spf13/pflag"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
@@ -28,8 +30,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -40,9 +40,7 @@ import (
 	"github.com/onflow/flow-go/module/ingress"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -181,7 +179,7 @@ func main() {
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
-			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
+			create := func() mempool.Transactions { return herocache.NewTransactions(uint32(txLimit), node.Logger) }
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
@@ -246,11 +244,6 @@ func main() {
 			// state when the follower detects newly finalized blocks
 			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
-			// initialize the staking & beacon verifiers, signature joiner
-			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
-			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
@@ -259,8 +252,9 @@ func main() {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
+			packer := hotsignature.NewConsensusSigDataPacker(mainConsensusCommittee)
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, packer)
 
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 
@@ -437,7 +431,6 @@ func main() {
 			createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
 				return metrics.NewHotstuffCollector(chainID)
 			}
-			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 
 			opts := []consensus.Option{
 				consensus.WithBlockRateDelay(blockRateDelay),
@@ -455,7 +448,6 @@ func main() {
 			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
-				staking,
 				node.DB,
 				node.State,
 				createMetrics,
@@ -465,7 +457,7 @@ func main() {
 				return nil, err
 			}
 
-			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+			signer := verification.NewStakingSigner(node.Me)
 
 			// construct QC contract client
 			qcContractClients, err := createQCContractClients(node, machineAccountInfo, flowClientConfigs)

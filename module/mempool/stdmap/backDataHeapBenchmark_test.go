@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/heropool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
