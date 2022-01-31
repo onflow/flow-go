@@ -29,15 +29,17 @@ type ReadyDoneAware interface {
 	Done() <-chan struct{}
 }
 
-type NoopReadDoneAware struct{}
+// NoopReadyDoneAware is a ReadyDoneAware implementation whose ready/done channels close
+// immediately
+type NoopReadyDoneAware struct{}
 
-func (n *NoopReadDoneAware) Ready() <-chan struct{} {
+func (n *NoopReadyDoneAware) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	defer close(ready)
 	return ready
 }
 
-func (n *NoopReadDoneAware) Done() <-chan struct{} {
+func (n *NoopReadyDoneAware) Done() <-chan struct{} {
 	done := make(chan struct{})
 	defer close(done)
 	return done

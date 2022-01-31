@@ -9,6 +9,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/common/approvalstate"
+	"github.com/onflow/flow-go/integration/tests/common/blockstate"
+	"github.com/onflow/flow-go/integration/tests/common/receiptstate"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestVerificationTestSuite(t *testing.T) {
@@ -22,17 +26,7 @@ type VerificationTestSuite struct {
 // TestVerificationNodeHappyPath verifies the integration of verification and execution nodes over the
 // happy path of successfully issuing a result approval for the first chunk of the first block of the testnet.
 func (suite *VerificationTestSuite) TestVerificationNodeHappyPath() {
-	// wait for next height finalized (potentially first height), called blockA
-	blockA := suite.BlockState.WaitForHighestFinalizedProgress(suite.T())
-	suite.T().Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.Header.ID())
-
-	// waits for execution receipt for blockA from execution node, called receiptA
-	receiptA := suite.ReceiptState.WaitForReceiptFrom(suite.T(), blockA.Header.ID(), suite.exe1ID)
-	resultID := receiptA.ExecutionResult.ID()
-	suite.T().Logf("receipt for blockA generated: result ID: %x\n", resultID)
-
-	// wait for a result approval from verification node
-	suite.ApprovalState.WaitForResultApproval(suite.T(), suite.verID, resultID, uint64(0))
+	testVerificationNodeHappyPath(suite.T(), suite.exe1ID, suite.verID, suite.BlockState, suite.ReceiptState, suite.ApprovalState)
 }
 
 // TestSealingAndVerificationHappyPath evaluates the health of the happy path of verification and sealing. It
@@ -112,4 +106,24 @@ func (suite *VerificationTestSuite) TestSystemChunkIDsShouldBeDifferent() {
 
 	// requires that system chunk Id of execution results be different
 	require.NotEqual(suite.T(), systemChunkAId, systemChunkBId)
+}
+
+func testVerificationNodeHappyPath(t *testing.T,
+	exeID flow.Identifier,
+	verID flow.Identifier,
+	blocks *blockstate.BlockState,
+	receipts *receiptstate.ReceiptState,
+	approvals *approvalstate.ResultApprovalState) {
+
+	// wait for next height finalized (potentially first height), called blockA
+	blockA := blocks.WaitForHighestFinalizedProgress(t)
+	t.Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.Header.ID())
+
+	// waits for execution receipt for blockA from execution node, called receiptA
+	receiptA := receipts.WaitForReceiptFrom(t, blockA.Header.ID(), exeID)
+	resultID := receiptA.ExecutionResult.ID()
+	t.Logf("receipt for blockA generated: result ID: %x\n", resultID)
+
+	// wait for a result approval from verification node
+	approvals.WaitForResultApproval(t, verID, resultID, uint64(0))
 }

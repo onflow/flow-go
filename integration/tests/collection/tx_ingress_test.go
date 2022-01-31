@@ -29,7 +29,7 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	// pick a collector to test against
 	col1 := suite.Collector(0, 0)
 
-	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
 	require.Nil(t, err)
 
 	t.Run("missing reference block id", func(t *testing.T) {
@@ -93,7 +93,7 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	// pick a collector to test against
 	col1 := suite.Collector(0, 0)
 
-	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
 	require.Nil(t, err)
 
 	tx := suite.NextTransaction()
@@ -105,9 +105,12 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	err = client.SendTransaction(ctx, *tx)
 	cancel()
 	assert.Nil(t, err)
+	t.Log("sent transaction: ", tx.ID())
 
 	// wait for the transaction to be included in a collection
 	suite.AwaitTransactionsIncluded(convert.IDFromSDK(tx.ID()))
+
+	t.Log("stopping containers")
 	suite.net.StopContainers()
 
 	state := suite.ClusterStateFor(col1.Config.NodeID)
@@ -118,6 +121,8 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 		ExpectContainsTx(convert.IDFromSDK(tx.ID())).
 		ExpectTxCount(1).
 		Assert(t)
+
+	t.Logf("finish testing single cluster")
 }
 
 // Test sending a single valid transaction to the responsible cluster in a
@@ -145,7 +150,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	targetNode := suite.Collector(0, 0)
 
 	// get a client pointing to the cluster member
-	client, err := sdkclient.New(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
 	require.Nil(t, err)
 
 	tx := suite.TxForCluster(targetCluster)
@@ -220,7 +225,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
 	otherNode := suite.Collector(1, 0)
 
 	// create clients pointing to each other node
-	client, err := sdkclient.New(otherNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(otherNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure()) //nolint:staticcheck
 	require.Nil(t, err)
 
 	// create a transaction that will be routed to the target cluster

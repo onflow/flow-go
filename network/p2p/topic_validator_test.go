@@ -129,5 +129,5 @@ func TestTopicValidator(t *testing.T) {
 		wg.Done()
 	}()
 
-	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 }

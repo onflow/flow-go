@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	mockstate "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -38,8 +39,9 @@ const RequiredApprovalsForSealConstructionTestingValue = 1
 type ApprovalProcessingCoreTestSuite struct {
 	approvals.BaseAssignmentCollectorTestSuite
 
-	sealsDB *storage.Seals
-	core    *Core
+	sealsDB    *storage.Seals
+	rootHeader *flow.Header
+	core       *Core
 }
 
 func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {
@@ -51,7 +53,14 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 
 	s.sealsDB = &storage.Seals{}
 
+	s.rootHeader = unittest.GenesisFixture().Header
+	params := new(mockstate.Params)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Maybe()
+	s.State.On("Params").Return(params)
+	params.On("Root").Return(
+		func() *flow.Header { return s.rootHeader },
+		func() error { return nil },
+	)
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -63,7 +72,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigVerifier, s.SealsPL, s.Conduit, options)
+	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options)
 	require.NoError(s.T(), err)
 }
 
@@ -214,7 +223,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCl
 // execution result and after that we discovered execution result. In this scenario we should be able
 // to create a seal right after discovering execution result since all approvals should be cached.(if cache capacity is big enough)
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBeforeResult() {
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
@@ -239,7 +248,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBefor
 //// and after that we started receiving approvals. In this scenario we should be able to create a seal right
 //// after processing last needed approval to meet `RequiredApprovalsForSealConstruction` threshold.
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfterResult() {
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	s.SealsPL.On("Add", mock.Anything).Return(true, nil).Once()
 
@@ -264,7 +273,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfter
 // is correctly handled in case of sentinel error
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInvalidApproval() {
 	// fail signature verification for first approval
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
 
 	// generate approvals for first chunk
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
@@ -286,7 +295,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInva
 // is correctly handled in case of exception
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerificationException() {
 	// fail signature verification with exception
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, fmt.Errorf("exception")).Once()
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, fmt.Errorf("exception")).Once()
 
 	// generate approvals for first chunk
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
@@ -386,7 +395,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	require.NoError(s.T(), err)
 
 	// verify will be called twice for every approval in first fork
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(len(forkResults[0]) * 2)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(len(forkResults[0]) * 2)
 
 	// try submitting approvals for each result
 	for _, results := range forkResults {
@@ -644,18 +653,29 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	expectedResults := []*flow.IncorporatedResult{s.IncorporatedResult}
 	blockChildren := make([]flow.Identifier, 0)
 
+	rootSnapshot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
+	s.Snapshots[s.rootHeader.ID()] = rootSnapshot
+	rootSnapshot.On("SealingSegment").Return(
+		&flow.SealingSegment{
+			Blocks: []*flow.Block{{
+				Header:  s.rootHeader,
+				Payload: &flow.Payload{},
+			}},
+		}, nil)
+
 	s.sealsDB.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
 		unittest.Seal.Fixture(
 			unittest.Seal.WithBlock(&s.ParentBlock)), nil)
 
-	payload := unittest.PayloadFixture(
+	// the incorporated block contains the result for the sealing candidate block
+	incorporatedBlockPayload := unittest.PayloadFixture(
 		unittest.WithReceipts(
 			unittest.ExecutionReceiptFixture(
 				unittest.WithResult(s.IncorporatedResult.Result))))
+	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
+
 	emptyPayload := flow.EmptyPayload()
 	payloads.On("ByBlockID", s.Block.ID()).Return(&emptyPayload, nil)
-	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
-		&payload, nil)
 
 	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
 
@@ -707,7 +727,87 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigVerifier, s.SealsPL, s.Conduit, s.core.config)
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
+	require.NoError(s.T(), err)
+
+	err = core.RepopulateAssignmentCollectorTree(payloads)
+	require.NoError(s.T(), err)
+
+	// check collector tree, after repopulating we should have all collectors for execution results that we have
+	// traversed and they have to be processable.
+	for _, incorporatedResult := range expectedResults {
+		collector, err := core.collectorTree.GetOrCreateCollector(incorporatedResult.Result)
+		require.NoError(s.T(), err)
+		require.False(s.T(), collector.Created)
+		require.Equal(s.T(), approvals.VerifyingApprovals, collector.Collector.ProcessingStatus())
+	}
+}
+
+// TestRepopulateAssignmentCollectorTree_RootSealingSegment tests that the sealing
+// engine will be initialized correctly when bootstrapping with a root sealing
+// segment with multiple blocks, as is the case when joining the network at an epoch
+// boundary.
+//
+// In particular, the assignment collector tree population step should ignore
+// unknown block references below the root height.
+//
+func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_RootSealingSegment() {
+	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
+	assigner := &module.ChunkAssigner{}
+	payloads := &storage.Payloads{}
+
+	// setup mocks
+	s.rootHeader = &s.IncorporatedBlock
+	expectedResults := []*flow.IncorporatedResult{s.IncorporatedResult}
+
+	s.sealsDB.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
+		unittest.Seal.Fixture(
+			unittest.Seal.WithBlock(&s.ParentBlock)), nil)
+
+	// the incorporated block contains the result for the sealing candidate block
+	incorporatedBlockPayload := unittest.PayloadFixture(
+		unittest.WithReceipts(
+			unittest.ExecutionReceiptFixture(
+				unittest.WithResult(s.IncorporatedResult.Result))))
+	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(&incorporatedBlockPayload, nil)
+
+	// the sealing candidate block (S) is the lowest block in the segment under consideration here
+	// initially, this block would represent the lowest block in a node's root sealing segment,
+	// meaning that all earlier blocks are not known. In this case we should ignore results and seals
+	// referencing unknown blocks (tested here by adding such a result+seal to the candidate payload).
+	candidatePayload := unittest.PayloadFixture(
+		unittest.WithReceipts(unittest.ExecutionReceiptFixture()), // receipt referencing pre-root block
+		unittest.WithSeals(unittest.Seal.Fixture()),               // seal referencing pre-root block
+	)
+	payloads.On("ByBlockID", s.Block.ID()).Return(&candidatePayload, nil)
+
+	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
+
+	assigner.On("Assign", s.IncorporatedResult.Result, mock.Anything).Return(s.ChunksAssignment, nil)
+
+	finalSnapShot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
+	s.Snapshots[s.rootHeader.ID()] = finalSnapShot
+	// root snapshot has no pending children
+	finalSnapShot.On("ValidDescendants").Return(nil, nil)
+	// set up sealing segment
+	finalSnapShot.On("SealingSegment").Return(
+		&flow.SealingSegment{
+			Blocks: []*flow.Block{{
+				Header:  &s.Block,
+				Payload: &candidatePayload,
+			}, {
+				Header:  &s.ParentBlock,
+				Payload: &flow.Payload{},
+			}, {
+				Header:  &s.IncorporatedBlock,
+				Payload: &incorporatedBlockPayload,
+			}},
+		}, nil)
+	s.State.On("Final").Return(finalSnapShot)
+
+	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)
