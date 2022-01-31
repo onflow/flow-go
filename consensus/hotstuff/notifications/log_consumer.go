@@ -3,6 +3,7 @@ package notifications
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/logging"
@@ -13,6 +14,8 @@ import (
 type LogConsumer struct {
 	log zerolog.Logger
 }
+
+var _ hotstuff.Consumer = (*LogConsumer)(nil)
 
 func NewLogConsumer(log zerolog.Logger) *LogConsumer {
 	lc := &LogConsumer{
@@ -48,7 +51,7 @@ func (lc *LogConsumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 	lc.log.Debug().
 		Uint64("cur_view", currentView).
 		Uint64("vote_view", vote.View).
-		Hex("vote_id", vote.BlockID[:]).
+		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
 		Msg("processing vote")
 }
@@ -86,8 +89,9 @@ func (lc *LogConsumer) OnVoting(vote *model.Vote) {
 		Msg("voting for block")
 }
 
-func (lc *LogConsumer) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
+func (lc *LogConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
+		Uint64("cur_view", curView).
 		Uint64("qc_view", qc.View).
 		Hex("qc_id", qc.BlockID[:]).
 		Msg("QC constructed from votes")
@@ -127,7 +131,7 @@ func (lc *LogConsumer) OnForkChoiceGenerated(view uint64, qc *flow.QuorumCertifi
 func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote) {
 	lc.log.Warn().
 		Uint64("vote_view", vote.View).
-		Hex("vote_id", vote.BlockID[:]).
+		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("alt_id", alt.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
 		Msg("double vote detected")
@@ -136,9 +140,18 @@ func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote)
 func (lc *LogConsumer) OnInvalidVoteDetected(vote *model.Vote) {
 	lc.log.Warn().
 		Uint64("vote_view", vote.View).
-		Hex("vote_id", vote.BlockID[:]).
+		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
 		Msg("invalid vote detected")
+}
+
+func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
+	lc.log.Warn().
+		Uint64("vote_view", vote.View).
+		Hex("voted_block_id", vote.BlockID[:]).
+		Hex("voter_id", vote.SignerID[:]).
+		Hex("proposer_id", proposal.Block.ProposerID[:]).
+		Msg("vote for invalid proposal detected")
 }
 
 func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {

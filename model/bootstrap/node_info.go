@@ -200,6 +200,8 @@ func NewPrivateNodeInfo(
 		Stake:          stake,
 		networkPrivKey: networkKey,
 		stakingPrivKey: stakingKey,
+		networkPubKey:  networkKey.PublicKey(),
+		stakingPubKey:  stakingKey.PublicKey(),
 	}
 }
 

@@ -40,13 +40,40 @@ type short struct {
 
 var _ node = &short{}
 
-func (n *short) Hash() []byte {
-	c := serializedPathSegmentLength(n.count)
+func computeShortHash(count int, path []byte, childHash []byte) []byte {
+	c := serializedPathSegmentLength(count)
 	h, _ := blake2b.New256(shortNodeTag) // blake2b.New256(..) never errors for given MAC (verified in tests)
 	_, _ = h.Write(c[:])                 // blake2b.Write(..) never errors for _any_ input
-	_, _ = h.Write(n.path)               // blake2b.Write(..) never errors for _any_ input
-	_, _ = h.Write(n.child.Hash())       // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(path)                 // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(childHash)            // blake2b.Write(..) never errors for _any_ input
 	return h.Sum(nil)
+}
+
+func (n *short) Hash() []byte {
+	return computeShortHash(n.count, n.path, n.child.Hash())
+}
+
+// CountAsUint16Encoding encodes the short count as uint16,
+// it uses similar techniques to serializedPathSegmentLength,
+// to effiently utilize zero for encoding 65536.
+// (see serializedPathSegmentLength for more details)
+func (n *short) CountAsUint16Encoding() uint16 {
+	if n.count > 65536 {
+		panic("count does not fit a uint16")
+	}
+	if n.count == 65536 {
+		return 0
+	}
+	return uint16(n.count)
+}
+
+// CountUint16EncodingToInt is the reverse method to CountAsUint16Encoding
+// see `CountAsUint16Encoding` for more details.
+func CountUint16EncodingToInt(inp uint16) int {
+	if inp == 0 {
+		return 65536
+	}
+	return int(inp)
 }
 
 // serializedPathSegmentLength serializes the bitCount into two bytes using the following optimization:
@@ -72,11 +99,15 @@ type full struct {
 
 var _ node = &full{}
 
-func (n *full) Hash() []byte {
+func computeFullHash(leftChildHash, rightChildHash []byte) []byte {
 	h, _ := blake2b.New256(fullNodeTag) // blake2b.New256(..) never errors for given MAC (verified in tests)
-	_, _ = h.Write(n.left.Hash())       // blake2b.Write(..) never errors for _any_ input
-	_, _ = h.Write(n.right.Hash())      // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(leftChildHash)       // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(rightChildHash)      // blake2b.Write(..) never errors for _any_ input
 	return h.Sum(nil)
+}
+
+func (n *full) Hash() []byte {
+	return computeFullHash(n.left.Hash(), n.right.Hash())
 }
 
 /* ******************************** Leaf Node ******************************* */
@@ -89,10 +120,14 @@ type leaf struct {
 
 var _ node = &leaf{}
 
-func (n *leaf) Hash() []byte {
+func computeLeafHash(value []byte) []byte {
 	h, _ := blake2b.New256(leafNodeTag) // blake2b.New256(..) never errors for given MAC (verified in tests)
-	_, _ = h.Write(n.val)               // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(value)               // blake2b.Write(..) never errors for _any_ input
 	return h.Sum(nil)
+}
+
+func (n *leaf) Hash() []byte {
+	return computeLeafHash(n.val)
 }
 
 /* ******************************** Dummy Node ******************************* */
