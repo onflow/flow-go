@@ -43,6 +43,62 @@ func (suite *Suite) SetupTest() {
 	suite.blocks = new(storage.Blocks)
 }
 
+// TestExecuteScriptAtBlockID tests the ExecuteScriptAtBlockID API call
+func (suite *Suite) TestExecuteScriptAtBlockID() {
+	// setup handler
+	mockEngine := new(ingestion.IngestRPC)
+	handler := &handler{
+		engine: mockEngine,
+		chain:  flow.Mainnet,
+	}
+
+	// setup dummy request/response
+	ctx := context.Background()
+	rawId := []byte("dummy ID")
+	mockIdentifier, err := convert.BlockID(rawId)
+	suite.Require().NoError(err)
+	script := []byte("dummy script")
+	arguments := [][]byte(nil)
+	executionReq := execution.ExecuteScriptAtBlockIDRequest{
+		BlockId: rawId[:],
+		Script:  script,
+	}
+	scriptExecValue := []byte{9, 10, 11}
+	executionResp := execution.ExecuteScriptAtBlockIDResponse{
+		Value: scriptExecValue,
+	}
+
+	suite.Run("happy path with successful script execution", func() {
+		mockEngine.On("ExecuteScriptAtBlockID", ctx, script, arguments, mockIdentifier).
+			Return(scriptExecValue, nil).Once()
+		response, err := handler.ExecuteScriptAtBlockID(ctx, &executionReq)
+		suite.Require().NoError(err)
+		suite.Require().Equal(&executionResp, response)
+		mockEngine.AssertExpectations(suite.T())
+	})
+
+	suite.Run("valid request with script execution failure", func() {
+		mockEngine.On("ExecuteScriptAtBlockID", ctx, script, arguments, mockIdentifier).
+			Return(nil, status.Error(codes.InvalidArgument, "")).Once()
+		_, err := handler.ExecuteScriptAtBlockID(ctx, &executionReq)
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+	})
+
+	suite.Run("invalid request with nil blockID", func() {
+		executionReqWithNilBlock := execution.ExecuteScriptAtBlockIDRequest{
+			BlockId: nil,
+			Script:  script,
+		}
+		_, err := handler.ExecuteScriptAtBlockID(ctx, &executionReqWithNilBlock)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+	})
+
+}
+
 // TestGetEventsForBlockIDs tests the GetEventsForBlockIDs API call
 func (suite *Suite) TestGetEventsForBlockIDs() {
 
