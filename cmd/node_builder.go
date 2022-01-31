@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -68,6 +69,11 @@ type NodeBuilder interface {
 	// In both cases, the object is started according to its interface when the node is run,
 	// and the node will wait for the component to exit gracefully.
 	Component(name string, f ReadyDoneFactory) NodeBuilder
+
+	// ShutdownFunc adds a callback function that is called after all components have exited.
+	// All shutdown functions are called regardless of errors returned by previous callbacks. Any
+	// errors returned are captured and passed to the caller.
+	ShutdownFunc(fn func() error) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
@@ -130,6 +136,8 @@ type BaseConfig struct {
 	db                              *badger.DB
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize int
+	topologyProtocolName            string
+	topologyEdgeProbability         float64
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -200,5 +208,7 @@ func DefaultBaseConfig() *BaseConfig {
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
+		topologyProtocolName:            string(topology.TopicBased),
+		topologyEdgeProbability:         topology.MaximumEdgeProbability,
 	}
 }

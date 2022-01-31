@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -89,6 +90,7 @@ type FlowNodeBuilder struct {
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
 	components               []namedComponentFunc
+	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
 	extraFlagCheck           func() error
@@ -132,6 +134,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
+	fnb.flags.StringVar(&fnb.BaseConfig.topologyProtocolName, "topology", defaultConfig.topologyProtocolName, "networking overlay topology")
+	fnb.flags.Float64Var(&fnb.BaseConfig.topologyEdgeProbability, "topology-edge-probability", defaultConfig.topologyEdgeProbability,
+		"pairwise edge probability between nodes in topology")
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
@@ -221,11 +226,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
 
-		top, err := topology.NewTopicBasedTopology(
-			fnb.NodeID,
-			fnb.Logger,
-			fnb.State,
-		)
+		topologyFactory, err := topology.Factory(topology.Name(fnb.topologyProtocolName))
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.topologyProtocolName, err)
+		}
+		top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.topologyEdgeProbability)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
@@ -476,6 +481,13 @@ func (fnb *FlowNodeBuilder) initDB() {
 	publicDB, err := bstorage.InitPublic(opts)
 	fnb.MustNot(err).Msg("could not open public db")
 	fnb.DB = publicDB
+
+	fnb.ShutdownFunc(func() error {
+		if err := fnb.DB.Close(); err != nil {
+			return fmt.Errorf("error closing protocol database: %w", err)
+		}
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initSecretsDB() {
@@ -510,6 +522,13 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 	secretsDB, err := bstorage.InitSecret(opts)
 	fnb.MustNot(err).Msg("could not open secrets db")
 	fnb.SecretsDB = secretsDB
+
+	fnb.ShutdownFunc(func() error {
+		if err := fnb.SecretsDB.Close(); err != nil {
+			return fmt.Errorf("error closing secrets database: %w", err)
+		}
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -855,6 +874,12 @@ func (fnb *FlowNodeBuilder) Module(name string, f BuilderFunc) NodeBuilder {
 	return fnb
 }
 
+// ShutdownFunc adds a callback function that is called after all components have exited.
+func (fnb *FlowNodeBuilder) ShutdownFunc(fn func() error) NodeBuilder {
+	fnb.postShutdownFns = append(fnb.postShutdownFns, fn)
+	return fnb
+}
+
 func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder {
 	fnb.adminCommands[command] = f
 	return fnb
@@ -1080,11 +1105,16 @@ func (fnb *FlowNodeBuilder) onStart() error {
 // postShutdown is called by the node before exiting
 // put any cleanup code here that should be run after all components have stopped
 func (fnb *FlowNodeBuilder) postShutdown() error {
-	err := fnb.closeDatabase()
-	if err != nil {
-		return fmt.Errorf("could not close database: %w", err)
+	var errs *multierror.Error
+
+	for _, fn := range fnb.postShutdownFns {
+		err := fn()
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
-	return nil
+	fnb.Logger.Info().Msg("database has been closed")
+	return errs.ErrorOrNil()
 }
 
 // handleFatal handles irrecoverable errors by logging them and exiting the process.
@@ -1098,10 +1128,6 @@ func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {
 
 func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
 	return f(fnb.NodeConfig)
-}
-
-func (fnb *FlowNodeBuilder) closeDatabase() error {
-	return fnb.DB.Close()
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
