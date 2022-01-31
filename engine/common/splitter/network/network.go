@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ipfs/go-datastore"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
 	splitterEngine "github.com/onflow/flow-go/engine/common/splitter"
-	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -19,32 +23,56 @@ import (
 // splitter engine. As a result, multiple engines can register with the splitter network on
 // the same channel and will each receive all events on that channel.
 type Network struct {
-	network.Network
+	net       network.Network
 	mu        sync.RWMutex
 	log       zerolog.Logger
 	splitters map[network.Channel]*splitterEngine.Engine // stores splitters for each channel
 	conduits  map[network.Channel]network.Conduit        // stores conduits for all registered channels
-	lm        *lifecycle.LifecycleManager
+	*component.ComponentManager
 }
+
+var _ network.Network = (*Network)(nil)
 
 // NewNetwork returns a new splitter network.
 func NewNetwork(
 	net network.Network,
 	log zerolog.Logger,
 ) *Network {
-	return &Network{
-		Network:   net,
+	n := &Network{
+		net:       net,
 		splitters: make(map[network.Channel]*splitterEngine.Engine),
 		conduits:  make(map[network.Channel]network.Conduit),
 		log:       log,
-		lm:        lifecycle.NewLifecycleManager(),
 	}
+
+	n.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			err := util.WaitClosed(ctx, n.net.Ready())
+
+			if err != nil {
+				return
+			}
+
+			ready()
+
+			<-ctx.Done()
+		}).Build()
+
+	return n
+}
+
+func (n *Network) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
+	return n.net.RegisterBlobService(channel, store, opts...)
+}
+
+func (n *Network) RegisterPingService(pid protocol.ID, provider network.PingInfoProvider) (network.PingService, error) {
+	return n.net.RegisterPingService(pid, provider)
 }
 
 // Register will subscribe the given engine with the spitter on the given channel, and all registered
 // engines will be notified with incoming messages on the channel.
 // The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -72,7 +100,7 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 
 	if !channelRegistered {
 		var err error
-		conduit, err = n.Network.Register(channel, splitter)
+		conduit, err = n.net.Register(channel, splitter)
 
 		if err != nil {
 			// undo previous steps
@@ -86,23 +114,4 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 	}
 
 	return conduit, nil
-}
-
-// Ready returns a ready channel that is closed once the network has fully
-// started. For the splitter network, this is true once the wrapped network
-// has started.
-func (n *Network) Ready() <-chan struct{} {
-	n.lm.OnStart(func() {
-		<-n.Network.Ready()
-	})
-	return n.lm.Started()
-}
-
-// Done returns a done channel that is closed once the network has fully stopped.
-// For the splitter network, this is true once the wrapped network has stopped.
-func (n *Network) Done() <-chan struct{} {
-	n.lm.OnStop(func() {
-		<-n.Network.Done()
-	})
-	return n.lm.Stopped()
 }
