@@ -501,15 +501,6 @@ func (l *missingBlocksList) add(id flow.Identifier) {
 	l.missingBlocks[id] = struct{}{}
 }
 
-// has returns true if the provided ID exists in the list
-func (l *missingBlocksList) has(id flow.Identifier) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	_, has := l.missingBlocks[id]
-	return has
-}
-
 // delete attempts to remove the provided ID from the list of missing blocks and returns true if
 // the ID was removed
 func (l *missingBlocksList) delete(id flow.Identifier) bool {

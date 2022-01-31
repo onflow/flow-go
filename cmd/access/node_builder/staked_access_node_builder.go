@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -123,10 +124,6 @@ func (builder *StakedAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
-
-	var datastore *badger.Datastore
-	var blobservice network.BlobService
-	var eds state_synchronization.ExecutionDataService
 
 	builder.
 		BuildConsensusFollower().
@@ -266,53 +263,71 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return builder.RequestEng, nil
-		}).
-		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			err := os.MkdirAll(builder.executionDataDir, 0700)
-			if err != nil {
-				return nil, err
-			}
-
-			// TODO: we need to close this after the execution data services are stopped. it should probably be run as part of the node's postShutdown handler
-			datastore, err := badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
-			if err != nil {
-				return nil, err
-			}
-
-			blobservice, err := node.Network.RegisterBlobService(engine.ExecutionDataService, datastore)
-			if err != nil {
-				return nil, err
-			}
-
-			eds := state_synchronization.NewExecutionDataService(
-				new(cbor.Codec),
-				compressor.NewLz4Compressor(),
-				blobservice,
-				metrics.NewExecutionDataServiceCollector(),
-				builder.Logger,
-			)
-
-			return eds, nil
-		}).
-		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			edr, err := state_synchronization.NewExecutionDataRequester(
-				builder.Logger,
-				metrics.NewNoopCollector(),
-				builder.FinalizationDistributor,
-				datastore,
-				blobservice,
-				eds,
-				builder.RootBlock,
-				builder.Storage.Blocks,
-				builder.Storage.Results,
-			)
-
-			if err != nil {
-				return nil, fmt.Errorf("could not create execution data requester: %w", err)
-			}
-
-			return edr, nil
 		})
+
+	if builder.executionDataSyncEnabled {
+		var dstore datastore.Batching
+		var blobservice network.BlobService
+
+		builder.
+			Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				err := os.MkdirAll(builder.executionDataDir, 0700)
+				if err != nil {
+					return nil, err
+				}
+
+				// TODO: we need to close this after the execution data services are stopped. it should probably be run as part of the node's postShutdown handler
+				dstore, err := badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
+				if err != nil {
+					return nil, err
+				}
+
+				builder.ShutdownFunc(func() error {
+					if err := dstore.Close(); err != nil {
+						return fmt.Errorf("could not close execution data datastore: %w", err)
+					}
+					return nil
+				})
+
+				blobservice, err := node.Network.RegisterBlobService(engine.ExecutionDataService, dstore)
+				if err != nil {
+					return nil, err
+				}
+
+				eds := state_synchronization.NewExecutionDataService(
+					new(cbor.Codec),
+					compressor.NewLz4Compressor(),
+					blobservice,
+					metrics.NewExecutionDataServiceCollector(),
+					builder.Logger,
+				)
+
+				builder.ExecutionDataService = eds
+
+				return builder.ExecutionDataService, nil
+			}).
+			Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				edr, err := state_synchronization.NewExecutionDataRequester(
+					builder.Logger,
+					metrics.NewNoopCollector(),
+					builder.FinalizationDistributor,
+					dstore,
+					blobservice,
+					builder.ExecutionDataService,
+					builder.RootBlock,
+					builder.Storage.Blocks,
+					builder.Storage.Results,
+				)
+
+				if err != nil {
+					return nil, fmt.Errorf("could not create execution data requester: %w", err)
+				}
+
+				builder.ExecutionDataRequester = edr
+
+				return builder.ExecutionDataRequester, nil
+			})
+	}
 
 	if builder.supportsUnstakedFollower {
 		builder.Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
