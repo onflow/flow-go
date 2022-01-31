@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/onflow/flow-go/cmd"
 	nodebuilder "github.com/onflow/flow-go/cmd/access/node_builder"
 )
 
@@ -23,6 +24,8 @@ func main() {
 	if err := nodeBuilder.Initialize(); err != nil {
 		anb.Logger.Fatal().Err(err).Send()
 	}
+
+	nodeBuilder.PreInit(cmd.DynamicStartPreInit)
 
 	node, err := nodeBuilder.Build()
 	if err != nil {

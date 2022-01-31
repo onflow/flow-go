@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,8 +10,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-
-	"github.com/onflow/flow-go/state/protocol/inmem"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -120,13 +117,6 @@ func main() {
 		finalizedHeader         *synceng.FinalizedHeaderCache
 		dkgState                *bstorage.DKGState
 		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
-
-		// dynamic start up
-		dynamicStartupANAddress     string
-		dynamicStartupANPubkey      string
-		dynamicStartupEpochPhase    string
-		dynamicStartupEpoch         int
-		dynamicStartupSleepInterval time.Duration
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -158,14 +148,6 @@ func main() {
 		flags.DurationVar(&dkgControllerConfig.BaseHandleFirstBroadcastDelay, "dkg-controller-base-handle-first-broadcast-delay", dkgmodule.DefaultBaseHandleFirstBroadcastDelay, "used to define the range for jitter prior to DKG handling the first broadcast messages (eg. 50ms) - the base value is scaled quadratically with the # of DKG participants")
 		flags.DurationVar(&dkgControllerConfig.HandleSubsequentBroadcastDelay, "dkg-controller-handle-subsequent-broadcast-delay", dkgmodule.DefaultHandleSubsequentBroadcastDelay, "used to define the constant delay introduced prior to DKG handling subsequent broadcast messages (eg. 2s)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
-
-		// dynamic node startup flags
-		flags.StringVar(&dynamicStartupANPubkey, "dynamic-startup-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-		flags.StringVar(&dynamicStartupANAddress, "dynamic-startup-access-address", "", "the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-		flags.StringVar(&dynamicStartupEpochPhase, "dynamic-startup-startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
-		flags.IntVar(&dynamicStartupEpoch, "dynamic-startup-startup-epoch", 0, "the epoch the node will wait for before initializing modules when using dynamic-startup")
-		flags.DurationVar(&dynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in milliseconds in which the node will check if it can start")
-
 	}).ValidateFlags(func() error {
 		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
 		if startupTimeString != cmd.NotSet {
@@ -184,46 +166,7 @@ func main() {
 	}
 
 	nodeBuilder.
-		PreInit(func(nodeConfig *cmd.NodeConfig) error {
-			rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
-
-			// root snapshot exists skip dynamic start up
-			if cmd.RootSnapshotExists(rootSnapshotPath) {
-				return nil
-			}
-
-			startupPhase := flow.GetEpochPhase(dynamicStartupEpochPhase)
-
-			// validate dynamic startup flags
-			err := cmd.ValidateDynamicStartupFlags(dynamicStartupANPubkey, dynamicStartupANAddress, startupPhase, dynamicStartupEpoch)
-			if err != nil {
-				return err
-			}
-
-			ctx := context.Background()
-			getSnapshotFunc := func() (protocol.Snapshot, error) {
-				return cmd.GetSnapshot(ctx, dynamicStartupANAddress, dynamicStartupANPubkey)
-			}
-
-			snapshot, err := cmd.GetSnapshotAtEpochAndPhase(
-				nodeConfig.Logger,
-				dynamicStartupEpoch,
-				startupPhase,
-				dynamicStartupSleepInterval,
-				getSnapshotFunc,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to get snapshot at start up epoch (%d) and phase (%s): %w", dynamicStartupEpoch, startupPhase.String(), err)
-			}
-
-			nodeBuilder.Logger.Info().Str("snapshot-path", rootSnapshotPath).Msg("writing root snapshot file")
-			err = cmd.WriteRootSnapshotFile(snapshot.(*inmem.Snapshot), rootSnapshotPath)
-			if err != nil {
-				return fmt.Errorf("failed to write root snapshot file: %w", err)
-			}
-
-			return nil
-		}).
+		PreInit(cmd.DynamicStartPreInit).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil

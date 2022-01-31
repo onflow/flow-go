@@ -110,6 +110,11 @@ type BaseConfig struct {
 	AdminClientCAs                  string
 	BindAddr                        string
 	NodeRole                        string
+	DynamicStartupANAddress         string
+	DynamicStartupANPubkey          string
+	DynamicStartupEpochPhase        string
+	DynamicStartupEpoch             uint64
+	DynamicStartupSleepInterval     time.Duration
 	datadir                         string
 	secretsdir                      string
 	secretsDBEnabled                bool

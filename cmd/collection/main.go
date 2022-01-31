@@ -1,14 +1,10 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
-
-	"github.com/onflow/flow-go/state/protocol/inmem"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -95,13 +91,6 @@ func main() {
 		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
-
-		// dynamic start up
-		dynamicStartupANAddress     string
-		dynamicStartupANPubkey      string
-		dynamicStartupEpochPhase    string
-		dynamicStartupEpoch         int
-		dynamicStartupSleepInterval time.Duration
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
@@ -159,13 +148,6 @@ func main() {
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
 
-		// dynamic node startup flags
-		flags.StringVar(&dynamicStartupANPubkey, "dynamic-startup-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-		flags.StringVar(&dynamicStartupANAddress, "dynamic-startup-access-address", "", "the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-		flags.StringVar(&dynamicStartupEpochPhase, "dynamic-startup-startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
-		flags.IntVar(&dynamicStartupEpoch, "dynamic-startup-startup-epoch", 0, "the epoch the node will wait for before initializing modules when using dynamic-startup")
-		flags.DurationVar(&dynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in milliseconds in which the node will check if it can start")
-
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -182,46 +164,7 @@ func main() {
 	}
 
 	nodeBuilder.
-		PreInit(func(nodeConfig *cmd.NodeConfig) error {
-			rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
-
-			// root snapshot exists skip dynamic start up
-			if cmd.RootSnapshotExists(rootSnapshotPath) {
-				return nil
-			}
-
-			startupPhase := flow.GetEpochPhase(dynamicStartupEpochPhase)
-
-			// validate dynamic startup flags
-			err := cmd.ValidateDynamicStartupFlags(dynamicStartupANPubkey, dynamicStartupANAddress, startupPhase, dynamicStartupEpoch)
-			if err != nil {
-				return err
-			}
-
-			ctx := context.Background()
-			getSnapshotFunc := func() (protocol.Snapshot, error) {
-				return cmd.GetSnapshot(ctx, dynamicStartupANAddress, dynamicStartupANPubkey)
-			}
-
-			snapshot, err := cmd.GetSnapshotAtEpochAndPhase(
-				nodeConfig.Logger,
-				dynamicStartupEpoch,
-				startupPhase,
-				dynamicStartupSleepInterval,
-				getSnapshotFunc,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to get snapshot at start up epoch (%d) and phase (%s): %w", dynamicStartupEpoch, startupPhase.String(), err)
-			}
-
-			nodeBuilder.Logger.Info().Str("snapshot-path", rootSnapshotPath).Msg("writing root snapshot file")
-			err = cmd.WriteRootSnapshotFile(snapshot.(*inmem.Snapshot), rootSnapshotPath)
-			if err != nil {
-				return fmt.Errorf("failed to write root snapshot file: %w", err)
-			}
-
-			return nil
-		}).
+		PreInit(cmd.DynamicStartPreInit).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
