@@ -190,7 +190,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 
 	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
 
-	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
+	resolver := dns.NewResolver(dns.DefaultCacheSize, builder.Logger, builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
 	var pis []peer.AddrInfo
 	for _, b := range builder.bootstrapIdentities {
