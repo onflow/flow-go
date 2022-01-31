@@ -186,7 +186,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 
 func (fnb *FlowNodeBuilder) EnqueueResolver() {
 	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		resolver := dns.NewResolver(fnb.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+		resolver := dns.NewResolver(dns.DefaultCacheSize, node.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
 		fnb.Resolver = resolver
 		return resolver, nil
 	})
@@ -1125,7 +1125,7 @@ func (fnb *FlowNodeBuilder) postShutdown() error {
 			errs = multierror.Append(errs, err)
 		}
 	}
-
+	fnb.Logger.Info().Msg("database has been closed")
 	return errs.ErrorOrNil()
 }
 

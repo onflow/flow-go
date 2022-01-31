@@ -29,7 +29,7 @@ type Middleware interface {
 	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
 	SetOverlay(Overlay)
 
-	// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
+	// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 	// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 	// as the router.
 	//

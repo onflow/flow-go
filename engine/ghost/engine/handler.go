@@ -66,9 +66,20 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 		Msg("sending message")
 
 	// Submit the message over libp2p
-	err = conduit.Publish(event, flowIDs...)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to submit message: %v", err)
+	// TODO: there is an issue in the Publish method for the ghost node,
+	// sometimes, it fails to deliver the message to the target without returning any error.
+	// This becomes one of the big factors contributing to the tests flakeiness.
+	// For now, we use Unicast here temporarily to pass around this problem.
+	// Should enable the next line again once Publish method has been fixed.
+	//
+	// err = conduit.Publish(event, flowIDs...)
+	//
+
+	for _, flowID := range flowIDs {
+		err = conduit.Unicast(event, flowID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to submit message: %v", err)
+		}
 	}
 
 	return new(empty.Empty), nil
