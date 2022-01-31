@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 
 	"github.com/dapperlabs/testingdock"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/onflow/cadence"
@@ -172,7 +173,37 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	// makes it easier to see logs for a specific test case
 	net.t.Logf("%v starting flow network %v with docker containers for test case [%v]",
 		time.Now().UTC(), net.config.Name, net.t.Name())
+
+	// print all existing containers before starting our containers, Useful to debug the issue
+	// that the tests fail due to "port is already allocated"
+
+	cli, err := dockerclient.NewClientWithOpts(dockerclient.FromEnv, dockerclient.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	t := net.t
+	t.Logf("%v (%v) before starting flow network, found %v docker container", time.Now().UTC(), t.Name(), len(containers))
+
+	for _, container := range containers {
+		t.Logf("%v (%v) before starting flow network, found docker container: %v %v", time.Now().UTC(), t.Name(), container.Names, container.Ports)
+	}
+
 	net.suite.Start(ctx)
+
+	containers, err = cli.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		panic(err)
+	}
+	t.Logf("%v (%v after starting flow network, found %v docker container", time.Now().UTC(), t.Name(), len(containers))
+	for _, container := range containers {
+		t.Logf("%v (%v) after starting flow network, found docker container: %v %v", time.Now().UTC(), t.Name(), container.Names, container.Ports)
+	}
 }
 
 // Remove stops the network, removes all the containers and cleans up all resources.
