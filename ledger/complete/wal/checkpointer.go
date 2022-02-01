@@ -133,7 +133,7 @@ func (c *Checkpointer) NotCheckpointedSegments() (from, to int, err error) {
 }
 
 // Checkpoint creates new checkpoint stopping at given segment
-func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, error)) error {
+func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, error)) (err error) {
 
 	_, notCheckpointedTo, err := c.NotCheckpointedSegments()
 	if err != nil {
@@ -185,16 +185,26 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("cannot replay WAL: %w", err)
 	}
 
+	c.wal.log.Info().Msgf("flattening forest for checkpoint %d", to)
+
 	forestSequencing, err := flattener.FlattenForest(forest)
 	if err != nil {
 		return fmt.Errorf("cannot get storables: %w", err)
 	}
 
+	c.wal.log.Info().Msgf("serializing checkpoint %d", to)
+
 	writer, err := targetWriter()
 	if err != nil {
 		return fmt.Errorf("cannot generate writer: %w", err)
 	}
-	defer writer.Close()
+	defer func() {
+		closeErr := writer.Close()
+		// Return close error if there isn't any prior error to return.
+		if err == nil {
+			err = closeErr
+		}
+	}()
 
 	err = StoreCheckpoint(forestSequencing, writer)
 

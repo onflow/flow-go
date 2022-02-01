@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -9,11 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -176,4 +177,38 @@ func TestComponentsRunSerially(t *testing.T) {
 		"component 2 done",
 		"component 3 done",
 	}, doneLogs)
+}
+
+func TestPostShutdown(t *testing.T) {
+	nb := FlowNode("scaffold test")
+
+	logger := testLog{}
+
+	err1 := errors.New("error 1")
+	err3 := errors.New("error 3")
+	errExpected := multierror.Append(&multierror.Error{}, err1, err3)
+	nb.
+		ShutdownFunc(func() error {
+			logger.Log("shutdown 1")
+			return err1
+		}).
+		ShutdownFunc(func() error {
+			logger.Log("shutdown 2")
+			return nil
+		}).
+		ShutdownFunc(func() error {
+			logger.Log("shutdown 3")
+			return err3
+		})
+
+	err := nb.postShutdown()
+	assert.EqualError(t, err, errExpected.Error())
+
+	logs := logger.logs
+	assert.Len(t, logs, 3)
+	assert.Equal(t, []string{
+		"shutdown 1",
+		"shutdown 2",
+		"shutdown 3",
+	}, logs)
 }

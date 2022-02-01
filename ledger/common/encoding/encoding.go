@@ -554,7 +554,7 @@ func EncodeTrieProof(p *ledger.TrieProof) []byte {
 
 	// append encoded proof content
 	proof := encodeTrieProof(p)
-	buffer = append(buffer, proof[:]...)
+	buffer = append(buffer, proof...)
 
 	return buffer
 }

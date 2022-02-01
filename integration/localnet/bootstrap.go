@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/plus3it/gorecurcopy"
@@ -339,6 +340,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 				"TARGET":  container.Role.String(),
 				"VERSION": build.Semver(),
 				"COMMIT":  build.Commit(),
+				"GOARCH":  runtime.GOARCH,
 			},
 			Target: "production",
 		}

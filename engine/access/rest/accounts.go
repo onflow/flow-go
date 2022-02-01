@@ -2,49 +2,32 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
-const blockHeightQueryParam = "block_height"
-
-// getAccount handler retrieves account by address and returns the response
-func getAccount(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
-	address, err := toAddress(r.getVar("address"))
+// GetAccount handler retrieves account by address and returns the response
+func GetAccount(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+	req, err := r.GetAccountRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
-	// retrieve account and decide based on provided query params which rpc method to envoke
-	var account *flow.Account
-	height := r.getQueryParam(blockHeightQueryParam)
-	switch height {
-	case sealedHeightQueryParam:
-		account, err = backend.GetAccountAtLatestBlock(r.Context(), address)
+	// in case we receive special height values 'final' and 'sealed', fetch that height and overwrite request with it
+	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
+		header, err := backend.GetLatestBlockHeader(r.Context(), req.Height == request.SealedHeight)
 		if err != nil {
 			return nil, err
 		}
-	case finalHeightQueryParam:
-		// GetAccountAtLatestBlock only lookups account at the latest sealed block, to lookup account at the
-		// finalized block we need to first call GetLatestBlockHeader to get the latest finalized height,
-		// and then call GetAccountAtBlockHeight
-		finalizedBlkHeader, err := backend.GetLatestBlockHeader(r.Context(), false)
-		if err != nil {
-			return nil, err
-		}
-		account, err = backend.GetAccountAtBlockHeight(r.Context(), address, finalizedBlkHeader.Height)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		h, err := toHeight(height)
-		if err != nil {
-			return nil, NewBadRequestError(err)
-		}
-		account, err = backend.GetAccountAtBlockHeight(r.Context(), address, h)
-		if err != nil {
-			return nil, err
-		}
+		req.Height = header.Height
 	}
 
-	return accountResponse(account, link, r.expandFields)
+	account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	var response models.Account
+	err = response.Build(account, link, r.ExpandFields)
+	return response, err
 }

@@ -7,9 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	mocks "github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -58,41 +59,16 @@ func TestGetResultByID(t *testing.T) {
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 
-	t.Run("get by ID with events", func(t *testing.T) {
-		backend := &mock.API{}
-		id := unittest.IdentifierFixture()
-		result := unittest.ExecutionResultFixture(unittest.WithServiceEvents(1))
-
-		backend.Mock.
-			On("GetExecutionResultByID", mocks.Anything, id).
-			Return(result, nil).
-			Once()
-
-		req := getResultByIDReq(id.String(), nil)
-		expected := fmt.Sprintf(`{
-			"id": "%s",
-			"block_id": "%s",
-			"events": [{
-				"type": "%s"
-			}],
-			"_links": {
-				"_self": "/v1/execution_results/%s"
-			}
-		}`, result.ID(), result.BlockID, result.ServiceEvents[0].Type, result.ID())
-		assertOKResponse(t, req, expected, backend)
-		mocks.AssertExpectationsForObjects(t, backend)
-	})
-
 	t.Run("get by ID not found", func(t *testing.T) {
 		backend := &mock.API{}
 		id := unittest.IdentifierFixture()
 		backend.Mock.
 			On("GetExecutionResultByID", mocks.Anything, id).
-			Return(nil, status.Error(codes.NotFound, "not found")).
+			Return(nil, status.Error(codes.NotFound, "block not found")).
 			Once()
 
 		req := getResultByIDReq(id.String(), nil)
-		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"not found"}`, backend)
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }
@@ -126,11 +102,11 @@ func TestGetResultBlockID(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		backend.Mock.
 			On("GetExecutionResultForBlockID", mocks.Anything, blockID).
-			Return(nil, status.Error(codes.NotFound, "not found")).
+			Return(nil, status.Error(codes.NotFound, "block not found")).
 			Once()
 
 		req := getResultByIDReq("", []string{blockID.String()})
-		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"not found"}`, backend)
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }

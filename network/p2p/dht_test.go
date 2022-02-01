@@ -2,19 +2,19 @@ package p2p
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/flow"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,10 +28,10 @@ func TestFindPeerWithDHT(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, 2, withDHTNodeEnabled(true))
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 2, withDHTOptions(AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, count-2, withDHTNodeEnabled(false))
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-2, withDHTOptions(AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	defer stopNodes(t, nodes)
@@ -49,7 +49,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	// wait for clients to connect to DHT servers and update their routing tables
 	require.Eventually(t, func() bool {
 		for i, clientNode := range dhtClientNodes {
-			if clientNode.dht.RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
+			if clientNode.routing.(*dht.IpfsDHT).RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
 				return false
 			}
 		}
@@ -62,7 +62,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 
 	// wait for the first server to connect to the second and update its routing table
 	require.Eventually(t, func() bool {
-		return dhtServerNodes[0].dht.RoutingTable().Find(getDhtServerAddr(1).ID) != ""
+		return dhtServerNodes[0].routing.(*dht.IpfsDHT).RoutingTable().Find(getDhtServerAddr(1).ID) != ""
 	}, time.Second*5, ticksForAssertEventually, "dht servers failed to connect")
 
 	// check that all even numbered clients can create streams with all odd numbered clients
@@ -109,12 +109,12 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, 1, withDHTNodeEnabled(true))
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 1, withDHTOptions(AsServer()))
 	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, count-1, withDHTNodeEnabled(false))
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-1, withDHTOptions(AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	defer stopNodes(t, nodes)
@@ -132,16 +132,23 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	// Step 3: Subscribe to the test topic
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
-	ch := make(chan flow.Identifier, count)
+	ch := make(chan peer.ID, count)
+
+	msg := &message.Message{
+		Payload: []byte("hello"),
+	}
+
+	data, err := msg.Marshal()
+	require.NoError(t, err)
+
 	for _, n := range nodes {
-		m := n.id
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
 			msg, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, msg)
-			assert.Equal(t, []byte("hello"), msg.Data)
-			ch <- m
+			assert.Equal(t, data, msg.Data)
+			ch <- n.host.ID()
 		}
 
 		// Subscribes to the test topic
@@ -168,24 +175,26 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	require.Eventually(t, fullyConnectedGraph, time.Second*5, ticksForAssertEventually, "nodes failed to discover each other")
 
 	// Step 4: publish a message to the topic
-	require.NoError(t, dhtServerNode.Publish(ctx, topic, []byte("hello")))
+	require.NoError(t, dhtServerNode.Publish(ctx, topic, data))
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
-	recv := make(map[flow.Identifier]bool, count)
+	recv := make(map[peer.ID]bool, count)
+
+loop:
 	for i := 0; i < count; i++ {
 		select {
 		case res := <-ch:
 			recv[res] = true
 		case <-time.After(3 * time.Second):
-			var missing flow.IdentifierList
+			var missing peer.IDSlice
 			for _, n := range nodes {
-				if _, found := recv[n.id]; !found {
-					missing = append(missing, n.id)
+				if _, found := recv[n.host.ID()]; !found {
+					missing = append(missing, n.host.ID())
 				}
 			}
-			assert.Fail(t, " messages not received by nodes: "+strings.Join(missing.Strings(), ","))
-			break
+			assert.Fail(t, "messages not received by some nodes", "%v", missing)
+			break loop
 		}
 	}
 
