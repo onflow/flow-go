@@ -436,7 +436,7 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 // threshold is the threshold value, it must be in the range [MinimumThreshold..size-1].
 // The function does not check the validity of the shares, and does not check
 // the validity of the resulting signature.
-// ReconstructThresholdSignature returns:
+// BLSReconstructThresholdSignature returns:
 // - error if the inputs are not in the correct range, if the threshold is not reached,
 //    or if input signers are not distinct.
 // - Signature: the threshold signature if there is no returned error, nil otherwise
