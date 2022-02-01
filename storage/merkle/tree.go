@@ -299,7 +299,7 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 	shortPathLengths := make([]uint16, 0)
 
 	steps := 0
-	shortNodeVisited := make([]bool, 0, len(key))
+	shortNodeVisited := make([]bool, 0)
 
 ProveLoop:
 	for {

@@ -28,7 +28,7 @@ var (
 	shortNodeTag = []byte{2}
 )
 
-/* ******************************* Short Node ******************************* */
+// Short Node
 // Per convention a Short node has always _one child_, which is either
 // a full node or a leaf.
 
@@ -62,7 +62,7 @@ func serializedPathSegmentLength(bitCount int) [2]byte {
 	return byteCount
 }
 
-/* ******************************** Full Node ******************************* */
+//Full Node
 // Per convention a Full Node has always _two children_. Nil values not allowed.
 
 type full struct {
@@ -83,7 +83,7 @@ func (n *full) Hash() []byte {
 	return computeFullHash(n.left.Hash(), n.right.Hash())
 }
 
-/* ******************************** Leaf Node ******************************* */
+// Leaf Node
 // Leaf represents a key-value pair. We only store the value, because the
 // key is implicitly stored as the merkle path through the tree.
 
@@ -103,7 +103,7 @@ func (n *leaf) Hash() []byte {
 	return computeLeafHash(n.val)
 }
 
-/* ******************************** Dummy Node ******************************* */
+// Dummy Node
 // Dummy node type as substitute for `nil`. Not used in the trie, but as zero
 // value for auxiliary variables during trie update operations. This reduces
 // complexity of the business logic, as we can then also apply the convention of
