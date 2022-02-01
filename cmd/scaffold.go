@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -610,18 +611,20 @@ func (fnb *FlowNodeBuilder) initState() {
 		rootBlock, err := state.Params().Root()
 		fnb.MustNot(err).Msg("could not get root block from protocol state")
 		rootSnapshot := state.AtBlockID(rootBlock.ID())
-		fnb.RootSnapshot = rootSnapshot
+		fnb.setRootSnapshot(rootSnapshot)
 	} else {
 		// Bootstrap!
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
 		// if no root snapshot is configured, attempt to load the file from disk
-		if fnb.RootSnapshot == nil {
+		var rootSnapshot = fnb.RootSnapshot
+		if rootSnapshot == nil {
 			fnb.Logger.Info().Msgf("loading root protocol state snapshot from disk")
-			rootSnapshot, err := loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+			rootSnapshot, err = loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
 			fnb.MustNot(err).Msg("failed to read protocol snapshot from disk")
-			fnb.RootSnapshot = rootSnapshot
 		}
+		// set root snapshot fields
+		fnb.setRootSnapshot(rootSnapshot)
 
 		// generate bootstrap config options as per NodeConfig
 		var options []badgerState.BootstrapConfigOptions
@@ -652,18 +655,6 @@ func (fnb *FlowNodeBuilder) initState() {
 			Msg("protocol state bootstrapped")
 	}
 
-	// cache properties of the root snapshot, for convenience
-	fnb.RootResult, fnb.RootSeal, err = fnb.RootSnapshot.SealedResult()
-	fnb.MustNot(err).Msg("failed to read root sealed result")
-	sealingSegment, err := fnb.RootSnapshot.SealingSegment()
-	fnb.MustNot(err).Msg("failed to read root sealing segment")
-	fnb.RootBlock = sealingSegment.Highest()
-	fnb.RootQC, err = fnb.RootSnapshot.QuorumCertificate()
-	fnb.MustNot(err).Msg("failed to read root qc")
-	fnb.RootChainID = fnb.RootBlock.Header.ChainID
-	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
-	fnb.MustNot(err)
-
 	// initialize local if it hasn't been initialized yet
 	if fnb.Me == nil {
 		fnb.initLocal()
@@ -677,6 +668,24 @@ func (fnb *FlowNodeBuilder) initState() {
 		Hex("finalized_block_id", logging.Entity(lastFinalized)).
 		Uint64("finalized_block_height", lastFinalized.Height).
 		Msg("successfully opened protocol state")
+}
+
+// setRootSnapshot sets the root snapshot field and all related fields in the NodeConfig.
+func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) {
+	var err error
+
+	fnb.RootSnapshot = rootSnapshot
+	// cache properties of the root snapshot, for convenience
+	fnb.RootResult, fnb.RootSeal, err = fnb.RootSnapshot.SealedResult()
+	fnb.MustNot(err).Msg("failed to read root sealed result")
+	sealingSegment, err := fnb.RootSnapshot.SealingSegment()
+	fnb.MustNot(err).Msg("failed to read root sealing segment")
+	fnb.RootBlock = sealingSegment.Highest()
+	fnb.RootQC, err = fnb.RootSnapshot.QuorumCertificate()
+	fnb.MustNot(err).Msg("failed to read root qc")
+	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
+	fnb.MustNot(err)
 }
 
 func (fnb *FlowNodeBuilder) initLocal() {
