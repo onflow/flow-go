@@ -25,6 +25,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
+const getSnapshotTimeout = 30 * time.Second
+
 // GetProtocolSnapshot callback that will get latest finalized protocol snapshot
 type GetProtocolSnapshot func() (protocol.Snapshot, error)
 
@@ -135,8 +137,6 @@ func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPha
 // 3. Target epoch > current epoch (in future), wait until target epoch and target phase is reached before
 // setting root snapshot
 func DynamicStartPreInit(nodeConfig *NodeConfig) error {
-	ctx := context.Background()
-
 	log := nodeConfig.Logger.With().Str("component", "dynamic-startup").Logger()
 
 	rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
@@ -158,6 +158,10 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	}
 
 	startupPhase := flow.GetEpochPhase(nodeConfig.BaseConfig.DynamicStartupEpochPhase)
+
+	// ctx with 30 second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), getSnapshotTimeout)
+	defer cancel()
 
 	// validate dynamic startup epoch flag
 	startupEpoch, err := validateDynamicStartEpochFlag(ctx, nodeConfig.DynamicStartupEpoch, flowClient)
@@ -205,6 +209,7 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 // if epoch = current return the current epoch counter
 func validateDynamicStartEpochFlag(ctx context.Context, epoch string, client *client.Client) (uint64, error) {
 	if epoch == "current" {
+
 		snapshot, err := GetSnapshot(ctx, client)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get snapshot: %w", err)
