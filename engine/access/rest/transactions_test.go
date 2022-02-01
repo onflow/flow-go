@@ -62,16 +62,16 @@ func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 			"key_index":       fmt.Sprintf("%d", tx.ProposalKey.KeyIndex),
 			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
 		},
-		"authorizers":        auth,
+		"authorizers": auth,
 		"payload_signatures": []map[string]interface{}{{
-			"address":      tx.PayloadSignatures[0].Address.String(),
-			"key_index":    fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
-			"signature":    util.ToBase64(tx.PayloadSignatures[0].Signature),
+			"address":   tx.PayloadSignatures[0].Address.String(),
+			"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
+			"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
 		}},
 		"envelope_signatures": []map[string]interface{}{{
-			"address":      tx.EnvelopeSignatures[0].Address.String(),
-			"key_index":    fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
-			"signature":    util.ToBase64(tx.EnvelopeSignatures[0].Signature),
+			"address":   tx.EnvelopeSignatures[0].Address.String(),
+			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
+			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
 		}},
 	}
 }
