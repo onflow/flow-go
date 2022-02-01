@@ -291,8 +291,8 @@ func main() {
 
 			if !myBeaconPublicKeyShare.Equals(beaconPrivateKey.PrivateKey.PublicKey()) {
 				return fmt.Errorf("configured beacon key is inconsistent with this node's canonical public beacon key (%s!=%s)",
-					beaconPrivateKey.PrivateKey.PublicKey().String(),
-					myBeaconPublicKeyShare.String())
+					beaconPrivateKey.PrivateKey.PublicKey(),
+					myBeaconPublicKeyShare)
 			}
 
 			// store my beacon key for the first epoch post-spork
