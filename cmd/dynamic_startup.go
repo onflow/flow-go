@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -126,22 +127,21 @@ func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPha
 	return nil
 }
 
-// DynamicStartPreInit will attempt to save a the latest finalizes protocol snapshot
-// if we have reached the target epoch and phase are
+// DynamicStartPreInit is the pre-init func that will check if a node has already bootstrapped
+// from a root protocol snapshot. If not attempt to get a protocol snapshot where the following
+// conditions are met.
+// 1. Target epoch < current epoch (in the past), set root snapshot to current snapshot
+// 2. Target epoch == "current", wait until target phase == current phase before setting root snapshot
+// 3. Target epoch > current epoch (in future), wait until target epoch and target phase is reached before
+// setting root snapshot
 func DynamicStartPreInit(nodeConfig *NodeConfig) error {
+	ctx := context.Background()
+
 	rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
 
 	// root snapshot exists skip dynamic start up
 	if rootSnapshotExists(rootSnapshotPath) {
 		return nil
-	}
-
-	startupPhase := flow.GetEpochPhase(nodeConfig.BaseConfig.DynamicStartupEpochPhase)
-
-	// validate dynamic startup flags
-	err := ValidateDynamicStartupFlags(nodeConfig.BaseConfig.DynamicStartupANPubkey, nodeConfig.BaseConfig.DynamicStartupANAddress, startupPhase)
-	if err != nil {
-		return err
 	}
 
 	// get flow clinet with secure client connection to download protocol snapshot from access node
@@ -155,14 +155,27 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 		return fmt.Errorf("failed to create flow client for node dynamic startup pre-init: %w", err)
 	}
 
-	ctx := context.Background()
+	startupPhase := flow.GetEpochPhase(nodeConfig.BaseConfig.DynamicStartupEpochPhase)
+
+	// validate dynamic startup epoch flag
+	startupEpoch, err := validateDynamicStartEpochFlag(ctx, nodeConfig.DynamicStartupEpoch, flowClient)
+	if err != nil {
+		return fmt.Errorf("failed to validate flag --dynamic-start-epoch: %w", err)
+	}
+
+	// validate the rest of the dynamic startup flags
+	err = ValidateDynamicStartupFlags(nodeConfig.BaseConfig.DynamicStartupANPubkey, nodeConfig.BaseConfig.DynamicStartupANAddress, startupPhase)
+	if err != nil {
+		return err
+	}
+
 	getSnapshotFunc := func() (protocol.Snapshot, error) {
 		return GetSnapshot(ctx, flowClient)
 	}
 
 	snapshot, err := GetSnapshotAtEpochAndPhase(
 		nodeConfig.Logger,
-		nodeConfig.BaseConfig.DynamicStartupEpoch,
+		startupEpoch,
 		startupPhase,
 		nodeConfig.BaseConfig.DynamicStartupSleepInterval,
 		getSnapshotFunc,
@@ -178,6 +191,31 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	}
 
 	return nil
+}
+
+// validateDynamicStartEpochFlag parse the start epoch flag and return the uin64 value,
+// if epoch = current return the current epoch counter
+func validateDynamicStartEpochFlag(ctx context.Context, epoch string, client *client.Client) (uint64, error) {
+	if epoch == "current" {
+		snapshot, err := GetSnapshot(ctx, client)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get snapshot: %w", err)
+		}
+
+		counter, err := snapshot.Epochs().Current().Counter()
+		if err != nil {
+			return 0, fmt.Errorf("failed to get current epoch counter: %w", err)
+		}
+
+		return counter, nil
+	}
+
+	counter, err := strconv.ParseUint(string("90"), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse target epoch (%d): %w", counter, err)
+	}
+
+	return counter, nil
 }
 
 // rootSnapshotExists check if root snapshot file exists

@@ -113,7 +113,7 @@ type BaseConfig struct {
 	DynamicStartupANAddress         string
 	DynamicStartupANPubkey          string
 	DynamicStartupEpochPhase        string
-	DynamicStartupEpoch             uint64
+	DynamicStartupEpoch             string
 	DynamicStartupSleepInterval     time.Duration
 	datadir                         string
 	secretsdir                      string

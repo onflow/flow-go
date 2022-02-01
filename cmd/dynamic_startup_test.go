@@ -153,4 +153,48 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 		require.Equalf(t, 1, hookInfoCalls, "expected 1 info log got %d", hookInfoCalls)
 		require.Equal(t, expectedSnapshot, actualSnapshot)
 	})
+	t.Run("should return snapshot after target phase is reached if target epoch is the same as current", func(t *testing.T) {
+		snapshot := getMockSnapshot(t, 5, flow.EpochPhaseStaking)
+		expectedSnapshot := getMockSnapshot(t, 5, flow.EpochPhaseSetup)
+
+		// setup hooked logger to capture warn and info log counts
+		hookWarnCalls := 0
+		hookInfoCalls := 0
+		hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+			if level == zerolog.WarnLevel {
+				hookWarnCalls++
+			} else if level == zerolog.InfoLevel {
+				hookInfoCalls++
+			}
+		})
+
+		logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
+
+		counter := 0
+		// setup mock get snapshot func that will return expected snapshot after 3 invocations
+		getSnapshot := func() (protocol.Snapshot, error) {
+			if counter < 3 {
+				counter++
+				return snapshot, nil
+			}
+
+			return expectedSnapshot, nil
+		}
+
+		_, _, targetPhase, _ := dynamicJoinFlagsFixture()
+
+		// get snapshot
+		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
+			logger,
+			5,
+			targetPhase,
+			time.Millisecond,
+			getSnapshot,
+		)
+		require.NoError(t, err)
+
+		require.Equalf(t, 3, hookWarnCalls, "expected 0 warn logs got %d", hookWarnCalls)
+		require.Equalf(t, 1, hookInfoCalls, "expected 1 info log got %d", hookInfoCalls)
+		require.Equal(t, expectedSnapshot, actualSnapshot)
+	})
 }
