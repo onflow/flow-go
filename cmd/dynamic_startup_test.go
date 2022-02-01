@@ -1,11 +1,10 @@
 package cmd
 
 import (
-	"os"
+	"context"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -67,32 +66,19 @@ func TestValidateDynamicStartupFlags(t *testing.T) {
 // for a node to bootstrap with by asserting the expected number of warn/info log messages are output and the expected
 // snapshot is returned
 func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
-	t.Run("should log 4 messages, 3 warnings and 1 info before returning successfully", func(t *testing.T) {
+	t.Run("should retry until a snapshot is observed with desired epoch/phase", func(t *testing.T) {
 		// the snapshot we will use to force GetSnapshotAtEpochAndPhase to retry
-		snapshot := getMockSnapshot(t, 0, flow.EpochPhaseStaking)
+		oldSnapshot := getMockSnapshot(t, 0, flow.EpochPhaseStaking)
 
 		// the snapshot that will return target counter and phase
 		expectedSnapshot := getMockSnapshot(t, 1, flow.EpochPhaseSetup)
 
-		// setup hooked logger to capture warn and info log counts
-		hookWarnCalls := 0
-		hookInfoCalls := 0
-		hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-			if level == zerolog.WarnLevel {
-				hookWarnCalls++
-			} else if level == zerolog.InfoLevel {
-				hookInfoCalls++
-			}
-		})
-
-		logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
-
 		// setup mock get snapshot func that will return expected snapshot after 3 invocations
 		counter := 0
-		getSnapshot := func() (protocol.Snapshot, error) {
+		getSnapshot := func(_ context.Context) (protocol.Snapshot, error) {
 			if counter < 3 {
 				counter++
-				return snapshot, nil
+				return oldSnapshot, nil
 			}
 
 			return expectedSnapshot, nil
@@ -102,7 +88,8 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 
 		// get snapshot
 		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
-			logger,
+			context.Background(),
+			unittest.Logger(),
 			targetEpoch,
 			targetPhase,
 			time.Millisecond,
@@ -110,30 +97,16 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		require.Equalf(t, 3, hookWarnCalls, "expected 3 warn logs got %d", hookWarnCalls)
-		require.Equalf(t, 1, hookInfoCalls, "expected 1 info log got %d", hookInfoCalls)
 		require.Equal(t, expectedSnapshot, actualSnapshot)
 	})
+
 	t.Run("should return snapshot immediately if target epoch has passed", func(t *testing.T) {
 		// the snapshot that will return target counter and phase
 		// epoch > target epoch but phase < target phase
 		expectedSnapshot := getMockSnapshot(t, 5, flow.EpochPhaseStaking)
 
-		// setup hooked logger to capture warn and info log counts
-		hookWarnCalls := 0
-		hookInfoCalls := 0
-		hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-			if level == zerolog.WarnLevel {
-				hookWarnCalls++
-			} else if level == zerolog.InfoLevel {
-				hookInfoCalls++
-			}
-		})
-
-		logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
-
 		// setup mock get snapshot func that will return expected snapshot after 3 invocations
-		getSnapshot := func() (protocol.Snapshot, error) {
+		getSnapshot := func(_ context.Context) (protocol.Snapshot, error) {
 			return expectedSnapshot, nil
 		}
 
@@ -141,41 +114,27 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 
 		// get snapshot
 		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
-			logger,
+			context.Background(),
+			unittest.Logger(),
 			targetEpoch,
 			targetPhase,
 			time.Millisecond,
 			getSnapshot,
 		)
 		require.NoError(t, err)
-
-		require.Equalf(t, 0, hookWarnCalls, "expected 0 warn logs got %d", hookWarnCalls)
-		require.Equalf(t, 1, hookInfoCalls, "expected 1 info log got %d", hookInfoCalls)
 		require.Equal(t, expectedSnapshot, actualSnapshot)
 	})
+
 	t.Run("should return snapshot after target phase is reached if target epoch is the same as current", func(t *testing.T) {
-		snapshot := getMockSnapshot(t, 5, flow.EpochPhaseStaking)
+		oldSnapshot := getMockSnapshot(t, 5, flow.EpochPhaseStaking)
 		expectedSnapshot := getMockSnapshot(t, 5, flow.EpochPhaseSetup)
-
-		// setup hooked logger to capture warn and info log counts
-		hookWarnCalls := 0
-		hookInfoCalls := 0
-		hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-			if level == zerolog.WarnLevel {
-				hookWarnCalls++
-			} else if level == zerolog.InfoLevel {
-				hookInfoCalls++
-			}
-		})
-
-		logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
 
 		counter := 0
 		// setup mock get snapshot func that will return expected snapshot after 3 invocations
-		getSnapshot := func() (protocol.Snapshot, error) {
+		getSnapshot := func(_ context.Context) (protocol.Snapshot, error) {
 			if counter < 3 {
 				counter++
-				return snapshot, nil
+				return oldSnapshot, nil
 			}
 
 			return expectedSnapshot, nil
@@ -185,16 +144,14 @@ func TestGetSnapshotAtEpochAndPhase(t *testing.T) {
 
 		// get snapshot
 		actualSnapshot, err := GetSnapshotAtEpochAndPhase(
-			logger,
+			context.Background(),
+			unittest.Logger(),
 			5,
 			targetPhase,
 			time.Millisecond,
 			getSnapshot,
 		)
 		require.NoError(t, err)
-
-		require.Equalf(t, 3, hookWarnCalls, "expected 0 warn logs got %d", hookWarnCalls)
-		require.Equalf(t, 1, hookInfoCalls, "expected 1 info log got %d", hookInfoCalls)
 		require.Equal(t, expectedSnapshot, actualSnapshot)
 	})
 }

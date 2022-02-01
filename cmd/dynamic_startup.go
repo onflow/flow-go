@@ -211,7 +211,7 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 		getSnapshotFunc,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to get snapshot at start up epoch (%d) and phase (%s): %w", nodeConfig.BaseConfig.DynamicStartupEpoch, startupPhase.String(), err)
+		return fmt.Errorf("failed to get snapshot at start up epoch (%d) and phase (%s): %w", startupEpoch, startupPhase.String(), err)
 	}
 
 	// set the root snapshot in the config - we will use this later to bootstrap
