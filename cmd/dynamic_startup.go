@@ -25,7 +25,7 @@ import (
 )
 
 // GetProtocolSnapshot callback that will get latest finalized protocol snapshot
-type GetProtocolSnapshot func() (protocol.Snapshot, error)
+type GetProtocolSnapshot func(context.Context) (protocol.Snapshot, error)
 
 // GetSnapshot will attempt to get the latest finalized protocol snapshot with the given flow configs
 func GetSnapshot(ctx context.Context, client *client.Client) (*inmem.Snapshot, error) {
@@ -57,8 +57,14 @@ func GetSnapshotAtEpochAndPhase(logger zerolog.Logger, startupEpoch uint64, star
 	}
 
 	err = retry.Do(context.Background(), constRetry, func(ctx context.Context) error {
-		snapshot, err = getSnapshot()
+		ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+		defer cancel()
+		logger.Info().
+			Dur("time-waiting", time.Since(start)).
+			Msg("retrieving snapshot...")
+		snapshot, err = getSnapshot(ctx)
 		if err != nil {
+			logger.Info().Err(err).Msg("failed to get snapshot")
 			return retry.RetryableError(fmt.Errorf("failed to get protocol snapshot: %w", err))
 		}
 
@@ -131,8 +137,11 @@ func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPha
 func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
 
+	log := nodeConfig.Logger.With().Str("component", "dynamic_start").Logger()
+
 	// root snapshot exists skip dynamic start up
 	if rootSnapshotExists(rootSnapshotPath) {
+		log.Info().Msg("starting up using existing root snapshot file")
 		return nil
 	}
 
@@ -155,8 +164,7 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 		return fmt.Errorf("failed to create flow client for node dynamic startup pre-init: %w", err)
 	}
 
-	ctx := context.Background()
-	getSnapshotFunc := func() (protocol.Snapshot, error) {
+	getSnapshotFunc := func(ctx context.Context) (protocol.Snapshot, error) {
 		return GetSnapshot(ctx, flowClient)
 	}
 
