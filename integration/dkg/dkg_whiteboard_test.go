@@ -312,7 +312,7 @@ func TestWithWhiteboard(t *testing.T) {
 	})
 
 	threshold := signature.RandomBeaconThreshold(len(nodes))
-	groupSignature, err := crypto.ReconstructThresholdSignature(len(nodes), threshold, signatures, indices)
+	groupSignature, err := crypto.BLSReconstructThresholdSignature(len(nodes), threshold, signatures, indices)
 	require.NoError(t, err)
 
 	result := whiteboard.resultBySubmitter[nodes[0].Me.NodeID()]
