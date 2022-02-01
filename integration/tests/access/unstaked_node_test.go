@@ -122,9 +122,8 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 	)
 
 	collectionConfigs := []func(*testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
-		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.AsGhost(),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){

@@ -64,25 +64,31 @@ func TestCollectorSuite(t *testing.T) {
 // NOTE: This must be called explicitly by each test, since nodes/clusters vary
 //       between test cases.
 func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
+	suite.T().Logf("test case startup %v", suite.T().Name())
+
 	var (
-		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
-		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
-		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+		// DKG require at least 2 consensus nodes
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+		exeNode  = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+		verNode  = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	)
 	nodes := []testnet.NodeConfig{
 		conNode,
+		conNode2,
 		exeNode,
 		verNode,
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	}
 	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection,
-		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 		testnet.WithAdditionalFlag("--block-rate-delay=1ms"),
 	)
 
 	suite.nClusters = nClusters
 
-	// set one of the non-collector nodes to be the ghost
+	// set consensus node as ghost node, since collection node
+	// will send collection guarantees to consensus nodes.
 	suite.ghostID = conNode.Identifier
 
 	// instantiate the network
@@ -112,6 +118,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 }
 
 func (suite *CollectorSuite) TearDownTest() {
+	suite.T().Logf("test case %v tear down", suite.T().Name())
 	// avoid nil pointer errors for skipped tests
 	if suite.cancel != nil {
 		defer suite.cancel()
@@ -224,78 +231,94 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 	var (
 		// for quickly looking up tx IDs
+		// if the tx has been finalized, we remove it from the lookup
+		// we exit the loop when there is no more tx in the lookup
 		lookup = make(map[flow.Identifier]struct{}, len(txIDs))
-		// for keeping track of which transactions have been included in a finalized collection
-		finalized = make(map[flow.Identifier]struct{}, len(txIDs))
 		// for keeping track of proposals we've seen, and which transactions they contain
 		proposals = make(map[flow.Identifier][]flow.Identifier)
 		// in case we see a guarantee first
 		guarantees = make(map[flow.Identifier]bool)
 	)
+
+	if len(txIDs) == 0 {
+		suite.T().Logf("no transaction to wait for")
+		return
+	}
+
+	suite.T().Logf("waiting for %v transaction(s) to be included in a collection guarantee", len(txIDs))
+
+	// we have sent transactions, we need to verify that they will be included in a
+	// collection guarantee.
+	// a collection guarantee is generated when a collection is finalized.
 	for _, txID := range txIDs {
 		lookup[txID] = struct{}{}
 	}
-
-	suite.T().Logf("awaiting %d transactions included", len(txIDs))
 
 	waitFor := defaultTimeout + time.Duration(len(lookup))*200*time.Millisecond
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
-		_, msg, err := suite.reader.Next()
+		originID, msg, err := suite.reader.Next()
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
 			header := val.Header
 			collection := val.Payload.Collection
-			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
+			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, header.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
-					finalized[txID] = struct{}{}
+					delete(lookup, txID)
 				}
 
-				if len(finalized) == len(lookup) {
+				// we exit the loop when we found all the transactions are included in the collection guarantees
+				suite.T().Logf("remaining transaction to wait for %v", len(lookup))
+
+				if len(lookup) == 0 {
+					suite.T().Logf("all transactions are included in collection guarantees !!")
 					return
 				}
 			} else {
+				// caching the proposal, so that when we receive the guarantee, we can finalized all the transactions
+				// in it.
+				suite.T().Logf("no guarantee for the received collection proposal %v, caching the collection proposal",
+					collection.ID())
 				proposals[collection.ID()] = collection.Light().Transactions
 			}
 
 		case *flow.CollectionGuarantee:
 			finalizedTxIDs, ok := proposals[val.CollectionID]
 			if !ok {
-				suite.T().Logf("got unseen guarantee (id=%x)", val.CollectionID)
+				suite.T().Logf("got guarantee from %v before the collection proposal (collection id=%x)", originID, val.CollectionID)
 				guarantees[val.CollectionID] = true
 				continue
 			} else {
-				suite.T().Logf("got guarantee (id=%x)", val.CollectionID)
+				suite.T().Logf("got guarantee from %v (id=%x)", originID, val.CollectionID)
 			}
 			for _, txID := range finalizedTxIDs {
-				finalized[txID] = struct{}{}
+				delete(lookup, txID)
 			}
 
-			if len(finalized) == len(lookup) {
+			suite.T().Logf("remaining transaction to wait for %v", len(lookup))
+			if len(lookup) == 0 {
+				suite.T().Logf("all transactions are included in collection guarantees !!")
 				return
 			}
 
 		case *flow.TransactionBody:
-			suite.T().Log("got tx: ", val.ID())
+			suite.T().Logf("got tx from %v: %v", originID, val.ID())
 		}
 	}
 
 	suite.T().Logf(
-		"timed out waiting for inclusion (timeout=%s, finalized=%d, expected=%d)",
-		waitFor.String(), len(finalized), len(lookup),
+		"timed out waiting for inclusion (timeout=%s, remaining=%d)",
+		waitFor.String(), len(lookup),
 	)
 	var missing []flow.Identifier
 	for id := range lookup {
-		if _, ok := finalized[id]; !ok {
-			missing = append(missing, id)
-		}
+		missing = append(missing, id)
 	}
-	suite.T().Logf("missing: %v", missing)
-	suite.T().FailNow()
+	suite.T().Fatalf("missing transactions: %v", missing)
 }
 
 // Collector returns the collector node with the given index in the

@@ -15,7 +15,8 @@ import (
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	builder "github.com/onflow/flow-go/module/builder/collection"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
@@ -50,7 +51,7 @@ type BuilderSuite struct {
 	// protocol state for reference blocks for transactions
 	protoState protocol.MutableState
 
-	pool    *stdmap.Transactions
+	pool    mempool.Transactions
 	builder *builder.Builder
 }
 
@@ -64,7 +65,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 
-	suite.pool = stdmap.NewTransactions(1000)
+	suite.pool = herocache.NewTransactions(1000, unittest.Logger())
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
@@ -375,7 +376,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	t := suite.T()
 
 	// use a mempool with 2000 transactions, one per block
-	suite.pool = stdmap.NewTransactions(2000)
+	suite.pool = herocache.NewTransactions(2000, unittest.Logger())
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
@@ -522,7 +523,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	}
 
 	// reset the pool and builder
-	suite.pool = stdmap.NewTransactions(10)
+	suite.pool = herocache.NewTransactions(10, unittest.Logger())
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	// insert a transaction referring genesis (now expired)
@@ -564,7 +565,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 
 	// start with an empty mempool
-	suite.pool = stdmap.NewTransactions(1000)
+	suite.pool = herocache.NewTransactions(1000, unittest.Logger())
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -828,7 +829,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.genesis = model.Genesis()
 		suite.chainID = suite.genesis.Header.ChainID
 
-		suite.pool = stdmap.NewTransactions(1000)
+		suite.pool = herocache.NewTransactions(1000, unittest.Logger())
 
 		suite.dbdir = unittest.TempDir(b)
 		suite.db = unittest.BadgerDB(b, suite.dbdir)

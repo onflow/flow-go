@@ -13,7 +13,7 @@ require (
 	github.com/btcsuite/btcd v0.22.0-beta
 	github.com/dapperlabs/testingdock v0.4.2
 	github.com/davecgh/go-spew v1.1.1
-	github.com/dgraph-io/badger/v2 v2.0.3
+	github.com/dgraph-io/badger/v2 v2.2007.3
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fxamacker/cbor/v2 v2.3.1-0.20211029162100-5d5d7c3edd41
@@ -24,7 +24,7 @@ require (
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
 	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
-	github.com/gorilla/mux v1.7.3
+	github.com/gorilla/mux v1.8.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2 v2.0.0-rc.2
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-20200501113911-9a95f0fdbfea
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -37,7 +37,8 @@ require (
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.2.0
 	github.com/ipfs/go-cid v0.1.0
-	github.com/ipfs/go-datastore v0.5.0
+	github.com/ipfs/go-datastore v0.5.1
+	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v0.2.0
 	github.com/ipfs/go-ipfs-provider v0.7.0
 	github.com/ipfs/go-log v1.0.5
@@ -55,9 +56,10 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multiaddr-dns v0.3.1
+	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.1.1
-	github.com/onflow/cadence v0.20.3
-	github.com/onflow/flow v0.2.3-0.20211203180137-d6c902ccc3a7
+	github.com/onflow/cadence v0.21.0
+	github.com/onflow/flow v0.2.3-0.20220124225841-6dd3bed23faf
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.9.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.9.0
 	github.com/onflow/flow-emulator v0.20.3
@@ -69,6 +71,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
+	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/rs/cors v1.8.0
 	github.com/rs/zerolog v1.19.0
 	github.com/schollz/progressbar/v3 v3.8.3
@@ -90,7 +93,7 @@ require (
 	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/api v0.63.0
 	google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa
 	google.golang.org/grpc v1.43.0

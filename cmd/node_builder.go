@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -69,6 +70,11 @@ type NodeBuilder interface {
 	// In both cases, the object is started according to its interface when the node is run,
 	// and the node will wait for the component to exit gracefully.
 	Component(name string, f ReadyDoneFactory) NodeBuilder
+
+	// ShutdownFunc adds a callback function that is called after all components have exited.
+	// All shutdown functions are called regardless of errors returned by previous callbacks. Any
+	// errors returned are captured and passed to the caller.
+	ShutdownFunc(fn func() error) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
@@ -157,8 +163,10 @@ type NodeConfig struct {
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
+	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
+	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey

@@ -11,19 +11,19 @@ import (
 // Each channel should be taken by at most a single engine.
 type ChannelSubscriptionManager struct {
 	mu      sync.RWMutex
-	engines map[network.Channel]network.Engine
+	engines map[network.Channel]network.MessageProcessor
 	mw      network.Middleware
 }
 
 func NewChannelSubscriptionManager(mw network.Middleware) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
-		engines: make(map[network.Channel]network.Engine),
+		engines: make(map[network.Channel]network.MessageProcessor),
 		mw:      mw,
 	}
 }
 
 // Register registers an engine on the channel into the subscription manager.
-func (sm *ChannelSubscriptionManager) Register(channel network.Channel, engine network.Engine) error {
+func (sm *ChannelSubscriptionManager) Register(channel network.Channel, engine network.MessageProcessor) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -68,7 +68,7 @@ func (sm *ChannelSubscriptionManager) Unregister(channel network.Channel) error 
 }
 
 // GetEngine returns engine associated with a channel.
-func (sm *ChannelSubscriptionManager) GetEngine(channel network.Channel) (network.Engine, error) {
+func (sm *ChannelSubscriptionManager) GetEngine(channel network.Channel) (network.MessageProcessor, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
