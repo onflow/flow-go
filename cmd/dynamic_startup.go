@@ -48,7 +48,7 @@ func GetSnapshot(ctx context.Context, client *client.Client) (*inmem.Snapshot, e
 // GetSnapshotAtEpochAndPhase will get the latest finalized protocol snapshot and check the current epoch and epoch phase.
 // If we are past the target epoch and epoch phase we exit the retry mechanism immediately.
 // If not check the snapshot at the specified interval until we reach the target epoch and phase.
-func GetSnapshotAtEpochAndPhase(logger zerolog.Logger, startupEpoch uint64, startupEpochPhase flow.EpochPhase, retryInterval time.Duration, getSnapshot GetProtocolSnapshot) (protocol.Snapshot, error) {
+func GetSnapshotAtEpochAndPhase(ctx context.Context, logger zerolog.Logger, startupEpoch uint64, startupEpochPhase flow.EpochPhase, retryInterval time.Duration, getSnapshot GetProtocolSnapshot) (protocol.Snapshot, error) {
 	start := time.Now()
 	var snapshot protocol.Snapshot
 
@@ -57,7 +57,7 @@ func GetSnapshotAtEpochAndPhase(logger zerolog.Logger, startupEpoch uint64, star
 		return nil, fmt.Errorf("failed to create retry mechanism: %w", err)
 	}
 
-	err = retry.Do(context.Background(), constRetry, func(ctx context.Context) error {
+	err = retry.Do(ctx, constRetry, func(ctx context.Context) error {
 		snapshot, err = getSnapshot()
 		if err != nil {
 			return retry.RetryableError(fmt.Errorf("failed to get protocol snapshot: %w", err))
@@ -137,6 +137,8 @@ func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPha
 func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	ctx := context.Background()
 
+	log := nodeConfig.Logger.With().Str("component", "dynamic-startup").Logger()
+
 	rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
 
 	// root snapshot exists skip dynamic start up
@@ -173,8 +175,14 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 		return GetSnapshot(ctx, flowClient)
 	}
 
+	log.Info().
+		Str("startup_epoch", nodeConfig.BaseConfig.DynamicStartupEpoch).
+		Str("startup_phase", startupPhase.String()).
+		Msg("waiting until target epoch/phase to start...")
+
 	snapshot, err := GetSnapshotAtEpochAndPhase(
-		nodeConfig.Logger,
+		ctx,
+		log,
 		startupEpoch,
 		startupPhase,
 		nodeConfig.BaseConfig.DynamicStartupSleepInterval,
@@ -184,7 +192,7 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 		return fmt.Errorf("failed to get snapshot at start up epoch (%d) and phase (%s): %w", nodeConfig.BaseConfig.DynamicStartupEpoch, startupPhase.String(), err)
 	}
 
-	nodeConfig.Logger.Info().Str("snapshot-path", rootSnapshotPath).Msg("writing root snapshot file")
+	log.Info().Str("snapshot-path", rootSnapshotPath).Msg("writing root snapshot file")
 	err = writeRootSnapshotFile(snapshot.(*inmem.Snapshot), rootSnapshotPath)
 	if err != nil {
 		return fmt.Errorf("failed to write root snapshot file: %w", err)
