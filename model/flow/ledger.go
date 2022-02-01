@@ -15,8 +15,27 @@ type RegisterID struct {
 	Key        string
 }
 
+// this function returns a string format of a RegisterID in the form '%x/%x/%x'
+// it has been optimized to avoid the memory allocations inside Sprintf
 func (r *RegisterID) String() string {
-	return fmt.Sprintf("%x/%x/%x", r.Owner, r.Controller, r.Key)
+	ownerLen := len(r.Owner)
+	controllerLen := len(r.Controller)
+
+	requiredLen := ((ownerLen + controllerLen + len(r.Key)) * 2) + 2
+
+	arr := make([]byte, requiredLen)
+
+	hex.Encode(arr, []byte(r.Owner))
+
+	arr[2*ownerLen] = byte('/')
+
+	hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Controller))
+
+	arr[2*(ownerLen+controllerLen)+1] = byte('/')
+
+	hex.Encode(arr[2*(ownerLen+controllerLen+1):], []byte(r.Key))
+
+	return string(arr)
 }
 
 // Bytes returns a bytes representation of the RegisterID.
