@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,7 +15,7 @@ const maxAllowedScriptArguments = 100
 
 type Transaction flow.TransactionBody
 
-func (t *Transaction) Parse(raw io.Reader) error {
+func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 	var tx models.TransactionsBody
 	err := parseBody(raw, &tx)
 	if err != nil {
@@ -107,7 +108,7 @@ func (t *Transaction) Parse(raw io.Reader) error {
 		return fmt.Errorf("invalid gas limit: %v", err)
 	}
 
-	*t = Transaction(flow.TransactionBody{
+	flowTransaction := flow.TransactionBody{
 		ReferenceBlockID:   blockID.Flow(),
 		Script:             script,
 		Arguments:          args.Flow(),
@@ -117,7 +118,17 @@ func (t *Transaction) Parse(raw io.Reader) error {
 		Authorizers:        auths,
 		PayloadSignatures:  payloadSigs.Flow(),
 		EnvelopeSignatures: envelopeSigs.Flow(),
-	})
+	}
+
+	// we use the gRPC method of converting the incoming transaction to a Flow transaction since
+	// it sets the signer_index appropriately.
+	entityTransaction := convert.TransactionToMessage(flowTransaction)
+	flowTx, err := convert.MessageToTransaction(entityTransaction, chain)
+	if err != nil {
+		return err
+	}
+
+	*t = Transaction(flowTx)
 
 	return nil
 }

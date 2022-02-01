@@ -46,7 +46,6 @@ func createTransactionReq(body interface{}) *http.Request {
 
 func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
-	tx.PayloadSignatures = []flow.TransactionSignature{}
 	auth := make([]string, len(tx.Authorizers))
 	for i, a := range tx.Authorizers {
 		auth[i] = a.String()
@@ -64,10 +63,13 @@ func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
 		},
 		"authorizers":        auth,
-		"payload_signatures": nil,
+		"payload_signatures": []map[string]interface{}{{
+			"address":      tx.PayloadSignatures[0].Address.String(),
+			"key_index":    fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
+			"signature":    util.ToBase64(tx.PayloadSignatures[0].Signature),
+		}},
 		"envelope_signatures": []map[string]interface{}{{
 			"address":      tx.EnvelopeSignatures[0].Address.String(),
-			"signer_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].SignerIndex),
 			"key_index":    fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
 			"signature":    util.ToBase64(tx.EnvelopeSignatures[0].Signature),
 		}},
@@ -105,7 +107,6 @@ func TestGetTransactions(t *testing.T) {
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
-					 "signer_index":"0",
 					 "key_index":"1",
 					 "signature":"%s"
 				  }
@@ -157,7 +158,6 @@ func TestGetTransactions(t *testing.T) {
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
-					 "signer_index":"0",
 					 "key_index":"1",
 					 "signature":"%s"
 				  }
@@ -266,9 +266,10 @@ func TestGetTransactionResult(t *testing.T) {
 func TestCreateTransaction(t *testing.T) {
 
 	t.Run("create", func(t *testing.T) {
-		t.Skip()
 		backend := &mock.API{}
 		tx := unittest.TransactionBodyFixture()
+		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+		tx.Arguments = [][]uint8{}
 		req := createTransactionReq(validCreateBody(tx))
 
 		backend.Mock.
@@ -279,7 +280,7 @@ func TestCreateTransaction(t *testing.T) {
 			{
 			   "id":"%s",
 			   "script":"cHViIGZ1biBtYWluKCkge30=",
-			   "arguments":null,
+			   "arguments": [],
 			   "reference_block_id":"%s",
 			   "gas_limit":"10",
 			   "payer":"8c5303eaa26202d6",
@@ -291,10 +292,16 @@ func TestCreateTransaction(t *testing.T) {
 			   "authorizers":[
 				  "8c5303eaa26202d6"
 			   ],
+               "payload_signatures":[
+				  {
+					 "address":"8c5303eaa26202d6",
+					 "key_index":"1",
+					 "signature":"%s"
+				  }
+			   ],
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
-					 "signer_index":"0",
 					 "key_index":"1",
 					 "signature":"%s"
 				  }
@@ -306,7 +313,7 @@ func TestCreateTransaction(t *testing.T) {
 				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
-			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
+			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.PayloadSignatures[0].Signature), util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
 		assertOKResponse(t, req, expected, backend)
 	})
 
@@ -321,15 +328,16 @@ func TestCreateTransaction(t *testing.T) {
 			{"reference_block_id", "", `{"code":400, "message":"reference block not provided"}`},
 			{"gas_limit", "-1", `{"code":400, "message":"invalid gas limit: value must be an unsigned 64 bit integer"}`},
 			{"payer", "yo", `{"code":400, "message":"invalid payer: invalid address"}`},
-			{"proposal_key", "yo", `{"code":400, "message":"request body contains an invalid value for the \"proposal_key\" field (at position 333)"}`},
+			{"proposal_key", "yo", `{"code":400, "message":"request body contains an invalid value for the \"proposal_key\" field (at position 461)"}`},
 			{"authorizers", "", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 32)"}`},
 			{"authorizers", "yo", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 34)"}`},
 			{"envelope_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"envelope_signatures\" field (at position 75)"}`},
-			{"payload_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"payload_signatures\" field (at position 311)"}`},
+			{"payload_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"payload_signatures\" field (at position 292)"}`},
 		}
 
 		for _, test := range tests {
 			tx := unittest.TransactionBodyFixture()
+			tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
 			testTx := validCreateBody(tx)
 			testTx[test.inputField] = test.inputValue
 			req := createTransactionReq(testTx)

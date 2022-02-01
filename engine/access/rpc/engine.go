@@ -58,6 +58,7 @@ type Engine struct {
 	httpServer          *http.Server
 	restServer          *http.Server
 	config              Config
+	chain               flow.Chain
 	unsecureGrpcAddress net.Addr
 	secureGrpcAddress   net.Addr
 	restAPIAddress      net.Addr
@@ -164,6 +165,7 @@ func New(log zerolog.Logger,
 		secureGrpcServer:   secureGrpcServer,
 		httpServer:         httpServer,
 		config:             config,
+		chain:              chainID.Chain(),
 	}
 
 	accessproto.RegisterAccessAPIServer(
@@ -332,7 +334,7 @@ func (e *Engine) serveREST() {
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log)
+	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log, e.chain)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		return
