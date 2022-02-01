@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/state/protocol"
@@ -28,10 +29,13 @@ import (
 const getSnapshotTimeout = 30 * time.Second
 
 // GetProtocolSnapshot callback that will get latest finalized protocol snapshot
-type GetProtocolSnapshot func() (protocol.Snapshot, error)
+type GetProtocolSnapshot func(ctx context.Context) (protocol.Snapshot, error)
 
 // GetSnapshot will attempt to get the latest finalized protocol snapshot with the given flow configs
 func GetSnapshot(ctx context.Context, client *client.Client) (*inmem.Snapshot, error) {
+	ctx, cancel := context.WithTimeout(ctx, getSnapshotTimeout)
+	defer cancel()
+
 	b, err := client.GetLatestProtocolStateSnapshot(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest finalized protocol state snapshot during pre-initialization: %w", err)
@@ -50,7 +54,7 @@ func GetSnapshot(ctx context.Context, client *client.Client) (*inmem.Snapshot, e
 // GetSnapshotAtEpochAndPhase will get the latest finalized protocol snapshot and check the current epoch and epoch phase.
 // If we are past the target epoch and epoch phase we exit the retry mechanism immediately.
 // If not check the snapshot at the specified interval until we reach the target epoch and phase.
-func GetSnapshotAtEpochAndPhase(ctx context.Context, logger zerolog.Logger, startupEpoch uint64, startupEpochPhase flow.EpochPhase, retryInterval time.Duration, getSnapshot GetProtocolSnapshot) (protocol.Snapshot, error) {
+func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startupEpoch uint64, startupEpochPhase flow.EpochPhase, retryInterval time.Duration, getSnapshot GetProtocolSnapshot) (protocol.Snapshot, error) {
 	start := time.Now()
 	var snapshot protocol.Snapshot
 
@@ -59,10 +63,19 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, logger zerolog.Logger, star
 		return nil, fmt.Errorf("failed to create retry mechanism: %w", err)
 	}
 
+	log = log.With().
+		Uint64("target_epoch_counter", startupEpoch).
+		Str("target_epoch_phase", startupEpochPhase.String()).
+		Logger()
+
+	log.Info().Msg("starting dynamic startup - waiting until target epoch/phase to start...")
+
 	err = retry.Do(ctx, constRetry, func(ctx context.Context) error {
-		snapshot, err = getSnapshot()
+		snapshot, err = getSnapshot(ctx)
 		if err != nil {
-			return retry.RetryableError(fmt.Errorf("failed to get protocol snapshot: %w", err))
+			err = fmt.Errorf("failed to get protocol snapshot: %w", err)
+			log.Error().Err(err).Msg("could not get protocol snapshot")
+			return retry.RetryableError(err)
 		}
 
 		// if we encounter any errors interpreting the snapshot something went wrong stop retrying
@@ -78,16 +91,17 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, logger zerolog.Logger, star
 
 		// check if we are in or past the target epoch and phase
 		if currEpochCounter > startupEpoch || (currEpochCounter == startupEpoch && currEpochPhase >= startupEpochPhase) {
-			logger.Info().
+			log.Info().
 				Dur("time-waiting", time.Since(start)).
 				Uint64("current-epoch", currEpochCounter).
 				Str("current-epoch-phase", currEpochPhase.String()).
-				Msg("reached desired epoch and phase in dynamic startup pre-init")
+				Msg("finished dynamic startup - reached desired epoch and phase")
 
 			return nil
 		}
 
-		logger.Warn().
+		// wait then poll for latest snapshot again
+		log.Info().
 			Dur("time-waiting", time.Since(start)).
 			Uint64("current-epoch", currEpochCounter).
 			Str("current-epoch-phase", currEpochPhase.String()).
@@ -106,7 +120,6 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, logger zerolog.Logger, star
 // - assert dynamic-startup-access-publickey  is valid ECDSA_P256 public key hex
 // - assert dynamic-startup-access-address is not empty
 // - assert dynamic-startup-startup-epoch-phase is > 0 (EpochPhaseUndefined)
-// - assert dynamic-startup-startup-epoch is > 0
 func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPhase flow.EpochPhase) error {
 	b, err := hex.DecodeString(strings.TrimPrefix(accessPublicKey, "0x"))
 	if err != nil {
@@ -123,7 +136,7 @@ func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPha
 	}
 
 	if startPhase <= flow.EpochPhaseUndefined {
-		return fmt.Errorf("invalid flag --dynamic-startup-startup-epoch-phase unknow epoch phase")
+		return fmt.Errorf("invalid flag --dynamic-startup-startup-epoch-phase unknown epoch phase")
 	}
 
 	return nil
@@ -137,16 +150,30 @@ func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPha
 // 3. Target epoch > current epoch (in future), wait until target epoch and target phase is reached before
 // setting root snapshot
 func DynamicStartPreInit(nodeConfig *NodeConfig) error {
+	ctx := context.Background()
+
 	log := nodeConfig.Logger.With().Str("component", "dynamic-startup").Logger()
 
-	rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
-
-	// root snapshot exists skip dynamic start up
-	if rootSnapshotExists(rootSnapshotPath) {
+	// skip dynamic startup if the protocol state is bootstrapped
+	isBootstrapped, err := badgerstate.IsBootstrapped(nodeConfig.DB)
+	if err != nil {
+		return fmt.Errorf("could not check if state is boostrapped: %w", err)
+	}
+	if isBootstrapped {
+		log.Info().Msg("protocol state already bootstrapped, skipping dynamic startup")
 		return nil
 	}
 
-	// get flow clinet with secure client connection to download protocol snapshot from access node
+	// skip dynamic startup if a root snapshot file is specified - this takes priority
+	rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
+	if utilsio.FileExists(rootSnapshotPath) {
+		log.Info().
+			Str("root_snapshot_path", rootSnapshotPath).
+			Msg("protocol state is not bootstrapped, will bootstrap using configured root snapshot file, skipping dynamic startup")
+		return nil
+	}
+
+	// get flow client with secure client connection to download protocol snapshot from access node
 	config, err := common.NewFlowClientConfig(nodeConfig.DynamicStartupANAddress, nodeConfig.DynamicStartupANPubkey, false)
 	if err != nil {
 		return fmt.Errorf("failed to create flow client config for node dynamic startup pre-init: %w", err)
@@ -157,32 +184,23 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 		return fmt.Errorf("failed to create flow client for node dynamic startup pre-init: %w", err)
 	}
 
-	startupPhase := flow.GetEpochPhase(nodeConfig.BaseConfig.DynamicStartupEpochPhase)
-
-	// ctx with 30 second timeout
-	ctx, cancel := context.WithTimeout(context.Background(), getSnapshotTimeout)
-	defer cancel()
+	getSnapshotFunc := func(ctx context.Context) (protocol.Snapshot, error) {
+		return GetSnapshot(ctx, flowClient)
+	}
 
 	// validate dynamic startup epoch flag
-	startupEpoch, err := validateDynamicStartEpochFlag(ctx, nodeConfig.DynamicStartupEpoch, flowClient)
+	startupEpoch, err := validateDynamicStartEpochFlags(ctx, getSnapshotFunc, nodeConfig.DynamicStartupEpoch)
 	if err != nil {
 		return fmt.Errorf("failed to validate flag --dynamic-start-epoch: %w", err)
 	}
 
+	startupPhase := flow.GetEpochPhase(nodeConfig.DynamicStartupEpochPhase)
+
 	// validate the rest of the dynamic startup flags
-	err = ValidateDynamicStartupFlags(nodeConfig.BaseConfig.DynamicStartupANPubkey, nodeConfig.BaseConfig.DynamicStartupANAddress, startupPhase)
+	err = ValidateDynamicStartupFlags(nodeConfig.DynamicStartupANPubkey, nodeConfig.DynamicStartupANAddress, startupPhase)
 	if err != nil {
 		return err
 	}
-
-	getSnapshotFunc := func() (protocol.Snapshot, error) {
-		return GetSnapshot(ctx, flowClient)
-	}
-
-	log.Info().
-		Str("startup_epoch", nodeConfig.BaseConfig.DynamicStartupEpoch).
-		Str("startup_phase", startupPhase.String()).
-		Msg("waiting until target epoch/phase to start...")
 
 	snapshot, err := GetSnapshotAtEpochAndPhase(
 		ctx,
@@ -196,52 +214,34 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 		return fmt.Errorf("failed to get snapshot at start up epoch (%d) and phase (%s): %w", nodeConfig.BaseConfig.DynamicStartupEpoch, startupPhase.String(), err)
 	}
 
-	log.Info().Str("snapshot-path", rootSnapshotPath).Msg("writing root snapshot file")
-	err = writeRootSnapshotFile(snapshot.(*inmem.Snapshot), rootSnapshotPath)
-	if err != nil {
-		return fmt.Errorf("failed to write root snapshot file: %w", err)
-	}
-
+	// set the root snapshot in the config - we will use this later to bootstrap
+	nodeConfig.RootSnapshot = snapshot
 	return nil
 }
 
-// validateDynamicStartEpochFlag parse the start epoch flag and return the uin64 value,
+// validateDynamicStartEpochFlags parse the start epoch flag and return the uin64 value,
 // if epoch = current return the current epoch counter
-func validateDynamicStartEpochFlag(ctx context.Context, epoch string, client *client.Client) (uint64, error) {
-	if epoch == "current" {
+func validateDynamicStartEpochFlags(ctx context.Context, getSnapshot GetProtocolSnapshot, flagEpoch string) (uint64, error) {
 
-		snapshot, err := GetSnapshot(ctx, client)
+	// if flag is not `current` sentinel, it must be a specific epoch counter (uint64)
+	if flagEpoch != "current" {
+		epochCounter, err := strconv.ParseUint(flagEpoch, 10, 64)
 		if err != nil {
-			return 0, fmt.Errorf("failed to get snapshot: %w", err)
+			return 0, fmt.Errorf("invalid epoch counter flag (%s): %w", flagEpoch, err)
 		}
-
-		counter, err := snapshot.Epochs().Current().Counter()
-		if err != nil {
-			return 0, fmt.Errorf("failed to get current epoch counter: %w", err)
-		}
-
-		return counter, nil
+		return epochCounter, nil
 	}
 
-	counter, err := strconv.ParseUint(string("90"), 10, 64)
+	// we are using the current epoch, retrieve latest snapshot to determine this value
+	snapshot, err := getSnapshot(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse target epoch (%d): %w", counter, err)
+		return 0, fmt.Errorf("failed to get snapshot: %w", err)
 	}
 
-	return counter, nil
-}
-
-// rootSnapshotExists check if root snapshot file exists
-func rootSnapshotExists(path string) bool {
-	return utilsio.FileExists(path)
-}
-
-// writeRootSnapshotFile will write the snapshot to the path provided
-func writeRootSnapshotFile(snapshot *inmem.Snapshot, path string) error {
-	err := utilsio.WriteJSON(path, snapshot.Encodable())
+	epochCounter, err := snapshot.Epochs().Current().Counter()
 	if err != nil {
-		return fmt.Errorf("failed to write root snapshot file: %w", err)
+		return 0, fmt.Errorf("failed to get current epoch counter: %w", err)
 	}
 
-	return nil
+	return epochCounter, nil
 }

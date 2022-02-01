@@ -170,12 +170,16 @@ type NodeConfig struct {
 	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
-	RootBlock                     *flow.Block
-	RootQC                        *flow.QuorumCertificate
-	RootResult                    *flow.ExecutionResult
-	RootSeal                      *flow.Seal
-	RootChainID                   flow.ChainID
-	SporkID                       flow.Identifier
+	RootSnapshot protocol.Snapshot
+	// cached properties of RootSnapshot for convenience
+	RootBlock   *flow.Block
+	RootQC      *flow.QuorumCertificate
+	RootResult  *flow.ExecutionResult
+	RootSeal    *flow.Seal
+	RootChainID flow.ChainID
+	SporkID     flow.Identifier
+
+	// bootstrapping options
 	SkipNwAddressBasedValidations bool
 }
 
