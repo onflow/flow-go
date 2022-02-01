@@ -105,9 +105,12 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	err = client.SendTransaction(ctx, *tx)
 	cancel()
 	assert.Nil(t, err)
+	t.Log("sent transaction: ", tx.ID())
 
 	// wait for the transaction to be included in a collection
 	suite.AwaitTransactionsIncluded(convert.IDFromSDK(tx.ID()))
+
+	t.Log("stopping containers")
 	suite.net.StopContainers()
 
 	state := suite.ClusterStateFor(col1.Config.NodeID)
@@ -118,6 +121,8 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 		ExpectContainsTx(convert.IDFromSDK(tx.ID())).
 		ExpectTxCount(1).
 		Assert(t)
+
+	t.Logf("finish testing single cluster")
 }
 
 // Test sending a single valid transaction to the responsible cluster in a

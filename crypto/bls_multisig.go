@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -72,6 +73,9 @@ func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 // The order of the signatures in the slice does not matter since the aggregation
 // is commutative. The slice should not be empty.
 // No subgroup membership check is performed on the input signatures.
+// Expected error returns during normal operations:
+//  - invalidInputsError if no signatures are provided (sigs is empty) or
+//    at least one signature fails to deserialize.
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -114,6 +118,8 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 // The order of the keys in the slice does not matter since the aggregation
 // is commutative. The slice should not be empty.
 // No check is performed on the input private keys.
+// Expected error returns:
+//  - invalidInputsError if keys is empty or at least one key type is not BLS12-381.
 func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -144,6 +150,8 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // The order of the keys in the slice does not matter since the aggregation
 // is commutative. The slice should not be empty.
 // No check is performed on the input public keys.
+// Expected error returns:
+//  - invalidInputsError if keys is empty or at least one key type is not BLS12-381.
 func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	// set BLS context
 	blsInstance.reInit()
@@ -186,6 +194,8 @@ func NeutralBLSPublicKey() PublicKey {
 // The order of the keys to be removed in the slice does not matter since the removal
 // is commutative. The slice of keys to be removed can be empty.
 // No check is performed on the input public keys.
+// Expected error returns:
+//  - invalidInputsError if at least one key type is not BLS12-381.
 func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey, error) {
 	// set BLS context
 	blsInstance.reInit()

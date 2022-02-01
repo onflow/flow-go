@@ -109,7 +109,7 @@ func main() {
 	go func() {
 		// run load cases
 		for i, c := range cases {
-			log.Info().Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
+			log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
 
 			loaderMetrics.SetTPSConfigured(c.tps)
 

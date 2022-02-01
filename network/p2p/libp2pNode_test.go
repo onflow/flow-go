@@ -52,9 +52,12 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	node, _ := nodeFixture(t,
+	node, _ := nodeFixture(
+		t,
 		ctx,
-		unittest.IdentifierFixture())
+		unittest.IdentifierFixture(),
+		"test_single_node_life_cycle",
+	)
 
 	stopNode(t, node)
 }
@@ -89,7 +92,7 @@ func TestAddPeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), count)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_add_peers", count)
 	defer stopNodes(t, nodes)
 
 	// add the remaining nodes to the first node as its set of peers
@@ -110,7 +113,7 @@ func TestRemovePeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), count)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
 	peerInfos, errs := peerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 	defer stopNodes(t, nodes)
@@ -130,57 +133,44 @@ func TestRemovePeers(t *testing.T) {
 	}
 }
 
-// TestPing tests that a node can ping another node
-func TestPing(t *testing.T) {
+func TestConnGater(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// creates two nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), 2)
-	defer stopNodes(t, nodes)
+	sporkID := unittest.IdentifierFixture()
 
-	node1 := nodes[0]
-	node2 := nodes[1]
-	node1Id := *identities[0]
-	node2Id := *identities[1]
-
-	_, expectedVersion, expectedHeight, expectedView := mockPingInfoProvider()
-
-	// test node1 can ping node 2
-	testPing(t, node1, node2Id, expectedVersion, expectedHeight, expectedView)
-
-	// test node 2 can ping node 1
-	testPing(t, node2, node1Id, expectedVersion, expectedHeight, expectedView)
-}
-
-func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion string, expectedHeight uint64, expectedView uint64) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	pInfo, err := PeerAddressInfo(target)
-	assert.NoError(t, err)
-	source.host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-	resp, rtt, err := source.Ping(ctx, pInfo.ID)
-	assert.NoError(t, err)
-	assert.NotZero(t, rtt)
-	assert.Equal(t, expectedVersion, resp.Version)
-	assert.Equal(t, expectedHeight, resp.BlockHeight)
-	assert.Equal(t, expectedView, resp.HotstuffView)
-}
-
-func TestConnectionGatingBootstrap(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	node, identity := nodesFixture(t, ctx, unittest.IdentifierFixture(), 1)
-	node1 := node[0]
-	node1Id := identity[0]
+	node1Peers := make(map[peer.ID]struct{})
+	node1, identity1 := nodeFixture(t, ctx, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
+		_, ok := node1Peers[pid]
+		return ok
+	}))
 	defer stopNode(t, node1)
-	node1Info, err := PeerAddressInfo(*node1Id)
+	node1Info, err := PeerAddressInfo(identity1)
 	assert.NoError(t, err)
 
-	t.Run("updating allowlist of node w/o ConnGater does not crash", func(t *testing.T) {
-		// node1 allowlists node1
-		node1.UpdateAllowList(peer.IDSlice{node1Info.ID})
-	})
+	node2Peers := make(map[peer.ID]struct{})
+	node2, identity2 := nodeFixture(t, ctx, sporkID, "test_conn_gater", withPeerFilter(func(pid peer.ID) bool {
+		_, ok := node2Peers[pid]
+		return ok
+	}))
+	defer stopNode(t, node2)
+	node2Info, err := PeerAddressInfo(identity2)
+	assert.NoError(t, err)
+
+	node1.host.Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)
+	node2.host.Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.PermanentAddrTTL)
+
+	_, err = node1.CreateStream(ctx, node2Info.ID)
+	assert.Error(t, err, "connection should not be possible")
+
+	_, err = node2.CreateStream(ctx, node1Info.ID)
+	assert.Error(t, err, "connection should not be possible")
+
+	node1Peers[node2Info.ID] = struct{}{}
+	_, err = node1.CreateStream(ctx, node2Info.ID)
+	assert.Error(t, err, "connection should not be possible")
+
+	node2Peers[node1Info.ID] = struct{}{}
+	_, err = node1.CreateStream(ctx, node2Info.ID)
+	assert.NoError(t, err, "connection should not be blocked")
 }
