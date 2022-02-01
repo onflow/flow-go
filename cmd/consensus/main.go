@@ -261,7 +261,7 @@ func main() {
 			}
 
 			// If the node has a beacon key file, then save it to the secrets database
-			// as the beacon key for the first epoch of the root snapshot.
+			// as the beacon key for the epoch of the root snapshot.
 			beaconPrivateKey, err = loadBeaconPrivateKey(node.BaseConfig.BootstrapDir, node.NodeID)
 			if errors.Is(err, os.ErrNotExist) {
 				return fmt.Errorf("node is starting from spork root snapshot, but does not have spork random beacon key file: %w", err)
