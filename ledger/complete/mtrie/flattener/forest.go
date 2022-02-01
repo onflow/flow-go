@@ -49,18 +49,15 @@ func FlattenForest(f *mtrie.Forest) (*FlattenedForest, error) {
 
 	counter := uint64(1) // start from 1, as 0 marks nil
 	for _, t := range tries {
-		for itr := NewNodeIterator(t); itr.Next(); {
+		for itr := NewUniqueNodeIterator(t, allNodes); itr.Next(); {
 			n := itr.Value()
-			// if node not in map
-			if _, has := allNodes[n]; !has {
-				allNodes[n] = counter
-				counter++
-				storableNode, err := toStorableNode(n, allNodes)
-				if err != nil {
-					return nil, fmt.Errorf("failed to construct storable node: %w", err)
-				}
-				storableNodes = append(storableNodes, storableNode)
+			allNodes[n] = counter
+			counter++
+			storableNode, err := toStorableNode(n, allNodes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to construct storable node: %w", err)
 			}
+			storableNodes = append(storableNodes, storableNode)
 		}
 		//fix root nodes indices
 		// since we indexed all nodes, root must be present
