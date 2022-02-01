@@ -126,7 +126,6 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() error {
 	anb.enqueueConnectWithStakedAN()
 
 	anb.PreInit(anb.initUnstakedLocal())
-	anb.PreInit(cmd.DynamicStartPreInit)
 
 	return nil
 }
