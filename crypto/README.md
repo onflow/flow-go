@@ -79,12 +79,12 @@ fi
 ``` 
 
 
-When building your project and including any BLS functionality, adding a build tag to include the BLS files in the build is required.
+Finally, when building your project and including any BLS functionality, adding a Go build tag to include the BLS files in the build is required.
 The tag is not required when the package is used without BLS functions. It was introduced to avoid build errors when BLS (and therefore Relic) is not needed.
+
 ```
 go build -tags=relic
 ```
-
 
 ## Algorithms
 
