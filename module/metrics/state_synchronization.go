@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
 )
@@ -22,8 +21,8 @@ type ExecutionDataServiceCollector struct {
 	executionDataBlobTreeSize prometheus.Histogram
 }
 
-func NewExecutionDataServiceCollector() module.ExecutionDataServiceMetrics {
-	executionDataAddDuration := promauto.NewHistogram(prometheus.HistogramOpts{
+func NewExecutionDataServiceCollector(registerer prometheus.Registerer) module.ExecutionDataServiceMetrics {
+	executionDataAddDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_add_duration_ms",
@@ -31,21 +30,21 @@ func NewExecutionDataServiceCollector() module.ExecutionDataServiceMetrics {
 		Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 	})
 
-	executionDataAddInProgress := promauto.NewGauge(prometheus.GaugeOpts{
+	executionDataAddInProgress := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_add_in_progress",
 		Help:      "number of concurrently running execution data add operations",
 	})
 
-	executionDataAddFailCount := promauto.NewCounter(prometheus.CounterOpts{
+	executionDataAddFailCount := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_add_fail_total",
 		Help:      "number of failed execution data add operations",
 	})
 
-	executionDataGetDuration := promauto.NewHistogram(prometheus.HistogramOpts{
+	executionDataGetDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_get_duration_ms",
@@ -53,27 +52,35 @@ func NewExecutionDataServiceCollector() module.ExecutionDataServiceMetrics {
 		Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 	})
 
-	executionDataGetInProgress := promauto.NewGauge(prometheus.GaugeOpts{
+	executionDataGetInProgress := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_get_in_progress",
 		Help:      "number of concurrently running execution data get operations",
 	})
 
-	executionDataGetFailCount := promauto.NewCounter(prometheus.CounterOpts{
+	executionDataGetFailCount := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_get_fail_total",
 		Help:      "number of failed execution data get operations",
 	})
 
-	executionDataBlobTreeSize := promauto.NewHistogram(prometheus.HistogramOpts{
+	executionDataBlobTreeSize := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_blob_tree_size",
 		Help:      "the size execution data blob tree",
 		Buckets:   []float64{1, 1000, 10000, 50000, 100000, 500000, 1000000, 10000000, 50000000, 100000000, 250000000, 500000000},
 	})
+
+	registerer.MustRegister(executionDataAddDuration)
+	registerer.MustRegister(executionDataAddInProgress)
+	registerer.MustRegister(executionDataAddFailCount)
+	registerer.MustRegister(executionDataGetDuration)
+	registerer.MustRegister(executionDataGetInProgress)
+	registerer.MustRegister(executionDataGetFailCount)
+	registerer.MustRegister(executionDataBlobTreeSize)
 
 	return &ExecutionDataServiceCollector{
 		executionDataAddDuration:   executionDataAddDuration,
