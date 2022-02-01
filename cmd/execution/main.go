@@ -192,7 +192,7 @@ func main() {
 			return nil
 		}).
 		Module("execution data service metrics", func(node *cmd.NodeConfig) error {
-			executionDataServiceCollector = metrics.NewExecutionDataServiceCollector()
+			executionDataServiceCollector = metrics.NewExecutionDataServiceCollector(node.MetricsRegisterer)
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
