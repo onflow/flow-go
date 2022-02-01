@@ -63,10 +63,10 @@ type VoteCollector interface {
 	// It returns other error if there is exception processing the block.
 	ProcessBlock(block *model.Proposal) error
 
-	// AddVote adds a vote to the collector
-	// return error if the signature is invalid
-	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
-	// passed to EventLoop through a callback.
+	// AddVote adds a vote to the vote collector. When enough votes have been
+	// added to produce a QC, the QC will be created asynchronously.
+	// All expected errors are handled internally. Under normal execution only
+	// exceptions are propagated to caller.
 	AddVote(vote *model.Vote) error
 
 	// RegisterVoteConsumer registers a VoteConsumer. Upon registration, the collector

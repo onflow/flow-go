@@ -132,9 +132,19 @@ func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote)
 	lc.log.Warn().
 		Uint64("vote_view", vote.View).
 		Hex("voted_block_id", vote.BlockID[:]).
-		Hex("alt_id", alt.BlockID[:]).
+		Hex("alt_block_id", alt.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
-		Msg("double vote detected")
+		Msg("replica voted for different blocks in the same view")
+}
+
+func (lc *LogConsumer) OnInconsistentVotingDetected(vote *model.Vote, alt *model.Vote) {
+	lc.log.Warn().
+		Uint64("vote_view", vote.View).
+		Hex("voter_id", vote.SignerID[:]).
+		Hex("voted_block_id", vote.BlockID[:]).
+		Hex("signature", vote.SigData).
+		Hex("alt_signature", alt.SigData).
+		Msg("replica emitted votes with inconsistent signatures for the same block")
 }
 
 func (lc *LogConsumer) OnInvalidVoteDetected(vote *model.Vote) {

@@ -16,7 +16,7 @@ import (
 // TestVotesCache_View tests that View returns same value that was set by constructor
 func TestVotesCache_View(t *testing.T) {
 	view := uint64(100)
-	cache := NewVotesCache(view)
+	cache := NewViewSpecificVotesCache(view)
 	require.Equal(t, view, cache.View())
 }
 
@@ -25,12 +25,12 @@ func TestVotesCache_AddVoteRepeatedVote(t *testing.T) {
 	t.Parallel()
 
 	view := uint64(100)
-	cache := NewVotesCache(view)
+	cache := NewViewSpecificVotesCache(view)
 	vote := unittest.VoteFixture(unittest.WithVoteView(view))
 
 	require.NoError(t, cache.AddVote(vote))
 	err := cache.AddVote(vote)
-	require.ErrorIs(t, err, RepeatedVoteErr)
+	require.ErrorIs(t, err, DuplicatedVoteErr)
 }
 
 // TestVotesCache_AddVoteIncompatibleView tests that adding vote with incompatible view results in error
@@ -38,7 +38,7 @@ func TestVotesCache_AddVoteIncompatibleView(t *testing.T) {
 	t.Parallel()
 
 	view := uint64(100)
-	cache := NewVotesCache(view)
+	cache := NewViewSpecificVotesCache(view)
 	vote := unittest.VoteFixture(unittest.WithVoteView(view + 1))
 	err := cache.AddVote(vote)
 	require.ErrorIs(t, err, VoteForIncompatibleViewError)
@@ -50,7 +50,7 @@ func TestVotesCache_GetVote(t *testing.T) {
 	knownVote := unittest.VoteFixture(unittest.WithVoteView(view))
 	doubleVote := unittest.VoteFixture(unittest.WithVoteView(view), unittest.WithVoteSignerID(knownVote.SignerID))
 
-	cache := NewVotesCache(view)
+	cache := NewViewSpecificVotesCache(view)
 
 	// unknown vote
 	vote, found := cache.GetVote(unittest.IdentifierFixture())
@@ -77,7 +77,7 @@ func TestVotesCache_All(t *testing.T) {
 	t.Parallel()
 
 	view := uint64(100)
-	cache := NewVotesCache(view)
+	cache := NewViewSpecificVotesCache(view)
 	expectedVotes := make([]*model.Vote, 0, 5)
 	for i := range expectedVotes {
 		vote := unittest.VoteFixture(unittest.WithVoteView(view))
@@ -93,7 +93,7 @@ func TestVotesCache_RegisterVoteConsumer(t *testing.T) {
 	t.Parallel()
 
 	view := uint64(100)
-	cache := NewVotesCache(view)
+	cache := NewViewSpecificVotesCache(view)
 	votesBatchSize := 5
 	expectedVotes := make([]*model.Vote, 0, votesBatchSize)
 	// produce first batch before registering vote consumer
@@ -125,7 +125,7 @@ func TestVotesCache_RegisterVoteConsumer(t *testing.T) {
 	require.Equal(t, expectedVotes, consumedVotes)
 }
 
-// BenchmarkAdd measured the time it takes to add `numberVotes` concurrently to the VotesCache.
+// BenchmarkAdd measured the time it takes to add `numberVotes` concurrently to the ViewSpecificVotesCache.
 // On MacBook with Intel i7-7820HQ CPU @ 2.90GHz:
 // adding 1 million votes in total, with 20 threads concurrently, took 0.48s
 func BenchmarkAdd(b *testing.B) {
@@ -134,7 +134,7 @@ func BenchmarkAdd(b *testing.B) {
 
 	// Setup: create worker routines and votes to feed
 	view := uint64(10)
-	cache := NewVotesCache(view)
+	cache := NewViewSpecificVotesCache(view)
 
 	var start sync.WaitGroup
 	start.Add(threads)

@@ -140,6 +140,17 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnDoubleVotingDetected(*model.Vote, *model.Vote)
 
+	// OnInconsistentVotingDetected notifications are produced by the Vote Aggregation
+	// logic whenever a consensus replica has emitted inconsistent votes for the _same_
+	// block. This is only relevant for voting schemes where the voting replica has
+	// different options how to sign (e.g. a replica can sign with their staking key
+	// and/or their random beacon key).
+	// For such voting schemes, byzantine replicas could try to submit different
+	// votes for the same block, attempting to deplete the primary's resources or be
+	// counted repeatedly towards the supermajority threshold to undermine consensus
+	// safety. Sending InconsistentVote belongs to the family of equivocation attacks.
+	OnInconsistentVotingDetected(*model.Vote, *model.Vote)
+
 	// OnInvalidVoteDetected notifications are produced by the Vote Aggregation logic
 	// whenever an invalid vote was detected.
 	// Prerequisites:

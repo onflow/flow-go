@@ -127,7 +127,7 @@ func (e ByzantineThresholdExceededError) Error() string {
 	return e.Evidence
 }
 
-// DoubleVoteError indicates that a consensus replica has voted for two different
+// DoubleVoteError indicates that a consensus replica has voted for two _different_
 // blocks, or has provided two semantically different votes for the same block.
 type DoubleVoteError struct {
 	FirstVote       *Vote
@@ -165,6 +165,53 @@ func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...i
 		FirstVote:       firstVote,
 		ConflictingVote: conflictingVote,
 		err:             fmt.Errorf(msg, args...),
+	}
+}
+
+// InconsistentVoteError indicates that a consensus replica has emitted
+// inconsistent votes for the _same_ block. This is only relevant for voting
+// schemes where the voting replica has different options how to sign (e.g. a
+// replica can sign with their staking key and/or their random beacon key).
+// For such voting schemes, byzantine replicas could try to submit different
+// votes for the same block, attempting to deplete the primary's resources
+// or have multiple of their votes counted to undermine consensus safety.
+// Sending InconsistentVote belongs to the family of equivocation attacks.
+type InconsistentVoteError struct {
+	FirstVote        *Vote
+	InconsistentVote *Vote
+	err              error
+}
+
+func (e InconsistentVoteError) Error() string {
+	return e.err.Error()
+}
+
+// IsInconsistentVoteError returns whether an error is InconsistentVoteError
+func IsInconsistentVoteError(err error) bool {
+	var e InconsistentVoteError
+	return errors.As(err, &e)
+}
+
+// AsInconsistentVoteError determines whether the given error is a InconsistentVoteError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInconsistentVoteError(err error) (*InconsistentVoteError, bool) {
+	var e InconsistentVoteError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
+func (e InconsistentVoteError) Unwrap() error {
+	return e.err
+}
+
+func NewInconsistentVoteErrorf(firstVote, inconsistentVote *Vote, msg string, args ...interface{}) error {
+	return InconsistentVoteError{
+		FirstVote:        firstVote,
+		InconsistentVote: inconsistentVote,
+		err:              fmt.Errorf(msg, args...),
 	}
 }
 

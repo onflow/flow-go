@@ -28,6 +28,16 @@ func (c *SlashingViolationsConsumer) OnDoubleVotingDetected(vote1 *model.Vote, v
 		Msg("OnDoubleVotingDetected")
 }
 
+func (c *SlashingViolationsConsumer) OnInconsistentVotingDetected(vote1 *model.Vote, vote2 *model.Vote) {
+	c.log.Warn().
+		Uint64("vote_view", vote1.View).
+		Hex("voter_id", vote1.SignerID[:]).
+		Hex("voted_block_id", vote1.BlockID[:]).
+		Hex("signature", vote1.SigData).
+		Hex("alt_signature", vote2.SigData).
+		Msg("OnInconsistentVotingDetected")
+}
+
 func (c *SlashingViolationsConsumer) OnInvalidVoteDetected(vote *model.Vote) {
 	c.log.Warn().
 		Uint64("vote_view", vote.View).

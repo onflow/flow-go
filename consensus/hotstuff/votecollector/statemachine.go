@@ -28,7 +28,7 @@ type VoteCollector struct {
 	notifier                 hotstuff.Consumer
 	createVerifyingProcessor VerifyingVoteProcessorFactory
 
-	votesCache     VotesCache
+	votesCache     ViewSpecificVotesCache
 	votesProcessor atomic.Value
 }
 
@@ -62,6 +62,8 @@ func NewStateMachine(
 	notifier hotstuff.Consumer,
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) *VoteCollector {
+	vc := NewViewSpecificVotesCache(view)
+
 	log = log.With().
 		Str("hotstuff", "VoteCollector").
 		Uint64("view", view).
@@ -71,7 +73,7 @@ func NewStateMachine(
 		workers:                  workers,
 		notifier:                 notifier,
 		createVerifyingProcessor: verifyingVoteProcessorFactory,
-		votesCache:               *NewVotesCache(view),
+		votesCache:               *NewViewSpecificVotesCache(view),
 	}
 
 	// without a block, we don't process votes (only cache them)
@@ -81,24 +83,31 @@ func NewStateMachine(
 	return sm
 }
 
-// AddVote adds a vote to current vote collector
-// All expected errors are handled via callbacks to notifier.
-// Under normal execution only exceptions are propagated to caller.
+// AddVote adds a vote to the vote collector. When enough votes have been
+// added to produce a QC, the QC will be created asynchronously, and passed
+// to EventLoop through a callback.
+// All expected errors are handled internally. Under normal execution only
+// exceptions are propagated to caller.
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
-	err := m.votesCache.AddVote(vote)
+	err := m.votesCache.AddVote(vote) // only accepts votes for pre-configured view
 	if err != nil {
-		if errors.Is(err, RepeatedVoteErr) {
+		if errors.Is(err, DuplicatedVoteErr) {
 			return nil
 		}
 		if doubleVoteErr, isDoubleVoteErr := model.AsDoubleVoteError(err); isDoubleVoteErr {
 			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
 			return nil
 		}
+		if inconsistentVoteErr, isInconsistentVoteErr := model.AsInconsistentVoteError(err); isInconsistentVoteErr {
+			m.notifier.OnDoubleVotingDetected(inconsistentVoteErr.FirstVote, inconsistentVoteErr.InconsistentVote)
+			return nil
+		}
 		return fmt.Errorf("internal error adding vote %v to cache for block %v: %w",
 			vote.ID(), vote.BlockID, err)
 	}
 
+	// process vote
 	err = m.processVote(vote)
 	if err != nil {
 		if errors.Is(err, VoteForIncompatibleBlockError) {
@@ -173,7 +182,6 @@ func (m *VoteCollector) View() uint64 {
 //         CachingVotes   -> Invalid
 //         VerifyingVotes -> Invalid
 func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
-
 	if proposal.Block.View != m.View() {
 		return fmt.Errorf("this VoteCollector requires a proposal for view %d but received block %v with view %d",
 			m.votesCache.View(), proposal.Block.BlockID, proposal.Block.View)
@@ -189,7 +197,6 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 			if errors.Is(err, ErrDifferentCollectorState) {
 				continue // concurrent state update by other thread => restart our logic
 			}
-
 			if err != nil {
 				return fmt.Errorf("internal error updating VoteProcessor's status from %s to %s for block %v: %w",
 					proc.Status().String(), hotstuff.VoteCollectorStatusVerifying.String(), proposal.Block.BlockID, err)

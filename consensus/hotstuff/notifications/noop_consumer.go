@@ -49,6 +49,8 @@ func (*NoopConsumer) OnForkChoiceGenerated(uint64, *flow.QuorumCertificate) {}
 
 func (*NoopConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
+func (*NoopConsumer) OnInconsistentVotingDetected(*model.Vote, *model.Vote) {}
+
 func (*NoopConsumer) OnInvalidVoteDetected(*model.Vote) {}
 
 func (*NoopConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}

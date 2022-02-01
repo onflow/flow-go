@@ -9,8 +9,18 @@ import (
 )
 
 var (
-	VoteForIncompatibleViewError  = errors.New("vote for incompatible view")
+	// VoteForIncompatibleViewError is emitted, if a view-specific component
+	// receives a vote for a different view number.
+	VoteForIncompatibleViewError = errors.New("vote for incompatible view")
+
+	// VoteForIncompatibleBlockError is emitted, if a block-specific component
+	// receives a vote for a different block ID.
 	VoteForIncompatibleBlockError = errors.New("vote for incompatible block")
+
+	// DuplicatedVoteErr is emitted, when we receive an _identical_ duplicated
+	// vote for the same block from the same block. This error does _not_
+	// indicate equivocation.
+	DuplicatedVoteErr = errors.New("duplicated vote")
 )
 
 /******************************* NoopProcessor *******************************/

@@ -157,6 +157,14 @@ func (p *Distributor) OnDoubleVotingDetected(vote1, vote2 *model.Vote) {
 	}
 }
 
+func (p *Distributor) OnInconsistentVotingDetected(vote1, vote2 *model.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnInconsistentVotingDetected(vote1, vote2)
+	}
+}
+
 func (p *Distributor) OnInvalidVoteDetected(vote *model.Vote) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()

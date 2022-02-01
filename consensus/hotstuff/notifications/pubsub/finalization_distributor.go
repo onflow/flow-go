@@ -104,6 +104,8 @@ func (p *FinalizationDistributor) OnForkChoiceGenerated(uint64, *flow.QuorumCert
 
 func (p *FinalizationDistributor) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
+func (p *FinalizationDistributor) OnInconsistentVotingDetected(*model.Vote, *model.Vote) {}
+
 func (p *FinalizationDistributor) OnInvalidVoteDetected(*model.Vote) {}
 
 func (p *FinalizationDistributor) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}
