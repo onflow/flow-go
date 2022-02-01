@@ -12,6 +12,8 @@ import (
 type ExecutionDataCIDCache interface {
 	Get(c cid.Cid) (BlobRecord, error)
 	Insert(header *flow.Header, blobTree BlobTree)
+	BlobTreeRecords() uint
+	BlobRecords() uint
 }
 
 type ExecutionDataCIDCacheImpl struct {
@@ -57,6 +59,20 @@ func (e *ExecutionDataCIDCacheImpl) Get(c cid.Cid) (BlobRecord, error) {
 	} else {
 		return BlobRecord{}, ErrCacheMiss
 	}
+}
+
+func (e *ExecutionDataCIDCacheImpl) BlobTreeRecords() uint {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return uint(len(e.blobTrees))
+}
+
+func (e *ExecutionDataCIDCacheImpl) BlobRecords() uint {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return uint(len(e.blobs))
 }
 
 func (e *ExecutionDataCIDCacheImpl) insertBlobTree(header *flow.Header, blobTree BlobTree) *BlobTreeRecord {

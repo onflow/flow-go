@@ -15,6 +15,34 @@ type ExecutionDataCIDCache struct {
 	mock.Mock
 }
 
+// BlobRecords provides a mock function with given fields:
+func (_m *ExecutionDataCIDCache) BlobRecords() uint {
+	ret := _m.Called()
+
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint)
+	}
+
+	return r0
+}
+
+// BlobTreeRecords provides a mock function with given fields:
+func (_m *ExecutionDataCIDCache) BlobTreeRecords() uint {
+	ret := _m.Called()
+
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint)
+	}
+
+	return r0
+}
+
 // Get provides a mock function with given fields: c
 func (_m *ExecutionDataCIDCache) Get(c cid.Cid) (state_synchronization.BlobRecord, error) {
 	ret := _m.Called(c)
