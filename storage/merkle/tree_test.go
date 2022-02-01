@@ -110,7 +110,6 @@ func Test_ReferenceSingleEntry(t *testing.T) {
 	})
 
 	t.Run("maxKeyLength-byte path", func(t *testing.T) {
-		t.Skip()
 		// as key, we just repeat the following 32 bytes 256 times
 		k, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a33f0267b56b9a7be8defe38958f89c95fc")
 		key := make([]byte, 0, maxKeyLength)
@@ -119,13 +118,13 @@ func Test_ReferenceSingleEntry(t *testing.T) {
 		}
 		key = append(key, k[:maxKeyLength%len(k)]...)
 
-		expectedRootHash := "80ae4aaff2f9cc82e56968db6c313a578b07723701e6fd745f256b30fac496bf" // from python reference impl
+		expectedRootHash := "bf6eab5ce259b8a936f4fe205ca49f5d6614a7bee4162cafa5a6ab4691eba40d" // from python reference impl
 		tree, err := NewTree(len(key))
 		assert.NoError(t, err)
 		replaced, err := tree.Put(key, val)
 		assert.NoError(t, err)
 		assert.False(t, replaced)
-		require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
+		assert.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
 	})
 }
 

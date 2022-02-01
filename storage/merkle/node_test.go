@@ -85,7 +85,6 @@ func TestShortHash(t *testing.T) {
 	})
 
 	t.Run("maxKeyLenBits-bit path", func(t *testing.T) {
-		t.Skip()
 		// as path, we just repeat the following 32 bytes 256 times
 		k, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a33f0267b56b9a7be8defe38958f89c95fc")
 		path := make([]byte, 0, maxKeyLength)
@@ -94,7 +93,7 @@ func TestShortHash(t *testing.T) {
 		}
 		path = append(path, k[:maxKeyLength%len(k)]...)
 		// expected value from python reference implementation
-		ref := "b49541ce56e5cd207cac3a08821ddfc61fc5aaf8886907d226581a7c53a48827"
+		ref := "22eb614e20aae939ff38a0dced42fdebb95199e725f1c898e2c5141e7c9d6848"
 
 		s := short{
 			path:  path,
