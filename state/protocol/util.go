@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
-// IsNodeStakedAt returns whether or not the node with the given ID is a valid
+// IsNodeStakedAt returns whether the node with the given ID is a valid
 // staked, un-ejected node as of the given state snapshot.
 func IsNodeStakedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
 	return CheckNodeStatusAt(
@@ -18,7 +18,7 @@ func IsNodeStakedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
 	)
 }
 
-// IsNodeStakedWithRoleAt returns whether or not the node with the given ID is a valid
+// IsNodeStakedWithRoleAt returns whether the node with the given ID is a valid
 // staked, un-ejected node with the specified role as of the given state snapshot.
 // Expected errors during normal operations:
 //  * storage.ErrNotFound if snapshot references an unknown block
@@ -33,7 +33,7 @@ func IsNodeStakedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow.Rol
 	)
 }
 
-// CheckNodeStatusAt returns whether or not the node with the given ID is a valid identity at the given
+// CheckNodeStatusAt returns whether the node with the given ID is a valid identity at the given
 // state snapshot, and satisfies all checks.
 // Expected errors during normal operations:
 //  * storage.ErrNotFound if snapshot references an unknown block
@@ -53,5 +53,19 @@ func CheckNodeStatusAt(snapshot Snapshot, id flow.Identifier, checks ...flow.Ide
 		}
 	}
 
+	return true, nil
+}
+
+// IsSporkRootSnapshot returns whether the given snapshot is the state snapshot
+// representing the initial state for a spork.
+func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
+	segment, err := snapshot.SealingSegment()
+	if err != nil {
+		return false, fmt.Errorf("could not get snapshot head: %w", err)
+	}
+	if len(segment.Blocks) > 1 {
+		// spork root snapshots uniquely have only one block in the sealing segment
+		return false, nil
+	}
 	return true, nil
 }
