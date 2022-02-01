@@ -216,7 +216,7 @@ func RunFastKG(n int, seed []byte) (model.DKGData, error) {
 		return dkgData, nil
 	}
 
-	skShares, pkShares, pkGroup, err := crypto.ThresholdSignKeyGen(int(n),
+	skShares, pkShares, pkGroup, err := crypto.BLSThresholdKeyGen(int(n),
 		signature.RandomBeaconThreshold(int(n)), seed)
 	if err != nil {
 		return model.DKGData{}, fmt.Errorf("fast KeyGen failed: %w", err)
