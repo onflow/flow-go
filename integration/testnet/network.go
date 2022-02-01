@@ -63,6 +63,8 @@ const (
 	// DefaultExecutionRootDir is the default directory for the execution node
 	// state database.
 	DefaultExecutionRootDir = "/exedb"
+	// DefaultExecutionDataServiceDir for the execution data service blobstore.
+	DefaultExecutionDataServiceDir = "/data/execution_data"
 
 	// ColNodeAPIPort is the name used for the collection node API port.
 	ColNodeAPIPort = "col-ingress-port"
@@ -98,6 +100,8 @@ const (
 	DefaultFlowPort = 2137
 	// DefaultSecureGRPCPort is the port used to access secure GRPC server running on ANs
 	DefaultSecureGRPCPort = 9001
+	// AccessNodePublicNetworkPort is the port used by access nodes for the public libp2p network
+	AccessNodePublicNetworkPort = 9876
 
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
@@ -777,6 +781,16 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 
+			tmpExeDataDir, err := ioutil.TempDir(tmpdir, "execution-data")
+			require.NoError(t, err)
+
+			opts.HostConfig.Binds = append(
+				opts.HostConfig.Binds,
+				fmt.Sprintf("%s:%s:rw", tmpExeDataDir, DefaultExecutionDataServiceDir),
+			)
+
+			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
+
 		case flow.RoleAccess:
 			hostGRPCPort := testingdock.RandomPort(t)
 			hostHTTPProxyPort := testingdock.RandomPort(t)
@@ -802,9 +816,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			if nodeConf.SupportsUnstakedNodes {
 				hostExternalNetworkPort := testingdock.RandomPort(t)
-				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
+				containerExternalNetworkPort := fmt.Sprintf("%d/tcp", AccessNodePublicNetworkPort)
+				nodeContainer.bindPort(hostExternalNetworkPort, containerExternalNetworkPort)
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
 				nodeContainer.AddFlag("supports-unstaked-node", "true")
+				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
 			}
 
 			hostMetricsPort := testingdock.RandomPort(t)

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/module"
@@ -184,14 +185,36 @@ func (k *Key) Size() int {
 }
 
 // CanonicalForm returns a byte slice describing the key
-// Warning, Changing this has an impact on how leaf hashes are computed
+// Warning: Changing this has an impact on how leaf hashes are computed!
 // don't use this to reconstruct the key later
 func (k *Key) CanonicalForm() []byte {
-	ret := ""
+	// calculate the size of the byte array
+
+	// the maximum size of a uint16 is 5 characters, so
+	// this is using 10 for the estimate, to include the two '/'
+	// characters and an extra 3 characters for padding safety
+
+	constant := 10
+
+	requiredLen := constant * len(k.KeyParts)
 	for _, kp := range k.KeyParts {
-		ret += fmt.Sprintf("/%d/%v", kp.Type, string(kp.Value))
+		requiredLen += len(kp.Value)
 	}
-	return []byte(ret)
+
+	retval := make([]byte, 0, requiredLen)
+
+	for _, kp := range k.KeyParts {
+		typeNumber := strconv.Itoa(int(kp.Type))
+
+		retval = append(retval, byte('/'))
+		retval = append(retval, []byte(typeNumber)...)
+		retval = append(retval, byte('/'))
+		retval = append(retval, kp.Value...)
+	}
+
+	// create a byte slice with the correct size and copy
+	// the estimated string into it.
+	return retval
 }
 
 func (k *Key) String() string {
