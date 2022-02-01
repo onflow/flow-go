@@ -36,10 +36,9 @@ func buildTransaction() map[string]interface{} {
 		},
 		"authorizers": auth,
 		"envelope_signatures": []map[string]interface{}{{
-			"address":      tx.EnvelopeSignatures[0].Address.String(),
-			"signer_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].SignerIndex),
-			"key_index":    fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
-			"signature":    util.ToBase64(tx.EnvelopeSignatures[0].Signature),
+			"address":   tx.EnvelopeSignatures[0].Address.String(),
+			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
+			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
 		}},
 	}
 }
@@ -61,7 +60,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 		{"gas_limit", "-1", "invalid gas limit: value must be an unsigned 64 bit integer"},
 		{"payer", "-1", "invalid payer: invalid address"},
 		{"authorizers", "-1", `request body contains an invalid value for the "authorizers" field (at position 34)`},
-		{"proposal_key", "-1", `request body contains an invalid value for the "proposal_key" field (at position 307)`},
+		{"proposal_key", "-1", `request body contains an invalid value for the "proposal_key" field (at position 288)`},
 		{"envelope_signatures", "", `request body contains an invalid value for the "envelope_signatures" field (at position 75)`},
 		{"envelope_signatures", "[]", `request body contains an invalid value for the "envelope_signatures" field (at position 77)`},
 	}
@@ -72,7 +71,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 		input := transactionToReader(tx)
 
 		var transaction Transaction
-		err := transaction.Parse(input)
+		err := transaction.Parse(input, flow.Testnet.Chain())
 
 		assert.EqualError(t, err, test.output)
 	}
@@ -93,7 +92,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 		input := transactionToReader(tx)
 
 		var transaction Transaction
-		err := transaction.Parse(input)
+		err := transaction.Parse(input, flow.Testnet.Chain())
 
 		assert.EqualError(t, err, test.output)
 	}
@@ -105,7 +104,6 @@ func TestTransaction_InvalidParse(t *testing.T) {
 	}{
 		{"address", "-1", "invalid address"},
 		{"key_index", "-1", `invalid key index: value must be an unsigned 64 bit integer`},
-		{"signer_index", "-1", "invalid signer index: value must be an unsigned 64 bit integer"},
 		{"signature", "-1", "invalid signature: invalid encoding"},
 	}
 
@@ -115,7 +113,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 		input := transactionToReader(tx)
 
 		var transaction Transaction
-		err := transaction.Parse(input)
+		err := transaction.Parse(input, flow.Testnet.Chain())
 
 		assert.EqualError(t, err, test.output)
 	}
@@ -128,7 +126,7 @@ func TestTransaction_ValidParse(t *testing.T) {
 	input := transactionToReader(tx)
 
 	var transaction Transaction
-	err := transaction.Parse(input)
+	err := transaction.Parse(input, flow.Testnet.Chain())
 
 	assert.NoError(t, err)
 	assert.Equal(t, tx["payer"], transaction.Flow().Payer.String())

@@ -9,9 +9,10 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-func newRouter(backend access.API, logger zerolog.Logger) (*mux.Router, error) {
+func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain) (*mux.Router, error) {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -23,7 +24,7 @@ func newRouter(backend access.API, logger zerolog.Logger) (*mux.Router, error) {
 	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
 
 	for _, r := range Routes {
-		h := NewHandler(logger, backend, r.Handler, linkGenerator)
+		h := NewHandler(logger, backend, r.Handler, linkGenerator, chain)
 		v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
