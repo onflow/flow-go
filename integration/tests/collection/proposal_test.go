@@ -16,7 +16,6 @@ import (
 // Run consensus on a multi-cluster setup. Ensure that transactions
 // are always included in the appropriate cluster.
 func (suite *CollectorSuite) TestProposal_MultiCluster() {
-
 	var (
 		nNodes        = 9
 		nClusters     = 3

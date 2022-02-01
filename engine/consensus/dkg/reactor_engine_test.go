@@ -216,6 +216,9 @@ func (suite *ReactorEngineSuite_SetupPhase) TestRunDKG_StartupInSetupPhase() {
 	// start up the engine
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
 
+	// keyStorage := new(storage.DKGKeys)
+	// keyStorage.On("RetrieveMyDKGPrivateInfo", currentCounter+1).Return(dkgParticipantPrivInfo, true, nil)
+	// factory := new(module.DKGControllerFactory)
 	for view := uint64(100); view <= 250; view += dkg.DefaultPollStep {
 		suite.viewEvents.BlockFinalized(suite.blocksByView[view])
 	}

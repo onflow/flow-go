@@ -3,6 +3,7 @@ package forks
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -12,6 +13,8 @@ type Forks struct {
 	finalizer  Finalizer
 	forkchoice ForkChoice
 }
+
+var _ hotstuff.Forks = (*Forks)(nil)
 
 // New creates a Forks instance
 func New(finalizer Finalizer, forkchoice ForkChoice) *Forks {
