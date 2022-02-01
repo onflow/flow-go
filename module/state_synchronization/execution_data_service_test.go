@@ -25,6 +25,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -114,18 +115,20 @@ func executionData(t *testing.T, s *serializer, minSerializedSize uint64) (*Exec
 	}
 }
 
-func getExecutionData(eds ExecutionDataService, rootCid cid.Cid, timeout time.Duration) (*ExecutionData, error) {
+func getExecutionData(eds ExecutionDataService, rootID flow.Identifier, timeout time.Duration) (*ExecutionData, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return eds.Get(ctx, rootCid)
+	return eds.Get(ctx, rootID)
 }
 
-func addExecutionData(eds ExecutionDataService, ed *ExecutionData, timeout time.Duration) (cid.Cid, error) {
+func addExecutionData(eds ExecutionDataService, ed *ExecutionData, timeout time.Duration) (flow.Identifier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return eds.Add(ctx, ed)
+	id, _, err := eds.Add(ctx, ed)
+
+	return id, err
 }
 
 func putBlob(bs blockstore.Blockstore, data []byte, timeout time.Duration) (cid.Cid, error) {
@@ -173,7 +176,7 @@ func executionDataService(bs network.BlobService) *executionDataServiceImpl {
 	return NewExecutionDataService(codec, compressor, bs, metrics.NewNoopCollector(), zerolog.Nop())
 }
 
-func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Blockstore, timeout time.Duration) cid.Cid {
+func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Blockstore, timeout time.Duration) flow.Identifier {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -196,7 +199,10 @@ func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Block
 		require.NoError(t, bs.PutMany(ctx, batch))
 
 		if numBlobs <= 1 {
-			return batch[0].Cid()
+			id, err := flow.CidToFlowID(batch[0].Cid())
+			require.NoError(t, err)
+
+			return id
 		}
 
 		cids := make([]cid.Cid, numBlobs)
@@ -236,8 +242,8 @@ func TestMalformedData(t *testing.T) {
 	eds := executionDataService(mockBlobService(bs))
 
 	test := func(data []byte) {
-		rootCid := writeBlobTree(t, eds.serializer, data, bs, time.Second)
-		_, err := getExecutionData(eds, rootCid, time.Second)
+		rootID := writeBlobTree(t, eds.serializer, data, bs, time.Second)
+		_, err := getExecutionData(eds, rootID, time.Second)
 		var malformedDataError *MalformedDataError
 		assert.ErrorAs(t, err, &malformedDataError)
 	}
@@ -262,7 +268,9 @@ func TestOversizedBlob(t *testing.T) {
 	test := func(data []byte) {
 		cid, err := putBlob(bs, data, time.Second)
 		require.NoError(t, err)
-		_, err = getExecutionData(eds, cid, time.Second)
+		fid, err := flow.CidToFlowID(cid)
+		require.NoError(t, err)
+		_, err = getExecutionData(eds, fid, time.Second)
 		var blobSizeLimitExceededError *BlobSizeLimitExceededError
 		assert.ErrorAs(t, err, &blobSizeLimitExceededError)
 	}
@@ -419,6 +427,12 @@ func createBlobService(ctx irrecoverable.SignalerContext, t *testing.T, ds datas
 	return service, h
 }
 
+func closeHost(t *testing.T, h host.Host) {
+	if err := h.Close(); err != nil {
+		require.FailNow(t, "failed to close host", err.Error())
+	}
+}
+
 func TestWithNetwork(t *testing.T) {
 	t.Parallel()
 
@@ -428,7 +442,9 @@ func TestWithNetwork(t *testing.T) {
 	ctx, errChan := irrecoverable.WithSignaler(parent)
 
 	service1, h1 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-create-store-request")
+	defer closeHost(t, h1)
 	service2, h2 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-create-store-request")
+	defer closeHost(t, h2)
 
 	done := make(chan struct{})
 
@@ -483,6 +499,7 @@ func TestReprovider(t *testing.T) {
 	require.NoError(t, err)
 
 	h1, err := libp2p.New()
+	defer closeHost(t, h1)
 	require.NoError(t, err)
 	cr1, err := dht.New(ctx, h1, dht.Mode(dht.ModeServer))
 	require.NoError(t, err)
@@ -496,7 +513,9 @@ func TestReprovider(t *testing.T) {
 	}
 
 	service2, h2 := createBlobService(ctx, t, ds, "test-reprovider", dhtOpts...)
+	defer closeHost(t, h2)
 	service3, h3 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-reprovider", dhtOpts...)
+	defer closeHost(t, h3)
 
 	require.NoError(t, h2.Connect(ctx, *host.InfoFromHost(h1)))
 	require.NoError(t, h3.Connect(ctx, *host.InfoFromHost(h1)))

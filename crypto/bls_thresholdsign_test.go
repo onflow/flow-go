@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -580,7 +581,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 			assert.NoError(t, err)
 			if threshReached {
 				// Reconstruct the threshold signature
-				thresholdSignature, err := ReconstructThresholdSignature(n, optimalThreshold(n), signShares, signers)
+				thresholdSignature, err := BLSReconstructThresholdSignature(n, optimalThreshold(n), signShares, signers)
 				assert.NoError(t, err)
 				verif, err = proc.keys.groupPublicKey.Verify(thresholdSignature, thresholdSignatureMessage, kmac)
 				require.NoError(t, err)
@@ -635,7 +636,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 			}
 		}
 		// reconstruct and test the threshold signature
-		thresholdSignature, err := ReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
+		thresholdSignature, err := BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 		require.NoError(t, err)
 		verif, err := pkGroup.Verify(thresholdSignature, thresholdSignatureMessage, kmac)
 		require.NoError(t, err)
@@ -645,7 +646,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 		if threshold > 1 {
 			randomDuplicate := mrand.Intn(int(threshold)) + 1 // 1 <= duplicate <= threshold
 			signers[randomDuplicate] = signers[0]
-			thresholdSignature, err = ReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
+			thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
 		}

@@ -314,11 +314,11 @@ type WALMetrics interface {
 type ExecutionDataServiceMetrics interface {
 	ExecutionDataAddStarted()
 
-	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeNodes int)
+	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize uint64)
 
 	ExecutionDataGetStarted()
 
-	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeNodes int)
+	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64)
 }
 
 type RuntimeMetrics interface {

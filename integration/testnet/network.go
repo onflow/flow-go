@@ -63,6 +63,8 @@ const (
 	// DefaultExecutionRootDir is the default directory for the execution node
 	// state database.
 	DefaultExecutionRootDir = "/exedb"
+	// DefaultExecutionDataServiceDir for the execution data service blobstore.
+	DefaultExecutionDataServiceDir = "/data/execution_data"
 
 	// ColNodeAPIPort is the name used for the collection node API port.
 	ColNodeAPIPort = "col-ingress-port"
@@ -778,6 +780,16 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			)
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
+
+			tmpExeDataDir, err := ioutil.TempDir(tmpdir, "execution-data")
+			require.NoError(t, err)
+
+			opts.HostConfig.Binds = append(
+				opts.HostConfig.Binds,
+				fmt.Sprintf("%s:%s:rw", tmpExeDataDir, DefaultExecutionDataServiceDir),
+			)
+
+			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
 
 		case flow.RoleAccess:
 			hostGRPCPort := testingdock.RandomPort(t)

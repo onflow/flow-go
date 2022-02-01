@@ -48,3 +48,5 @@ type BlobService interface {
 	// TriggerReprovide updates the BlobService's provider entries in the DHT
 	TriggerReprovide(ctx context.Context) error
 }
+
+type BlobServiceOption func(BlobService)

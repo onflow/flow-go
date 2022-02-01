@@ -61,8 +61,8 @@ func NewNetwork(
 	return n
 }
 
-func (n *Network) RegisterBlobService(channel network.Channel, store datastore.Batching) (network.BlobService, error) {
-	return n.net.RegisterBlobService(channel, store)
+func (n *Network) RegisterBlobService(channel network.Channel, store datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
+	return n.net.RegisterBlobService(channel, store, opts...)
 }
 
 func (n *Network) RegisterPingService(pid protocol.ID, provider network.PingInfoProvider) (network.PingService, error) {
