@@ -568,6 +568,59 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.NoError(t, tx.Err)
 	})
 
+	t.Run("account update with set code succeeds when there is a matching audit voucher", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		// Deployent without voucher fails
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+		require.NoError(t, err)
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.Error(t, tx.Err)
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+
+		// Generate an audit voucher
+		authTxBody, err := blueprints.AuditContractForDeploymentTransaction(
+			chain.ServiceAddress(),
+			accounts[0],
+			testutil.CounterContract)
+		require.NoError(t, err)
+
+		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		authTxBody.SetPayer(chain.ServiceAddress())
+		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+		authTx := fvm.Transaction(authTxBody, 0)
+
+		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, authTx.Err)
+
+		// Deploying with voucher succeeds
+		txBody = testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 1)
+		txBody.SetPayer(accounts[0])
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+		tx = fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, tx.Err)
+	})
+
 }
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
