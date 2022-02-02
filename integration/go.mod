@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/DataDog/zstd v1.4.8 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
-	github.com/dapperlabs/testingdock v0.4.4-0.20220202182049-aee9000ed843
+	github.com/dapperlabs/testingdock v0.4.4-0.20220202195407-5c9d233d77b8
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.2
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
