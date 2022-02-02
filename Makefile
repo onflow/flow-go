@@ -34,19 +34,8 @@ export DOCKER_BUILDKIT := 1
 
 .PHONY: crypto/relic/build
 crypto/relic/build:
-	cd ./crypto &&	go generate
-
-# relic versions in script and submodule
-export LOCAL_VERSION := $(shell (cd ./crypto/relic/ && git rev-parse HEAD))
-export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]{40}"' ./crypto/build_dependency.sh | cut -c 16-55)
-
-.PHONY: crypto/relic/check
-crypto/relic/check:
-ifeq ($(SCRIPT_VERSION), $(LOCAL_VERSION))
-	@echo "local relic version matches the version required by the crypto package"
-else
-	$(error local relic version doesn't match the version required by the crypto package)
-endif
+# setup the crypto package under the GOPATH, needed to test packages importing flow-go/crypto
+	bash crypto_setup.sh
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
@@ -126,7 +115,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'ComputationManager' -dir=engine/execution/computation -case=underscore -output="engine/execution/computation/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'EpochComponentsFactory' -dir=engine/collection/epochmgr -case=underscore -output="engine/collection/epochmgr/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ProviderEngine' -dir=engine/execution/provider -case=underscore -output="engine/execution/provider/mock" -outpkg="mock"
-	(cd ./crypto && GO111MODULE=on mockery -name 'PublicKey' -case=underscore -tags="relic" -output="../module/mock" -outpkg="mock")
+	(cd ./crypto && GO111MODULE=on mockery -name 'PublicKey' -case=underscore -output="../module/mock" -outpkg="mock")
 	GO111MODULE=on mockery -name '.*' -dir=state/cluster -case=underscore -output="state/cluster/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -tags="relic" -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
@@ -166,7 +155,7 @@ tidy:
 	git diff --exit-code
 
 .PHONY: lint
-lint:
+lint: tidy
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
 
