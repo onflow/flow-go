@@ -7,7 +7,8 @@
 set -e
 shopt -s extglob
 
-export JOB_STARTED=$(date -Iseconds)
+export JOB_STARTED=($(date +"%Y-%m-%d %H:%M:%S"))
+export JOB_ID=$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20)
 
 case $TEST_CATEGORY in
     unit|crypto-unit|integration-@(unit|common|network|epochs|access|collection|consensus|execution|verification))
@@ -63,4 +64,4 @@ else
 fi
 
 # upload results to GCS bucket
-gsutil cp $TEST_RESULT_FILE gs://$GCS_BUCKET/$COMMIT_SHA-$JOB_STARTED-$TEST_CATEGORY.json
+gsutil cp $TEST_RESULT_FILE gs://$GCS_BUCKET/${JOB_STARTED[0]}/${JOB_STARTED[1]}-$COMMIT_SHA-$TEST_CATEGORY-$JOB_ID.json
