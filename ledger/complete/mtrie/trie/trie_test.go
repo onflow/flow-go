@@ -257,7 +257,7 @@ func sampleRandomRegisterWritesWithPrefix(rng *LinearCongruentialGenerator, numb
 				nextRandomByteIndex = 0
 			}
 			p[b] = nextRandomBytes[nextRandomByteIndex]
-			nextRandomByteIndex += 1
+			nextRandomByteIndex++
 		}
 		paths = append(paths, p)
 

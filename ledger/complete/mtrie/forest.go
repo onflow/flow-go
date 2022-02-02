@@ -50,7 +50,7 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 			if !ok {
 				panic(fmt.Sprintf("cache contains item of type %T", value))
 			}
-			//TODO Log error
+			// TODO Log error
 			_ = onTreeEvicted(trie)
 		})
 	} else {

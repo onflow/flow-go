@@ -495,7 +495,7 @@ func randomlyModifyFile(t *testing.T, filename string) {
 	require.NoError(t, err)
 
 	// byte addition will simply wrap around
-	buf[0] += 1
+	buf[0]++
 
 	_, err = file.WriteAt(buf, offset)
 	require.NoError(t, err)
