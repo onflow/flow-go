@@ -281,6 +281,8 @@ github.com/cskr/pubsub v1.0.2/go.mod h1:/8MzYXk/NJAz782G8RPkFzXTZVu63VotefPnR9TI
 github.com/dapperlabs/testingdock v0.4.2/go.mod h1:S45YfB1J1mbOeLHhJROx3dFZfMCVSxTgSU9vZ15Oq18=
 github.com/dapperlabs/testingdock v0.4.3 h1:rlMghXa94vV7/uQCtxeiAbAOgK5fd83S1LeXcXMqql8=
 github.com/dapperlabs/testingdock v0.4.3/go.mod h1:HeTbuHG1J4yt4n7NlZSyuk5c5fmyz6hECbyV+36Ku7Q=
+github.com/dapperlabs/testingdock v0.4.4-0.20220202182049-aee9000ed843 h1:DYN/zuwwdVy9eVWCNFAk2EuAy2Ip5bWUk/aytoDtatc=
+github.com/dapperlabs/testingdock v0.4.4-0.20220202182049-aee9000ed843/go.mod h1:HeTbuHG1J4yt4n7NlZSyuk5c5fmyz6hECbyV+36Ku7Q=
 github.com/dave/jennifer v1.2.0/go.mod h1:fIb+770HOpJ2fmN9EPPKOqm1vMGhB+TwXKMZhrIygKg=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
