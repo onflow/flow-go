@@ -103,6 +103,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 type CombinedVoteProcessorV2 struct {
 	log              zerolog.Logger
 	block            *model.Block
+	votesCache       BlockSpecificVotesCache
 	stakingSigAggtor hotstuff.WeightedSignatureAggregator
 	rbRector         hotstuff.RandomBeaconReconstructor
 	onQCCreated      hotstuff.OnQCCreated
@@ -124,6 +125,7 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 	return &CombinedVoteProcessorV2{
 		log:              log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:            block,
+		votesCache:       *NewBlockSpecificVotesCache(block),
 		stakingSigAggtor: stakingSigAggtor,
 		rbRector:         rbRector,
 		onQCCreated:      onQCCreated,
@@ -148,20 +150,21 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 // Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
 // and submit it via callback for further processing.
 // Expected error returns during normal operations:
-// * VoteForIncompatibleBlockError - submitted vote for incompatible block
-// * VoteForIncompatibleViewError - submitted vote for incompatible view
-// * model.InvalidVoteError - submitted vote with invalid signature
-// * model.DuplicatedSignerError if the signer has been already added
+//  * VoteForIncompatibleBlockError - submitted vote for incompatible block
+//  * VoteForIncompatibleViewError - submitted vote for incompatible view
+//  * DuplicatedVoteErr is returned when adding a vote that is _identical_
+//    to a previously added vote.
+//  * model.InconsistentVoteError is returned if the voter emitted
+//    votes for the _same_ block but with inconsistent signatures
+//  * model.InvalidVoteError - vote has invalid signature or
+//    is not from an authorized consensus participant
 // All other errors should be treated as exceptions.
-//
-// Impossibility of vote double-counting: Our signature scheme requires _every_ vote to supply a
-// staking signature. Therefore, the `stakingSigAggtor` has the set of _all_ signerIDs that have
-// provided a valid vote. Hence, the `stakingSigAggtor` guarantees that only a single vote can
-// be successfully added for each `signerID`, i.e. double-counting votes is impossible.
 func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
-	err := EnsureVoteForBlock(vote, p.block)
+	// Cache Vote: rejects votes for different blocks or views, duplicates or inconsistent votes.
+	// VotesCache guarantees that we process at most one vote per SignerID.
+	err := p.votesCache.AddVote(vote)
 	if err != nil {
-		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
+		return fmt.Errorf("failed to cache vote %v: %w", vote.ID(), err)
 	}
 
 	// Vote Processing state machine

@@ -22,7 +22,8 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	[]crypto.PublicKey,
 	[]crypto.Signature,
 	[]byte,
-	hash.Hasher) {
+	hash.Hasher,
+) {
 
 	// create message and tag
 	msgLen := 100
@@ -57,7 +58,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 func TestWeightedSignatureAggregator(t *testing.T) {
 	signersNum := 20
 
-	// constrcutor edge cases
+	// constructor edge cases
 	t.Run("constructor", func(t *testing.T) {
 		msg := []byte("random_msg")
 		tag := "random_tag"

@@ -21,18 +21,17 @@ type signerInfo struct {
 // It is a wrapper around signature.SignatureAggregatorSameMessage, which implements a
 // mapping from node IDs (as used by HotStuff) to index-based addressing of authorized
 // signers (as used by SignatureAggregatorSameMessage).
+//
+// DUPLICATES: WeightedSignatureAggregator makes no assumptions about the underlying
+// signature.SignatureAggregatorSameMessage accepting duplicates or not. If duplicates
+// are accepted, WeightedSignatureAggregator counts the respective weight with the
+// corresponding multiplicity.
 type WeightedSignatureAggregator struct {
 	aggregator  *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
 	ids         flow.IdentityList                         // all possible ids (only gets updated by constructor)
+	idToInfo    map[flow.Identifier]signerInfo            // auxiliary map to lookup signer weight and index by ID (only gets updated by constructor)
 	totalWeight uint64                                    // weight collected (gets updated)
 	lock        sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
-
-	// collectedIDs tracks the Identities of all nodes whose signatures have been collected so far.
-	// The reason for tracking the duplicate signers at this module level is that having no duplicates
-	// is a Hotstuff constraint, rather than a cryptographic aggregation constraint. We are planning to
-	// extend the cryptographic primitives to support multiplicity higher than 1 in the future.
-	// Therefore, we already add the logic for identifying duplicates here.
-	collectedIDs map[flow.Identifier]struct{} // map of collected IDs (gets updated)
 }
 
 var _ hotstuff.WeightedSignatureAggregator = (*WeightedSignatureAggregator)(nil)
@@ -73,10 +72,9 @@ func NewWeightedSignatureAggregator(
 	}
 
 	return &WeightedSignatureAggregator{
-		aggregator:   agg,
-		ids:          ids,
-		idToInfo:     idToInfo,
-		collectedIDs: make(map[flow.Identifier]struct{}),
+		aggregator: agg,
+		ids:        ids,
+		idToInfo:   idToInfo,
 	}, nil
 }
 
@@ -110,6 +108,13 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 //  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 //  - model.DuplicatedSignerError if the signer has been already added
 // The function is thread-safe.
+//
+// DUPLICATES: the current implementation of the cryptographic primitive does not support
+// to include a signature more than once. However, we are planning to extend the cryptographic
+// primitives to support multiplicity higher than 1 in the future. The WeightedSignatureAggregator
+// supports both conventions. If the underlying crypto accepts duplicates, WeightedSignatureAggregator
+// also does so. If the underlying crypto rejects duplicates, WeightedSignatureAggregator
+// returns a `model.DuplicatedSignerError`.
 func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 	info, found := w.idToInfo[signerID]
 	if !found {
@@ -120,18 +125,15 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
-	// check for repeated occurrence of signerID (in anticipation of aggregator supporting multiplicities larger than 1 in the future)
-	if _, duplicate := w.collectedIDs[signerID]; duplicate {
-		return w.totalWeight, model.NewDuplicatedSignerErrorf("signature from %v was already added", signerID)
-	}
-
 	err := w.aggregator.TrustedAdd(info.index, sig)
 	if err != nil {
-		// During normal operations, signature.InvalidSignerIdxError or signature.DuplicatedSignerIdxError should never occur.
+		if signature.IsDuplicatedSignerIdxError(err) { // signature.DuplicatedSignerIdxError might occur
+			return w.totalWeight, model.NewDuplicatedSignerError(err)
+		}
+		// During normal operations, signature.InvalidSignerIdxError should never occur.
 		return w.totalWeight, fmt.Errorf("unexpected exception while trusted add of signature from %v: %w", signerID, err)
 	}
 	w.totalWeight += info.weight
-	w.collectedIDs[signerID] = struct{}{}
 
 	return w.totalWeight, nil
 }
@@ -152,9 +154,10 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 //  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 // The function is thread-safe.
 //
-// TODO : When compacting the list of signers, update the return from []flow.Identifier
-//        to a compact bit vector.
-func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+// DUPLICATES: WeightedSignatureAggregator makes no assumptions about the underlying
+// signature.SignatureAggregatorSameMessage accepting duplicates or not. The signer's multiplicity
+// in the returned Identifier slice equals to the number of signatures included from this signer.
+func (w *WeightedSignatureAggregator) Aggregate() (flow.IdentifierList, []byte, error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 

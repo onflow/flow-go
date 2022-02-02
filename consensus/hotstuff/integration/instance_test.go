@@ -352,7 +352,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			)
 		}, nil)
 
-	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory)
 	voteCollectors := voteaggregator.NewVoteCollectors(DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator

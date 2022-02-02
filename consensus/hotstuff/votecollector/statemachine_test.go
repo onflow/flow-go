@@ -25,6 +25,11 @@ func TestStateMachine(t *testing.T) {
 
 var factoryError = errors.New("factory error")
 
+// VerifyingVoteProcessorFactory generates hotstuff.VerifyingVoteCollector instances
+// Expected error returns during normal operations:
+// * model.InvalidBlockError - proposal has invalid proposer vote
+type VerifyingVoteProcessorFactory = func(log zerolog.Logger, proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error)
+
 // StateMachineTestSuite is a test suite for testing VoteCollector. It stores mocked
 // VoteProcessors internally for testing behavior and state transitions for VoteCollector.
 type StateMachineTestSuite struct {

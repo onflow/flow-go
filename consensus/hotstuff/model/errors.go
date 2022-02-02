@@ -173,9 +173,9 @@ func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...i
 // schemes where the voting replica has different options how to sign (e.g. a
 // replica can sign with their staking key and/or their random beacon key).
 // For such voting schemes, byzantine replicas could try to submit different
-// votes for the same block, attempting to deplete the primary's resources
-// or have multiple of their votes counted to undermine consensus safety.
-// Sending InconsistentVote belongs to the family of equivocation attacks.
+// votes for the same block, to exhaust the primary's resources or have
+// multiple of their votes counted to undermine consensus safety. Sending
+// inconsistent votes belongs to the family of equivocation attacks.
 type InconsistentVoteError struct {
 	FirstVote        *Vote
 	InconsistentVote *Vote

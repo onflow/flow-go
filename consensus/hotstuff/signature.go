@@ -104,7 +104,7 @@ type WeightedSignatureAggregator interface {
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
 	//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
-	Aggregate() ([]flow.Identifier, []byte, error)
+	Aggregate() (flow.IdentifierList, []byte, error)
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the

@@ -65,7 +65,7 @@ func (vc *ViewSpecificVotesCache) View() uint64 { return vc.view }
 // When AddVote returns an error, the vote is _not_ stored.
 func (vc *ViewSpecificVotesCache) AddVote(vote *model.Vote) error {
 	if vote.View != vc.view {
-		return VoteForIncompatibleViewError
+		return fmt.Errorf("expected vote for view %d but vote's view is %d: %w", vc.view, vote.View, VoteForIncompatibleViewError)
 	}
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
@@ -84,10 +84,10 @@ func (vc *ViewSpecificVotesCache) AddVote(vote *model.Vote) error {
 		}
 		if firstVote.BlockID != vote.BlockID {
 			// voting in the same view for different blocks => double vote attack
-			return model.NewDoubleVoteErrorf(firstVote.Vote, vote, "replica %v voted for different blocks in view %d", vote.SignerID, vc.view)
+			return model.NewDoubleVoteErrorf(firstVote.Vote, vote, "in view %d, replica %v voted for different blocks %v and %v", vc.view, vote.SignerID, firstVote.BlockID, vote.BlockID)
 		}
 		// voting for the same block but supplying different signatures => inconsistent vote attack
-		return model.NewInconsistentVoteErrorf(firstVote.Vote, vote, "detected vote equivocation at view: %d", vc.view)
+		return model.NewInconsistentVoteErrorf(firstVote.Vote, vote, "in view %d, replica %v emitted inconsistent votes %v and %v for block %v: %d", vc.view, vote.SignerID, firstVote.ID(), vote.ID(), firstVote.BlockID)
 	}
 
 	// previously unknown vote: (1) store and (2) forward to consumers

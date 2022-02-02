@@ -91,6 +91,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 	return &CombinedVoteProcessorV3{
 		log:              log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:            block,
+		votesCache:       *NewBlockSpecificVotesCache(block),
 		stakingSigAggtor: stakingSigAggtor,
 		rbSigAggtor:      rbSigAggtor,
 		rbRector:         rbRector,
@@ -112,6 +113,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 type CombinedVoteProcessorV3 struct {
 	log              zerolog.Logger
 	block            *model.Block
+	votesCache       BlockSpecificVotesCache
 	stakingSigAggtor hotstuff.WeightedSignatureAggregator
 	rbSigAggtor      hotstuff.WeightedSignatureAggregator
 	rbRector         hotstuff.RandomBeaconReconstructor
@@ -138,10 +140,14 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
 // and submit it via callback for further processing.
 // Expected error returns during normal operations:
-// * VoteForIncompatibleBlockError - submitted vote for incompatible block
-// * VoteForIncompatibleViewError - submitted vote for incompatible view
-// * model.InvalidVoteError - submitted vote with invalid signature
-// * model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
+//  * VoteForIncompatibleBlockError - submitted vote for incompatible block
+//  * VoteForIncompatibleViewError - submitted vote for incompatible view
+//  * DuplicatedVoteErr is returned when adding a vote that is _identical_
+//    to a previously added vote.
+//  * model.InconsistentVoteError is returned if the voter emitted
+//    votes for the _same_ block but with inconsistent signatures
+//  * model.InvalidVoteError - vote has invalid signature or
+//    is not from an authorized consensus participant
 // All other errors should be treated as exceptions.
 //
 // CAUTION: implementation is NOT (yet) BFT
@@ -156,9 +162,11 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 //       runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
 //       0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
-	err := EnsureVoteForBlock(vote, p.block)
+	// Cache Vote: rejects votes for different blocks or views, duplicates or inconsistent votes.
+	// VotesCache guarantees that we process at most one vote per SignerID.
+	err := p.votesCache.AddVote(vote)
 	if err != nil {
-		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
+		return fmt.Errorf("failed to cache vote %v: %w", vote.ID(), err)
 	}
 
 	// Vote Processing state machine

@@ -57,10 +57,11 @@ func (ps VoteCollectorStatus) String() string {
 // to the VoteProcessor.
 type VoteCollector interface {
 	// ProcessBlock performs validation of block signature and processes block with respected collector.
-	// Calling this function will mark conflicting collector as stale and change state of valid collectors
-	// It returns nil if the block is valid.
-	// It returns model.InvalidBlockError if block is invalid.
-	// It returns other error if there is exception processing the block.
+	// Calling this function will mark conflicting collector as stale and change state of valid collectors.
+	// Expected returns during normal operations:
+	//  * nil if the proposer's vote, included in the proposal, is valid.
+	//  * model.InvalidBlockError if the proposer's vote is invalid.
+	// All other errors should be treated as exceptions.
 	ProcessBlock(block *model.Proposal) error
 
 	// AddVote adds a vote to the vote collector. When enough votes have been
@@ -89,10 +90,14 @@ type VoteCollector interface {
 type VoteProcessor interface {
 	// Process performs processing of single vote. This function is safe to call from multiple goroutines.
 	// Expected error returns during normal operations:
-	// * VoteForIncompatibleBlockError - submitted vote for incompatible block
-	// * VoteForIncompatibleViewError - submitted vote for incompatible view
-	// * model.InvalidVoteError - submitted vote with invalid signature
-	// * model.DuplicatedSignerError - vote from a signer whose vote was previously already processed
+	//  * VoteForIncompatibleBlockError - submitted vote for incompatible block
+	//  * VoteForIncompatibleViewError - submitted vote for incompatible view
+	//  * DuplicatedVoteErr is returned when adding a vote that is _identical_
+	//    to a previously added vote.
+	//  * model.InconsistentVoteError is returned if the voter emitted
+	//    votes for the _same_ block but with inconsistent signatures
+	//  * model.InvalidVoteError - vote has invalid signature or
+	//    is not from an authorized consensus participant
 	// All other errors should be treated as exceptions.
 	Process(vote *model.Vote) error
 
@@ -115,6 +120,6 @@ type VoteProcessorFactory interface {
 	// Create instantiates a VerifyingVoteProcessor for processing votes for a specific proposal.
 	// Caller can be sure that proposal vote was successfully verified and processed.
 	// Expected error returns during normal operations:
-	// * model.InvalidBlockError - proposal has invalid proposer vote
+	//  * model.InvalidBlockError - proposal has invalid proposer vote
 	Create(log zerolog.Logger, proposal *model.Proposal) (VerifyingVoteProcessor, error)
 }

@@ -19,7 +19,7 @@ func NewVoteAggregator(
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
 ) (hotstuff.VoteAggregator, error) {
 
-	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory)
 	voteCollectors := voteaggregator.NewVoteCollectors(lowestRetainedView, workerpool.New(4), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator

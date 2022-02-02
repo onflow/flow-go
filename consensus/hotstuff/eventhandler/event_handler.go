@@ -125,7 +125,6 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 				log.Warn().Err(err).Msgf("invalid block proposal, but vote aggregator has pruned this height: %v", perr)
 				return nil
 			}
-
 			if perr != nil {
 				return fmt.Errorf("vote aggregator could not process invalid block proposal %v, err %v: %w",
 					block.BlockID, err, perr)
