@@ -11,7 +11,7 @@ test:
 integration-test: access-tests common-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests
 
 .PHONY: ci-integration-test
-ci-integration-test: access-tests common-tests # execution-tests verification-tests epochs-tests network-tests consensus-tests collection-tests
+ci-integration-test: access-tests common-tests epochs-tests # execution-tests verification-tests epochs-tests network-tests consensus-tests collection-tests
 
 .PHONY: access-tests
 access-tests:
@@ -28,7 +28,11 @@ consensus-tests:
 
 .PHONY: epochs-tests
 epochs-tests:
-	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/views_progress
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/epoch_join_and_leave_an
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/epoch_join_and_leave_vn
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/epoch_join_and_leave_ln
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/epoch_join_and_leave_sn
 
 .PHONY: common-tests
 common-tests:
