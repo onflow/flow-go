@@ -3,6 +3,7 @@ package wal
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -29,6 +31,10 @@ const VersionV1 uint16 = 0x01
 // Versions was reset while changing trie format, so now bump it to 3 to avoid conflicts
 // Version 3 contains a file checksum for detecting corrupted checkpoint files.
 const VersionV3 uint16 = 0x03
+
+// Version 4 contains a footer with node count and trie count (previously in the header).
+// Version 4 also reduces checkpoint data size.  See EncodeNode() and EncodeTrie() for more details.
+const VersionV4 uint16 = 0x04
 
 type Checkpointer struct {
 	dir            string
@@ -185,11 +191,9 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("cannot replay WAL: %w", err)
 	}
 
-	c.wal.log.Info().Msgf("flattening forest for checkpoint %d", to)
-
-	forestSequencing, err := flattener.FlattenForest(forest)
+	tries, err := forest.GetTries()
 	if err != nil {
-		return fmt.Errorf("cannot get storables: %w", err)
+		return fmt.Errorf("cannot get forest tries: %w", err)
 	}
 
 	c.wal.log.Info().Msgf("serializing checkpoint %d", to)
@@ -206,7 +210,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		}
 	}()
 
-	err = StoreCheckpoint(forestSequencing, writer)
+	err = StoreCheckpoint(writer, tries...)
 
 	return err
 }
@@ -251,38 +255,100 @@ func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error)
 }
 
 // StoreCheckpoint writes the given checkpoint to disk, and also append with a CRC32 file checksum for integrity check.
-func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writer) error {
-	storableNodes := forestSequencing.Nodes
-	storableTries := forestSequencing.Tries
-	header := make([]byte, 4+8+2)
+func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
+
+	var err error
 
 	crc32Writer := NewCRC32Writer(writer)
 
+	// Write header: magic (2 bytes) + version (2 bytes)
+	header := make([]byte, 4)
 	pos := writeUint16(header, 0, MagicBytes)
-	pos = writeUint16(header, pos, VersionV3)
-	pos = writeUint64(header, pos, uint64(len(storableNodes)-1)) // -1 to account for 0 node meaning nil
-	writeUint16(header, pos, uint16(len(storableTries)))
+	_ = writeUint16(header, pos, VersionV4)
 
-	_, err := crc32Writer.Write(header)
+	_, err = crc32Writer.Write(header)
 	if err != nil {
 		return fmt.Errorf("cannot write checkpoint header: %w", err)
 	}
 
-	// 0 element = nil, we don't need to store it
-	for i := 1; i < len(storableNodes); i++ {
-		bytes := flattener.EncodeStorableNode(storableNodes[i])
+	// assign unique value to every node
+	allNodes := make(map[*node.Node]uint64)
+	allNodes[nil] = 0 // 0th element is nil
+
+	allRootNodes := make([]*node.Node, len(tries))
+
+	// Serialize all unique nodes
+	nodeCounter := uint64(1) // start from 1, as 0 marks nil
+	for i, t := range tries {
+
+		// Traverse all unique nodes for trie t.
+		for itr := flattener.NewUniqueNodeIterator(t, allNodes); itr.Next(); {
+			n := itr.Value()
+
+			allNodes[n] = nodeCounter
+			nodeCounter++
+
+			var lchildIndex, rchildIndex uint64
+
+			if lchild := n.LeftChild(); lchild != nil {
+				var found bool
+				lchildIndex, found = allNodes[lchild]
+				if !found {
+					hash := lchild.Hash()
+					return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+				}
+			}
+			if rchild := n.RightChild(); rchild != nil {
+				var found bool
+				rchildIndex, found = allNodes[rchild]
+				if !found {
+					hash := rchild.Hash()
+					return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+				}
+			}
+
+			// TODO: reuse scratch buffer for encoding
+			bytes := flattener.EncodeNode(n, lchildIndex, rchildIndex)
+			_, err = crc32Writer.Write(bytes)
+			if err != nil {
+				return fmt.Errorf("error while writing node data: %w", err)
+			}
+		}
+
+		// Save trie root for serialization later.
+		allRootNodes[i] = t.RootNode()
+	}
+
+	// Serialize trie root nodes
+	for _, rootNode := range allRootNodes {
+		// Get root node index
+		rootIndex, found := allNodes[rootNode]
+		if !found {
+			var rootHash ledger.RootHash
+			if rootNode == nil {
+				rootHash = trie.EmptyTrieRootHash()
+			} else {
+				rootHash = ledger.RootHash(rootNode.Hash())
+			}
+			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
+		}
+
+		// TODO: reuse scratch buffer for encoding
+		bytes := flattener.EncodeTrie(rootNode, rootIndex)
 		_, err = crc32Writer.Write(bytes)
 		if err != nil {
-			return fmt.Errorf("error while writing node date: %w", err)
+			return fmt.Errorf("error while writing trie data: %w", err)
 		}
 	}
 
-	for _, storableTrie := range storableTries {
-		bytes := flattener.EncodeStorableTrie(storableTrie)
-		_, err = crc32Writer.Write(bytes)
-		if err != nil {
-			return fmt.Errorf("error while writing trie date: %w", err)
-		}
+	// Write footer with nodes count and tries count
+	footer := make([]byte, 10)
+	pos = writeUint64(footer, 0, uint64(len(allNodes)-1)) // -1 to account for 0 node meaning nil
+	writeUint16(footer, pos, uint16(len(allRootNodes)))
+
+	_, err = crc32Writer.Write(footer)
+	if err != nil {
+		return fmt.Errorf("cannot write checkpoint footer: %w", err)
 	}
 
 	// add CRC32 sum
@@ -330,37 +396,70 @@ func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
 		_ = file.Close()
 	}()
 
-	return ReadCheckpoint(file)
+	return readCheckpoint(file)
 }
 
-func ReadCheckpoint(r io.Reader) (*flattener.FlattenedForest, error) {
+func readCheckpoint(f *os.File) (*flattener.FlattenedForest, error) {
+	// Read header: magic (2 bytes) + version (2 bytes)
+	header := make([]byte, 4)
+	_, err := io.ReadFull(f, header)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read header bytes: %w", err)
+	}
 
-	var bufReader io.Reader = bufio.NewReader(r)
+	magicBytes, pos := readUint16(header, 0)
+	version, _ := readUint16(header, pos)
+
+	if magicBytes != MagicBytes {
+		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
+	}
+
+	// Reset offset
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
+	}
+
+	switch version {
+	case VersionV1, VersionV3:
+		return readCheckpointV3AndEarlier(f, version)
+	case VersionV4:
+		return readCheckpointV4(f)
+	default:
+		return nil, fmt.Errorf("unsupported file version %x ", version)
+	}
+}
+
+// readCheckpointV3AndEarlier deserializes checkpoint file (version 3 and earlier) and returns flattened forest.
+// Header (magic and version) are verified by the caller.
+// TODO: return []*trie.MTrie directly without conversion to FlattenedForest.
+func readCheckpointV3AndEarlier(f *os.File, version uint16) (*flattener.FlattenedForest, error) {
+
+	var bufReader io.Reader = bufio.NewReader(f)
 	crcReader := NewCRC32Reader(bufReader)
-	var reader io.Reader = crcReader
 
-	header := make([]byte, 4+8+2)
+	var reader io.Reader
+
+	if version != VersionV3 {
+		reader = bufReader
+	} else {
+		reader = crcReader
+	}
+
+	// Header has: magic (2 bytes) + version (2 bytes) + node count (8 bytes) + trie count (2 bytes)
+	header := make([]byte, 2+2+8+2)
 
 	_, err := io.ReadFull(reader, header)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read header bytes: %w", err)
 	}
 
-	magicBytes, pos := readUint16(header, 0)
-	version, pos := readUint16(header, pos)
-	nodesCount, pos := readUint64(header, pos)
+	// Magic and version are verified by the caller.
+
+	// Get node count and trie count
+	const nodesCountOffset = 2 + 2
+	nodesCount, pos := readUint64(header, nodesCountOffset)
 	triesCount, _ := readUint16(header, pos)
-
-	if magicBytes != MagicBytes {
-		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
-	}
-	if version != VersionV1 && version != VersionV3 {
-		return nil, fmt.Errorf("unsupported file version %x ", version)
-	}
-
-	if version != VersionV3 {
-		reader = bufReader //switch back to plain reader
-	}
 
 	nodes := make([]*flattener.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*flattener.StorableTrie, triesCount)
@@ -402,6 +501,95 @@ func ReadCheckpoint(r io.Reader) (*flattener.FlattenedForest, error) {
 		Tries: tries,
 	}, nil
 
+}
+
+// readCheckpointV4 deserializes checkpoint file (version 4) and returns flattened forest.
+// Checkpoint file header (magic and version) are verified by the caller.
+func readCheckpointV4(f *os.File) (*flattener.FlattenedForest, error) {
+
+	// Read footer to get node count and trie count
+
+	// footer offset: nodes count (8 bytes) + tries count (2 bytes) + CRC32 sum (4 bytes)
+	const footerOffset = 8 + 2 + 4
+	const footerSize = 8 + 2 // footer doesn't include crc32 sum
+
+	_, err := f.Seek(-footerOffset, io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to footer: %w", err)
+	}
+
+	footer := make([]byte, footerSize)
+
+	_, err = io.ReadFull(f, footer)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer bytes: %w", err)
+	}
+
+	nodesCount, pos := readUint64(footer, 0)
+	triesCount, _ := readUint16(footer, pos)
+
+	// Seek to the start of file
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
+	}
+
+	var bufReader io.Reader = bufio.NewReader(f)
+	crcReader := NewCRC32Reader(bufReader)
+	var reader io.Reader = crcReader
+
+	// Read header: magic (2 bytes) + version (2 bytes)
+	// No action is needed for header because it is verified by the caller.
+	header := make([]byte, 4)
+
+	_, err = io.ReadFull(reader, header)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read header bytes: %w", err)
+	}
+
+	nodes := make([]*flattener.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*flattener.StorableTrie, triesCount)
+
+	for i := uint64(1); i <= nodesCount; i++ {
+		storableNode, err := flattener.ReadStorableNode(reader)
+		if err != nil {
+			return nil, fmt.Errorf("cannot read storable node %d: %w", i, err)
+		}
+		nodes[i] = storableNode
+	}
+
+	for i := uint16(0); i < triesCount; i++ {
+		storableTrie, err := flattener.ReadStorableTrie(reader)
+		if err != nil {
+			return nil, fmt.Errorf("cannot read storable trie %d: %w", i, err)
+		}
+		tries[i] = storableTrie
+	}
+
+	// Read footer again for crc32 computation
+	// No action is needed.
+	_, err = io.ReadFull(reader, footer)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer bytes: %w", err)
+	}
+
+	crc32buf := make([]byte, 4)
+	_, err = bufReader.Read(crc32buf)
+	if err != nil {
+		return nil, fmt.Errorf("error while reading CRC32 checksum: %w", err)
+	}
+	readCrc32, _ := readUint32(crc32buf, 0)
+
+	calculatedCrc32 := crcReader.Crc32()
+
+	if calculatedCrc32 != readCrc32 {
+		return nil, fmt.Errorf("checkpoint checksum failed! File contains %x but read data checksums to %x", readCrc32, calculatedCrc32)
+	}
+
+	return &flattener.FlattenedForest{
+		Nodes: nodes,
+		Tries: tries,
+	}, nil
 }
 
 func writeUint16(buffer []byte, location int, value uint16) int {

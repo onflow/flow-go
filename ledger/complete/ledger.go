@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module"
@@ -359,14 +358,9 @@ func (l *Ledger) ExportCheckpointAt(
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
 
-	flatTrie, err := flattener.FlattenTrie(newTrie)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to flatten the trie: %w", err)
-	}
-
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
-	err = wal.StoreCheckpoint(flatTrie.ToFlattenedForestWithASingleTrie(), writer)
+	err = wal.StoreCheckpoint(writer, newTrie)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
 	}

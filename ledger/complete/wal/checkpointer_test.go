@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
@@ -503,45 +504,60 @@ func randomlyModifyFile(t *testing.T, filename string) {
 
 func Test_StoringLoadingCheckpoints(t *testing.T) {
 
-	// some hash will be literally copied into the output file
-	// so we can find it and modify - to make sure we get a different checksum
-	// but not fail process by, for example, modifying saved data length causing EOF
-	someHash := []byte{22, 22, 22}
-	forest := &flattener.FlattenedForest{
-		Nodes: []*flattener.StorableNode{
-			{}, {},
-		},
-		Tries: []*flattener.StorableTrie{
-			{}, {
-				RootHash: someHash,
-			},
-		},
-	}
-	buffer := &bytes.Buffer{}
+	unittest.RunWithTempDir(t, func(dir string) {
+		// some hash will be literally encoded in output file
+		// so we can find it and modify - to make sure we get a different checksum
+		// but not fail process by, for example, modifying saved data length causing EOF
 
-	err := realWAL.StoreCheckpoint(forest, buffer)
-	require.NoError(t, err)
+		emptyTrie := trie.NewEmptyMTrie()
 
-	// copy buffer data
-	bytes2 := buffer.Bytes()[:]
+		p1 := utils.PathByUint8(0)
+		v1 := utils.LightPayload8('A', 'a')
 
-	t.Run("works without data modification", func(t *testing.T) {
+		p2 := utils.PathByUint8(1)
+		v2 := utils.LightPayload8('B', 'b')
 
-		// first buffer reads ok
-		_, err = realWAL.ReadCheckpoint(buffer)
+		paths := []ledger.Path{p1, p2}
+		payloads := []ledger.Payload{*v1, *v2}
+
+		updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 		require.NoError(t, err)
+
+		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
+
+		file, err := ioutil.TempFile(dir, "temp-checkpoint")
+		filepath := file.Name()
+		require.NoError(t, err)
+
+		err = realWAL.StoreCheckpoint(file, updatedTrie)
+		require.NoError(t, err)
+
+		file.Close()
+
+		t.Run("works without data modification", func(t *testing.T) {
+
+			// first buffer reads ok
+			_, err = realWAL.LoadCheckpoint(filepath)
+			require.NoError(t, err)
+		})
+
+		t.Run("detects modified data", func(t *testing.T) {
+
+			b, err := ioutil.ReadFile(filepath)
+			require.NoError(t, err)
+
+			index := bytes.Index(b, someHash[:])
+			require.NotEqual(t, -1, index)
+			b[index] = 23
+
+			err = os.WriteFile(filepath, b, 0644)
+			require.NoError(t, err)
+
+			_, err = realWAL.LoadCheckpoint(filepath)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "checksum")
+		})
 	})
-
-	t.Run("detects modified data", func(t *testing.T) {
-
-		index := bytes.Index(bytes2, someHash)
-		bytes2[index] = 23
-
-		_, err = realWAL.ReadCheckpoint(bytes.NewBuffer(bytes2))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "checksum")
-	})
-
 }
 
 func loadIntoForest(forest *mtrie.Forest, forestSequencing *flattener.FlattenedForest) error {

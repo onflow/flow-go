@@ -4,42 +4,57 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
 const encodingDecodingVersion = uint16(0)
 
-// EncodeStorableNode encodes StorableNode
-func EncodeStorableNode(storableNode *StorableNode) []byte {
+// EncodeNode encodes node.
+// TODO: reuse buffer
+func EncodeNode(n *node.Node, lchildIndex uint64, rchildIndex uint64) []byte {
 
-	length := 2 + 2 + 8 + 8 + 2 + 8 + 2 + len(storableNode.Path) + 4 + len(storableNode.EncPayload) + 2 + len(storableNode.HashValue)
+	encPayload := encoding.EncodePayload(n.Payload())
+
+	length := 2 + 2 + 8 + 8 + 2 + 8 + 2 + len(n.Path()) + 4 + len(encPayload) + 2 + len(n.Hash())
+
 	buf := make([]byte, 0, length)
+
 	// 2-bytes encoding version
 	buf = utils.AppendUint16(buf, encodingDecodingVersion)
 
 	// 2-bytes Big Endian uint16 height
-	buf = utils.AppendUint16(buf, storableNode.Height)
+	buf = utils.AppendUint16(buf, uint16(n.Height()))
 
 	// 8-bytes Big Endian uint64 LIndex
-	buf = utils.AppendUint64(buf, storableNode.LIndex)
+	buf = utils.AppendUint64(buf, lchildIndex)
 
 	// 8-bytes Big Endian uint64 RIndex
-	buf = utils.AppendUint64(buf, storableNode.RIndex)
+	buf = utils.AppendUint64(buf, rchildIndex)
 
 	// 2-bytes Big Endian maxDepth
-	buf = utils.AppendUint16(buf, storableNode.MaxDepth)
+	buf = utils.AppendUint16(buf, n.MaxDepth())
 
 	// 8-bytes Big Endian regCount
-	buf = utils.AppendUint64(buf, storableNode.RegCount)
+	buf = utils.AppendUint64(buf, n.RegCount())
 
 	// 2-bytes Big Endian uint16 encoded path length and n-bytes encoded path
-	buf = utils.AppendShortData(buf, storableNode.Path)
+	path := n.Path()
+	if path != nil {
+		buf = utils.AppendShortData(buf, path[:])
+	} else {
+		buf = utils.AppendShortData(buf, nil)
+	}
 
 	// 4-bytes Big Endian uint32 encoded payload length and n-bytes encoded payload
-	buf = utils.AppendLongData(buf, storableNode.EncPayload)
+	buf = utils.AppendLongData(buf, encPayload)
 
 	// 2-bytes Big Endian uint16 hashValue length and n-bytes hashValue
-	buf = utils.AppendShortData(buf, storableNode.HashValue)
+	hash := n.Hash()
+	buf = utils.AppendShortData(buf, hash[:])
 
 	return buf
 }
@@ -122,18 +137,27 @@ func ReadStorableNode(reader io.Reader) (*StorableNode, error) {
 	return storableNode, nil
 }
 
-// EncodeStorableTrie encodes StorableTrie
-func EncodeStorableTrie(storableTrie *StorableTrie) []byte {
-	length := 2 + 8 + 2 + len(storableTrie.RootHash)
+// EncodeTrie encodes trie root node
+// TODO: reuse buffer
+func EncodeTrie(rootNode *node.Node, rootIndex uint64) []byte {
+	// Get root hash
+	var rootHash ledger.RootHash
+	if rootNode == nil {
+		rootHash = trie.EmptyTrieRootHash()
+	} else {
+		rootHash = ledger.RootHash(rootNode.Hash())
+	}
+
+	length := 2 + 8 + 2 + len(rootHash)
 	buf := make([]byte, 0, length)
 	// 2-bytes encoding version
 	buf = utils.AppendUint16(buf, encodingDecodingVersion)
 
 	// 8-bytes Big Endian uint64 RootIndex
-	buf = utils.AppendUint64(buf, storableTrie.RootIndex)
+	buf = utils.AppendUint64(buf, rootIndex)
 
 	// 2-bytes Big Endian uint16 RootHash length and n-bytes RootHash
-	buf = utils.AppendShortData(buf, storableTrie.RootHash)
+	buf = utils.AppendShortData(buf, rootHash[:])
 
 	return buf
 }
