@@ -87,6 +87,8 @@ func New(
 		retry.Activate()
 	}
 
+	seenScripts := make(map[[16]byte]time.Time)
+
 	b := &Backend{
 		state: state,
 		// create the sub-backends
@@ -96,6 +98,7 @@ func New(
 			connFactory:       connFactory,
 			state:             state,
 			log:               log,
+			seenScripts:       seenScripts,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,

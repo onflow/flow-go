@@ -2,6 +2,8 @@ package backend
 
 import (
 	"context"
+	"crypto/md5"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -20,6 +22,7 @@ type backendScripts struct {
 	state             protocol.State
 	connFactory       ConnectionFactory
 	log               zerolog.Logger
+	seenScripts       map[[16]byte]time.Time
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -90,18 +93,24 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
 	}
-
+	// encode to MD5 as low memory lookup key
+	encodedScript := md5.Sum(script)
 	// try each of the execution nodes found
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
+		executionTime := time.Now()
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
-			b.log.Debug().
-				Str("execution_node", execNode.String()).
-				Hex("block_id", blockID[:]).
-				Str("script", string(script)).
-				Msg("Successfully executed script")
+			timestamp, seen := b.seenScripts[encodedScript]
+			if !seen || executionTime.Sub(timestamp) > time.Duration(10)*time.Minute {
+				b.log.Debug().
+					Str("execution_node", execNode.String()).
+					Hex("block_id", blockID[:]).
+					Str("script", string(script)).
+					Msg("Successfully executed script")
+				b.seenScripts[encodedScript] = executionTime
+			}
 			return result, nil
 		}
 		// return OK status if it's just a script failure as opposed to an EN failure
