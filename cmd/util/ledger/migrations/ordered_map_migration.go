@@ -6,10 +6,8 @@ import (
 	"math"
 	"os"
 	"path"
-	"reflect"
 	"strings"
 	"time"
-	"unsafe"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
@@ -187,24 +185,12 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 				panic(err)
 			}
 			storageMap := m.newStorage.GetStorageMap(address, domain)
-			// in the interest of not having to update Cadence and break its abstractions to allow
-			// this one-time migration, just use reflection to grab the unexported field
-			unsafeOrderedMap := reflect.ValueOf(storageMap).Elem().FieldByName("orderedMap")
-			orderedMap := reflect.NewAt(
-				unsafeOrderedMap.Type(),
-				unsafe.Pointer(unsafeOrderedMap.UnsafeAddr()),
-			).Elem().Interface().(*atree.OrderedMap)
 			for _, pair := range keyValuePairs {
-				_, err := orderedMap.Set(
-					// these should be rawstorables too probably
-					interpreter.StringAtreeComparator,
-					interpreter.StringAtreeHashInput,
-					interpreter.StringAtreeValue(pair.Key),
+				storageMap.SetValue(
+					m.Interpreter,
+					pair.Key,
 					RawStorable(pair.Value),
 				)
-				if err != nil {
-					panic(err)
-				}
 			}
 		}
 	}
