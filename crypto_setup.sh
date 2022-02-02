@@ -4,9 +4,6 @@
 # crypto package 
 PKG_NAME="github.com/onflow/flow-go/crypto"
 
-# go get the package
-go get ${PKG_NAME}
-
 # go.mod
 MOD_FILE="./go.mod"
 
@@ -15,6 +12,8 @@ if [ -f "${MOD_FILE}" ]
 then
     # extract the version from the go.mod file
     VERSION="$(grep ${PKG_NAME} < ${MOD_FILE} | cut -d' ' -f 2)"
+    # go get the package
+    go get "${PKG_NAME}@${VERSION}" || { echo "go get the package failed"; exit 1; }
     # using the right version, get the package directory path
     PKG_DIR="$(go env GOPATH)/pkg/mod/${PKG_NAME}@${VERSION}"
 else 
