@@ -144,6 +144,52 @@ func filterAccountCreatedEvents(events []flow.Event) []flow.Event {
 	return accountCreatedEvents
 }
 
+const auditContractForDeploymentTransactionTemplate = `
+import FlowContractAudits from 0x%s
+
+transaction(deployAddress: Address, code: String) {
+	prepare(serviceAccount: AuthAccount) {
+		
+		let auditorAdmin = serviceAccount.borrow<&FlowContractAudits.Administrator>(from: FlowContractAudits.AdminStoragePath)
+            ?? panic("Could not borrow a reference to the admin resource")
+
+		let auditor <- auditorAdmin.createNewAuditor()
+
+		auditor.addVoucher(address: deployAddress, recurrent: false, expiryOffset: nil, code: code)
+
+		destroy auditor
+	}
+}
+`
+
+// AuditContractForDeploymentTransaction returns a transaction for generating an audit voucher for contract deploy/update
+func AuditContractForDeploymentTransaction(serviceAccount flow.Address, deployAddress flow.Address, code string) (*flow.TransactionBody, error) {
+	arg1, err := jsoncdc.Encode(cadence.NewAddress(deployAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	codeCdc, err := cadence.NewString(code)
+	if err != nil {
+		return nil, err
+	}
+	arg2, err := jsoncdc.Encode(codeCdc)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := fmt.Sprintf(
+		auditContractForDeploymentTransactionTemplate,
+		serviceAccount.String(),
+	)
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(tx)).
+		AddAuthorizer(serviceAccount).
+		AddArgument(arg1).
+		AddArgument(arg2), nil
+}
+
 func TestPrograms(t *testing.T) {
 
 	t.Run(
@@ -592,7 +638,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 
 		// Generate an audit voucher
-		authTxBody, err := blueprints.AuditContractForDeploymentTransaction(
+		authTxBody, err := AuditContractForDeploymentTransaction(
 			chain.ServiceAddress(),
 			accounts[0],
 			testutil.CounterContract)
