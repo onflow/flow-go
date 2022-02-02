@@ -110,9 +110,9 @@ func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 	}
 }
 
-// readCounter executes a script to read the value of a counter. The counter
+// ReadCounter executes a script to read the value of a counter. The counter
 // must have been deployed and created.
-func readCounter(ctx context.Context, client *testnet.Client, address sdk.Address) (int, error) {
+func ReadCounter(ctx context.Context, client *testnet.Client, address sdk.Address) (int, error) {
 
 	res, err := client.ExecuteScript(ctx, ReadCounterScript(address, address))
 	if err != nil {

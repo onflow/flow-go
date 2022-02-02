@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -144,7 +145,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.NoError(t, err)
 
 	// create new account to deploy Counter to
-	accountPrivateKey := RandomPrivateKey()
+	accountPrivateKey := common.RandomPrivateKey()
 
 	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(accountPrivateKey).
@@ -158,8 +159,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		[]*sdk.AccountKey{accountKey},
 		[]templates.Contract{
 			{
-				Name:   CounterContract.Name,
-				Source: CounterContract.ToCadence(),
+				Name:   common.CounterContract.Name,
+				Source: common.CounterContract.ToCadence(),
 			},
 		},
 		serviceAddress).
@@ -246,14 +247,14 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	// contract is deployed, but no instance is created yet
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	counter, err := readCounter(childCtx, accountClient, newAccountAddress)
+	counter, err := common.ReadCounter(childCtx, accountClient, newAccountAddress)
 	cancel()
 	require.NoError(t, err)
 	require.Equal(t, -3, counter)
 
 	// create counter instance
 	createCounterTx := sdk.NewTransaction().
-		SetScript([]byte(CreateCounterTx(newAccountAddress).ToCadence())).
+		SetScript([]byte(common.CreateCounterTx(newAccountAddress).ToCadence())).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(newAccountAddress, 0, 0).
 		SetPayer(newAccountAddress).
@@ -279,7 +280,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
 		childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-		counter, err = readCounter(ctx, serviceAccountClient, newAccountAddress)
+		counter, err = common.ReadCounter(ctx, serviceAccountClient, newAccountAddress)
 		cancel()
 
 		return err == nil && counter == 2
