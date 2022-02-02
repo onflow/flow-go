@@ -167,18 +167,8 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	}
 
 	err = c.wal.replay(0, to,
-		func(forestSequencing *flattener.FlattenedForest) error {
-			tries, err := flattener.RebuildTries(forestSequencing)
-			if err != nil {
-				return err
-			}
-			for _, t := range tries {
-				err := forest.AddTrie(t)
-				if err != nil {
-					return err
-				}
-			}
-			return nil
+		func(tries []*trie.MTrie) error {
+			return forest.AddTries(tries)
 		},
 		func(update *ledger.TrieUpdate) error {
 			_, err := forest.Update(update)
@@ -254,7 +244,20 @@ func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error)
 	}, nil
 }
 
-// StoreCheckpoint writes the given checkpoint to disk, and also append with a CRC32 file checksum for integrity check.
+// StoreCheckpoint writes the given tries to checkpoint file, and also appends
+// a CRC32 file checksum for integrity check.
+// Checkpoint file consists of a flattened forest. Specifically, it consists of:
+//   * a list of encoded nodes, where references to other nodes are by list index.
+//   * a list of encoded tries, each referencing their respective root node by index.
+// Referencing to other nodes by index 0 is a special case, meaning nil.
+//
+// As an important property, the nodes are listed in an order which satisfies
+// Descendents-First-Relationship. The Descendents-First-Relationship has the
+// following important property:
+// When rebuilding the trie from the sequence of nodes, build the trie on the fly,
+// as for each node, the children have been previously encountered.
+// TODO: evaluate alternatives to CRC32 since checkpoint file is many GB in size.
+// TODO: add concurrency if the performance gains are enough to offset complexity.
 func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 	var err error
@@ -271,7 +274,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 		return fmt.Errorf("cannot write checkpoint header: %w", err)
 	}
 
-	// assign unique value to every node
+	// assign unique index to every node
 	allNodes := make(map[*node.Node]uint64)
 	allNodes[nil] = 0 // 0th element is nil
 
@@ -363,12 +366,12 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	return nil
 }
 
-func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedForest, error) {
+func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
 	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
 	return LoadCheckpoint(filepath)
 }
 
-func (c *Checkpointer) LoadRootCheckpoint() (*flattener.FlattenedForest, error) {
+func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
 	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
 	return LoadCheckpoint(filepath)
 }
@@ -387,7 +390,7 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
+func LoadCheckpoint(filepath string) ([]*trie.MTrie, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
@@ -399,7 +402,7 @@ func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
 	return readCheckpoint(file)
 }
 
-func readCheckpoint(f *os.File) (*flattener.FlattenedForest, error) {
+func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
 	// Read header: magic (2 bytes) + version (2 bytes)
 	header := make([]byte, 4)
 	_, err := io.ReadFull(f, header)
@@ -430,10 +433,10 @@ func readCheckpoint(f *os.File) (*flattener.FlattenedForest, error) {
 	}
 }
 
-// readCheckpointV3AndEarlier deserializes checkpoint file (version 3 and earlier) and returns flattened forest.
+// readCheckpointV3AndEarlier deserializes checkpoint file (version 3 and earlier) and returns a list of tries.
 // Header (magic and version) are verified by the caller.
 // TODO: return []*trie.MTrie directly without conversion to FlattenedForest.
-func readCheckpointV3AndEarlier(f *os.File, version uint16) (*flattener.FlattenedForest, error) {
+func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, error) {
 
 	var bufReader io.Reader = bufio.NewReader(f)
 	crcReader := NewCRC32Reader(bufReader)
@@ -461,24 +464,33 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) (*flattener.Flattene
 	nodesCount, pos := readUint64(header, nodesCountOffset)
 	triesCount, _ := readUint16(header, pos)
 
-	nodes := make([]*flattener.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
-	tries := make([]*flattener.StorableTrie, triesCount)
+	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		storableNode, err := flattener.ReadStorableNode(reader)
+		n, err := flattener.ReadNode(reader, func(nodeIndex uint64) (*node.Node, error) {
+			if nodeIndex >= uint64(i) {
+				return nil, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
+			}
+			return nodes[nodeIndex], nil
+		})
 		if err != nil {
-			return nil, fmt.Errorf("cannot read storable node %d: %w", i, err)
+			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
 		}
-		nodes[i] = storableNode
+		nodes[i] = n
 	}
 
-	// TODO version ?
 	for i := uint16(0); i < triesCount; i++ {
-		storableTrie, err := flattener.ReadStorableTrie(reader)
+		trie, err := flattener.ReadTrie(reader, func(nodeIndex uint64) (*node.Node, error) {
+			if nodeIndex >= uint64(len(nodes)) {
+				return nil, fmt.Errorf("sequence of stored nodes doesn't contain node")
+			}
+			return nodes[nodeIndex], nil
+		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot read storable trie %d: %w", i, err)
 		}
-		tries[i] = storableTrie
+		tries[i] = trie
 	}
 
 	if version == VersionV3 {
@@ -496,16 +508,13 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) (*flattener.Flattene
 		}
 	}
 
-	return &flattener.FlattenedForest{
-		Nodes: nodes,
-		Tries: tries,
-	}, nil
+	return tries, nil
 
 }
 
-// readCheckpointV4 deserializes checkpoint file (version 4) and returns flattened forest.
+// readCheckpointV4 deserializes checkpoint file (version 4) and returns a list of tries.
 // Checkpoint file header (magic and version) are verified by the caller.
-func readCheckpointV4(f *os.File) (*flattener.FlattenedForest, error) {
+func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 
 	// Read footer to get node count and trie count
 
@@ -547,23 +556,34 @@ func readCheckpointV4(f *os.File) (*flattener.FlattenedForest, error) {
 		return nil, fmt.Errorf("cannot read header bytes: %w", err)
 	}
 
-	nodes := make([]*flattener.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
-	tries := make([]*flattener.StorableTrie, triesCount)
+	// nodes's element at index 0 is a special, meaning nil .
+	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		storableNode, err := flattener.ReadStorableNode(reader)
+		n, err := flattener.ReadNode(reader, func(nodeIndex uint64) (*node.Node, error) {
+			if nodeIndex >= uint64(i) {
+				return nil, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
+			}
+			return nodes[nodeIndex], nil
+		})
 		if err != nil {
-			return nil, fmt.Errorf("cannot read storable node %d: %w", i, err)
+			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
 		}
-		nodes[i] = storableNode
+		nodes[i] = n
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
-		storableTrie, err := flattener.ReadStorableTrie(reader)
+		trie, err := flattener.ReadTrie(reader, func(nodeIndex uint64) (*node.Node, error) {
+			if nodeIndex >= uint64(len(nodes)) {
+				return nil, fmt.Errorf("sequence of stored nodes doesn't contain node")
+			}
+			return nodes[nodeIndex], nil
+		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot read storable trie %d: %w", i, err)
 		}
-		tries[i] = storableTrie
+		tries[i] = trie
 	}
 
 	// Read footer again for crc32 computation
@@ -586,10 +606,7 @@ func readCheckpointV4(f *os.File) (*flattener.FlattenedForest, error) {
 		return nil, fmt.Errorf("checkpoint checksum failed! File contains %x but read data checksums to %x", readCrc32, calculatedCrc32)
 	}
 
-	return &flattener.FlattenedForest{
-		Nodes: nodes,
-		Tries: tries,
-	}, nil
+	return tries, nil
 }
 
 func writeUint16(buffer []byte, location int, value uint16) int {

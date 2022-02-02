@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
@@ -182,7 +181,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(forestSequencing *flattener.FlattenedForest) error {
+				func(tries []*trie.MTrie) error {
 					return fmt.Errorf("I should fail as there should be no checkpoints")
 				},
 				func(update *ledger.TrieUpdate) error {
@@ -216,8 +215,8 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal3.Replay(
-				func(forestSequencing *flattener.FlattenedForest) error {
-					return loadIntoForest(f3, forestSequencing)
+				func(tries []*trie.MTrie) error {
+					return f3.AddTries(tries)
 				},
 				func(update *ledger.TrieUpdate) error {
 					return fmt.Errorf("I should fail as there should be no updates")
@@ -298,8 +297,8 @@ func Test_Checkpointing(t *testing.T) {
 			updatesLeft := 1 // there should be only one update
 
 			err = wal5.Replay(
-				func(forestSequencing *flattener.FlattenedForest) error {
-					return loadIntoForest(f5, forestSequencing)
+				func(tries []*trie.MTrie) error {
+					return f5.AddTries(tries)
 				},
 				func(update *ledger.TrieUpdate) error {
 					if updatesLeft == 0 {
@@ -558,20 +557,6 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 			require.Contains(t, err.Error(), "checksum")
 		})
 	})
-}
-
-func loadIntoForest(forest *mtrie.Forest, forestSequencing *flattener.FlattenedForest) error {
-	tries, err := flattener.RebuildTries(forestSequencing)
-	if err != nil {
-		return err
-	}
-	for _, t := range tries {
-		err := forest.AddTrie(t)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 type writeCloserWithErrors struct {

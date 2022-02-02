@@ -28,12 +28,12 @@ func init() {
 
 func run(*cobra.Command, []string) {
 
-	flattenedForest, err := wal.LoadCheckpoint(flagCheckpoint)
+	tries, err := wal.LoadCheckpoint(flagCheckpoint)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while loading checkpoint")
 	}
 
-	for _, trie := range flattenedForest.Tries {
-		fmt.Printf("%x\n", trie.RootHash)
+	for _, trie := range tries {
+		fmt.Printf("%x\n", trie.RootHash())
 	}
 }
