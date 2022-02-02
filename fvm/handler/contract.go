@@ -62,7 +62,8 @@ func (h *ContractHandler) SetContract(address runtime.Address, name string, code
 		// check if there's an audit voucher for the contract
 		voucherAvailable, err := h.useContractAuditVoucher(address, code)
 		if err != nil {
-			return fmt.Errorf("setting contract failed: (useContractAuditVoucher) %w", err)
+			errInner := errors.NewOperationAuthorizationErrorf("SetContract", "failed to check audit vouchers")
+			return fmt.Errorf("setting contract failed: %w - %s", errInner, err)
 		}
 		if !voucherAvailable {
 			err = errors.NewOperationAuthorizationErrorf("SetContract", "setting contracts requires authorization from specific accounts")
