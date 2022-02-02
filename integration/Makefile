@@ -11,11 +11,12 @@ test:
 integration-test: access-tests common-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests
 
 .PHONY: ci-integration-test
-ci-integration-test: access-tests common-tests execution-tests verification-tests epochs-tests network-tests consensus-tests collection-tests
+ci-integration-test: access-tests #common-tests execution-tests verification-tests epochs-tests network-tests consensus-tests collection-tests
 
 .PHONY: access-tests
 access-tests:
-	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/access
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/access_api
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/access_unstaked
 
 .PHONY: collection-tests
 collection-tests:
