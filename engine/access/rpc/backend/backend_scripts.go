@@ -93,8 +93,10 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
 	}
-	// encode to MD5 as low memory lookup key
+	// encode to MD5 as low compute/memory lookup key
 	encodedScript := md5.Sum(script)
+	tenMinutes := time.Duration(10) * time.Minute
+
 	// try each of the execution nodes found
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
@@ -103,7 +105,8 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
 			timestamp, seen := b.seenScripts[encodedScript]
-			if !seen || executionTime.Sub(timestamp) > time.Duration(10)*time.Minute {
+			// log unique script seen in the last 10 minutes
+			if !seen || executionTime.Sub(timestamp) >= tenMinutes {
 				b.log.Debug().
 					Str("execution_node", execNode.String()).
 					Hex("block_id", blockID[:]).
