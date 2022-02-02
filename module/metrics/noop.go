@@ -31,6 +31,7 @@ func (nc *NoopCollector) DNSLookupDuration(duration time.Duration)              
 func (nc *NoopCollector) OnDNSCacheMiss()                                                        {}
 func (nc *NoopCollector) OnDNSCacheInvalidated()                                                 {}
 func (nc *NoopCollector) OnDNSCacheHit()                                                         {}
+func (nc *NoopCollector) OnDNSLookupRequestDropped()                                             {}
 func (nc *NoopCollector) UnstakedOutboundConnections(_ uint)                                     {}
 func (nc *NoopCollector) UnstakedInboundConnections(_ uint)                                      {}
 func (nc *NoopCollector) RanGC(duration time.Duration)                                           {}
@@ -148,6 +149,6 @@ func (nc *NoopCollector) DiskSize(uint64)                                       
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
 func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)                    {}
 func (nc *NoopCollector) ExecutionDataAddStarted()                                              {}
-func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, int)                     {}
+func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)                  {}
 func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
-func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, int)                     {}
+func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)                  {}

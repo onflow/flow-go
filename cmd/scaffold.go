@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -39,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -89,6 +91,7 @@ type FlowNodeBuilder struct {
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
 	components               []namedComponentFunc
+	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
 	extraFlagCheck           func() error
@@ -137,29 +140,25 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"pairwise edge probability between nodes in topology")
 }
 
-func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-
-		codec := cborcodec.NewCodec()
-
-		myAddr := fnb.NodeConfig.Me.Address()
-		if fnb.BaseConfig.BindAddr != NotSet {
-			myAddr = fnb.BaseConfig.BindAddr
-		}
+func (fnb *FlowNodeBuilder) EnqueuePingService() {
+	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
 
 		// setup the Ping provider to return the software version and the sealed block height
-		pingProvider := p2p.PingInfoProviderImpl{
+		pingInfoProvider := &p2p.PingInfoProviderImpl{
 			SoftwareVersionFun: func() string {
 				return build.Semver()
 			},
 			SealedBlockHeightFun: func() (uint64, error) {
-				head, err := fnb.State.Sealed().Head()
+				head, err := node.State.Sealed().Head()
 				if err != nil {
 					return 0, err
 				}
 				return head.Height, nil
 			},
-			HotstuffViewFun: nil, // set in next code block, depending on role
+			HotstuffViewFun: func() (uint64, error) {
+				return 0, fmt.Errorf("hotstuff view reporting disabled")
+			},
 		}
 
 		// only consensus roles will need to report hotstuff view
@@ -167,7 +166,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
-			pingProvider.HotstuffViewFun = func() (uint64, error) {
+			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
 				curView, err := persist.GetStarted()
 				if err != nil {
 					return 0, err
@@ -175,29 +174,43 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 				return curView, nil
 			}
-		} else {
-			// non-consensus will not report any hotstuff view
-			pingProvider.HotstuffViewFun = func() (uint64, error) {
-				return 0, fmt.Errorf("non-consensus nodes do not report hotstuff view in ping")
-			}
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
+		pingService, err := node.Network.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
+
+		node.PingService = pingService
+
+		return &module.NoopReadyDoneAware{}, err
+	})
+}
+
+func (fnb *FlowNodeBuilder) EnqueueResolver() {
+	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		resolver := dns.NewResolver(dns.DefaultCacheSize, node.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+		fnb.Resolver = resolver
+		return resolver, nil
+	})
+}
+
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
+	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		codec := cborcodec.NewCodec()
+
+		myAddr := fnb.NodeConfig.Me.Address()
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
+		}
+
+		libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger,
-			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
-			pingProvider,
-			fnb.BaseConfig.DNSCacheTTL,
-			fnb.BaseConfig.NodeRole)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
-		}
+			fnb.Resolver,
+			fnb.BaseConfig.NodeRole,
+		)
 
 		var mwOpts []p2p.MiddlewareOption
 		if len(fnb.MsgValidators) > 0 {
@@ -208,8 +221,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
 		mwOpts = append(mwOpts,
 			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithConnectionGating(true),
-			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)))
+			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+		)
 
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger,
@@ -251,10 +264,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		fnb.Network = net
 
-		idEvents := gadgets.NewIdentityDeltas(func() {
-			fnb.Middleware.UpdateNodeAddresses()
-			fnb.Middleware.UpdateAllowList()
-		})
+		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
 		return net, nil
@@ -479,6 +489,13 @@ func (fnb *FlowNodeBuilder) initDB() {
 	publicDB, err := bstorage.InitPublic(opts)
 	fnb.MustNot(err).Msg("could not open public db")
 	fnb.DB = publicDB
+
+	fnb.ShutdownFunc(func() error {
+		if err := fnb.DB.Close(); err != nil {
+			return fmt.Errorf("error closing protocol database: %w", err)
+		}
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initSecretsDB() {
@@ -513,6 +530,13 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 	secretsDB, err := bstorage.InitSecret(opts)
 	fnb.MustNot(err).Msg("could not open secrets db")
 	fnb.SecretsDB = secretsDB
+
+	fnb.ShutdownFunc(func() error {
+		if err := fnb.SecretsDB.Close(); err != nil {
+			return fmt.Errorf("error closing secrets database: %w", err)
+		}
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -858,6 +882,12 @@ func (fnb *FlowNodeBuilder) Module(name string, f BuilderFunc) NodeBuilder {
 	return fnb
 }
 
+// ShutdownFunc adds a callback function that is called after all components have exited.
+func (fnb *FlowNodeBuilder) ShutdownFunc(fn func() error) NodeBuilder {
+	fnb.postShutdownFns = append(fnb.postShutdownFns, fn)
+	return fnb
+}
+
 func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder {
 	fnb.adminCommands[command] = f
 	return fnb
@@ -981,7 +1011,11 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
+	fnb.EnqueueResolver()
+
 	fnb.EnqueueNetworkInit()
+
+	fnb.EnqueuePingService()
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
@@ -1083,11 +1117,16 @@ func (fnb *FlowNodeBuilder) onStart() error {
 // postShutdown is called by the node before exiting
 // put any cleanup code here that should be run after all components have stopped
 func (fnb *FlowNodeBuilder) postShutdown() error {
-	err := fnb.closeDatabase()
-	if err != nil {
-		return fmt.Errorf("could not close database: %w", err)
+	var errs *multierror.Error
+
+	for _, fn := range fnb.postShutdownFns {
+		err := fn()
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
-	return nil
+	fnb.Logger.Info().Msg("database has been closed")
+	return errs.ErrorOrNil()
 }
 
 // handleFatal handles irrecoverable errors by logging them and exiting the process.
@@ -1101,10 +1140,6 @@ func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {
 
 func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
 	return f(fnb.NodeConfig)
-}
-
-func (fnb *FlowNodeBuilder) closeDatabase() error {
-	return fnb.DB.Close()
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {

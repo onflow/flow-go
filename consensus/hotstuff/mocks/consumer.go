@@ -60,9 +60,9 @@ func (_m *Consumer) OnProposingBlock(proposal *model.Proposal) {
 	_m.Called(proposal)
 }
 
-// OnQcConstructedFromVotes provides a mock function with given fields: _a0
-func (_m *Consumer) OnQcConstructedFromVotes(_a0 *flow.QuorumCertificate) {
-	_m.Called(_a0)
+// OnQcConstructedFromVotes provides a mock function with given fields: curView, qc
+func (_m *Consumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
+	_m.Called(curView, qc)
 }
 
 // OnQcIncorporated provides a mock function with given fields: _a0
@@ -93,6 +93,11 @@ func (_m *Consumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 // OnStartingTimeout provides a mock function with given fields: _a0
 func (_m *Consumer) OnStartingTimeout(_a0 *model.TimerInfo) {
 	_m.Called(_a0)
+}
+
+// OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
+func (_m *Consumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
+	_m.Called(vote, invalidProposal)
 }
 
 // OnVoting provides a mock function with given fields: vote
