@@ -37,18 +37,6 @@ crypto/relic/build:
 # setup the crypto package under the GOPATH, needed to test packages importing flow-go/crypto
 	bash crypto_setup.sh
 
-# relic versions in script and submodule
-export LOCAL_VERSION := $(shell (cd ./crypto/relic/ && git rev-parse HEAD))
-export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]{40}"' ./crypto/build_dependency.sh | cut -c 16-55)
-
-.PHONY: crypto/relic/check
-crypto/relic/check:
-ifeq ($(SCRIPT_VERSION), $(LOCAL_VERSION))
-	@echo "local relic version matches the version required by the crypto package"
-else
-	$(error local relic version doesn't match the version required by the crypto package)
-endif
-
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
