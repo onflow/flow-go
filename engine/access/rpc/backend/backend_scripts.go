@@ -2,7 +2,7 @@ package backend
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -94,7 +94,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
 	}
 	// encode to MD5 as low compute/memory lookup key
-	encodedScript := md5.Sum(script)
+	encodedScript := md5.Sum(script) //nolint:gosec
 	tenMinutes := time.Duration(10) * time.Minute
 
 	// try each of the execution nodes found
