@@ -79,8 +79,13 @@ unittest: unittest-main
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 
+.PHONY: emulator-build
+emulator-build:
+	# test the fvm package compiles with Relic library disabled (required for the emulator build)
+	cd ./fvm && GO111MODULE=on go test ./... -run=NoTestHasThisPrefix
+
 .PHONY: test
-test: generate-mocks unittest
+test: generate-mocks emulator-build unittest
 
 .PHONY: integration-test
 integration-test: docker-build-flow

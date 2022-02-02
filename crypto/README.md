@@ -41,11 +41,10 @@ cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.18.0/
 go generate
 ```
 
-When building your project and including any BLS functionality, adding a build tag to include the BLS files in the build is necessary. 
+Finally, when building your project and including any BLS functionality, adding a Go build tag to include the BLS files in the build is necessary.
 ```
 go test -tags=relic
 ```
-
 
 ## Algorithms
 
