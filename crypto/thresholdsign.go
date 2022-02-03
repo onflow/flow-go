@@ -1,7 +1,5 @@
 package crypto
 
-import "C"
-
 import (
 	"errors"
 	"fmt"
