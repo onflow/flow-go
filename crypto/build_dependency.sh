@@ -34,4 +34,3 @@ else
    { echo "couldn't find relic directory"; exit 1; }
 fi
 
-
