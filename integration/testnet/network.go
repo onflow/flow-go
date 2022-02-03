@@ -768,6 +768,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// set a low timeout so that all nodes agree on the current view more quickly
 			nodeContainer.AddFlag("hotstuff-timeout", time.Second.String())
 			nodeContainer.AddFlag("hotstuff-min-timeout", time.Second.String())
+			nodeContainer.AddFlag("hotstuff-startup-time", time.Now().Add(3*time.Second).Format(time.RFC3339))
 
 			nodeContainer.AddFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.Ports[ColNodeAPIPort] = hostPort
@@ -850,6 +851,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.AddFlag("chunk-alpha", "1")
+			nodeContainer.AddFlag("hotstuff-startup-time", time.Now().Add(3*time.Second).Format(time.RFC3339))
 			hostMetricsPort := testingdock.RandomPort(t)
 			containerMetricsPort := "8080/tcp"
 
