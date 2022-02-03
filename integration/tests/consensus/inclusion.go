@@ -97,11 +97,11 @@ func (is *InclusionSuite) SetupTest() {
 	}
 }
 
-func (is *InclusionSuite) TearDownTest() {
-	is.log.Info().Msgf("================> Start TearDownTest")
-	is.net.Remove()
-	is.cancel()
-	is.log.Info().Msgf("================> Finish TearDownTest")
+func (s *InclusionSuite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
+	s.net.Remove()
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {

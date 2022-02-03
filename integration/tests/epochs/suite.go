@@ -41,6 +41,7 @@ type nodeUpdateValidation func(ctx context.Context, env templates.Environment, r
 
 type Suite struct {
 	suite.Suite
+	log zerolog.Logger
 	common.TestnetStateTracker
 	cancel      context.CancelFunc
 	net         *testnet.FlowNetwork
@@ -50,8 +51,15 @@ type Suite struct {
 }
 
 func (s *Suite) SetupTest() {
-	t := s.T()
-	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "suite.go").
+		Str("testcase", suite.T().Name()).
+		Logger()
+	suite.log = logger
+	suite.log.Info().Msgf("================> SetupTest")
+	defer func() {
+		suite.log.Info().Msgf("================> Finish SetupTest")
+	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
@@ -114,13 +122,10 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
 	s.net.Remove()
-	if s.cancel != nil {
-		s.cancel()
-	}
-
-	t := s.T()
-	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)

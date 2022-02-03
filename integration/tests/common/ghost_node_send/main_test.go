@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -13,22 +12,27 @@ import (
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Tests to check if the Ghost node works as expected
 
 // TestGhostNodeExample_Subscribe demonstrates how to emulate a node and receive all inbound events for it
 func TestGhostNodeExample_Subscribe(t *testing.T) {
-	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "ghost_node_send/main_test.go").
+		Str("testcase", t.Name()).
+		Logger()
+	logger.Info().Msgf("================> START TESTING")
 
 	var (
 		// one collection node
 		collNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(1))
 
 		// three consensus nodes
-		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
-		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
-		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 
 		// an actual execution node
 		realExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(2))
@@ -51,7 +55,11 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Remove()
+	defer func() {
+		logger.Info().Msgf("================> Start TearDownTest")
+		net.Remove()
+		logger.Info().Msgf("================> Finish TearDownTest")
+	}()
 
 	// get the ghost container
 	ghostContainer := net.ContainerByID(ghostExeNode.Identifier)
@@ -78,5 +86,5 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 			t.Logf(" ignoring event: :%T: %v", v, v)
 		}
 	}
-	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
+
 }

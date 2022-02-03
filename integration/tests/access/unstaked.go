@@ -35,17 +35,20 @@ type UnstakedAccessSuite struct {
 	followerMgr2 *followerManager
 }
 
-func (suite *UnstakedAccessSuite) TearDownTest() {
-	suite.net.Remove()
-	suite.cancel()
-
-	t := suite.T()
-	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
+func (s *UnstakedAccessSuite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
+	s.net.Remove()
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 func (suite *UnstakedAccessSuite) SetupTest() {
-	t := suite.T()
-	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "unstaked.go").
+		Str("testcase", suite.T().Name()).
+		Logger()
+	suite.log = logger
+	suite.log.Info().Msgf("================> SetupTest")
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.buildNetworkConfig()
 	// start the network

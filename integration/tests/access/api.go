@@ -41,6 +41,9 @@ func (suite *AccessSuite) SetupTest() {
 		Logger()
 	suite.log = logger
 	suite.log.Info().Msgf("================> SetupTest")
+	defer func() {
+		suite.log.Info().Msgf("================> Finish SetupTest")
+	}()
 
 	nodeConfigs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel)),

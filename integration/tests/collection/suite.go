@@ -36,6 +36,8 @@ type CollectorSuite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	log zerolog.Logger
+
 	net       *testnet.FlowNetwork
 	nClusters uint
 
@@ -59,7 +61,12 @@ type CollectorSuite struct {
 // NOTE: This must be called explicitly by each test, since nodes/clusters vary
 //       between test cases.
 func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
-	suite.T().Logf("test case startup %v", suite.T().Name())
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "suite.go").
+		Str("testcase", suite.T().Name()).
+		Logger()
+	suite.log = logger
+	suite.log.Info().Msgf("================> SetupTest")
 
 	var (
 		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
@@ -112,17 +119,11 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	}
 }
 
-func (suite *CollectorSuite) TearDownTest() {
-	suite.T().Logf("test case %v tear down", suite.T().Name())
-	// avoid nil pointer errors for skipped tests
-	if suite.net != nil {
-		suite.net.Remove()
-	}
-	if suite.cancel != nil {
-		suite.cancel()
-	}
-	t := suite.T()
-	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
+func (s *CollectorSuite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
+	s.net.Remove()
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 // Ghost returns a client for the ghost node.
