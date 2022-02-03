@@ -188,11 +188,11 @@ func main() {
 			return err
 		}).
 		Module("execution metrics", func(node *cmd.NodeConfig) error {
-			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
+			collector = metrics.NewExecutionCollector(node.Tracer)
 			return nil
 		}).
 		Module("execution data service metrics", func(node *cmd.NodeConfig) error {
-			executionDataServiceCollector = metrics.NewExecutionDataServiceCollector(node.MetricsRegisterer)
+			executionDataServiceCollector = metrics.NewExecutionDataServiceCollector()
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
