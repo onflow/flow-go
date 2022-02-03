@@ -34,19 +34,8 @@ export DOCKER_BUILDKIT := 1
 
 .PHONY: crypto/relic/build
 crypto/relic/build:
-	cd ./crypto &&	go generate
-
-# relic versions in script and submodule
-export LOCAL_VERSION := $(shell (cd ./crypto/relic/ && git rev-parse HEAD))
-export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]{40}"' ./crypto/build_dependency.sh | cut -c 16-55)
-
-.PHONY: crypto/relic/check
-crypto/relic/check:
-ifeq ($(SCRIPT_VERSION), $(LOCAL_VERSION))
-	@echo "local relic version matches the version required by the crypto package"
-else
-	$(error local relic version doesn't match the version required by the crypto package)
-endif
+# setup the crypto package under the GOPATH, needed to test packages importing flow-go/crypto
+	bash crypto_setup.sh
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
@@ -80,8 +69,13 @@ unittest: unittest-main
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 
+.PHONY: emulator-build
+emulator-build:
+	# test the fvm package compiles with Relic library disabled (required for the emulator build)
+	cd ./fvm && GO111MODULE=on go test ./... -run=NoTestHasThisPrefix
+
 .PHONY: test
-test: generate-mocks unittest
+test: generate-mocks emulator-build unittest
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -116,12 +110,13 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
 	GO111MODULE=on mockgen -destination=network/mocknetwork/engine.go -package=mocknetwork github.com/onflow/flow-go/network Engine
 	GO111MODULE=on mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network Network
+	GO111MODULE=on mockery -name '(ExecutionDataService|ExecutionDataCIDCache)' -dir=module/state_synchronization -case=underscore -output="./module/state_synchronization/mock" -outpkg="state_synchronization"
 	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'BlockComputer' -dir=engine/execution/computation/computer -case=underscore -output="engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ComputationManager' -dir=engine/execution/computation -case=underscore -output="engine/execution/computation/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'EpochComponentsFactory' -dir=engine/collection/epochmgr -case=underscore -output="engine/collection/epochmgr/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ProviderEngine' -dir=engine/execution/provider -case=underscore -output="engine/execution/provider/mock" -outpkg="mock"
-	(cd ./crypto && GO111MODULE=on mockery -name 'PublicKey' -case=underscore -tags="relic" -output="../module/mock" -outpkg="mock")
+	(cd ./crypto && GO111MODULE=on mockery -name 'PublicKey' -case=underscore -output="../module/mock" -outpkg="mock")
 	GO111MODULE=on mockery -name '.*' -dir=state/cluster -case=underscore -output="state/cluster/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -tags="relic" -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
@@ -161,7 +156,7 @@ tidy:
 	git diff --exit-code
 
 .PHONY: lint
-lint:
+lint: tidy
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
 
@@ -290,7 +285,7 @@ tool-transit: docker-build-bootstrap-transit
 
 .PHONY: docker-build-loader
 docker-build-loader:
-	docker build -f ./integration/loader/Dockerfile --ssh default --build-arg TARGET=loader --target production \
+	docker build -f ./integration/loader/Dockerfile --build-arg TARGET=loader --target production \
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow

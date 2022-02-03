@@ -68,7 +68,7 @@ type Network struct {
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the
 // Conduit instance.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	ctx, cancel := context.WithCancel(n.ctx)
 	con := &Conduit{
 		ctx:     ctx,
@@ -77,11 +77,15 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 		channel: channel,
 		queue:   make(chan message, 1024),
 	}
+
 	go func() {
 		for msg := range con.queue {
-			engine.Submit(channel, msg.originID, msg.event)
+			go func(m message) {
+				_ = engine.Process(channel, m.originID, m.event)
+			}(msg)
 		}
 	}()
+
 	n.conduits[channel] = con
 	return con, nil
 }
