@@ -53,12 +53,12 @@ type Suite struct {
 func (s *Suite) SetupTest() {
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
 		Str("testfile", "suite.go").
-		Str("testcase", suite.T().Name()).
+		Str("testcase", s.T().Name()).
 		Logger()
-	suite.log = logger
-	suite.log.Info().Msgf("================> SetupTest")
+	s.log = logger
+	s.log.Info().Msgf("================> SetupTest")
 	defer func() {
-		suite.log.Info().Msgf("================> Finish SetupTest")
+		s.log.Info().Msgf("================> Finish SetupTest")
 	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
