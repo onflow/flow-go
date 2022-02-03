@@ -29,7 +29,7 @@ type Suite struct {
 	exe1ID                     flow.Identifier
 	exe2ID                     flow.Identifier
 	verID                      flow.Identifier // represents id of verification node
-	preferredUnicasts          string          // preferred unicast protocols between execution and verification nodes.
+	PreferredUnicasts          string          // preferred unicast protocols between execution and verification nodes.
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -91,7 +91,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two execution nodes
@@ -100,7 +100,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
@@ -108,7 +108,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
