@@ -713,7 +713,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		return fmt.Errorf("could not get tmp dir: %w", err)
 	}
 
-	t.Logf("adding container %v for %v node", nodeConf.ContainerName, nodeConf.Role)
+	t.Logf("%v adding container %v for %v node", time.Now().UTC(), nodeConf.ContainerName, nodeConf.Role)
 
 	nodeContainer := &Container{
 		Config:  nodeConf,
@@ -749,6 +749,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, DefaultBootstrapDir),
 	)
 
+	hotstuffStartupTime := time.Now().Add(8 * time.Second).Format(time.RFC3339)
+
 	if !nodeConf.Ghost {
 		switch nodeConf.Role {
 		case flow.RoleCollection:
@@ -768,7 +770,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// set a low timeout so that all nodes agree on the current view more quickly
 			nodeContainer.AddFlag("hotstuff-timeout", time.Second.String())
 			nodeContainer.AddFlag("hotstuff-min-timeout", time.Second.String())
-			nodeContainer.AddFlag("hotstuff-startup-time", time.Now().Add(3*time.Second).Format(time.RFC3339))
+			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
+			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
 
 			nodeContainer.AddFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.Ports[ColNodeAPIPort] = hostPort
@@ -851,7 +854,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.AddFlag("chunk-alpha", "1")
-			nodeContainer.AddFlag("hotstuff-startup-time", time.Now().Add(3*time.Second).Format(time.RFC3339))
+			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
+			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
 			hostMetricsPort := testingdock.RandomPort(t)
 			containerMetricsPort := "8080/tcp"
 
