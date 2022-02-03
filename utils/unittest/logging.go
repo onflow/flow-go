@@ -19,13 +19,13 @@ func LogVerbose() {
 // Logger returns a zerolog
 // use -vv flag to print debugging logs for tests
 func Logger() zerolog.Logger {
-	writer := ioutil.Discard
+	return LoggerWithLevel(zerolog.DebugLevel)
+}
 
-	if *verbose {
-		writer = os.Stderr
-	}
+func LoggerWithLevel(level zerolog.Level) zerolog.Logger {
+	writer := os.Stderr
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(writer).Level(zerolog.DebugLevel).With().Timestamp().Logger()
+	log := zerolog.New(writer).Level(level).With().Timestamp().Logger()
 	return log
 }
 

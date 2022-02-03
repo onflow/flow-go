@@ -117,6 +117,7 @@ func init() {
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
 	t                           *testing.T
+	log                         zerolog.Logger
 	suite                       *testingdock.Suite
 	config                      NetworkConfig
 	cli                         *dockerclient.Client
@@ -171,8 +172,8 @@ func (net *FlowNetwork) Result() *flow.ExecutionResult {
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
 	// makes it easier to see logs for a specific test case
-	net.t.Logf("%v starting flow network %v with docker containers for test case [%v]",
-		time.Now().UTC(), net.config.Name, net.t.Name())
+	net.log.Info().Msgf("starting flow network %v with docker containers",
+		net.config.Name)
 
 	// print all existing containers before starting our containers, Useful to debug the issue
 	// that the tests fail due to "port is already allocated"
@@ -557,12 +558,18 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	root, result, seal, confs, bootstrapSnapshot, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("module", "flownetwork").
+		Str("testcase", t.Name()).
+		Logger()
+
 	flowNetwork := &FlowNetwork{
 		t:                           t,
 		cli:                         dockerClient,
 		config:                      networkConf,
 		suite:                       suite,
 		network:                     network,
+		log:                         logger,
 		Containers:                  make(map[string]*Container, nNodes),
 		ConsensusFollowers:          make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
 		AccessPorts:                 make(map[string]string),
