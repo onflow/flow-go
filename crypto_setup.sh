@@ -22,7 +22,7 @@ fi
 
 # grant permissions if not existant
 if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
-   sudo chmod -R 755 "${PKG_DIR}"
+   chmod -R 755 "${PKG_DIR}"
 fi
 
 # get into the package directory and set up the external dependencies
