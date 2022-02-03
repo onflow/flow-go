@@ -292,6 +292,11 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
 	// process the blocks one by one
+	if len(res.Blocks) == 0 {
+		e.log.Debug().Msg("received empty block response")
+		return
+	}
+
 	min := res.Blocks[0].Header.Height
 	max := res.Blocks[len(res.Blocks)-1].Header.Height
 	e.log.Debug().Uint64("min", min).Uint64("max", max).Msg("received block response")
