@@ -226,12 +226,65 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 
 // GetLatestProtocolStateSnapshot returns the latest finalized snapshot
 func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
-	data, err := convert.SnapshotToBytes(b.state.Final())
+	snapshot := b.state.Final()
+
+	validSnapshot, err := b.getValidSnapshot(snapshot)
 	if err != nil {
 		return nil, err
 	}
 
-	return data, nil
+	return convert.SnapshotToBytes(validSnapshot)
+}
+
+func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot) (protocol.Snapshot, error) {
+	segment, err := snapshot.SealingSegment()
+	if err != nil {
+		return nil, err
+	}
+
+	snapshotAtHighest := b.state.AtBlockID(segment.Highest().ID())
+	snapshotAtLowest := b.state.AtBlockID(segment.Lowest().ID())
+
+	counterAtHighest, err := snapshotAtHighest.Epochs().Current().Counter()
+	if err != nil {
+		return nil, err
+	}
+
+	phaseAtHighest, err := snapshotAtHighest.Phase()
+	if err != nil {
+		return nil, err
+	}
+
+	counterAtLowest, err := snapshotAtLowest.Epochs().Current().Counter()
+	if err != nil {
+		return nil, err
+	}
+
+	phaseAtLowest, err := snapshotAtLowest.Phase()
+	if err != nil {
+		return nil, err
+	}
+
+	if counterAtHighest != counterAtLowest || phaseAtHighest != phaseAtLowest {
+		for i := len(segment.Blocks) - 1; i >= 0; i-- {
+			snapshotAtBlock := b.state.AtBlockID(segment.Blocks[i].ID())
+			counterAtBlock, err := snapshotAtBlock.Epochs().Current().Counter()
+			if err != nil {
+				return nil, err
+			}
+
+			phaseAtBlock, err := snapshotAtBlock.Phase()
+			if err != nil {
+				return nil, err
+			}
+
+			if counterAtHighest != counterAtBlock || phaseAtHighest != phaseAtBlock {
+				return b.getValidSnapshot(snapshotAtBlock)
+			}
+		}
+	}
+
+	return snapshot, nil
 }
 
 func convertStorageError(err error) error {

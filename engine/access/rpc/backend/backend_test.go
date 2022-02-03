@@ -153,7 +153,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
 		suite.log,
 	)
 
-	// query the handler for the latest sealed snapshot
+	// query the handler for the latest finalized snapshot
 	bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
 	suite.Require().NoError(err)
 
