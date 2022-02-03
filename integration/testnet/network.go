@@ -591,7 +591,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		}
 	}
 	require.GreaterOrEqualf(t, len(accessNodeIDS), DefaultMinimumNumOfAccessNodeIDS,
-		"at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS)
+		fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
 
 	for _, nodeConf := range confs {
 		var nodeType = "real"
