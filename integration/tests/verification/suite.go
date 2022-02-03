@@ -19,6 +19,7 @@ import (
 // against happy path of verification nodes.
 type Suite struct {
 	suite.Suite
+	log                        zerolog.Logger
 	common.TestnetStateTracker                      // used to track messages over testnet
 	cancel                     context.CancelFunc   // used to tear down the testnet
 	net                        *testnet.FlowNetwork // used to keep an instance of testnet
