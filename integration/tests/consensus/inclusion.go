@@ -3,7 +3,6 @@ package consensus
 import (
 	"context"
 	"math/rand"
-	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -18,10 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func TestCollectionGuaranteeInclusion(t *testing.T) {
-	suite.Run(t, new(InclusionSuite))
-}
 
 type InclusionSuite struct {
 	suite.Suite

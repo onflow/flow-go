@@ -3,7 +3,6 @@ package consensus
 import (
 	"context"
 	"math/rand"
-	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -21,10 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func TestExecutionStateSealing(t *testing.T) {
-	suite.Run(t, new(SealingSuite))
-}
 
 type SealingSuite struct {
 	suite.Suite
