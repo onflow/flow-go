@@ -14,9 +14,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type MultiClusterSuite struct {
+	CollectionSuite
+}
+
 // Run consensus on a multi-cluster setup. Ensure that transactions
 // are always included in the appropriate cluster.
-func (suite *CollectorSuite) TestProposal_MultiCluster() {
+func (suite *MultiClusterSuite) TestProposal_MultiCluster() {
 	t := suite.T()
 	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 	var (
@@ -212,9 +216,13 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 	})
 }
 
+type RecoverySuite struct {
+	CollectionSuite
+}
+
 // Start consensus, pause a node, allow consensus to continue, then restart
 // the node. It should be able to catch up.
-func (suite *CollectorSuite) TestProposal_Recovery() {
+func (suite *RecoverySuite) TestProposal_Recovery() {
 	t := suite.T()
 	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 

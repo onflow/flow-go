@@ -26,10 +26,14 @@ func logStartFinish(fn func(*testing.T)) func(*testing.T) {
 	}
 }
 
+type IngressSuite struct {
+	CollectionSuite
+}
+
 // Test sending various invalid transactions to a single-cluster configuration.
 // The transactions should be rejected by the collection node and not included
 // in any collection.
-func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
+func (suite *IngressSuite) TestTransactionIngress_InvalidTransaction() {
 	t := suite.T()
 	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
@@ -94,7 +98,7 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 
 // Test sending a single valid transaction to a single cluster.
 // The transaction should be included in a collection.
-func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
+func (suite *IngressSuite) TestTxIngress_SingleCluster() {
 	t := suite.T()
 	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
@@ -140,7 +144,7 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 //
 // The transaction should not be routed and should be included in exactly one
 // collection in only the responsible cluster.
-func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
+func (suite *IngressSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	t := suite.T()
 	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
@@ -213,7 +217,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 //
 // The transaction should be routed to the responsible cluster and should be
 // included in a collection in only the responsible cluster's state.
-func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
+func (suite *IngressSuite) TestTxIngressMultiCluster_OtherCluster() {
 	t := suite.T()
 	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 

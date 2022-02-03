@@ -2,7 +2,6 @@ package collection
 
 import (
 	"context"
-	"testing"
 	"time"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -52,10 +51,6 @@ type CollectorSuite struct {
 	// ghost node
 	ghostID flow.Identifier
 	reader  *ghostclient.FlowMessageStreamReader
-}
-
-func TestCollectorSuite(t *testing.T) {
-	suite.Run(t, new(CollectorSuite))
 }
 
 // SetupTest generates a test network with the given number of collector nodes
