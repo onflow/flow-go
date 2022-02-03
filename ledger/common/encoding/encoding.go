@@ -327,6 +327,12 @@ func EncodePayload(p *ledger.Payload) []byte {
 	return buffer
 }
 
+// EncodePayloadWithoutPrefix encodes a ledger payload
+// without prefix (version and type).
+func EncodePayloadWithoutPrefix(p *ledger.Payload) []byte {
+	return encodePayload(p)
+}
+
 func encodePayload(p *ledger.Payload) []byte {
 	buffer := make([]byte, 0)
 
@@ -368,6 +374,12 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 	return decodePayload(rest)
+}
+
+// DecodePayloadWithoutPrefix construct a payload from an encoded byte slice
+// without prefix (version and type).
+func DecodePayloadWithoutPrefix(encodedPayload []byte) (*ledger.Payload, error) {
+	return decodePayload(encodedPayload)
 }
 
 func decodePayload(inp []byte) (*ledger.Payload, error) {

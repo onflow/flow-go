@@ -31,41 +31,31 @@ func TestNodeSerialization(t *testing.T) {
 	leafNode2 := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2, 0, 1)
 	rootNode := node.NewNode(256, leafNode1, leafNode2, ledger.DummyPath, nil, hashValue3, 1, 2)
 
-	// Version 0
 	expectedLeafNode1 := []byte{
-		0, 0, // encoding version
+		0,      // node type
 		0, 255, // height
-		0, 0, 0, 0, 0, 0, 0, 0, // LIndex
-		0, 0, 0, 0, 0, 0, 0, 0, // RIndex
 		0, 0, // max depth
 		0, 0, 0, 0, 0, 0, 0, 1, // reg count
+		0, 32, // hash data len
+		1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // hash data
 		0, 32, // path data len
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // path data
-		0, 0, 0, 25, // payload data len
-		0, 0, 6, 0, 0, 0, 9, 0, 1, 0, 0, 0, 3, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 1, 97, // payload data
-		0, 32, // hashValue length
-		1, 1, 1, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, // hashValue
+		0, 0, 0, 22, // payload data len
+		0, 0, 0, 9, 0, 1, 0, 0, 0, 3, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 1, 97, // payload data
 	}
 
-	// Version 0
 	expectedRootNode := []byte{
-		0, 0, // encoding version
+		1,    // node type
 		1, 0, // height
-		0, 0, 0, 0, 0, 0, 0, 1, // LIndex
-		0, 0, 0, 0, 0, 0, 0, 2, // RIndex
 		0, 1, // max depth
 		0, 0, 0, 0, 0, 0, 0, 2, // reg count
-		0, 0, // path data len
-		0, 0, 0, 0, // payload data len
-		0, 32, // hashValue length
-		3, 3, 3, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, // hashValue
+		0, 0, 0, 0, 0, 0, 0, 1, // LIndex
+		0, 0, 0, 0, 0, 0, 0, 2, // RIndex
+		0, 32, // hash data len
+		3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // hash data
 	}
 
 	t.Run("encode leaf node", func(t *testing.T) {
@@ -112,9 +102,7 @@ func TestTrieSerialization(t *testing.T) {
 	rootNode := node.NewNode(256, nil, nil, ledger.DummyPath, nil, hashValue, 7, 5000)
 	rootNodeIndex := uint64(21)
 
-	// Version 0
 	expected := []byte{
-		0, 0, // encoding version
 		0, 0, 0, 0, 0, 0, 0, 21, // RootIndex
 		0, 32, // RootHash length
 		2, 2, 2, 0, 0, 0, 0, 0,

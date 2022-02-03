@@ -468,7 +468,7 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		n, err := flattener.ReadNode(reader, func(nodeIndex uint64) (*node.Node, error) {
+		n, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= uint64(i) {
 				return nil, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -481,7 +481,7 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
-		trie, err := flattener.ReadTrie(reader, func(nodeIndex uint64) (*node.Node, error) {
+		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= uint64(len(nodes)) {
 				return nil, fmt.Errorf("sequence of stored nodes doesn't contain node")
 			}
