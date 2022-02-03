@@ -20,7 +20,7 @@ import (
 // TestGhostNodeExample_Subscribe demonstrates how to emulate a node and receive all inbound events for it
 func TestGhostNodeExample_Subscribe(t *testing.T) {
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "ghost_node_send/main_test.go").
+		Str("testfile", "ghost_node_subscribe/main_test.go").
 		Str("testcase", t.Name()).
 		Logger()
 	logger.Info().Msgf("================> START TESTING")
@@ -30,9 +30,9 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 		collNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(1))
 
 		// three consensus nodes
-		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
-		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
-		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+		conNode1 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode2 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
+		conNode3 = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel))
 
 		// an actual execution node
 		realExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(2))
