@@ -625,7 +625,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
-	flowNetwork.PrintMetricsPorts()
+	// flowNetwork.PrintMetricsPorts()
 
 	t.Logf("%v finish preparing flow network for %v", time.Now().UTC(), t.Name())
 
