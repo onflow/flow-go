@@ -181,9 +181,49 @@ func (lg *ContLoadGenerator) SetupFavContract() error {
 	}
 
 	lg.sendTx(-1, deploymentTx)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	lg.txTracker.AddTx(deploymentTx.ID(),
+		nil,
+		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+			defer wg.Done()
+
+			lg.log.Debug().
+				Str("status", res.Status.String()).
+				Msg("fav contract deployment tx executed")
+
+			if res.Error != nil {
+				lg.log.Error().
+					Err(res.Error).
+					Msg("fav contract deployment tx failed")
+				err = res.Error
+			}
+		},
+		nil, // on sealed
+		func(_ flowsdk.Identifier) {
+			lg.log.Error().Msg("fav contract deployment transaction has expired")
+			err = fmt.Errorf("fav contract deployment transaction has expired")
+			wg.Done()
+		}, // on expired
+		func(_ flowsdk.Identifier) {
+			lg.log.Error().Msg("fav contract deployment transaction has timed out")
+			err = fmt.Errorf("fav contract deployment transaction has timed out")
+			wg.Done()
+		}, // on timeout
+		func(_ flowsdk.Identifier, terr error) {
+			lg.log.Error().Err(terr).Msg("fav contract deployment transaction has encountered an error")
+			err = terr
+			wg.Done()
+		}, // on error
+		120)
+
+	wg.Wait()
+
 	lg.favContractAddress = acc.address
 
-	return nil
+	return err
 }
 
 func (lg *ContLoadGenerator) Start() {

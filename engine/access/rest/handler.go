@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -36,6 +37,7 @@ type Handler struct {
 	backend        access.API
 	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
+	chain          flow.Chain
 }
 
 func NewHandler(
@@ -43,12 +45,14 @@ func NewHandler(
 	backend access.API,
 	handlerFunc ApiHandlerFunc,
 	generator models.LinkGenerator,
+	chain flow.Chain,
 ) *Handler {
 	return &Handler{
 		logger:         logger,
 		backend:        backend,
 		apiHandlerFunc: handlerFunc,
 		linkGenerator:  generator,
+		chain:          chain,
 	}
 }
 
@@ -67,7 +71,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create request decorator with parsed values
-	decoratedRequest := request.Decorate(r)
+	decoratedRequest := request.Decorate(r, h.chain)
 
 	// execute handler function and check for error
 	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
