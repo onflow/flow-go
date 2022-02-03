@@ -15,7 +15,7 @@ import (
 )
 
 type MultiClusterSuite struct {
-	CollectionSuite
+	CollectorSuite
 }
 
 // Run consensus on a multi-cluster setup. Ensure that transactions
@@ -217,7 +217,7 @@ func (suite *MultiClusterSuite) TestProposal_MultiCluster() {
 }
 
 type RecoverySuite struct {
-	CollectionSuite
+	CollectorSuite
 }
 
 // Start consensus, pause a node, allow consensus to continue, then restart

@@ -27,7 +27,7 @@ func logStartFinish(fn func(*testing.T)) func(*testing.T) {
 }
 
 type IngressSuite struct {
-	CollectionSuite
+	CollectorSuite
 }
 
 // Test sending various invalid transactions to a single-cluster configuration.

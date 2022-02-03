@@ -24,6 +24,8 @@ const blockCount = 5 // number of finalized blocks to wait for
 type UnstakedAccessSuite struct {
 	suite.Suite
 
+	log zerolog.Logger
+
 	// root context for the current test
 	ctx    context.Context
 	cancel context.CancelFunc
