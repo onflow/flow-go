@@ -17,7 +17,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -26,28 +25,43 @@ import (
 // timeout for individual actions
 const defaultTimeout = time.Second * 10
 
-func TestMVP_Network(t *testing.T) {
-	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
+func MVP_Network(t *testing.T) {
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "suite.go").
+		Str("testcase", t.Name()).
+		Logger()
+	logger.Info().Msgf("================> START TESTING")
 	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	flowNetwork.Start(ctx)
-	defer flowNetwork.Remove()
+	defer func() {
+		logger.Info().Msgf("================> Start TearDownTest")
+		flowNetwork.Remove()
+		logger.Info().Msgf("================> Finish TearDownTest")
+	}()
 
 	runMVPTest(t, ctx, flowNetwork)
-	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
-func TestMVP_Bootstrap(t *testing.T) {
-	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
+func MVP_Bootstrap(t *testing.T) {
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "suite.go").
+		Str("testcase", t.Name()).
+		Logger()
+	logger.Info().Msgf("================> START TESTING")
 	unittest.SkipUnless(t, unittest.TEST_WIP, "skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
 
 	testingdock.Verbose = false
 
 	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
-	defer flowNetwork.Remove()
+	defer func() {
+		logger.Info().Msgf("================> Start TearDownTest")
+		flowNetwork.Remove()
+		logger.Info().Msgf("================> Finish TearDownTest")
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -101,7 +115,6 @@ func TestMVP_Bootstrap(t *testing.T) {
 	runMVPTest(t, ctx, flowNetwork)
 
 	t.Log("@@ finished running mvp test 2")
-	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
 
 func buildMVPNetConfig() testnet.NetworkConfig {
@@ -145,7 +158,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.NoError(t, err)
 
 	// create new account to deploy Counter to
-	accountPrivateKey := common.RandomPrivateKey()
+	accountPrivateKey := RandomPrivateKey()
 
 	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(accountPrivateKey).
@@ -159,8 +172,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		[]*sdk.AccountKey{accountKey},
 		[]templates.Contract{
 			{
-				Name:   common.CounterContract.Name,
-				Source: common.CounterContract.ToCadence(),
+				Name:   CounterContract.Name,
+				Source: CounterContract.ToCadence(),
 			},
 		},
 		serviceAddress).
@@ -247,14 +260,14 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	// contract is deployed, but no instance is created yet
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	counter, err := common.ReadCounter(childCtx, accountClient, newAccountAddress)
+	counter, err := ReadCounter(childCtx, accountClient, newAccountAddress)
 	cancel()
 	require.NoError(t, err)
 	require.Equal(t, -3, counter)
 
 	// create counter instance
 	createCounterTx := sdk.NewTransaction().
-		SetScript([]byte(common.CreateCounterTx(newAccountAddress).ToCadence())).
+		SetScript([]byte(CreateCounterTx(newAccountAddress).ToCadence())).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(newAccountAddress, 0, 0).
 		SetPayer(newAccountAddress).
@@ -280,7 +293,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
 		childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-		counter, err = common.ReadCounter(ctx, serviceAccountClient, newAccountAddress)
+		counter, err = ReadCounter(ctx, serviceAccountClient, newAccountAddress)
 		cancel()
 
 		return err == nil && counter == 2
