@@ -60,11 +60,11 @@ require (
 	github.com/onflow/atree v0.1.1
 	github.com/onflow/cadence v0.21.0
 	github.com/onflow/flow v0.2.3-0.20220131193101-d4e2ca43a621
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.9.0
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.9.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.1
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.24.0
-	github.com/onflow/flow-go/crypto v0.21.4-0.20211125190211-7b31c986316e
+	github.com/onflow/flow-go/crypto v0.24.2
 	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -105,5 +105,3 @@ require (
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
-
-replace github.com/onflow/flow-go/crypto => ./crypto
