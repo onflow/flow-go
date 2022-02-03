@@ -35,10 +35,6 @@ type UnstakedAccessSuite struct {
 	followerMgr2 *followerManager
 }
 
-func TestUnstakedAccessSuite(t *testing.T) {
-	suite.Run(t, new(UnstakedAccessSuite))
-}
-
 func (suite *UnstakedAccessSuite) TearDownTest() {
 	suite.net.Remove()
 	suite.cancel()

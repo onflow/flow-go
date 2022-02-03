@@ -35,8 +35,12 @@ func (is *InclusionSuite) Collection() *client.GhostClient {
 }
 
 func (is *InclusionSuite) SetupTest() {
-	t := is.T()
-	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "inclusion.go").
+		Str("testcase", is.T().Name()).
+		Logger()
+	is.log = logger
+	is.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -94,16 +98,15 @@ func (is *InclusionSuite) SetupTest() {
 }
 
 func (is *InclusionSuite) TearDownTest() {
-	is.T().Logf("test case tear down inclusion")
+	is.log.Info().Msgf("================> Start TearDownTest")
 	is.net.Remove()
 	is.cancel()
-	t := is.T()
-	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
+	is.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	t := is.T()
-	t.Logf("%v ================> RUNNING TESTING %v", time.Now().UTC(), t.Name())
+	is.log.Info().Msgf("================> RUNNING TESTING %v", t.Name())
 	// fix the deadline for the test as a whole
 	deadline := time.Now().Add(30 * time.Second)
 	is.T().Logf("%s ------ test started, deadline %s", time.Now(), deadline)
