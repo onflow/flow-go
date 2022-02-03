@@ -20,6 +20,8 @@ import (
 
 type InclusionSuite struct {
 	suite.Suite
+
+	log    zerolog.Logger
 	cancel context.CancelFunc
 	net    *testnet.FlowNetwork
 	conIDs []flow.Identifier

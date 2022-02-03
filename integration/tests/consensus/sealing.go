@@ -380,5 +380,4 @@ SealingLoop:
 
 	// make sure we found the guarantee in at least one block proposal
 	require.True(ss.T(), found, "block seal should have been included in at least one block")
-	require.True(ss.T(), false)
 }
