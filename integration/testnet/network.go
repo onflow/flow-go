@@ -767,13 +767,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
-			hostMetricsPort := testingdock.RandomPort(t)
-			containerMetricsPort := "8080/tcp"
+			// hostMetricsPort := testingdock.RandomPort(t)
+			// containerMetricsPort := "8080/tcp"
 
-			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
-			nodeContainer.Ports[ColNodeMetricsPort] = hostMetricsPort
-			net.AccessPorts[ColNodeMetricsPort] = hostMetricsPort
-			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
+			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			// nodeContainer.Ports[ColNodeMetricsPort] = hostMetricsPort
+			// net.AccessPorts[ColNodeMetricsPort] = hostMetricsPort
+			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 			// set a low timeout so that all nodes agree on the current view more quickly
 			nodeContainer.AddFlag("hotstuff-timeout", time.Second.String())
 			nodeContainer.AddFlag("hotstuff-min-timeout", time.Second.String())
@@ -792,11 +792,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
-			hostMetricsPort := testingdock.RandomPort(t)
-			containerMetricsPort := "8080/tcp"
+			// hostMetricsPort := testingdock.RandomPort(t)
+			// containerMetricsPort := "8080/tcp"
 
-			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
-			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
+			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
 			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 
@@ -804,8 +804,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 			net.AccessPorts[ExeNodeAPIPort] = hostPort
 
-			nodeContainer.Ports[ExeNodeMetricsPort] = hostMetricsPort
-			net.AccessPorts[ExeNodeMetricsPort] = hostMetricsPort
+			// nodeContainer.Ports[ExeNodeMetricsPort] = hostMetricsPort
+			// net.AccessPorts[ExeNodeMetricsPort] = hostMetricsPort
 
 			// create directories for execution state trie and values in the tmp
 			// host directory.
@@ -849,13 +849,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				nodeContainer.AddFlag("supports-unstaked-node", "true")
 			}
 
-			hostMetricsPort := testingdock.RandomPort(t)
-			containerMetricsPort := "8080/tcp"
-
-			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
-			nodeContainer.Ports[AccessNodeMetricsPort] = hostMetricsPort
-			net.AccessPorts[AccessNodeMetricsPort] = hostMetricsPort
-			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
+			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			// nodeContainer.Ports[AccessNodeMetricsPort] = hostMetricsPort
+			// net.AccessPorts[AccessNodeMetricsPort] = hostMetricsPort
+			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
 		case flow.RoleConsensus:
 			// use 1 here instead of the default 5, because the integration
@@ -863,24 +860,20 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.AddFlag("chunk-alpha", "1")
 			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
 			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
-			hostMetricsPort := testingdock.RandomPort(t)
-			containerMetricsPort := "8080/tcp"
 
-			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
-			nodeContainer.Ports[ConNodeMetricsPort] = hostMetricsPort
-			net.AccessPorts[ConNodeMetricsPort] = hostMetricsPort
-			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
+			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			// nodeContainer.Ports[ConNodeMetricsPort] = hostMetricsPort
+			// net.AccessPorts[ConNodeMetricsPort] = hostMetricsPort
+			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.AddFlag("chunk-alpha", "1")
-			hostMetricsPort := testingdock.RandomPort(t)
-			containerMetricsPort := "8080/tcp"
 
-			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
-			nodeContainer.Ports[VerNodeMetricsPort] = hostMetricsPort
-			net.AccessPorts[VerNodeMetricsPort] = hostMetricsPort
-			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
+			// nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			// nodeContainer.Ports[VerNodeMetricsPort] = hostMetricsPort
+			// net.AccessPorts[VerNodeMetricsPort] = hostMetricsPort
+			// net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)
