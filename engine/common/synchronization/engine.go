@@ -4,7 +4,6 @@ package synchronization
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"time"
 
@@ -293,17 +292,11 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
 	// process the blocks one by one
+	min := res.Blocks[0].Header.Height
+	max := res.Blocks[len(res.Blocks)-1].Header.Height
+	e.log.Debug().Uint64("min", min).Uint64("max", max).Msg("received block response")
 
-	min, max := uint64(math.MaxUint64), uint64(0)
 	for _, block := range res.Blocks {
-		if e.log.GetLevel() <= zerolog.DebugLevel {
-			if block.Header.Height > max {
-				max = block.Header.Height
-			}
-			if block.Header.Height < min {
-				min = block.Header.Height
-			}
-		}
 		if !e.core.HandleBlock(block.Header) {
 			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
@@ -314,7 +307,6 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 		}
 		e.comp.SubmitLocal(synced)
 	}
-	e.log.Debug().Uint64("min", min).Uint64("max", max).Msg("received block response")
 }
 
 // checkLoop will regularly scan for items that need requesting.
