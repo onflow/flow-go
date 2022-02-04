@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const DefaultCacheSize = 10e4
@@ -502,16 +503,29 @@ func (n *Network) removeSelfFilter() flow.IdentifierFilter {
 
 // sendOnChannel sends the message on channel to targets.
 func (n *Network) sendOnChannel(channel network.Channel, message interface{}, targetIDs []flow.Identifier) error {
-	n.logger.Debug().
-		Interface("message", message).
-		Str("channel", channel.String()).
-		Str("target_ids", fmt.Sprintf("%v", targetIDs)).
-		Msg("sending new message on channel")
 
 	// generate network message (encoding) based on list of recipients
 	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("failed to generate network message for channel %s: %w", channel, err)
+	}
+
+	collection, ok := message.(*flow.CollectionGuarantee)
+	if ok {
+		n.logger.Info().
+			Hex("event_id", logging.ID(flow.HashToID(msg.EventID))).
+			Hex("collection_id", logging.ID(collection.CollectionID)).
+			Interface("message", message).
+			Str("channel", channel.String()).
+			Str("target_ids", fmt.Sprintf("%v", targetIDs)).
+			Msg("sending new message on channel")
+	} else {
+		n.logger.Debug().
+			Hex("event_id", logging.ID(flow.HashToID(msg.EventID))).
+			Interface("message", message).
+			Str("channel", channel.String()).
+			Str("target_ids", fmt.Sprintf("%v", targetIDs)).
+			Msg("sending new message on channel")
 	}
 
 	// publish the message through the channel, however, the message

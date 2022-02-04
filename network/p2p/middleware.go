@@ -177,13 +177,19 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
+func (m *Middleware) topologyPeers() (peer.IDSlice, func(), error) {
 	identities, err := m.ov.Topology()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return m.peerIDs(identities.NodeIDs()), nil
+	return m.peerIDs(identities.NodeIDs()), func() {
+		topic := engine.TopicFromChannel("push-guarantees", m.rootBlockID)
+		list := m.libP2PNode.pubSub.ListPeers(topic.String())
+		m.log.Info().Str("channel", "push-guarantees").
+			Str("topic_fanout", fmt.Sprintf("%v", list)).
+			Msg("channel fanout updated")
+	}, nil
 }
 
 func (m *Middleware) allPeers() peer.IDSlice {
@@ -263,6 +269,7 @@ func (m *Middleware) start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err)
 	}
+	m.log.Info().Hex("flow_id", logging.ID(m.me)).Str("peer_id", fmt.Sprintf("%v", m.libP2PNode.host.ID())).Msg("my libp2p identifer")
 
 	m.UpdateNodeAddresses()
 
@@ -472,8 +479,9 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 func (m *Middleware) processMessage(msg *message.Message) {
 	originID := flow.HashToID(msg.OriginID)
 
-	m.log.Debug().
+	m.log.Info().
 		Str("channel", msg.ChannelID).
+		Hex("event_id", logging.ID(flow.HashToID(msg.EventID))).
 		Str("type", msg.Type).
 		Str("origin_id", originID.String()).
 		Msg("processing new message")
@@ -497,8 +505,6 @@ func (m *Middleware) processMessage(msg *message.Message) {
 // a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 // effort.
 func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
-	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
-
 	// convert the message to bytes to be put on the wire.
 	//bs := binstat.EnterTime(binstat.BinNet + ":wire<4message2protobuf")
 	data, err := msg.Marshal()
@@ -517,11 +523,19 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
+
 	if err != nil {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
 	m.metrics.NetworkMessageSent(len(data), string(channel), msg.Type)
+	list := m.libP2PNode.pubSub.ListPeers(topic.String())
+	m.log.Info().Str("channel", channel.String()).
+		Str("targets", fmt.Sprintf("%v", msg.TargetIDs)).
+		Str("channel", channel.String()).
+		Str("topic_fanout", fmt.Sprintf("%v", list)).
+		Hex("event_id", logging.ID(flow.HashToID(msg.EventID))).
+		Interface("msg", msg).Msg("message published")
 
 	return nil
 }

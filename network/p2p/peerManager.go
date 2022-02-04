@@ -24,16 +24,16 @@ type Connector interface {
 }
 
 // DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
-var DefaultPeerUpdateInterval = 10 * time.Minute
+var DefaultPeerUpdateInterval = 1 * time.Second
 
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
 	unit               *engine.Unit
 	logger             zerolog.Logger
-	peersProvider      func() (peer.IDSlice, error) // callback to retrieve list of peers to connect to
-	peerRequestQ       chan struct{}                // a channel to queue a peer update request
-	connector          Connector                    // connector to connect or disconnect from peers
-	peerUpdateInterval time.Duration                // interval the peer manager runs on
+	peersProvider      PeersProvider // callback to retrieve list of peers to connect to
+	peerRequestQ       chan struct{} // a channel to queue a peer update request
+	connector          Connector     // connector to connect or disconnect from peers
+	peerUpdateInterval time.Duration // interval the peer manager runs on
 }
 
 // Option represents an option for the peer manager.
@@ -45,7 +45,7 @@ func WithInterval(period time.Duration) Option {
 	}
 }
 
-type PeersProvider func() (peer.IDSlice, error)
+type PeersProvider func() (peer.IDSlice, func(), error)
 
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
@@ -130,7 +130,7 @@ func (pm *PeerManager) RequestPeerUpdate() {
 func (pm *PeerManager) updatePeers() {
 
 	// get all the peer ids to connect to
-	peers, err := pm.peersProvider()
+	peers, post, err := pm.peersProvider()
 	if err != nil {
 		pm.logger.Error().Err(err).Msg("failed to update peers")
 		return
@@ -142,4 +142,6 @@ func (pm *PeerManager) updatePeers() {
 
 	// ask the connector to connect to all peers in the list
 	pm.connector.UpdatePeers(pm.unit.Ctx(), peers)
+
+	post()
 }

@@ -50,11 +50,11 @@ func (is *InclusionSuite) SetupTest() {
 	var nodeConfigs []testnet.NodeConfig
 
 	// need one dummy execution node (unused ghost)
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.InfoLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
 	// need one dummy verification node (unused ghost)
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.InfoLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
 
 	// need three real consensus nodes
@@ -71,7 +71,7 @@ func (is *InclusionSuite) SetupTest() {
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	nodeConfigs = append(nodeConfigs,
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel)),
 	)
 
 	// generate the network config
@@ -122,7 +122,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	t.Logf("%s collection created: %v", time.Now().UTC(), collection.ID())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	msgs1, msgs2 := dup(ctx, getMsgs(t, ctx, is.reader))

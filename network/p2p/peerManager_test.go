@@ -53,8 +53,10 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	pids := suite.generatePeerIDs(10)
 
 	// setup a ID provider callback to return peer IDs
-	idProvider := func() (peer.IDSlice, error) {
-		return pids, nil
+	idProvider := func() (peer.IDSlice, func(), error) {
+		return pids, func() {
+
+		}, nil
 	}
 
 	// create the connector mock to check ids requested for connect and disconnect
@@ -122,8 +124,10 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	pids := suite.generatePeerIDs(10)
 
 	// setup a ID provider callback to return peer IDs
-	idProvider := func() (peer.IDSlice, error) {
-		return pids, nil
+	idProvider := func() (peer.IDSlice, func(), error) {
+		return pids, func() {
+
+		}, nil
 	}
 
 	connector := new(mocknetwork.Connector)
@@ -157,8 +161,10 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	pids := suite.generatePeerIDs(10)
 
 	// setup a ID provider callback to return peer IDs
-	idProvider := func() (peer.IDSlice, error) {
-		return pids, nil
+	idProvider := func() (peer.IDSlice, func(), error) {
+		return pids, func() {
+
+		}, nil
 	}
 
 	// chooses peer interval rate deliberately long to capture on demand peer update
@@ -203,8 +209,10 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	pids := suite.generatePeerIDs(10)
 
 	// setup a ID provider callback to return peer IDs
-	idProvider := func() (peer.IDSlice, error) {
-		return pids, nil
+	idProvider := func() (peer.IDSlice, func(), error) {
+		return pids, func() {
+
+		}, nil
 	}
 
 	connector := new(mocknetwork.Connector)
