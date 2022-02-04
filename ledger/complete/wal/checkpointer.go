@@ -36,6 +36,11 @@ const VersionV3 uint16 = 0x03
 // Version 4 also reduces checkpoint data size.  See EncodeNode() and EncodeTrie() for more details.
 const VersionV4 uint16 = 0x04
 
+// defaultBufioReadSize replaces the default bufio buffer size of 4096 bytes.
+// defaultBufioReadSize can be increased to 16KiB, 32KiB, etc. if it improves performance on
+// typical EN hardware.
+const defaultBufioReadSize = 1024 * 8
+
 type Checkpointer struct {
 	dir            string
 	wal            *DiskWAL
@@ -438,7 +443,7 @@ func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
 // TODO: return []*trie.MTrie directly without conversion to FlattenedForest.
 func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, error) {
 
-	var bufReader io.Reader = bufio.NewReader(f)
+	var bufReader io.Reader = bufio.NewReaderSize(f, defaultBufioReadSize)
 	crcReader := NewCRC32Reader(bufReader)
 
 	var reader io.Reader
@@ -550,7 +555,7 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
 	}
 
-	var bufReader io.Reader = bufio.NewReader(f)
+	var bufReader io.Reader = bufio.NewReaderSize(f, defaultBufioReadSize)
 	crcReader := NewCRC32Reader(bufReader)
 	var reader io.Reader = crcReader
 
