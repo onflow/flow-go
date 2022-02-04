@@ -133,6 +133,7 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
+	e.log.Info().Hex("script_hex", code).Msg("script is sent for execution")
 	err := func() (err error) {
 
 		start := time.Now()
