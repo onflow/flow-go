@@ -62,7 +62,7 @@ install-tools: crypto/relic/build check-go-version install-mock-generators
 unittest-main:
 	# test all packages with Relic library enabled
 	# TODO: enable it. Disable for now to debug flakey integration tests
-# 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
 
 .PHONY: unittest
 unittest: unittest-main
