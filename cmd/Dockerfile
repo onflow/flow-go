@@ -4,7 +4,7 @@
 FROM golang:1.17-bullseye AS build-setup
 
 RUN apt-get update
-RUN apt-get -y install cmake zip sudo
+RUN apt-get -y install cmake zip
 
 ## (2) Build the app binary
 FROM build-setup AS build-env
