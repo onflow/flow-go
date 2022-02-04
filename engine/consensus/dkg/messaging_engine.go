@@ -18,11 +18,12 @@ import (
 )
 
 // retryMax is the maximum number of times the engine will attempt to forward
-// a message
-const retryMax = 5
+// a message before permanently giving up.
+const retryMax = 9
 
-// retryMilliseconds is the number of milliseconds to wait between the two first tries
-const retryMilliseconds = 1000 * time.Millisecond
+// retryBaseWait is the duration to wait between the two first tries.
+// With 10 attempts, this will retry for about 8m before giving up.
+const retryBaseWait = time.Second
 
 // MessagingEngine is a network engine that enables DKG nodes to exchange
 // private messages over the network.
@@ -128,6 +129,8 @@ func (e *MessagingEngine) process(originID flow.Identifier, event interface{}) e
 	}
 }
 
+// forwardInboundMessageAsync forwards a private DKG message from another DKG
+// participant to the DKG controller.
 func (e *MessagingEngine) forwardInboundMessageAsync(originID flow.Identifier, message *msg.DKGMessage) {
 	e.unit.Launch(func() {
 		e.tunnel.SendIn(
@@ -150,9 +153,11 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 	}
 }
 
+// forwardOutboundMessageAsync asynchronously attempts to forward a private
+// DKG message to a single other DKG participant, on a best effort basis.
 func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessageOut) {
 	e.unit.Launch(func() {
-		expRetry, err := retry.NewExponential(retryMilliseconds)
+		expRetry, err := retry.NewFibonacci(retryBaseWait)
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 		}
@@ -162,18 +167,18 @@ func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessage
 		err = retry.Do(e.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
 			err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
 			if err != nil {
-				e.log.Warn().Err(err).Msgf("error sending dkg message retrying (%x)", attempts)
+				e.log.Warn().Err(err).Msgf("error sending dkg message retrying (%d)", attempts)
 			}
 
 			attempts++
 			return retry.RetryableError(err)
 		})
 
-		// Various network can conditions can result in errors while forwarding outbound messages,
-		// because failure to send an individual DKG message doesn't necessarily result in local or global DKG failure
+		// Various network conditions can result in errors while forwarding outbound messages.
+		// Because the overall DKG is resilient to individual message failures,
 		// it is acceptable to log the error and move on.
 		if err != nil {
-			e.log.Error().Err(err).Msg("error sending dkg message")
+			e.log.Error().Err(err).Msgf("error sending private dkg message after %d attempts", attempts)
 		}
 	})
 }

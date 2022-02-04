@@ -210,9 +210,8 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 		b.updateLastSuccessfulClient(clientIndex)
 		return nil
 	})
-
 	if err != nil {
-		b.log.Fatal().Err(err).Msgf("failed to submit dkg result after %d attempts", attempts)
+		return fmt.Errorf("failed to submit dkg result after %d attempts: %w", attempts, err)
 	}
 
 	b.log.Info().Msgf("dkg result submitted successfully on attempt %d", attempts)
@@ -269,10 +268,12 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
 
 	var msgs []messages.BroadcastDKGMessage
+	attempt := 1
 	err = retry.Do(b.unit.Ctx(), afterConsecutiveFailures, func(ctx context.Context) error {
 		msgs, err = dkgContractClient.ReadBroadcast(b.messageOffset, referenceBlock)
 		if err != nil {
-			err = fmt.Errorf("could not read broadcast messages(offset: %d, ref: %v): %w", b.messageOffset, referenceBlock, err)
+			err = fmt.Errorf("could not read broadcast messages (attempt: %d, offset: %d, ref: %v): %w", attempt, b.messageOffset, referenceBlock, err)
+			attempt++
 			return retry.RetryableError(err)
 		}
 
@@ -283,7 +284,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	// Various network conditions can result in errors while reading DKG messages
 	// We will read any missed messages during the next poll because messageOffset is not increased
 	if err != nil {
-		b.log.Error().Err(err).Msg("failed to read messages")
+		b.log.Error().Err(err).Msgf("failed to read messages after %d attempts", attempt)
 		return nil
 	}
 
@@ -292,7 +293,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	for _, msg := range msgs {
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
-			b.log.Error().Err(err).Msg("bad broadcast message")
+			b.log.Error().Err(err).Msg("unable to verify broadcast message")
 			continue
 		}
 		if !ok {
