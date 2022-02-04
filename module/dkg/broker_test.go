@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -239,17 +240,20 @@ func TestBroadcastMessage(t *testing.T) {
 
 	// sender
 	sender := NewBroker(
-		zerolog.Logger{},
+		unittest.Logger(),
 		dkgInstanceID,
 		committee,
 		locals[orig],
 		orig,
 		[]module.DKGContractClient{&mock.DKGContractClient{}, &mock.DKGContractClient{}},
 		NewBrokerTunnel(),
+		func(config *BrokerConfig) { config.RetryInitialWait = 1 }, // disable waiting between retries for tests
 	)
 
 	expectedMsg, err := sender.prepareBroadcastMessage(msgb)
 	require.NoError(t, err)
+
+	done := make(chan struct{}) // will be closed after final expected call
 
 	// check that the dkg contract client is called with the expected message
 	contractClient := &mock.DKGContractClient{}
@@ -260,12 +264,15 @@ func TestBroadcastMessage(t *testing.T) {
 
 	contractClient2 := &mock.DKGContractClient{}
 	contractClient2.On("Broadcast", expectedMsg).
+		Run(func(_ mocks.Arguments) {
+			close(done)
+		}).
 		Return(nil).
 		Once()
 	sender.dkgContractClients[1] = contractClient2
 
 	sender.Broadcast(msgb)
-	unittest.AssertClosesBefore(t, sender.unit.Done(), 4*time.Second)
+	unittest.AssertClosesBefore(t, done, time.Second)
 
 	contractClient.AssertExpectations(t)
 	contractClient2.AssertExpectations(t)
