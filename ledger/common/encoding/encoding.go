@@ -205,10 +205,13 @@ func DecodeKey(encodedKey []byte) (*ledger.Key, error) {
 }
 
 func decodeKey(inp []byte) (*ledger.Key, error) {
-	key := &ledger.Key{}
 	numOfParts, rest, err := utils.ReadUint16(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key (content): %w", err)
+	}
+
+	key := &ledger.Key{
+		KeyParts: make([]ledger.KeyPart, numOfParts),
 	}
 
 	for i := 0; i < int(numOfParts); i++ {
@@ -231,7 +234,8 @@ func decodeKey(inp []byte) (*ledger.Key, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding key (content): %w", err)
 		}
-		key.KeyParts = append(key.KeyParts, *kp)
+
+		key.KeyParts[i] = *kp
 	}
 	return key, nil
 }
@@ -330,6 +334,9 @@ func EncodePayload(p *ledger.Payload) []byte {
 // EncodePayloadWithoutPrefix encodes a ledger payload
 // without prefix (version and type).
 func EncodePayloadWithoutPrefix(p *ledger.Payload) []byte {
+	if p == nil {
+		return []byte{}
+	}
 	return encodePayload(p)
 }
 
@@ -379,6 +386,10 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 // DecodePayloadWithoutPrefix construct a payload from an encoded byte slice
 // without prefix (version and type).
 func DecodePayloadWithoutPrefix(encodedPayload []byte) (*ledger.Payload, error) {
+	// if empty don't decode
+	if len(encodedPayload) == 0 {
+		return nil, nil
+	}
 	return decodePayload(encodedPayload)
 }
 
