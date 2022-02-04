@@ -8,7 +8,7 @@ RELIC_DIR="${PKG_DIR}/${RELIC_DIR_NAME}"
 
 # grant permissions if not existant
 if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
-   sudo chmod -R 755 "${PKG_DIR}"
+   chmod -R 755 "${PKG_DIR}"
 fi
 
 rm -rf "${RELIC_DIR}"
