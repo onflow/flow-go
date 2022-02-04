@@ -576,11 +576,16 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 		// this is required otherwise collection node will fail to startup
+		nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
+
+		// testnet is running at a significantly smaller scale than a production network, hence to
+		// hold the mathematics behind topology connectivity valid, we need a faster connection update rate than the default value:
+		nodeContainer.AddFlag("peerupdate-interval", "1s")
 		if nodeConf.Role == flow.RoleCollection || nodeConf.Role == flow.RoleConsensus {
-			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
+
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
