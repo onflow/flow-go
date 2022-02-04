@@ -128,6 +128,9 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 	startedAt := time.Now()
 
+	// allocate a random ID to be able to track this script when its done,
+	// scripts might not be unique so we use this extra tracker to follow their logs
+	// TODO: this is a temporary measure, we could remove this in the future
 	trackerID := rand.Uint32()
 	e.log.Info().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
 
