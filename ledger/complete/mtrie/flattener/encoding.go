@@ -1,7 +1,6 @@
 package flattener
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -9,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
@@ -140,85 +138,64 @@ func EncodeNode(n *node.Node, lchildIndex uint64, rchildIndex uint64) []byte {
 }
 
 // ReadNode reconstructs a node from data read from reader.
-// TODO: reuse read buffer
-func ReadNode(reader io.Reader, getNode func(nodeIndex uint64) (*node.Node, error)) (*node.Node, error) {
+func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*node.Node, error) {
 
-	// bufSize is large enough to be used for:
-	// - fixed-length data: node type (1 byte) + height (2 bytes) + max depth (2 bytes) + reg count (8 bytes), or
-	// - child node indexes: 8 bytes * 2
-	const bufSize = 16
+	// minBufSize should be large enough for interim node and leaf node with small payload.
+	// minBufSize is a failsafe and is only used when len(scratch) is much smaller
+	// than expected (4096 by default).
+	const minBufSize = 1024
+
+	if len(scratch) < minBufSize {
+		scratch = make([]byte, minBufSize)
+	}
+
+	// fixed-length data: node type (1 byte) + height (2 bytes) + max depth (2 bytes) + reg count (8 bytes), or
 	const fixLengthSize = 1 + 2 + 2 + 8
 
 	// Read fixed-length part
-	buf := make([]byte, bufSize)
 	pos := 0
 
-	_, err := io.ReadFull(reader, buf[:fixLengthSize])
+	_, err := io.ReadFull(reader, scratch[:fixLengthSize])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read serialized node, cannot read fixed-length part: %w", err)
 	}
 
 	// Read node type (1 byte)
-	nType := buf[pos]
+	nType := scratch[pos]
 	pos++
 
 	// Read height (2 bytes)
-	height := binary.BigEndian.Uint16(buf[pos:])
+	height := binary.BigEndian.Uint16(scratch[pos:])
 	pos += 2
 
 	// Read max depth (2 bytes)
-	maxDepth := binary.BigEndian.Uint16(buf[pos:])
+	maxDepth := binary.BigEndian.Uint16(scratch[pos:])
 	pos += 2
 
 	// Read reg count (8 bytes)
-	regCount := binary.BigEndian.Uint64(buf[pos:])
+	regCount := binary.BigEndian.Uint64(scratch[pos:])
 
 	if nType == byte(leafNodeType) {
 
-		// Read hash
-		encHash, err := utils.ReadShortDataFromReader(reader)
-		if err != nil {
-			return nil, fmt.Errorf("cannot read hash: %w", err)
-		}
-
-		// Read path
-		encPath, err := utils.ReadShortDataFromReader(reader)
-		if err != nil {
-			return nil, fmt.Errorf("cannot read path: %w", err)
-		}
-
-		// Read payload
-		encPayload, err := utils.ReadLongDataFromReader(reader)
-		if err != nil {
-			return nil, fmt.Errorf("cannot read payload: %w", err)
-		}
-
-		// ToHash copies encHash
-		nodeHash, err := hash.ToHash(encHash)
+		// Read encoded hash data from reader and create hash.Hash.
+		nodeHash, err := readHashFromReader(reader, scratch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode hash from checkpoint: %w", err)
 		}
 
-		// ToPath copies encPath
-		path, err := ledger.ToPath(encPath)
+		// Read encoded path data from reader and create ledger.Path.
+		path, err := readPathFromReader(reader, scratch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode path from checkpoint: %w", err)
 		}
 
-		// TODO: maybe optimize DecodePayload
-		payload, err := encoding.DecodePayloadWithoutPrefix(encPayload)
+		// Read encoded payload data from reader and create ledger.Payload.
+		payload, err := readPayloadFromReader(reader, scratch)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode payload from checkpoint: %w", err)
+			return nil, fmt.Errorf("cannot read payload: %w", err)
 		}
 
-		// make a copy of payload
-		// TODO: copying may not be necessary
-		var pl *ledger.Payload
-		if payload != nil {
-			pl = payload.DeepCopy()
-		}
-
-		node := node.NewNode(int(height), nil, nil, path, pl, nodeHash, maxDepth, regCount)
+		node := node.NewNode(int(height), nil, nil, path, payload, nodeHash, maxDepth, regCount)
 		return node, nil
 	}
 
@@ -227,26 +204,20 @@ func ReadNode(reader io.Reader, getNode func(nodeIndex uint64) (*node.Node, erro
 	pos = 0
 
 	// Read left and right child index (8 bytes each)
-	_, err = io.ReadFull(reader, buf[:16])
+	_, err = io.ReadFull(reader, scratch[:16])
 	if err != nil {
 		return nil, fmt.Errorf("cannot read children index: %w", err)
 	}
 
 	// Read left child index (8 bytes)
-	lchildIndex := binary.BigEndian.Uint64(buf[pos:])
+	lchildIndex := binary.BigEndian.Uint64(scratch[pos:])
 	pos += 8
 
 	// Read right child index (8 bytes)
-	rchildIndex := binary.BigEndian.Uint64(buf[pos:])
+	rchildIndex := binary.BigEndian.Uint64(scratch[pos:])
 
-	// Read hash
-	hashValue, err := utils.ReadShortDataFromReader(reader)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read hash data: %w", err)
-	}
-
-	// ToHash copies hashValue
-	nodeHash, err := hash.ToHash(hashValue)
+	// Read encoded hash data from reader and create hash.Hash
+	nodeHash, err := readHashFromReader(reader, scratch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode hash from checkpoint: %w", err)
 	}
@@ -296,21 +267,26 @@ func EncodeTrie(rootNode *node.Node, rootIndex uint64) []byte {
 }
 
 // ReadTrie reconstructs a trie from data read from reader.
-func ReadTrie(reader io.Reader, getNode func(nodeIndex uint64) (*node.Node, error)) (*trie.MTrie, error) {
+func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*trie.MTrie, error) {
 
-	// read root uint64 RootIndex
-	buf := make([]byte, 8)
-	_, err := io.ReadFull(reader, buf)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read fixed-legth part: %w", err)
+	// minBufSize should be large enough for encoded trie (42 bytes).
+	// minBufSize is a failsafe and is only used when len(scratch) is much smaller
+	// than expected (4096 by default).
+	const minBufSize = 42
+
+	if len(scratch) < minBufSize {
+		scratch = make([]byte, minBufSize)
 	}
 
-	rootIndex, _, err := utils.ReadUint64(buf)
+	// read root index (8 bytes)
+	_, err := io.ReadFull(reader, scratch[:8])
 	if err != nil {
 		return nil, fmt.Errorf("cannot read root index data: %w", err)
 	}
 
-	readRootHash, err := utils.ReadShortDataFromReader(reader)
+	rootIndex := binary.BigEndian.Uint64(scratch)
+
+	readRootHash, err := readHashFromReader(reader, scratch)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read roothash data: %w", err)
 	}
@@ -326,9 +302,99 @@ func ReadTrie(reader io.Reader, getNode func(nodeIndex uint64) (*node.Node, erro
 	}
 
 	rootHash := mtrie.RootHash()
-	if !bytes.Equal(readRootHash, rootHash[:]) {
+	if !rootHash.Equals(ledger.RootHash(readRootHash)) {
 		return nil, fmt.Errorf("restoring trie failed: roothash doesn't match")
 	}
 
 	return mtrie, nil
+}
+
+func readHashFromReader(reader io.Reader, scratch []byte) (hash.Hash, error) {
+
+	const encHashBufSize = 2 + hash.HashLen
+
+	if len(scratch) < encHashBufSize {
+		scratch = make([]byte, encHashBufSize)
+	} else {
+		scratch = scratch[:encHashBufSize]
+	}
+
+	_, err := io.ReadFull(reader, scratch)
+	if err != nil {
+		return hash.DummyHash, fmt.Errorf("cannot read hash: %w", err)
+	}
+
+	sizeBuf, encHashBuf := scratch[:2], scratch[2:]
+
+	size := binary.BigEndian.Uint16(sizeBuf)
+	if size != hash.HashLen {
+		return hash.DummyHash, fmt.Errorf("encoded hash size is wrong: want %d bytes, got %d bytes", hash.HashLen, size)
+	}
+
+	// hash.ToHash copies data
+	return hash.ToHash(encHashBuf)
+}
+
+func readPathFromReader(reader io.Reader, scratch []byte) (ledger.Path, error) {
+
+	const encPathBufSize = 2 + ledger.PathLen
+
+	if len(scratch) < encPathBufSize {
+		scratch = make([]byte, encPathBufSize)
+	} else {
+		scratch = scratch[:encPathBufSize]
+	}
+
+	_, err := io.ReadFull(reader, scratch)
+	if err != nil {
+		return ledger.DummyPath, fmt.Errorf("cannot read path: %w", err)
+	}
+
+	sizeBuf, encPathBuf := scratch[:2], scratch[2:]
+
+	size := binary.BigEndian.Uint16(sizeBuf)
+	if size != ledger.PathLen {
+		return ledger.DummyPath, fmt.Errorf("encoded path size is wrong: want %d bytes, got %d bytes", ledger.PathLen, size)
+	}
+
+	// ToPath copies encPath
+	return ledger.ToPath(encPathBuf)
+}
+
+func readPayloadFromReader(reader io.Reader, scratch []byte) (*ledger.Payload, error) {
+
+	if len(scratch) < 4 {
+		scratch = make([]byte, 4)
+	}
+
+	// Read payload size
+	_, err := io.ReadFull(reader, scratch[:4])
+	if err != nil {
+		return nil, fmt.Errorf("cannot read long data length: %w", err)
+	}
+
+	size := binary.BigEndian.Uint32(scratch)
+
+	if len(scratch) < int(size) {
+		scratch = make([]byte, size)
+	} else {
+		scratch = scratch[:size]
+	}
+
+	_, err = io.ReadFull(reader, scratch)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read long data: %w", err)
+	}
+
+	payload, err := encoding.DecodePayloadWithoutPrefix(scratch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode payload from checkpoint: %w", err)
+	}
+
+	if payload == nil {
+		return nil, nil
+	}
+
+	// make a copy of payload
+	return payload.DeepCopy(), nil
 }

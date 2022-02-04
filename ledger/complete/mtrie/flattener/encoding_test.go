@@ -69,31 +69,47 @@ func TestNodeSerialization(t *testing.T) {
 	})
 
 	t.Run("decode leaf node", func(t *testing.T) {
-		reader := bytes.NewReader(expectedLeafNode1)
-		newNode, err := flattener.ReadNode(reader, func(nodeIndex uint64) (*node.Node, error) {
-			if nodeIndex != 0 {
-				return nil, fmt.Errorf("expect child node index 0, got %d", nodeIndex)
-			}
-			return nil, nil
-		})
-		require.NoError(t, err)
-		assert.Equal(t, leafNode1, newNode)
+		scratchBuffers := [][]byte{
+			nil,
+			make([]byte, 0),
+			make([]byte, 1024),
+		}
+
+		for _, scratch := range scratchBuffers {
+			reader := bytes.NewReader(expectedLeafNode1)
+			newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+				if nodeIndex != 0 {
+					return nil, fmt.Errorf("expect child node index 0, got %d", nodeIndex)
+				}
+				return nil, nil
+			})
+			require.NoError(t, err)
+			assert.Equal(t, leafNode1, newNode)
+		}
 	})
 
 	t.Run("decode interim node", func(t *testing.T) {
-		reader := bytes.NewReader(expectedRootNode)
-		newNode, err := flattener.ReadNode(reader, func(nodeIndex uint64) (*node.Node, error) {
-			switch nodeIndex {
-			case 1:
-				return leafNode1, nil
-			case 2:
-				return leafNode2, nil
-			default:
-				return nil, fmt.Errorf("unexpected child node index %d ", nodeIndex)
-			}
-		})
-		require.NoError(t, err)
-		assert.Equal(t, rootNode, newNode)
+		scratchBuffers := [][]byte{
+			nil,
+			make([]byte, 0),
+			make([]byte, 1024),
+		}
+
+		for _, scratch := range scratchBuffers {
+			reader := bytes.NewReader(expectedRootNode)
+			newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+				switch nodeIndex {
+				case 1:
+					return leafNode1, nil
+				case 2:
+					return leafNode2, nil
+				default:
+					return nil, fmt.Errorf("unexpected child node index %d ", nodeIndex)
+				}
+			})
+			require.NoError(t, err)
+			assert.Equal(t, rootNode, newNode)
+		}
 	})
 }
 
@@ -117,14 +133,22 @@ func TestTrieSerialization(t *testing.T) {
 	})
 
 	t.Run("decode", func(t *testing.T) {
-		reader := bytes.NewReader(expected)
-		trie, err := flattener.ReadTrie(reader, func(nodeIndex uint64) (*node.Node, error) {
-			if nodeIndex != rootNodeIndex {
-				return nil, fmt.Errorf("unexpected root node index %d ", nodeIndex)
-			}
-			return rootNode, nil
-		})
-		require.NoError(t, err)
-		assert.Equal(t, rootNode, trie.RootNode())
+		scratchBuffers := [][]byte{
+			nil,
+			make([]byte, 0),
+			make([]byte, 1024),
+		}
+
+		for _, scratch := range scratchBuffers {
+			reader := bytes.NewReader(expected)
+			trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+				if nodeIndex != rootNodeIndex {
+					return nil, fmt.Errorf("unexpected root node index %d ", nodeIndex)
+				}
+				return rootNode, nil
+			})
+			require.NoError(t, err)
+			assert.Equal(t, rootNode, trie.RootNode())
+		}
 	})
 }

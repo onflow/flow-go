@@ -516,6 +516,13 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 // Checkpoint file header (magic and version) are verified by the caller.
 func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 
+	// Scratch buffer is used as temporary buffer that reader can read into.
+	// Raw data in scratch buffer should be copied or converted into desired
+	// objects before next Read operation.  If the scratch buffer isn't large
+	// enough, a new buffer will be allocated.  However, 4096 bytes will
+	// be large enough to handle almost all payloads and 100% of interim nodes.
+	scratch := make([]byte, 1024*4) // must not be less than 1024
+
 	// Read footer to get node count and trie count
 
 	// footer offset: nodes count (8 bytes) + tries count (2 bytes) + CRC32 sum (4 bytes)
@@ -527,15 +534,15 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 		return nil, fmt.Errorf("cannot seek to footer: %w", err)
 	}
 
-	footer := make([]byte, footerSize)
+	footer := scratch[:footerSize]
 
 	_, err = io.ReadFull(f, footer)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read footer bytes: %w", err)
 	}
 
-	nodesCount, pos := readUint64(footer, 0)
-	triesCount, _ := readUint16(footer, pos)
+	nodesCount := binary.BigEndian.Uint64(footer)
+	triesCount := binary.BigEndian.Uint16(footer[8:])
 
 	// Seek to the start of file
 	_, err = f.Seek(0, io.SeekStart)
@@ -549,9 +556,8 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 
 	// Read header: magic (2 bytes) + version (2 bytes)
 	// No action is needed for header because it is verified by the caller.
-	header := make([]byte, 4)
 
-	_, err = io.ReadFull(reader, header)
+	_, err = io.ReadFull(reader, scratch[:4])
 	if err != nil {
 		return nil, fmt.Errorf("cannot read header bytes: %w", err)
 	}
@@ -561,7 +567,7 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		n, err := flattener.ReadNode(reader, func(nodeIndex uint64) (*node.Node, error) {
+		n, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= uint64(i) {
 				return nil, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -574,7 +580,7 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
-		trie, err := flattener.ReadTrie(reader, func(nodeIndex uint64) (*node.Node, error) {
+		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
 			if nodeIndex >= uint64(len(nodes)) {
 				return nil, fmt.Errorf("sequence of stored nodes doesn't contain node")
 			}
@@ -593,7 +599,7 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 		return nil, fmt.Errorf("cannot read footer bytes: %w", err)
 	}
 
-	crc32buf := make([]byte, 4)
+	crc32buf := scratch[:4]
 	_, err = bufReader.Read(crc32buf)
 	if err != nil {
 		return nil, fmt.Errorf("error while reading CRC32 checksum: %w", err)
