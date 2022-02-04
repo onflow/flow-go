@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -127,13 +128,19 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 	startedAt := time.Now()
 
+	trackerID := rand.Uint32()
+	e.log.Info().Hex("script_hex", code).Uint32("trackerID", trackerID).Msg("script is sent for execution")
+
+	defer func() {
+		e.log.Info().Uint32("trackerID", trackerID).Msg("script execution is complete")
+	}()
+
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
 
 	script := fvm.Script(code).WithArguments(arguments...)
 
 	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
-	e.log.Info().Hex("script_hex", code).Msg("script is sent for execution")
 	err := func() (err error) {
 
 		start := time.Now()
