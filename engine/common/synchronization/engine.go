@@ -297,9 +297,9 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 		return
 	}
 
-	min := res.Blocks[0].Header.Height
-	max := res.Blocks[len(res.Blocks)-1].Header.Height
-	e.log.Debug().Uint64("min", min).Uint64("max", max).Msg("received block response")
+	first := res.Blocks[0].Header.Height
+	last := res.Blocks[len(res.Blocks)-1].Header.Height
+	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
 
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
