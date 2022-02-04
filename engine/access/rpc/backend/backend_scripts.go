@@ -16,13 +16,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// uniqueErrorLogTimeWindow is the duration for checking the uniqueness of scripts sent for execution
+const uniqueErrorLogTimeWindow = time.Duration(10) * time.Minute
+
 type backendScripts struct {
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 	connFactory       ConnectionFactory
 	log               zerolog.Logger
-	seenScripts       map[[16]byte]time.Time
+	seenScripts       map[[16]byte]time.Time // a map of script hash to time to keep track of unique scripts sent by clients
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -95,7 +98,6 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	}
 	// encode to MD5 as low compute/memory lookup key
 	encodedScript := md5.Sum(script) //nolint:gosec
-	tenMinutes := time.Duration(10) * time.Minute
 
 	// try each of the execution nodes found
 	var errors *multierror.Error
@@ -104,15 +106,17 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		executionTime := time.Now()
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
-			timestamp, seen := b.seenScripts[encodedScript]
-			// log unique script seen in the last 10 minutes
-			if !seen || executionTime.Sub(timestamp) >= tenMinutes {
-				b.log.Debug().
-					Str("execution_node", execNode.String()).
-					Hex("block_id", blockID[:]).
-					Str("script", string(script)).
-					Msg("Successfully executed script")
-				b.seenScripts[encodedScript] = executionTime
+			if b.log.GetLevel() == zerolog.DebugLevel {
+				timestamp, seen := b.seenScripts[encodedScript]
+				// log if the script is unique in the time window
+				if !seen || executionTime.Sub(timestamp) >= uniqueErrorLogTimeWindow {
+					b.log.Debug().
+						Str("execution_node", execNode.String()).
+						Hex("block_id", blockID[:]).
+						Str("script", string(script)).
+						Msg("Successfully executed script")
+					b.seenScripts[encodedScript] = executionTime
+				}
 			}
 			return result, nil
 		}
