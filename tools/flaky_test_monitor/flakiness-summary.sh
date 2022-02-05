@@ -22,7 +22,7 @@ upload_data () {
     mv results/$1*.json results/$1/
     go run level2/process_summary2_results.go results/$1
     mv level2-summary.json level2-summary-$1.json
-    mkdir test_outputs $1_test_outputs
+    mv test_outputs $1_test_outputs
     go run level3/process_summary3_results.go level2-summary-$1.json level3/flaky-test-monitor.json
     mv level3-summary.json level3-summary-$1.json
     gsutil -m cp -r $1_test_outputs gs://$GCS_BUCKET/SUMMARIES/$FOLDER_NAME
