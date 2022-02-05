@@ -35,7 +35,7 @@ type Middleware interface {
 	//
 	// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 	// a more efficient candidate.
-	SendDirect(msg *message.Message, targetID flow.Identifier) error
+	SendDirect(msg *message.Message, peerID flow.Identifier) error
 
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
@@ -49,7 +49,7 @@ type Middleware interface {
 	Unsubscribe(channel Channel) error
 
 	// Ping pings the target node and returns the ping RTT or an error
-	Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error)
+	Ping(targetID peer.ID) (message.PingResponse, time.Duration, error)
 
 	// UpdateAllowList fetches the most recent identity of the nodes from overlay
 	// and updates the underlying libp2p node.
@@ -59,7 +59,7 @@ type Middleware interface {
 	// in the Flow protocol.
 	UpdateNodeAddresses()
 
-	IsConnected(nodeID flow.Identifier) (bool, error)
+	IsConnected(nodeID peer.ID) (bool, error)
 }
 
 // Overlay represents the interface that middleware uses to interact with the
@@ -74,9 +74,14 @@ type Overlay interface {
 	// GetIdentity returns the Identity associated with the given peer ID, if it exists
 	Identity(peer.ID) (*flow.Identity, bool)
 
-	Receive(nodeID flow.Identifier, channel Channel, msg interface{}) error
+	Receive(peerID peer.ID, channel Channel, msg *message.Message) error
 
-	ReceiveRequest(nodeID flow.Identifier, channel Channel, msg interface{}, callback func(interface{}, error)) error
+	ReceiveRequest(peerID peer.ID, channel Channel, msg *message.Message, resp Responder) error
+}
+
+type Responder interface {
+	SetError(err error)
+	SetResponse(resp interface{})
 }
 
 // Connection represents an interface to read from & write to a connection.

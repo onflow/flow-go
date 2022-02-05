@@ -12,12 +12,18 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
-type MessageSender struct {
+// TODO: So we should completely separate pubsub from direct communication
+// For direct, we can register a MessageHandler and receive back a StreamCreator
+// StreamCreator in turn can create Streams, which can SendMessage, ReceiveMessage, and Closef
+
+type RequestSender struct {
 	codec   network.Codec
 	channel network.Channel
 }
 
-func (m *MessageSender) SendRequest(ctx context.Context, event interface{}, targetID peer.ID) (interface{}, error) {
+var _ network.RequestSender = (*RequestSender)(nil)
+
+func (m *RequestSender) SendRequest(ctx context.Context, event interface{}, targetID peer.ID) (interface{}, error) {
 	payload, err := m.codec.Encode(event)
 
 	if err != nil {
