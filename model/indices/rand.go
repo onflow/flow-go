@@ -1,5 +1,7 @@
 package indices
 
+import "encoding/binary"
+
 var (
 	// ProtocolConsensusLeaderSelection is the indices for consensus leader selection
 	ProtocolConsensusLeaderSelection = []uint32{0, 1, 1}
@@ -27,4 +29,20 @@ func ProtocolCollectorClusterLeaderSelection(clusterIndex uint) []uint32 {
 // ExecutionChunk returns the indices for i-th chunk
 func ExecutionChunk(chunkIndex uint32) []uint32 {
 	return append([]uint32{1}, chunkIndex)
+}
+
+// customizerFromIndices maps the input indices into a slice of bytes.
+// The implementation insures no collision of mapping of different indices.
+//
+// The output is built as a concatenation of indices, each index encoded over 2 bytes.
+// (the implementation could be updated to map the indices differently depending on the
+// constraints over the output length)
+func customizerFromIndices(indices []uint16) []byte {
+	customizerLen := 2 * len(indices)
+	customizer := make([]byte, customizerLen)
+	// concatenate the indices
+	for i, index := range indices {
+		binary.LittleEndian.PutUint16(customizer[2*i:2*i+2], index)
+	}
+	return customizer
 }

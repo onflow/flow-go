@@ -22,15 +22,15 @@ func FromParentSignature(indices []uint32, sigData []byte) ([]byte, error) {
 }
 
 // FromRandomSource generates a task-specific seed (task is determined by indices).
-func FromRandomSource(indices []uint32, sor []byte) ([]byte, error) {
+func FromRandomSource(customizer []uint32, sor []byte) ([]byte, error) {
 
 	// create the key used for the KMAC by concatenating all indices
-	keyLen := 4 * len(indices)
+	keyLen := 4 * len(customizer)
 	if keyLen < hash.KmacMinKeyLen {
 		keyLen = hash.KmacMinKeyLen
 	}
 	key := make([]byte, keyLen)
-	for i, index := range indices {
+	for i, index := range customizer {
 		binary.LittleEndian.PutUint32(key[4*i:4*i+4], index)
 	}
 
