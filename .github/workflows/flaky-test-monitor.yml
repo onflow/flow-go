@@ -20,8 +20,8 @@ jobs:
       matrix:
         test-category:
           - unit
-          - crypto-unit
-          - integration-unit
+          - unit-crypto
+          - unit-integration
           - integration-common
           - integration-network
           - integration-epochs

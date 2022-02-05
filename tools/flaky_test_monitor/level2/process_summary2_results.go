@@ -11,7 +11,7 @@ import (
 )
 
 const failuresDir = "./failures/"
-const noResultsDir = "./no-results/"
+const noResultsDir = "./exceptions/"
 
 // process level 1 summary files in a single directory and output level 2 summary
 func processSummary2TestRun(level1Directory string) common.TestSummary2 {

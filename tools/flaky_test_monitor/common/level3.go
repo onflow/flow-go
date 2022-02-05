@@ -2,7 +2,7 @@ package common
 
 // models full level 3 summary of a test run from 1 (single) level 2 test run
 type TestSummary3 struct {
-	NoResults []TestResultSummary `json:"no_results"`
+	Exceptions []TestResultSummary `json:"exceptions"`
 
 	// ordered list of tests (from level 2 summary) that:
 	// a) met minimum failure threshold as specified in property file property `failures_threshold_percent`

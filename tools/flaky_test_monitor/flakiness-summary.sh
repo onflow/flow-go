@@ -3,35 +3,38 @@
 set -e
 shopt -s extglob
 
-# download files
-
-# GCS_BUCKET
-#
-
-# START_DATE (YYYY-MM-DD)
-# NUM_DAYS
-
-# gsutil ls "gs://production_ddp_flow_test_metrics/**"
-
-# gs://$GCS_BUCKET/${JOB_STARTED[0]}/${JOB_STARTED[1]}-$COMMIT_SHA-$TEST_CATEGORY.json
+# TODO: remove this
+export GCS_BUCKET=flow-internal
+export START_DATE=2021-01-01
+export NUM_DAYS=7
 
 mkdir results
 
 for i in $(seq $NUM_DAYS); do
     day=$(date +"%Y-%m-%d" -d "$START_DATE+$((i-1)) days")
-    gsutil cp -r "gs://$GCS_BUCKET/$day/*" results/
+    gsutil -m cp -r "gs://$GCS_BUCKET/$day/*" results/
 done
 
-go run level2/process_summary2_results.go results/
+export FOLDER_NAME=$(echo $START_DATE | sed 's/[-]//g')-$(date +"%Y%m%d" -d "$START_DATE+$((NUM_DAYS-1)) days")
 
-go run level3/process_summary3_results.go level2-summary.json level3/flaky-test-monitor.json
+upload_results () {
+    mkdir results/$1
+    mv results/$1* results/$1/
+    go run level2/process_summary2_results.go results/$1
+    mv level2-summary.json level2-summary-$1.json
+    mkdir $1
+    mv failures exceptions $1
+    go run level3/process_summary3_results.go level2-summary-$1.json level3/flaky-test-monitor.json
+    mv level3-summary.json level3-summary-$1.json
+    gsutil -m cp -r $1 gs://$GCS_BUCKET/SUMMARIES/$FOLDER_NAME
+}
 
-# TODO: upload all level 2 folders to gcs
-gsutil cp $TEST_RESULT_FILE gs://$GCS_BUCKET/${JOB_STARTED[0]}/${JOB_STARTED[1]}-$COMMIT_SHA-$TEST_CATEGORY-$JOB_ID.json
+upload_results unit
+upload_results integration
 
-curl -X POST -H 'Content-type: application/json' --data @slack_message.json $FLAKINESS_RESULTS_WEBHOOK
+go run slack-message-generator.go level3-summary-unit.json level3-summary-integration.json
+
+# TODO
+# curl -X POST -H 'Content-type: application/json' --data @slack-message.json $FLAKINESS_RESULTS_WEBHOOK
 
 
-# generate slack message json
-# need: link from each test to the folder of results
-#

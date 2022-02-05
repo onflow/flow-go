@@ -11,7 +11,7 @@ export JOB_STARTED=($(date +"%Y-%m-%d %H:%M:%S"))
 export JOB_ID=$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20)
 
 case $TEST_CATEGORY in
-    unit|crypto-unit|integration-@(unit|common|network|epochs|access|collection|consensus|execution|verification))
+    unit|unit-@(crypto|integration)|integration-@(common|network|epochs|access|collection|consensus|execution|verification))
         echo "Generating flakiness summary for \"$TEST_CATEGORY\" tests."
     ;; 
     *)
@@ -54,14 +54,14 @@ else
             make generate-mocks
             make -s unittest-main | $process_results
         ;;
-        crypto-unit)
+        unit-crypto)
             make -C crypto -s test | $process_results
         ;;
-        integration-unit)
+        unit-integration)
             make -C integration -s test | $process_results
         ;;
     esac
 fi
 
 # upload results to GCS bucket
-gsutil cp $TEST_RESULT_FILE gs://$GCS_BUCKET/${JOB_STARTED[0]}/${JOB_STARTED[1]}-$COMMIT_SHA-$TEST_CATEGORY-$JOB_ID.json
+gsutil cp $TEST_RESULT_FILE gs://$GCS_BUCKET/${JOB_STARTED[0]}/$TEST_CATEGORY-$JOB_ID.json
