@@ -33,7 +33,6 @@ upload_data integration
 
 go run slack-message-generator.go level3-summary-unit.json level3-summary-integration.json
 
-# TODO
-# curl -X POST -H 'Content-type: application/json' --data @slack-message.json $FLAKINESS_RESULTS_WEBHOOK
+curl -X POST -H 'Content-type: application/json' --data @slack-message.json $FLAKINESS_RESULTS_WEBHOOK
 
 
