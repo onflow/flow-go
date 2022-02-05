@@ -3,10 +3,7 @@
 set -e
 shopt -s extglob
 
-# TODO: remove this
-export GCS_BUCKET=flow-internal
-export START_DATE=2021-01-01
-export NUM_DAYS=7
+export START_DATE=$(date --date="$NUM_DAYS days ago" +"%Y-%m-%d")
 
 mkdir results
 

@@ -2,7 +2,7 @@ name: Flaky Test Monitor
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '*/30 * * * *' # every 30 minutes
   push:
     branches:
       - master

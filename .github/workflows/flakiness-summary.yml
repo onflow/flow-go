@@ -2,5 +2,27 @@ name: Flaky Test Summary
 
 on:
   schedule:
-    - cron: '0 9 * * 1'
+    - cron: '0 9 * * 1' # 9am every Monday
 
+jobs:
+  summary:
+    name: Flakiness Summary
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run flakiness summary script
+      working-directory: ./tools/flaky_test_monitor
+      run: ./flakiness-summary.sh
+      env:
+        GCS_BUCKET: production_ddp_flow_test_metrics
+        FLAKINESS_RESULTS_WEBHOOK: ${{ secrets.FLAKINESS_RESULTS_WEBHOOK }}
+        NUM_DAYS: 7
