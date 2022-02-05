@@ -102,7 +102,7 @@ func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Ra
 		return nil, fmt.Errorf("failed to retrieve source of randomness: %w", err)
 	}
 
-	rng, err := random.NewRand(seed)
+	rng, err := random.NewChacha20PRG(seed, indices.ChunkAssignmentCustomizer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate random number generator: %w", err)
 	}

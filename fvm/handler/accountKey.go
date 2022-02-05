@@ -31,19 +31,19 @@ func NewAccountPublicKey(publicKey *runtime.PublicKey,
 	var err error
 	signAlgorithm := crypto.RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgorithm != fgcrypto.ECDSAP256 && signAlgorithm != fgcrypto.ECDSASecp256k1 {
-		err = errors.NewValueErrorf(string(publicKey.SignAlgo), "signature algorithm type not supported")
+		err = errors.NewValueErrorf(fmt.Sprintf("%d", publicKey.SignAlgo), "signature algorithm type not supported")
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	hashAlgorithm := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgo)
 	if hashAlgorithm != fghash.SHA2_256 && hashAlgorithm != fghash.SHA3_256 {
-		err = errors.NewValueErrorf(string(hashAlgo), "hashing algorithm type not supported")
+		err = errors.NewValueErrorf(fmt.Sprintf("%d", hashAlgo), "hashing algorithm type not supported")
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	decodedPublicKey, err := fgcrypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
 	if err != nil {
-		err = errors.NewValueErrorf(string(publicKey.PublicKey), "cannot decode public key: %w", err)
+		err = errors.NewValueErrorf(hex.EncodeToString(publicKey.PublicKey), "cannot decode public key: %w", err)
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 

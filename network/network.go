@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/ipfs/go-datastore"
+	"github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/onflow/flow-go/module/component"
 )
@@ -16,10 +17,13 @@ type Network interface {
 	// the engine will be notified with incoming messages on the channel.
 	// The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
 	// On a single node, only one engine can be subscribed to a channel at any given time.
-	Register(channel Channel, engine Engine) (Conduit, error)
+	Register(channel Channel, messageProcessor MessageProcessor) (Conduit, error)
 
 	// RegisterBlobService registers a BlobService on the given channel, using the given datastore to retrieve values.
 	// The returned BlobService can be used to request blocks from the network.
 	// TODO: We should return a function that can be called to unregister / close the BlobService
-	RegisterBlobService(channel Channel, store datastore.Batching) (BlobService, error)
+	RegisterBlobService(channel Channel, store datastore.Batching, opts ...BlobServiceOption) (BlobService, error)
+
+	// RegisterPingService registers a ping protocol handler for the given protocol ID
+	RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error)
 }

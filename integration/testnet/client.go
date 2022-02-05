@@ -3,8 +3,9 @@ package testnet
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go-sdk/templates"
 	"time"
+
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"google.golang.org/grpc"
 
@@ -38,7 +39,7 @@ type Client struct {
 // address, using the given account key for signing transactions.
 func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.PrivateKey, chain flow.Chain) (*Client, error) {
 
-	flowClient, err := client.New(accessAddr, grpc.WithInsecure())
+	flowClient, err := client.New(accessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}

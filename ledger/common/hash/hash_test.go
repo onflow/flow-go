@@ -59,7 +59,7 @@ func TestHash(t *testing.T) {
 
 // Test_GetDefaultHashForHeight tests getting default hash for given heights
 func Test_GetDefaultHashForHeight(t *testing.T) {
-	var defaultLeafHash [cryhash.HashLenSha3_256]byte
+	var defaultLeafHash [cryhash.HashLenSHA3_256]byte
 	cryhash.ComputeSHA3_256(&defaultLeafHash, []byte("default:"))
 	expected := ledger.GetDefaultHashForHeight(0)
 	assert.Equal(t, expected[:], defaultLeafHash[:])

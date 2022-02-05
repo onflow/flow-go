@@ -78,7 +78,7 @@ func Bootstrap(
 
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
-	if err := isValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
+	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 

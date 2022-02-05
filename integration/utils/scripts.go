@@ -180,7 +180,7 @@ access(all) contract MyFavContract {
     }
 
     access(all) fun LedgerInteractionHeavy() {
-        MyFavContract.AddManyRandomItems(800)
+        MyFavContract.AddManyRandomItems(700)
     }
 }
 `

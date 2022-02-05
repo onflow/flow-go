@@ -12,6 +12,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -41,6 +43,7 @@ type Core struct {
 	pending           module.PendingBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
+	voteAggregator    hotstuff.VoteAggregator
 }
 
 // NewCore instantiates the business logic for the main consensus' compliance engine.
@@ -56,6 +59,7 @@ func NewCore(
 	state protocol.MutableState,
 	pending module.PendingBlockBuffer,
 	sync module.BlockRequester,
+	voteAggregator hotstuff.VoteAggregator,
 ) (*Core, error) {
 
 	e := &Core{
@@ -71,6 +75,7 @@ func NewCore(
 		pending:           pending,
 		sync:              sync,
 		hotstuff:          nil, // use `WithConsensus`
+		voteAggregator:    voteAggregator,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
@@ -331,17 +336,22 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 	}
 	defer span.Finish()
 
-	log := c.log.With().
+	v := &model.Vote{
+		View:     vote.View,
+		BlockID:  vote.BlockID,
+		SignerID: originID,
+		SigData:  vote.SigData,
+	}
+
+	c.log.Info().
 		Uint64("block_view", vote.View).
 		Hex("block_id", vote.BlockID[:]).
-		Hex("voter", originID[:]).
-		Logger()
-
-	log.Info().Msg("block vote received")
-	log.Info().Msg("forwarding block vote to hotstuff") // to keep logging consistent with proposals
+		Hex("voter", v.SignerID[:]).
+		Str("vote_id", v.ID().String()).
+		Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
 
 	// forward the vote to hotstuff for processing
-	c.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
+	c.voteAggregator.AddVote(v)
 
 	return nil
 }
