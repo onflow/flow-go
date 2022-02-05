@@ -19,7 +19,7 @@ export FOLDER_NAME=$(echo $START_DATE | sed 's/[-]//g')-$(date +"%Y%m%d" -d "$ST
 
 upload_results () {
     mkdir results/$1
-    mv results/$1* results/$1/
+    mv results/$1*.json results/$1/
     go run level2/process_summary2_results.go results/$1
     mv level2-summary.json level2-summary-$1.json
     mkdir $1
