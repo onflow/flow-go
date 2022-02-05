@@ -68,7 +68,7 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 	})
 
 	var testSummary3 common.TestSummary3
-	testSummary3.NoResults = noResultsTRS
+	testSummary3.Exceptions = noResultsTRS
 
 	// total # of failed tests that satisfy min failure threshold
 	testSummary3.MostFailuresTotal = len(failuresTRS)

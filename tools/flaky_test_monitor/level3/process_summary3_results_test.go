@@ -53,7 +53,7 @@ func runProcessSummary3TestRun(t *testing.T, testDir string) {
 	// check all details of test summary level 2 between expected and actual
 
 	// check # of no-results, failures and longest durations is the same for expected vs actual
-	require.Equal(t, len(expectedTestSummary3.NoResults), len(actualTestSummary3.NoResults))
+	require.Equal(t, len(expectedTestSummary3.Exceptions), len(actualTestSummary3.Exceptions))
 
 	require.Equal(t, len(expectedTestSummary3.MostFailures), len(actualTestSummary3.MostFailures))
 	require.Equal(t, expectedTestSummary3.MostFailuresTotal, actualTestSummary3.MostFailuresTotal)

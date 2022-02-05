@@ -10,21 +10,16 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-const failuresDir = "./failures/"
-const noResultsDir = "./exceptions/"
+const summaryDataDir = "./test_outputs/"
 
 // process level 1 summary files in a single directory and output level 2 summary
 func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 	dirEntries, err := os.ReadDir(filepath.Join(level1Directory))
 	common.AssertNoError(err, "error reading level 1 directory")
 
-	// create directory to store failure messages
-	err = os.Mkdir(failuresDir, 0755)
-	common.AssertNoError(err, "error creating failures directory")
-
-	// create directory to store no-results messages
-	err = os.Mkdir(noResultsDir, 0755)
-	common.AssertNoError(err, "error creating no-results directory")
+	// create directory to store output files
+	err = os.Mkdir(summaryDataDir, 0755)
+	common.AssertNoError(err, "error creating output directory")
 
 	testSummary2 := common.TestSummary2{}
 	testSummary2.TestResults = make(map[string]*common.TestResultSummary)
@@ -98,51 +93,48 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 }
 
 func saveFailureMessage(testResult common.TestResult) {
-	saveMessageHelper(testResult, "fail", failuresDir, "failure")
+	saveMessageHelper(testResult, "failure")
 }
 
 func saveNoResultMessage(testResult common.TestResult) {
-	saveMessageHelper(testResult, "", noResultsDir, "no-result")
+	saveMessageHelper(testResult, "exception")
 }
 
-// for each failed / no-result test, we want to save the raw output message as a text file
-// there could be multiple failures / no-results of the same test so we want to save each failed / no-result message in a separate text file
-// each test with failures / no-results will have a uniquely named (based on test name and package) sub-directory where failed / no-result messages are saved
-// e.g. "failures/TestSanitySha3_256+github.com-onflow-flow-go-crypto-hash" will store failed messages text files
-// from test TestSanitySha3_256 from the "github.com/onflow/flow-go/crypto/hash" package
-// failure and no-result messages are saved in a similar way so this helper function
-// handles saving both types of messages
-func saveMessageHelper(testResult common.TestResult, expectedResult string, messagesDir string, messageFileStem string) {
-	if testResult.Result != expectedResult {
-		panic(fmt.Sprintf("unexpected test result: " + testResult.Result))
-	}
-
+func saveMessageHelper(testResult common.TestResult, prefix string) {
 	// each sub directory corresponds to a failed / no-result test name and package name
-	messagesDirFullPath := messagesDir + testResult.Test + "+" + strings.ReplaceAll(testResult.Package, "/", "-") + "/"
+	messagesDirFullPath := summaryDataDir + testResult.Test + "+" + strings.ReplaceAll(testResult.Package, "/", "-") + "/"
 
 	// there could already be previous failures / no-results for this test, so it's important
 	// to check if failed test / no-result folder exists
 	if !common.DirExists(messagesDirFullPath) {
 		err := os.Mkdir(messagesDirFullPath, 0755)
-		common.AssertNoError(err, "error creating sub-dir under failures / no-results dir")
+		common.AssertNoError(err, "error creating sub-directory for test")
 	}
 
 	// under each sub-directory, there should be 1 or more text files
-	// (failure1.txt / no-result1.txt, failure2.txt / no-result2.txt, etc)
-	// that holds the raw failure / no-result message for that test
+	// (failure1.txt / exception1.txt, failure2.txt / exception2.txt, etc)
+	// that holds the raw failure / exception message for that test
 	dirEntries, err := os.ReadDir(messagesDirFullPath)
-	common.AssertNoError(err, "error reading sub-dir entries under failures / no-results dir")
+	common.AssertNoError(err, "error reading test sub-directory")
+
+	count := 1
+
+	for _, dirEntry := range dirEntries {
+		if strings.HasPrefix(dirEntry.Name(), prefix) {
+			count++
+		}
+	}
 
 	// failure text files will be named "failure1.txt", "failure2.txt", etc
-	// no-result text files will be named "no-result1.txt", "no-result2.txt", etc
-	// need to know how many failure / no-result text files already exist in the sub-directory before creating the next one
-	messageFile, err := os.Create(messagesDirFullPath + fmt.Sprintf(messageFileStem+"%d.txt", len(dirEntries)+1))
-	common.AssertNoError(err, "error creating failure / no-result file")
+	// exception text files will be named "exception1.txt", "exception2.txt", etc
+	// need to know how many failure / exception text files already exist in the sub-directory before creating the next one
+	messageFile, err := os.Create(messagesDirFullPath + fmt.Sprintf(prefix+"%d.txt", count))
+	common.AssertNoError(err, "error creating failure / exception file")
 	defer messageFile.Close()
 
 	for _, output := range testResult.Output {
 		_, err = messageFile.WriteString(output)
-		common.AssertNoError(err, "error writing to failure / no-result file")
+		common.AssertNoError(err, "error writing to failure / exception file")
 	}
 }
 
@@ -157,18 +149,6 @@ func postProcessTestSummary2(testSummary2 common.TestSummary2) {
 
 		// calculate failure rate for each test summary
 		testResultSummary.FailureRate = common.ConvertToNDecimalPlaces(2, testResultSummary.Failed, testResultSummary.Runs)
-	}
-
-	// check if there are no failures so can delete failures sub-directory
-	if common.IsDirEmpty(failuresDir) {
-		err := os.RemoveAll(failuresDir)
-		common.AssertNoError(err, "error removing failures directory")
-	}
-
-	// check if there are no no-result tests so can delete no-results sub-directory
-	if common.IsDirEmpty(noResultsDir) {
-		err := os.RemoveAll(noResultsDir)
-		common.AssertNoError(err, "error removing no-results directory")
 	}
 }
 
