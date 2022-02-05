@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	blocks "github.com/ipfs/go-block-format"
+	"github.com/ipfs/go-cid"
 	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
@@ -390,6 +392,12 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) flow.Header {
 	}
 
 	return header
+}
+
+func CidFixture() cid.Cid {
+	data := make([]byte, 1024)
+	rand.Read(data)
+	return blocks.NewBlock(data).Cid()
 }
 
 func BlockHeaderFixtureOnChain(chainID flow.ChainID) flow.Header {
@@ -1149,6 +1157,15 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 	}
 
 	return tb
+}
+
+func TransactionBodyListFixture(n int) []flow.TransactionBody {
+	l := make([]flow.TransactionBody, n)
+	for i := 0; i < n; i++ {
+		l[i] = TransactionBodyFixture()
+	}
+
+	return l
 }
 
 func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {

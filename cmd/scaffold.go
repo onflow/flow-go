@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -39,8 +40,10 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -89,6 +92,7 @@ type FlowNodeBuilder struct {
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
 	components               []namedComponentFunc
+	postShutdownFns          []func() error
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
 	extraFlagCheck           func() error
@@ -132,31 +136,37 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
+	fnb.flags.StringVar(&fnb.BaseConfig.topologyProtocolName, "topology", defaultConfig.topologyProtocolName, "networking overlay topology")
+	fnb.flags.Float64Var(&fnb.BaseConfig.topologyEdgeProbability, "topology-edge-probability", defaultConfig.topologyEdgeProbability,
+		"pairwise edge probability between nodes in topology")
+
+	// dynamic node startup flags
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey, "dynamic-startup-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANAddress, "dynamic-startup-access-address", "", "the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpochPhase, "dynamic-startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpoch, "dynamic-startup-epoch", "current", "the target epoch for dynamic-startup, use \"current\" to start node in the current epoch")
+	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in which the node will check if it can start")
 }
 
-func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-
-		codec := cborcodec.NewCodec()
-
-		myAddr := fnb.NodeConfig.Me.Address()
-		if fnb.BaseConfig.BindAddr != NotSet {
-			myAddr = fnb.BaseConfig.BindAddr
-		}
+func (fnb *FlowNodeBuilder) EnqueuePingService() {
+	fnb.Component("ping service", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		pingLibP2PProtocolID := unicast.PingProtocolId(node.SporkID)
 
 		// setup the Ping provider to return the software version and the sealed block height
-		pingProvider := p2p.PingInfoProviderImpl{
+		pingInfoProvider := &p2p.PingInfoProviderImpl{
 			SoftwareVersionFun: func() string {
 				return build.Semver()
 			},
 			SealedBlockHeightFun: func() (uint64, error) {
-				head, err := fnb.State.Sealed().Head()
+				head, err := node.State.Sealed().Head()
 				if err != nil {
 					return 0, err
 				}
 				return head.Height, nil
 			},
-			HotstuffViewFun: nil, // set in next code block, depending on role
+			HotstuffViewFun: func() (uint64, error) {
+				return 0, fmt.Errorf("hotstuff view reporting disabled")
+			},
 		}
 
 		// only consensus roles will need to report hotstuff view
@@ -164,7 +174,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
-			pingProvider.HotstuffViewFun = func() (uint64, error) {
+			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
 				curView, err := persist.GetStarted()
 				if err != nil {
 					return 0, err
@@ -172,29 +182,43 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 				return curView, nil
 			}
-		} else {
-			// non-consensus will not report any hotstuff view
-			pingProvider.HotstuffViewFun = func() (uint64, error) {
-				return 0, fmt.Errorf("non-consensus nodes do not report hotstuff view in ping")
-			}
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
+		pingService, err := node.Network.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
+
+		node.PingService = pingService
+
+		return &module.NoopReadyDoneAware{}, err
+	})
+}
+
+func (fnb *FlowNodeBuilder) EnqueueResolver() {
+	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		resolver := dns.NewResolver(dns.DefaultCacheSize, node.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+		fnb.Resolver = resolver
+		return resolver, nil
+	})
+}
+
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
+	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		codec := cborcodec.NewCodec()
+
+		myAddr := fnb.NodeConfig.Me.Address()
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
+		}
+
+		libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger,
-			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
-			pingProvider,
-			fnb.BaseConfig.DNSCacheTTL,
-			fnb.BaseConfig.NodeRole)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
-		}
+			fnb.Resolver,
+			fnb.BaseConfig.NodeRole,
+		)
 
 		var mwOpts []p2p.MiddlewareOption
 		if len(fnb.MsgValidators) > 0 {
@@ -205,8 +229,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
 		mwOpts = append(mwOpts,
 			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithConnectionGating(true),
-			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)))
+			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+		)
 
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger,
@@ -221,11 +245,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
 
-		top, err := topology.NewTopicBasedTopology(
-			fnb.NodeID,
-			fnb.Logger,
-			fnb.State,
-		)
+		topologyFactory, err := topology.Factory(topology.Name(fnb.topologyProtocolName))
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.topologyProtocolName, err)
+		}
+		top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.topologyEdgeProbability)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
@@ -248,10 +272,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		fnb.Network = net
 
-		idEvents := gadgets.NewIdentityDeltas(func() {
-			fnb.Middleware.UpdateNodeAddresses()
-			fnb.Middleware.UpdateAllowList()
-		})
+		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
 		return net, nil
@@ -476,6 +497,13 @@ func (fnb *FlowNodeBuilder) initDB() {
 	publicDB, err := bstorage.InitPublic(opts)
 	fnb.MustNot(err).Msg("could not open public db")
 	fnb.DB = publicDB
+
+	fnb.ShutdownFunc(func() error {
+		if err := fnb.DB.Close(); err != nil {
+			return fmt.Errorf("error closing protocol database: %w", err)
+		}
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initSecretsDB() {
@@ -510,6 +538,13 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 	secretsDB, err := bstorage.InitSecret(opts)
 	fnb.MustNot(err).Msg("could not open secrets db")
 	fnb.SecretsDB = secretsDB
+
+	fnb.ShutdownFunc(func() error {
+		if err := fnb.SecretsDB.Close(); err != nil {
+			return fmt.Errorf("error closing secrets database: %w", err)
+		}
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -577,29 +612,11 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 func (fnb *FlowNodeBuilder) initState() {
 	fnb.ProtocolEvents = events.NewDistributor()
 
-	// load the root protocol state snapshot from disk
-	rootSnapshot, err := loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
-	fnb.MustNot(err).Msg("failed to read protocol snapshot from disk")
-
-	fnb.RootResult, fnb.RootSeal, err = rootSnapshot.SealedResult()
-	fnb.MustNot(err).Msg("failed to read root sealed result")
-	sealingSegment, err := rootSnapshot.SealingSegment()
-	fnb.MustNot(err).Msg("failed to read root sealing segment")
-	fnb.RootBlock = sealingSegment.Highest()
-	fnb.RootQC, err = rootSnapshot.QuorumCertificate()
-	fnb.MustNot(err).Msg("failed to read root qc")
-	// set the chain ID based on the root header
-	// TODO: as the root header can now be loaded from protocol state, we should
-	// not use a global variable for chain ID anymore, but rely on the protocol
-	// state as final authority on what the chain ID is
-	// => https://github.com/dapperlabs/flow-go/issues/4167
-	fnb.RootChainID = fnb.RootBlock.Header.ChainID
-	fnb.SporkID, err = rootSnapshot.Params().SporkID()
-	fnb.MustNot(err)
-
 	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
 	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
+
 	if isBootStrapped {
+		fnb.Logger.Info().Msg("opening already bootstrapped protocol state")
 		state, err := badgerState.OpenState(
 			fnb.Metrics.Compliance,
 			fnb.DB,
@@ -611,26 +628,27 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 		)
-		fnb.MustNot(err).Msg("could not open flow state")
+		fnb.MustNot(err).Msg("could not open protocol state")
 		fnb.State = state
 
-		// Verify root block in protocol state is consistent with bootstrap information stored on-disk.
-		// Inconsistencies can happen when the bootstrap root block is updated (because of new spork),
-		// but the protocol state is not updated, so they don't match.
-		//
-		// When this happens during a spork, we could try deleting the protocol state database.
-		//
-		rootBlockFromState, err := state.Params().Root()
-		fnb.MustNot(err).Msg("could not load root block from protocol state")
-		if fnb.RootBlock.ID() != rootBlockFromState.ID() {
-			fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
-				rootBlockFromState.ID(),
-				fnb.RootBlock.ID(),
-			)
-		}
+		// set root snapshot field
+		rootBlock, err := state.Params().Root()
+		fnb.MustNot(err).Msg("could not get root block from protocol state")
+		rootSnapshot := state.AtBlockID(rootBlock.ID())
+		fnb.setRootSnapshot(rootSnapshot)
 	} else {
 		// Bootstrap!
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
+
+		// if no root snapshot is configured, attempt to load the file from disk
+		var rootSnapshot = fnb.RootSnapshot
+		if rootSnapshot == nil {
+			fnb.Logger.Info().Msgf("loading root protocol state snapshot from disk")
+			rootSnapshot, err = loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+			fnb.MustNot(err).Msg("failed to read protocol snapshot from disk")
+		}
+		// set root snapshot fields
+		fnb.setRootSnapshot(rootSnapshot)
 
 		// generate bootstrap config options as per NodeConfig
 		var options []badgerState.BootstrapConfigOptions
@@ -648,7 +666,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
-			rootSnapshot,
+			fnb.RootSnapshot,
 			options...,
 		)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
@@ -658,7 +676,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
 			Hex("root_block_id", logging.Entity(fnb.RootBlock)).
 			Uint64("root_block_height", fnb.RootBlock.Header.Height).
-			Msg("genesis state bootstrapped")
+			Msg("protocol state bootstrapped")
 	}
 
 	// initialize local if it hasn't been initialized yet
@@ -669,9 +687,29 @@ func (fnb *FlowNodeBuilder) initState() {
 	lastFinalized, err := fnb.State.Final().Head()
 	fnb.MustNot(err).Msg("could not get last finalized block header")
 	fnb.Logger.Info().
-		Hex("block_id", logging.Entity(lastFinalized)).
-		Uint64("height", lastFinalized.Height).
-		Msg("last finalized block")
+		Hex("root_block_id", logging.Entity(fnb.RootBlock)).
+		Uint64("root_block_height", fnb.RootBlock.Header.Height).
+		Hex("finalized_block_id", logging.Entity(lastFinalized)).
+		Uint64("finalized_block_height", lastFinalized.Height).
+		Msg("successfully opened protocol state")
+}
+
+// setRootSnapshot sets the root snapshot field and all related fields in the NodeConfig.
+func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) {
+	var err error
+
+	fnb.RootSnapshot = rootSnapshot
+	// cache properties of the root snapshot, for convenience
+	fnb.RootResult, fnb.RootSeal, err = fnb.RootSnapshot.SealedResult()
+	fnb.MustNot(err).Msg("failed to read root sealed result")
+	sealingSegment, err := fnb.RootSnapshot.SealingSegment()
+	fnb.MustNot(err).Msg("failed to read root sealing segment")
+	fnb.RootBlock = sealingSegment.Highest()
+	fnb.RootQC, err = fnb.RootSnapshot.QuorumCertificate()
+	fnb.MustNot(err).Msg("failed to read root qc")
+	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
+	fnb.MustNot(err)
 }
 
 func (fnb *FlowNodeBuilder) initLocal() {
@@ -726,7 +764,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
+	if fnb.RootChainID == flow.Testnet {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedDeployment(false),
 		)
@@ -855,6 +893,12 @@ func (fnb *FlowNodeBuilder) Module(name string, f BuilderFunc) NodeBuilder {
 	return fnb
 }
 
+// ShutdownFunc adds a callback function that is called after all components have exited.
+func (fnb *FlowNodeBuilder) ShutdownFunc(fn func() error) NodeBuilder {
+	fnb.postShutdownFns = append(fnb.postShutdownFns, fn)
+	return fnb
+}
+
 func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder {
 	fnb.adminCommands[command] = f
 	return fnb
@@ -978,7 +1022,11 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
+	fnb.EnqueueResolver()
+
 	fnb.EnqueueNetworkInit()
+
+	fnb.EnqueuePingService()
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
@@ -1080,11 +1128,16 @@ func (fnb *FlowNodeBuilder) onStart() error {
 // postShutdown is called by the node before exiting
 // put any cleanup code here that should be run after all components have stopped
 func (fnb *FlowNodeBuilder) postShutdown() error {
-	err := fnb.closeDatabase()
-	if err != nil {
-		return fmt.Errorf("could not close database: %w", err)
+	var errs *multierror.Error
+
+	for _, fn := range fnb.postShutdownFns {
+		err := fn()
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
-	return nil
+	fnb.Logger.Info().Msg("database has been closed")
+	return errs.ErrorOrNil()
 }
 
 // handleFatal handles irrecoverable errors by logging them and exiting the process.
@@ -1098,10 +1151,6 @@ func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {
 
 func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
 	return f(fnb.NodeConfig)
-}
-
-func (fnb *FlowNodeBuilder) closeDatabase() error {
-	return fnb.DB.Close()
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {

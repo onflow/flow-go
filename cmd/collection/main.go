@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spf13/pflag"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
-
-	"github.com/spf13/pflag"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 
 	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -39,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/module/ingress"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
@@ -145,6 +145,7 @@ func main() {
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -161,6 +162,7 @@ func main() {
 	}
 
 	nodeBuilder.
+		PreInit(cmd.DynamicStartPreInit).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -179,7 +181,7 @@ func main() {
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
-			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
+			create := func() mempool.Transactions { return herocache.NewTransactions(uint32(txLimit), node.Logger) }
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
@@ -220,11 +222,17 @@ func main() {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
 
+			// disable balance checks for transient networks, which do not have transaction fees
+			var opts []epochs.MachineAccountValidatorConfigOption
+			if node.RootChainID.Transient() {
+				opts = append(opts, epochs.WithoutBalanceChecks)
+			}
 			validator, err := epochs.NewMachineAccountConfigValidator(
 				node.Logger,
 				flowClient,
 				flow.RoleCollection,
 				*machineAccountInfo,
+				opts...,
 			)
 
 			return validator, err

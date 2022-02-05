@@ -63,6 +63,8 @@ const (
 	// DefaultExecutionRootDir is the default directory for the execution node
 	// state database.
 	DefaultExecutionRootDir = "/exedb"
+	// DefaultExecutionDataServiceDir for the execution data service blobstore.
+	DefaultExecutionDataServiceDir = "/data/execution_data"
 
 	// ColNodeAPIPort is the name used for the collection node API port.
 	ColNodeAPIPort = "col-ingress-port"
@@ -98,6 +100,8 @@ const (
 	DefaultFlowPort = 2137
 	// DefaultSecureGRPCPort is the port used to access secure GRPC server running on ANs
 	DefaultSecureGRPCPort = 9001
+	// AccessNodePublicNetworkPort is the port used by access nodes for the public libp2p network
+	AccessNodePublicNetworkPort = 9876
 
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
@@ -170,7 +174,8 @@ func (net *FlowNetwork) Result() *flow.ExecutionResult {
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
 	// makes it easier to see logs for a specific test case
-	fmt.Println("starting network: ", net.config.Name)
+	net.t.Logf("%v starting flow network %v with docker containers for test case [%v]",
+		time.Now().UTC(), net.config.Name, net.t.Name())
 	net.suite.Start(ctx)
 }
 
@@ -468,6 +473,8 @@ func WithDebugImage(debug bool) func(config *NodeConfig) {
 func AsGhost() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.Ghost = true
+		// using the fully-connectred topology to ensure a ghost node is always connected to all other nodes in the network,
+		config.AdditionalFlags = append(config.AdditionalFlags, "--topology=fully-connected")
 	}
 }
 
@@ -490,6 +497,8 @@ func integrationBootstrapDir() (string, error) {
 }
 
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
+
+	t.Logf("preparing flow network")
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
@@ -516,7 +525,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
-	fmt.Printf("BootstrapDir: %s \n", bootstrapDir)
+	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
 	root, result, seal, confs, bootstrapSnapshot, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
@@ -547,21 +556,30 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
 		}
 	}
-	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAccessNodeIDS, fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
+	require.GreaterOrEqualf(t, len(accessNodeIDS), DefaultMinimumNumOfAccessNodeIDS,
+		"at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS)
 
-	// add each node to the network
 	for _, nodeConf := range confs {
+		var nodeType = "real"
+		if nodeConf.Ghost {
+			nodeType = "ghost"
+		}
+
+		t.Logf("add docker container type: %s, %v, node id: %v, address: %v", nodeType, nodeConf.ContainerName, nodeConf.NodeID, nodeConf.Address)
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 
+		// ghost nodes will not need any flags
+		if nodeConf.Ghost {
+			continue
+		}
+
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
-		if nodeConf.Role == flow.RoleConsensus || nodeConf.Role == flow.RoleCollection {
-			// ghost containers don't participate in the network skip any SN/LN ghost containers
-			if !nodeConf.Ghost {
-				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
-				nodeContainer.AddFlag("insecure-access-api", "false")
-				nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
-			}
+		// this is required otherwise collection node will fail to startup
+		if nodeConf.Role == flow.RoleCollection || nodeConf.Role == flow.RoleConsensus {
+			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
+			nodeContainer.AddFlag("insecure-access-api", "false")
+			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
 	}
 
@@ -569,10 +587,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// add each follower to the network
 	for _, followerConf := range networkConf.ConsensusFollowers {
+		t.Logf("add consensus follower %v", followerConf.NodeID)
 		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
 	flowNetwork.PrintMetricsPorts()
+
+	t.Logf("finish preparing flow network")
 
 	return flowNetwork
 }
@@ -640,7 +661,6 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 // AddNode creates a node container with the given config and adds it to the
 // network.
 func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf ContainerConfig) error {
-
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
 		Name:      nodeConf.ContainerName,
@@ -665,6 +685,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	if err != nil {
 		return fmt.Errorf("could not get tmp dir: %w", err)
 	}
+
+	t.Logf("adding container %v for %v node", nodeConf.ContainerName, nodeConf.Role)
 
 	nodeContainer := &Container{
 		Config:  nodeConf,
@@ -759,6 +781,16 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 
+			tmpExeDataDir, err := ioutil.TempDir(tmpdir, "execution-data")
+			require.NoError(t, err)
+
+			opts.HostConfig.Binds = append(
+				opts.HostConfig.Binds,
+				fmt.Sprintf("%s:%s:rw", tmpExeDataDir, DefaultExecutionDataServiceDir),
+			)
+
+			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
+
 		case flow.RoleAccess:
 			hostGRPCPort := testingdock.RandomPort(t)
 			hostHTTPProxyPort := testingdock.RandomPort(t)
@@ -784,9 +816,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			if nodeConf.SupportsUnstakedNodes {
 				hostExternalNetworkPort := testingdock.RandomPort(t)
-				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
+				containerExternalNetworkPort := fmt.Sprintf("%d/tcp", AccessNodePublicNetworkPort)
+				nodeContainer.bindPort(hostExternalNetworkPort, containerExternalNetworkPort)
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
 				nodeContainer.AddFlag("supports-unstaked-node", "true")
+				nodeContainer.AddFlag("public-network-address", fmt.Sprintf("%s:%d", nodeContainer.Name(), AccessNodePublicNetworkPort))
 			}
 
 			hostMetricsPort := testingdock.RandomPort(t)
@@ -847,6 +881,20 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	suiteContainer := net.suite.Container(*opts)
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
+
+	// start ghost node right away
+	// ghost nodes are to help testing other nodes' logic,
+	// in order to reduce tests flakyness, we try to prepare the network, so that the real node
+	// can be tested with the network that all ghost nodes are up. Therefore, we start
+	// ghost nodes right away
+	if nodeConf.Ghost {
+		net.network.After(suiteContainer)
+		return nil
+	}
+
+	// if is real node, since the node config has been sorted, execution should always
+	// be created before consensus node. so by the time we are creating access/consensus
+	// node, the execution has been created, and we can add the dependency here
 	if nodeConf.Role == flow.RoleAccess || nodeConf.Role == flow.RoleConsensus {
 		execution1 := net.ContainerByName("execution_1")
 		execution1.After(suiteContainer)
@@ -1018,7 +1066,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
 	}
 	epochConfig := epochs.EpochConfig{
-		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
 		NumViewsInEpoch:              cadence.UInt64(networkConf.ViewsInEpoch),

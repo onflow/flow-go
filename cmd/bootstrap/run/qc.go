@@ -83,11 +83,11 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData) ([]*model.Vote, error) {
 	hotBlock := model.GenesisBlockFromFlow(block.Header)
 	n := len(participantData.Participants)
-	fmt.Println("Number of staked nodes: ", n)
+	fmt.Println("Number of staked consensus nodes: ", n)
 
 	votes := make([]*model.Vote, 0, n)
 	for _, p := range participantData.Participants {
-		fmt.Println(p.NodeID, p.Address, p.StakingPubKey().String())
+		fmt.Println("generating votes from consensus participants: ", p.NodeID, p.Address, p.StakingPubKey().String())
 
 		// create the participant's local identity
 		keys, err := p.PrivateKeys()

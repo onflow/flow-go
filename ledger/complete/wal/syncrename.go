@@ -21,6 +21,7 @@ type WriterSeekerCloser interface {
 type SyncOnCloseRenameFile struct {
 	file       *os.File
 	targetName string
+	savedError error // savedError is the first error returned from Write.  Close() renames temp file to target file only if savedError is nil.
 	*bufio.Writer
 }
 
@@ -34,6 +35,11 @@ func (s *SyncOnCloseRenameFile) Sync() error {
 }
 
 func (s *SyncOnCloseRenameFile) Close() error {
+	if s.savedError != nil {
+		// If there is any error saved from previous op, close temp file without renaming to target file.
+		return s.closeOnError()
+	}
+
 	err := s.Flush()
 	if err != nil {
 		return fmt.Errorf("cannot flush buffer: %w", err)
@@ -55,4 +61,26 @@ func (s *SyncOnCloseRenameFile) Close() error {
 	}
 
 	return nil
+}
+
+func (s *SyncOnCloseRenameFile) Write(b []byte) (int, error) {
+	n, err := s.Writer.Write(b)
+	if err != nil && s.savedError == nil {
+		s.savedError = err
+	}
+	return n, err
+}
+
+// closeOnError closes and deletes temp file.
+func (s *SyncOnCloseRenameFile) closeOnError() error {
+	fileName := s.file.Name()
+
+	// Close temp file
+	err := s.file.Close()
+	if err != nil {
+		return err
+	}
+
+	// Remove temp file because it is incomplete/invalid.
+	return os.Remove(fileName)
 }

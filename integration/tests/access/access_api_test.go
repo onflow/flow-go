@@ -42,7 +42,7 @@ func (suite *AccessSuite) TearDownTest() {
 
 func (suite *AccessSuite) SetupTest() {
 	nodeConfigs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel)),
 	}
 
 	// need one dummy execution node (unused ghost)
@@ -52,6 +52,10 @@ func (suite *AccessSuite) SetupTest() {
 	// need one dummy verification node (unused ghost)
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
+
+	// need one controllable collection node (used ghost)
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+	nodeConfigs = append(nodeConfigs, collConfig)
 
 	// need three consensus nodes (unused ghost)
 	for n := 0; n < 3; n++ {
@@ -63,15 +67,11 @@ func (suite *AccessSuite) SetupTest() {
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 	}
 
-	// need one controllable collection node (used ghost)
-	collID := unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(collID))
-	nodeConfigs = append(nodeConfigs, collConfig)
-
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 
 	// start the network
+	suite.T().Logf("starting flow network with docker containers")
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.net.Start(suite.ctx)
 }

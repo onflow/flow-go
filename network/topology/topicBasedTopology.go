@@ -12,6 +12,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+const TopicBased = Name("topic-based")
+
+func TopicBasedTopologyFactory() FactoryFunction {
+	return func(nodeId flow.Identifier, logger zerolog.Logger, state protocol.State, _ float64) (network.Topology, error) {
+		return NewTopicBasedTopology(nodeId, logger, state)
+	}
+}
+
 // TopicBasedTopology is a deterministic topology mapping that creates a connected graph component among the nodes
 // involved in each topic.
 type TopicBasedTopology struct {
