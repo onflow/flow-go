@@ -102,7 +102,7 @@ func saveNoResultMessage(testResult common.TestResult) {
 
 func saveMessageHelper(testResult common.TestResult, prefix string) {
 	// each sub directory corresponds to a failed / no-result test name and package name
-	messagesDirFullPath := summaryDataDir + testResult.Package + "/" + testResult.Test
+	messagesDirFullPath := summaryDataDir + testResult.Package + "/" + testResult.Test + "/"
 
 	// there could already be previous failures / no-results for this test, so it's important
 	// to check if failed test / no-result folder exists
