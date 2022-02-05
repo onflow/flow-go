@@ -62,8 +62,8 @@ func runProcessSummary3TestRun(t *testing.T, testDir string) {
 	require.Equal(t, expectedTestSummary3.LongestRunningTotal, actualTestSummary3.LongestRunningTotal)
 
 	// check no-result, failure and duration lists are the same for expected vs actual
-	for noResultsIndex := range expectedTestSummary3.NoResults {
-		common.AssertTestSummariesEqual(t, expectedTestSummary3.NoResults[noResultsIndex], actualTestSummary3.NoResults[noResultsIndex])
+	for noResultsIndex := range expectedTestSummary3.Exceptions {
+		common.AssertTestSummariesEqual(t, expectedTestSummary3.Exceptions[noResultsIndex], actualTestSummary3.Exceptions[noResultsIndex])
 	}
 
 	for failuresIndex := range expectedTestSummary3.MostFailures {
