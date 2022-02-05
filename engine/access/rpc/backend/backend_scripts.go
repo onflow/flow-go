@@ -16,8 +16,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// uniqueErrorLogTimeWindow is the duration for checking the uniqueness of scripts sent for execution
-const uniqueErrorLogTimeWindow = time.Duration(10) * time.Minute
+// uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
+const uniqueScriptLoggingTimeWindow = time.Duration(10) * time.Minute
 
 type backendScripts struct {
 	headers           storage.Headers
@@ -103,13 +103,13 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
-		executionTime := time.Now()
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
+				executionTime := time.Now()
 				timestamp, seen := b.seenScripts[encodedScript]
 				// log if the script is unique in the time window
-				if !seen || executionTime.Sub(timestamp) >= uniqueErrorLogTimeWindow {
+				if !seen || executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
 					b.log.Debug().
 						Str("execution_node", execNode.String()).
 						Hex("block_id", blockID[:]).
