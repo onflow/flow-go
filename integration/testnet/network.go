@@ -111,6 +111,11 @@ const (
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
+
+	// defaultPeerUpdateInterval determines the time interval at which each node updates its pubsub connections.
+	// Testnet is running at a significantly smaller scale than a production network, hence to
+	// hold the mathematics behind topology connectivity valid, we need a faster connection update rate than the default value:
+	defaultPeerUpdateInterval = 1 * time.Second
 )
 
 func init() {
@@ -576,12 +581,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 		// this is required otherwise collection node will fail to startup
-		nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
-
-		// testnet is running at a significantly smaller scale than a production network, hence to
-		// hold the mathematics behind topology connectivity valid, we need a faster connection update rate than the default value:
-		nodeContainer.AddFlag("peerupdate-interval", "1s")
 		if nodeConf.Role == flow.RoleCollection || nodeConf.Role == flow.RoleConsensus {
+			nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
@@ -673,6 +674,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			Image: nodeConf.ImageName(),
 			User:  currentUser(),
 			Cmd: append([]string{
+				fmt.Sprintf("--peerupdate-interval=%s", defaultPeerUpdateInterval.String()),
 				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
