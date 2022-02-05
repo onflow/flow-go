@@ -32,7 +32,7 @@ func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
 }
 func (e Epoch) RandomSource() ([]byte, error) { return e.enc.RandomSource, nil }
 
-func (e Epoch) Seed(indices ...uint32) ([]byte, error) {
+func (e Epoch) Seed(indices ...uint16) ([]byte, error) {
 	return seed.FromRandomSource(indices, e.enc.RandomSource)
 }
 
@@ -134,7 +134,7 @@ func (es *setupEpoch) RandomSource() ([]byte, error) {
 	return es.setupEvent.RandomSource, nil
 }
 
-func (es *setupEpoch) Seed(indices ...uint32) ([]byte, error) {
+func (es *setupEpoch) Seed(indices ...uint16) ([]byte, error) {
 	return seed.FromRandomSource(indices, es.setupEvent.RandomSource)
 }
 

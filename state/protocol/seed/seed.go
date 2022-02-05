@@ -11,7 +11,7 @@ import (
 // FromParentSignature reads the raw random seed from a main consensus QC sigData.
 // The sigData is an RLP encoded structure that is part of QuorumCertificate.
 // The indices can be used to generate task-specific seeds from the same signature.
-func FromParentSignature(indices []uint32, sigData []byte) ([]byte, error) {
+func FromParentSignature(indices []uint16, sigData []byte) ([]byte, error) {
 	// unpack sig data to extract random beacon sig
 	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
 	if err != nil {
@@ -22,16 +22,16 @@ func FromParentSignature(indices []uint32, sigData []byte) ([]byte, error) {
 }
 
 // FromRandomSource generates a task-specific seed (task is determined by indices).
-func FromRandomSource(customizer []uint32, sor []byte) ([]byte, error) {
+func FromRandomSource(customizer []uint16, sor []byte) ([]byte, error) {
 
 	// create the key used for the KMAC by concatenating all indices
-	keyLen := 4 * len(customizer)
+	keyLen := 2 * len(customizer)
 	if keyLen < hash.KmacMinKeyLen {
 		keyLen = hash.KmacMinKeyLen
 	}
 	key := make([]byte, keyLen)
 	for i, index := range customizer {
-		binary.LittleEndian.PutUint32(key[4*i:4*i+4], index)
+		binary.LittleEndian.PutUint16(key[2*i:2*i+2], index)
 	}
 
 	// create a KMAC instance with our key and 32 bytes output size
