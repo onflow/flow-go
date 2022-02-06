@@ -2,8 +2,8 @@ package backend
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
+	"syscall"
 	"testing"
 	"time"
 
@@ -272,7 +272,6 @@ func (suite *Suite) TestSendTransactionPanic() {
 	transactionBody := unittest.TransactionBodyFixture()
 
 	suite.colClient.On("SendTransaction").Return(nil, nil)
-	suite.transactions.On("Store", mock.Anything).Return(fmt.Errorf("no space left on device"))
 
 	backend := New(
 		suite.state,
@@ -291,6 +290,7 @@ func (suite *Suite) TestSendTransactionPanic() {
 		suite.log,
 	)
 	suite.Run("panic on full disk error", func() {
+		suite.transactions.On("Store", mock.Anything).Return(syscall.ENOSPC)
 		defer func() {
 			if rec := recover(); rec == nil {
 				suite.Fail("Code did not panic from full disc")
