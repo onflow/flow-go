@@ -65,7 +65,8 @@ func (b *backendTransactions) SendTransaction(
 	// store the transaction locally
 	err = b.transactions.Store(tx)
 	if err != nil {
-		return status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
+		// Crash the node as disk is full, transactions.Store calls are otherwise idempotent
+		panic(fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
 	if b.retry.IsActive() {

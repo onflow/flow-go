@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -263,6 +264,38 @@ func (suite *Suite) TestGetCollection() {
 
 	suite.Equal(expected, *actual)
 	suite.assertAllExpectations()
+}
+
+// TestSendTransactionPanic tests that shutdown behaviour if transactions fail to store when disk is full
+func (suite *Suite) TestSendTransactionPanic() {
+	ctx := context.Background()
+	transactionBody := unittest.TransactionBodyFixture()
+
+	suite.colClient.On("SendTransaction").Return(nil, nil)
+	suite.transactions.On("Store", mock.Anything).Return(fmt.Errorf("no space left on device"))
+
+	backend := New(
+		suite.state,
+		suite.colClient, nil, nil, nil,
+		suite.collections,
+		suite.transactions,
+		nil,
+		nil,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+	)
+	defer func() {
+		if rec := recover(); rec == nil {
+			suite.Fail("Code did not panic from full disc")
+		}
+	}()
+	backend.SendTransaction(ctx, &transactionBody)
 }
 
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
