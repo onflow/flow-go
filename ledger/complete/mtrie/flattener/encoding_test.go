@@ -59,13 +59,29 @@ func TestNodeSerialization(t *testing.T) {
 	}
 
 	t.Run("encode leaf node", func(t *testing.T) {
-		data := flattener.EncodeNode(leafNode1, 0, 0)
-		assert.Equal(t, expectedLeafNode1, data)
+		scratchBuffers := [][]byte{
+			nil,
+			make([]byte, 0),
+			make([]byte, 1024),
+		}
+
+		for _, scratch := range scratchBuffers {
+			data := flattener.EncodeNode(leafNode1, 0, 0, scratch)
+			assert.Equal(t, expectedLeafNode1, data)
+		}
 	})
 
 	t.Run("encode interim node", func(t *testing.T) {
-		data := flattener.EncodeNode(rootNode, 1, 2)
-		assert.Equal(t, expectedRootNode, data)
+		scratchBuffers := [][]byte{
+			nil,
+			make([]byte, 0),
+			make([]byte, 1024),
+		}
+
+		for _, scratch := range scratchBuffers {
+			data := flattener.EncodeNode(rootNode, 1, 2, scratch)
+			assert.Equal(t, expectedRootNode, data)
+		}
 	})
 
 	t.Run("decode leaf node", func(t *testing.T) {
@@ -128,8 +144,16 @@ func TestTrieSerialization(t *testing.T) {
 	}
 
 	t.Run("encode", func(t *testing.T) {
-		data := flattener.EncodeTrie(rootNode, rootNodeIndex)
-		assert.Equal(t, expected, data)
+		scratchBuffers := [][]byte{
+			nil,
+			make([]byte, 0),
+			make([]byte, 1024),
+		}
+
+		for _, scratch := range scratchBuffers {
+			data := flattener.EncodeTrie(rootNode, rootNodeIndex, scratch)
+			assert.Equal(t, expected, data)
+		}
 	})
 
 	t.Run("decode", func(t *testing.T) {

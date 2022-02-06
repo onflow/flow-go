@@ -285,6 +285,13 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 	allRootNodes := make([]*node.Node, len(tries))
 
+	// Scratch buffer is used as temporary buffer that node can encode into.
+	// Data in scratch buffer should be copied or used before scratch buffer is used again.
+	// If the scratch buffer isn't large enough, a new buffer will be allocated.
+	// However, 4096 bytes will be large enough to handle almost all payloads
+	// and 100% of interim nodes.
+	scratch := make([]byte, 1024*4)
+
 	// Serialize all unique nodes
 	nodeCounter := uint64(1) // start from 1, as 0 marks nil
 	for i, t := range tries {
@@ -315,8 +322,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 				}
 			}
 
-			// TODO: reuse scratch buffer for encoding
-			bytes := flattener.EncodeNode(n, lchildIndex, rchildIndex)
+			bytes := flattener.EncodeNode(n, lchildIndex, rchildIndex, scratch)
 			_, err = crc32Writer.Write(bytes)
 			if err != nil {
 				return fmt.Errorf("error while writing node data: %w", err)
@@ -341,8 +347,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
 		}
 
-		// TODO: reuse scratch buffer for encoding
-		bytes := flattener.EncodeTrie(rootNode, rootIndex)
+		bytes := flattener.EncodeTrie(rootNode, rootIndex, scratch)
 		_, err = crc32Writer.Write(bytes)
 		if err != nil {
 			return fmt.Errorf("error while writing trie data: %w", err)

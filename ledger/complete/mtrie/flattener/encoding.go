@@ -29,53 +29,60 @@ const (
 // - payload (4 bytes + n bytes)
 // Encoded leaf node size is 85 bytes (assuming length of hash/path is 32 bytes) +
 // length of encoded payload size.
-// TODO: encode payload more efficiently.
-// TODO: reuse buffer.
+// Scratch buffer is used to avoid allocs.
+// WARNING: The returned buffer is likely to share the same underlying array as
+// the scratch buffer. Caller is responsible for copying or using returned buffer
+// before scratch buffer is used again.
 // TODO: reduce hash size from 2 bytes to 1 byte.
-func encodeLeafNode(n *node.Node) []byte {
+func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
-	hash := n.Hash()
-	path := n.Path()
-	encPayload := encoding.EncodePayloadWithoutPrefix(n.Payload())
+	encPayloadSize := encoding.EncodedPayloadLengthWithoutPrefix(n.Payload())
 
-	buf := make([]byte, 1+2+2+8+2+len(hash)+2+len(path)+4+len(encPayload))
+	encodedNodeSize := 1 + 2 + 2 + 8 + 2 + hash.HashLen + 2 + ledger.PathLen + 4 + encPayloadSize
+
+	if len(scratch) < encodedNodeSize {
+		scratch = make([]byte, encodedNodeSize)
+	}
+
 	pos := 0
 
 	// Encode node type (1 byte)
-	buf[pos] = byte(leafNodeType)
+	scratch[pos] = byte(leafNodeType)
 	pos++
 
 	// Encode height (2-bytes Big Endian)
-	binary.BigEndian.PutUint16(buf[pos:], uint16(n.Height()))
+	binary.BigEndian.PutUint16(scratch[pos:], uint16(n.Height()))
 	pos += 2
 
 	// Encode max depth (2-bytes Big Endian)
-	binary.BigEndian.PutUint16(buf[pos:], n.MaxDepth())
+	binary.BigEndian.PutUint16(scratch[pos:], n.MaxDepth())
 	pos += 2
 
 	// Encode reg count (8-bytes Big Endian)
-	binary.BigEndian.PutUint64(buf[pos:], n.RegCount())
+	binary.BigEndian.PutUint64(scratch[pos:], n.RegCount())
 	pos += 8
 
 	// Encode hash (2-bytes Big Endian for hashValue length and n-bytes hashValue)
-	binary.BigEndian.PutUint16(buf[pos:], uint16(len(hash)))
+	hash := n.Hash()
+	binary.BigEndian.PutUint16(scratch[pos:], uint16(len(hash)))
 	pos += 2
 
-	pos += copy(buf[pos:], hash[:])
+	pos += copy(scratch[pos:], hash[:])
 
 	// Encode path (2-bytes Big Endian for path length and n-bytes path)
-	binary.BigEndian.PutUint16(buf[pos:], uint16(len(path)))
+	path := n.Path()
+	binary.BigEndian.PutUint16(scratch[pos:], uint16(len(path)))
 	pos += 2
 
-	pos += copy(buf[pos:], path[:])
+	pos += copy(scratch[pos:], path[:])
 
 	// Encode payload (4-bytes Big Endian for encoded payload length and n-bytes encoded payload)
-	binary.BigEndian.PutUint32(buf[pos:], uint32(len(encPayload)))
+	binary.BigEndian.PutUint32(scratch[pos:], uint32(encPayloadSize))
 	pos += 4
 
-	copy(buf[pos:], encPayload)
+	scratch = encoding.EncodeAndAppendPayloadWithoutPrefix(n.Payload(), scratch[:pos])
 
-	return buf
+	return scratch
 }
 
 // encodeInterimNode encodes interim node in the following format:
@@ -87,54 +94,65 @@ func encodeLeafNode(n *node.Node) []byte {
 // - rchild index (8 bytes)
 // - hash (2 bytes + 32 bytes)
 // Encoded interim node size is 63 bytes (assuming length of hash is 32 bytes).
-// TODO: reuse buffer.
+// Scratch buffer is used to avoid allocs.
+// WARNING: The returned buffer is likely to share the same underlying array as
+// the scratch buffer. Caller is responsible for copying or using returned buffer
+// before scratch buffer is used again.
 // TODO: reduce hash size from 2 bytes to 1 byte.
-func encodeInterimNode(n *node.Node, lchildIndex uint64, rchildIndex uint64) []byte {
+func encodeInterimNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scratch []byte) []byte {
 
-	hash := n.Hash()
+	encodedNodeSize := 1 + 2 + 2 + 8 + 8 + 8 + 2 + hash.HashLen
 
-	buf := make([]byte, 1+2+2+8+8+8+2+len(hash))
+	if len(scratch) < encodedNodeSize {
+		scratch = make([]byte, encodedNodeSize)
+	}
+
 	pos := 0
 
 	// Encode node type (1-byte)
-	buf[pos] = byte(interimNodeType)
+	scratch[pos] = byte(interimNodeType)
 	pos++
 
 	// Encode height (2-bytes Big Endian)
-	binary.BigEndian.PutUint16(buf[pos:], uint16(n.Height()))
+	binary.BigEndian.PutUint16(scratch[pos:], uint16(n.Height()))
 	pos += 2
 
 	// Encode max depth (2-bytes Big Endian)
-	binary.BigEndian.PutUint16(buf[pos:], n.MaxDepth())
+	binary.BigEndian.PutUint16(scratch[pos:], n.MaxDepth())
 	pos += 2
 
 	// Encode reg count (8-bytes Big Endian)
-	binary.BigEndian.PutUint64(buf[pos:], n.RegCount())
+	binary.BigEndian.PutUint64(scratch[pos:], n.RegCount())
 	pos += 8
 
 	// Encode left child index (8-bytes Big Endian)
-	binary.BigEndian.PutUint64(buf[pos:], lchildIndex)
+	binary.BigEndian.PutUint64(scratch[pos:], lchildIndex)
 	pos += 8
 
 	// Encode right child index (8-bytes Big Endian)
-	binary.BigEndian.PutUint64(buf[pos:], rchildIndex)
+	binary.BigEndian.PutUint64(scratch[pos:], rchildIndex)
 	pos += 8
 
 	// Encode hash (2-bytes Big Endian hashValue length and n-bytes hashValue)
-	binary.BigEndian.PutUint16(buf[pos:], uint16(len(hash)))
+	binary.BigEndian.PutUint16(scratch[pos:], hash.HashLen)
 	pos += 2
 
-	copy(buf[pos:], hash[:])
+	h := n.Hash()
+	pos += copy(scratch[pos:], h[:])
 
-	return buf
+	return scratch[:pos]
 }
 
 // EncodeNode encodes node.
-func EncodeNode(n *node.Node, lchildIndex uint64, rchildIndex uint64) []byte {
+// Scratch buffer is used to avoid allocs.
+// WARNING: The returned buffer is likely to share the same underlying array as
+// the scratch buffer. Caller is responsible for copying or using returned buffer
+// before scratch buffer is used again.
+func EncodeNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scratch []byte) []byte {
 	if n.IsLeaf() {
-		return encodeLeafNode(n)
+		return encodeLeafNode(n, scratch)
 	}
-	return encodeInterimNode(n, lchildIndex, rchildIndex)
+	return encodeInterimNode(n, lchildIndex, rchildIndex, scratch)
 }
 
 // ReadNode reconstructs a node from data read from reader.
@@ -239,8 +257,12 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 }
 
 // EncodeTrie encodes trie root node
-// TODO: reuse buffer
-func EncodeTrie(rootNode *node.Node, rootIndex uint64) []byte {
+// Scratch buffer is used to avoid allocs.
+// WARNING: The returned buffer is likely to share the same underlying array as
+// the scratch buffer. Caller is responsible for copying or using returned buffer
+// before scratch buffer is used again.
+func EncodeTrie(rootNode *node.Node, rootIndex uint64, scratch []byte) []byte {
+
 	// Get root hash
 	var rootHash ledger.RootHash
 	if rootNode == nil {
@@ -249,21 +271,25 @@ func EncodeTrie(rootNode *node.Node, rootIndex uint64) []byte {
 		rootHash = ledger.RootHash(rootNode.Hash())
 	}
 
-	length := 8 + 2 + len(rootHash)
-	buf := make([]byte, length)
+	const encodedTrieSize = 8 + 2 + len(rootHash)
+
+	if len(scratch) < encodedTrieSize {
+		scratch = make([]byte, encodedTrieSize)
+	}
+
 	pos := 0
 
 	// 8-bytes Big Endian uint64 RootIndex
-	binary.BigEndian.PutUint64(buf, rootIndex)
+	binary.BigEndian.PutUint64(scratch, rootIndex)
 	pos += 8
 
 	// Encode hash (2-bytes Big Endian for hashValue length and n-bytes hashValue)
-	binary.BigEndian.PutUint16(buf[pos:], uint16(len(rootHash)))
+	binary.BigEndian.PutUint16(scratch[pos:], uint16(len(rootHash)))
 	pos += 2
 
-	copy(buf[pos:], rootHash[:])
+	pos += copy(scratch[pos:], rootHash[:])
 
-	return buf
+	return scratch[:pos]
 }
 
 // ReadTrie reconstructs a trie from data read from reader.

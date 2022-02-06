@@ -108,14 +108,23 @@ func EncodeKeyPart(kp *ledger.KeyPart) []byte {
 }
 
 func encodeKeyPart(kp *ledger.KeyPart) []byte {
-	buffer := make([]byte, 0)
+	buffer := make([]byte, 0, encodedKeyPartLength(kp))
+	return encodeAndAppendKeyPart(kp, buffer)
+}
 
+func encodeAndAppendKeyPart(kp *ledger.KeyPart, buffer []byte) []byte {
 	// encode "Type" field of the key part
 	buffer = utils.AppendUint16(buffer, kp.Type)
 
 	// encode "Value" field of the key part
 	buffer = append(buffer, kp.Value...)
+
 	return buffer
+}
+
+func encodedKeyPartLength(kp *ledger.KeyPart) int {
+	// Key part is encoded as: type (2 bytes) + value
+	return 2 + len(kp.Value)
 }
 
 // DecodeKeyPart constructs a key part from an encoded key part
@@ -168,19 +177,35 @@ func EncodeKey(k *ledger.Key) []byte {
 
 // encodeKey encodes a key into a byte slice
 func encodeKey(k *ledger.Key) []byte {
-	buffer := make([]byte, 0)
+	buffer := make([]byte, 0, encodedKeyLength(k))
+	return encodeAndAppendKey(k, buffer)
+}
+
+// encodeKey encodes a key into a byte slice
+func encodeAndAppendKey(k *ledger.Key, buffer []byte) []byte {
 	// encode number of key parts
 	buffer = utils.AppendUint16(buffer, uint16(len(k.KeyParts)))
+
 	// iterate over key parts
 	for _, kp := range k.KeyParts {
-		// encode the key part
-		encKP := encodeKeyPart(&kp)
 		// encode the len of the encoded key part
-		buffer = utils.AppendUint32(buffer, uint32(len(encKP)))
-		// append the encoded key part
-		buffer = append(buffer, encKP...)
+		buffer = utils.AppendUint32(buffer, uint32(encodedKeyPartLength(&kp)))
+
+		// encode the key part
+		buffer = encodeAndAppendKeyPart(&kp, buffer)
 	}
+
 	return buffer
+}
+
+func encodedKeyLength(k *ledger.Key) int {
+	// Key is encoded as: number of key parts (2 bytes) and for each key part,
+	// the key part size (4 bytes) + encoded key part (n bytes).
+	size := 2
+	for _, kp := range k.KeyParts {
+		size += 4 + encodedKeyPartLength(&kp)
+	}
+	return size
 }
 
 // DecodeKey constructs a key from an encoded key part
@@ -258,6 +283,14 @@ func encodeValue(v ledger.Value) []byte {
 	return v
 }
 
+func encodeAndAppendValue(v ledger.Value, buffer []byte) []byte {
+	return append(buffer, v...)
+}
+
+func encodedValueLength(v ledger.Value) int {
+	return len(v)
+}
+
 // DecodeValue constructs a ledger value using an encoded byte slice
 func DecodeValue(encodedValue []byte) (ledger.Value, error) {
 	// check enc dec version
@@ -331,37 +364,47 @@ func EncodePayload(p *ledger.Payload) []byte {
 	return buffer
 }
 
-// EncodePayloadWithoutPrefix encodes a ledger payload
-// without prefix (version and type).
-func EncodePayloadWithoutPrefix(p *ledger.Payload) []byte {
+// EncodeAndAppendPayloadWithoutPrefix encodes a ledger payload
+// without prefix (version and type) and appends to buffer.
+func EncodeAndAppendPayloadWithoutPrefix(p *ledger.Payload, buffer []byte) []byte {
 	if p == nil {
 		return []byte{}
 	}
-	return encodePayload(p)
+	return encodeAndAppendPayload(p, buffer)
+}
+
+func EncodedPayloadLengthWithoutPrefix(p *ledger.Payload) int {
+	return encodedPayloadLength(p)
 }
 
 func encodePayload(p *ledger.Payload) []byte {
-	buffer := make([]byte, 0)
+	buffer := make([]byte, 0, encodedPayloadLength(p))
+	return encodeAndAppendPayload(p, buffer)
+}
 
-	// encode key
-	encK := encodeKey(&p.Key)
+func encodeAndAppendPayload(p *ledger.Payload, buffer []byte) []byte {
 
 	// encode encoded key size
-	buffer = utils.AppendUint32(buffer, uint32(len(encK)))
+	buffer = utils.AppendUint32(buffer, uint32(encodedKeyLength(&p.Key)))
 
-	// append encoded key content
-	buffer = append(buffer, encK...)
-
-	// encode value
-	encV := encodeValue(p.Value)
+	// encode key
+	buffer = encodeAndAppendKey(&p.Key, buffer)
 
 	// encode encoded value size
-	buffer = utils.AppendUint64(buffer, uint64(len(encV)))
+	buffer = utils.AppendUint64(buffer, uint64(encodedValueLength(p.Value)))
 
-	// append encoded key content
-	buffer = append(buffer, encV...)
+	// encode value
+	buffer = encodeAndAppendValue(p.Value, buffer)
 
 	return buffer
+}
+
+func encodedPayloadLength(p *ledger.Payload) int {
+	if p == nil {
+		return 0
+	}
+	// Payload is encoded as: encode key length (4 bytes) + encoded key + encoded value length (8 bytes) + encode value
+	return 4 + encodedKeyLength(&p.Key) + 8 + encodedValueLength(p.Value)
 }
 
 // DecodePayload construct a payload from an encoded byte slice
