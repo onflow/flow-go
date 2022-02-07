@@ -12,7 +12,7 @@ func getAccount(
 	vm VirtualMachine,
 	ctx Context,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs programs.Programs,
 	address flow.Address,
 ) (*flow.Account, error) {
 	accounts := state.NewAccounts(sth)

@@ -108,7 +108,7 @@ type balanceProcessor struct {
 	vm            fvm.VirtualMachine
 	ctx           fvm.Context
 	view          state.View
-	prog          *programs.Programs
+	prog          programs.Programs
 	balanceScript []byte
 	momentsScript []byte
 

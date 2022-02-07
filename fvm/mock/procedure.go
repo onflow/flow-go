@@ -17,11 +17,11 @@ type Procedure struct {
 }
 
 // Run provides a mock function with given fields: vm, ctx, sth, _a3
-func (_m *Procedure) Run(vm fvm.VirtualMachine, ctx fvm.Context, sth *state.StateHolder, _a3 *programs.Programs) error {
+func (_m *Procedure) Run(vm fvm.VirtualMachine, ctx fvm.Context, sth *state.StateHolder, _a3 programs.Programs) error {
 	ret := _m.Called(vm, ctx, sth, _a3)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(fvm.VirtualMachine, fvm.Context, *state.StateHolder, *programs.Programs) error); ok {
+	if rf, ok := ret.Get(0).(func(fvm.VirtualMachine, fvm.Context, *state.StateHolder, programs.Programs) error); ok {
 		r0 = rf(vm, ctx, sth, _a3)
 	} else {
 		r0 = ret.Error(0)

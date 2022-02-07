@@ -38,7 +38,7 @@ func (i *TransactionInvoker) Process(
 	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs programs.Programs,
 ) (processErr error) {
 
 	txIDStr := proc.ID.String()

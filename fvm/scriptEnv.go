@@ -60,7 +60,7 @@ func NewScriptEnvironment(
 	ctx Context,
 	vm VirtualMachine,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs programs.Programs,
 ) *ScriptEnv {
 
 	accounts := state.NewAccounts(sth)

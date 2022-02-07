@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
+func NewProgramsHandler(programs programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
 	return &ProgramsHandler{
 		masterState:  stateHolder,
 		viewsStack:   nil,
@@ -34,7 +34,7 @@ type stackEntry struct {
 type ProgramsHandler struct {
 	masterState  *state.StateHolder
 	viewsStack   []stackEntry
-	Programs     *programs.Programs
+	Programs     programs.Programs
 	initialState *state.State
 }
 

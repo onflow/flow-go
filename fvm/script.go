@@ -35,7 +35,7 @@ type ScriptProcedure struct {
 }
 
 type ScriptProcessor interface {
-	Process(VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) error
+	Process(VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, programs.Programs) error
 }
 
 func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
@@ -46,7 +46,7 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
+func (proc *ScriptProcedure) Run(vm VirtualMachine, ctx Context, sth *state.StateHolder, programs programs.Programs) error {
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, proc, sth, programs)
 		txError, failure := errors.SplitErrorTypes(err)
@@ -76,7 +76,7 @@ func (i ScriptInvoker) Process(
 	ctx Context,
 	proc *ScriptProcedure,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs programs.Programs,
 ) error {
 	env := NewScriptEnvironment(ctx, vm, sth, programs)
 	location := common.ScriptLocation(proc.ID[:])

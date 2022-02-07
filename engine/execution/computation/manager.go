@@ -29,8 +29,8 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
-	GetAccount(fvm.Context, flow.Address, state.View, *programs.Programs) (*flow.Account, error)
+	Run(fvm.Context, fvm.Procedure, state.View, programs.Programs) error
+	GetAccount(fvm.Context, flow.Address, state.View, programs.Programs) (*flow.Account, error)
 }
 
 type ComputationManager interface {
@@ -116,7 +116,7 @@ func New(
 	return &e, nil
 }
 
-func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Programs {
+func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) programs.Programs {
 	blockPrograms := e.programsCache.Get(blockID)
 	if blockPrograms == nil {
 		return programs.NewEmptyPrograms()
@@ -218,7 +218,7 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	var blockPrograms *programs.Programs
+	var blockPrograms programs.Programs
 	fromCache := e.programsCache.Get(block.ParentID())
 
 	if fromCache == nil {

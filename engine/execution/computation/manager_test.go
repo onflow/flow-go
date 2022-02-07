@@ -312,11 +312,11 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 
 type PanickingVM struct{}
 
-func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 programs.Programs) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
-func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
+func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 programs.Programs) (*flow.Account, error) {
 	panic("not expected")
 }
 
@@ -324,7 +324,7 @@ type LongRunningVM struct {
 	duration time.Duration
 }
 
-func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 programs.Programs) error {
 	time.Sleep(l.duration)
 	// satisfy value marshaller
 	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
@@ -334,7 +334,7 @@ func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.V
 	return nil
 }
 
-func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
+func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 programs.Programs) (*flow.Account, error) {
 	panic("not expected")
 }
 
@@ -342,7 +342,7 @@ type FakeBlockComputer struct {
 	computationResult *execution.ComputationResult
 }
 
-func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs) (*execution.ComputationResult, error) {
+func (f *FakeBlockComputer) ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, programs.Programs) (*execution.ComputationResult, error) {
 	return f.computationResult, nil
 }
 

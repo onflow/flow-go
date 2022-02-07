@@ -53,7 +53,7 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 }
 
 func (vmt vmTest) run(
-	f func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
+	f func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		rt := fvm.NewInterpreterRuntime()
@@ -195,7 +195,7 @@ func TestPrograms(t *testing.T) {
 	t.Run(
 		"transaction execution programs are committed",
 		newVMTest().run(
-			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 
 				txCtx := fvm.NewContextFromParent(ctx)
 
@@ -236,7 +236,7 @@ func TestPrograms(t *testing.T) {
 
 	t.Run("script execution programs are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
 
@@ -878,7 +878,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -913,7 +913,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -992,7 +992,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 				ctx.MaxStateInteractionSize = 500_000
 
 				// Create an account private key.
@@ -1029,7 +1029,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 				ctx.MaxStateInteractionSize = 500_000
 				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
@@ -1072,7 +1072,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 			),
 		).
 		run(
-			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 				ctx.MaxStateInteractionSize = 500_000
 				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
@@ -1751,7 +1751,7 @@ func TestSignatureVerification(t *testing.T) {
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
-					programs *programs.Programs,
+					programs programs.Programs,
 				) {
 					privateKey, publicKey := createKey()
 					signableMessage, message := createMessage("foo")
@@ -1848,7 +1848,7 @@ func TestSignatureVerification(t *testing.T) {
 					chain flow.Chain,
 					ctx fvm.Context,
 					view state.View,
-					programs *programs.Programs,
+					programs programs.Programs,
 				) {
 					privateKeyA, publicKeyA := createKey()
 					privateKeyB, publicKeyB := createKey()
@@ -2379,7 +2379,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).run(
-		func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+		func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
@@ -2421,7 +2421,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 	).
 		run(
-			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -2459,7 +2459,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).
 		run(
-			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -2504,7 +2504,7 @@ func TestSigningWithTags(t *testing.T) {
 	checkWithTag := func(tag []byte, shouldWork bool) func(t *testing.T) {
 		return newVMTest().
 			run(
-				func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 					// Create an account private key.
 					privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 					require.NoError(t, err)
@@ -2839,8 +2839,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		},
 	}
 
-	runTx := func(tc testCase) func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-		return func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+	runTx := func(tc testCase) func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
+		return func(t *testing.T, vm fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs programs.Programs) {
 			// ==== Create an account ====
 			privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
 

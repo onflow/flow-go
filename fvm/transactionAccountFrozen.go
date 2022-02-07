@@ -20,7 +20,7 @@ func (c *TransactionAccountFrozenChecker) Process(
 	_ *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	_ *programs.Programs,
+	_ programs.Programs,
 ) error {
 	var err error
 	sth.DisableLimitEnforcement()
@@ -69,7 +69,7 @@ func (c *TransactionAccountFrozenEnabler) Process(
 	ctx *Context,
 	proc *TransactionProcedure,
 	_ *state.StateHolder,
-	_ *programs.Programs,
+	_ programs.Programs,
 ) error {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {

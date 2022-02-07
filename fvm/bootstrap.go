@@ -25,7 +25,7 @@ type BootstrapProcedure struct {
 	vm        VirtualMachine
 	ctx       Context
 	sth       *state.StateHolder
-	programs  *programs.Programs
+	programs  programs.Programs
 	accounts  state.Accounts
 	rootBlock *flow.Header
 
@@ -165,7 +165,7 @@ func Bootstrap(
 	return bootstrapProcedure
 }
 
-func (b *BootstrapProcedure) Run(vm VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
+func (b *BootstrapProcedure) Run(vm VirtualMachine, ctx Context, sth *state.StateHolder, programs programs.Programs) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(
 		ctx,

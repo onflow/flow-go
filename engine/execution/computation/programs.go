@@ -25,14 +25,14 @@ func NewProgramsCache(size uint) (*ProgramsCache, error) {
 	}, nil
 }
 
-func (pc *ProgramsCache) Get(blockID flow.Identifier) *programs.Programs {
+func (pc *ProgramsCache) Get(blockID flow.Identifier) programs.Programs {
 	get, ok := pc.cache.Get(blockID)
 	if !ok {
 		return nil
 	}
-	return get.(*programs.Programs)
+	return get.(programs.Programs)
 }
 
-func (pc *ProgramsCache) Set(blockId flow.Identifier, programs *programs.Programs) {
+func (pc *ProgramsCache) Set(blockId flow.Identifier, programs programs.Programs) {
 	pc.cache.Add(blockId, programs)
 }

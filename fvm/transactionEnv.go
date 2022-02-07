@@ -58,7 +58,7 @@ func NewTransactionEnvironment(
 	ctx Context,
 	vm VirtualMachine,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	programs programs.Programs,
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan opentracing.Span,

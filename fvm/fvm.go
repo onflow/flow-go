@@ -21,7 +21,7 @@ import (
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(vm VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
+	Run(vm VirtualMachine, ctx Context, sth *state.StateHolder, programs programs.Programs) error
 }
 
 func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
@@ -49,7 +49,7 @@ type VirtualMachine interface {
 		parentCtx Context,
 		tx *TransactionProcedure,
 		sth *state.StateHolder,
-		programs *programs.Programs,
+		programs programs.Programs,
 	) (errors.Error, error)
 }
 
@@ -66,7 +66,7 @@ func NewVirtualMachine(rt runtime.Runtime) VirtualMachine {
 }
 
 // Run runs a procedure against a ledger in the given context.
-func (vm *virtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
+func (vm *virtualMachine) Run(ctx Context, proc Procedure, v state.View, programs programs.Programs) (err error) {
 
 	st := state.NewState(v,
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
@@ -98,7 +98,7 @@ func (vm *virtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 }
 
 // GetAccount returns an account by address or an error if none exists.
-func (vm *virtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
+func (vm *virtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs programs.Programs) (*flow.Account, error) {
 	st := state.NewState(v,
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
@@ -119,7 +119,7 @@ func (vm *virtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *virtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
+func (vm *virtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, sth *state.StateHolder, programs programs.Programs) (errors.Error, error) {
 	invoker := NewTransactionInvoker(zerolog.Nop())
 
 	// do not deduct fees or check storage in meta transactions

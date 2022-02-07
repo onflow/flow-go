@@ -79,7 +79,7 @@ func (account *TestBenchAccount) DeployContract(b *testing.B, blockExec TestBenc
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
-	programCache          *programs.Programs
+	programCache          programs.Programs
 	activeView            state.View
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain

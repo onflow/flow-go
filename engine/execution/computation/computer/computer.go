@@ -32,7 +32,7 @@ const MaxTransactionErrorStringSize = 1000             // 1000 chars
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
+	Run(fvm.Context, fvm.Procedure, state.View, programs.Programs) error
 }
 
 // ViewCommitter commits views's deltas to the ledger and collects the proofs
@@ -43,7 +43,7 @@ type ViewCommitter interface {
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs) (*execution.ComputationResult, error)
+	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, programs.Programs) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -93,7 +93,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	program *programs.Programs,
+	program programs.Programs,
 ) (*execution.ComputationResult, error) {
 
 	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
@@ -116,7 +116,7 @@ func (e *blockComputer) executeBlock(
 	blockSpan opentracing.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	programs *programs.Programs,
+	programs programs.Programs,
 ) (*execution.ComputationResult, error) {
 
 	// check the start state is set
@@ -235,7 +235,7 @@ func (e *blockComputer) executeSystemCollection(
 	txIndex uint32,
 	systemChunkCtx fvm.Context,
 	collectionView state.View,
-	programs *programs.Programs,
+	programs programs.Programs,
 	res *execution.ComputationResult,
 ) (uint32, error) {
 
@@ -278,7 +278,7 @@ func (e *blockComputer) executeCollection(
 	txIndex uint32,
 	blockCtx fvm.Context,
 	collectionView state.View,
-	programs *programs.Programs,
+	programs programs.Programs,
 	collection *entity.CompleteCollection,
 	res *execution.ComputationResult,
 ) (uint32, error) {
@@ -325,7 +325,7 @@ func (e *blockComputer) executeTransaction(
 	txBody *flow.TransactionBody,
 	colSpan opentracing.Span,
 	collectionView state.View,
-	programs *programs.Programs,
+	programs programs.Programs,
 	ctx fvm.Context,
 	collectionIndex int,
 	txIndex uint32,
