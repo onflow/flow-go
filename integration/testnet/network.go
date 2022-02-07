@@ -183,14 +183,10 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	// that the tests fail due to "port is already allocated"
 
 	cli, err := dockerclient.NewClientWithOpts(dockerclient.FromEnv, dockerclient.WithAPIVersionNegotiation())
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(net.t, err)
 
 	t := net.t
 	t.Logf("%v (%v) before starting flow network, found %v docker container", time.Now().UTC(), t.Name(), len(containers))
@@ -202,9 +198,8 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	net.suite.Start(ctx)
 
 	containers, err = cli.ContainerList(ctx, types.ContainerListOptions{})
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(net.t, err)
+
 	t.Logf("%v (%v after starting flow network, found %v docker container", time.Now().UTC(), t.Name(), len(containers))
 	for _, container := range containers {
 		t.Logf("%v (%v) after starting flow network, found docker container: %v %v", time.Now().UTC(), t.Name(), container.Names, container.Ports)
