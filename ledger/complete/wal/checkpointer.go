@@ -41,6 +41,11 @@ const VersionV4 uint16 = 0x04
 // typical EN hardware.
 const defaultBufioReadSize = 1024 * 8
 
+// defaultBufioWriteSize replaces the default bufio buffer size of 4096 bytes.
+// defaultBufioWriteSize can be increased to 16KiB, 32KiB, etc. if it improves performance on
+// typical EN hardware.
+const defaultBufioWriteSize = 1024 * 8
+
 type Checkpointer struct {
 	dir            string
 	wal            *DiskWAL
@@ -241,7 +246,7 @@ func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error)
 		return nil, fmt.Errorf("cannot create temporary file for checkpoint %v: %w", tmpFile, err)
 	}
 
-	writer := bufio.NewWriter(tmpFile)
+	writer := bufio.NewWriterSize(tmpFile, defaultBufioWriteSize)
 	return &SyncOnCloseRenameFile{
 		file:       tmpFile,
 		targetName: fullname,
