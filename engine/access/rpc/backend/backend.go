@@ -291,12 +291,12 @@ func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int
 			snapshotAtBlock := b.state.AtHeight(segment.Blocks[i].Header.Height)
 			counterAtBlock, err := snapshotAtBlock.Epochs().Current().Counter()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get counter for block %s: %w", segment.Blocks[i].ID(), err)
 			}
 
 			phaseAtBlock, err := snapshotAtBlock.Phase()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get phase for block %s: %w", segment.Blocks[i].ID(), err)
 			}
 
 			if counterAtHighest != counterAtBlock || phaseAtHighest != phaseAtBlock {
