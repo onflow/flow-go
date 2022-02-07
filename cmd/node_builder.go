@@ -116,6 +116,11 @@ type BaseConfig struct {
 	AdminClientCAs                  string
 	BindAddr                        string
 	NodeRole                        string
+	DynamicStartupANAddress         string
+	DynamicStartupANPubkey          string
+	DynamicStartupEpochPhase        string
+	DynamicStartupEpoch             string
+	DynamicStartupSleepInterval     time.Duration
 	datadir                         string
 	secretsdir                      string
 	secretsDBEnabled                bool
@@ -173,12 +178,16 @@ type NodeConfig struct {
 	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
-	RootBlock                     *flow.Block
-	RootQC                        *flow.QuorumCertificate
-	RootResult                    *flow.ExecutionResult
-	RootSeal                      *flow.Seal
-	RootChainID                   flow.ChainID
-	SporkID                       flow.Identifier
+	RootSnapshot protocol.Snapshot
+	// cached properties of RootSnapshot for convenience
+	RootBlock   *flow.Block
+	RootQC      *flow.QuorumCertificate
+	RootResult  *flow.ExecutionResult
+	RootSeal    *flow.Seal
+	RootChainID flow.ChainID
+	SporkID     flow.Identifier
+
+	// bootstrapping options
 	SkipNwAddressBasedValidations bool
 }
 
