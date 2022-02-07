@@ -189,10 +189,10 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	require.NoError(net.t, err)
 
 	t := net.t
-	t.Logf("%v (%v) before starting flow network, found %v docker container", time.Now().UTC(), t.Name(), len(containers))
+	t.Logf("%v (%v) before starting flow network, found %d docker containers", time.Now().UTC(), t.Name(), len(containers))
 
 	for _, container := range containers {
-		t.Logf("%v (%v) before starting flow network, found docker container: %v %v", time.Now().UTC(), t.Name(), container.Names, container.Ports)
+		t.Logf("%v (%v) before starting flow network, found docker container %v with ports %v", time.Now().UTC(), t.Name(), container.Names, container.Ports)
 	}
 
 	net.suite.Start(ctx)
@@ -200,7 +200,7 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	containers, err = cli.ContainerList(ctx, types.ContainerListOptions{})
 	require.NoError(net.t, err)
 
-	t.Logf("%v (%v after starting flow network, found %v docker container", time.Now().UTC(), t.Name(), len(containers))
+	t.Logf("%v (%v) after starting flow network, found %d docker containers", time.Now().UTC(), t.Name(), len(containers))
 	for _, container := range containers {
 		t.Logf("%v (%v) after starting flow network, found docker container: %v %v", time.Now().UTC(), t.Name(), container.Names, container.Ports)
 	}
@@ -590,7 +590,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		}
 	}
 	require.GreaterOrEqualf(t, len(accessNodeIDS), DefaultMinimumNumOfAccessNodeIDS,
-		fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
+		fmt.Sprintf("at least %d access nodes that are not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
 
 	for _, nodeConf := range confs {
 		var nodeType = "real"
