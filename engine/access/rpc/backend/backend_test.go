@@ -161,10 +161,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 
 		// setup AtBlockID mock returns for state
 		for _, height := range epoch1.Range() {
-			snapAtHeight := state.AtHeight(height)
-			head, err := snapAtHeight.Head()
-			require.Nil(suite.T(), err)
-			suite.state.On("AtBlockID", head.ID()).Return(snapAtHeight).Once()
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height)).Once()
 		}
 
 		// Take snapshot at height of block D (epoch1.heights[3]) for valid segment and valid snapshot
@@ -225,11 +222,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 
 		// setup AtBlockID mock returns for state
 		for _, height := range append(epoch1.Range(), epoch2.Range()...) {
-			snapAtHeight := state.AtHeight(height)
-			head, err := snapAtHeight.Head()
-			require.Nil(suite.T(), err)
-
-			suite.state.On("AtBlockID", head.ID()).Return(snapAtHeight)
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
 		}
 
 		// Take snapshot at height of the first block of epoch2, the sealing segment of this snapshot
@@ -288,10 +281,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 
 		// setup AtBlockID mock returns for state
 		for _, height := range epoch1.Range() {
-			snapAtHeight := state.AtHeight(height)
-			head, err := snapAtHeight.Head()
-			require.Nil(suite.T(), err)
-			suite.state.On("AtBlockID", head.ID()).Return(snapAtHeight)
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
 		}
 
 		// Take snapshot at height of block E (epoch1.heights[4]) the sealing segment for this snapshot
@@ -361,10 +351,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 
 		// setup AtBlockID mock returns for state
 		for _, height := range append(epoch1.Range(), epoch2.Range()...) {
-			snapAtHeight := state.AtHeight(height)
-			head, err := snapAtHeight.Head()
-			require.Nil(suite.T(), err)
-			suite.state.On("AtBlockID", head.ID()).Return(snapAtHeight)
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
 		}
 
 		// Take snapshot at the first block of epoch2 . The sealing segment

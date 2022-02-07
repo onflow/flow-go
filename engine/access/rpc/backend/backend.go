@@ -236,14 +236,21 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
+// getValidSnapshot will return a valid snapshot that has a sealing segment which
+// 1. does not contain any blocks that span an epoch transition
+// 2. does not contain any blocks that span an epoch phase transition
+// If a snapshot does contain an invalid sealing segment query the state
+// by height of each block in the segment and return a snapshot at the point
+// where the transition happens.
 func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot) (protocol.Snapshot, error) {
 	segment, err := snapshot.SealingSegment()
 	if err != nil {
 		return nil, err
 	}
 
-	snapshotAtHighest := b.state.AtBlockID(segment.Highest().ID())
-	snapshotAtLowest := b.state.AtBlockID(segment.Lowest().ID())
+	// get snapshots at the highest and lowest blocks in segment for comparison
+	snapshotAtHighest := b.state.AtHeight(segment.Highest().Header.Height)
+	snapshotAtLowest := b.state.AtHeight(segment.Lowest().Header.Height)
 
 	counterAtHighest, err := snapshotAtHighest.Epochs().Current().Counter()
 	if err != nil {
@@ -265,9 +272,11 @@ func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot) (protocol.Snapsho
 		return nil, err
 	}
 
+	// check if any epoch or phase transition occurs, visit each node
+	// in strict order of decreasing height starting at head
 	if counterAtHighest != counterAtLowest || phaseAtHighest != phaseAtLowest {
 		for i := len(segment.Blocks) - 1; i >= 0; i-- {
-			snapshotAtBlock := b.state.AtBlockID(segment.Blocks[i].ID())
+			snapshotAtBlock := b.state.AtHeight(segment.Blocks[i].Header.Height)
 			counterAtBlock, err := snapshotAtBlock.Epochs().Current().Counter()
 			if err != nil {
 				return nil, err
