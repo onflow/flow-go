@@ -28,11 +28,10 @@ func Connect(instances []*Instance) {
 			func(header *flow.Header, delay time.Duration) error {
 
 				// sender should always have the parent
-				parentBlob, exists := sender.headers.Load(header.ParentID)
+				parent, exists := sender.headers[header.ParentID]
 				if !exists {
 					return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", sender.localID, header.ParentID)
 				}
-				parent := parentBlob.(*flow.Header)
 
 				// fill in the header chain ID and height
 				header.ChainID = parent.ChainID
@@ -62,7 +61,7 @@ func Connect(instances []*Instance) {
 						return nil
 					}
 
-					receiver.processBlock(proposal)
+					receiver.ProcessBlock(proposal)
 				}
 
 				return nil

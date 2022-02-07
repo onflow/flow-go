@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
 	"github.com/onflow/flow-go/model/flow"
-	buffer "github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -52,7 +51,7 @@ type Instance struct {
 	queue          chan interface{}
 	updatingBlocks sync.RWMutex
 	headers        map[flow.Identifier]*flow.Header
-	pendings       map[flow.Identifier]*flow.Header // indexed by parent ID
+	pendings       map[flow.Identifier]*model.Proposal // indexed by parent ID
 
 	// mocked dependencies
 	committee    *mocks.Committee
@@ -123,7 +122,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		stop:         cfg.StopCondition,
 
 		// instance data
-		pendings: buffer.NewPendingBlocks(),
+		pendings: make(map[flow.Identifier]*model.Proposal),
+		headers:  make(map[flow.Identifier]*flow.Header),
 		queue:    make(chan interface{}, 1024),
 
 		// instance mocks
@@ -159,8 +159,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
 		func(parentID flow.Identifier, setter func(*flow.Header) error) *flow.Header {
-			in.updatingBlocks.lock()
-			defer in.updatingBlocks.Unlock()
+			in.updatingBlocks.RLock()
+			defer in.updatingBlocks.RUnlock()
 
 			parent, ok := in.headers[parentID]
 			if !ok {
@@ -169,7 +169,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			header := &flow.Header{
 				ChainID:     "chain",
 				ParentID:    parentID,
-				Height:      parent.(*flow.Header).Height + 1,
+				Height:      parent.Height + 1,
 				PayloadHash: unittest.IdentifierFixture(),
 				Timestamp:   time.Now().UTC(),
 			}
@@ -242,13 +242,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 			// sender should always have the parent
 			in.updatingBlocks.RLock()
-			parentBlob, exists := in.headers[header.ParentID]
+			parent, exists := in.headers[header.ParentID]
 			in.updatingBlocks.RUnlock()
 
 			if !exists {
 				return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", in.localID, header.ParentID)
 			}
-			parent := parentBlob.(*flow.Header)
 
 			// set the height and chain ID
 			header.ChainID = parent.ChainID
@@ -258,7 +257,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			proposal := model.ProposalFromFlow(header, parent.View)
 
 			// store locally and loop back to engine for processing
-			in.ProcessProposal(proposal)
+			in.ProcessBlock(proposal)
 
 			return nil
 		},
@@ -277,7 +276,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			if !found {
 				return fmt.Errorf("can't broadcast with unknown parent")
 			}
-			if block.(*flow.Header).Height%100 == 0 {
+			if block.Height%100 == 0 {
 				in.committee.Calls = nil
 				in.builder.Calls = nil
 				in.signer.Calls = nil
@@ -451,21 +450,21 @@ func (in *Instance) Run() error {
 }
 
 func (in *Instance) ProcessBlock(proposal *model.Proposal) {
-	in.updatingBlocks.Lock()
-	defer in.updatingBlocks.Unlock()
-	_, parentExists = in.headers[proposal.Header.ParentID]
-	id := proposal.Header.ID()
+	in.updatingBlocks.RLock()
+	_, parentExists := in.headers[proposal.Block.QC.BlockID]
+	defer in.updatingBlocks.RUnlock()
+
 	if parentExists {
 		next := proposal
 		for next != nil {
-			in.headers[id] = next.Header
+			in.headers[next.Block.BlockID] = model.ProposalToFlow(next)
+
 			in.queue <- next
 			// keep processing the pending blocks
-			next, _ = pendings[next.ParentID]
+			next, _ = in.pendings[next.Block.QC.BlockID]
 		}
 	} else {
-		// orphan, exists := in.pendings[id]
 		// cache it in pendings by ParentID
-		in.pendings[proposal.Header.ParentID] = proposal
+		in.pendings[proposal.Block.QC.BlockID] = proposal
 	}
 }
