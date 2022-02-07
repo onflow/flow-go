@@ -22,7 +22,7 @@ import (
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	vm        *VirtualMachine
+	vm        VirtualMachine
 	ctx       Context
 	sth       *state.StateHolder
 	programs  *programs.Programs
@@ -165,7 +165,7 @@ func Bootstrap(
 	return bootstrapProcedure
 }
 
-func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
+func (b *BootstrapProcedure) Run(vm VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(
 		ctx,

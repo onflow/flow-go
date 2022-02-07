@@ -153,7 +153,7 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
-	vm *fvm.VirtualMachine,
+	vm fvm.VirtualMachine,
 	view state.View,
 	programs *programs.Programs,
 	privateKeys []flow.AccountPrivateKey,
@@ -163,7 +163,7 @@ func CreateAccounts(
 }
 
 func CreateAccountsWithSimpleAddresses(
-	vm *fvm.VirtualMachine,
+	vm fvm.VirtualMachine,
 	view state.View,
 	programs *programs.Programs,
 	privateKeys []flow.AccountPrivateKey,
@@ -232,7 +232,7 @@ func CreateAccountsWithSimpleAddresses(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) state.View {
+func RootBootstrappedLedger(vm fvm.VirtualMachine, ctx fvm.Context) state.View {
 	view := fvmUtils.NewSimpleView()
 	programs := programs.NewEmptyPrograms()
 

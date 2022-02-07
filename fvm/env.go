@@ -8,6 +8,6 @@ import (
 // cadence runtime interface methods to the runtime.
 type Environment interface {
 	Context() *Context
-	VM() *VirtualMachine
+	VM() VirtualMachine
 	runtime.Interface
 }

@@ -35,7 +35,7 @@ var _ Environment = &ScriptEnv{}
 type ScriptEnv struct {
 	ctx                Context
 	sth                *state.StateHolder
-	vm                 *VirtualMachine
+	vm                 VirtualMachine
 	accounts           state.Accounts
 	contracts          *handler.ContractHandler
 	programs           *handler.ProgramsHandler
@@ -52,13 +52,13 @@ func (e *ScriptEnv) Context() *Context {
 	return &e.ctx
 }
 
-func (e *ScriptEnv) VM() *VirtualMachine {
+func (e *ScriptEnv) VM() VirtualMachine {
 	return e.vm
 }
 
 func NewScriptEnvironment(
 	ctx Context,
-	vm *VirtualMachine,
+	vm VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) *ScriptEnv {

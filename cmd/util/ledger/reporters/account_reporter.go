@@ -105,7 +105,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 }
 
 type balanceProcessor struct {
-	vm            *fvm.VirtualMachine
+	vm            fvm.VirtualMachine
 	ctx           fvm.Context
 	view          state.View
 	prog          *programs.Programs

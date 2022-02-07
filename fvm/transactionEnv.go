@@ -33,7 +33,7 @@ var _ runtime.Interface = &TransactionEnv{}
 
 // TransactionEnv is a read-write environment used for executing flow transactions.
 type TransactionEnv struct {
-	vm                 *VirtualMachine
+	vm                 VirtualMachine
 	ctx                Context
 	sth                *state.StateHolder
 	programs           *handler.ProgramsHandler
@@ -56,7 +56,7 @@ type TransactionEnv struct {
 
 func NewTransactionEnvironment(
 	ctx Context,
-	vm *VirtualMachine,
+	vm VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
 	tx *flow.TransactionBody,
@@ -133,7 +133,7 @@ func (e *TransactionEnv) Context() *Context {
 	return &e.ctx
 }
 
-func (e *TransactionEnv) VM() *VirtualMachine {
+func (e *TransactionEnv) VM() VirtualMachine {
 	return e.vm
 }
 
@@ -160,7 +160,7 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())
 	defaultAccounts := []runtime.Address{service}
 
-	value, err := e.vm.Runtime.ReadStored(
+	value, err := e.vm.ReadStored(
 		service,
 		cadence.Path{
 			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,

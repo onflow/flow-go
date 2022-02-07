@@ -34,7 +34,7 @@ func NewTransactionInvoker(logger zerolog.Logger) *TransactionInvoker {
 }
 
 func (i *TransactionInvoker) Process(
-	vm *VirtualMachine,
+	vm VirtualMachine,
 	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
@@ -120,7 +120,7 @@ func (i *TransactionInvoker) Process(
 
 		location := common.TransactionLocation(proc.ID[:])
 
-		err := vm.Runtime.ExecuteTransaction(
+		err := vm.ExecuteTransaction(
 			runtime.Script{
 				Source:    proc.Transaction.Script,
 				Arguments: proc.Transaction.Arguments,

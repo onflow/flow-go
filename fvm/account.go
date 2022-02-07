@@ -9,7 +9,7 @@ import (
 )
 
 func getAccount(
-	vm *VirtualMachine,
+	vm VirtualMachine,
 	ctx Context,
 	sth *state.StateHolder,
 	programs *programs.Programs,

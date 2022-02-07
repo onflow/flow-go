@@ -55,7 +55,7 @@ func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTrace
 
 	predeclaredValues := valueDeclarations(ctx, env)
 
-	value, err := env.VM().Runtime.InvokeContractFunction(
+	value, err := env.VM().InvokeContractFunction(
 		i.contractLocation,
 		i.functionName,
 		i.arguments,

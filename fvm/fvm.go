@@ -7,15 +7,21 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/sema"
 )
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
+	Run(vm VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
 }
 
 func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
@@ -29,20 +35,38 @@ func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
 	)
 }
 
+type VirtualMachine interface {
+	computation.VirtualMachine
+	computer.VirtualMachine
+
+	ExecuteTransaction(script runtime.Script, context runtime.Context) error
+
+	ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error)
+
+	ReadStored(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error)
+
+	invokeMetaTransaction(
+		parentCtx Context,
+		tx *TransactionProcedure,
+		sth *state.StateHolder,
+		programs *programs.Programs,
+	) (errors.Error, error)
+}
+
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
-type VirtualMachine struct {
-	Runtime runtime.Runtime
+type virtualMachine struct {
+	runtime runtime.Runtime
 }
 
 // NewVirtualMachine creates a new virtual machine instance with the provided runtime.
-func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
-	return &VirtualMachine{
-		Runtime: rt,
+func NewVirtualMachine(rt runtime.Runtime) VirtualMachine {
+	return &virtualMachine{
+		runtime: rt,
 	}
 }
 
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
+func (vm *virtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
 
 	st := state.NewState(v,
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
@@ -74,7 +98,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 }
 
 // GetAccount returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
+func (vm *virtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
 	st := state.NewState(v,
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
@@ -95,7 +119,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
+func (vm *virtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
 	invoker := NewTransactionInvoker(zerolog.Nop())
 
 	// do not deduct fees or check storage in meta transactions
@@ -107,4 +131,31 @@ func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *Transacti
 	err := invoker.Process(vm, &ctx, tx, sth, programs)
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 	return txErr, fatalErr
+}
+
+func (vm *virtualMachine) ExecuteTransaction(script runtime.Script, context runtime.Context) error {
+	return vm.runtime.ExecuteTransaction(script, context)
+}
+
+func (vm *virtualMachine) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
+	return vm.runtime.ExecuteScript(script, context)
+}
+
+func (vm *virtualMachine) InvokeContractFunction(
+	contractLocation common.AddressLocation,
+	functionName string,
+	arguments []interpreter.Value,
+	argumentTypes []sema.Type,
+	context runtime.Context,
+) (cadence.Value, error) {
+	return vm.runtime.InvokeContractFunction(
+		contractLocation,
+		functionName,
+		arguments,
+		argumentTypes, context,
+	)
+}
+
+func (vm *virtualMachine) ReadStored(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+	return vm.runtime.ReadStored(address, path, context)
 }

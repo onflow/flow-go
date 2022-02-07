@@ -16,7 +16,7 @@ func NewTransactionAccountFrozenChecker() *TransactionAccountFrozenChecker {
 }
 
 func (c *TransactionAccountFrozenChecker) Process(
-	_ *VirtualMachine,
+	_ VirtualMachine,
 	_ *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
@@ -65,7 +65,7 @@ func NewTransactionAccountFrozenEnabler() *TransactionAccountFrozenEnabler {
 }
 
 func (c *TransactionAccountFrozenEnabler) Process(
-	_ *VirtualMachine,
+	_ VirtualMachine,
 	ctx *Context,
 	proc *TransactionProcedure,
 	_ *state.StateHolder,

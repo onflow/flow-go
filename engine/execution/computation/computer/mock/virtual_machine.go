@@ -17,7 +17,7 @@ type VirtualMachine struct {
 }
 
 // Run provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *VirtualMachine) Run(_a0 fvm.Context, _a1 fvm.Procedure, _a2 state.View, _a3 *programs.Programs) error {
+func (_m VirtualMachine) Run(_a0 fvm.Context, _a1 fvm.Procedure, _a2 state.View, _a3 *programs.Programs) error {
 	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 error

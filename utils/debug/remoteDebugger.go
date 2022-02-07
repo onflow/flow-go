@@ -10,7 +10,7 @@ import (
 )
 
 type RemoteDebugger struct {
-	vm          *fvm.VirtualMachine
+	vm          fvm.VirtualMachine
 	ctx         fvm.Context
 	grpcAddress string
 }

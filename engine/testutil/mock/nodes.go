@@ -199,7 +199,7 @@ type ExecutionNode struct {
 	SyncEngine          *synchronization.Engine
 	DiskWAL             *wal.DiskWAL
 	BadgerDB            *badger.DB
-	VM                  *fvm.VirtualMachine
+	VM                  fvm.VirtualMachine
 	ExecutionState      state.ExecutionState
 	Ledger              ledger.Ledger
 	LevelDbDir          string
