@@ -172,7 +172,9 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
+	headerID := proposal.Header.ID()
+
+	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), headerID, trace.FollowerOnBlockProposal)
 	defer span.Finish()
 
 	header := proposal.Header
@@ -181,7 +183,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
+		Hex("block_id", headerID[:]).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
@@ -199,14 +201,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// 3) blocks at a height below finalized height; they can not be finalized
 
 	// ignore proposals that are already cached
-	_, cached := e.pending.ByID(header.ID())
+	_, cached := e.pending.ByID(headerID)
 	if cached {
 		log.Debug().Msg("skipping already cached proposal")
 		return nil
 	}
 
 	// ignore proposals that were already processed
-	_, err := e.headers.ByBlockID(header.ID())
+	_, err := e.headers.ByBlockID(headerID)
 	if err == nil {
 		log.Debug().Msg("skipping already processed proposal")
 		return nil

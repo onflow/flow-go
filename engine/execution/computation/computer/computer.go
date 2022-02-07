@@ -352,10 +352,12 @@ func (e *blockComputer) executeTransaction(
 	}
 	defer txInternalSpan.Finish()
 
+	resExecutableBlockID := res.ExecutableBlock.ID()
+
 	e.log.Info().
 		Str("tx_id", txID.String()).
 		Uint32("tx_index", txIndex).
-		Str("block_id", res.ExecutableBlock.ID().String()).
+		Str("block_id", resExecutableBlockID.String()).
 		Uint64("height", res.ExecutableBlock.Block.Header.Height).
 		Bool("system_chunk", isSystemChunk).
 		Msg("executing transaction in fvm")
@@ -370,7 +372,7 @@ func (e *blockComputer) executeTransaction(
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction %v for block %v at height %v: %w",
 			txID.String(),
-			res.ExecutableBlock.ID(),
+			resExecutableBlockID[:],
 			res.ExecutableBlock.Block.Header.Height,
 			err)
 	}
@@ -412,7 +414,7 @@ func (e *blockComputer) executeTransaction(
 
 	lg := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).
-		Str("block_id", res.ExecutableBlock.ID().String()).
+		Str("block_id", resExecutableBlockID.String()).
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
