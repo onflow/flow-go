@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
@@ -27,7 +28,7 @@ const (
 func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRecorder, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	router, err := newRouter(backend, logger)
+	router, err := newRouter(backend, logger, flow.Canary.Chain())
 	if err != nil {
 		return nil, err
 	}

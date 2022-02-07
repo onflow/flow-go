@@ -69,8 +69,8 @@ func WithTTL(ttl time.Duration) optFunc {
 }
 
 const (
-	numIPAddrLookupWorkers = 4
-	numTxtLookupWorkers    = 4
+	numIPAddrLookupWorkers = 16
+	numTxtLookupWorkers    = 16
 	ipAddrLookupQueueSize  = 64
 	txtLookupQueueSize     = 64
 )

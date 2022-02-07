@@ -65,7 +65,7 @@ The following table lists all work streams and links to their home directory and
 
 ### Install Dependencies
 
-- Install [Go](https://golang.org/doc/install) (Flow supports Go 1.13 and later)
+- Install [Go](https://golang.org/doc/install) (Flow supports Go 1.16 and later)
 - Install [CMake](https://cmake.org/install/), which is used for building the crypto library
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running
   a local network and integration tests
