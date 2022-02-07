@@ -2,10 +2,12 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -16,6 +18,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/util"
 
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
@@ -134,33 +139,264 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 }
 
-func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
-	// setup the snapshot mock
-	snap := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
-	suite.state.On("Final").Return(snap).Once()
+// TestGetLatestProtocolStateSnapshot_NoTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the sealing segment for the state requested at latest finalized  block does not contain any blocks that
+// spans an epoch or epoch phase transition.
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// blocks in current state
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) | <- E(S_C) <- F(S_D) | <- G(S_E)
+		// 						                     setup		           commit
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
 
-	backend := New(
-		suite.state,
-		nil, nil, nil, nil,
-		nil, nil, nil, nil,
-		suite.chainID,
-		metrics.NewNoopCollector(),
-		nil,
-		false,
-		100,
-		nil,
-		nil,
-		suite.log,
-	)
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
 
-	// query the handler for the latest finalized snapshot
-	bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
-	suite.Require().NoError(err)
+		// setup AtBlockID mock returns for state
+		for _, height := range epoch1.Range() {
+			snapAtHeight := state.AtHeight(height)
+			head, err := snapAtHeight.Head()
+			require.Nil(suite.T(), err)
+			suite.state.On("AtBlockID", head.ID()).Return(snapAtHeight).Once()
+		}
 
-	// make sure the returned bytes is equal to the serialized snapshot
-	convertedSnapshot, err := convert.SnapshotToBytes(snap)
-	suite.Require().NoError(err)
-	suite.Require().Equal(bytes, convertedSnapshot)
+		// Take snapshot at height of block D (epoch1.heights[3]) for valid segment and valid snapshot
+		// where it's sealing segment is B <- C <- D
+		snap := state.AtHeight(epoch1.Range()[3])
+		suite.state.On("Final").Return(snap).Once()
+
+		backend := New(
+			suite.state,
+			nil, nil, nil, nil,
+			nil, nil, nil, nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			100,
+			nil,
+			nil,
+			suite.log,
+		)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return the snapshot at the same height we requested
+		// because it has a valid sealing segment with no blocks spanning an epoch or phase transition
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetLatestProtocolStateSnapshot_TransitionSpans tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the sealing segment for the state requested for latest finalized block  contains a block that
+// spans an epoch transition and blocks that span epoch phase transitions.
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+
+		// building 2 epochs allows us to take a snapshot at a point in time where
+		// an epoch transition happens
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+		epoch2, ok := epochBuilder.EpochHeights(2)
+		require.True(suite.T(), ok)
+
+		// setup AtBlockID mock returns for state
+		for _, height := range append(epoch1.Range(), epoch2.Range()...) {
+			snapAtHeight := state.AtHeight(height)
+			head, err := snapAtHeight.Head()
+			require.Nil(suite.T(), err)
+
+			suite.state.On("AtBlockID", head.ID()).Return(snapAtHeight)
+		}
+
+		// Take snapshot at height of the first block of epoch2, the sealing segment of this snapshot
+		// will have contain block spanning an epoch transition as well as an epoch phase transition.
+		// This will cause our GetLatestProtocolStateSnapshot func to return a snapshot
+		// at block with height 3, the first block of the staking phase of epoch1.
+
+		snap := state.AtHeight(epoch2.Range()[0])
+		suite.state.On("Final").Return(snap).Once()
+
+		backend := New(
+			suite.state,
+			nil, nil, nil, nil,
+			nil, nil, nil, nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			100,
+			nil,
+			nil,
+			suite.log,
+		)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().NoError(err)
+		fmt.Println()
+
+		// we expect the endpoint to return last valid snapshot which is the snapshot at block D (height 3)
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[3]))
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the sealing segment for the state requested at latest finalized  block contains a blocks that
+// spans an epoch phase transition.
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// blocks in current state
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) | <- E(S_C) <- F(S_D) | <- G(S_E)
+		// 						                     setup		           commit
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// setup AtBlockID mock returns for state
+		for _, height := range epoch1.Range() {
+			snapAtHeight := state.AtHeight(height)
+			head, err := snapAtHeight.Head()
+			require.Nil(suite.T(), err)
+			suite.state.On("AtBlockID", head.ID()).Return(snapAtHeight)
+		}
+
+		// Take snapshot at height of block E (epoch1.heights[4]) the sealing segment for this snapshot
+		// is C(S_A) <- D(S_B) |setup| <- E(S_C) which spans the epoch setup phase. This will force
+		// our RPC endpoint to return a snapshot at block D which is the snapshot at the boundary where the phase
+		// transition happens.
+		snap := state.AtHeight(epoch1.Range()[4])
+		suite.state.On("Final").Return(snap).Once()
+
+		backend := New(
+			suite.state,
+			nil, nil, nil, nil,
+			nil, nil, nil, nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			100,
+			nil,
+			nil,
+			suite.log,
+		)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return last valid snapshot which is the snapshot at block D (height 3)
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[3]))
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetLatestProtocolStateSnapshot_EpochTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the sealing segment for the state requested at latest finalized  block contains a blocks that
+// spans an epoch transition.
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// blocks in current state
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) | <- E(S_C) <- F(S_D) | <- G(S_E)
+		// 						                     setup		           commit
+		epochBuilder.BuildEpoch()
+
+		// add more blocks to our state in the commit phase, this will allow
+		// us to take a snapshot at the height where the epoch1 -> epoch2 transition
+		// and no block spans an epoch phase transition. The third block added will
+		// have a seal for the first block in the commit phase allowing us to avoid
+		// spanning an epoch phase transition.
+		epochBuilder.AddBlocksWithSeals(3, 1)
+		epochBuilder.CompleteEpoch()
+
+		// Now we build our second epoch
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+		epoch2, ok := epochBuilder.EpochHeights(2)
+		require.True(suite.T(), ok)
+
+		// setup AtBlockID mock returns for state
+		for _, height := range append(epoch1.Range(), epoch2.Range()...) {
+			snapAtHeight := state.AtHeight(height)
+			head, err := snapAtHeight.Head()
+			require.Nil(suite.T(), err)
+			suite.state.On("AtBlockID", head.ID()).Return(snapAtHeight)
+		}
+
+		// Take snapshot at the first block of epoch2 . The sealing segment
+		// for this snapshot contains a block (highest) that spans the epoch1 -> epoch2
+		// transition.
+		snap := state.AtHeight(epoch2.Range()[0])
+		suite.state.On("Final").Return(snap).Once()
+
+		backend := New(
+			suite.state,
+			nil, nil, nil, nil,
+			nil, nil, nil, nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			100,
+			nil,
+			nil,
+			suite.log,
+		)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return last valid snapshot which is the snapshot at the final block
+		// of the previous epoch
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[len(epoch1.Range())-1]))
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
 }
 
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
