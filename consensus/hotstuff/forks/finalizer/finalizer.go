@@ -122,7 +122,7 @@ func (r *Finalizer) IsSafeBlock(block *model.Block) bool {
 	return false
 }
 
-// ProcessBlock adds `block` to the consensus state.
+// AddBlock adds `block` to the consensus state.
 // Calling this method with previously-processed blocks leaves the consensus state invariant
 // (though, it will potentially cause some duplicate processing).
 // UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)

@@ -23,8 +23,6 @@ var (
 	DuplicatedVoteErr = errors.New("duplicated vote")
 )
 
-/******************************* NoopProcessor *******************************/
-
 // NoopProcessor implements hotstuff.VoteProcessor. It drops all votes.
 type NoopProcessor struct {
 	status hotstuff.VoteCollectorStatus
@@ -37,19 +35,41 @@ func NewNoopCollector(status hotstuff.VoteCollectorStatus) *NoopProcessor {
 func (c *NoopProcessor) Process(*model.Vote) error            { return nil }
 func (c *NoopProcessor) Status() hotstuff.VoteCollectorStatus { return c.status }
 
-/************************ enforcing vote is for block ************************/
+// ConflictingProposalError indicates that a conflicting block for
+// the same view has already been ingested.
+type ConflictingProposalError struct {
+	ConflictingBlock *model.Block
+	err              error
+}
 
-// EnsureVoteForBlock verifies that the vote is for the given block.
-// Returns nil on success and sentinel errors:
-//  * model.VoteForIncompatibleViewError if the vote is from a different view than block
-//  * model.VoteForIncompatibleBlockError if the vote is from the same view as block
-//    but for a different blockID
-func EnsureVoteForBlock(vote *model.Vote, block *model.Block) error {
-	if vote.View != block.View {
-		return fmt.Errorf("vote %v has view %d while block's view is %d: %w ", vote.ID(), vote.View, block.View, VoteForIncompatibleViewError)
+func (e ConflictingProposalError) Error() string {
+	return e.err.Error()
+}
+
+// IsConflictingProposalError returns whether err is a ConflictingProposalError
+func IsConflictingProposalError(err error) bool {
+	var e ConflictingProposalError
+	return errors.As(err, &e)
+}
+
+// AsConflictingProposalError determines whether the given error is a ConflictingProposalError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsConflictingProposalError(err error) (*ConflictingProposalError, bool) {
+	var e ConflictingProposalError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
 	}
-	if vote.BlockID != block.BlockID {
-		return fmt.Errorf("expecting only votes for block %v, but vote %v is for block %v: %w ", block.BlockID, vote.ID(), vote.BlockID, VoteForIncompatibleBlockError)
+	return nil, false
+}
+
+func (e ConflictingProposalError) Unwrap() error {
+	return e.err
+}
+
+func NewConflictingProposalErrorf(conflictingBlock *model.Block, msg string, args ...interface{}) error {
+	return ConflictingProposalError{
+		ConflictingBlock: conflictingBlock,
+		err:              fmt.Errorf(msg, args...),
 	}
-	return nil
 }

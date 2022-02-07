@@ -20,7 +20,7 @@ type NoVoteError struct {
 
 func (e NoVoteError) Error() string { return e.Msg }
 
-// IsNoVoteError returns whether an error is NoVoteError
+// IsNoVoteError returns whether an err is a NoVoteError
 func IsNoVoteError(err error) bool {
 	var e NoVoteError
 	return errors.As(err, &e)
@@ -59,7 +59,7 @@ func (e MissingBlockError) Error() string {
 	return fmt.Sprintf("missing Block at view %d with ID %v", e.View, e.BlockID)
 }
 
-// IsMissingBlockError returns whether an error is MissingBlockError
+// IsMissingBlockError returns whether err is a MissingBlockError
 func IsMissingBlockError(err error) bool {
 	var e MissingBlockError
 	return errors.As(err, &e)
@@ -76,7 +76,7 @@ func (e InvalidBlockError) Error() string {
 	return fmt.Sprintf("invalid block %x at view %d: %s", e.BlockID, e.View, e.Err.Error())
 }
 
-// IsInvalidBlockError returns whether an error is InvalidBlockError
+// IsInvalidBlockError returns whether err is an InvalidBlockError
 func IsInvalidBlockError(err error) bool {
 	var e InvalidBlockError
 	return errors.As(err, &e)
@@ -105,7 +105,7 @@ func (e InvalidVoteError) Error() string {
 	return fmt.Sprintf("invalid vote %x for view %d: %s", e.VoteID, e.View, e.Err.Error())
 }
 
-// IsInvalidVoteError returns whether an error is InvalidVoteError
+// IsInvalidVoteError returns whether err is an InvalidVoteError
 func IsInvalidVoteError(err error) bool {
 	var e InvalidVoteError
 	return errors.As(err, &e)
@@ -139,7 +139,7 @@ func (e DoubleVoteError) Error() string {
 	return e.err.Error()
 }
 
-// IsDoubleVoteError returns whether an error is DoubleVoteError
+// IsDoubleVoteError returns whether err is a DoubleVoteError
 func IsDoubleVoteError(err error) bool {
 	var e DoubleVoteError
 	return errors.As(err, &e)
@@ -186,7 +186,7 @@ func (e InconsistentVoteError) Error() string {
 	return e.err.Error()
 }
 
-// IsInconsistentVoteError returns whether an error is InconsistentVoteError
+// IsInconsistentVoteError returns whether err is an InconsistentVoteError
 func IsInconsistentVoteError(err error) bool {
 	var e InconsistentVoteError
 	return errors.As(err, &e)

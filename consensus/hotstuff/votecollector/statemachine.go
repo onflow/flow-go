@@ -275,6 +275,108 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 	}
 }
 
+// processBlockHappyPath implements the happy path of ingesting the proposal for this specific view.
+//
+// performs validation of block signature and processes block with respected collector.
+// In case we have received double proposal, we will stop attempting to build a QC for this view,
+// because we don't want to build on any proposal from an equivocating primary. Note: slashing challenges
+// for proposal equivocation are triggered by hotstuff.Forks, so we don't have to do anything else here.
+// Expected returns during normal operations:
+//  * nil if the proposer's vote, included in the proposal, is valid.
+//  * model.InvalidBlockError if the proposer's vote is invalid.
+//  * model.DoubleVoteError if the proposer has voted for a block other than the given proposal.
+//  * model.InconsistentVoteError if the proposer has emitted inconsistent votes for their proposal.
+//    This sentinel error is only relevant for voting schemes, where the voting replica has different
+//    options for signing (e.g. replica can sign with their staking key and/or their random beacon key).
+//    For such voting schemes, byzantine replicas could try to submit different votes for the same block,
+//    to exhaust the primary's resources or have multiple of their votes counted to undermine consensus
+//    safety. Sending inconsistent votes belongs to the family of equivocation attacks.
+// All other errors should be treated as exceptions.
+//
+// PREREQUISITES:
+//  1. The origin of the proposal is cryptographically verified (via the sender's networking key).
+//     Otherwise, VoteCollector is vulnerable to impersonation attacks.
+//  2. Here, we only check the proposer's vote. All other aspects of the block proposal must already
+//     be validated. Otherwise, VoteCollector is vulnerable to constructing a QC for an invalid block.
+func (m *VoteCollector) processBlockHappyPath(proposal *model.Proposal) error {
+	// IMPLEMENTATION: the internal state change is implemented as an atomic compare-and-swap,
+	// i.e. the state transition is only executed if VoteCollector's internal state is
+	// equal to `expectedValue`. The implementation only allows the transitions
+	//         CachingVotes   -> VerifyingVotes
+	//         CachingVotes   -> Invalid
+	//         VerifyingVotes -> Invalid
+
+	// Cache proposer's vote for their own block
+	// Note: receiving a DuplicatedVoteErr is _not_ enough to skip processing the block entirely.
+	// Consider the situation where we receive a vote from the proposer for their own block, where
+	// the vote arrives as a stand-alone message _before_ the block. While such vote is redundant
+	// information, it is not a protocol violation. The implementation should still accept the bock.
+	err := m.votesCache.AddVote(proposal.ProposerVote()) // only accepts votes for pre-configured view; errors otherwise
+	if err != nil && !errors.Is(err, DuplicatedVoteErr) {
+		return fmt.Errorf("caching proposer vote of block %v failed: %w", proposal.Block.BlockID, err)
+	}
+
+	for {
+		proc := m.atomicLoadProcessor()
+
+		switch proc.Status() {
+		// first valid block for this view: commence state transition from caching to verifying
+		case hotstuff.VoteCollectorStatusCaching:
+			err = m.caching2Verifying(proposal)
+			if err != nil {
+				if errors.Is(err, ErrDifferentCollectorState) {
+					continue // concurrent state update by other thread => restart our logic
+				}
+				return fmt.Errorf("VoteProcessor transition from %s to %s failed for block %v: %w",
+					proc.Status().String(), hotstuff.VoteCollectorStatusVerifying.String(), proposal.Block.BlockID, err)
+			}
+			m.log.Info().
+				Hex("block_id", proposal.Block.BlockID[:]).
+				Msg("vote collector status changed from caching to verifying")
+
+			m.processCachedVotes()
+
+		// We already received a valid block for this view. Check whether the proposer is
+		// equivocating and terminate vote processing in this case. Note: proposal equivocation
+		// is handled by hotstuff.Forks, so we don't have to do anything else here.
+		case hotstuff.VoteCollectorStatusVerifying:
+			verifyingProc, ok := proc.(hotstuff.VerifyingVoteProcessor)
+			if !ok {
+				return fmt.Errorf("while processing block %v, VoteProcessor reports status %s but has an incompatible implementation type %T",
+					proposal.Block.BlockID, proc.Status(), verifyingProc)
+			}
+			if verifyingProc.Block().BlockID != proposal.Block.BlockID {
+				// We have found two conflicting blocks in the same view. Before raising a slashing
+				return NewConflictingProposalErrorf(verifyingProc.Block())
+			}
+			return nil
+
+			// We have found two conflicting blocks in the same view. Before raising a slashing
+			// challenge, we do some sanity checks:
+			// 1. We assume that there is only one _legitimate_ primary per view. If blocks are from
+			//    different proposers, one must be invalid purely by the fact that the node is not
+			//    primary. Per API contract, the proposal should have been validated in all aspects
+			//    other than the proposer signature, which includes checking that the proposer is a
+			//    legitimate primary for this view.
+			if verifyingProc.Block().ProposerID != proposal.Block.ProposerID {
+
+			}
+			// sanity check:
+			model.NewDoubleProposalErrorf(verifyingProc.Block(), proposal.Block, "")
+			m.terminateVoteProcessing()
+
+		// Vote processing for this view has already been terminated. Note: proposal equivocation
+		// is handled by hotstuff.Forks, so we don't have anything to do here.
+		case hotstuff.VoteCollectorStatusInvalid: /* no op */
+
+		default:
+			return fmt.Errorf("while processing block %v, found that VoteProcessor reported unknown status %s", proposal.Block.BlockID, proc.Status())
+		}
+
+		return nil
+	}
+}
+
 // RegisterVoteConsumer registers a VoteConsumer. Upon registration, the collector
 // feeds all cached votes into the consumer in the order they arrived.
 // CAUTION, VoteConsumer implementations must be
@@ -322,7 +424,7 @@ func (m *VoteCollector) terminateVoteProcessing() {
 }
 
 // processCachedVotes feeds all cached votes into the VoteProcessor
-func (m *VoteCollector) processCachedVotes(block *model.Block) {
+func (m *VoteCollector) processCachedVotes() {
 	for _, vote := range m.votesCache.All() {
 		blockVote := vote
 		voteProcessingTask := func() {
@@ -333,4 +435,9 @@ func (m *VoteCollector) processCachedVotes(block *model.Block) {
 		}
 		m.workers.Submit(voteProcessingTask)
 	}
+}
+
+// processCachedVotes feeds all cached votes into the VoteProcessor
+func (m *VoteCollector) raiseDouble() {
+
 }
