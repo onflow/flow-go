@@ -71,7 +71,7 @@ type Broker struct {
 	messageOffset             uint                       // offset for next broadcast messages to fetch
 	shutdownCh                chan struct{}              // channel to stop the broker from listening
 
-	broadcasts uint // broadcasts counts the number of successful broadcasts
+	broadcasts uint // broadcasts counts the number of attempted broadcasts
 
 	broadcastLock sync.Mutex // protects access to broadcasts count variable
 	pollLock      sync.Mutex // lock around polls to read inbound broadcasts

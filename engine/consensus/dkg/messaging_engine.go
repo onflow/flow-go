@@ -19,11 +19,12 @@ import (
 
 // retryMax is the maximum number of times the engine will attempt to forward
 // a message before permanently giving up.
-const retryMax = 9
+const retryMax = 10
 
 // retryBaseWait is the duration to wait between the two first tries.
-// With 10 attempts, this will retry for about 8m before giving up.
-const retryBaseWait = time.Second
+// With 10 attempts and Fibonacci backoff, this will retry for about
+// 10m before giving up.
+const retryBaseWait = 5 * time.Second
 
 // MessagingEngine is a network engine that enables DKG nodes to exchange
 // private messages over the network.
