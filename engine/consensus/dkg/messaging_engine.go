@@ -19,12 +19,15 @@ import (
 
 // retryMax is the maximum number of times the engine will attempt to forward
 // a message before permanently giving up.
-const retryMax = 10
+const retryMax = 9
 
 // retryBaseWait is the duration to wait between the two first tries.
-// With 10 attempts and Fibonacci backoff, this will retry for about
-// 10m before giving up.
-const retryBaseWait = 5 * time.Second
+// With 9 attempts and exponential backoff, this will retry for about
+// 8m before giving up.
+const retryBaseWait = 1 * time.Second
+
+// retryJitterPct is the percent jitter to add to each inter-retry wait.
+const retryJitterPct = 25
 
 // MessagingEngine is a network engine that enables DKG nodes to exchange
 // private messages over the network.
@@ -158,14 +161,15 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 // DKG message to a single other DKG participant, on a best effort basis.
 func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessageOut) {
 	e.unit.Launch(func() {
-		expRetry, err := retry.NewFibonacci(retryBaseWait)
+		backoff, err := retry.NewExponential(retryBaseWait)
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 		}
+		backoff = retry.WithMaxRetries(retryMax, backoff)
+		backoff = retry.WithJitterPercent(retryJitterPct, backoff)
 
-		maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
 		attempts := 1
-		err = retry.Do(e.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
+		err = retry.Do(e.unit.Ctx(), backoff, func(ctx context.Context) error {
 			err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
 			if err != nil {
 				e.log.Warn().Err(err).Msgf("error sending dkg message retrying (%d)", attempts)
