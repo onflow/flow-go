@@ -163,23 +163,23 @@ func (b *Broker) Broadcast(data []byte) {
 			log.Fatal().Err(err).Msg("failed to create broadcast message")
 		}
 
-		expRetry, err := retry.NewExponential(b.config.RetryInitialWait)
+		backoff, err := retry.NewExponential(b.config.RetryInitialWait)
 		if err != nil {
 			log.Fatal().Err(err).Msg("create retry mechanism")
 		}
-		maxedExpRetry := retry.WithMaxRetries(b.config.PublishMaxRetries, expRetry)
-		withJitter := retry.WithJitterPercent(b.config.RetryJitterPct, maxedExpRetry)
+		backoff = retry.WithMaxRetries(b.config.PublishMaxRetries, backoff)
+		backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
 		clientIndex, dkgContractClient := b.getInitialContractClient()
 		onMaxConsecutiveRetries := func(totalAttempts int) {
 			clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
 			log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 		}
-		afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
+		backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
 		b.broadcastLock.Lock()
 		attempts := 1
-		err = retry.Do(b.unit.Ctx(), afterConsecutiveFailures, func(ctx context.Context) error {
+		err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 			err := dkgContractClient.Broadcast(bcastMsg)
 			if err != nil {
 				log.Error().Err(err).Msgf("error broadcasting, retrying (attempt %d)", attempts)
@@ -206,22 +206,22 @@ func (b *Broker) Broadcast(data []byte) {
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
 func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
-	expRetry, err := retry.NewExponential(b.config.RetryInitialWait)
+	backoff, err := retry.NewExponential(b.config.RetryInitialWait)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
-	maxedExpRetry := retry.WithMaxRetries(b.config.PublishMaxRetries, expRetry)
-	withJitter := retry.WithJitterPercent(b.config.RetryJitterPct, maxedExpRetry)
+	backoff = retry.WithMaxRetries(b.config.PublishMaxRetries, backoff)
+	backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
 	clientIndex, dkgContractClient := b.getInitialContractClient()
 	onMaxConsecutiveRetries := func(totalAttempts int) {
 		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
 		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
-	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
+	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
 	attempts := 1
-	err = retry.Do(b.unit.Ctx(), afterConsecutiveFailures, func(ctx context.Context) error {
+	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 		err := dkgContractClient.SubmitResult(pubKey, groupKeys)
 		if err != nil {
 			b.log.Error().Err(err).Msgf("error submitting DKG result, retrying (attempt %d)", attempts)
@@ -276,23 +276,23 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	b.pollLock.Lock()
 	defer b.pollLock.Unlock()
 
-	expRetry, err := retry.NewExponential(b.config.RetryInitialWait)
+	backoff, err := retry.NewExponential(b.config.RetryInitialWait)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
-	maxedExpRetry := retry.WithMaxRetries(b.config.ReadMaxRetries, expRetry)
-	withJitter := retry.WithJitterPercent(b.config.RetryJitterPct, maxedExpRetry)
+	backoff = retry.WithMaxRetries(b.config.ReadMaxRetries, backoff)
+	backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
 	clientIndex, dkgContractClient := b.getInitialContractClient()
 	onMaxConsecutiveRetries := func(totalAttempts int) {
 		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
 		b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
-	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
+	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
 	var msgs []messages.BroadcastDKGMessage
 	attempt := 1
-	err = retry.Do(b.unit.Ctx(), afterConsecutiveFailures, func(ctx context.Context) error {
+	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 		msgs, err = dkgContractClient.ReadBroadcast(b.messageOffset, referenceBlock)
 		if err != nil {
 			err = fmt.Errorf("could not read broadcast messages (attempt: %d, offset: %d, ref: %v): %w", attempt, b.messageOffset, referenceBlock, err)
