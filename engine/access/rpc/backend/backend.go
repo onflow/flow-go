@@ -32,9 +32,9 @@ const maxAttemptsForExecutionReceipt = 3
 // DefaultMaxHeightRange is the default maximum size of range requests.
 const DefaultMaxHeightRange = 250
 
-// ProtocolSnapshotLookBackLimit the amount of blocks to look back in state
+// snapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
-const protocolSnapshotLookBackLimit = 50
+const snapshotHistoryLimit = 50
 
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
@@ -247,7 +247,7 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 // by height of each block in the segment and return a snapshot at the point
 // where the transition happens.
 func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int) (protocol.Snapshot, error) {
-	if blocksVisited > protocolSnapshotLookBackLimit {
+	if blocksVisited > snapshotHistoryLimit {
 		return nil, fmt.Errorf("failed to get valid snapshot reached look back limit ")
 	}
 
