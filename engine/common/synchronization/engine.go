@@ -291,10 +291,19 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	e.log.Debug().Str("origin_id", originID.String()).Msg("received block response")
 	// process the blocks one by one
+	if len(res.Blocks) == 0 {
+		e.log.Debug().Msg("received empty block response")
+		return
+	}
+
+	first := res.Blocks[0].Header.Height
+	last := res.Blocks[len(res.Blocks)-1].Header.Height
+	e.log.Debug().Uint64("first", first).Uint64("last", last).Msg("received block response")
+
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
+			e.log.Debug().Uint64("height", block.Header.Height).Msg("block handler rejected")
 			continue
 		}
 		synced := &events.SyncedBlock{
