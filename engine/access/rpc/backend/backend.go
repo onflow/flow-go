@@ -32,10 +32,14 @@ const maxAttemptsForExecutionReceipt = 3
 // DefaultMaxHeightRange is the default maximum size of range requests.
 const DefaultMaxHeightRange = 250
 
+// ProtocolSnapshotLookBackLimit the amount of blocks to look back in state
+// when recursively searching for a valid snapshot
+const protocolSnapshotLookBackLimit = 50
+
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
 
-// Backends implements the Access API.
+// Backend implements the Access API.
 //
 // It is composed of several sub-backends that implement part of the Access API.
 //
@@ -228,7 +232,7 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
 	snapshot := b.state.Final()
 
-	validSnapshot, err := b.getValidSnapshot(snapshot)
+	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +246,11 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 // If a snapshot does contain an invalid sealing segment query the state
 // by height of each block in the segment and return a snapshot at the point
 // where the transition happens.
-func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot) (protocol.Snapshot, error) {
+func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int) (protocol.Snapshot, error) {
+	if blocksVisited > protocolSnapshotLookBackLimit {
+		return nil, fmt.Errorf("failed to get valid snapshot reached look back limit ")
+	}
+
 	segment, err := snapshot.SealingSegment()
 	if err != nil {
 		return nil, err
@@ -276,6 +284,7 @@ func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot) (protocol.Snapsho
 	// in strict order of decreasing height starting at head
 	if counterAtHighest != counterAtLowest || phaseAtHighest != phaseAtLowest {
 		for i := len(segment.Blocks) - 1; i >= 0; i-- {
+			blocksVisited++
 			snapshotAtBlock := b.state.AtHeight(segment.Blocks[i].Header.Height)
 			counterAtBlock, err := snapshotAtBlock.Epochs().Current().Counter()
 			if err != nil {
@@ -288,7 +297,8 @@ func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot) (protocol.Snapsho
 			}
 
 			if counterAtHighest != counterAtBlock || phaseAtHighest != phaseAtBlock {
-				return b.getValidSnapshot(snapshotAtBlock)
+				fmt.Println(blocksVisited)
+				return b.getValidSnapshot(snapshotAtBlock, blocksVisited)
 			}
 		}
 	}
