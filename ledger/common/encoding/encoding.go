@@ -541,9 +541,6 @@ func DecodeTrieUpdate(encodedTrieUpdate []byte) (*ledger.TrieUpdate, error) {
 
 func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 
-	paths := make([]ledger.Path, 0)
-	payloads := make([]*ledger.Payload, 0)
-
 	// decode root hash
 	rhSize, rest, err := utils.ReadUint16(inp)
 	if err != nil {
@@ -571,6 +568,9 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 
+	paths := make([]ledger.Path, numOfPaths)
+	payloads := make([]*ledger.Payload, numOfPaths)
+
 	var path ledger.Path
 	var encPath []byte
 	for i := 0; i < int(numOfPaths); i++ {
@@ -582,7 +582,7 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		paths = append(paths, path)
+		paths[i] = path
 	}
 
 	var payloadSize uint32
@@ -602,7 +602,7 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		payloads = append(payloads, payload)
+		payloads[i] = payload
 	}
 	return &ledger.TrieUpdate{RootHash: rh, Paths: paths, Payloads: payloads}, nil
 }
@@ -737,7 +737,8 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	interims := make([]hash.Hash, 0)
+
+	interims := make([]hash.Hash, interimsLen)
 
 	var interimSize uint16
 	var interim hash.Hash
@@ -758,7 +759,7 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
 
-		interims = append(interims, interim)
+		interims[i] = interim
 	}
 	pInst.Interims = interims
 
