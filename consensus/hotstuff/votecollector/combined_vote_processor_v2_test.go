@@ -932,11 +932,11 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 	qc, err := buildQCWithPackerAndSigData(packer, block, blockSigData)
 	require.NoError(t, err)
 
-	indices := []uint32{1, 2, 3, 4}
-	randomSource, err := seed.FromParentSignature(indices, qc.SigData)
+	customizer := []byte{1, 2, 3, 4}
+	randomSource, err := seed.FromParentSignature(customizer, qc.SigData)
 	require.NoError(t, err)
 
-	randomSourceAgain, err := seed.FromParentSignature(indices, qc.SigData)
+	randomSourceAgain, err := seed.FromParentSignature(customizer, qc.SigData)
 	require.NoError(t, err)
 
 	// verify the randomness is deterministic

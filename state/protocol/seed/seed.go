@@ -1,7 +1,6 @@
 package seed
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/packer"
@@ -11,7 +10,7 @@ import (
 // FromParentSignature reads the raw random seed from a main consensus QC sigData.
 // The sigData is an RLP encoded structure that is part of QuorumCertificate.
 // The indices can be used to generate task-specific seeds from the same signature.
-func FromParentSignature(indices []uint16, sigData []byte) ([]byte, error) {
+func FromParentSignature(indices []byte, sigData []byte) ([]byte, error) {
 	// unpack sig data to extract random beacon sig
 	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
 	if err != nil {
@@ -22,17 +21,15 @@ func FromParentSignature(indices []uint16, sigData []byte) ([]byte, error) {
 }
 
 // FromRandomSource generates a task-specific seed (task is determined by indices).
-func FromRandomSource(customizer []uint16, sor []byte) ([]byte, error) {
+func FromRandomSource(customizer []byte, sor []byte) ([]byte, error) {
 
 	// create the key used for the KMAC by concatenating all indices
-	keyLen := 2 * len(customizer)
+	keyLen := len(customizer)
 	if keyLen < hash.KmacMinKeyLen {
 		keyLen = hash.KmacMinKeyLen
 	}
 	key := make([]byte, keyLen)
-	for i, index := range customizer {
-		binary.LittleEndian.PutUint16(key[2*i:2*i+2], index)
-	}
+	copy(key, customizer)
 
 	// create a KMAC instance with our key and 32 bytes output size
 	kmac, err := hash.NewKMAC_128(key, nil, 32)

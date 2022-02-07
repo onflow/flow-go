@@ -64,9 +64,9 @@ type Epoch interface {
 	// RandomSource returns the underlying random source of this epoch.
 	RandomSource() ([]byte, error)
 
-	// Seed generates a random seed using the source of randomness for this
+	// Seed extracts a seed using the source of randomness for this
 	// epoch, specified in the EpochSetup service event.
-	Seed(indices ...uint32) ([]byte, error)
+	Seed([]byte) ([]byte, error)
 
 	// InitialIdentities returns the identities for this epoch as they were
 	// specified in the EpochSetup service event.

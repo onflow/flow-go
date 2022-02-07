@@ -19,7 +19,7 @@ func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch initial identities: %w", err)
 	}
-	seed, err := epoch.Seed(indices.ProtocolConsensusLeaderSelection...)
+	seed, err := epoch.Seed(indices.ProtocolConsensusLeaderSelection)
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch seed: %w", err)
 	}

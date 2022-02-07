@@ -97,7 +97,7 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 
 func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
 	// TODO: seed could be cached to optimize performance
-	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...) // potentially returns NoValidChildBlockError
+	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment) // potentially returns NoValidChildBlockError
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve source of randomness: %w", err)
 	}

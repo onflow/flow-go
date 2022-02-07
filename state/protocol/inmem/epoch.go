@@ -32,8 +32,8 @@ func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
 }
 func (e Epoch) RandomSource() ([]byte, error) { return e.enc.RandomSource, nil }
 
-func (e Epoch) Seed(indices ...uint16) ([]byte, error) {
-	return seed.FromRandomSource(indices, e.enc.RandomSource)
+func (e Epoch) Seed(customizer []byte) ([]byte, error) {
+	return seed.FromRandomSource(customizer, e.enc.RandomSource)
 }
 
 func (e Epoch) Clustering() (flow.ClusterList, error) {
@@ -134,8 +134,8 @@ func (es *setupEpoch) RandomSource() ([]byte, error) {
 	return es.setupEvent.RandomSource, nil
 }
 
-func (es *setupEpoch) Seed(indices ...uint16) ([]byte, error) {
-	return seed.FromRandomSource(indices, es.setupEvent.RandomSource)
+func (es *setupEpoch) Seed(customizer []byte) ([]byte, error) {
+	return seed.FromRandomSource(customizer, es.setupEvent.RandomSource)
 }
 
 // committedEpoch is an implementation of protocol.Epoch backed by an EpochSetup

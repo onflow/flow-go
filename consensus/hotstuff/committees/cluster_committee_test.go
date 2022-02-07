@@ -55,8 +55,8 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.cluster.On("Members").Return(suite.members)
 	suite.cluster.On("RootBlock").Return(suite.root)
 	suite.epoch.On("Counter").Return(counter, nil)
-	inds := indices.ProtocolCollectorClusterLeaderSelection(suite.cluster.Index())
-	suite.epoch.On("Seed", inds[0], inds[1], inds[2]).Return(unittest.SeedFixture(32), nil)
+	customizer := indices.ProtocolCollectorClusterLeaderSelection(suite.cluster.Index())
+	suite.epoch.On("Seed", customizer).Return(unittest.SeedFixture(32), nil)
 
 	var err error
 	suite.com, err = NewClusterCommittee(

@@ -82,14 +82,14 @@ type Snapshot interface {
 
 	// Seed returns a deterministic seed for a pseudo random number generator.
 	// The seed is derived from the source of randomness for the Head block.
-	// In order to deterministically derive task specific seeds, indices must
-	// be specified. Refer to module/indices/rand.go for different indices.
+	// In order to deterministically derive task specific seeds, customizer must
+	// be specified. Refer to module/indices/rand.go for different customizers.
 	// NOTE: not to be confused with the epoch source of randomness!
 	// error returns:
 	//  * NoValidChildBlockError indicates that no valid child block is known
 	//    (which contains the block's source of randomness)
 	//  * unexpected errors should be considered symptoms of internal bugs
-	Seed(indices ...uint32) ([]byte, error)
+	Seed(customizer []byte) ([]byte, error)
 
 	// Phase returns the epoch phase for the current epoch, as of the Head block.
 	Phase() (flow.EpochPhase, error)

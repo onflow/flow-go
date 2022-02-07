@@ -116,7 +116,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	result := a.CreateResult(head, 4, a.T())
 	seed := a.HashResult(result, a.T())
 
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	snapshot.On("Seed", mock.Anything).Return(seed, nil)
 
 	// creates random ids
 	count := 10
@@ -159,7 +159,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	// create seed
 	result := a.CreateResult(head, 4, a.T())
 	seed := a.HashResult(result, a.T())
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	snapshot.On("Seed", mock.Anything).Return(seed, nil)
 
 	// creates random ids
 	count := 10
@@ -196,7 +196,7 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	// create seed
 	result := a.CreateResult(head, c, a.T())
 	seed := a.HashResult(result, a.T())
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	snapshot.On("Seed", mock.Anything).Return(seed, nil)
 
 	// creates two set of the same nodes
 	nodes1 := unittest.IdentityListFixture(n)
@@ -263,7 +263,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 
 	result := a.CreateResult(head, chunkNum, a.T())
 	seed := a.HashResult(result, a.T())
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	snapshot.On("Seed", mock.Anything).Return(seed, nil)
 
 	// creates nodes and keeps a copy of them
 	nodes := unittest.IdentityListFixture(verNum)
@@ -290,7 +290,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 
 	result := a.CreateResult(head, 20, a.T())
 	seed := a.HashResult(result, a.T())
-	snapshot.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(seed, nil)
+	snapshot.On("Seed", mock.Anything).Return(seed, nil)
 
 	// creates nodes and keeps a copy of them
 	nodes := unittest.IdentityListFixture(5)

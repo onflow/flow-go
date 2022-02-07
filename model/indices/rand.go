@@ -4,9 +4,9 @@ import "encoding/binary"
 
 var (
 	// ProtocolConsensusLeaderSelection is the indices for consensus leader selection
-	ProtocolConsensusLeaderSelection = []uint16{0, 1, 1}
+	ProtocolConsensusLeaderSelection = customizerFromIndices([]uint16{0, 1, 1})
 	// ProtocolVerificationChunkAssignment is the indices for verification nodes determines chunk assignment
-	ProtocolVerificationChunkAssignment = []uint16{0, 2, 0}
+	ProtocolVerificationChunkAssignment = customizerFromIndices([]uint16{0, 2, 0})
 )
 
 // list of customizers used for different sub-protocol PRNGs.
@@ -22,17 +22,19 @@ var (
 )
 
 // ProtocolCollectorClusterLeaderSelection returns the indices for the leader selection for the i-th collector cluster
-func ProtocolCollectorClusterLeaderSelection(clusterIndex uint) []uint16 {
-	return append([]uint16{0, 0}, uint16(clusterIndex))
+func ProtocolCollectorClusterLeaderSelection(clusterIndex uint) []byte {
+	indices := append([]uint16{0, 0}, uint16(clusterIndex))
+	return customizerFromIndices(indices)
 }
 
 // ExecutionChunk returns the indices for i-th chunk
-func ExecutionChunk(chunkIndex uint16) []uint16 {
-	return append([]uint16{1}, chunkIndex)
+func ExecutionChunk(chunkIndex uint16) []byte {
+	indices := append([]uint16{1}, chunkIndex)
+	return customizerFromIndices(indices)
 }
 
 // customizerFromIndices maps the input indices into a slice of bytes.
-// The implementation insures no collision of mapping of different indices.
+// The implementation insures there are no collisions of mapping of different indices.
 //
 // The output is built as a concatenation of indices, each index encoded over 2 bytes.
 // (the implementation could be updated to map the indices differently depending on the

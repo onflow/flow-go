@@ -407,10 +407,10 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	return descendantIDs, nil
 }
 
-// Seed returns the random seed at the given indices for the current block snapshot.
+// Seed returns the seed for the current block snapshot using the input customizer.
 // Expected error returns:
 // * state.NoValidChildBlockError if no valid child is known
-func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
+func (s *Snapshot) Seed(customizer []byte) ([]byte, error) {
 
 	// CASE 1: for the root block, generate the seed from the root qc
 	root, err := s.state.Params().Root()
@@ -425,7 +425,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
 		}
 
-		seed, err := seed.FromParentSignature(indices, rootQC.SigData)
+		seed, err := seed.FromParentSignature(customizer, rootQC.SigData)
 		if err != nil {
 			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
 		}
@@ -439,7 +439,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
 	}
 
-	seed, err := seed.FromParentSignature(indices, child.ParentVoterSigData)
+	seed, err := seed.FromParentSignature(customizer, child.ParentVoterSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
 	}

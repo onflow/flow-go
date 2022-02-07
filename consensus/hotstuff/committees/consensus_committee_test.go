@@ -283,11 +283,6 @@ func newMockEpoch(
 	// return nil error to indicate the epoch is committed
 	epoch.On("DKG").Return(nil, nil)
 
-	var params []interface{}
-	for _, ind := range indices.ProtocolConsensusLeaderSelection {
-		params = append(params, ind)
-	}
-	epoch.On("Seed", params...).Return(seed, nil)
-
+	epoch.On("Seed", indices.ProtocolConsensusLeaderSelection).Return(seed, nil)
 	return epoch
 }

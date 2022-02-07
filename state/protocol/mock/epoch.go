@@ -255,19 +255,13 @@ func (_m *Epoch) RandomSource() ([]byte, error) {
 	return r0, r1
 }
 
-// Seed provides a mock function with given fields: indices
-func (_m *Epoch) Seed(indices ...uint32) ([]byte, error) {
-	_va := make([]interface{}, len(indices))
-	for _i := range indices {
-		_va[_i] = indices[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
+// Seed provides a mock function with given fields: _a0
+func (_m *Epoch) Seed(_a0 []byte) ([]byte, error) {
+	ret := _m.Called(_a0)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(...uint32) []byte); ok {
-		r0 = rf(indices...)
+	if rf, ok := ret.Get(0).(func([]byte) []byte); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -275,8 +269,8 @@ func (_m *Epoch) Seed(indices ...uint32) ([]byte, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(...uint32) error); ok {
-		r1 = rf(indices...)
+	if rf, ok := ret.Get(1).(func([]byte) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
