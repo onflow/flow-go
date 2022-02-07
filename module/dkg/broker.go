@@ -205,7 +205,20 @@ func (b *Broker) Broadcast(data []byte) {
 }
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
-func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
+func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
+
+	// If the DKG failed locally, we will get a nil key vector here. We need to convert
+	// the nil slice to a slice of nil keys before submission.
+	//
+	// In general, if pubKeys does not have one key per participant, we cannot submit
+	// a valid result - therefore we submit a nil vector (indicating that we have
+	// completed the process, but we know that we don't have a valid result).
+	if len(pubKeys) != len(b.committee) {
+		b.log.Warn().Msgf("submitting dkg result with incomplete key vector (len=%d, expected=%d)", len(pubKeys), len(b.committee))
+		// create a key vector with one nil entry for each committee member
+		pubKeys = make([]crypto.PublicKey, len(b.committee))
+	}
+
 	backoff, err := retry.NewExponential(b.config.RetryInitialWait)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
@@ -222,7 +235,7 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 
 	attempts := 1
 	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
-		err := dkgContractClient.SubmitResult(pubKey, groupKeys)
+		err := dkgContractClient.SubmitResult(groupKey, pubKeys)
 		if err != nil {
 			b.log.Error().Err(err).Msgf("error submitting DKG result, retrying (attempt %d)", attempts)
 			attempts++
