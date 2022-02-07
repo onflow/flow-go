@@ -104,7 +104,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	// submit signed transaction to node
-	c.Log.Info().Msg("sending Broadcast transaction")
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending Broadcast transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
@@ -226,7 +226,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
-	c.Log.Info().Msg("sending SubmitResult transaction")
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
