@@ -105,6 +105,15 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 	if height > final.Height {
 		c.mu.Lock()
 		defer c.mu.Unlock()
+
+		// limit to request up to 2*MaxSize blocks from the peer.
+		// without this limit, then if we are falling far behind,
+		// we would queue up too many heights.
+		heightLimit := final.Height + 2*uint64(c.Config.MaxSize)
+		if height > heightLimit {
+			height = heightLimit
+		}
+
 		for h := final.Height + 1; h <= height; h++ {
 			c.requeueHeight(h)
 		}

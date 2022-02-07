@@ -12,7 +12,6 @@ type TransactionSignature flow.TransactionSignature
 
 func (s *TransactionSignature) Parse(
 	rawAddress string,
-	rawSignerIndex string,
 	rawKeyIndex string,
 	rawSignature string,
 ) error {
@@ -20,11 +19,6 @@ func (s *TransactionSignature) Parse(
 	err := address.Parse(rawAddress)
 	if err != nil {
 		return err
-	}
-
-	sigIndex, err := util.ToUint64(rawSignerIndex)
-	if err != nil {
-		return fmt.Errorf("invalid signer index: %w", err)
 	}
 
 	keyIndex, err := util.ToUint64(rawKeyIndex)
@@ -39,10 +33,9 @@ func (s *TransactionSignature) Parse(
 	}
 
 	*s = TransactionSignature(flow.TransactionSignature{
-		Address:     address.Flow(),
-		SignerIndex: int(sigIndex),
-		KeyIndex:    keyIndex,
-		Signature:   signature,
+		Address:   address.Flow(),
+		KeyIndex:  keyIndex,
+		Signature: signature,
 	})
 
 	return nil
@@ -58,7 +51,7 @@ func (t *TransactionSignatures) Parse(rawSigs []models.TransactionSignature) err
 	signatures := make([]TransactionSignature, len(rawSigs))
 	for i, sig := range rawSigs {
 		var signature TransactionSignature
-		err := signature.Parse(sig.Address, sig.SignerIndex, sig.KeyIndex, sig.Signature)
+		err := signature.Parse(sig.Address, sig.KeyIndex, sig.Signature)
 		if err != nil {
 			return err
 		}

@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Request a convenience wrapper around the http request to make it easy to read request query params
@@ -14,6 +15,7 @@ type Request struct {
 	*http.Request
 	ExpandFields map[string]bool
 	selectFields []string
+	Chain        flow.Chain
 }
 
 func (rd *Request) GetScriptRequest() (GetScript, error) {
@@ -117,9 +119,10 @@ func (rd *Request) GetQueryParams(name string) []string {
 
 // Decorate takes http request and applies functions to produce our custom
 // request object decorated with values we need
-func Decorate(r *http.Request) *Request {
+func Decorate(r *http.Request, chain flow.Chain) *Request {
 	decoratedReq := &Request{
 		Request: r,
+		Chain:   chain,
 	}
 
 	if expandFields, found := middleware.GetFieldsToExpand(r); found {

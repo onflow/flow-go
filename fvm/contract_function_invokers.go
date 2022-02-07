@@ -143,3 +143,36 @@ func AccountStorageCapacityInvocation(
 		return invoker.Invoke(env, traceSpan)
 	}
 }
+
+var useContractAuditVoucherInvocationArgumentTypes = []sema.Type{
+	&sema.AddressType{},
+	sema.StringType,
+}
+
+// UseContractAuditVoucherInvocation prepares a function that can use a contract deployment audit voucher
+func UseContractAuditVoucherInvocation(
+	env Environment,
+	traceSpan opentracing.Span,
+) func(address common.Address, code string) (bool, error) {
+	return func(address common.Address, code string) (bool, error) {
+		invoker := NewTransactionContractFunctionInvoker(
+			common.AddressLocation{
+				Address: common.Address(env.Context().Chain.ServiceAddress()),
+				Name:    systemcontracts.ContractDeploymentAudits,
+			},
+			systemcontracts.ContractDeploymentAuditsFunction_useVoucherForDeploy,
+			[]interpreter.Value{
+				interpreter.NewAddressValue(address),
+				interpreter.NewStringValue(code),
+			},
+			useContractAuditVoucherInvocationArgumentTypes,
+			env.Context().Logger,
+		)
+		resultCdc, err := invoker.Invoke(env, traceSpan)
+		if err != nil {
+			return false, err
+		}
+		result := resultCdc.(cadence.Bool).ToGoValue().(bool)
+		return result, nil
+	}
+}
