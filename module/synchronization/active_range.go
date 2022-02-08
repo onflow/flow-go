@@ -1,11 +1,14 @@
 package synchronization
 
 import (
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
-// TODO: replace WithinTolerance with something
+// TODO: replace WithinTolerance with something/
+// Maybe we can just check that if the active range is too small,
+// we prioritize batch requests instead?
 
 type ActiveRange struct {
 	minResponses     uint
@@ -78,7 +81,7 @@ func (a *ActiveRange) rangeEnd() uint64 {
 	return end
 }
 
-func (a *ActiveRange) Update(startHeight uint64, blockIDs []flow.Identifier, originID flow.Identifier) {
+func (a *ActiveRange) Update(startHeight uint64, blockIDs []flow.Identifier, originID peer.ID) {
 	rangeEnd := a.rangeEnd()
 
 	for i, _ := range blockIDs {
