@@ -204,6 +204,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  prevResults,
 		Seals:    sealsForPrev,
 	})
+
 	builder.addBlock(B)
 
 	// create a receipt for block B, to be included in block C
@@ -403,11 +404,6 @@ func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBui
 		seal := Seal.Fixture(
 			Seal.WithResult(a.Payload.Results[0]),
 		)
-		block.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{receiptB.Meta()},
-			Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
-			Seals:    []*flow.Seal{seal},
-		})
 
 		payload := PayloadFixture(
 			WithReceipts(receiptB),
