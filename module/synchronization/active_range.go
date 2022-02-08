@@ -78,16 +78,19 @@ func (a *ActiveRange) rangeEnd() uint64 {
 	return end
 }
 
-func (a *ActiveRange) Update(headers []flow.Header, originID flow.Identifier) {
+func (a *ActiveRange) Update(startHeight uint64, blockIDs []flow.Identifier, originID flow.Identifier) {
 	rangeEnd := a.rangeEnd()
 
-	for _, header := range headers {
-		if header.Height >= a.pendingStart && header.Height <= rangeEnd {
-			a.numResponses[header.Height]++
+	for i, _ := range blockIDs {
+		height := startHeight + uint64(i)
+		if height >= a.pendingStart && height <= rangeEnd {
+			a.numResponses[height]++
 
-			if header.Height == a.pendingStart && a.numResponses[header.Height] >= a.minResponses {
-				delete(a.numResponses, header.Height)
-				a.pendingStart++
+			if height == a.pendingStart {
+				for a.numResponses[a.pendingStart] >= a.minResponses {
+					delete(a.numResponses, height)
+					a.pendingStart++
+				}
 			}
 		}
 	}
