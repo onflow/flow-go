@@ -13,6 +13,8 @@ type TransactionResult struct {
 
 	Status *TransactionStatus `json:"status"`
 
+	StatusCode int32 `json:"status_code"`
+
 	ErrorMessage string `json:"error_message"`
 
 	ComputationUsed string `json:"computation_used"`

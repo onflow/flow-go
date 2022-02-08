@@ -6,13 +6,13 @@ Usually it's easy to tell from the error message. However, there might be errors
 
 How do we know which test case is failing if the error isn't clear about it?
 
-Using log.
+Using the log messages.
 
-Usually when tests are passing, no log will be printed. But when the tests is failing, _all_ logs for the failed tests in that package will be printed.
+Usually when tests are passing, no logs will be printed. But when the tests are failing, _all_ logs for the failed tests in that package will be printed.
 
-In order to use log, they must be printed in a way that is easy to reason about.
+In order to use log messages to debug, they must be printed in a way that is easy to reason about.
 
-If logs are printed in pairs, one at the entrance and the other at the exit of a test case, then if we find both logs, it means the test case has passed; if we only find the entrance log line, but no log for the exit, it means the test case must have failed.
+It is useful if logs are printed in pairs at the start and at the end of a test case.  Then when debugging a test case you can search for the start and end log for that test case, any logs in between will be for that test case only.  If we only find the entrance log line, but no log for the exit, it means the test case must have failed.
 
 In order to easily find the log for the entrance and exit of a test case, I'm using the following logs:
 
@@ -50,6 +50,5 @@ func (s *Suite) TearDownTest() {
 }
 ```
 
-Why adding timestamp to the log?
 
-Because golang will reorder logs if the tests were run without the `-v` flag. When `-v` is not specified, golang will cache the logs and print them only if the test case fails. However, the logs from docker container will not be reordered, this makes it hard to reason about with the logs. Adding timestamp is not the perfect solution to it, but at least provides data to reason about.
+The reason why we add a timestamp to the logs is because golang will reorder logs if the tests were run without the `-v` flag. When `-v` is not specified, golang will cache the logs and print them only if the test case fails. However, the logs from docker container will not be reordered, this makes it hard to reason about with the logs. Adding timestamp is not the perfect solution to it, but at least provides data to reason about.
