@@ -461,7 +461,7 @@ func (in *Instance) ProcessBlock(proposal *model.Proposal) {
 
 			in.queue <- next
 			// keep processing the pending blocks
-			next, _ = in.pendings[next.Block.QC.BlockID]
+			next = in.pendings[next.Block.QC.BlockID]
 		}
 	} else {
 		// cache it in pendings by ParentID
