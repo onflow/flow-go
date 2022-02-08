@@ -43,7 +43,7 @@ type Programs interface {
 	Cleanup(changedContracts []ContractUpdateKey)
 }
 
-// Programs is a cumulative cache-like storage for Programs helping speed up execution of Cadence
+// Programs is a cumulative cache-like storage for Programs helping speed up execution of Cadence.
 // Programs don't evict elements at will, like a typical cache would, but it does it only
 // during a cleanup method, which must be called only when the Cadence execution has finished.
 // It is also fork-aware, support cheap creation of children capturing local changes.

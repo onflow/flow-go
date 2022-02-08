@@ -7,8 +7,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -36,14 +34,23 @@ func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
 }
 
 type VirtualMachine interface {
-	computation.VirtualMachine
-	computer.VirtualMachine
+	Run(ctx Context, proc Procedure, v state.View, programs programs.Programs) (err error)
+
+	GetAccount(ctx Context, address flow.Address, v state.View, programs programs.Programs) (*flow.Account, error)
 
 	ExecuteTransaction(script runtime.Script, context runtime.Context) error
 
 	ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error)
 
 	ReadStored(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error)
+
+	InvokeContractFunction(
+		contractLocation common.AddressLocation,
+		functionName string,
+		arguments []interpreter.Value,
+		argumentTypes []sema.Type,
+		context runtime.Context,
+	) (cadence.Value, error)
 
 	invokeMetaTransaction(
 		parentCtx Context,
