@@ -262,12 +262,15 @@ func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int
 		return nil, fmt.Errorf("failed to get counter and phase at lowest block in the segment: %w", err)
 	}
 
-	// check if any epoch or phase transition occurs, visit each node
-	// in strict order of decreasing height starting at head
-	if counterAtHighest != counterAtLowest || phaseAtHighest != phaseAtLowest {
+	// Check if the counters and phase are different this indicates that the sealing segment
+	// of the snapshot requested spans either an epoch transition or phase transition.
+	if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtLowest, phaseAtHighest, phaseAtLowest) {
+		// Visit each node in strict order of decreasing height starting at head
+		// to find the block that straddles the transition boundary.
 		for i := len(segment.Blocks) - 1; i >= 0; i-- {
 			blocksVisited++
-			// NOTE: check if we have reached our history limit, in edge cases
+
+			// NOTE: Check if we have reached our history limit, in edge cases
 			// where the sealing segment is abnormally long we want to short circuit
 			// the recursive calls and return an error. The API caller can retry.
 			if blocksVisited > snapshotHistoryLimit {
@@ -279,7 +282,9 @@ func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int
 				return nil, fmt.Errorf("failed to get epoch counter and phase for snapshot at block %s: %w", segment.Blocks[i].ID(), err)
 			}
 
-			if counterAtHighest != counterAtBlock || phaseAtHighest != phaseAtBlock {
+			// Check if this block straddles the transition boundary, if it does return the snapshot
+			// at that block height.
+			if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtBlock, phaseAtHighest, phaseAtBlock) {
 				return b.getValidSnapshot(b.state.AtHeight(segment.Blocks[i].Header.Height), blocksVisited)
 			}
 		}
@@ -303,6 +308,10 @@ func (b *Backend) getCounterAndPhase(height uint64) (uint64, flow.EpochPhase, er
 	}
 
 	return counter, phase, nil
+}
+
+func (b *Backend) isEpochOrPhaseDifferent(counter1, counter2 uint64, phase1, phase2 flow.EpochPhase) bool {
+	return counter1 != counter2 || phase1 != phase2
 }
 
 func convertStorageError(err error) error {
