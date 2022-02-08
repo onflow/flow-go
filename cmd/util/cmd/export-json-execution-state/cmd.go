@@ -92,11 +92,6 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string, full
 		if fullSearch {
 			return fmt.Errorf("target state must be provided when using full search")
 		}
-
-		//state, err = led.MostRecentTouchedState()
-		//if err != nil {
-		//	return fmt.Errorf("failed to load most recently used state: %w", err)
-		//}
 	} else {
 		st, err := hex.DecodeString(targetstate)
 		if err != nil {
