@@ -409,14 +409,13 @@ func (builder *FlowAccessNodeBuilder) IsStaked() bool {
 	return builder.staked
 }
 
-func (builder *FlowAccessNodeBuilder) ParseFlags() {
+func (builder *FlowAccessNodeBuilder) ParseFlags() error {
 
 	builder.BaseFlags()
 
 	builder.extraFlags()
 
-	builder.ParseAndPrintFlags()
-
+	return builder.ParseAndPrintFlags()
 }
 
 func (builder *FlowAccessNodeBuilder) extraFlags() {

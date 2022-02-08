@@ -2,24 +2,16 @@ package execution
 
 import (
 	"context"
-	"testing"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/stretchr/testify/require"
-	tsuite "github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func TestExecutionStateSync(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_DEPRECATED, "state sync disabled")
-	tsuite.Run(t, new(StateSyncSuite))
-}
 
 type StateSyncSuite struct {
 	Suite
