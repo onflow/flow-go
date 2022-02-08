@@ -287,7 +287,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	receiptF := ReceiptForBlockFixture(F)
 
 	// build block G
-	// seal for block N , receipt for block n-1
+	// G contains a seal for block E and a receipt for block F
 	G := BlockWithParentFixture(F.Header)
 	sealForE := Seal.Fixture(
 		Seal.WithResult(&receiptE.ExecutionResult),
@@ -391,31 +391,30 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 // NOTE: This func should only be used after BuildEpoch to extend the commit phase
 func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBuilder {
 	for i := 0; i < n; i++ {
-		// given the last 3 blocks in state a <- b <- c
-		// the new block will contain
-		// - seal for c
-		// - execution receipt for b
-		// - execution result for a
-		a := builder.blocks[len(builder.blocks)-1]
-		b := builder.blocks[len(builder.blocks)-2]
+		// Given the last 2 blocks in state A <- B when we add block C it will contain the following.
+		// - seal for B
+		// - execution result for A
+		a := builder.blocks[len(builder.blocks)-2]
+		b := builder.blocks[len(builder.blocks)-1]
 
-		// get execution result for third highest block
-		//builder.blocks[len(builder.blocks)-3].Payload.Receipts
+		receiptB := ReceiptForBlockFixture(b)
 
-		// get receipt for the highest block
-		receiptF := ReceiptForBlockFixture(a)
-
-		// build a new block
-		// this new block contains a seal for previous highest block and a receipt for the highest block
-		block := BlockWithParentFixture(a.Header)
+		block := BlockWithParentFixture(b.Header)
 		seal := Seal.Fixture(
-			Seal.WithResult(b.Payload.Results[0]),
+			Seal.WithResult(a.Payload.Results[0]),
 		)
 		block.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{receiptF.Meta()},
-			Results:  []*flow.ExecutionResult{&receiptF.ExecutionResult},
+			Receipts: []*flow.ExecutionReceiptMeta{receiptB.Meta()},
+			Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
 			Seals:    []*flow.Seal{seal},
 		})
+
+		payload := PayloadFixture(
+			WithReceipts(receiptB),
+			WithExecutionResults(&receiptB.ExecutionResult),
+			WithSeals(seal),
+		)
+		block.SetPayload(payload)
 
 		builder.addBlock(block)
 
