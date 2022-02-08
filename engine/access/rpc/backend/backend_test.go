@@ -219,7 +219,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 		epoch2, ok := epochBuilder.EpochHeights(2)
 		require.True(suite.T(), ok)
 
-		// setup AtBlockID mock returns for state
+		// setup AtHeight mock returns for state
 		for _, height := range append(epoch1.Range(), epoch2.Range()...) {
 			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
 		}
