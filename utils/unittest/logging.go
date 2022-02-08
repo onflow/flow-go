@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"flag"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -20,13 +21,21 @@ func LogVerbose() {
 // use -vv flag to print debugging logs for tests
 func Logger() zerolog.Logger {
 	writer := ioutil.Discard
-
 	if *verbose {
 		writer = os.Stderr
 	}
+
+	return LoggerWithWriterAndLevel(writer, zerolog.DebugLevel)
+}
+
+func LoggerWithWriterAndLevel(writer io.Writer, level zerolog.Level) zerolog.Logger {
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(writer).Level(zerolog.DebugLevel).With().Timestamp().Logger()
+	log := zerolog.New(writer).Level(level).With().Timestamp().Logger()
 	return log
+}
+
+func LoggerWithLevel(level zerolog.Level) zerolog.Logger {
+	return LoggerWithWriterAndLevel(os.Stderr, level)
 }
 
 func NewLoggerHook() LoggerHook {

@@ -29,7 +29,7 @@ type NitroPaceMaker struct {
 // notifier provides callbacks for pacemaker events.
 func New(startView uint64, timeoutController *timeout.Controller, notifier hotstuff.Consumer) (*NitroPaceMaker, error) {
 	if startView < 1 {
-		return nil, &model.ConfigurationError{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
+		return nil, model.NewConfigurationErrorf("Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)")
 	}
 	pm := NitroPaceMaker{
 		currentView:    startView,

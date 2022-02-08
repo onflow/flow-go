@@ -126,7 +126,6 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 func (suite *MutableIdentityTableSuite) signalIdentityChanged() {
 	for _, n := range suite.testNodes.nodes {
 		n.mw.UpdateNodeAddresses()
-		n.mw.UpdateAllowList()
 	}
 }
 

@@ -390,7 +390,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.assertAllExpectations()
 }
 
-// TestTransactionPendingToExpiredStatusTransition tests that the status
+// TestTransactionExpiredStatusTransition tests that the status
 // of transaction changes from Pending to Expired when enough blocks pass
 func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -869,6 +869,88 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	suite.assertAllExpectations()
 }
+
+func (suite *Suite) TestGetExecutionResultByID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	validExecutorIdentities := flow.IdentityList{}
+	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+
+	nonexistingID := unittest.IdentifierFixture()
+	blockID := unittest.IdentifierFixture()
+	executionResult := unittest.ExecutionResultFixture(
+		unittest.WithExecutionResultBlockID(blockID))
+
+	ctx := context.Background()
+
+	results := new(storagemock.ExecutionResults)
+	results.
+		On("ByID", nonexistingID).
+		Return(nil, storage.ErrNotFound)
+
+	results.
+		On("ByID", executionResult.ID()).
+		Return(executionResult, nil)
+
+	suite.Run("nonexisting execution result for id", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, nil,
+			nil,
+			suite.headers, nil, nil,
+			suite.receipts,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
+			suite.log,
+		)
+
+		// execute request
+		_, err := backend.GetExecutionResultByID(ctx, nonexistingID)
+
+		assert.Error(suite.T(), err)
+	})
+
+	suite.Run("existing execution result id", func() {
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, nil,
+			nil,
+			suite.headers, nil, nil,
+			nil,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(),
+			suite.log,
+		)
+
+		// execute request
+		er, err := backend.GetExecutionResultByID(ctx, executionResult.ID())
+		suite.checkResponse(er, err)
+
+		require.Equal(suite.T(), executionResult, er)
+	})
+
+	results.AssertExpectations(suite.T())
+	suite.assertAllExpectations()
+}
+
 func (suite *Suite) TestGetExecutionResultByBlockID() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
@@ -881,7 +963,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	blockID := unittest.IdentifierFixture()
 	executionResult := unittest.ExecutionResultFixture(
 		unittest.WithExecutionResultBlockID(blockID),
-		unittest.WIthServiceEvents(2))
+		unittest.WithServiceEvents(2))
 
 	ctx := context.Background()
 
@@ -1531,6 +1613,74 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		preferredENs := allExecutionNodes[0:2]
 		expectedList := preferredENs
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
+	})
+}
+
+// TestExecuteScriptOnExecutionNode tests the method backend.scripts.executeScriptOnExecutionNode for script execution
+func (suite *Suite) TestExecuteScriptOnExecutionNode() {
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).
+		Return(suite.execClient, &mockCloser{}, nil)
+
+	// create the handler with the mock
+	backend := New(
+		suite.state,
+		nil, nil, nil,
+		suite.headers,
+		nil, nil,
+		suite.receipts,
+		suite.results,
+		flow.Mainnet,
+		metrics.NewNoopCollector(),
+		connFactory,
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+	)
+
+	// mock parameters
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	script := []byte("dummy script")
+	arguments := [][]byte(nil)
+	executionNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	execReq := execproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments,
+	}
+	execRes := execproto.ExecuteScriptAtBlockIDResponse{
+		Value: []byte{4, 5, 6},
+	}
+
+	suite.Run("happy path script execution success", func() {
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).Return(&execRes, nil).Once()
+		res, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		suite.execClient.AssertExpectations(suite.T())
+		suite.checkResponse(res, err)
+	})
+
+	suite.Run("script execution failure returns status OK", func() {
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).
+			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
+		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		suite.execClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
+	})
+
+	suite.Run("execution node internal failure returns status code Internal", func() {
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).
+			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
+		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		suite.execClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.Internal)
 	})
 }
 

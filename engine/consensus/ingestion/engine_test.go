@@ -44,7 +44,7 @@ func (s *IngestionSuite) SetupTest() {
 	// set up network module mock
 	s.net = &mocknetwork.Network{}
 	s.net.On("Register", engine.ReceiveGuarantees, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
+		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return s.con
 		},
 		nil,

@@ -25,6 +25,8 @@ type Consensus struct {
 	leaders map[uint64]*leader.LeaderSelection // pre-computed leader selection for each epoch
 }
 
+var _ hotstuff.Committee = (*Consensus)(nil)
+
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 
 	com := &Consensus{
@@ -76,14 +78,14 @@ func (c *Consensus) Identities(blockID flow.Identifier, selector flow.IdentityFi
 
 func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
-	if protocol.IsIdentityNotFound(err) {
-		return nil, model.ErrInvalidSigner
-	}
 	if err != nil {
+		if protocol.IsIdentityNotFound(err) {
+			return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id: %w", nodeID, err)
+		}
 		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
 	}
 	if !filter.IsVotingConsensusCommitteeMember(identity) {
-		return nil, model.ErrInvalidSigner
+		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff voting participant", nodeID)
 	}
 	return identity, nil
 }
