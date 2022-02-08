@@ -299,7 +299,7 @@ func (b *Backend) getCounterAndPhase(height uint64) (uint64, flow.EpochPhase, er
 
 	counter, err := snapshot.Epochs().Current().Counter()
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to get counter at highest block in the segment: %w", err)
+		return 0, 0, fmt.Errorf("failed to get counter for block (height=%d): %w", height, err)
 	}
 
 	phase, err := snapshot.Phase()
