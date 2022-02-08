@@ -96,6 +96,7 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	}
 
 	t.Status = &status
+	t.StatusCode = int32(txr.StatusCode)
 	t.ErrorMessage = txr.ErrorMessage
 	t.ComputationUsed = util.FromUint64(0)
 	t.Events = events
