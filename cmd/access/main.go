@@ -10,7 +10,9 @@ func main() {
 	anb.PrintBuildVersionDetails()
 
 	// parse all the command line args
-	anb.ParseFlags()
+	if err := anb.ParseFlags(); err != nil {
+		anb.Logger.Fatal().Err(err).Send()
+	}
 
 	// choose a staked or an unstaked node builder based on anb.staked
 	var nodeBuilder nodebuilder.AccessNodeBuilder
