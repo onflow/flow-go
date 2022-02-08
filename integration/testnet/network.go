@@ -765,7 +765,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			containerPort := "9000/tcp"
 
 			nodeContainer.bindPort(hostPort, containerPort)
-
+// uncomment this code to expose the metrics server for each node
 			// hostMetricsPort := testingdock.RandomPort(t)
 			// containerMetricsPort := "8080/tcp"
 
