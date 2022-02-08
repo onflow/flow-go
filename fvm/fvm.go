@@ -52,7 +52,7 @@ type VirtualMachine interface {
 		context runtime.Context,
 	) (cadence.Value, error)
 
-	invokeMetaTransaction(
+	InvokeMetaTransaction(
 		parentCtx Context,
 		tx *TransactionProcedure,
 		sth *state.StateHolder,
@@ -126,7 +126,7 @@ func (vm *virtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *virtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, sth *state.StateHolder, programs programs.Programs) (errors.Error, error) {
+func (vm *virtualMachine) InvokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, sth *state.StateHolder, programs programs.Programs) (errors.Error, error) {
 	invoker := NewTransactionInvoker(zerolog.Nop())
 
 	// do not deduct fees or check storage in meta transactions
