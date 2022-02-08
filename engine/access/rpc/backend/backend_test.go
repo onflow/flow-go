@@ -91,7 +91,13 @@ func (suite *Suite) TestPing() {
 	backend := New(
 		suite.state,
 		suite.colClient,
-		nil, nil, nil, nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -100,6 +106,7 @@ func (suite *Suite) TestPing() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	err := backend.Ping(context.Background())
@@ -115,7 +122,14 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -124,6 +138,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// query the handler for the latest finalized block
@@ -170,8 +185,14 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 
 		backend := New(
 			suite.state,
-			nil, nil, nil, nil,
-			nil, nil, nil, nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			nil,
@@ -180,6 +201,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 			nil,
 			nil,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -234,8 +256,14 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 
 		backend := New(
 			suite.state,
-			nil, nil, nil, nil,
-			nil, nil, nil, nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			nil,
@@ -244,6 +272,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 			nil,
 			nil,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -291,8 +320,14 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 
 		backend := New(
 			suite.state,
-			nil, nil, nil, nil,
-			nil, nil, nil, nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			nil,
@@ -301,6 +336,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 			nil,
 			nil,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -359,8 +395,14 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 
 		backend := New(
 			suite.state,
-			nil, nil, nil, nil,
-			nil, nil, nil, nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			nil,
@@ -369,6 +411,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 			nil,
 			nil,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -383,6 +426,59 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 	})
 }
 
+// TestGetLatestProtocolStateSnapshot_EpochTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the length of the sealing segment is greater than the configured snapshotHistoryLimit
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state).BuildEpoch().CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// setup AtBlockID mock returns for state
+		for _, height := range epoch1.Range() {
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
+		}
+
+		// Take snapshot at height of block E (epoch1.heights[4]) the sealing segment for this snapshot
+		// is C(S_A) <- D(S_B) |setup| <- E(S_C) which spans the epoch setup phase. This will force
+		// our RPC endpoint to return a snapshot at block D which is the snapshot at the boundary where a phase
+		// transition happens.
+		snap := state.AtHeight(epoch1.Range()[4])
+		suite.state.On("Final").Return(snap).Once()
+
+		// very short history limit, any segment with any blocks spanning any transition should force the endpoint to return a history limit error
+		snapshotHistoryLimit := 1
+		backend := New(
+			suite.state,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			nil,
+			suite.log,
+			snapshotHistoryLimit,
+		)
+
+		// the handler should return a snapshot history limit error
+		_, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().ErrorIs(err, SnapshotHistoryLimitErr)
+	})
+}
+
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	// setup the mocks
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -392,8 +488,14 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil,
-		nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -402,6 +504,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// query the handler for the latest sealed block
@@ -429,9 +532,14 @@ func (suite *Suite) TestGetTransaction() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.transactions,
-		nil, nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -440,6 +548,7 @@ func (suite *Suite) TestGetTransaction() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
@@ -462,7 +571,10 @@ func (suite *Suite) TestGetCollection() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.collections,
 		suite.transactions,
 		nil,
@@ -475,6 +587,7 @@ func (suite *Suite) TestGetCollection() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
@@ -550,12 +663,13 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		suite.results,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		connFactory,
+		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
 		nil,
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// Successfully return empty event list
@@ -674,6 +788,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// should return pending status when we have not observed an expiry block
@@ -825,12 +940,13 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		suite.results,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		connFactory,
+		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		100,
 		nil,
 		flow.IdentifierList(enIDs.NodeIDs()).Strings(),
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -887,6 +1003,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
@@ -917,9 +1034,14 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 	backend := New(
 		suite.state,
-		nil, nil,
+		nil,
+		nil,
 		suite.blocks,
-		nil, nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -928,6 +1050,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// query the handler for the latest finalized header
@@ -1039,9 +1162,12 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
@@ -1052,6 +1178,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -1066,9 +1193,12 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			receipts,
 			nil,
 			suite.chainID,
@@ -1077,8 +1207,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			false,
 			DefaultMaxHeightRange,
 			nil,
-			validENIDs.Strings(),
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request with an empty block id list and expect an empty list of events and no error
@@ -1120,9 +1251,12 @@ func (suite *Suite) TestGetExecutionResultByID() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			suite.receipts,
 			results,
 			suite.chainID,
@@ -1133,6 +1267,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -1145,9 +1280,12 @@ func (suite *Suite) TestGetExecutionResultByID() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			nil,
 			results,
 			suite.chainID,
@@ -1156,8 +1294,9 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			false,
 			DefaultMaxHeightRange,
 			nil,
-			validENIDs.Strings(),
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -1203,9 +1342,12 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			suite.receipts,
 			results,
 			suite.chainID,
@@ -1216,6 +1358,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -1229,9 +1372,12 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			nil,
 			results,
 			suite.chainID,
@@ -1240,8 +1386,9 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			false,
 			DefaultMaxHeightRange,
 			nil,
-			validENIDs.Strings(),
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -1374,17 +1521,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("invalid request max height < min height", func() {
 		backend := New(
 			suite.state,
-			nil, nil, nil, suite.headers, nil, nil,
+			nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
 			nil,
 			nil,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
@@ -1406,20 +1559,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		// create handler
 		backend := New(
 			state,
-			nil, nil,
+			nil,
+			nil,
 			suite.blocks,
 			suite.headers,
-			nil, nil,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -1440,20 +1596,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		backend := New(
 			state,
-			nil, nil,
+			nil,
+			nil,
 			suite.blocks,
 			suite.headers,
-			nil, nil,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1473,20 +1632,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		// create handler
 		backend := New(
 			state,
-			nil, nil,
+			nil,
+			nil,
 			suite.blocks,
 			suite.headers,
-			nil, nil,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			1, // set maximum range to 1
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
@@ -1506,20 +1668,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		// create handler
 		backend := New(
 			state,
-			nil, nil,
+			nil,
+			nil,
 			suite.blocks,
 			suite.headers,
-			nil, nil,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1579,19 +1744,23 @@ func (suite *Suite) TestGetAccount() {
 	// create the handler with the mock
 	backend := New(
 		suite.state,
-		nil, nil, nil,
+		nil,
+		nil,
+		nil,
 		suite.headers,
-		nil, nil,
+		nil,
+		nil,
 		suite.receipts,
 		suite.results,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		connFactory,
+		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1655,19 +1824,23 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	// create the handler with the mock
 	backend := New(
 		suite.state,
-		nil, nil, nil,
+		nil,
+		nil,
+		nil,
 		suite.headers,
-		nil, nil,
+		nil,
+		nil,
 		suite.receipts,
 		suite.results,
 		flow.Testnet,
 		metrics.NewNoopCollector(),
-		connFactory,
+		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1687,9 +1860,15 @@ func (suite *Suite) TestGetNetworkParameters() {
 
 	expectedChainID := flow.Mainnet
 
-	backend := New(
-		nil, nil, nil, nil, nil, nil, nil,
-		nil, nil,
+	backend := New(nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		flow.Mainnet,
 		metrics.NewNoopCollector(),
 		nil,
@@ -1698,6 +1877,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	params := backend.GetNetworkParameters(context.Background())
@@ -1847,19 +2027,23 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	// create the handler with the mock
 	backend := New(
 		suite.state,
-		nil, nil, nil,
+		nil,
+		nil,
+		nil,
 		suite.headers,
-		nil, nil,
+		nil,
+		nil,
 		suite.receipts,
 		suite.results,
 		flow.Mainnet,
 		metrics.NewNoopCollector(),
-		connFactory,
+		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// mock parameters

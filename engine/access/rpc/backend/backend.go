@@ -32,12 +32,14 @@ const maxAttemptsForExecutionReceipt = 3
 // DefaultMaxHeightRange is the default maximum size of range requests.
 const DefaultMaxHeightRange = 250
 
-// snapshotHistoryLimit the amount of blocks to look back in state
+// DefaultSnapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
-const snapshotHistoryLimit = 50
+const DefaultSnapshotHistoryLimit = 50
 
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
+
+var SnapshotHistoryLimitErr = fmt.Errorf("reached the snapshot history limit")
 
 // Backend implements the Access API.
 //
@@ -60,11 +62,12 @@ type Backend struct {
 	backendAccounts
 	backendExecutionResults
 
-	state             protocol.State
-	chainID           flow.ChainID
-	collections       storage.Collections
-	executionReceipts storage.ExecutionReceipts
-	connFactory       ConnectionFactory
+	state                protocol.State
+	chainID              flow.ChainID
+	collections          storage.Collections
+	executionReceipts    storage.ExecutionReceipts
+	connFactory          ConnectionFactory
+	snapshotHistoryLimit int
 }
 
 func New(
@@ -85,6 +88,7 @@ func New(
 	preferredExecutionNodeIDs []string,
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
+	snapshotHistoryLimit int,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -142,10 +146,11 @@ func New(
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,
 		},
-		collections:       collections,
-		executionReceipts: executionReceipts,
-		connFactory:       connFactory,
-		chainID:           chainID,
+		collections:          collections,
+		executionReceipts:    executionReceipts,
+		connFactory:          connFactory,
+		chainID:              chainID,
+		snapshotHistoryLimit: snapshotHistoryLimit,
 	}
 
 	retry.SetBackend(b)
@@ -273,8 +278,8 @@ func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int
 			// NOTE: Check if we have reached our history limit, in edge cases
 			// where the sealing segment is abnormally long we want to short circuit
 			// the recursive calls and return an error. The API caller can retry.
-			if blocksVisited > snapshotHistoryLimit {
-				return nil, fmt.Errorf("failed to get valid snapshot reached snapshot history limit (%d)", snapshotHistoryLimit)
+			if blocksVisited > b.snapshotHistoryLimit {
+				return nil, fmt.Errorf("%w: (%d)", SnapshotHistoryLimitErr, b.snapshotHistoryLimit)
 			}
 
 			counterAtBlock, phaseAtBlock, err := b.getCounterAndPhase(segment.Blocks[i].Header.Height)
