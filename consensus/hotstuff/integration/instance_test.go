@@ -36,7 +36,6 @@ import (
 )
 
 type Instance struct {
-	log zerolog.Logger
 
 	// instance parameters
 	participants flow.IdentityList
@@ -307,7 +306,6 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		Hex("node_id", in.localID[:]).
 		Logger()
 	notifier := notifications.NewLogConsumer(log)
-	in.log = log
 
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)

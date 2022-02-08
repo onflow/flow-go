@@ -30,6 +30,7 @@ import (
 
 	pb "github.com/onflow/flow-go/admin/admin"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type CommandRunnerSuite struct {
@@ -420,6 +421,9 @@ func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certifica
 }
 
 func (suite *CommandRunnerSuite) TestTLS() {
+	// https://github.com/onflow/flow-go/runs/5115795699?check_suite_focus=true
+	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "flaky test")
+
 	called := false
 
 	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
