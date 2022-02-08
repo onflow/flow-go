@@ -35,7 +35,7 @@ type Middleware interface {
 	//
 	// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 	// a more efficient candidate.
-	SendDirect(msg *message.Message, targetID flow.Identifier) error
+	SendDirect(msg *message.Message, peerID peer.ID) error
 
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
@@ -58,7 +58,7 @@ type Middleware interface {
 	// NewPingService creates a new PingService for the given ping protocol ID.
 	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService
 
-	IsConnected(nodeID flow.Identifier) (bool, error)
+	IsConnected(peerID peer.ID) bool
 }
 
 // Overlay represents the interface that middleware uses to interact with the
@@ -73,7 +73,7 @@ type Overlay interface {
 	// GetIdentity returns the Identity associated with the given peer ID, if it exists
 	Identity(peer.ID) (*flow.Identity, bool)
 
-	Receive(nodeID flow.Identifier, msg *message.Message) error
+	Receive(nodeID peer.ID, msg *message.Message) error
 }
 
 // Connection represents an interface to read from & write to a connection.

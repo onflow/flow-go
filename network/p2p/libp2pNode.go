@@ -273,7 +273,6 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 }
 
 // IsConnected returns true is address is a direct peer of this node else false
-func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
-	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
-	return isConnected, nil
+func (n *Node) IsConnected(peerID peer.ID) bool {
+	return n.host.Network().Connectedness(peerID) == libp2pnet.Connected
 }

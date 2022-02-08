@@ -33,3 +33,7 @@ type Engine interface {
 type MessageProcessor interface {
 	Process(channel Channel, originID flow.Identifier, message interface{}) error
 }
+
+type RequestHandler interface {
+	HandleRequest(channel Channel, originID flow.Identifier, request interface{}) (interface{}, error)
+}

@@ -26,4 +26,6 @@ type Network interface {
 
 	// RegisterPingService registers a ping protocol handler for the given protocol ID
 	RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error)
+
+	RegisterDirectMessageProcessor(channel Channel, messageProcessor MessageProcessor) (MessageSender, error)
 }
