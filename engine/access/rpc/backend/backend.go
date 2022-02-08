@@ -274,7 +274,7 @@ func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int
 			// where the sealing segment is abnormally long we want to short circuit
 			// the recursive calls and return an error. The API caller can retry.
 			if blocksVisited > snapshotHistoryLimit {
-				return nil, fmt.Errorf("failed to get valid snapshot reached snapshot history limit")
+				return nil, fmt.Errorf("failed to get valid snapshot reached snapshot history limit (%d)", snapshotHistoryLimit)
 			}
 
 			counterAtBlock, phaseAtBlock, err := b.getCounterAndPhase(segment.Blocks[i].Header.Height)
