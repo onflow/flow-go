@@ -40,7 +40,7 @@ type NodeBuilder interface {
 	ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder
 
 	// ParseAndPrintFlags parses all the command line arguments
-	ParseAndPrintFlags()
+	ParseAndPrintFlags() error
 
 	// Initialize performs all the initialization needed at the very start of a node
 	Initialize() error
