@@ -381,35 +381,6 @@ func (tb *TransactionBody) PayloadMessage() []byte {
 	return fingerprint.Fingerprint(payload)
 }
 
-func (tb *TransactionBody) payloadCanonicalForm() interface{} {
-	authorizers := make([][]byte, len(tb.Authorizers))
-	for i, auth := range tb.Authorizers {
-		authorizers[i] = auth.Bytes()
-	}
-
-	return struct {
-		Script                    []byte
-		Arguments                 [][]byte
-		ReferenceBlockID          []byte
-		GasLimit                  uint64
-		ProposalKeyAddress        []byte
-		ProposalKeyID             uint64
-		ProposalKeySequenceNumber uint64
-		Payer                     []byte
-		Authorizers               [][]byte
-	}{
-		Script:                    tb.Script,
-		Arguments:                 tb.Arguments,
-		ReferenceBlockID:          tb.ReferenceBlockID[:],
-		GasLimit:                  tb.GasLimit,
-		ProposalKeyAddress:        tb.ProposalKey.Address.Bytes(),
-		ProposalKeyID:             tb.ProposalKey.KeyIndex,
-		ProposalKeySequenceNumber: tb.ProposalKey.SequenceNumber,
-		Payer:                     tb.Payer.Bytes(),
-		Authorizers:               authorizers,
-	}
-}
-
 // EnvelopeMessage returns the signable message for transaction envelope.
 //
 // This message is only signed by the payer account.
