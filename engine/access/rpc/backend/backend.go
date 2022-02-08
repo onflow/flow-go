@@ -247,40 +247,19 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 // by height of each block in the segment and return a snapshot at the point
 // where the transition happens.
 func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int) (protocol.Snapshot, error) {
-	// NOTE: check if we have reached our history limit, in edge cases
-	// where the sealing segment is abnormally long we want to short circuit
-	// the recursive calls and return an error. The API caller can retry.
-	if blocksVisited > snapshotHistoryLimit {
-		return nil, fmt.Errorf("failed to get valid snapshot reached look back limit ")
-	}
-
 	segment, err := snapshot.SealingSegment()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sealing segment: %w", err)
 	}
 
-	// get snapshots at the highest and lowest blocks in segment for comparison
-	snapshotAtHighest := b.state.AtHeight(segment.Highest().Header.Height)
-	snapshotAtLowest := b.state.AtHeight(segment.Lowest().Header.Height)
-
-	counterAtHighest, err := snapshotAtHighest.Epochs().Current().Counter()
+	counterAtHighest, phaseAtHighest, err := b.getCounterAndPhase(segment.Highest().Header.Height)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get counter at highest block in the segment: %w", err)
+		return nil, fmt.Errorf("failed to get counter and phase at highest block in the segment: %w", err)
 	}
 
-	phaseAtHighest, err := snapshotAtHighest.Phase()
+	counterAtLowest, phaseAtLowest, err := b.getCounterAndPhase(segment.Lowest().Header.Height)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get phase at highest block in the segment: %w", err)
-	}
-
-	counterAtLowest, err := snapshotAtLowest.Epochs().Current().Counter()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get counter at lowest block in the segment: %w", err)
-	}
-
-	phaseAtLowest, err := snapshotAtLowest.Phase()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get phase at lowest block in the segment: %w", err)
+		return nil, fmt.Errorf("failed to get counter and phase at lowest block in the segment: %w", err)
 	}
 
 	// check if any epoch or phase transition occurs, visit each node
@@ -288,24 +267,42 @@ func (b *Backend) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int
 	if counterAtHighest != counterAtLowest || phaseAtHighest != phaseAtLowest {
 		for i := len(segment.Blocks) - 1; i >= 0; i-- {
 			blocksVisited++
-			snapshotAtBlock := b.state.AtHeight(segment.Blocks[i].Header.Height)
-			counterAtBlock, err := snapshotAtBlock.Epochs().Current().Counter()
-			if err != nil {
-				return nil, fmt.Errorf("failed to get epoch counter for snapshot at block %s: %w", segment.Blocks[i].ID(), err)
+			// NOTE: check if we have reached our history limit, in edge cases
+			// where the sealing segment is abnormally long we want to short circuit
+			// the recursive calls and return an error. The API caller can retry.
+			if blocksVisited > snapshotHistoryLimit {
+				return nil, fmt.Errorf("failed to get valid snapshot reached snapshot history limit")
 			}
 
-			phaseAtBlock, err := snapshotAtBlock.Phase()
+			counterAtBlock, phaseAtBlock, err := b.getCounterAndPhase(segment.Blocks[i].Header.Height)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get phase for snapshot at block %s: %w", segment.Blocks[i].ID(), err)
+				return nil, fmt.Errorf("failed to get epoch counter and phase for snapshot at block %s: %w", segment.Blocks[i].ID(), err)
 			}
 
 			if counterAtHighest != counterAtBlock || phaseAtHighest != phaseAtBlock {
-				return b.getValidSnapshot(snapshotAtBlock, blocksVisited)
+				return b.getValidSnapshot(b.state.AtHeight(segment.Blocks[i].Header.Height), blocksVisited)
 			}
 		}
 	}
 
 	return snapshot, nil
+}
+
+// getCounterAndPhase will return the epoch counter and phase at the specified height in state
+func (b *Backend) getCounterAndPhase(height uint64) (uint64, flow.EpochPhase, error) {
+	snapshot := b.state.AtHeight(height)
+
+	counter, err := snapshot.Epochs().Current().Counter()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get counter at highest block in the segment: %w", err)
+	}
+
+	phase, err := snapshot.Phase()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get phase at highest block in the segment: %w", err)
+	}
+
+	return counter, phase, nil
 }
 
 func convertStorageError(err error) error {
