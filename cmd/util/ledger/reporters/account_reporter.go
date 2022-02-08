@@ -71,6 +71,8 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
 	addressIndexes := make(chan uint64)
+	defer close(addressIndexes)
+
 	wg := &sync.WaitGroup{}
 
 	workerCount := goRuntime.NumCPU() / 2
@@ -92,7 +94,6 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 			panic(err)
 		}
 	}
-	close(addressIndexes)
 
 	wg.Wait()
 
@@ -145,21 +146,21 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 	fusdScript := []byte(fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FUSD from 0x%s
-			
+
 			pub fun main(address: Address): UFix64 {
 				let account = getAccount(address)
-			
+
 				let vaultRef = account.getCapability(/public/fusdBalance)!
 					.borrow<&FUSD.Vault{FungibleToken.Balance}>()
 					?? panic("Could not borrow Balance reference to the Vault")
-			
+
 				return vaultRef.balance
 			}
 			`, fvm.FungibleTokenAddress(ctx.Chain), "3c5959b568896393"))
 
 	momentsScript := []byte(`
 			import TopShot from 0x0b2a3299cc857e29
-			
+
 			pub fun main(account: Address): Int {
 				let acct = getAccount(account)
 				let collectionRef = acct.getCapability(/public/MomentCollection)
