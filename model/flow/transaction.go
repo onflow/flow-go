@@ -53,12 +53,38 @@ func NewTransactionBody() *TransactionBody {
 }
 
 func (tb TransactionBody) Fingerprint() []byte {
+	authorizers := make([][]byte, len(tb.Authorizers))
+	for i, auth := range tb.Authorizers {
+		authorizers[i] = auth.Bytes()
+	}
+
+	var payload = struct {
+		Script                    []byte
+		Arguments                 [][]byte
+		ReferenceBlockID          []byte
+		GasLimit                  uint64
+		ProposalKeyAddress        []byte
+		ProposalKeyID             uint64
+		ProposalKeySequenceNumber uint64
+		Payer                     []byte
+		Authorizers               [][]byte
+	}{
+		Script:                    tb.Script,
+		Arguments:                 tb.Arguments,
+		ReferenceBlockID:          tb.ReferenceBlockID[:],
+		GasLimit:                  tb.GasLimit,
+		ProposalKeyAddress:        tb.ProposalKey.Address.Bytes(),
+		ProposalKeyID:             tb.ProposalKey.KeyIndex,
+		ProposalKeySequenceNumber: tb.ProposalKey.SequenceNumber,
+		Payer:                     tb.Payer.Bytes(),
+		Authorizers:               authorizers,
+	}
 	return fingerprint.Fingerprint(struct {
 		Payload            interface{}
 		PayloadSignatures  interface{}
 		EnvelopeSignatures interface{}
 	}{
-		Payload:            tb.payloadCanonicalForm(),
+		Payload:            payload,
 		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
 		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).canonicalForm(),
 	})
@@ -326,7 +352,33 @@ func (tb *TransactionBody) createSignature(address Address, keyID uint64, sig []
 }
 
 func (tb *TransactionBody) PayloadMessage() []byte {
-	return fingerprint.Fingerprint(tb.payloadCanonicalForm())
+	authorizers := make([][]byte, len(tb.Authorizers))
+	for i, auth := range tb.Authorizers {
+		authorizers[i] = auth.Bytes()
+	}
+
+	var payload = struct {
+		Script                    []byte
+		Arguments                 [][]byte
+		ReferenceBlockID          []byte
+		GasLimit                  uint64
+		ProposalKeyAddress        []byte
+		ProposalKeyID             uint64
+		ProposalKeySequenceNumber uint64
+		Payer                     []byte
+		Authorizers               [][]byte
+	}{
+		Script:                    tb.Script,
+		Arguments:                 tb.Arguments,
+		ReferenceBlockID:          tb.ReferenceBlockID[:],
+		GasLimit:                  tb.GasLimit,
+		ProposalKeyAddress:        tb.ProposalKey.Address.Bytes(),
+		ProposalKeyID:             tb.ProposalKey.KeyIndex,
+		ProposalKeySequenceNumber: tb.ProposalKey.SequenceNumber,
+		Payer:                     tb.Payer.Bytes(),
+		Authorizers:               authorizers,
+	}
+	return fingerprint.Fingerprint(payload)
 }
 
 func (tb *TransactionBody) payloadCanonicalForm() interface{} {
@@ -366,17 +418,43 @@ func (tb *TransactionBody) EnvelopeMessage() []byte {
 }
 
 func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
+	authorizers := make([][]byte, len(tb.Authorizers))
+	for i, auth := range tb.Authorizers {
+		authorizers[i] = auth.Bytes()
+	}
+
+	var payload = struct {
+		Script                    []byte
+		Arguments                 [][]byte
+		ReferenceBlockID          []byte
+		GasLimit                  uint64
+		ProposalKeyAddress        []byte
+		ProposalKeyID             uint64
+		ProposalKeySequenceNumber uint64
+		Payer                     []byte
+		Authorizers               [][]byte
+	}{
+		Script:                    tb.Script,
+		Arguments:                 tb.Arguments,
+		ReferenceBlockID:          tb.ReferenceBlockID[:],
+		GasLimit:                  tb.GasLimit,
+		ProposalKeyAddress:        tb.ProposalKey.Address.Bytes(),
+		ProposalKeyID:             tb.ProposalKey.KeyIndex,
+		ProposalKeySequenceNumber: tb.ProposalKey.SequenceNumber,
+		Payer:                     tb.Payer.Bytes(),
+		Authorizers:               authorizers,
+	}
 	return struct {
 		Payload           interface{}
 		PayloadSignatures interface{}
 	}{
-		tb.payloadCanonicalForm(),
+		payload,
 		signaturesList(tb.PayloadSignatures).canonicalForm(),
 	}
 }
 
 func (tx *Transaction) PayloadMessage() []byte {
-	return fingerprint.Fingerprint(tx.TransactionBody.payloadCanonicalForm())
+	return tx.TransactionBody.PayloadMessage()
 }
 
 // Checksum provides a cryptographic commitment for a chunk content
