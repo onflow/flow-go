@@ -64,6 +64,9 @@ func Connect(instances []*Instance) {
 					}
 
 					// put the proposal header into the receivers map
+					// TODO: we should not store the header directly without checking if parent
+					// exists, this has been causing flakeiness.
+					// if parent is missing we should store the block in pending blocks
 					receiver.headers.Store(header.ID(), header)
 
 					// submit the proposal to the receiving event loop (non-blocking)
