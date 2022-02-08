@@ -19,6 +19,7 @@ import (
 // against happy path of verification nodes.
 type Suite struct {
 	suite.Suite
+	log                        zerolog.Logger
 	common.TestnetStateTracker                      // used to track messages over testnet
 	cancel                     context.CancelFunc   // used to tear down the testnet
 	net                        *testnet.FlowNetwork // used to keep an instance of testnet
@@ -28,7 +29,7 @@ type Suite struct {
 	exe1ID                     flow.Identifier
 	exe2ID                     flow.Identifier
 	verID                      flow.Identifier // represents id of verification node
-	preferredUnicasts          string          // preferred unicast protocols between execution and verification nodes.
+	PreferredUnicasts          string          // preferred unicast protocols between execution and verification nodes.
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -63,6 +64,13 @@ func (s *Suite) MetricsPort() string {
 // - One verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "suite.go").
+		Str("testcase", s.T().Name()).
+		Logger()
+	s.log = logger
+	s.log.Info().Msgf("================> SetupTest")
+
 	blockRateFlag := "--block-rate-delay=1ms"
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
@@ -87,7 +95,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two execution nodes
@@ -96,7 +104,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
@@ -104,7 +112,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
+		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
@@ -150,8 +158,8 @@ func (s *Suite) SetupSuite() {
 
 // TearDownSuite tears down the test network of Flow
 func (s *Suite) TearDownSuite() {
+	s.log.Info().Msgf("================> Start TearDownTest")
 	s.net.Remove()
-	if s.cancel != nil {
-		s.cancel()
-	}
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }

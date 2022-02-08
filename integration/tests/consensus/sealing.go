@@ -3,7 +3,6 @@ package consensus
 import (
 	"context"
 	"math/rand"
-	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -22,12 +21,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestExecutionStateSealing(t *testing.T) {
-	suite.Run(t, new(SealingSuite))
-}
-
 type SealingSuite struct {
 	suite.Suite
+	log    zerolog.Logger
 	cancel context.CancelFunc
 	net    *testnet.FlowNetwork
 	conIDs []flow.Identifier
@@ -62,7 +58,12 @@ func (ss *SealingSuite) Verification() *client.GhostClient {
 }
 
 func (ss *SealingSuite) SetupTest() {
-	ss.T().Logf("%s test case setup sealing", time.Now())
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "sealing.go").
+		Str("testcase", ss.T().Name()).
+		Logger()
+	ss.log = logger
+	ss.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -81,7 +82,7 @@ func (ss *SealingSuite) SetupTest() {
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		ss.conIDs = append(ss.conIDs, conID)
 	}
-	ss.T().Logf("consensus IDs: %v\n", ss.conIDs)
+	ss.log.Info().Msgf("consensus IDs: %v\n", ss.conIDs)
 
 	// need one controllable execution node (used ghost)
 	ss.exeID = unittest.IdentifierFixture()
@@ -98,7 +99,7 @@ func (ss *SealingSuite) SetupTest() {
 	ss.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.verID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
-	ss.T().Logf("verification ID: %v\n", ss.verID)
+	ss.log.Info().Msgf("verification ID: %v\n", ss.verID)
 
 	nodeConfigs = append(nodeConfigs,
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
@@ -141,16 +142,18 @@ func (ss *SealingSuite) SetupTest() {
 }
 
 func (ss *SealingSuite) TearDownTest() {
-	ss.T().Logf("test case tear down sealing")
+	ss.log.Info().Msgf("================> Start TearDownTest")
 	ss.net.Remove()
 	ss.cancel()
+	ss.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 func (ss *SealingSuite) TestBlockSealCreation() {
+	ss.log.Info().Msgf("================> RUNNING TESTING")
 
 	// fix the deadline of the entire test
 	deadline := time.Now().Add(30 * time.Second)
-	ss.T().Logf("seal creation deadline: %s", deadline)
+	ss.log.Info().Msgf("seal creation deadline %s", deadline)
 
 	// first, we listen to see which block proposal is the first one to be
 	// confirmed three times (finalized)

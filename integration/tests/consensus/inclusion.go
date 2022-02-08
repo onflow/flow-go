@@ -3,7 +3,6 @@ package consensus
 import (
 	"context"
 	"math/rand"
-	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -19,12 +18,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestCollectionGuaranteeInclusion(t *testing.T) {
-	suite.Run(t, new(InclusionSuite))
-}
-
 type InclusionSuite struct {
 	suite.Suite
+
+	log    zerolog.Logger
 	cancel context.CancelFunc
 	net    *testnet.FlowNetwork
 	conIDs []flow.Identifier
@@ -40,7 +37,12 @@ func (is *InclusionSuite) Collection() *client.GhostClient {
 }
 
 func (is *InclusionSuite) SetupTest() {
-	is.T().Logf("test case setup inclusion")
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "inclusion.go").
+		Str("testcase", is.T().Name()).
+		Logger()
+	is.log = logger
+	is.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -97,13 +99,16 @@ func (is *InclusionSuite) SetupTest() {
 	}
 }
 
-func (is *InclusionSuite) TearDownTest() {
-	is.T().Logf("test case tear down inclusion")
-	is.net.Remove()
-	is.cancel()
+func (s *InclusionSuite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
+	s.net.Remove()
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
+	t := is.T()
+	is.log.Info().Msgf("================> RUNNING TESTING %v", t.Name())
 	// fix the deadline for the test as a whole
 	deadline := time.Now().Add(30 * time.Second)
 	is.T().Logf("%s ------ test started, deadline %s", time.Now(), deadline)

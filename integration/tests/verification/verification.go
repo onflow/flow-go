@@ -6,7 +6,6 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/integration/tests/common/approvalstate"
@@ -15,18 +14,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestVerificationTestSuite(t *testing.T) {
-	suite.Run(t, new(VerificationTestSuite))
-}
-
 type VerificationTestSuite struct {
 	Suite
-}
-
-// TestVerificationNodeHappyPath verifies the integration of verification and execution nodes over the
-// happy path of successfully issuing a result approval for the first chunk of the first block of the testnet.
-func (suite *VerificationTestSuite) TestVerificationNodeHappyPath() {
-	testVerificationNodeHappyPath(suite.T(), suite.exe1ID, suite.verID, suite.BlockState, suite.ReceiptState, suite.ApprovalState)
 }
 
 // TestSealingAndVerificationHappyPath evaluates the health of the happy path of verification and sealing. It
@@ -71,9 +60,13 @@ func (suite *VerificationTestSuite) TestSealingAndVerificationHappyPath() {
 	suite.BlockState.WaitForSealed(suite.T(), blockB.Header.Height)
 }
 
+type VerifySystemChunkSuite struct {
+	Suite
+}
+
 // TestSystemChunkIDsShouldBeDifferent evaluates that system chunk of consecutive blocks that
 // do not cause state change have different chunk Ids.
-func (suite *VerificationTestSuite) TestSystemChunkIDsShouldBeDifferent() {
+func (suite *VerifySystemChunkSuite) TestSystemChunkIDsShouldBeDifferent() {
 	// // wait for next height finalized (potentially first height), called blockA
 	blockA := suite.BlockState.WaitForHighestFinalizedProgress(suite.T())
 	suite.T().Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.Header.ID())
