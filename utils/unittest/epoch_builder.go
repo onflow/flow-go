@@ -393,8 +393,8 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBuilder {
 	for i := 0; i < n; i++ {
 		// Given the last 2 blocks in state A <- B when we add block C it will contain the following.
-		// - seal for B
-		// - execution result for A
+		// - seal for A
+		// - execution result for B
 		a := builder.blocks[len(builder.blocks)-2]
 		b := builder.blocks[len(builder.blocks)-1]
 
@@ -407,7 +407,6 @@ func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBui
 
 		payload := PayloadFixture(
 			WithReceipts(receiptB),
-			WithExecutionResults(&receiptB.ExecutionResult),
 			WithSeals(seal),
 		)
 		block.SetPayload(payload)
