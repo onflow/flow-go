@@ -112,6 +112,11 @@ const (
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
+
+	// defaultPeerUpdateInterval determines the time interval at which each node updates its pubsub connections.
+	// Testnet is running at a significantly smaller scale than a production network, hence to
+	// hold the mathematics behind topology connectivity valid, we need a faster connection update rate than the default value:
+	defaultPeerUpdateInterval = 1 * time.Second
 )
 
 func init() {
@@ -614,6 +619,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			nodeContainer.AddFlag("insecure-access-api", "false")
 			nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 		}
+
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
@@ -701,6 +707,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			Image: nodeConf.ImageName(),
 			User:  currentUser(),
 			Cmd: append([]string{
+				fmt.Sprintf("--peerupdate-interval=%s", defaultPeerUpdateInterval.String()),
 				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
