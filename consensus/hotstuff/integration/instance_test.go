@@ -159,8 +159,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
 		func(parentID flow.Identifier, setter func(*flow.Header) error) *flow.Header {
-			in.updatingBlocks.RLock()
-			defer in.updatingBlocks.RUnlock()
+			in.updatingBlocks.Lock()
+			defer in.updatingBlocks.Unlock()
 
 			parent, ok := in.headers[parentID]
 			if !ok {
@@ -174,7 +174,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				Timestamp:   time.Now().UTC(),
 			}
 			require.NoError(t, setter(header))
-			// in.headers[header.ID()] = header
+			in.headers[header.ID()] = header
 			return header
 		},
 		func(parentID flow.Identifier, setter func(*flow.Header) error) error {
@@ -450,9 +450,9 @@ func (in *Instance) Run() error {
 }
 
 func (in *Instance) ProcessBlock(proposal *model.Proposal) {
-	in.updatingBlocks.RLock()
+	in.updatingBlocks.Lock()
 	_, parentExists := in.headers[proposal.Block.QC.BlockID]
-	defer in.updatingBlocks.RUnlock()
+	defer in.updatingBlocks.Unlock()
 
 	if parentExists {
 		next := proposal
