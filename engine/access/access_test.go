@@ -102,8 +102,7 @@ func (suite *Suite) RunTest(
 		collections := storage.NewCollections(db, transactions)
 		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
 
-		suite.backend = backend.New(
-			suite.state,
+		suite.backend = backend.New(suite.state,
 			suite.collClient,
 			nil,
 			blocks,
@@ -120,6 +119,7 @@ func (suite *Suite) RunTest(
 			nil,
 			nil,
 			suite.log,
+			backend.DefaultSnapshotHistoryLimit,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
@@ -278,9 +278,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
 		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
 
-		backend := backend.New(
-			suite.state,
-			nil, // setting collectionRPC to nil to choose a random collection node for each send tx request
+		backend := backend.New(suite.state,
+			nil,
 			nil,
 			nil,
 			nil,
@@ -290,12 +289,13 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			nil,
 			suite.chainID,
 			metrics,
-			connFactory, // passing in the connection factory
+			connFactory,
 			false,
 			backend.DefaultMaxHeightRange,
 			nil,
 			nil,
 			suite.log,
+			backend.DefaultSnapshotHistoryLimit,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -542,8 +542,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		backend := backend.New(
-			suite.state,
+		backend := backend.New(suite.state,
 			suite.collClient,
 			nil,
 			blocks,
@@ -560,6 +559,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			nil,
 			enNodeIDs.Strings(),
 			suite.log,
+			backend.DefaultSnapshotHistoryLimit,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -626,8 +626,7 @@ func (suite *Suite) TestExecuteScript() {
 		connFactory := new(factorymock.ConnectionFactory)
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-		suite.backend = backend.New(
-			suite.state,
+		suite.backend = backend.New(suite.state,
 			suite.collClient,
 			nil,
 			blocks,
@@ -644,6 +643,7 @@ func (suite *Suite) TestExecuteScript() {
 			nil,
 			flow.IdentifierList(identities.NodeIDs()).Strings(),
 			suite.log,
+			backend.DefaultSnapshotHistoryLimit,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
