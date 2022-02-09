@@ -8,5 +8,5 @@ import (
 )
 
 func TestEpoch(t *testing.T) {
-	suite.Run(t, new(epochs.EpochJoinAndLeaveVNSuite))
+	suite.Run(t, new(epochs.EpochJoinAndLaveANSuite))
 }
