@@ -9,15 +9,15 @@ import (
 
 // FromParentSignature reads the raw random seed from a main consensus QC sigData.
 // The sigData is an RLP encoded structure that is part of QuorumCertificate.
-// The indices can be used to generate task-specific seeds from the same signature.
-func FromParentSignature(indices []byte, sigData []byte) ([]byte, error) {
+// The customizer can be used to generate task-specific seeds from the same signature.
+func FromParentSignature(customizer []byte, sigData []byte) ([]byte, error) {
 	// unpack sig data to extract random beacon sig
 	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not unpack block signature: %w", err)
 	}
 
-	return FromRandomSource(indices, randomBeaconSig)
+	return FromRandomSource(customizer, randomBeaconSig)
 }
 
 // FromRandomSource generates a task-specific seed (task is determined by indices).
