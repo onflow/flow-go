@@ -43,7 +43,7 @@ func PRGFromRandomSource(randomSource []byte, customizer []byte) (random.Rand, e
 	// create random number generator from the seed and customizer
 	rng, err := random.NewChacha20PRG(seed[:], customizer)
 	if err != nil {
-		return nil, fmt.Errorf("could not create rng: %w", err)
+		return nil, fmt.Errorf("could not create ChaCha20 PRG: %w", err)
 	}
 	return rng, nil
 }

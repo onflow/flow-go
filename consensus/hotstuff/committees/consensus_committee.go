@@ -8,11 +8,11 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 var errSelectionNotComputed = fmt.Errorf("leader selection for epoch not yet computed")
@@ -158,7 +158,7 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 			return flow.ZeroID, fmt.Errorf("could not get epoch initial identities: %w", err)
 		}
 		// CAUTION: this is re-using the same leader selection seed from the now-ending epoch
-		seed, err := current.Seed()
+		randomSeed, err := current.Seed()
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not get epoch seed: %w", err)
 		}
@@ -173,12 +173,12 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		firstView := currentFinalView + 1
 
 		// create random number generator from the seed and customizer
-		rng, err := random.NewChacha20PRG(seed, indices.ProtocolConsensusLeaderSelection)
+		rng, err := seed.PRGFromRandomSource(randomSeed, indices.ProtocolConsensusLeaderSelection)
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("could not create rng: %w", err)
+			return flow.ZeroID, fmt.Errorf("could not create rng from seed: %w", err)
 		}
 
-		selection, err := leader.ComputeLeaderSelectionFromSeed(
+		selection, err := leader.ComputeLeaderSelection(
 			firstView,
 			rng,
 			int(firstView+leader.EstimatedSixMonthOfViews), // the fallback epoch lasts until the next spork

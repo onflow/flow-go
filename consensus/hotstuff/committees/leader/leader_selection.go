@@ -82,14 +82,14 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 	}
 }
 
-// ComputeLeaderSelectionFromSeed pre-generates a certain number of leader selections, and returns a
+// ComputeLeaderSelection pre-generates a certain number of leader selections, and returns a
 // leader selection instance for querying the leader indexes for certain views.
 // firstView - the start view of the epoch, the generated leader selections start from this view.
 // rng - the deterministic source of randoms
 // count - the number of leader selections to be pre-generated and cached.
 // identities - the identities that contain the stake info, which is used as weight for the chance of
 //							the identity to be selected as leader.
-func ComputeLeaderSelectionFromSeed(
+func ComputeLeaderSelection(
 	firstView uint64,
 	rng random.Rand,
 	count int,

@@ -70,6 +70,12 @@ func bruteSearch(value uint64, arr []uint64) (int, error) {
 	return 0, fmt.Errorf("not found")
 }
 
+func prg(t testing.TB, seed []byte) random.Rand {
+	rng, err := random.NewChacha20PRG(seed, []byte("random"))
+	require.NoError(t, err)
+	return rng
+}
+
 // Test given the same seed, the leader selection will produce the same selection
 func TestDeterministic(t *testing.T) {
 
@@ -80,17 +86,14 @@ func TestDeterministic(t *testing.T) {
 	for i, identity := range identities {
 		identity.Stake = uint64(i + 1)
 	}
-	var err error
-	rng, err := random.NewChacha20PRG(someSeed, []byte{})
+	rng := prg(t, someSeed)
+
+	leaders1, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	leaders1, err := ComputeLeaderSelectionFromSeed(0, rng, N_VIEWS, identities)
-	require.NoError(t, err)
+	rng = prg(t, someSeed)
 
-	rng, err = random.NewChacha20PRG(someSeed, []byte{})
-	require.NoError(t, err)
-
-	leaders2, err := ComputeLeaderSelectionFromSeed(0, rng, N_VIEWS, identities)
+	leaders2, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
 	require.NoError(t, err)
 
 	for i := 0; i < N_VIEWS; i++ {
@@ -106,23 +109,22 @@ func TestDeterministic(t *testing.T) {
 
 func TestInputValidation(t *testing.T) {
 
-	rng, err := random.NewChacha20PRG(someSeed, []byte{})
-	require.NoError(t, err)
+	rng := prg(t, someSeed)
 
 	// should return an error if we request to compute leader selection for <1 views
 	t.Run("epoch containing no views", func(t *testing.T) {
 		count := 0
-		_, err := ComputeLeaderSelectionFromSeed(0, rng, count, unittest.IdentityListFixture(4))
+		_, err := ComputeLeaderSelection(0, rng, count, unittest.IdentityListFixture(4))
 		assert.Error(t, err)
 		count = -1
-		_, err = ComputeLeaderSelectionFromSeed(0, rng, count, unittest.IdentityListFixture(4))
+		_, err = ComputeLeaderSelection(0, rng, count, unittest.IdentityListFixture(4))
 		assert.Error(t, err)
 	})
 
 	// epoch with no possible leaders should return an error
 	t.Run("epoch without participants", func(t *testing.T) {
 		identities := unittest.IdentityListFixture(0)
-		_, err := ComputeLeaderSelectionFromSeed(0, rng, 100, identities)
+		_, err := ComputeLeaderSelection(0, rng, 100, identities)
 		assert.Error(t, err)
 	})
 }
@@ -130,14 +132,13 @@ func TestInputValidation(t *testing.T) {
 // test that requesting a view outside the given range returns an error
 func TestViewOutOfRange(t *testing.T) {
 
-	rng, err := random.NewChacha20PRG(someSeed, []byte{})
-	require.NoError(t, err)
+	rng := prg(t, someSeed)
 
 	firstView := uint64(100)
 	finalView := uint64(200)
 
 	identities := unittest.IdentityListFixture(4)
-	leaders, err := ComputeLeaderSelectionFromSeed(firstView, rng, int(finalView-firstView+1), identities)
+	leaders, err := ComputeLeaderSelection(firstView, rng, int(finalView-firstView+1), identities)
 	require.Nil(t, err)
 
 	// confirm the selection has first/final view we expect
@@ -185,18 +186,16 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 		identity.Stake = uint64(i)
 	}
 
-	rng1, err := random.NewChacha20PRG(someSeed, []byte{})
-	require.NoError(t, err)
+	rng1 := prg(t, someSeed)
 
 	seed2 := make([]byte, 32)
 	seed2[0] = 8
-	rng2, err := random.NewChacha20PRG(seed2, []byte{})
+	rng2 := prg(t, seed2)
+
+	leaders1, err := ComputeLeaderSelection(0, rng1, N_VIEWS, identities)
 	require.NoError(t, err)
 
-	leaders1, err := ComputeLeaderSelectionFromSeed(0, rng1, N_VIEWS, identities)
-	require.NoError(t, err)
-
-	leaders2, err := ComputeLeaderSelectionFromSeed(0, rng2, N_VIEWS, identities)
+	leaders2, err := ComputeLeaderSelection(0, rng2, N_VIEWS, identities)
 	require.NoError(t, err)
 
 	diff := 0
@@ -219,8 +218,7 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 // The number of time being selected as leader might not exactly match their weight, but also
 // won't go too far from that.
 func TestLeaderSelectionAreWeighted(t *testing.T) {
-	rng, err := random.NewChacha20PRG(someSeed, []byte{})
-	require.NoError(t, err)
+	rng := prg(t, someSeed)
 
 	const N_VIEWS = 100000
 	const N_NODES = 4
@@ -230,7 +228,7 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 		identity.Stake = uint64(i + 1)
 	}
 
-	leaders, err := ComputeLeaderSelectionFromSeed(0, rng, N_VIEWS, identities)
+	leaders, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
 	require.NoError(t, err)
 
 	selected := make(map[flow.Identifier]uint64)
@@ -269,30 +267,27 @@ func BenchmarkLeaderSelection(b *testing.B) {
 	for i := 0; i < N_NODES; i++ {
 		identities = append(identities, unittest.IdentityFixture(unittest.WithStake(uint64(i))))
 	}
-	rng, _ := random.NewChacha20PRG(someSeed, []byte{})
+	rng := prg(b, someSeed)
 
 	for n := 0; n < b.N; n++ {
-		_, err := ComputeLeaderSelectionFromSeed(0, rng, N_VIEWS, identities)
+		_, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
 
 		require.NoError(b, err)
 	}
 }
 
 func TestInvalidTotalWeight(t *testing.T) {
-	rng, err := random.NewChacha20PRG(someSeed, []byte{})
-	require.NoError(t, err)
+	rng := prg(t, someSeed)
 	identities := unittest.IdentityListFixture(4, unittest.WithStake(0))
-	_, err = ComputeLeaderSelectionFromSeed(0, rng, 10, identities)
+	_, err := ComputeLeaderSelection(0, rng, 10, identities)
 	require.Error(t, err)
 }
 
 func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 
 	// create 2 RNGs from the same seed
-	rng, err := random.NewChacha20PRG(someSeed, []byte{})
-	require.NoError(t, err)
-	rng_copy, err := random.NewChacha20PRG(someSeed, []byte{})
-	require.NoError(t, err)
+	rng := prg(t, someSeed)
+	rng_copy := prg(t, someSeed)
 
 	// check that if there is some zero staked node, the selections for each view should be the same as
 	// with no zero staked nodes.
@@ -307,10 +302,10 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 
 		identities := append(stakeless, stakeful...)
 
-		selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, rng, N_VIEWS, identities)
+		selectionFromAll, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
 		require.NoError(t, err)
 
-		selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, rng_copy, N_VIEWS, stakeful)
+		selectionFromStakeful, err := ComputeLeaderSelection(0, rng_copy, N_VIEWS, stakeful)
 		require.NoError(t, err)
 
 		for i := 0; i < N_VIEWS; i++ {
@@ -326,8 +321,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 	})
 
 	t.Run("fuzzy set", func(t *testing.T) {
-		toolRng, err := random.NewChacha20PRG(someSeed, []byte("test"))
-		require.NoError(t, err)
+		toolRng := prg(t, someSeed)
 
 		// TODO: randomize the test at each iteration
 		for i := 0; i < 1; i++ {
@@ -346,10 +340,10 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 
 			count := 1000
 
-			selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, rng, count, identities)
+			selectionFromAll, err := ComputeLeaderSelection(0, rng, count, identities)
 			require.NoError(t, err)
 
-			selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, rng_copy, count, stakeful)
+			selectionFromStakeful, err := ComputeLeaderSelection(0, rng_copy, count, stakeful)
 			require.NoError(t, err)
 
 			for j := 0; j < count; j++ {
@@ -365,8 +359,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 		}
 
 		t.Run("if there is only 1 node has stake, then it will be always be the leader and the only leader", func(t *testing.T) {
-			toolRng, err := random.NewChacha20PRG(someSeed, []byte("test"))
-			require.NoError(t, err)
+			toolRng := prg(t, someSeed)
 
 			// TODO: randomize the test at each iteration
 			for i := 0; i < 1; i++ {
@@ -377,7 +370,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 				identities[n].Stake = stake
 				onlyStaked := identities[n]
 
-				selections, err := ComputeLeaderSelectionFromSeed(0, rng, 1000, identities)
+				selections, err := ComputeLeaderSelection(0, rng, 1000, identities)
 				require.NoError(t, err)
 
 				for j := 0; j < 1000; j++ {
