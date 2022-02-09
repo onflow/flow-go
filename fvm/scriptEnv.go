@@ -95,6 +95,21 @@ func NewScriptEnvironment(
 	return env
 }
 
+func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (bool, error) {
+	return crypto.BLSVerifyPOP(pk, s)
+}
+
+func (e *ScriptEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+	return crypto.AggregateBLSSignatures(sigs)
+}
+
+func (e *ScriptEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	return crypto.AggregateBLSPublicKeys(keys)
+}
+
+func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+}
+
 func (e *ScriptEnv) seedRNG(header *flow.Header) {
 	// Seed the random number generator with entropy created from the block header ID. The random number generator will
 	// be used by the UnsafeRandom function.

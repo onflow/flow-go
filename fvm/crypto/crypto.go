@@ -115,6 +115,58 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bo
 	return true, nil
 }
 
+// ValidatePublicKey returns true if public key is valid
+func BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (valid bool, err error) {
+	sigAlgo := RuntimeToCryptoSigningAlgorithm(pk.SignAlgo)
+
+	cpk, err := crypto.DecodePublicKey(sigAlgo, pk.PublicKey)
+	if err != nil {
+		if crypto.IsInvalidInputsError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("BLSVerifyPOP failed: %w", err)
+	}
+
+	return crypto.BLSVerifyPOP(cpk, s)
+}
+
+func AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+
+	cryptoSigs := make([]crypto.Signature, len(sigs))
+	for i, sig := range sigs {
+		cryptoSigs[i] = sig
+	}
+
+	return crypto.AggregateBLSSignatures(cryptoSigs)
+}
+
+func AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	cryptoKeys := make([]crypto.PublicKey, len(keys))
+	for i, key := range keys {
+		sigAlgo := RuntimeToCryptoSigningAlgorithm(key.SignAlgo)
+		cpk, err := crypto.DecodePublicKey(sigAlgo, key.PublicKey)
+		if err != nil {
+			if crypto.IsInvalidInputsError(err) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("AggregateBLSPublicKeys failed: %w", err)
+		}
+		cryptoKeys[i] = cpk
+	}
+
+	aggregatedKey, err := crypto.AggregateBLSPublicKeys(cryptoKeys)
+	if err != nil {
+		return nil, fmt.Errorf("AggregateBLSPublicKeys failed: %w", err)
+	}
+
+	return &runtime.PublicKey{
+		PublicKey: aggregatedKey.Encode(),
+		SignAlgo:  0,
+		IsValid:   true, // <- TODO: check if this is correct
+		Validated: true,
+	}, nil
+}
+
 // VerifySignatureFromRuntime is an adapter that performs signature verification using
 // raw values provided by the Cadence runtime.
 func VerifySignatureFromRuntime(
