@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"math/rand"
-	"syscall"
 	"testing"
 	"time"
 
@@ -264,42 +263,6 @@ func (suite *Suite) TestGetCollection() {
 
 	suite.Equal(expected, *actual)
 	suite.assertAllExpectations()
-}
-
-// TestSendTransactionPanic tests that shutdown behaviour if transactions fail to store when disk is full
-func (suite *Suite) TestSendTransactionPanic() {
-	ctx := context.Background()
-	transactionBody := unittest.TransactionBodyFixture()
-
-	suite.colClient.On("SendTransaction").Return(nil, nil)
-
-	backend := New(
-		suite.state,
-		suite.colClient, nil, nil, nil,
-		suite.collections,
-		suite.transactions,
-		nil,
-		nil,
-		suite.chainID,
-		metrics.NewNoopCollector(),
-		nil,
-		false,
-		DefaultMaxHeightRange,
-		nil,
-		nil,
-		suite.log,
-	)
-	suite.Run("panic on full disk error", func() {
-		suite.transactions.On("Store", mock.Anything).Return(syscall.ENOSPC)
-		defer func() {
-			if rec := recover(); rec == nil {
-				suite.Fail("Code did not panic from full disc")
-			}
-		}()
-		err := backend.SendTransaction(ctx, &transactionBody)
-		suite.Require().NoError(err)
-		suite.Require().Fail("this line should not be reached")
-	})
 }
 
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
