@@ -2,9 +2,11 @@ package badger
 
 import (
 	"errors"
-	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 	lru "github.com/hashicorp/golang-lru"
+
+	"fmt"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
