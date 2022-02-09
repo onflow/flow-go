@@ -1278,7 +1278,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		}
 
 		// generate qc for root cluster block
-		qc, err := run.GenerateClusterRootQC(participants, block)
+		qc, err := run.GenerateClusterRootQC(participants, bootstrap.ToIdentityList(participants), block)
 		if err != nil {
 			return nil, nil, err
 		}
