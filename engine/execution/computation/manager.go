@@ -292,7 +292,7 @@ func (e *Manager) ComputeBlock(
 		Msg("computed block result")
 
 	// e.edCache.Insert(block.Block.Header, blobTree)
-	// result.ExecutionDataID = rootID
+	result.ExecutionDataID = flow.ZeroID
 
 	return result, nil
 }
