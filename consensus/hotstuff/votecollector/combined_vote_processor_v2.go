@@ -103,7 +103,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 type CombinedVoteProcessorV2 struct {
 	log              zerolog.Logger
 	block            *model.Block
-	votesCache       BlockSpecificVotesCache
+	blockVotesCache  BlockSpecificVotesCache
 	stakingSigAggtor hotstuff.WeightedSignatureAggregator
 	rbRector         hotstuff.RandomBeaconReconstructor
 	onQCCreated      hotstuff.OnQCCreated
@@ -125,7 +125,7 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 	return &CombinedVoteProcessorV2{
 		log:              log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:            block,
-		votesCache:       *NewBlockSpecificVotesCache(block),
+		blockVotesCache:  *NewBlockSpecificVotesCache(block),
 		stakingSigAggtor: stakingSigAggtor,
 		rbRector:         rbRector,
 		onQCCreated:      onQCCreated,
@@ -154,7 +154,7 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 //  * VoteForIncompatibleViewError - submitted vote for incompatible view
 //  * DuplicatedVoteErr is returned when adding a vote that is _identical_
 //    to a previously added vote.
-//  * model.InconsistentVoteError is returned if the voter emitted
+//  * model.DEP_InconsistentVoteError is returned if the voter emitted
 //    votes for the _same_ block but with inconsistent signatures
 //  * model.InvalidVoteError - vote has invalid signature or
 //    is not from an authorized consensus participant
@@ -162,7 +162,7 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	// Cache Vote: rejects votes for different blocks or views, duplicates or inconsistent votes.
 	// VotesCache guarantees that we process at most one vote per SignerID.
-	err := p.votesCache.AddVote(vote)
+	err := p.blockVotesCache.AddVote(vote)
 	if err != nil {
 		return fmt.Errorf("failed to cache vote %v: %w", vote.ID(), err)
 	}

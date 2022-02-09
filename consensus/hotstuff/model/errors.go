@@ -145,8 +145,8 @@ func IsDoubleVoteError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// AsDoubleVoteError determines whether the given error is a DoubleVoteError
-// (potentially wrapped). It follows the same semantics as a checked type cast.
+// AsDoubleVoteError determines whether err is a DoubleVoteError (potentially
+// wrapped). It follows the same semantics as a checked type cast.
 func AsDoubleVoteError(err error) (*DoubleVoteError, bool) {
 	var e DoubleVoteError
 	ok := errors.As(err, &e)
@@ -168,7 +168,7 @@ func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...i
 	}
 }
 
-// InconsistentVoteError indicates that a consensus replica has emitted
+// DEP_InconsistentVoteError indicates that a consensus replica has emitted
 // inconsistent votes for the _same_ block. This is only relevant for voting
 // schemes where the voting replica has different options how to sign (e.g. a
 // replica can sign with their staking key and/or their random beacon key).
@@ -176,26 +176,26 @@ func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...i
 // votes for the same block, to exhaust the primary's resources or have
 // multiple of their votes counted to undermine consensus safety. Sending
 // inconsistent votes belongs to the family of equivocation attacks.
-type InconsistentVoteError struct {
+type DEP_InconsistentVoteError struct {
 	FirstVote        *Vote
 	InconsistentVote *Vote
 	err              error
 }
 
-func (e InconsistentVoteError) Error() string {
+func (e DEP_InconsistentVoteError) Error() string {
 	return e.err.Error()
 }
 
-// IsInconsistentVoteError returns whether err is an InconsistentVoteError
-func IsInconsistentVoteError(err error) bool {
-	var e InconsistentVoteError
+// DEP_IsInconsistentVoteError returns whether err is an DEP_InconsistentVoteError
+func DEP_IsInconsistentVoteError(err error) bool {
+	var e DEP_InconsistentVoteError
 	return errors.As(err, &e)
 }
 
-// AsInconsistentVoteError determines whether the given error is a InconsistentVoteError
+// DEP_AsInconsistentVoteError determines whether err is a DEP_InconsistentVoteError
 // (potentially wrapped). It follows the same semantics as a checked type cast.
-func AsInconsistentVoteError(err error) (*InconsistentVoteError, bool) {
-	var e InconsistentVoteError
+func DEP_AsInconsistentVoteError(err error) (*DEP_InconsistentVoteError, bool) {
+	var e DEP_InconsistentVoteError
 	ok := errors.As(err, &e)
 	if ok {
 		return &e, true
@@ -203,12 +203,12 @@ func AsInconsistentVoteError(err error) (*InconsistentVoteError, bool) {
 	return nil, false
 }
 
-func (e InconsistentVoteError) Unwrap() error {
+func (e DEP_InconsistentVoteError) Unwrap() error {
 	return e.err
 }
 
-func NewInconsistentVoteErrorf(firstVote, inconsistentVote *Vote, msg string, args ...interface{}) error {
-	return InconsistentVoteError{
+func DEP_NewInconsistentVoteErrorf(firstVote, inconsistentVote *Vote, msg string, args ...interface{}) error {
+	return DEP_InconsistentVoteError{
 		FirstVote:        firstVote,
 		InconsistentVote: inconsistentVote,
 		err:              fmt.Errorf(msg, args...),
@@ -301,4 +301,50 @@ func (e InvalidSignerError) Unwrap() error { return e.err }
 func IsInvalidSignerError(err error) bool {
 	var e InvalidSignerError
 	return errors.As(err, &e)
+}
+
+// InconsistentVoteError indicates that a consensus replica has emitted
+// inconsistent votes within the same view. We consider two votes as
+// inconsistent, if they are from the same signer for the same view, but have
+// different IDs. Potential causes could be:
+//  * The signer voted for different blocks in the same view.
+//  * The signer emitted votes for the same block, but included different
+//    signatures. This is only relevant for voting schemes where the signer has
+//    different options how to sign (e.g. sign with staking key and/or random
+//    beacon key). For such voting schemes, byzantine replicas could try to
+//    submit different votes for the same block, to exhaust the primary's
+//    resources or have multiple of their votes counted to undermine consensus
+//    safety (aka double-counting attack).
+// Both are protocol violations and belong to the family of equivocation attacks.
+// The InconsistentVoteError does not specify the specific root cause.
+type InconsistentVoteError struct {
+	InconsistentVote *Vote
+	err              error
+}
+
+func (e InconsistentVoteError) Error() string { return e.err.Error() }
+func (e InconsistentVoteError) Unwrap() error { return e.err }
+
+// IsInconsistentVoteError returns whether err is an InconsistentVoteError
+func IsInconsistentVoteError(err error) bool {
+	var e InconsistentVoteError
+	return errors.As(err, &e)
+}
+
+// AsInconsistentVoteError determines whether err is a InconsistentVoteError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsInconsistentVoteError(err error) (*InconsistentVoteError, bool) {
+	var e InconsistentVoteError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
+func NewInconsistentVoteErrorf(inconsistentVote *Vote, msg string, args ...interface{}) error {
+	return InconsistentVoteError{
+		InconsistentVote: inconsistentVote,
+		err:              fmt.Errorf(msg, args...),
+	}
 }

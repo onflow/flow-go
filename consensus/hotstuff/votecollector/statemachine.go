@@ -84,8 +84,8 @@ func NewStateMachine(
 // All expected errors are handled internally. Under normal execution only
 // exceptions are propagated to caller.
 //
-// PREREQUISITE: The origin of the vote is cryptographically verified (via the
-// sender's networking key). Otherwise, VoteCollector is vulnerable to
+// PREREQUISITE: The origin of the vote is cryptographically verified (via
+// the sender's networking key). Otherwise, VoteCollector is vulnerable to
 // impersonation attacks.
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
@@ -94,12 +94,8 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 		if errors.Is(err, DuplicatedVoteErr) {
 			return nil
 		}
-		if doubleVoteErr, isDoubleVoteErr := model.AsDoubleVoteError(err); isDoubleVoteErr {
-			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
-			return nil
-		}
-		if inconsistentVoteErr, isInconsistentVoteErr := model.AsInconsistentVoteError(err); isInconsistentVoteErr {
-			m.notifier.OnInconsistentVotingDetected(inconsistentVoteErr.FirstVote, inconsistentVoteErr.InconsistentVote)
+		if ivErr, isInconsistentVote := model.AsInconsistentVoteError(err); isInconsistentVote {
+			m.notifier.OnInconsistentVotingDetected(ivErr.InconsistentVote)
 			return nil
 		}
 		return fmt.Errorf("internal error adding vote %v to cache for block %v: %w", vote.ID(), vote.BlockID, err)
@@ -191,7 +187,7 @@ func (m *VoteCollector) View() uint64 {
 //  * nil if the proposer's vote, included in the proposal, is valid.
 //  * model.InvalidBlockError if the proposer's vote is invalid.
 //  * model.DoubleVoteError if the proposer has voted for a block other than the given proposal.
-//  * model.InconsistentVoteError if the proposer has emitted inconsistent votes for their proposal.
+//  * model.DEP_InconsistentVoteError if the proposer has emitted inconsistent votes for their proposal.
 //    This sentinel error is only relevant for voting schemes, where the voting replica has different
 //    options for signing (e.g. replica can sign with their staking key and/or their random beacon key).
 //    For such voting schemes, byzantine replicas could try to submit different votes for the same block,
@@ -219,7 +215,7 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
 			return fmt.Errorf("rejecting proposal %v because proposer is equivocating: %w", proposal.Block.BlockID, err)
 		}
-		if inconsistentVoteErr, isInconsistentVoteErr := model.AsInconsistentVoteError(err); isInconsistentVoteErr {
+		if inconsistentVoteErr, isInconsistentVoteErr := model.DEP_AsInconsistentVoteError(err); isInconsistentVoteErr {
 			m.notifier.OnInconsistentVotingDetected(inconsistentVoteErr.FirstVote, inconsistentVoteErr.InconsistentVote)
 			return fmt.Errorf("rejecting proposal %v because proposer published inconsistent voters: %w", proposal.Block.BlockID, err)
 		}
@@ -285,7 +281,7 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 //  * nil if the proposer's vote, included in the proposal, is valid.
 //  * model.InvalidBlockError if the proposer's vote is invalid.
 //  * model.DoubleVoteError if the proposer has voted for a block other than the given proposal.
-//  * model.InconsistentVoteError if the proposer has emitted inconsistent votes for their proposal.
+//  * model.DEP_InconsistentVoteError if the proposer has emitted inconsistent votes for their proposal.
 //    This sentinel error is only relevant for voting schemes, where the voting replica has different
 //    options for signing (e.g. replica can sign with their staking key and/or their random beacon key).
 //    For such voting schemes, byzantine replicas could try to submit different votes for the same block,

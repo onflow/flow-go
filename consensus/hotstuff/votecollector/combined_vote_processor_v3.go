@@ -91,7 +91,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 	return &CombinedVoteProcessorV3{
 		log:              log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:            block,
-		votesCache:       *NewBlockSpecificVotesCache(block),
+		blockVotesCache:  *NewBlockSpecificVotesCache(block),
 		stakingSigAggtor: stakingSigAggtor,
 		rbSigAggtor:      rbSigAggtor,
 		rbRector:         rbRector,
@@ -113,7 +113,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 type CombinedVoteProcessorV3 struct {
 	log              zerolog.Logger
 	block            *model.Block
-	votesCache       BlockSpecificVotesCache
+	blockVotesCache  BlockSpecificVotesCache
 	stakingSigAggtor hotstuff.WeightedSignatureAggregator
 	rbSigAggtor      hotstuff.WeightedSignatureAggregator
 	rbRector         hotstuff.RandomBeaconReconstructor
@@ -144,7 +144,7 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 //  * VoteForIncompatibleViewError - submitted vote for incompatible view
 //  * DuplicatedVoteErr is returned when adding a vote that is _identical_
 //    to a previously added vote.
-//  * model.InconsistentVoteError is returned if the voter emitted
+//  * model.DEP_InconsistentVoteError is returned if the voter emitted
 //    votes for the _same_ block but with inconsistent signatures
 //  * model.InvalidVoteError - vote has invalid signature or
 //    is not from an authorized consensus participant
@@ -152,19 +152,19 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 //
 // CAUTION: implementation is NOT (yet) BFT
 // Explanation: for correctness, we require that no voter can be counted repeatedly. However,
-// CombinedVoteProcessorV3 relies on the `VoteCollector`'s `votesCache` filter out all votes but the first for
+// CombinedVoteProcessorV3 relies on the `VoteCollector`'s `blockVotesCache` filter out all votes but the first for
 // every signerID. However, we have the edge case, where we still feed the proposers vote twice into the
 // `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
 // by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
-// TODO: (suggestion) I think it would be worth-while to include a second `votesCache` into the `CombinedVoteProcessorV3`.
+// TODO: (suggestion) I think it would be worth-while to include a second `blockVotesCache` into the `CombinedVoteProcessorV3`.
 //       Thereby,  `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
 //       external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
-//       runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
+//       runtime overhead is marginal: For `blockVotesCache` to add 500 votes (concurrently with 20 threads) takes about
 //       0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	// Cache Vote: rejects votes for different blocks or views, duplicates or inconsistent votes.
 	// VotesCache guarantees that we process at most one vote per SignerID.
-	err := p.votesCache.AddVote(vote)
+	err := p.blockVotesCache.AddVote(vote)
 	if err != nil {
 		return fmt.Errorf("failed to cache vote %v: %w", vote.ID(), err)
 	}

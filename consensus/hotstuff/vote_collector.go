@@ -94,7 +94,7 @@ type VoteProcessor interface {
 	//  * VoteForIncompatibleViewError - submitted vote for incompatible view
 	//  * DuplicatedVoteErr is returned when adding a vote that is _identical_
 	//    to a previously added vote.
-	//  * model.InconsistentVoteError is returned if the voter emitted
+	//  * model.DEP_InconsistentVoteError is returned if the voter emitted
 	//    votes for the _same_ block but with inconsistent signatures
 	//  * model.InvalidVoteError - vote has invalid signature or
 	//    is not from an authorized consensus participant
