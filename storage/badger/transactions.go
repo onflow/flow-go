@@ -46,7 +46,7 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transacti
 
 // Store ...
 func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
-	return operation.RetryOnConflictTx(t.db, transaction.Update, t.storeTx(flowTx))
+	return operation.TerminateOnFullDisk(operation.RetryOnConflictTx(t.db, transaction.Update, t.storeTx(flowTx)))
 }
 
 // ByID ...

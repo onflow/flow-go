@@ -3,8 +3,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"syscall"
-
 	"github.com/dgraph-io/badger/v2"
 	lru "github.com/hashicorp/golang-lru"
 
@@ -131,7 +129,7 @@ func (c *Cache) PutTx(key interface{}, resource interface{}) func(*transaction.T
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
 	return func(tx *transaction.Tx) error {
-		err := terminateOnFullDisk(storeOps(tx)) // execute operations to store recourse
+		err := storeOps(tx) // execute operations to store resource
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}
@@ -142,13 +140,4 @@ func (c *Cache) PutTx(key interface{}, resource interface{}) func(*transaction.T
 
 		return nil
 	}
-}
-
-// terminateOnFullDisk helper function to crash node if write failed because disk is full
-func terminateOnFullDisk(err error) error {
-	// using panic so any deferred functions can still execute
-	if err == syscall.ENOSPC {
-		panic("disk full, terminating node...")
-	}
-	return err
 }

@@ -65,7 +65,7 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 
 // Store ...
 func (b *Blocks) Store(block *flow.Block) error {
-	return operation.RetryOnConflictTx(b.db, transaction.Update, b.StoreTx(block))
+	return operation.TerminateOnFullDisk(operation.RetryOnConflictTx(b.db, transaction.Update, b.StoreTx(block)))
 }
 
 // ByID ...
@@ -110,7 +110,7 @@ func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flo
 
 // UpdateLastFullBlockHeight upsert (update or insert) the last full block height
 func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
-	return operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
+	return operation.TerminateOnFullDisk(operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
 
 		// try to update
 		err := operation.UpdateLastCompleteBlockHeight(height)(tx)
@@ -129,7 +129,7 @@ func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
 		}
 
 		return nil
-	})
+	}))
 }
 
 // GetLastFullBlockHeight ...
