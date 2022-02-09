@@ -11,8 +11,6 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/ipfs/go-bitswap"
-	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -47,17 +45,13 @@ import (
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -67,32 +61,32 @@ import (
 func main() {
 
 	var (
-		followerState                 protocol.MutableState
-		ledgerStorage                 *ledger.Ledger
-		events                        *storage.Events
-		serviceEvents                 *storage.ServiceEvents
-		txResults                     *storage.TransactionResults
-		results                       *storage.ExecutionResults
-		myReceipts                    *storage.MyExecutionReceipts
-		providerEngine                *exeprovider.Engine
-		checkerEng                    *checker.Engine
-		syncCore                      *chainsync.Core
-		pendingBlocks                 *buffer.PendingBlocks // used in follower engine
-		deltas                        *ingestion.Deltas
-		syncEngine                    *synchronization.Engine
-		followerEng                   *followereng.Engine // to sync blocks from consensus nodes
-		computationManager            *computation.Manager
-		collectionRequester           *requester.Engine
-		ingestionEng                  *ingestion.Engine
-		finalizationDistributor       *pubsub.FinalizationDistributor
-		finalizedHeader               *synchronization.FinalizedHeaderCache
-		rpcConf                       rpc.Config
-		err                           error
-		executionState                state.ExecutionState
-		triedir                       string
-		executionDataDir              string
-		collector                     module.ExecutionMetrics
-		executionDataServiceCollector module.ExecutionDataServiceMetrics
+		followerState           protocol.MutableState
+		ledgerStorage           *ledger.Ledger
+		events                  *storage.Events
+		serviceEvents           *storage.ServiceEvents
+		txResults               *storage.TransactionResults
+		results                 *storage.ExecutionResults
+		myReceipts              *storage.MyExecutionReceipts
+		providerEngine          *exeprovider.Engine
+		checkerEng              *checker.Engine
+		syncCore                *chainsync.Core
+		pendingBlocks           *buffer.PendingBlocks // used in follower engine
+		deltas                  *ingestion.Deltas
+		syncEngine              *synchronization.Engine
+		followerEng             *followereng.Engine // to sync blocks from consensus nodes
+		computationManager      *computation.Manager
+		collectionRequester     *requester.Engine
+		ingestionEng            *ingestion.Engine
+		finalizationDistributor *pubsub.FinalizationDistributor
+		finalizedHeader         *synchronization.FinalizedHeaderCache
+		rpcConf                 rpc.Config
+		err                     error
+		executionState          state.ExecutionState
+		triedir                 string
+		executionDataDir        string
+		collector               module.ExecutionMetrics
+		// executionDataServiceCollector module.ExecutionDataServiceMetrics
 		mTrieCacheSize                uint32
 		transactionResultsCacheSize   uint
 		checkpointDistance            uint
@@ -118,10 +112,10 @@ func main() {
 		blockDataUploaders            []uploader.Uploader
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
-		executionDataService          state_synchronization.ExecutionDataService
-		executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
-		executionDataCIDCacheSize     uint = 100
-		edsDatastoreTTL               time.Duration
+		// executionDataService          state_synchronization.ExecutionDataService
+		// executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
+		// executionDataCIDCacheSize     uint = 100
+		// edsDatastoreTTL               time.Duration
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -154,7 +148,7 @@ func main() {
 			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
 			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
-			flags.DurationVar(&edsDatastoreTTL, "execution-data-service-datastore-ttl", 0, "TTL for new blobs added to the execution data service blobstore")
+			// flags.DurationVar(&edsDatastoreTTL, "execution-data-service-datastore-ttl", 0, "TTL for new blobs added to the execution data service blobstore")
 		}).
 		ValidateFlags(func() error {
 			if enableBlockDataUpload {
@@ -191,10 +185,10 @@ func main() {
 			collector = metrics.NewExecutionCollector(node.Tracer)
 			return nil
 		}).
-		Module("execution data service metrics", func(node *cmd.NodeConfig) error {
-			executionDataServiceCollector = metrics.NewExecutionDataServiceCollector()
-			return nil
-		}).
+		// Module("execution data service metrics", func(node *cmd.NodeConfig) error {
+		// 	executionDataServiceCollector = metrics.NewExecutionDataServiceCollector()
+		// 	return nil
+		// }).
 		Module("sync core", func(node *cmd.NodeConfig) error {
 			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
@@ -334,76 +328,76 @@ func main() {
 
 			return compactor, nil
 		}).
-		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			err := os.MkdirAll(executionDataDir, 0700)
+		// Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		// 	err := os.MkdirAll(executionDataDir, 0700)
 
-			if err != nil {
-				return nil, err
-			}
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
 
-			dsOpts := &badger.DefaultOptions
-			dsOpts.TTL = edsDatastoreTTL
+		// 	dsOpts := &badger.DefaultOptions
+		// 	dsOpts.TTL = edsDatastoreTTL
 
-			ds, err := badger.NewDatastore(executionDataDir, dsOpts)
+		// 	ds, err := badger.NewDatastore(executionDataDir, dsOpts)
 
-			if err != nil {
-				return nil, err
-			}
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
 
-			nodeBuilder.ShutdownFunc(ds.Close)
+		// 	nodeBuilder.ShutdownFunc(ds.Close)
 
-			// TODO: if the node is not starting from the beginning of the spork, it may be useful to prepopulate
-			// the cache with the existing Execution Data blob trees. Currently, the cache is empty every time the
-			// node restarts, meaning that there will initially be no prioritization of requests.
-			executionDataCIDCache = state_synchronization.NewExecutionDataCIDCache(executionDataCIDCacheSize)
+		// 	// TODO: if the node is not starting from the beginning of the spork, it may be useful to prepopulate
+		// 	// the cache with the existing Execution Data blob trees. Currently, the cache is empty every time the
+		// 	// node restarts, meaning that there will initially be no prioritization of requests.
+		// 	// executionDataCIDCache = state_synchronization.NewExecutionDataCIDCache(executionDataCIDCacheSize)
 
-			bs, err := node.Network.RegisterBlobService(
-				engine.ExecutionDataService,
-				ds,
-				p2p.WithBitswapOptions(
-					bitswap.WithTaskComparator(
-						func(ta, tb *bitswap.TaskInfo) bool {
-							ra, err := executionDataCIDCache.Get(ta.Cid)
+		// 	bs, err := node.Network.RegisterBlobService(
+		// 		engine.ExecutionDataService,
+		// 		ds,
+		// 		p2p.WithBitswapOptions(
+		// 			bitswap.WithTaskComparator(
+		// 				func(ta, tb *bitswap.TaskInfo) bool {
+		// 					ra, err := executionDataCIDCache.Get(ta.Cid)
 
-							if err != nil {
-								return false
-							}
+		// 					if err != nil {
+		// 						return false
+		// 					}
 
-							rb, err := executionDataCIDCache.Get(tb.Cid)
+		// 					rb, err := executionDataCIDCache.Get(tb.Cid)
 
-							if err != nil {
-								return true
-							}
+		// 					if err != nil {
+		// 						return true
+		// 					}
 
-							if ra.BlobTreeRecord.BlockHeight > rb.BlobTreeRecord.BlockHeight {
-								// more recent block has higher priority
-								return true
-							} else if ra.BlobTreeRecord.BlockID == rb.BlobTreeRecord.BlockID {
-								// deeper node in the same blob tree has higher priority
-								return ra.BlobTreeLocation.Height < rb.BlobTreeLocation.Height
-							} else {
-								return false
-							}
-						},
-					),
-				))
+		// 					if ra.BlobTreeRecord.BlockHeight > rb.BlobTreeRecord.BlockHeight {
+		// 						// more recent block has higher priority
+		// 						return true
+		// 					} else if ra.BlobTreeRecord.BlockID == rb.BlobTreeRecord.BlockID {
+		// 						// deeper node in the same blob tree has higher priority
+		// 						return ra.BlobTreeLocation.Height < rb.BlobTreeLocation.Height
+		// 					} else {
+		// 						return false
+		// 					}
+		// 				},
+		// 			),
+		// 		))
 
-			if err != nil {
-				return nil, err
-			}
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
 
-			eds := state_synchronization.NewExecutionDataService(
-				&cbor.Codec{},
-				compressor.NewLz4Compressor(),
-				bs,
-				executionDataServiceCollector,
-				node.Logger,
-			)
+		// 	eds := state_synchronization.NewExecutionDataService(
+		// 		&cbor.Codec{},
+		// 		compressor.NewLz4Compressor(),
+		// 		bs,
+		// 		executionDataServiceCollector,
+		// 		node.Logger,
+		// 	)
 
-			executionDataService = eds
+		// 	executionDataService = eds
 
-			return eds, nil
-		}).
+		// 	return eds, nil
+		// }).
 		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			extraLogPath := path.Join(triedir, "extralogs")
 			err := os.MkdirAll(extraLogPath, 0777)
@@ -431,8 +425,8 @@ func main() {
 				committer,
 				scriptLogThreshold,
 				blockDataUploaders,
-				executionDataService,
-				executionDataCIDCache,
+				// executionDataService,
+				// executionDataCIDCache,
 			)
 			if err != nil {
 				return nil, err
