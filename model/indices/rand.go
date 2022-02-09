@@ -2,6 +2,10 @@ package indices
 
 import "encoding/binary"
 
+// list of customizers used for different sub-protocol PRNGs.
+// These customizers help instanciate different PRNGs from the
+// same source of randomness.
+
 var (
 	// ProtocolConsensusLeaderSelection is the cuztomizer for consensus leader selection
 	ProtocolConsensusLeaderSelection = customizerFromIndices([]uint16{0, 1, 1})
@@ -24,18 +28,6 @@ func ExecutionChunk(chunkIndex uint16) []byte {
 	indices := append(executionChunkPrefix, chunkIndex)
 	return customizerFromIndices(indices)
 }
-
-// list of customizers used for different sub-protocol PRNGs.
-// These customizers help instanciate different PRNGs from the
-// same source of randomness.
-//
-// TODO: the seed input is already diversified using the indices above.
-// The customizers below are enough to diversify the PRNGs and we can
-// remove the indices.
-var (
-	ConsensusLeaderSelectionCustomizer = []byte("leader_selec")
-	ChunkAssignmentCustomizer          = []byte("chunk_assign")
-)
 
 // customizerFromIndices maps the input indices into a slice of bytes.
 // The implementation insures there are no collisions of mapping of different indices.

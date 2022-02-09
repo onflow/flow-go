@@ -260,13 +260,13 @@ func (_m *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	return r0, r1
 }
 
-// Seed provides a mock function with given fields: customizer
-func (_m *Snapshot) Seed(customizer []byte) ([]byte, error) {
-	ret := _m.Called(customizer)
+// Seed provides a mock function with given fields:
+func (_m *Snapshot) Seed() ([]byte, error) {
+	ret := _m.Called()
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func([]byte) []byte); ok {
-		r0 = rf(customizer)
+	if rf, ok := ret.Get(0).(func() []byte); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -274,8 +274,8 @@ func (_m *Snapshot) Seed(customizer []byte) ([]byte, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]byte) error); ok {
-		r1 = rf(customizer)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}

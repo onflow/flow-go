@@ -94,12 +94,12 @@ func createNode(
 	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
 	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView, nil)
 	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
-	currentEpoch.On("Seed", mock.Anything).Return(nextSetup.RandomSource, nil)
+	currentEpoch.On("Seed").Return(nextSetup.RandomSource, nil)
 
 	nextEpoch := new(protocolmock.Epoch)
 	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
-	nextEpoch.On("Seed", mock.Anything).Return(nextSetup.RandomSource, nil)
+	nextEpoch.On("Seed").Return(nextSetup.RandomSource, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
 	epochQuery.Add(currentEpoch)

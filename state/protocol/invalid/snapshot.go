@@ -55,7 +55,7 @@ func (u *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 	return nil, u.err
 }
 
-func (u *Snapshot) Seed(_ []byte) ([]byte, error) {
+func (u *Snapshot) Seed() ([]byte, error) {
 	return nil, u.err
 }
 

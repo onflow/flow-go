@@ -5,37 +5,45 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/random"
 )
 
-// FromParentSignature reads the raw random seed from a main consensus QC sigData.
+// FromParentSignature extracts a seed from the given QC sigData.
 // The sigData is an RLP encoded structure that is part of QuorumCertificate.
-// The customizer can be used to generate task-specific seeds from the same signature.
-func FromParentSignature(customizer []byte, sigData []byte) ([]byte, error) {
+//
+// The function extracts first the source of randomness from sigData and then hashes
+// it to obtain the outout seed.
+// Since the source of randmoness is a cryptographic signature, it is required to
+// hash it in order to uniformize the entropy over the output.
+func FromParentSignature(sigData []byte) ([]byte, error) {
 	// unpack sig data to extract random beacon sig
 	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not unpack block signature: %w", err)
 	}
 
-	return FromRandomSource(customizer, randomBeaconSig)
+	return FromRandomSource(randomBeaconSig), nil
 }
 
-// FromRandomSource generates a task-specific seed (task is determined by indices).
-func FromRandomSource(customizer []byte, sor []byte) ([]byte, error) {
+// FromRandomSource generates a seed from source of randomness.
+//
+// The source of randomness is a cryptographic signature, it is therefore required to
+// hash the data in order to uniformize the entropy over the output seed.
+func FromRandomSource(randomSource []byte) []byte {
+	var seed [hash.HashLenSHA3_256]byte
+	hash.ComputeSHA3_256(&seed, randomSource)
+	return seed[:]
+}
 
-	// create the key used for the KMAC by concatenating all indices
-	keyLen := len(customizer)
-	if keyLen < hash.KmacMinKeyLen {
-		keyLen = hash.KmacMinKeyLen
-	}
-	key := make([]byte, keyLen)
-	copy(key, customizer)
+func PRGFromRandomSource(randomSource []byte, customizer []byte) (random.Rand, error) {
+	// hash the source of randomness (signature) to uniformize the entropy
+	var seed [hash.HashLenSHA3_256]byte
+	hash.ComputeSHA3_256(&seed, randomSource)
 
-	// create a KMAC instance with our key and 32 bytes output size
-	kmac, err := hash.NewKMAC_128(key, nil, 32)
+	// create random number generator from the seed and customizer
+	rng, err := random.NewChacha20PRG(seed[:], customizer)
 	if err != nil {
-		return nil, fmt.Errorf("could not create kmac: %w", err)
+		return nil, fmt.Errorf("could not create rng: %w", err)
 	}
-
-	return kmac.ComputeHash(sor), nil
+	return rng, nil
 }

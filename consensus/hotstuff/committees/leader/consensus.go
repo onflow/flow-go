@@ -3,6 +3,7 @@ package leader
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
@@ -19,7 +20,7 @@ func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch initial identities: %w", err)
 	}
-	seed, err := epoch.Seed(indices.ProtocolConsensusLeaderSelection)
+	seed, err := epoch.Seed()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch seed: %w", err)
 	}
@@ -31,9 +32,16 @@ func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch final view: %w", err)
 	}
+
+	// create random number generator from the seed and customizer
+	rng, err := random.NewChacha20PRG(seed, indices.ProtocolConsensusLeaderSelection)
+	if err != nil {
+		return nil, fmt.Errorf("could not create rng: %w", err)
+	}
+
 	leaders, err := ComputeLeaderSelectionFromSeed(
 		firstView,
-		seed,
+		rng,
 		int(finalView-firstView+1), // add 1 because both first/final view are inclusive
 		identities.Filter(filter.IsVotingConsensusCommitteeMember),
 	)

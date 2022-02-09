@@ -54,7 +54,7 @@ func (u *Epoch) RandomSource() ([]byte, error) {
 	return nil, u.err
 }
 
-func (u *Epoch) Seed([]byte) ([]byte, error) {
+func (u *Epoch) Seed() ([]byte, error) {
 	return nil, u.err
 }
 

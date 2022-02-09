@@ -89,7 +89,7 @@ type Snapshot interface {
 	//  * NoValidChildBlockError indicates that no valid child block is known
 	//    (which contains the block's source of randomness)
 	//  * unexpected errors should be considered symptoms of internal bugs
-	Seed(customizer []byte) ([]byte, error)
+	Seed() ([]byte, error)
 
 	// Phase returns the epoch phase for the current epoch, as of the Head block.
 	Phase() (flow.EpochPhase, error)

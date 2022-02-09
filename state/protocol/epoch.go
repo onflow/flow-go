@@ -66,7 +66,7 @@ type Epoch interface {
 
 	// Seed extracts a seed using the source of randomness for this
 	// epoch, specified in the EpochSetup service event.
-	Seed([]byte) ([]byte, error)
+	Seed() ([]byte, error)
 
 	// InitialIdentities returns the identities for this epoch as they were
 	// specified in the EpochSetup service event.

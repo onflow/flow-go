@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -283,6 +282,6 @@ func newMockEpoch(
 	// return nil error to indicate the epoch is committed
 	epoch.On("DKG").Return(nil, nil)
 
-	epoch.On("Seed", indices.ProtocolConsensusLeaderSelection).Return(seed, nil)
+	epoch.On("Seed").Return(seed, nil)
 	return epoch
 }

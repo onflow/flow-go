@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/indices"
 )
 
 const EstimatedSixMonthOfViews = 15000000 // 1 sec block time * 60 secs * 60 mins * 24 hours * 30 days * 6 months
@@ -86,11 +85,16 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 // ComputeLeaderSelectionFromSeed pre-generates a certain number of leader selections, and returns a
 // leader selection instance for querying the leader indexes for certain views.
 // firstView - the start view of the epoch, the generated leader selections start from this view.
-// seed - the random seed for leader selection
+// rng - the deterministic source of randoms
 // count - the number of leader selections to be pre-generated and cached.
 // identities - the identities that contain the stake info, which is used as weight for the chance of
 //							the identity to be selected as leader.
-func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
+func ComputeLeaderSelectionFromSeed(
+	firstView uint64,
+	rng random.Rand,
+	count int,
+	identities flow.IdentityList,
+) (*LeaderSelection, error) {
 
 	if count < 1 {
 		return nil, fmt.Errorf("number of views must be positive (got %d)", count)
@@ -101,7 +105,7 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 		weights = append(weights, id.Stake)
 	}
 
-	leaders, err := WeightedRandomSelection(seed, count, weights)
+	leaders, err := weightedRandomSelection(rng, count, weights)
 	if err != nil {
 		return nil, fmt.Errorf("could not select leader: %w", err)
 	}
@@ -113,17 +117,16 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 	}, nil
 }
 
-// WeightedRandomSelection - given a seed and a given count, pre-generate the indexs of leader.
+// weightedRandomSelection - given a random source source and a given count, pre-generate the indexs of leader.
 // The chance to be selected as leader is proportional to its weight.
 // If an identity has 0 stake (weight is 0), it won't be selected as leader.
 // This algorithm is essentially Fitness proportionate selection:
 // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
-func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16, error) {
-	// create random number generator from the seed
-	rng, err := random.NewChacha20PRG(seed, indices.ConsensusLeaderSelectionCustomizer)
-	if err != nil {
-		return nil, fmt.Errorf("can not create rng: %w", err)
-	}
+func weightedRandomSelection(
+	rng random.Rand,
+	count int,
+	weights []uint64,
+) ([]uint16, error) {
 
 	if len(weights) == 0 {
 		return nil, fmt.Errorf("weights is empty")
