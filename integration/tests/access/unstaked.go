@@ -24,6 +24,8 @@ const blockCount = 5 // number of finalized blocks to wait for
 type UnstakedAccessSuite struct {
 	suite.Suite
 
+	log zerolog.Logger
+
 	// root context for the current test
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -35,16 +37,20 @@ type UnstakedAccessSuite struct {
 	followerMgr2 *followerManager
 }
 
-func TestUnstakedAccessSuite(t *testing.T) {
-	suite.Run(t, new(UnstakedAccessSuite))
-}
-
-func (suite *UnstakedAccessSuite) TearDownTest() {
-	defer suite.cancel()
-	suite.net.Remove()
+func (s *UnstakedAccessSuite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
+	s.net.Remove()
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 func (suite *UnstakedAccessSuite) SetupTest() {
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "unstaked.go").
+		Str("testcase", suite.T().Name()).
+		Logger()
+	suite.log = logger
+	suite.log.Info().Msgf("================> SetupTest")
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.buildNetworkConfig()
 	// start the network

@@ -3,10 +3,8 @@ package execution
 import (
 	"context"
 	"math/rand"
-	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
@@ -20,10 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func TestExecutionChunkDataPacks(t *testing.T) {
-	suite.Run(t, new(ChunkDataPacksSuite))
-}
 
 type ChunkDataPacksSuite struct {
 	Suite
