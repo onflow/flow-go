@@ -16,6 +16,7 @@ import (
 	epochcmdutil "github.com/onflow/flow-go/cmd/util/cmd/epochs/utils"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -120,19 +121,57 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		log.Fatal().Err(err).Msg("could not get first view from epoch")
 	}
 
+	// determine staking auction end view based on dkg timing
+	stakingEndView, err := getStakingAuctionEndView(epoch)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not determine staking auction end view")
+	}
+
 	// read final view
 	finalView, err := epoch.FinalView()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not get final view from epoch")
 	}
 
-	return convertResetEpochArgs(epochCounter, randomSource, flagPayout, firstView, finalView)
+	return convertResetEpochArgs(epochCounter, randomSource, flagPayout, firstView, stakingEndView, finalView)
+}
+
+// getStakingAuctionEndView determines the staking auction end view from the
+// epoch based on DKG timing.
+//
+//   Staking  Setup
+//            DKG1  DKG2  DKG3
+// |---------|-----|-----|-----|----
+//           ^     ^     ^-dkgPhase2FinalView
+//           |     `-dkgPhase1FinalView
+//           `-stakingEndView
+//
+func getStakingAuctionEndView(epoch protocol.Epoch) (uint64, error) {
+	dkgPhase1FinalView, err := epoch.DKGPhase1FinalView()
+	if err != nil {
+		return 0, err
+	}
+	dkgPhase2FinalView, err := epoch.DKGPhase2FinalView()
+	if err != nil {
+		return 0, err
+	}
+
+	// sanity check
+	if dkgPhase1FinalView >= dkgPhase2FinalView {
+		return 0, fmt.Errorf("invalid dkg timing - phase 1 (%d) ends after phase 2 (%d)", dkgPhase1FinalView, dkgPhase2FinalView)
+	}
+
+	// the staking auction ends when the dkg begins
+	dkgPhaseLength := dkgPhase2FinalView - dkgPhase1FinalView
+	stakingEndView := dkgPhase1FinalView - dkgPhaseLength
+
+	return stakingEndView, nil
 }
 
 // convertResetEpochArgs converts the arguments required by `resetEpoch` to cadence representations
-// Contract Method: https://github.com/onflow/flow-core-contracts/blob/master/contracts/epochs/FlowEpoch.cdc#L423-L432
+// Contract Method: https://github.com/onflow/flow-core-contracts/blob/master/contracts/epochs/FlowEpoch.cdc#L413
 // Transaction: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/reset_epoch.cdc
-func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout string, firstView, finalView uint64) []cadence.Value {
+func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout string, firstView, stakingEndView, finalView uint64) []cadence.Value {
 
 	args := make([]cadence.Value, 0)
 
@@ -165,6 +204,9 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 
 	// add first view
 	args = append(args, cadence.NewUInt64(firstView))
+
+	// add staking auction phase end view
+	args = append(args, cadence.NewUInt64(stakingEndView))
 
 	// add final view
 	args = append(args, cadence.NewUInt64(finalView))

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flaky-test-monitor/common"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
 // data driven table test

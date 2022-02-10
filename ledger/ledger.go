@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/module"
@@ -184,14 +185,36 @@ func (k *Key) Size() int {
 }
 
 // CanonicalForm returns a byte slice describing the key
-// Warning, Changing this has an impact on how leaf hashes are computed
+// Warning: Changing this has an impact on how leaf hashes are computed!
 // don't use this to reconstruct the key later
 func (k *Key) CanonicalForm() []byte {
-	ret := ""
+	// calculate the size of the byte array
+
+	// the maximum size of a uint16 is 5 characters, so
+	// this is using 10 for the estimate, to include the two '/'
+	// characters and an extra 3 characters for padding safety
+
+	constant := 10
+
+	requiredLen := constant * len(k.KeyParts)
 	for _, kp := range k.KeyParts {
-		ret += fmt.Sprintf("/%d/%v", kp.Type, string(kp.Value))
+		requiredLen += len(kp.Value)
 	}
-	return []byte(ret)
+
+	retval := make([]byte, 0, requiredLen)
+
+	for _, kp := range k.KeyParts {
+		typeNumber := strconv.Itoa(int(kp.Type))
+
+		retval = append(retval, byte('/'))
+		retval = append(retval, []byte(typeNumber)...)
+		retval = append(retval, byte('/'))
+		retval = append(retval, kp.Value...)
+	}
+
+	// create a byte slice with the correct size and copy
+	// the estimated string into it.
+	return retval
 }
 
 func (k *Key) String() string {
@@ -200,9 +223,9 @@ func (k *Key) String() string {
 
 // DeepCopy returns a deep copy of the key
 func (k *Key) DeepCopy() Key {
-	newKPs := make([]KeyPart, 0, len(k.KeyParts))
-	for _, kp := range k.KeyParts {
-		newKPs = append(newKPs, *kp.DeepCopy())
+	newKPs := make([]KeyPart, len(k.KeyParts))
+	for i, kp := range k.KeyParts {
+		newKPs[i] = *kp.DeepCopy()
 	}
 	return Key{KeyParts: newKPs}
 }
@@ -247,8 +270,8 @@ func (kp *KeyPart) Equals(other *KeyPart) bool {
 
 // DeepCopy returns a deep copy of the key part
 func (kp *KeyPart) DeepCopy() *KeyPart {
-	newV := make([]byte, 0, len(kp.Value))
-	newV = append(newV, kp.Value...)
+	newV := make([]byte, len(kp.Value))
+	copy(newV, kp.Value)
 	return &KeyPart{Type: kp.Type, Value: newV}
 }
 
@@ -276,8 +299,8 @@ func (v Value) String() string {
 
 // DeepCopy returns a deep copy of the value
 func (v Value) DeepCopy() Value {
-	newV := make([]byte, 0, len(v))
-	newV = append(newV, []byte(v)...)
+	newV := make([]byte, len(v))
+	copy(newV, v)
 	return newV
 }
 

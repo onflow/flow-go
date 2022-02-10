@@ -41,6 +41,7 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 
 	account, err := b.getAccountAtBlockID(ctx, address, latestBlockID)
 	if err != nil {
+		b.log.Error().Err(err).Msgf("failed to get account at blockID: %v", latestBlockID)
 		return nil, err
 	}
 
@@ -89,6 +90,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 	var exeRes *execproto.GetAccountAtBlockIDResponse
 	exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
 	if err != nil {
+		b.log.Error().Err(err).Msg("failed to get account from execution nodes")
 		return nil, err
 	}
 
@@ -146,7 +148,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 		}
 	}
 
-	// if all errors were codes.NotFound, then return a codes.NotFound error wrapping all those error
+	// if all errors were codes.NotFound, then return a codes.NotFound error wrapping all those errors
 	return nil, status.Errorf(codes.NotFound, "failed to get account from the execution node: %v", errToReturn)
 }
 
