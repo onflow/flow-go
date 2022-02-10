@@ -60,8 +60,8 @@ type Broker struct {
 	log                       zerolog.Logger
 	unit                      *engine.Unit
 	dkgInstanceID             string                     // unique identifier of the current dkg run (prevent replay attacks)
-	committee                 flow.IdentityList          // IDs of DKG members
-	me                        module.Local               // used for signing bcast messages
+	committee                 flow.IdentityList          // identities of DKG members
+	me                        module.Local               // used for signing broadcast messages
 	myIndex                   int                        // index of this instance in the committee
 	dkgContractClients        []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
 	lastSuccessfulClientIndex int                        // index of the contract client that was last successful during retries
@@ -73,7 +73,8 @@ type Broker struct {
 
 	broadcasts uint // broadcasts counts the number of attempted broadcasts
 
-	broadcastLock sync.Mutex // protects access to broadcasts count variable
+	clientLock    sync.Mutex // lock around updates to current client
+	broadcastLock sync.Mutex // lock around outbound broadcasts
 	pollLock      sync.Mutex // lock around polls to read inbound broadcasts
 }
 
@@ -150,9 +151,9 @@ func (b *Broker) Broadcast(data []byte) {
 		if b.broadcasts > 0 {
 			// The warn-level log is used by the integration tests to check if this
 			// method is called more than once within one epoch (unhappy path).
-			b.log.Warn().Msgf("DKG broadcast number %d with header %d", b.broadcasts+1, data[0])
+			b.log.Warn().Msgf("preparing to send DKG broadcast number %d with header %d", b.broadcasts+1, data[0])
 		} else {
-			b.log.Info().Msgf("DKG message broadcast with header %d", data[0])
+			b.log.Info().Msgf("preparing to send DKG message broadcast with header %d", data[0])
 		}
 		b.broadcasts++
 		log := b.log.With().Uint("broadcast_number", b.broadcasts).Logger()
@@ -324,8 +325,6 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		return nil
 	}
 
-	b.unit.Lock()
-	defer b.unit.Unlock()
 	for _, msg := range msgs {
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
@@ -356,8 +355,8 @@ func (b *Broker) Shutdown() {
 // updateContractClient will return the last successful client index by default for all initial operations or else
 // it will return the appropriate client index with respect to last successful and number of client.
 func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractClient) {
-	b.unit.Lock()
-	defer b.unit.Unlock()
+	b.clientLock.Lock()
+	defer b.clientLock.Unlock()
 	if clientIndex == b.lastSuccessfulClientIndex {
 		if clientIndex == len(b.dkgContractClients)-1 {
 			clientIndex = 0
@@ -373,15 +372,15 @@ func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractC
 
 // getInitialContractClient will return the last successful contract client or the initial
 func (b *Broker) getInitialContractClient() (int, module.DKGContractClient) {
-	b.unit.Lock()
-	defer b.unit.Unlock()
+	b.clientLock.Lock()
+	defer b.clientLock.Unlock()
 	return b.lastSuccessfulClientIndex, b.dkgContractClients[b.lastSuccessfulClientIndex]
 }
 
 // updateLastSuccessfulClient set lastSuccessfulClientIndex in concurrency safe way
 func (b *Broker) updateLastSuccessfulClient(clientIndex int) {
-	b.unit.Lock()
-	defer b.unit.Unlock()
+	b.clientLock.Lock()
+	defer b.clientLock.Unlock()
 
 	b.lastSuccessfulClientIndex = clientIndex
 }
