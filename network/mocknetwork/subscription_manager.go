@@ -29,15 +29,15 @@ func (_m *SubscriptionManager) Channels() network.ChannelList {
 }
 
 // GetEngine provides a mock function with given fields: channel
-func (_m *SubscriptionManager) GetEngine(channel network.Channel) (network.Engine, error) {
+func (_m *SubscriptionManager) GetEngine(channel network.Channel) (network.MessageProcessor, error) {
 	ret := _m.Called(channel)
 
-	var r0 network.Engine
-	if rf, ok := ret.Get(0).(func(network.Channel) network.Engine); ok {
+	var r0 network.MessageProcessor
+	if rf, ok := ret.Get(0).(func(network.Channel) network.MessageProcessor); ok {
 		r0 = rf(channel)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(network.Engine)
+			r0 = ret.Get(0).(network.MessageProcessor)
 		}
 	}
 
@@ -52,11 +52,11 @@ func (_m *SubscriptionManager) GetEngine(channel network.Channel) (network.Engin
 }
 
 // Register provides a mock function with given fields: channel, engine
-func (_m *SubscriptionManager) Register(channel network.Channel, engine network.Engine) error {
+func (_m *SubscriptionManager) Register(channel network.Channel, engine network.MessageProcessor) error {
 	ret := _m.Called(channel, engine)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(network.Channel, network.Engine) error); ok {
+	if rf, ok := ret.Get(0).(func(network.Channel, network.MessageProcessor) error); ok {
 		r0 = rf(channel, engine)
 	} else {
 		r0 = ret.Error(0)

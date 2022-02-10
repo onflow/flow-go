@@ -17,6 +17,8 @@ const (
 	// ALL Flow libp2p protocols must start with this prefix.
 	FlowLibP2PProtocolCommonPrefix = "/flow"
 
+	FlowDHTProtocolIDPrefix = FlowLibP2PProtocolCommonPrefix + "/dht/"
+
 	// FlowLibP2POneToOneProtocolIDPrefix is a unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
 	// All nodes communicate with each other using this protocol id suffixed with the id of the root block
 	FlowLibP2POneToOneProtocolIDPrefix = FlowLibP2PProtocolCommonPrefix + "/push/"
@@ -34,6 +36,14 @@ func IsFlowProtocolStream(s libp2pnet.Stream) bool {
 	return strings.HasPrefix(p, FlowLibP2PProtocolCommonPrefix)
 }
 
+func FlowDHTProtocolID(sporkId flow.Identifier) protocol.ID {
+	return protocol.ID(FlowDHTProtocolIDPrefix + sporkId.String())
+}
+
+func FlowPublicDHTProtocolID(sporkId flow.Identifier) protocol.ID {
+	return protocol.ID(FlowDHTProtocolIDPrefix + "public/" + sporkId.String())
+}
+
 func FlowProtocolID(sporkId flow.Identifier) protocol.ID {
 	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + sporkId.String())
 }
@@ -48,7 +58,7 @@ type ProtocolFactory func(zerolog.Logger, flow.Identifier, libp2pnet.StreamHandl
 func ToProtocolNames(names []string) []ProtocolName {
 	p := make([]ProtocolName, 0)
 	for _, name := range names {
-		p = append(p, ProtocolName(name))
+		p = append(p, ProtocolName(strings.Trim(name, " ")))
 	}
 	return p
 }
@@ -66,7 +76,13 @@ func ToProtocolFactory(name ProtocolName) (ProtocolFactory, error) {
 
 // Protocol represents a unicast protocol.
 type Protocol interface {
-	NewStream(s libp2pnet.Stream) (libp2pnet.Stream, error)
-	Handler() libp2pnet.StreamHandler
+	// UpgradeRawStream wraps a specific unicast protocol implementation around
+	// the plain libp2p stream.
+	UpgradeRawStream(s libp2pnet.Stream) (libp2pnet.Stream, error)
+	// Handler is a libp2p stream handler that implements the logic of handling
+	// an established incoming stream to this node.
+	Handler(stream libp2pnet.Stream)
+	// ProtocolId returns the libp2p protocol id associated to this protocol. In libp2p
+	// streams running with the same protocol are identified with the same  protocol id.
 	ProtocolId() protocol.ID
 }

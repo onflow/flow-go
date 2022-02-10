@@ -386,6 +386,15 @@ func (il IdentityList) NodeIDs() []Identifier {
 	return nodeIDs
 }
 
+// PublicStakingKeys returns a list with the public staking keys (order preserving).
+func (il IdentityList) PublicStakingKeys() []crypto.PublicKey {
+	pks := make([]crypto.PublicKey, 0, len(il))
+	for _, id := range il {
+		pks = append(pks, id.StakingPubKey)
+	}
+	return pks
+}
+
 func (il IdentityList) Fingerprint() Identifier {
 	return MerkleRoot(GetIDs(il)...)
 }
@@ -619,4 +628,20 @@ func (il IdentityList) IdentifierExists(target Identifier) bool {
 		}
 		mid = (left + right) >> 1
 	}
+}
+
+// GetIndex returns the index of the identifier in the IdentityList and true
+// if the identifier is found.
+func (il IdentityList) GetIndex(identifier Identifier) (uint, bool) {
+	index := 0
+	ok := false
+	for i, id := range il.NodeIDs() {
+		if id == identifier {
+			index = i
+			ok = true
+			break
+		}
+	}
+
+	return uint(index), ok
 }

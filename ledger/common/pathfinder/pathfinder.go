@@ -45,13 +45,13 @@ func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 
 // KeysToPaths converts an slice of keys into a paths
 func KeysToPaths(keys []ledger.Key, version uint8) ([]ledger.Path, error) {
-	paths := make([]ledger.Path, 0)
-	for _, k := range keys {
+	paths := make([]ledger.Path, len(keys))
+	for i, k := range keys {
 		p, err := KeyToPath(k, version)
 		if err != nil {
 			return nil, err
 		}
-		paths = append(paths, p)
+		paths[i] = p
 	}
 	return paths, nil
 }
@@ -89,22 +89,22 @@ func QueryToTrieRead(q *ledger.Query, version uint8) (*ledger.TrieRead, error) {
 
 // PayloadsToValues extracts values from an slice of payload
 func PayloadsToValues(payloads []*ledger.Payload) ([]ledger.Value, error) {
-	ret := make([]ledger.Value, 0)
-	for _, p := range payloads {
-		ret = append(ret, p.Value)
+	ret := make([]ledger.Value, len(payloads))
+	for i, p := range payloads {
+		ret[i] = p.Value
 	}
 	return ret, nil
 }
 
 // PathsFromPayloads constructs paths from an slice of payload
 func PathsFromPayloads(payloads []ledger.Payload, version uint8) ([]ledger.Path, error) {
-	paths := make([]ledger.Path, 0)
-	for _, pay := range payloads {
+	paths := make([]ledger.Path, len(payloads))
+	for i, pay := range payloads {
 		p, err := KeyToPath(pay.Key, version)
 		if err != nil {
 			return nil, err
 		}
-		paths = append(paths, p)
+		paths[i] = p
 	}
 	return paths, nil
 }
@@ -113,10 +113,10 @@ func PathsFromPayloads(payloads []ledger.Payload, version uint8) ([]ledger.Path,
 func UpdateToPayloads(update *ledger.Update) ([]*ledger.Payload, error) {
 	keys := update.Keys()
 	values := update.Values()
-	payloads := make([]*ledger.Payload, 0)
+	payloads := make([]*ledger.Payload, len(keys))
 	for i := range keys {
 		payload := &ledger.Payload{Key: keys[i], Value: values[i]}
-		payloads = append(payloads, payload)
+		payloads[i] = payload
 	}
 	return payloads, nil
 }

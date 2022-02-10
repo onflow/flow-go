@@ -36,6 +36,7 @@ func TestStreamClosing(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
+		"test_stream_closing",
 		2,
 		withDefaultStreamHandler(handler))
 	defer stopNodes(t, nodes)
@@ -141,6 +142,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	nodes, identities := nodesFixture(t,
 		ctx,
 		sporkId,
+		"test_create_stream",
 		count,
 		withPreferredUnicasts(unicasts))
 	defer stopNodes(t, nodes)
@@ -198,8 +200,9 @@ func TestCreateStream_FallBack(t *testing.T) {
 	thisNode, _ := nodeFixture(t,
 		ctx,
 		sporkId,
+		"test_create_stream_fallback",
 		withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
-	otherNode, otherId := nodeFixture(t, ctx, sporkId)
+	otherNode, otherId := nodeFixture(t, ctx, sporkId, "test_create_stream_fallback")
 
 	defer stopNodes(t, []*Node{thisNode, otherNode})
 
@@ -257,7 +260,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	defer cancel()
 
 	// create two nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), 2)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 2)
 	nodeInfo1, err := PeerAddressInfo(*identities[1])
@@ -288,7 +291,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 }
 
-// TestNoBackoffWhenCreateStream checks that backoff is not enabled between attempts to connect to a remote peer
+// TestNoBackoffWhenCreatingStream checks that backoff is not enabled between attempts to connect to a remote peer
 // for one-to-one direct communication.
 func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -299,7 +302,9 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
-		count)
+		"test_no_backoff_when_create_stream",
+		count,
+	)
 	node1 := nodes[0]
 	node2 := nodes[1]
 
@@ -345,19 +350,29 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	}
 }
 
-// TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
-func TestOneToOneComm(t *testing.T) {
+// TestUnicastOverStream_WithPlainStream checks two nodes can send and receive unicast messages on libp2p plain streams.
+func TestUnicastOverStream_WithPlainStream(t *testing.T) {
+	testUnicastOverStream(t)
+}
+
+// TestUnicastOverStream_WithGzipStreamCompression checks two nodes can send and receive unicast messages on gzip compressed streams
+// when both nodes have gzip stream compression enabled.
+func TestUnicastOverStream_WithGzipStreamCompression(t *testing.T) {
+	testUnicastOverStream(t, withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
+}
+
+// testUnicastOverStream sends a message from node 1 to node 2 and then from node 2 to node 1 over a unicast stream.
+func testUnicastOverStream(t *testing.T, opts ...nodeFixtureParameterOption) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	count := 2
-	ch := make(chan string, count)
+	ch := make(chan string, count) // we expect two messages during test, one from node1->node2 and vice versa.
 
 	// Create the handler function
 	streamHandler := func(s network.Stream) {
 		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 		str, err := rw.ReadString('\n')
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		ch <- str
 	}
 
@@ -365,59 +380,117 @@ func TestOneToOneComm(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
+		"test_one_to_one_comm",
 		count,
-		withDefaultStreamHandler(streamHandler))
+		withDefaultStreamHandler(streamHandler),
+	)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, count)
 
-	id1 := *identities[0]
-	id2 := *identities[1]
+	testUnicastOverStreamRoundTrip(t, ctx, *identities[0], nodes[0], *identities[1], nodes[1], ch)
+}
+
+// TestUnicastOverStream_Fallback checks two nodes with asymmetric sets of preferred unicast protocols can create streams and
+// send and receive unicasts. Despite the asymmetry, the nodes must fall back to the libp2p plain stream during negotiation.
+func TestUnicastOverStream_Fallback(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := make(chan string, 2) // we expect two messages during test, one from node1->node2 and vice versa.
+
+	// Create the handler function
+	streamHandler := func(s network.Stream) {
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		str, err := rw.ReadString('\n')
+		require.NoError(t, err)
+		ch <- str
+	}
+
+	// Creates nodes
+	// node1: supports only plain unicast protocol
+	// node2: supports plain and gzip
+	sporkId := unittest.IdentifierFixture()
+	node1, id1 := nodeFixture(
+		t,
+		ctx,
+		sporkId,
+		"test_unicast_over_stream_fallback",
+		withDefaultStreamHandler(streamHandler),
+	)
+
+	node2, id2 := nodeFixture(
+		t,
+		ctx,
+		sporkId,
+		"test_unicast_over_stream_fallback",
+		withDefaultStreamHandler(streamHandler),
+		withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}),
+	)
+
+	defer stopNodes(t, []*Node{node1, node2})
+
+	testUnicastOverStreamRoundTrip(t, ctx, id1, node1, id2, node2, ch)
+}
+
+// testUnicastOverStreamRoundTrip checks node1 and node2 can create stream between each other and push unicast messages
+// to each other over the streams.
+//
+// The channel argument keeps the individual messages received at both ends.
+func testUnicastOverStreamRoundTrip(t *testing.T,
+	ctx context.Context,
+	id1 flow.Identity,
+	node1 *Node,
+	id2 flow.Identity,
+	node2 *Node,
+	ch <-chan string) {
+
 	pInfo1, err := PeerAddressInfo(id1)
 	require.NoError(t, err)
 	pInfo2, err := PeerAddressInfo(id2)
 	require.NoError(t, err)
 
 	// Create stream from node 1 to node 2
-	nodes[0].host.Peerstore().AddAddrs(pInfo2.ID, pInfo2.Addrs, peerstore.AddressTTL)
-	s1, err := nodes[0].CreateStream(ctx, pInfo2.ID)
-	assert.NoError(t, err)
+	node1.host.Peerstore().AddAddrs(pInfo2.ID, pInfo2.Addrs, peerstore.AddressTTL)
+	s1, err := node1.CreateStream(ctx, pInfo2.ID)
+	require.NoError(t, err)
 	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
 
 	// Send message from node 1 to 2
-	msg := "hello\n"
+	msg := "this is an intentionally long MESSAGE to be bigger than buffer size of most of stream compressors\n"
+	require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
 	_, err = rw.WriteString(msg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Flush the stream
-	assert.NoError(t, rw.Flush())
+	require.NoError(t, rw.Flush())
 
 	// Wait for the message to be received
 	select {
 	case rcv := <-ch:
 		require.Equal(t, msg, rcv)
 	case <-time.After(1 * time.Second):
-		assert.Fail(t, "message not received")
+		require.Fail(t, "message not received")
 	}
 
 	// Create stream from node 2 to node 1
-	nodes[1].host.Peerstore().AddAddrs(pInfo1.ID, pInfo1.Addrs, peerstore.AddressTTL)
-	s2, err := nodes[1].CreateStream(ctx, pInfo1.ID)
-	assert.NoError(t, err)
+	node2.host.Peerstore().AddAddrs(pInfo1.ID, pInfo1.Addrs, peerstore.AddressTTL)
+	s2, err := node2.CreateStream(ctx, pInfo1.ID)
+	require.NoError(t, err)
 	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
 
 	// Send message from node 2 to 1
-	msg = "hey\n"
+	msg = "this is an intentionally long REPLY to be bigger than buffer size of most of stream compressors\n"
+	require.Greater(t, len(msg), 10, "we must stress test with longer than 10 bytes messages")
 	_, err = rw.WriteString(msg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Flush the stream
-	assert.NoError(t, rw.Flush())
+	require.NoError(t, rw.Flush())
 
 	select {
 	case rcv := <-ch:
 		require.Equal(t, msg, rcv)
 	case <-time.After(3 * time.Second):
-		assert.Fail(t, "message not received")
+		require.Fail(t, "message not received")
 	}
 }
 
@@ -431,7 +504,9 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
-		1)
+		"test_create_stream_timeout_with_unresponsive_node",
+		1,
+	)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 1)
 
@@ -469,7 +544,9 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	goodNodes, goodNodeIds := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
-		2)
+		"test_create_stream_is_concurrent",
+		2,
+	)
 
 	defer stopNodes(t, goodNodes)
 	require.Len(t, goodNodeIds, 2)
@@ -514,21 +591,25 @@ func TestConnectionGating(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// create 2 nodes
-	nodes, identities := nodesFixture(t,
-		ctx,
-		unittest.IdentifierFixture(),
-		2,
-		withAllowListEnabled())
+	sporkID := unittest.IdentifierFixture()
 
-	node1 := nodes[0]
-	node1Id := *identities[0]
+	// create 2 nodes
+	node1Peers := make(map[peer.ID]struct{})
+	node1, node1Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
+		_, ok := node1Peers[p]
+		return ok
+	}))
+
+	node2Peers := make(map[peer.ID]struct{})
+	node2, node2Id := nodeFixture(t, ctx, sporkID, "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
+		_, ok := node2Peers[p]
+		return ok
+	}))
+
 	defer stopNode(t, node1)
 	node1Info, err := PeerAddressInfo(node1Id)
 	assert.NoError(t, err)
 
-	node2 := nodes[1]
-	node2Id := *identities[1]
 	defer stopNode(t, node2)
 	node2Info, err := PeerAddressInfo(node2Id)
 	assert.NoError(t, err)
@@ -551,7 +632,7 @@ func TestConnectionGating(t *testing.T) {
 	t.Run("inbound connection from an allowed node is rejected", func(t *testing.T) {
 
 		// node1 allowlists node2 but node2 does not allowlists node1
-		node1.UpdateAllowList(peer.IDSlice{node2Info.ID})
+		node1Peers[node2Info.ID] = struct{}{}
 
 		// node1 attempts to connect to node2
 		// node2 should reject the inbound connection
@@ -563,9 +644,9 @@ func TestConnectionGating(t *testing.T) {
 	t.Run("outbound connection to an approved node is allowed", func(t *testing.T) {
 
 		// node1 allowlists node2
-		node1.UpdateAllowList(peer.IDSlice{node2Info.ID})
+		node1Peers[node2Info.ID] = struct{}{}
 		// node2 allowlists node1
-		node2.UpdateAllowList(peer.IDSlice{node1Info.ID})
+		node2Peers[node1Info.ID] = struct{}{}
 
 		// node1 should be allowed to connect to node2
 		node1.host.Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.AddressTTL)

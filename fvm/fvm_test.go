@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -143,6 +142,52 @@ func filterAccountCreatedEvents(events []flow.Event) []flow.Event {
 		break
 	}
 	return accountCreatedEvents
+}
+
+const auditContractForDeploymentTransactionTemplate = `
+import FlowContractAudits from 0x%s
+
+transaction(deployAddress: Address, code: String) {
+	prepare(serviceAccount: AuthAccount) {
+		
+		let auditorAdmin = serviceAccount.borrow<&FlowContractAudits.Administrator>(from: FlowContractAudits.AdminStoragePath)
+            ?? panic("Could not borrow a reference to the admin resource")
+
+		let auditor <- auditorAdmin.createNewAuditor()
+
+		auditor.addVoucher(address: deployAddress, recurrent: false, expiryOffset: nil, code: code)
+
+		destroy auditor
+	}
+}
+`
+
+// AuditContractForDeploymentTransaction returns a transaction for generating an audit voucher for contract deploy/update
+func AuditContractForDeploymentTransaction(serviceAccount flow.Address, deployAddress flow.Address, code string) (*flow.TransactionBody, error) {
+	arg1, err := jsoncdc.Encode(cadence.NewAddress(deployAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	codeCdc, err := cadence.NewString(code)
+	if err != nil {
+		return nil, err
+	}
+	arg2, err := jsoncdc.Encode(codeCdc)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := fmt.Sprintf(
+		auditContractForDeploymentTransactionTemplate,
+		serviceAccount.String(),
+	)
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(tx)).
+		AddAuthorizer(serviceAccount).
+		AddArgument(arg1).
+		AddArgument(arg2), nil
 }
 
 func TestPrograms(t *testing.T) {
@@ -564,6 +609,59 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		tx := fvm.Transaction(txBody, 0)
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, tx.Err)
+	})
+
+	t.Run("account update with set code succeeds when there is a matching audit voucher", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		// Deployent without voucher fails
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+		require.NoError(t, err)
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.Error(t, tx.Err)
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+
+		// Generate an audit voucher
+		authTxBody, err := AuditContractForDeploymentTransaction(
+			chain.ServiceAddress(),
+			accounts[0],
+			testutil.CounterContract)
+		require.NoError(t, err)
+
+		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		authTxBody.SetPayer(chain.ServiceAddress())
+		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+		authTx := fvm.Transaction(authTxBody, 0)
+
+		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, authTx.Err)
+
+		// Deploying with voucher succeeds
+		txBody = testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 1)
+		txBody.SetPayer(accounts[0])
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+		tx = fvm.Transaction(txBody, 0)
+
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 		assert.NoError(t, tx.Err)
@@ -1303,11 +1401,8 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		require.NoError(t, err)
 
-		assert.PanicsWithValue(t, interpreter.ExternalError{
-			Recovered: logPanic{},
-		}, func() {
-			_ = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger, programs.NewEmptyPrograms())
-		})
+		err = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger, programs.NewEmptyPrograms())
+		require.Error(t, err)
 	})
 
 	t.Run("panics if external function panics in script", func(t *testing.T) {
@@ -1319,12 +1414,8 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
         `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
-
-		assert.PanicsWithValue(t, interpreter.ExternalError{
-			Recovered: logPanic{},
-		}, func() {
-			_ = vm.Run(blockCtx, fvm.Script(script), ledger, programs.NewEmptyPrograms())
-		})
+		err := vm.Run(blockCtx, fvm.Script(script), ledger, programs.NewEmptyPrograms())
+		require.Error(t, err)
 	})
 }
 
@@ -1548,15 +1639,15 @@ func TestSignatureVerification(t *testing.T) {
 	hashAlgorithms := []hashAlgorithm{
 		{
 			"SHA3_256",
-			func() hash.Hasher {
-				return hash.NewSHA3_256()
-			},
+			hash.NewSHA3_256,
 		},
 		{
 			"SHA2_256",
-			func() hash.Hasher {
-				return hash.NewSHA2_256()
-			},
+			hash.NewSHA2_256,
+		},
+		{
+			"KECCAK_256",
+			hash.NewKeccak_256,
 		},
 	}
 
@@ -1949,6 +2040,25 @@ func TestHashing(t *testing.T) {
 			},
 		},
 		{
+			Algo:    runtime.HashAlgorithmKECCAK_256,
+			WithTag: false,
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "1d5ced4738dd4e0bb4628dad7a7b59b8e339a75ece97a4ad004773a49ed7b5bc", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmKECCAK_256,
+			WithTag: true,
+			Tag:     "some_tag",
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "8454ec77f76b229a473770c91e3ea6e7e852416d747805215d15d53bdc56ce5f", result)
+			},
+		},
+		{
 			Algo:    runtime.HashAlgorithmSHA2_256,
 			WithTag: true,
 			Tag:     "some_tag",
@@ -2050,6 +2160,7 @@ func TestHashing(t *testing.T) {
 		runtime.HashAlgorithmSHA2_384,
 		runtime.HashAlgorithmSHA3_384,
 		runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+		runtime.HashAlgorithmKECCAK_256,
 	}
 
 	for i, algo := range hashAlgos {

@@ -69,10 +69,15 @@ type BlobChannelWriter struct {
 	blobs       *blobChannel
 	buf         []byte
 	err         error
+	bytesSent   uint64
 }
 
 var _ io.WriteCloser = (*BlobChannelWriter)(nil)
 var _ io.ByteWriter = (*BlobChannelWriter)(nil)
+
+func (bw *BlobChannelWriter) TotalBytesWritten() uint64 {
+	return bw.bytesSent
+}
 
 // Write writes len(data) bytes from data to the underlying blob channel. It returns the number of bytes written
 // from data (0 <= n <= len(data)) and any error encountered that caused the write to stop early. It will always
@@ -114,6 +119,8 @@ func (bw *BlobChannelWriter) sendNewBlob() error {
 	if err := bw.blobs.Send(blob); err != nil {
 		return err
 	}
+
+	bw.bytesSent += uint64(len(bw.buf))
 
 	// reset the buffer
 	bw.buf = make([]byte, 0, defaultInitialBufCapacity)
@@ -192,13 +199,18 @@ func IncomingBlobChannel(maxBlobSize int) (*BlobChannelWriter, *BlobReceiver) {
 
 // BlobChannelReader is a reader which reads data from a blob channel.
 type BlobChannelReader struct {
-	blobs *blobChannel
-	buf   []byte
-	err   error
+	blobs         *blobChannel
+	buf           []byte
+	err           error
+	bytesReceived uint64
 }
 
 var _ io.ReadCloser = (*BlobChannelReader)(nil)
 var _ io.ByteReader = (*BlobChannelReader)(nil)
+
+func (br *BlobChannelReader) TotalBytesRead() uint64 {
+	return br.bytesReceived
+}
 
 // Read reads up to len(data) bytes from the underlying blob channel into data. It returns the number of bytes read
 // (0 <= n <= len(data)) and any error encountered. If some data is available but not len(data) bytes, Read will
@@ -250,6 +262,8 @@ func (br *BlobChannelReader) receiveNewBlob() error {
 	}
 
 	br.buf = blob.RawData()
+
+	br.bytesReceived += uint64(len(br.buf))
 
 	return nil
 }
