@@ -2,7 +2,6 @@ package operation
 
 import (
 	"errors"
-	"strings"
 	"syscall"
 
 	"github.com/dgraph-io/badger/v2"
@@ -51,7 +50,7 @@ func TerminateOnFullDisk(err error) error {
 	// string check on Badger's or other Wraps on syscall disk error, instead of Unwrap or Is.
 	// relevant badgerDB code: https://github.com/dgraph-io/badger/blob/156819ccb106bbeb207e985f561780e2929344bc/value.go#L1454-L1463
 	// reference implementation for syscall error lookup: https://git.iitd.ac.in/cs1140221/docker/commit/26334b7a7d80fe233f27773bb65ac2d57d3af2a0
-	if err != nil && strings.Contains(err.Error(), strings.ToLower(syscall.ENOSPC.Error())) {
+	if err != nil && errors.Is(err, syscall.ENOSPC) {
 		panic("disk full, terminating node...")
 	}
 	return err

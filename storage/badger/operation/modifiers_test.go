@@ -108,7 +108,7 @@ func TestTerminateOnFullDisk(t *testing.T) {
 	// sad path
 	t.Run("panic on full disk", func(t *testing.T) {
 		// imitate badgerDB error wrapping
-		badgerDiskFullError := fmt.Errorf("unable to write to value log file:./fake/path/ : %v", syscall.ENOSPC.Error())
+		badgerDiskFullError := syscall.ENOSPC
 		defer func() {
 			if rec := recover(); rec == nil {
 				require.Fail(t, "code should panic")
