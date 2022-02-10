@@ -1,4 +1,4 @@
-package indices
+package seed
 
 import "encoding/binary"
 
@@ -7,13 +7,13 @@ import "encoding/binary"
 // same source of randomness.
 
 var (
-	// ProtocolConsensusLeaderSelection is the cuztomizer for consensus leader selection
+	// ProtocolConsensusLeaderSelection is the customizer for consensus leader selection
 	ProtocolConsensusLeaderSelection = customizerFromIndices([]uint16{0, 1, 1})
-	// ProtocolVerificationChunkAssignment is the cuztomizer for verification nodes determines chunk assignment
+	// ProtocolVerificationChunkAssignment is the customizer for verification nodes determines chunk assignment
 	ProtocolVerificationChunkAssignment = customizerFromIndices([]uint16{0, 2, 0})
-	// collectorClusterLeaderSelectionPrefix is the prefix of the cuztomizer for the leader selection of collector clusters
+	// collectorClusterLeaderSelectionPrefix is the prefix of the customizer for the leader selection of collector clusters
 	collectorClusterLeaderSelectionPrefix = []uint16{0, 0}
-	// executionChunkPrefix is the prefix of the cuztomizer for executing chunks
+	// executionChunkPrefix is the prefix of the customizer for executing chunks
 	executionChunkPrefix = []uint16{1}
 )
 

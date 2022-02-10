@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -37,7 +38,7 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 		unittest.IdentityListFixture(10),
 		1,
 		100,
-		unittest.SeedFixture(32),
+		unittest.SeedFixture(seed.RandomSourceLength),
 	)
 	epochs := mocks.NewEpochQuery(t, 1, currEpoch)
 	snapshot.On("Epochs").Return(epochs)
@@ -103,7 +104,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 		identities,
 		1,
 		100,
-		unittest.SeedFixture(32),
+		unittest.SeedFixture(seed.RandomSourceLength),
 	)
 	currEpoch := newMockEpoch(
 		epochCounter,
@@ -171,7 +172,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 		identities,
 		201,
 		300,
-		unittest.SeedFixture(32),
+		unittest.SeedFixture(seed.RandomSourceLength),
 	)
 	epochs.Add(nextEpoch)
 
@@ -212,7 +213,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	currentEpochCounter := firstEpochCounter
 	epochFinalView := uint64(100)
 
-	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(32))
+	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength))
 
 	// create mocks
 	state := new(protocolmock.State)
@@ -236,7 +237,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 		firstView := epochFinalView + 1
 		epochFinalView = epochFinalView + 100
 		currentEpochCounter++
-		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(32))
+		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength))
 		epochQuery.Add(nextEpoch)
 
 		// query a view from the new epoch

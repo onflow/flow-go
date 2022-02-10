@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/packer"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/crypto/random"
 )
@@ -27,6 +28,8 @@ func PRGFromRandomSource(randomSource []byte, customizer []byte) (random.Rand, e
 	}
 	return rng, nil
 }
+
+const RandomSourceLength = crypto.SignatureLenBLSBLS12381
 
 // FromParentQCSignature extracts the source of randomness from the given QC sigData.
 // The sigData is an RLP encoded structure that is part of QuorumCertificate.

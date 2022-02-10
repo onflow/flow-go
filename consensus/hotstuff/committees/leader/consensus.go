@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
@@ -27,7 +26,7 @@ func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 		return nil, fmt.Errorf("could not get epoch seed: %w", err)
 	}
 	// create random number generator from the seed and customizer
-	rng, err := seed.PRGFromRandomSource(randomSeed, indices.ProtocolConsensusLeaderSelection)
+	rng, err := seed.PRGFromRandomSource(randomSeed, seed.ProtocolConsensusLeaderSelection)
 	if err != nil {
 		return nil, fmt.Errorf("could not create rng: %w", err)
 	}

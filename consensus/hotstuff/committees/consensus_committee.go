@@ -173,7 +173,7 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		firstView := currentFinalView + 1
 
 		// create random number generator from the seed and customizer
-		rng, err := seed.PRGFromRandomSource(randomSeed, indices.ProtocolConsensusLeaderSelection)
+		rng, err := seed.PRGFromRandomSource(randomSeed, seed.ProtocolConsensusLeaderSelection)
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not create rng from seed: %w", err)
 		}

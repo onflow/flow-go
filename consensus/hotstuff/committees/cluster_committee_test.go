@@ -11,6 +11,7 @@ import (
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -54,7 +55,7 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.cluster.On("Members").Return(suite.members)
 	suite.cluster.On("RootBlock").Return(suite.root)
 	suite.epoch.On("Counter").Return(counter, nil)
-	suite.epoch.On("Seed").Return(unittest.SeedFixture(32), nil)
+	suite.epoch.On("Seed").Return(unittest.SeedFixture(seed.RandomSourceLength), nil)
 
 	var err error
 	suite.com, err = NewClusterCommittee(
