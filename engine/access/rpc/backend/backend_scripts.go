@@ -17,7 +17,7 @@ import (
 )
 
 // uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
-const uniqueScriptLoggingTimeWindow = time.Duration(10) * time.Minute
+const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
 type backendScripts struct {
 	headers           storage.Headers
@@ -25,7 +25,7 @@ type backendScripts struct {
 	state             protocol.State
 	connFactory       ConnectionFactory
 	log               zerolog.Logger
-	seenScripts       map[[16]byte]time.Time // a map of script hash to time to keep track of unique scripts sent by clients
+	seenScripts       map[[md5.Size]byte]time.Time // to keep track of unique scripts sent by clients
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -113,6 +113,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 					b.log.Debug().
 						Str("execution_node", execNode.String()).
 						Hex("block_id", blockID[:]).
+						Hex("script_hash", encodedScript[:]).
 						Str("script", string(script)).
 						Msg("Successfully executed script")
 					b.seenScripts[encodedScript] = executionTime
