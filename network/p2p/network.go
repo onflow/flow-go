@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
+
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -221,10 +222,10 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 		ctx:       ctx,
 		cancel:    cancel,
 		channel:   channel,
-		publish:   n.publish,
-		unicast:   n.unicast,
-		multicast: n.multicast,
-		close:     n.unregister,
+		publish:   n.PublishOnChannel,
+		unicast:   n.UnicastOnChannel,
+		multicast: n.MulticastOnChannel,
+		close:     n.UnRegisterChannel,
 	}
 
 	return conduit, nil
@@ -294,9 +295,9 @@ func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batc
 	}
 }
 
-// unregister unregisters the engine for the specified channel. The engine will no longer be able to send or
+// UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
 // receive messages from that channel
-func (n *Network) unregister(channel network.Channel) error {
+func (n *Network) UnRegisterChannel(channel network.Channel) error {
 	err := n.subMngr.Unregister(channel)
 	if err != nil {
 		return fmt.Errorf("failed to unregister engine for channel %s: %w", channel, err)
@@ -418,10 +419,10 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	return msg, nil
 }
 
-// unicast sends the message in a reliable way to the given recipient.
+// UnicastOnChannel sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
-func (n *Network) unicast(channel network.Channel, message interface{}, targetID flow.Identifier) error {
+func (n *Network) UnicastOnChannel(channel network.Channel, message interface{}, targetID flow.Identifier) error {
 	if targetID == n.me.NodeID() {
 		n.logger.Debug().Msg("network skips self unicasting")
 		return nil
@@ -441,11 +442,11 @@ func (n *Network) unicast(channel network.Channel, message interface{}, targetID
 	return nil
 }
 
-// publish sends the message in an unreliable way to the given recipients.
+// PublishOnChannel sends the message in an unreliable way to the given recipients.
 // In this context, unreliable means that the message is published over a libp2p pub-sub
 // channel and can be read by any node subscribed to that channel.
 // The selector could be used to optimize or restrict delivery.
-func (n *Network) publish(channel network.Channel, message interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) PublishOnChannel(channel network.Channel, message interface{}, targetIDs ...flow.Identifier) error {
 	filteredIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter())
 
 	if len(filteredIDs) == 0 {
@@ -461,9 +462,9 @@ func (n *Network) publish(channel network.Channel, message interface{}, targetID
 	return nil
 }
 
-// multicast unreliably sends the specified event over the channel to randomly selected 'num' number of recipients
+// MulticastOnChannel unreliably sends the specified event over the channel to randomly selected 'num' number of recipients
 // selected from the specified targetIDs.
-func (n *Network) multicast(channel network.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (n *Network) MulticastOnChannel(channel network.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
 	selectedIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()).Sample(num)
 
 	if len(selectedIDs) == 0 {
