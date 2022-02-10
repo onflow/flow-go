@@ -42,8 +42,9 @@ const (
 	networkingKeyField
 	stakingKeyField
 	tokensStakedField
-	infoFileNameTemplate = "node-info.pub.%s.json"
-	flowNodeAddrPart     = "nodes.onflow.org"
+	infoFileNameTemplate  = "node-info.pub.%s.json"
+	partnerStakesFileName = "partner-stakes.json"
+	flowNodeAddrPart      = "nodes.onflow.org"
 )
 
 // NodePubInfo basic representation of node-pub-info.json data
@@ -55,6 +56,9 @@ type NodePubInfo struct {
 	NetworkPubKey string `json:"NetworkPubKey"`
 	StakingPubKey string `json:"StakingPubKey"`
 }
+
+// PartnerStakesInfo mapping of NodeID => Amount of tokens staked
+type PartnerStakesInfo map[string]string
 
 // populatePartnerInfos represents the `populate-partner-infos` command which will read the proposed node
 // table from the staking contract and for each identity in the proposed table generate a node-info-pub
@@ -95,6 +99,7 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msgf("could not get proposed table")
 	}
 
+	partnerStakes := make(PartnerStakesInfo)
 	skippedNodes := make([]*NodePubInfo, 0)
 	for _, id := range proposedNodeIDS.Values {
 		info, err := executeGetNodeInfoScript(ctx, env, flowClient, id)
@@ -112,8 +117,11 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 			continue
 		}
 
+		partnerStakes[nodePubInfo.NodeID] = nodePubInfo.Stake
 		writeNodePubInfoFile(nodePubInfo)
 	}
+
+	writePartnerStakesFile(partnerStakes)
 
 	if flagPrintskippedNodes {
 		printSkippedNodes(skippedNodes)
@@ -201,10 +209,17 @@ func validateANNetworkKey(key string) error {
 	return nil
 }
 
+// writeNodePubInfoFile writes the node-pub-info file
 func writeNodePubInfoFile(info *NodePubInfo) {
 	fileOutputName := fmt.Sprintf(infoFileNameTemplate, info.NodeID)
 	path := filepath.Join(flagOutputDir, fileOutputName)
 	writeJSON(path, info)
+}
+
+// writePartnerStakesFile writes the partner stakes file
+func writePartnerStakesFile(partnerStakes PartnerStakesInfo) {
+	path := filepath.Join(flagOutputDir, partnerStakesFileName)
+	writeJSON(path, partnerStakes)
 }
 
 func printSkippedNodes(skippedNodes []*NodePubInfo) {
