@@ -110,14 +110,14 @@ func (p *programs) Set(location common.Location, program *interpreter.Program, s
 }
 
 // HasChanges indicates if any changes has been introduced
-// essentially telling if this object is identical to its parent
+// essentially telling if this object is identical to its parent.
 func (p *programs) HasChanges() bool {
 	return len(p.programs) > 0 || p.cleaned
 }
 
-// ForceCleanup is used to force a complete cleanup
+// ForceCleanup is used to force a complete cleanup.
 // It exists temporarily to facilitate a temporary measure which can retry
-// a transaction in case checking fails
+// a transaction in case checking fails.
 // It should be gone when the extra retry is gone
 func (p *programs) ForceCleanup() {
 	p.lock.Lock()

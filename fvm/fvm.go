@@ -33,17 +33,24 @@ func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
 	)
 }
 
+// A VirtualMachine augments the Cadence runtime with Flow host functionality.
+// VirtualMachine is compliant with the two interfaces `computation.VirtualMachine`
+// and `computer.VirtualMachine`.
 type VirtualMachine interface {
+
+	// Run runs a procedure against a ledger in the given context.
 	Run(ctx Context, proc Procedure, v state.View, programs programs.Programs) (err error)
 
+	// GetAccount returns an account by address or an error if none exists.
 	GetAccount(ctx Context, address flow.Address, v state.View, programs programs.Programs) (*flow.Account, error)
 
+	// ExecuteTransaction executes the given transaction.
 	ExecuteTransaction(script runtime.Script, context runtime.Context) error
 
+	// ExecuteScript executes the given script.
 	ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error)
 
-	ReadStored(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error)
-
+	// InvokeContractFunction invokes a function of a contract with the given arguments.
 	InvokeContractFunction(
 		contractLocation common.AddressLocation,
 		functionName string,
@@ -52,6 +59,10 @@ type VirtualMachine interface {
 		context runtime.Context,
 	) (cadence.Value, error)
 
+	// ReadStored reads the value stored at the given path.
+	ReadStored(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error)
+
+	// InvokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
 	InvokeMetaTransaction(
 		parentCtx Context,
 		tx *TransactionProcedure,
@@ -122,7 +133,7 @@ func (vm *virtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 	return account, nil
 }
 
-// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
+// InvokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
@@ -140,14 +151,20 @@ func (vm *virtualMachine) InvokeMetaTransaction(parentCtx Context, tx *Transacti
 	return txErr, fatalErr
 }
 
+// ExecuteTransaction executes the given transaction.
+//
 func (vm *virtualMachine) ExecuteTransaction(script runtime.Script, context runtime.Context) error {
 	return vm.runtime.ExecuteTransaction(script, context)
 }
 
+// ExecuteScript executes the given script.
+//
 func (vm *virtualMachine) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
 	return vm.runtime.ExecuteScript(script, context)
 }
 
+// InvokeContractFunction invokes a function of a contract with the given arguments.
+//
 func (vm *virtualMachine) InvokeContractFunction(
 	contractLocation common.AddressLocation,
 	functionName string,
@@ -163,6 +180,8 @@ func (vm *virtualMachine) InvokeContractFunction(
 	)
 }
 
+// ReadStored reads the value stored at the given path.
+//
 func (vm *virtualMachine) ReadStored(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
 	return vm.runtime.ReadStored(address, path, context)
 }
