@@ -70,28 +70,36 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
-	addressIndexes := make(chan uint64)
-	defer close(addressIndexes)
-
-	wg := &sync.WaitGroup{}
-
 	workerCount := goRuntime.NumCPU() / 2
 	if workerCount == 0 {
 		workerCount = 1
 	}
 
+	addressIndexes := make(chan uint64, workerCount)
+	defer close(addressIndexes)
+
+	wg := &sync.WaitGroup{}
 	for i := 0; i < workerCount; i++ {
-		adp := newAccountDataProcessor(wg, r.Log, rwa, rwc, rwm, r.Chain, l)
-		wg.Add(1)
-		go adp.reportAccountData(addressIndexes)
+		go func() {
+			adp := newAccountDataProcessor(r.Log, rwa, rwc, rwm, r.Chain, l)
+			for {
+				select {
+				case indx := <-addressIndexes:
+					adp.reportAccountData(indx)
+					wg.Done()
+				}
+			}
+		}()
 	}
 
-	for i := uint64(1); i <= gen.AddressCount(); i++ {
+	addressCount := gen.AddressCount()
+	for i := uint64(1); i <= addressCount; i++ {
 		addressIndexes <- i
 
+		wg.Add(1)
 		err := progress.Add(1)
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("progress.Add(1): %w", err))
 		}
 	}
 
@@ -99,7 +107,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 
 	err := progress.Finish()
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("progress.Finish(): %w", err))
 	}
 
 	return nil
@@ -118,13 +126,12 @@ type balanceProcessor struct {
 
 	rwa        ReportWriter
 	rwc        ReportWriter
-	wg         *sync.WaitGroup
 	logger     zerolog.Logger
 	rwm        ReportWriter
 	fusdScript []byte
 }
 
-func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
+func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
 
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
@@ -176,7 +183,6 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 	accounts := state.NewAccounts(sth)
 
 	return &balanceProcessor{
-		wg:            wg,
 		logger:        logger,
 		vm:            vm,
 		ctx:           ctx,
@@ -193,113 +199,109 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 	}
 }
 
-func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
-	for indx := range addressIndexes {
-
-		address, err := c.ctx.Chain.AddressAtIndex(indx)
-		if err != nil {
-			c.logger.
-				Err(err).
-				Uint64("index", indx).
-				Msgf("Error getting address")
-			continue
-		}
-
-		u, err := c.storageUsed(address)
-		if err != nil {
-			c.logger.
-				Err(err).
-				Uint64("index", indx).
-				Str("address", address.String()).
-				Msgf("Error getting storage used for account")
-			continue
-		}
-
-		balance, hasVault, err := c.balance(address)
-		if err != nil {
-			c.logger.
-				Err(err).
-				Uint64("index", indx).
-				Str("address", address.String()).
-				Msgf("Error getting balance for account")
-			continue
-		}
-		fusdBalance, err := c.fusdBalance(address)
-		if err != nil {
-			c.logger.
-				Err(err).
-				Uint64("index", indx).
-				Str("address", address.String()).
-				Msgf("Error getting FUSD balance for account")
-			continue
-		}
-
-		dapper, err := c.isDapper(address)
-		if err != nil {
-			c.logger.
-				Err(err).
-				Uint64("index", indx).
-				Str("address", address.String()).
-				Msgf("Error determining if account is dapper account")
-			continue
-		}
-		if dapper {
-			m, err := c.moments(address)
-			if err != nil {
-				c.logger.
-					Err(err).
-					Uint64("index", indx).
-					Str("address", address.String()).
-					Msgf("Error getting moments for account")
-				continue
-			}
-			c.rwm.Write(momentsRecord{
-				Address: address.Hex(),
-				Moments: m,
-			})
-		}
-
-		hasReceiver, err := c.hasReceiver(address)
-		if err != nil {
-			c.logger.
-				Err(err).
-				Uint64("index", indx).
-				Str("address", address.String()).
-				Msgf("Error checking if account has a receiver")
-			continue
-		}
-
-		c.rwa.Write(accountRecord{
-			Address:        address.Hex(),
-			StorageUsed:    u,
-			AccountBalance: balance,
-			FUSDBalance:    fusdBalance,
-			HasVault:       hasVault,
-			HasReceiver:    hasReceiver,
-			IsDapper:       dapper,
-		})
-
-		contracts, err := c.accounts.GetContractNames(address)
-		if err != nil {
-			c.logger.
-				Err(err).
-				Uint64("index", indx).
-				Str("address", address.String()).
-				Msgf("Error getting account contract names")
-			continue
-		}
-		if len(contracts) == 0 {
-			continue
-		}
-		for _, contract := range contracts {
-			c.rwc.Write(contractRecord{
-				Address:  address.Hex(),
-				Contract: contract,
-			})
-		}
-
+func (c *balanceProcessor) reportAccountData(indx uint64) {
+	address, err := c.ctx.Chain.AddressAtIndex(indx)
+	if err != nil {
+		c.logger.
+			Err(err).
+			Uint64("index", indx).
+			Msgf("Error getting address")
+		return
 	}
-	c.wg.Done()
+
+	u, err := c.storageUsed(address)
+	if err != nil {
+		c.logger.
+			Err(err).
+			Uint64("index", indx).
+			Str("address", address.String()).
+			Msgf("Error getting storage used for account")
+		return
+	}
+
+	balance, hasVault, err := c.balance(address)
+	if err != nil {
+		c.logger.
+			Err(err).
+			Uint64("index", indx).
+			Str("address", address.String()).
+			Msgf("Error getting balance for account")
+		return
+	}
+	fusdBalance, err := c.fusdBalance(address)
+	if err != nil {
+		c.logger.
+			Err(err).
+			Uint64("index", indx).
+			Str("address", address.String()).
+			Msgf("Error getting FUSD balance for account")
+		return
+	}
+
+	dapper, err := c.isDapper(address)
+	if err != nil {
+		c.logger.
+			Err(err).
+			Uint64("index", indx).
+			Str("address", address.String()).
+			Msgf("Error determining if account is dapper account")
+		return
+	}
+	if dapper {
+		m, err := c.moments(address)
+		if err != nil {
+			c.logger.
+				Err(err).
+				Uint64("index", indx).
+				Str("address", address.String()).
+				Msgf("Error getting moments for account")
+			return
+		}
+		c.rwm.Write(momentsRecord{
+			Address: address.Hex(),
+			Moments: m,
+		})
+	}
+
+	hasReceiver, err := c.hasReceiver(address)
+	if err != nil {
+		c.logger.
+			Err(err).
+			Uint64("index", indx).
+			Str("address", address.String()).
+			Msgf("Error checking if account has a receiver")
+		return
+	}
+
+	c.rwa.Write(accountRecord{
+		Address:        address.Hex(),
+		StorageUsed:    u,
+		AccountBalance: balance,
+		FUSDBalance:    fusdBalance,
+		HasVault:       hasVault,
+		HasReceiver:    hasReceiver,
+		IsDapper:       dapper,
+	})
+
+	contracts, err := c.accounts.GetContractNames(address)
+	if err != nil {
+		c.logger.
+			Err(err).
+			Uint64("index", indx).
+			Str("address", address.String()).
+			Msgf("Error getting account contract names")
+		return
+	}
+	if len(contracts) == 0 {
+		return
+	}
+	for _, contract := range contracts {
+		c.rwc.Write(contractRecord{
+			Address:  address.Hex(),
+			Contract: contract,
+		})
+	}
+
 }
 
 func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
