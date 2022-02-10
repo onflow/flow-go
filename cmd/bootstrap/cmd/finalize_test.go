@@ -14,6 +14,7 @@ import (
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -268,6 +269,7 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, randomSource1, randomSource2)
 		assert.Equal(t, randomSource1, getRandomSource(deterministicSeed))
+		assert.Equal(t, len(randomSource1), seed.RandomSourceLength)
 	})
 }
 

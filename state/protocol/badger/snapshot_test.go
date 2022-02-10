@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -652,7 +653,7 @@ func TestQuorumCertificate(t *testing.T) {
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.Error(t, err)
 
-			_, err = state.AtBlockID(block1.ID()).Seed()
+			_, err := state.AtBlockID(block1.ID()).Seed()
 			assert.Error(t, err)
 		})
 	})
@@ -663,8 +664,9 @@ func TestQuorumCertificate(t *testing.T) {
 			// since we bootstrap with a root snapshot, this will be the root block
 			_, err := state.AtBlockID(head.ID()).QuorumCertificate()
 			assert.NoError(t, err)
-			_, err = state.AtBlockID(head.ID()).Seed()
+			randomSeed, err := state.AtBlockID(head.ID()).Seed()
 			assert.NoError(t, err)
+			assert.Equal(t, len(randomSeed), seed.RandomSourceLength)
 		})
 	})
 
@@ -697,7 +699,7 @@ func TestQuorumCertificate(t *testing.T) {
 			// should have view matching block1 view
 			assert.Equal(t, block1.Header.View, qc.View)
 
-			_, err = state.AtBlockID(block1.ID()).Seed()
+			_, err := state.AtBlockID(block1.ID()).Seed()
 			require.Nil(t, err)
 		})
 	})
