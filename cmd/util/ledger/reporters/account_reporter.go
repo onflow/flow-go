@@ -78,31 +78,32 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	addressIndexes := make(chan uint64, workerCount)
 	defer close(addressIndexes)
 
+	// create multiple workers to generate account data report concurrently
 	wg := &sync.WaitGroup{}
 	for i := 0; i < workerCount; i++ {
 		go func() {
 			adp := newAccountDataProcessor(r.Log, rwa, rwc, rwm, r.Chain, l)
-			for {
-				select {
-				case indx := <-addressIndexes:
-					adp.reportAccountData(indx)
-					wg.Done()
-				}
+			for indx := range addressIndexes {
+				adp.reportAccountData(indx)
+				wg.Done()
 			}
 		}()
 	}
 
 	addressCount := gen.AddressCount()
+	// produce jobs for workers to process
 	for i := uint64(1); i <= addressCount; i++ {
 		addressIndexes <- i
 
 		wg.Add(1)
+
 		err := progress.Add(1)
 		if err != nil {
 			panic(fmt.Errorf("progress.Add(1): %w", err))
 		}
 	}
 
+	// wait until all jobs are done
 	wg.Wait()
 
 	err := progress.Finish()
