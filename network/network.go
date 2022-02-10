@@ -4,6 +4,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 )
 
@@ -26,4 +27,11 @@ type Network interface {
 
 	// RegisterPingService registers a ping protocol handler for the given protocol ID
 	RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error)
+}
+
+type Adapter interface {
+	UnicastOnChannel(Channel, interface{}, flow.Identifier) error
+	PublishOnChannel(Channel, interface{}, ...flow.Identifier) error
+	MulticastOnChannel(Channel, interface{}, uint, ...flow.Identifier) error
+	UnRegisterChannel(channel Channel) error
 }
