@@ -8,33 +8,13 @@ import (
 	"github.com/onflow/flow-go/crypto/random"
 )
 
-// FromParentSignature extracts a seed from the given QC sigData.
-// The sigData is an RLP encoded structure that is part of QuorumCertificate.
+// PRGFromRandomSource returns a PRG seeded by the source of randomness of the protocol.
+// The customizer is used to generate a task-specific PRG (customizer in this implementation
+// is up to 12-bytes long).
 //
 // The function extracts first the source of randomness from sigData and then hashes
-// it to obtain the outout seed.
-// Since the source of randmoness is a cryptographic signature, it is required to
-// hash it in order to uniformize the entropy over the output.
-func FromParentSignature(sigData []byte) ([]byte, error) {
-	// unpack sig data to extract random beacon sig
-	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
-	if err != nil {
-		return nil, fmt.Errorf("could not unpack block signature: %w", err)
-	}
-
-	return FromRandomSource(randomBeaconSig), nil
-}
-
-// FromRandomSource generates a seed from source of randomness.
-//
-// The source of randomness is a cryptographic signature, it is therefore required to
-// hash the data in order to uniformize the entropy over the output seed.
-func FromRandomSource(randomSource []byte) []byte {
-	var seed [hash.HashLenSHA3_256]byte
-	hash.ComputeSHA3_256(&seed, randomSource)
-	return seed[:]
-}
-
+// it to obtain a seed. Hashing is required to uniformize the entropy over the output,
+// since the source of randmoness is a cryptographic signature.
 func PRGFromRandomSource(randomSource []byte, customizer []byte) (random.Rand, error) {
 	// hash the source of randomness (signature) to uniformize the entropy
 	var seed [hash.HashLenSHA3_256]byte
@@ -46,4 +26,16 @@ func PRGFromRandomSource(randomSource []byte, customizer []byte) (random.Rand, e
 		return nil, fmt.Errorf("could not create ChaCha20 PRG: %w", err)
 	}
 	return rng, nil
+}
+
+// FromParentQCSignature extracts the source of randomness from the given QC sigData.
+// The sigData is an RLP encoded structure that is part of QuorumCertificate.
+func FromParentQCSignature(sigData []byte) ([]byte, error) {
+	// unpack sig data to extract random beacon sig
+	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not unpack block signature: %w", err)
+	}
+
+	return randomBeaconSig, nil
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
-	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 // Epoch is a memory-backed implementation of protocol.Epoch.
@@ -33,7 +32,7 @@ func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
 func (e Epoch) RandomSource() ([]byte, error) { return e.enc.RandomSource, nil }
 
 func (e Epoch) Seed() ([]byte, error) {
-	return seed.FromRandomSource(e.enc.RandomSource), nil
+	return e.enc.RandomSource, nil
 }
 
 func (e Epoch) Clustering() (flow.ClusterList, error) {
@@ -135,7 +134,7 @@ func (es *setupEpoch) RandomSource() ([]byte, error) {
 }
 
 func (es *setupEpoch) Seed() ([]byte, error) {
-	return seed.FromRandomSource(es.setupEvent.RandomSource), nil
+	return es.setupEvent.RandomSource, nil
 }
 
 // committedEpoch is an implementation of protocol.Epoch backed by an EpochSetup

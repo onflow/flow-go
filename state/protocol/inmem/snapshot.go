@@ -68,7 +68,7 @@ func (s Snapshot) Phase() (flow.EpochPhase, error) {
 }
 
 func (s Snapshot) Seed() ([]byte, error) {
-	return seed.FromParentSignature(s.enc.QuorumCertificate.SigData)
+	return seed.FromParentQCSignature(s.enc.QuorumCertificate.SigData)
 }
 
 func (s Snapshot) Epochs() protocol.EpochQuery {

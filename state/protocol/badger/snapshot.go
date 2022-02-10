@@ -425,7 +425,7 @@ func (s *Snapshot) Seed() ([]byte, error) {
 			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
 		}
 
-		seed, err := seed.FromParentSignature(rootQC.SigData)
+		seed, err := seed.FromParentQCSignature(rootQC.SigData)
 		if err != nil {
 			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
 		}
@@ -439,7 +439,7 @@ func (s *Snapshot) Seed() ([]byte, error) {
 		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
 	}
 
-	seed, err := seed.FromParentSignature(child.ParentVoterSigData)
+	seed, err := seed.FromParentQCSignature(child.ParentVoterSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
 	}
