@@ -3,57 +3,31 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"sort"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Channel specifies a virtual and isolated communication medium.
-// Nodes subscribed to the same channel can disseminate epidemic messages among
-// each other, i.e.. multicast and publish.
-type Channel string
-type ChannelList []Channel
+// PublishFunc is a function that broadcasts the specified event
+// to all participants on the given channel.
+type PublishFunc func(channel Channel, event interface{}, targetIDs ...flow.Identifier) error
 
-func (c Channel) String() string {
-	return string(c)
-}
+// UnicastFunc is a function that reliably sends the event via reliable 1-1 direct
+// connection in  the underlying network to the target ID.
+type UnicastFunc func(channel Channel, event interface{}, targetID flow.Identifier) error
 
-// Len returns length of the ChannelList in the number of stored Channels.
-// It satisfies the sort.Interface making the ChannelList sortable.
-func (cl ChannelList) Len() int {
-	return len(cl)
-}
+// MulticastFunc is a function that unreliably sends the event in the underlying
+// network to randomly chosen subset of nodes from targetIDs
+type MulticastFunc func(channel Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error
 
-// Less returns true if element i in the ChannelList  is less than j based on the numerical value of its Channel.
-// Otherwise it returns true.
-// It satisfies the sort.Interface making the ChannelList sortable.
-func (cl ChannelList) Less(i, j int) bool {
-	return cl[i] < cl[j]
-}
+// CloseFunc is a function that unsubscribes the conduit from the channel
+type CloseFunc func(channel Channel) error
 
-// Swap swaps the element i and j in the ChannelList.
-// It satisfies the sort.Interface making the ChannelList sortable.
-func (cl ChannelList) Swap(i, j int) {
-	cl[i], cl[j] = cl[j], cl[i]
-}
-
-// ID returns hash of the content of ChannelList. It first sorts the ChannelList and then takes its
-// hash value.
-func (cl ChannelList) ID() flow.Identifier {
-	sort.Sort(cl)
-	return flow.MakeID(cl)
-}
-
-// Contains retuns true if the ChannelList contains the given channel.
-func (cl ChannelList) Contains(channel Channel) bool {
-	for _, c := range cl {
-		if c == channel {
-			return true
-		}
-	}
-	return false
+type ConduitFactory interface {
+	NewConduit(context.Context, context.CancelFunc, Channel) (Conduit, error)
+	WithNetworkAdapter(Adapter) error
 }
 
 // Conduit represents the interface for engines to communicate over the
