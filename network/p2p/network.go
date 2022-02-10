@@ -47,6 +47,7 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
+	*component.ComponentManager
 	identityProvider            id.IdentityProvider
 	logger                      zerolog.Logger
 	codec                       network.Codec
@@ -57,9 +58,9 @@ type Network struct {
 	rcache                      *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
 	subMngr                     network.SubscriptionManager // used to keep track of subscribed channels
+	conduitFactory              network.ConduitFactory
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
-	*component.ComponentManager
 }
 
 var _ network.Network = (*Network)(nil)
@@ -103,6 +104,7 @@ func NewNetwork(
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
 	identityProvider id.IdentityProvider,
+	conduitFactory network.ConduitFactory,
 ) (*Network, error) {
 
 	rcache := netcache.NewReceiveCache(uint32(csize), log)
@@ -111,7 +113,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
 
-	o := &Network{
+	n := &Network{
 		logger:                      log,
 		codec:                       codec,
 		me:                          me,
@@ -121,18 +123,23 @@ func NewNetwork(
 		metrics:                     metrics,
 		subMngr:                     sm,
 		identityProvider:            identityProvider,
+		conduitFactory:              conduitFactory,
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 	}
 
-	o.mw.SetOverlay(o)
+	n.mw.SetOverlay(n)
 
-	o.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(o.runMiddleware).
-		AddWorker(o.processRegisterEngineRequests).
-		AddWorker(o.processRegisterBlobServiceRequests).Build()
+	if err := n.conduitFactory.WithNetworkAdapter(n); err != nil {
+		return nil, fmt.Errorf("could not register network adapter: %w", err)
+	}
 
-	return o, nil
+	n.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(n.runMiddleware).
+		AddWorker(n.processRegisterEngineRequests).
+		AddWorker(n.processRegisterBlobServiceRequests).Build()
+
+	return n, nil
 }
 
 func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -218,14 +225,9 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 	ctx, cancel := context.WithCancel(parent)
 
 	// create the conduit
-	conduit := &Conduit{
-		ctx:       ctx,
-		cancel:    cancel,
-		channel:   channel,
-		publish:   n.PublishOnChannel,
-		unicast:   n.UnicastOnChannel,
-		multicast: n.MulticastOnChannel,
-		close:     n.UnRegisterChannel,
+	conduit, err := n.conduitFactory.NewConduit(ctx, cancel, channel)
+	if err != nil {
+		return nil, fmt.Errorf("could not create conduit using factory: %w", err)
 	}
 
 	return conduit, nil
