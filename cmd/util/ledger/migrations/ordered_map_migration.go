@@ -99,6 +99,71 @@ type Pair = struct {
 
 type RawStorable []byte
 
+func (RawStorable) IsValue() {}
+
+func (v RawStorable) Accept(interpreter *interpreter.Interpreter, visitor interpreter.Visitor) {
+	panic("unreachable")
+}
+
+func (RawStorable) Walk(_ func(interpreter.Value)) {
+	// NO-OP
+}
+
+func (RawStorable) DynamicType(_ *interpreter.Interpreter, _ interpreter.SeenReferences) interpreter.DynamicType {
+	panic("unreachable")
+}
+
+func (RawStorable) StaticType() interpreter.StaticType {
+	panic("unreachable")
+}
+
+func (RawStorable) String() string {
+	panic("unreachable")
+}
+
+func (v RawStorable) RecursiveString(_ interpreter.SeenReferences) string {
+	panic("unreachable")
+}
+
+func (v RawStorable) ConformsToDynamicType(
+	_ *interpreter.Interpreter,
+	_ func() interpreter.LocationRange,
+	dynamicType interpreter.DynamicType,
+	_ interpreter.TypeConformanceResults,
+) bool {
+	panic("unreachable")
+}
+
+func (v RawStorable) Equal(_ *interpreter.Interpreter, _ func() interpreter.LocationRange, other interpreter.Value) bool {
+	panic("unreachable")
+}
+
+func (RawStorable) NeedsStoreTo(_ atree.Address) bool {
+	panic("unreachable")
+}
+
+func (RawStorable) IsResourceKinded(_ *interpreter.Interpreter) bool {
+	panic("unreachable")
+}
+
+func (v RawStorable) Transfer(
+	interpreter *interpreter.Interpreter,
+	_ func() interpreter.LocationRange,
+	_ atree.Address,
+	remove bool,
+	storable atree.Storable,
+) interpreter.Value {
+	panic("unreachable")
+}
+
+func (v RawStorable) Clone(_ *interpreter.Interpreter) interpreter.Value {
+	panic("unreachable")
+}
+
+func (RawStorable) DeepRemove(_ *interpreter.Interpreter) {
+	// NO-OP
+}
+
 func (r RawStorable) Encode(enc *atree.Encoder) error {
 	return enc.CBOR.EncodeRawBytes(r)
 }
@@ -108,7 +173,7 @@ func (r RawStorable) ByteSize() uint32 {
 }
 
 func (r RawStorable) StoredValue(storage atree.SlabStorage) (atree.Value, error) {
-	panic("unreachable")
+	return r, nil
 }
 
 func (r RawStorable) ChildStorables() []atree.Storable {

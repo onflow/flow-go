@@ -947,6 +947,22 @@ func (e *TransactionEnv) ValueDecoded(duration time.Duration) {
 	e.metrics.ValueDecoded(duration)
 }
 
+func (m *TransactionEnv) BLSVerifyPOP(_ *runtime.PublicKey, _ []byte) (bool, error) {
+	panic("unexpected BLSVerifyPOP call")
+}
+
+func (m *TransactionEnv) AggregateBLSSignatures(_ [][]byte) ([]byte, error) {
+	panic("unexpected BLSAggregateSignatures call")
+}
+
+func (m *TransactionEnv) AggregateBLSPublicKeys(_ []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	panic("unexpected BLSAggregatePublicKeys call")
+}
+
+func (m *TransactionEnv) ResourceOwnerChanged(*interpreter.CompositeValue, common.Address, common.Address) {
+	panic("unexpected ResourceOwnerChanged call")
+}
+
 // Commit commits changes and return a list of updated keys
 func (e *TransactionEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	// commit changes and return a list of updated keys

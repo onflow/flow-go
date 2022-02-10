@@ -77,6 +77,7 @@ func TestOrderedMapMigration(t *testing.T) {
 		payload := []ledger.Payload{
 			{Key: createAccountPayloadKey(address1, "storage\x1fFoo"), Value: encodeValue(array)},
 			{Key: createAccountPayloadKey(address1, "public\x1fBar"), Value: encodeValue(one)},
+			{Key: createAccountPayloadKey(address1, "public\x1fBar"), Value: encodeValue(one)},
 			{Key: createAccountPayloadKey(address1, "storage\x1fBar"), Value: encodeValue(str)},
 			{Key: createAccountPayloadKey(address1, "private\x1fBar"), Value: encodeValue(dict)},
 		}
