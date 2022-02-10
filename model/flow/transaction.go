@@ -544,21 +544,20 @@ func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
 
 type signaturesList []TransactionSignature
 
-
 func (sl signaturesList) canonicalForm() interface{} {
-        signatures := make([]interface{}, len(s))
+	signatures := make([]interface{}, len(sl))
 
-        for i, s := range sl {
-                signatures[i] = struct {
-                        SignerIndex uint
-                        KeyID       uint
-                        Signature   []byte
-                }{
-                        SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-                        KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-                        Signature:   s.Signature,
-                }
-        }
+	for i, s := range sl {
+		signatures[i] = struct {
+			SignerIndex uint
+			KeyID       uint
+			Signature   []byte
+		}{
+			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
+			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+			Signature:   s.Signature,
+		}
+	}
 
-        return signatures
+	return signatures
 }
