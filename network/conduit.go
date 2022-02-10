@@ -10,21 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// PublishFunc is a function that broadcasts the specified event
-// to all participants on the given channel.
-type PublishFunc func(channel Channel, event interface{}, targetIDs ...flow.Identifier) error
-
-// UnicastFunc is a function that reliably sends the event via reliable 1-1 direct
-// connection in  the underlying network to the target ID.
-type UnicastFunc func(channel Channel, event interface{}, targetID flow.Identifier) error
-
-// MulticastFunc is a function that unreliably sends the event in the underlying
-// network to randomly chosen subset of nodes from targetIDs
-type MulticastFunc func(channel Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error
-
-// CloseFunc is a function that unsubscribes the conduit from the channel
-type CloseFunc func(channel Channel) error
-
 type ConduitFactory interface {
 	NewConduit(context.Context, context.CancelFunc, Channel) (Conduit, error)
 	WithNetworkAdapter(Adapter) error
