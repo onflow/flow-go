@@ -517,11 +517,7 @@ func (s TransactionSignature) ByteSize() int {
 }
 
 func (s TransactionSignature) Fingerprint() []byte {
-	return fingerprint.Fingerprint(s.canonicalForm())
-}
-
-func (s TransactionSignature) canonicalForm() interface{} {
-	return struct {
+	var canonicalForm = struct {
 		SignerIndex uint
 		KeyID       uint
 		Signature   []byte
@@ -530,6 +526,7 @@ func (s TransactionSignature) canonicalForm() interface{} {
 		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
 		Signature:   s.Signature,
 	}
+	return fingerprint.Fingerprint(canonicalForm)
 }
 
 func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
@@ -547,12 +544,21 @@ func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
 
 type signaturesList []TransactionSignature
 
-func (s signaturesList) canonicalForm() interface{} {
-	signatures := make([]interface{}, len(s))
 
-	for i, signature := range s {
-		signatures[i] = signature.canonicalForm()
-	}
+func (sl signaturesList) canonicalForm() interface{} {
+        signatures := make([]interface{}, len(s))
 
-	return signatures
+        for i, s := range sl {
+                signatures[i] = struct {
+                        SignerIndex uint
+                        KeyID       uint
+                        Signature   []byte
+                }{
+                        SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
+                        KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+                        Signature:   s.Signature,
+                }
+        }
+
+        return signatures
 }
