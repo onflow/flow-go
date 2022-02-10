@@ -12,7 +12,7 @@ import (
 
 type ConduitFactory interface {
 	NewConduit(context.Context, context.CancelFunc, Channel) (Conduit, error)
-	WithNetworkAdapter(Adapter) error
+	RegisterAdapter(Adapter) error
 }
 
 // Conduit represents the interface for engines to communicate over the

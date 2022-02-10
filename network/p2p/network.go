@@ -130,7 +130,7 @@ func NewNetwork(
 
 	n.mw.SetOverlay(n)
 
-	if err := n.conduitFactory.WithNetworkAdapter(n); err != nil {
+	if err := n.conduitFactory.RegisterAdapter(n); err != nil {
 		return nil, fmt.Errorf("could not register network adapter: %w", err)
 	}
 

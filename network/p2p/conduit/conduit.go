@@ -16,7 +16,7 @@ func NewDefaultConduitFactory() *DefaultConduitFactory {
 	return &DefaultConduitFactory{}
 }
 
-func (d *DefaultConduitFactory) WithNetworkAdapter(adapter network.Adapter) error {
+func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 	if d.adapter != nil {
 		return fmt.Errorf("could not register a new network adapter, one already exists")
 	}
