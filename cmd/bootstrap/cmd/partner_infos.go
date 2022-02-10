@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go-sdk/client"
+	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
@@ -16,10 +18,11 @@ import (
 )
 
 var (
-	flagOutputDir    string
-	flagANAddress    string
-	flagANNetworkKey string
-	flagNetworkEnv   string
+	flagOutputDir         string
+	flagANAddress         string
+	flagANNetworkKey      string
+	flagNetworkEnv        string
+	flagPrintskippedNodes bool
 
 	getNodeInfoScript = []byte(`import FlowIDTableStaking from 0x9eca2b38b18b5dfe
 
@@ -69,10 +72,10 @@ func init() {
 	populatePartnerInfosCMD.Flags().StringVar(&flagANAddress, "access-address", "", "the address of the access node used for client connections")
 	populatePartnerInfosCMD.Flags().StringVar(&flagANNetworkKey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
 	populatePartnerInfosCMD.Flags().StringVar(&flagNetworkEnv, "network", "", "the network string, expecting one of ( mainnet | testnet | localnet )")
+	populatePartnerInfosCMD.Flags().BoolVar(&flagPrintskippedNodes, "print-skipped-nodes", false, "print address and node ID of all flow nodes that were skipped")
 
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "out")
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "access-address")
-	cmd.MarkFlagRequired(populatePartnerInfosCMD, "access-network-key")
 }
 
 // populatePartnerInfosRun generate node-pub-info file for each node in the proposed table and the partner stakes file, and prints the
@@ -82,22 +85,14 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 
 	env, err := common.EnvFromNetwork(flagNetworkEnv)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get environment for network (%s): %w", flagNetworkEnv, err)
+		log.Fatal().Err(err).Msgf("could not get environment for network (%s)", flagNetworkEnv)
 	}
 
-	config, err := common.NewFlowClientConfig(flagANAddress, flagANNetworkKey, true)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get flow client config with address (%s) and network key (%s): %w", flagANAddress, flagANNetworkKey, err)
-	}
-
-	flowClient, err := common.FlowClient(config)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get flow client with address (%s) and network key (%s): %w", flagANAddress, flagANNetworkKey, err)
-	}
+	flowClient := getFlowClient()
 
 	proposedNodeIDS, err := executeGetProposedTableScript(ctx, env, flowClient)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get proposed table: %w", err)
+		log.Fatal().Err(err).Msgf("could not get proposed table")
 	}
 
 	skippedNodes := make([]*NodePubInfo, 0)
@@ -120,7 +115,36 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 		writeNodePubInfoFile(nodePubInfo)
 	}
 
-	printSkippedNodes(skippedNodes)
+	if flagPrintskippedNodes {
+		printSkippedNodes(skippedNodes)
+	}
+}
+
+// getFlowClient will validate the flagANNetworkKey and return flow client
+func getFlowClient() *client.Client {
+	// default to insecure client connection
+	insecureClient := true
+
+	if flagANNetworkKey != "" {
+		err := validateANNetworkKey(flagANNetworkKey)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to create flow client invalid access-network-key provided (%s)", flagANNetworkKey, err)
+		}
+
+		insecureClient = false
+	}
+
+	config, err := common.NewFlowClientConfig(flagANAddress, strings.TrimPrefix(flagANNetworkKey, "0x"), insecureClient)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get flow client config with address (%s) and network key (%s)", flagANAddress, flagANNetworkKey)
+	}
+
+	flowClient, err := common.FlowClient(config)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get flow client with address (%s) and network key (%s)", flagANAddress, flagANNetworkKey)
+	}
+
+	return flowClient
 }
 
 // executeGetProposedTableScript executes the get proposed table script
@@ -162,6 +186,21 @@ func isFlowNode(address string) bool {
 	return strings.Contains(address, flowNodeAddrPart)
 }
 
+// validateANNetworkKey attempts to parse the network key provided for secure client connections
+func validateANNetworkKey(key string) error {
+	b, err := hex.DecodeString(strings.TrimPrefix(key, "0x"))
+	if err != nil {
+		return fmt.Errorf("failed to decode public key hex string: %w", err)
+	}
+
+	_, err = crypto.DecodePublicKey(crypto.ECDSA_P256, b)
+	if err != nil {
+		return fmt.Errorf("failed to decode public key: %w", err)
+	}
+
+	return nil
+}
+
 func writeNodePubInfoFile(info *NodePubInfo) {
 	fileOutputName := fmt.Sprintf(infoFileNameTemplate, info.NodeID)
 	path := filepath.Join(flagOutputDir, fileOutputName)
@@ -174,7 +213,5 @@ func printSkippedNodes(skippedNodes []*NodePubInfo) {
 	for _, info := range skippedNodes {
 		builder.WriteString(fmt.Sprintf("Address:%s, NodeID: %s \n", info.Address, info.NodeID))
 	}
-
-	log.Info().
-		Msgf("skipped flow nodes: %s", builder.String())
+	log.Info().Msgf("skipped flow nodes: %s", builder.String())
 }
