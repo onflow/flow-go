@@ -276,6 +276,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[3].ErrorMessage)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
