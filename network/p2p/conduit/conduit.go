@@ -32,13 +32,10 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, cancel context.C
 	}
 
 	return &Conduit{
-		ctx:       ctx,
-		cancel:    cancel,
-		channel:   channel,
-		publish:   d.adapter.PublishOnChannel,
-		unicast:   d.adapter.UnicastOnChannel,
-		multicast: d.adapter.MulticastOnChannel,
-		close:     d.adapter.UnRegisterChannel,
+		ctx:     ctx,
+		cancel:  cancel,
+		channel: channel,
+		adapter: d.adapter,
 	}, nil
 }
 
@@ -46,13 +43,10 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, cancel context.C
 // sending messages within a single engine process. It sends all messages to
 // what can be considered a bus reserved for that specific engine.
 type Conduit struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
-	channel   network.Channel
-	publish   network.PublishFunc
-	unicast   network.UnicastFunc
-	multicast network.MulticastFunc
-	close     network.CloseFunc
+	ctx     context.Context
+	cancel  context.CancelFunc
+	channel network.Channel
+	adapter network.Adapter
 }
 
 // Publish sends an event to the network layer for unreliable delivery
@@ -63,7 +57,7 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
-	return c.publish(c.channel, event, targetIDs...)
+	return c.adapter.PublishOnChannel(c.channel, event, targetIDs...)
 }
 
 // Unicast sends an event in a reliable way to the given recipient.
@@ -73,7 +67,7 @@ func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
-	return c.unicast(c.channel, event, targetID)
+	return c.adapter.UnicastOnChannel(c.channel, event, targetID)
 }
 
 // Multicast unreliably sends the specified event to the specified number of recipients selected from the specified subset.
@@ -82,7 +76,7 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
-	return c.multicast(c.channel, event, num, targetIDs...)
+	return c.adapter.MulticastOnChannel(c.channel, event, num, targetIDs...)
 }
 
 func (c *Conduit) Close() error {
@@ -92,5 +86,5 @@ func (c *Conduit) Close() error {
 	// close the conduit context
 	c.cancel()
 	// call the close function
-	return c.close(c.channel)
+	return c.adapter.UnRegisterChannel(c.channel)
 }
