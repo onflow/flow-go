@@ -6,17 +6,16 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p"
 )
 
 type Conduit struct {
 	channel   network.Channel
 	ctx       context.Context
 	cancel    context.CancelFunc
-	publish   p2p.PublishFunc
-	unicast   p2p.UnicastFunc
-	multicast p2p.MulticastFunc
-	close     p2p.CloseFunc
+	publish   network.PublishFunc
+	unicast   network.UnicastFunc
+	multicast network.MulticastFunc
+	close     network.CloseFunc
 }
 
 func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
