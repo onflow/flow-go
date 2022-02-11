@@ -48,6 +48,22 @@ func (_m *ExecutionDataService) Add(ctx context.Context, sd *state_synchronizati
 	return r0, r1, r2
 }
 
+// Done provides a mock function with given fields:
+func (_m *ExecutionDataService) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
 // Get provides a mock function with given fields: ctx, rootID
 func (_m *ExecutionDataService) Get(ctx context.Context, rootID flow.Identifier) (*state_synchronization.ExecutionData, error) {
 	ret := _m.Called(ctx, rootID)
@@ -69,4 +85,41 @@ func (_m *ExecutionDataService) Get(ctx context.Context, rootID flow.Identifier)
 	}
 
 	return r0, r1
+}
+
+// Has provides a mock function with given fields: ctx, rootID
+func (_m *ExecutionDataService) Has(ctx context.Context, rootID flow.Identifier) (bool, error) {
+	ret := _m.Called(ctx, rootID)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) bool); ok {
+		r0 = rf(ctx, rootID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = rf(ctx, rootID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Ready provides a mock function with given fields:
+func (_m *ExecutionDataService) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
 }

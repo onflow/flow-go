@@ -287,8 +287,18 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 		// initialize the verifier for the protocol consensus
 		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
 
-		followerCore, err := consensus.NewFollower(node.Logger, builder.Committee, node.Storage.Headers, final, verifier,
-			builder.FinalizationDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
+		followerCore, err := consensus.NewFollower(
+			node.Logger,
+			builder.Committee,
+			node.Storage.Headers,
+			final,
+			verifier,
+			builder.FinalizationDistributor,
+			node.RootBlock.Header,
+			node.RootQC,
+			builder.Finalized,
+			builder.Pending,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize follower core: %w", err)
 		}

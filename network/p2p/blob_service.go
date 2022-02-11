@@ -26,6 +26,7 @@ import (
 type blobService struct {
 	component.Component
 	blockService blockservice.BlockService
+	blockStore   blockstore.Blockstore
 	reprovider   provider.Reprovider
 	config       *BlobServiceConfig
 }
@@ -64,7 +65,10 @@ func NewBlobService(
 	config := &BlobServiceConfig{
 		ReprovideInterval: 12 * time.Hour,
 	}
-	bs := &blobService{config: config}
+	bs := &blobService{
+		config:     config,
+		blockStore: bstore,
+	}
 
 	for _, opt := range opts {
 		opt(bs)
@@ -131,6 +135,10 @@ func (bs *blobService) DeleteBlob(ctx context.Context, c cid.Cid) error {
 
 func (bs *blobService) GetSession(ctx context.Context) network.BlobGetter {
 	return &blobServiceSession{blockservice.NewSession(ctx, bs.blockService)}
+}
+
+func (bs *blobService) HasBlob(ctx context.Context, c cid.Cid) (bool, error) {
+	return bs.blockStore.Has(ctx, c)
 }
 
 type blobServiceSession struct {

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/cluster"
@@ -28,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -1978,4 +1980,31 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 		})
 	}
 	return results
+}
+
+func WithCollections(collections []*flow.Collection) func(*state_synchronization.ExecutionData) {
+	return func(executionData *state_synchronization.ExecutionData) {
+		executionData.Collections = collections
+	}
+}
+
+func WithEvents(events []flow.EventsList) func(*state_synchronization.ExecutionData) {
+	return func(executionData *state_synchronization.ExecutionData) {
+		executionData.Events = events
+	}
+}
+
+func WithTrieUpdates(updates []*ledger.TrieUpdate) func(*state_synchronization.ExecutionData) {
+	return func(executionData *state_synchronization.ExecutionData) {
+		executionData.TrieUpdates = updates
+	}
+}
+
+func ExecutionDataFixture(blockID flow.Identifier) *state_synchronization.ExecutionData {
+	return &state_synchronization.ExecutionData{
+		BlockID:     blockID,
+		Collections: []*flow.Collection{},
+		Events:      []flow.EventsList{},
+		TrieUpdates: []*ledger.TrieUpdate{},
+	}
 }

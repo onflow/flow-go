@@ -47,6 +47,9 @@ type BlobService interface {
 
 	// TriggerReprovide updates the BlobService's provider entries in the DHT
 	TriggerReprovide(ctx context.Context) error
+
+	// HasBlob checks if the requested CID exists in the blobstore
+	HasBlob(ctx context.Context, c cid.Cid) (bool, error)
 }
 
 type BlobServiceOption func(BlobService)

@@ -36,6 +36,9 @@ type ExecutionDataService interface {
 
 	// Get gets the ExecutionData for the given root CID from the blobservice.
 	Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error)
+
+	// Has checks if there is a value stored in the local blobstore for the given root CID
+	Has(ctx context.Context, rootID flow.Identifier) (bool, error)
 }
 
 type executionDataServiceImpl struct {
@@ -398,6 +401,13 @@ func (s *executionDataServiceImpl) Get(ctx context.Context, rootID flow.Identifi
 	}
 
 	return nil, ErrBlobTreeDepthExceeded
+}
+
+// Has returns true if the given root CID is stored in the blobstore.
+// This method does not guarantee that the entire blob tree exists in the blobstore, nor that it
+// is properly formed. It only checks that there is an entry for the root CID
+func (s *executionDataServiceImpl) Has(ctx context.Context, rootID flow.Identifier) (bool, error) {
+	return s.blobService.HasBlob(ctx, flow.FlowIDToCid(rootID))
 }
 
 // MalformedDataError is returned when malformed data is found at some level of the requested
