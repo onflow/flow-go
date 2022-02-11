@@ -10,8 +10,8 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
@@ -123,12 +123,35 @@ type balanceProcessor struct {
 	fusdScript []byte
 }
 
-func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
-
+func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 	prog := programs.NewEmptyPrograms()
-	balanceScript := []byte(fmt.Sprintf(`
+
+	v := view.NewChild()
+	st := state.NewState(v)
+	sth := state.NewStateHolder(st)
+	accounts := state.NewAccounts(sth)
+
+	return &balanceProcessor{
+		vm:       vm,
+		ctx:      ctx,
+		view:     v,
+		accounts: accounts,
+		st:       st,
+		prog:     prog,
+	}
+}
+
+func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
+	bp := NewBalanceReporter(chain, view)
+
+	bp.wg = wg
+	bp.logger = logger
+	bp.rwa = rwa
+	bp.rwc = rwc
+	bp.rwm = rwm
+	bp.balanceScript = []byte(fmt.Sprintf(`
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
 
@@ -140,9 +163,9 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 
 					return vaultRef.balance
 				}
-			`, fvm.FungibleTokenAddress(ctx.Chain), fvm.FlowTokenAddress(ctx.Chain)))
+			`, fvm.FungibleTokenAddress(bp.ctx.Chain), fvm.FlowTokenAddress(bp.ctx.Chain)))
 
-	fusdScript := []byte(fmt.Sprintf(`
+	bp.fusdScript = []byte(fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FUSD from 0x%s
 			
@@ -155,9 +178,9 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 			
 				return vaultRef.balance
 			}
-			`, fvm.FungibleTokenAddress(ctx.Chain), "3c5959b568896393"))
+			`, fvm.FungibleTokenAddress(bp.ctx.Chain), "3c5959b568896393"))
 
-	momentsScript := []byte(`
+	bp.momentsScript = []byte(`
 			import TopShot from 0x0b2a3299cc857e29
 			
 			pub fun main(account: Address): Int {
@@ -169,27 +192,7 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 			}
 			`)
 
-	v := view.NewChild()
-	st := state.NewState(v)
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
-
-	return &balanceProcessor{
-		wg:            wg,
-		logger:        logger,
-		vm:            vm,
-		ctx:           ctx,
-		view:          v,
-		accounts:      accounts,
-		st:            st,
-		prog:          prog,
-		rwa:           rwa,
-		rwc:           rwc,
-		rwm:           rwm,
-		balanceScript: balanceScript,
-		momentsScript: momentsScript,
-		fusdScript:    fusdScript,
-	}
+	return bp
 }
 
 func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
@@ -361,40 +364,33 @@ func (c *balanceProcessor) storageUsed(address flow.Address) (uint64, error) {
 }
 
 func (c *balanceProcessor) isDapper(address flow.Address) (bool, error) {
-	id := resourceId(address,
-		interpreter.PathValue{
-			Domain:     common.PathDomainPublic,
-			Identifier: "dapperUtilityCoinReceiver",
-		})
-
-	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key, false)
+	receiver, err := c.ReadStored(address, common.PathDomainPublic, "dapperUtilityCoinReceiver")
 	if err != nil {
 		return false, fmt.Errorf("could not load dapper receiver at %s: %w", address, err)
 	}
-	return len(receiver) != 0, nil
+	return receiver != nil, nil
 }
 
 func (c *balanceProcessor) hasReceiver(address flow.Address) (bool, error) {
-	id := resourceId(address,
-		interpreter.PathValue{
-			Domain:     common.PathDomainPublic,
-			Identifier: "flowTokenReceiver",
-		})
+	receiver, err := c.ReadStored(address, common.PathDomainPublic, "flowTokenReceiver")
 
-	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key, false)
 	if err != nil {
 		return false, fmt.Errorf("could not load receiver at %s: %w", address, err)
 	}
-	return len(receiver) != 0, nil
+	return receiver != nil, nil
 }
 
-func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterID {
-	// Copied logic from interpreter.storageKey(path)
-	key := fmt.Sprintf("%s\x1F%s", path.Domain.Identifier(), path.Identifier)
-
-	return flow.RegisterID{
-		Owner:      string(address.Bytes()),
-		Controller: "",
-		Key:        key,
+func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDomain, id string) (cadence.Value, error) {
+	addr, err := common.HexToAddress(address.Hex())
+	if err != nil {
+		return nil, err
 	}
+	receiver, err := c.vm.Runtime.ReadStored(addr,
+		cadence.Path{
+			Domain:     domain.Identifier(),
+			Identifier: "flowTokenReceiver",
+		},
+		runtime.Context{},
+	)
+	return receiver, err
 }

@@ -23,7 +23,7 @@ type OrderedMapMigration struct {
 	Log         zerolog.Logger
 	OutputDir   string
 	reportFile  *os.File
-	newStorage  *runtime.Storage
+	NewStorage  *runtime.Storage
 	Interpreter *interpreter.Interpreter
 	ledgerView  *view
 
@@ -70,7 +70,7 @@ func (m *OrderedMapMigration) initPersistentSlabStorage(v *view) {
 	stateHolder := state.NewStateHolder(st)
 	accounts := state.NewAccounts(stateHolder)
 
-	m.newStorage = runtime.NewStorage(
+	m.NewStorage = runtime.NewStorage(
 		NewAccountsAtreeLedger(accounts),
 	)
 }
@@ -79,7 +79,7 @@ func (m *OrderedMapMigration) initIntepreter() {
 	inter, err := interpreter.NewInterpreter(
 		nil,
 		nil,
-		interpreter.WithStorage(m.newStorage),
+		interpreter.WithStorage(m.NewStorage),
 	)
 
 	if err != nil {
@@ -224,6 +224,7 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 		// since it is storage metadata and does not need migration
 		if !strings.Contains(entry, "storage\x1f") &&
 			!strings.Contains(entry, "public\x1f") &&
+			!strings.Contains(entry, "contract\x1f") &&
 			!strings.Contains(entry, "private\x1f") {
 			continue
 		}
@@ -249,7 +250,7 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 			if err != nil {
 				panic(err)
 			}
-			storageMap := m.newStorage.GetStorageMap(address, domain)
+			storageMap := m.NewStorage.GetStorageMap(address, domain)
 			for _, pair := range keyValuePairs {
 				storageMap.SetValue(
 					m.Interpreter,
@@ -261,7 +262,7 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 	}
 
 	// we don't need to update any contracts in this migration
-	err := m.newStorage.Commit(m.Interpreter, false)
+	err := m.NewStorage.Commit(m.Interpreter, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
 	}

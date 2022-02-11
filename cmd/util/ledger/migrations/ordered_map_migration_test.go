@@ -42,7 +42,7 @@ func TestOrderedMapMigration(t *testing.T) {
 	})
 
 	encodeValue := func(v interpreter.Value) ledger.Value {
-		storable, _ := v.Storable(mig.newStorage, atree.Address(address1), math.MaxUint64)
+		storable, _ := v.Storable(mig.NewStorage, atree.Address(address1), math.MaxUint64)
 		encodedInt, _ := atree.Encode(storable, interpreter.CBOREncMode)
 		return encodedInt
 	}
@@ -132,7 +132,7 @@ func TestMultipleAccounts(t *testing.T) {
 	})
 
 	encodeValue := func(v interpreter.Value, address flow.Address) ledger.Value {
-		storable, _ := v.Storable(mig.newStorage, atree.Address(address), math.MaxUint64)
+		storable, _ := v.Storable(mig.NewStorage, atree.Address(address), math.MaxUint64)
 		encodedInt, _ := atree.Encode(storable, interpreter.CBOREncMode)
 		return encodedInt
 	}
@@ -189,7 +189,7 @@ func TestMultipleAccounts(t *testing.T) {
 	})
 }
 
-func TestComplexValue(t *testing.T) {
+func TestContractValue(t *testing.T) {
 	dir := t.TempDir()
 	mig := OrderedMapMigration{
 		Log:       zerolog.Logger{},
@@ -205,75 +205,36 @@ func TestComplexValue(t *testing.T) {
 	})
 
 	encodeValue := func(v interpreter.Value) ledger.Value {
-		storable, _ := v.Storable(mig.newStorage, atree.Address(address1), math.MaxUint64)
+		storable, _ := v.Storable(mig.NewStorage, atree.Address(address1), math.MaxUint64)
 		encodedInt, _ := atree.Encode(storable, interpreter.CBOREncMode)
 		return encodedInt
 	}
 
-	t.Run("migrate complex values", func(t *testing.T) {
-
-		one := interpreter.NewIntValueFromInt64(1)
-		str := interpreter.NewStringValue("test")
-
-		fields := []interpreter.CompositeField{
-			{
-				Name:  "x",
-				Value: one,
-			},
-			{
-				Name:  "y",
-				Value: str,
-			},
-		}
-
-		s := interpreter.NewCompositeValue(
+	t.Run("migrate contract values", func(t *testing.T) {
+		c := interpreter.NewCompositeValue(
 			mig.Interpreter,
 			common.AddressLocation{},
-			"S",
-			common.CompositeKindStructure,
-			fields,
-			cadenceAddress,
-		)
-
-		r := interpreter.NewCompositeValue(
-			mig.Interpreter,
-			common.AddressLocation{},
-			"R",
-			common.CompositeKindResource,
-			fields,
+			"C",
+			common.CompositeKindContract,
+			[]interpreter.CompositeField{},
 			cadenceAddress,
 		)
 
 		payload := []ledger.Payload{
-			{Key: createAccountPayloadKey(address1, "storage\x1fFoo"), Value: encodeValue(s)},
-			{Key: createAccountPayloadKey(address1, "storage\x1fBar"), Value: encodeValue(r)},
+			{Key: createAccountPayloadKey(address1, "contract\x1fFoo"), Value: encodeValue(c)},
 		}
 		migratedPayload, err := mig.migrate(payload)
 		require.NoError(t, err)
-		require.Equal(t, len(migratedPayload), 7)
+		require.Equal(t, len(migratedPayload), 6)
 
 		migrated := &OrderedMapMigration{}
 		migrated.initPersistentSlabStorage(NewView(migratedPayload))
 		migrated.initIntepreter()
 
-		getLocationRange := func() interpreter.LocationRange {
-			return interpreter.ReturnEmptyLocationRange()
-		}
-
-		stored := migrated.Interpreter.ReadStored(cadenceAddress, "storage", "Foo")
+		stored := migrated.Interpreter.ReadStored(cadenceAddress, "contract", "Foo")
 		require.IsType(t, &interpreter.CompositeValue{}, stored)
 		composite := stored.(*interpreter.CompositeValue)
-		require.Equal(t, composite.Kind, common.CompositeKindStructure)
-		require.Equal(t, composite.QualifiedIdentifier, "S")
-		require.Equal(t, composite.GetMember(migrated.Interpreter, getLocationRange, "x"), one)
-		require.Equal(t, composite.GetMember(migrated.Interpreter, getLocationRange, "y"), str)
-
-		stored = migrated.Interpreter.ReadStored(cadenceAddress, "storage", "Bar")
-		require.IsType(t, &interpreter.CompositeValue{}, stored)
-		composite = stored.(*interpreter.CompositeValue)
-		require.Equal(t, composite.Kind, common.CompositeKindResource)
-		require.Equal(t, composite.QualifiedIdentifier, "R")
-		require.Equal(t, composite.GetMember(migrated.Interpreter, getLocationRange, "x"), one)
-		require.Equal(t, composite.GetMember(migrated.Interpreter, getLocationRange, "y"), str)
+		require.Equal(t, composite.Kind, common.CompositeKindContract)
+		require.Equal(t, composite.QualifiedIdentifier, "C")
 	})
 }
