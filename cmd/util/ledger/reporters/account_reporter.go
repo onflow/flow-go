@@ -109,6 +109,7 @@ type balanceProcessor struct {
 	ctx           fvm.Context
 	view          state.View
 	prog          *programs.Programs
+	intf          runtime.Interface
 	balanceScript []byte
 	momentsScript []byte
 
@@ -140,6 +141,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		accounts: accounts,
 		st:       st,
 		prog:     prog,
+		intf:     fvm.NewScriptEnvironment(ctx, vm, sth, prog),
 	}
 }
 
@@ -388,9 +390,9 @@ func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDo
 	receiver, err := c.vm.Runtime.ReadStored(addr,
 		cadence.Path{
 			Domain:     domain.Identifier(),
-			Identifier: "flowTokenReceiver",
+			Identifier: id,
 		},
-		runtime.Context{},
+		runtime.Context{Interface: c.intf},
 	)
 	return receiver, err
 }

@@ -26,17 +26,17 @@ type Suite struct {
 
 	con     *mocknetwork.Conduit
 	net     *splitternetwork.Network
-	engines map[network.Channel]network.Engine
+	engines map[network.Channel]network.MessageProcessor
 }
 
 func (suite *Suite) SetupTest() {
 	net := new(mocknetwork.Network)
 	suite.con = new(mocknetwork.Conduit)
-	suite.engines = make(map[network.Channel]network.Engine)
+	suite.engines = make(map[network.Channel]network.MessageProcessor)
 
 	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Run(func(args mock.Arguments) {
 		channel, _ := args.Get(0).(network.Channel)
-		engine, ok := args.Get(1).(network.Engine)
+		engine, ok := args.Get(1).(network.MessageProcessor)
 		suite.Assert().True(ok)
 		suite.engines[channel] = engine
 	}).Return(suite.con, nil)

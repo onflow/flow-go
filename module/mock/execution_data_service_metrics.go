@@ -13,9 +13,9 @@ type ExecutionDataServiceMetrics struct {
 	mock.Mock
 }
 
-// ExecutionDataAddFinished provides a mock function with given fields: duration, success, blobTreeNodes
-func (_m *ExecutionDataServiceMetrics) ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeNodes int) {
-	_m.Called(duration, success, blobTreeNodes)
+// ExecutionDataAddFinished provides a mock function with given fields: duration, success, blobTreeSize
+func (_m *ExecutionDataServiceMetrics) ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize uint64) {
+	_m.Called(duration, success, blobTreeSize)
 }
 
 // ExecutionDataAddStarted provides a mock function with given fields:
@@ -23,9 +23,9 @@ func (_m *ExecutionDataServiceMetrics) ExecutionDataAddStarted() {
 	_m.Called()
 }
 
-// ExecutionDataGetFinished provides a mock function with given fields: duration, success, blobTreeNodes
-func (_m *ExecutionDataServiceMetrics) ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeNodes int) {
-	_m.Called(duration, success, blobTreeNodes)
+// ExecutionDataGetFinished provides a mock function with given fields: duration, success, blobTreeSize
+func (_m *ExecutionDataServiceMetrics) ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64) {
+	_m.Called(duration, success, blobTreeSize)
 }
 
 // ExecutionDataGetStarted provides a mock function with given fields:

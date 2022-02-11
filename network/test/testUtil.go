@@ -10,8 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	pc "github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -29,9 +33,8 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -116,7 +119,11 @@ func GenerateIDs(
 		key, err := generateNetworkingKey(id.NodeID)
 		require.NoError(t, err)
 
-		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, o.connectionGating, idProvider, o.dhtOpts...)
+		var opts []nodeBuilderOption
+
+		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
+
+		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, o.connectionGating, idProvider, opts...)
 
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
@@ -163,7 +170,6 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			p2p.DefaultUnicastTimeout,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
 			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithConnectionGating(o.connectionGating),
 		)
 	}
 	return mws, idProviders
@@ -257,6 +263,7 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 
 type optsConfig struct {
 	idOpts           []func(*flow.Identity)
+	dhtPrefix        string
 	dhtOpts          []dht.Option
 	peerManagerOpts  []p2p.Option
 	connectionGating bool
@@ -268,8 +275,9 @@ func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
 	}
 }
 
-func WithDHTOpts(dhtOpts ...dht.Option) func(*optsConfig) {
+func WithDHT(prefix string, dhtOpts ...dht.Option) func(*optsConfig) {
 	return func(o *optsConfig) {
+		o.dhtPrefix = prefix
 		o.dhtOpts = dhtOpts
 	}
 }
@@ -277,12 +285,6 @@ func WithDHTOpts(dhtOpts ...dht.Option) func(*optsConfig) {
 func WithPeerManagerOpts(peerManagerOpts ...p2p.Option) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.peerManagerOpts = peerManagerOpts
-	}
-}
-
-func WithConnectionGating(enabled bool) func(*optsConfig) {
-	return func(o *optsConfig) {
-		o.connectionGating = enabled
 	}
 }
 
@@ -312,44 +314,40 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	return engs
 }
 
+type nodeBuilderOption func(p2p.NodeBuilder)
+
+func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
+	return func(nb p2p.NodeBuilder) {
+		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
+			return p2p.NewDHT(c, h, pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix), dhtOpts...)
+		})
+	}
+}
+
 // generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
-func generateLibP2PNode(t *testing.T,
+func generateLibP2PNode(
+	t *testing.T,
 	logger zerolog.Logger,
 	id flow.Identity,
 	key crypto.PrivateKey,
 	connGating bool,
 	idProvider id.IdentityProvider,
-	dhtOpts ...dht.Option,
+	opts ...nodeBuilderOption,
 ) (*p2p.Node, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 
-	pingInfoProvider := new(mocknetwork.PingInfoProvider)
-	pingInfoProvider.On("SoftwareVersion").Return("test")
-	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
-
 	ctx := context.TODO()
-	var connGater *p2p.ConnGater = nil
-	if connGating {
-		connGater = p2p.NewConnGater(logger)
-	}
+
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
-	// dns resolver
-	resolver := dns.NewResolver(dns.DefaultCacheSize, unittest.Logger(), noopMetrics)
-
-	builder := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
-		SetSporkID(sporkID).
-		SetConnectionGater(connGater).
+	builder := p2p.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
 		SetConnectionManager(connManager).
-		SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
-		SetPingInfoProvider(pingInfoProvider).
-		SetResolver(resolver).
-		SetLogger(logger)
+		SetPubSub(pubsub.NewGossipSub)
 
-	if len(dhtOpts) > 0 {
-		builder.SetDHTOptions(dhtOpts...)
+	for _, opt := range opts {
+		opt(builder)
 	}
 
 	libP2PNode, err := builder.Build(ctx)

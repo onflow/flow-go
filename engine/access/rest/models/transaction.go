@@ -80,7 +80,6 @@ func (t *TransactionSignatures) Build(signatures []flow.TransactionSignature) {
 
 func (t *TransactionSignature) Build(sig flow.TransactionSignature) {
 	t.Address = sig.Address.String()
-	t.SignerIndex = util.FromUint64(uint64(sig.SignerIndex))
 	t.KeyIndex = util.FromUint64(sig.KeyIndex)
 	t.Signature = util.ToBase64(sig.Signature)
 }
@@ -97,6 +96,7 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	}
 
 	t.Status = &status
+	t.StatusCode = int32(txr.StatusCode)
 	t.ErrorMessage = txr.ErrorMessage
 	t.ComputationUsed = util.FromUint64(0)
 	t.Events = events

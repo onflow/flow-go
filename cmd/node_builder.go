@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -38,8 +39,8 @@ type NodeBuilder interface {
 	// ExtraFlags reads the node specific command line arguments and adds it to the FlagSet
 	ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder
 
-	// ParseAndPrintFlags parses all the command line arguments
-	ParseAndPrintFlags()
+	// ParseAndPrintFlags parses and validates all the command line arguments
+	ParseAndPrintFlags() error
 
 	// Initialize performs all the initialization needed at the very start of a node
 	Initialize() error
@@ -99,7 +100,7 @@ type NodeBuilder interface {
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics() error
 
-	// ValidateFlags is an extra method called after parsing flags, intended for extra check of flag validity
+	// ValidateFlags sets any custom validation rules for the command line flags,
 	// for example where certain combinations aren't allowed
 	ValidateFlags(func() error) NodeBuilder
 }
@@ -115,6 +116,11 @@ type BaseConfig struct {
 	AdminClientCAs                  string
 	BindAddr                        string
 	NodeRole                        string
+	DynamicStartupANAddress         string
+	DynamicStartupANPubkey          string
+	DynamicStartupEpochPhase        string
+	DynamicStartupEpoch             string
+	DynamicStartupSleepInterval     time.Duration
 	datadir                         string
 	secretsdir                      string
 	secretsDBEnabled                bool
@@ -157,8 +163,10 @@ type NodeConfig struct {
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
+	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
+	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
@@ -170,12 +178,16 @@ type NodeConfig struct {
 	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
-	RootBlock                     *flow.Block
-	RootQC                        *flow.QuorumCertificate
-	RootResult                    *flow.ExecutionResult
-	RootSeal                      *flow.Seal
-	RootChainID                   flow.ChainID
-	SporkID                       flow.Identifier
+	RootSnapshot protocol.Snapshot
+	// cached properties of RootSnapshot for convenience
+	RootBlock   *flow.Block
+	RootQC      *flow.QuorumCertificate
+	RootResult  *flow.ExecutionResult
+	RootSeal    *flow.Seal
+	RootChainID flow.ChainID
+	SporkID     flow.Identifier
+
+	// bootstrapping options
 	SkipNwAddressBasedValidations bool
 }
 

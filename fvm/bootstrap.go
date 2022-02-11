@@ -181,6 +181,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
+	b.deployContractAuditVouchers(service)
 	fungibleToken := b.deployFungibleToken()
 	flowToken := b.deployFlowToken(service, fungibleToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken)
@@ -328,6 +329,24 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
+}
+
+// deployContractAuditVouchers deploys audit vouchers contract to the service account
+func (b *BootstrapProcedure) deployContractAuditVouchers(service flow.Address) {
+	contract := contracts.FlowContractAudits()
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployContractTransaction(
+				service,
+				contract,
+				"FlowContractAudits"),
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy contract audit vouchers contract: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) createMinter(service, flowToken flow.Address) {
