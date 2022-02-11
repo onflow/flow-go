@@ -11,7 +11,7 @@ require (
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.22.0-beta
-	github.com/dapperlabs/testingdock v0.4.2
+	github.com/dapperlabs/testingdock v0.4.4
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v2 v2.2007.3
 	github.com/ef-ds/deque v1.0.4

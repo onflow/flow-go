@@ -40,6 +40,7 @@ type nodeUpdateValidation func(ctx context.Context, env templates.Environment, r
 // Suite encapsulates common functionality for epoch integration tests.
 type Suite struct {
 	suite.Suite
+	log zerolog.Logger
 	common.TestnetStateTracker
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -62,10 +63,17 @@ func (s *Suite) SetupTest() {
 	s.StakingAuctionLen = 200
 	s.DKGPhaseLen = 50
 	s.EpochLen = 380
-}
 
-// StartNetwork sets up and starts the Flow network configured for epoch integration tests.
-func (s *Suite) StartNetwork() {
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "suite.go").
+		Str("testcase", s.T().Name()).
+		Logger()
+	s.log = logger
+	s.log.Info().Msgf("================> SetupTest")
+	defer func() {
+		s.log.Info().Msgf("================> Finish SetupTest")
+	}()
+
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -125,12 +133,11 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return client
 }
 
-// StopNetwork tears down and cleans up the Docker network.
-func (s *Suite) StopNetwork() {
+func (s *Suite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
 	s.net.Remove()
-	if s.cancel != nil {
-		s.cancel()
-	}
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to
