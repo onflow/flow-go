@@ -30,7 +30,7 @@ type Network interface {
 }
 
 // Adapter is a wrapper around the Network implementation. It only exposes message dissemination functionalities.
-// Adapter is meant to be utilized by the Conduit interface to drop messages to the Network layer to be
+// Adapter is meant to be utilized by the Conduit interface to send messages to the Network layer to be
 // delivered to the remote targets.
 type Adapter interface {
 	// UnicastOnChannel sends the message in a reliable way to the given recipient.
