@@ -248,8 +248,24 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
-			builder.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, builder.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Results, node.Storage.Receipts, builder.TransactionMetrics,
-				builder.CollectionsToMarkFinalized, builder.CollectionsToMarkExecuted, builder.BlocksToMarkExecuted, builder.RpcEng)
+			builder.IngestEng, err = ingestion.New(
+				node.Logger,
+				node.Network,
+				node.State,
+				node.Me,
+				builder.RequestEng,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.Storage.Collections,
+				node.Storage.Transactions,
+				node.Storage.Results,
+				node.Storage.Receipts,
+				builder.TransactionMetrics,
+				builder.CollectionsToMarkFinalized,
+				builder.CollectionsToMarkExecuted,
+				builder.BlocksToMarkExecuted,
+				builder.RpcEng,
+			)
 			if err != nil {
 				return nil, err
 			}
