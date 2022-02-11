@@ -37,7 +37,7 @@ type Network struct {
 // NewNetwork create a mocked Network.
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
-func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
+func NewNetwork(state protocol.State, me module.Local, hub *Hub) (*Network, error) {
 	net := &Network{
 		ctx:            context.Background(),
 		state:          state,
@@ -47,9 +47,14 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 		qCD:            make(chan struct{}),
 		conduitFactory: conduit.NewDefaultConduitFactory(),
 	}
+
+	if err := net.conduitFactory.RegisterAdapter(net); err != nil {
+		return nil, fmt.Errorf("could not register adapter to the conduit factory: %w", err)
+	}
+
 	// AddNetwork the Network to a hub so that Networks can find each other.
 	hub.AddNetwork(net)
-	return net
+	return net, nil
 }
 
 // GetID returns the identity of the attached node.
@@ -77,7 +82,7 @@ func (n *Network) Register(channel network.Channel, engine network.MessageProces
 	return c, nil
 }
 
-func (n *Network) Unregister(channel network.Channel) error {
+func (n *Network) UnRegisterChannel(channel network.Channel) error {
 	n.Lock()
 	defer n.Unlock()
 	delete(n.engines, channel)
@@ -101,7 +106,7 @@ func (n *Network) submit(channel network.Channel, event interface{}, targetIDs .
 
 // unicast is called when the attached Engine to the channel is sending an event to a single target
 // Engine attached to the same channel on another node.
-func (n *Network) unicast(channel network.Channel, event interface{}, targetID flow.Identifier) error {
+func (n *Network) UnicastOnChannel(channel network.Channel, event interface{}, targetID flow.Identifier) error {
 	m := &PendingMessage{
 		From:      n.GetID(),
 		Channel:   channel,
@@ -116,7 +121,7 @@ func (n *Network) unicast(channel network.Channel, event interface{}, targetID f
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) PublishOnChannel(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 
 	if len(targetIDs) == 0 {
 		return fmt.Errorf("publish found empty target ID list for the message")
@@ -128,7 +133,7 @@ func (n *Network) publish(channel network.Channel, event interface{}, targetIDs 
 // multicast is called when an engine attached to the channel is sending an event to a number of randomly chosen
 // Engines attached to the same channel on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) multicast(channel network.Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (n *Network) MulticastOnChannel(channel network.Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error {
 	targetIDs = flow.Sample(num, targetIDs...)
 	return n.submit(channel, event, targetIDs...)
 }
