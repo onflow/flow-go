@@ -186,6 +186,14 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			require   func(t *testing.T, sigOk bool, err error)
 		}{
 			{
+				signTag:   "",
+				verifyTag: "",
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.True(t, sigOk)
+				},
+			},
+			{
 				signTag:   "user",
 				verifyTag: "user",
 				require: func(t *testing.T, sigOk bool, err error) {
