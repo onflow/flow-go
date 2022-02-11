@@ -22,7 +22,6 @@ var (
 	flagANAddress    string
 	flagANNetworkKey string
 	flagNetworkEnv   string
-	flagVerbose      bool
 
 	getNodeInfoScript = []byte(`import FlowIDTableStaking from 0x9eca2b38b18b5dfe
 
@@ -78,7 +77,6 @@ func init() {
 	populatePartnerInfosCMD.Flags().StringVar(&flagANAddress, "access-address", "", "the address of the access node used for client connections")
 	populatePartnerInfosCMD.Flags().StringVar(&flagANNetworkKey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
 	populatePartnerInfosCMD.Flags().StringVar(&flagNetworkEnv, "network", "", "the network string, expecting one of ( mainnet | testnet | localnet )")
-	populatePartnerInfosCMD.Flags().BoolVar(&flagVerbose, "verbose", false, "print the # of total node pub infos generated as well as the # of each role type and the # of skipped nodes")
 
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "out")
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "access-address")
@@ -128,17 +126,15 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 			continue
 		}
 
-		partnerStakes[nodePubInfo.NodeID] = defaultPartnerStake
 		writeNodePubInfoFile(nodePubInfo)
+		partnerStakes[nodePubInfo.NodeID] = defaultPartnerStake
 		numOfNodesByType[nodePubInfo.Role]++
 		totalNumOfPartnerNodes++
 	}
 
 	writePartnerStakesFile(partnerStakes)
 
-	if flagVerbose {
-		printNodeCounts(numOfNodesByType, totalNumOfPartnerNodes, skippedNodes)
-	}
+	printNodeCounts(numOfNodesByType, totalNumOfPartnerNodes, skippedNodes)
 }
 
 // getFlowClient will validate the flagANNetworkKey and return flow client
