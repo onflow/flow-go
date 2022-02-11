@@ -8,6 +8,9 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
+// DefaultConduitFactory is a wrapper around the network Adapter.
+// It directly passes the incoming messages to the corresponding methods of the
+// network Adapter.
 type DefaultConduitFactory struct {
 	adapter network.Adapter
 }
@@ -16,6 +19,9 @@ func NewDefaultConduitFactory() *DefaultConduitFactory {
 	return &DefaultConduitFactory{}
 }
 
+// RegisterAdapter sets the Adapter component of the factory.
+// The Adapter is a wrapper around the Network layer that only exposes the set of methods
+// that are needed by a conduit.
 func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 	if d.adapter != nil {
 		return fmt.Errorf("could not register a new network adapter, one already exists")
@@ -26,6 +32,8 @@ func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 	return nil
 }
 
+// NewConduit creates a conduit on the specified channel.
+// Prior to creating any conduit, the factory requires an Adapter to be registered with it.
 func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel network.Channel) (network.Conduit, error) {
 	if d.adapter == nil {
 		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")
