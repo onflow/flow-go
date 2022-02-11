@@ -293,7 +293,7 @@ func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batc
 }
 
 // UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
-// receive messages from that channel
+// receive messages from that channel.
 func (n *Network) UnRegisterChannel(channel network.Channel) error {
 	err := n.subMngr.Unregister(channel)
 	if err != nil {
