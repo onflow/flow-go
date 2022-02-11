@@ -40,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
@@ -266,7 +265,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			subscriptionManager,
 			fnb.Metrics.Network,
 			fnb.IdentityProvider,
-			conduit.NewDefaultConduitFactory(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
