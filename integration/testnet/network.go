@@ -772,7 +772,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			containerPort := "9000/tcp"
 
 			nodeContainer.bindPort(hostPort, containerPort)
-// uncomment this code to expose the metrics server for each node
+
+			// uncomment this code to expose the metrics server for each node
 			// hostMetricsPort := testingdock.RandomPort(t)
 			// containerMetricsPort := "8080/tcp"
 
@@ -1277,7 +1278,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		}
 
 		// generate qc for root cluster block
-		qc, err := run.GenerateClusterRootQC(participants, block)
+		qc, err := run.GenerateClusterRootQC(participants, bootstrap.ToIdentityList(participants), block)
 		if err != nil {
 			return nil, nil, err
 		}

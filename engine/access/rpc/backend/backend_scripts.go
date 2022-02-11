@@ -104,14 +104,14 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 				Msg("Successfully executed script")
 			return result, nil
 		}
-		// return OK status if it's just a script failure as opposed to an EN failure
+		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
 		if status.Code(err) == codes.InvalidArgument {
 			b.log.Debug().Err(err).
 				Str("execution_node", execNode.String()).
 				Hex("block_id", blockID[:]).
 				Str("script", string(script)).
 				Msg("script failed to execute on the execution node")
-			return nil, status.Errorf(codes.OK, "failed to execute script on execution node %v", execNode.String())
+			return nil, err
 		}
 		errors = multierror.Append(errors, err)
 	}
