@@ -150,7 +150,7 @@ func (b *Broker) Broadcast(data []byte) {
 		b.broadcastLock.Lock()
 		if b.broadcasts > 0 {
 			// The warn-level log is used by the integration tests to check if this
-			// method is called more than once within one epoch (unhappy path).
+			// func is called more than once within one epoch (unhappy path).
 			b.log.Warn().Msgf("preparing to send DKG broadcast number %d with header %d", b.broadcasts+1, data[0])
 		} else {
 			b.log.Info().Msgf("preparing to send DKG message broadcast with header %d", data[0])
