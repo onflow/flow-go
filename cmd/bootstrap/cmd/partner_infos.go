@@ -18,11 +18,11 @@ import (
 )
 
 var (
-	flagOutputDir         string
-	flagANAddress         string
-	flagANNetworkKey      string
-	flagNetworkEnv        string
-	flagPrintskippedNodes bool
+	flagOutputDir    string
+	flagANAddress    string
+	flagANNetworkKey string
+	flagNetworkEnv   string
+	flagVerbose      bool
 
 	getNodeInfoScript = []byte(`import FlowIDTableStaking from 0x9eca2b38b18b5dfe
 
@@ -34,17 +34,19 @@ var (
 )
 
 const (
-	// index of each field in the cadence NodeInfo as it corresponds to cadence.Struct.Fields needed to build NodePubInfo struct
-	// fields not needed are left out
+	// Index of each field in the cadence NodeInfo as it corresponds to cadence.Struct.Fields needed to build NodePubInfo struct,
+	// fields not needed are left out.
 	idField = iota
 	roleField
 	networkingAddressField
 	networkingKeyField
 	stakingKeyField
 	tokensStakedField
+	nodeInfosPubDir       = "node-pub-infos"
 	infoFileNameTemplate  = "node-info.pub.%s.json"
 	partnerStakesFileName = "partner-stakes.json"
 	flowNodeAddrPart      = "nodes.onflow.org"
+	defaultPartnerStake   = "100"
 )
 
 // NodePubInfo basic representation of node-pub-info.json data
@@ -57,7 +59,7 @@ type NodePubInfo struct {
 	StakingPubKey string `json:"StakingPubKey"`
 }
 
-// PartnerStakesInfo mapping of NodeID => Amount of tokens staked
+// PartnerStakesInfo mapping of NodeID =>
 type PartnerStakesInfo map[string]string
 
 // populatePartnerInfos represents the `populate-partner-infos` command which will read the proposed node
@@ -76,7 +78,7 @@ func init() {
 	populatePartnerInfosCMD.Flags().StringVar(&flagANAddress, "access-address", "", "the address of the access node used for client connections")
 	populatePartnerInfosCMD.Flags().StringVar(&flagANNetworkKey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
 	populatePartnerInfosCMD.Flags().StringVar(&flagNetworkEnv, "network", "", "the network string, expecting one of ( mainnet | testnet | localnet )")
-	populatePartnerInfosCMD.Flags().BoolVar(&flagPrintskippedNodes, "print-skipped-nodes", false, "print address and node ID of all flow nodes that were skipped")
+	populatePartnerInfosCMD.Flags().BoolVar(&flagVerbose, "verbose", false, "print the # of total node pub infos generated as well as the # of each role type and the # of skipped nodes")
 
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "out")
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "access-address")
@@ -100,7 +102,16 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 	}
 
 	partnerStakes := make(PartnerStakesInfo)
-	skippedNodes := make([]*NodePubInfo, 0)
+	skippedNodes := 0
+	numOfNodesByType := map[string]int{
+		flow.RoleCollection.String():   0,
+		flow.RoleConsensus.String():    0,
+		flow.RoleExecution.String():    0,
+		flow.RoleVerification.String(): 0,
+		flow.RoleAccess.String():       0,
+	}
+	totalNumOfPartnerNodes := 0
+
 	for _, id := range proposedNodeIDS.Values {
 		info, err := executeGetNodeInfoScript(ctx, env, flowClient, id)
 		if err != nil {
@@ -113,18 +124,20 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 		}
 
 		if isFlowNode(nodePubInfo.Address) {
-			skippedNodes = append(skippedNodes, nodePubInfo)
+			skippedNodes++
 			continue
 		}
 
-		partnerStakes[nodePubInfo.NodeID] = nodePubInfo.Stake
+		partnerStakes[nodePubInfo.NodeID] = defaultPartnerStake
 		writeNodePubInfoFile(nodePubInfo)
+		numOfNodesByType[nodePubInfo.Role]++
+		totalNumOfPartnerNodes++
 	}
 
 	writePartnerStakesFile(partnerStakes)
 
-	if flagPrintskippedNodes {
-		printSkippedNodes(skippedNodes)
+	if flagVerbose {
+		printNodeCounts(numOfNodesByType, totalNumOfPartnerNodes, skippedNodes)
 	}
 }
 
@@ -212,7 +225,7 @@ func validateANNetworkKey(key string) error {
 // writeNodePubInfoFile writes the node-pub-info file
 func writeNodePubInfoFile(info *NodePubInfo) {
 	fileOutputName := fmt.Sprintf(infoFileNameTemplate, info.NodeID)
-	path := filepath.Join(flagOutputDir, fileOutputName)
+	path := filepath.Join(flagOutputDir, nodeInfosPubDir, fileOutputName)
 	writeJSON(path, info)
 }
 
@@ -222,11 +235,14 @@ func writePartnerStakesFile(partnerStakes PartnerStakesInfo) {
 	writeJSON(path, partnerStakes)
 }
 
-func printSkippedNodes(skippedNodes []*NodePubInfo) {
+func printNodeCounts(numOfNodesByType map[string]int, totalNumOfPartnerNodes, skippedNodes int) {
 	var builder strings.Builder
-	builder.WriteString("\n")
-	for _, info := range skippedNodes {
-		builder.WriteString(fmt.Sprintf("Address:%s, NodeID: %s \n", info.Address, info.NodeID))
+	builder.WriteString(fmt.Sprintf("Number of Flow nodes skipped: %d\n", skippedNodes))
+	builder.WriteString(fmt.Sprintf("Number of Partner nodes: %d\n", totalNumOfPartnerNodes))
+	for role, count := range numOfNodesByType {
+		builder.WriteString(fmt.Sprintf("\t%s : %d", role, count))
 	}
-	log.Info().Msgf("skipped flow nodes: %s", builder.String())
+	builder.WriteString("\n")
+
+	fmt.Println(builder.String())
 }

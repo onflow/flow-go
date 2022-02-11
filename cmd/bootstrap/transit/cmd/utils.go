@@ -14,30 +14,22 @@ import (
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/flow"
 	ioutils "github.com/onflow/flow-go/utils/io"
 )
 
 const fileMode = os.FileMode(0644)
 
 var (
-	FilenameTransitKeyPub      = "transit-key.pub.%v"
-	FilenameTransitKeyPriv     = "transit-key.priv.%v"
+
+	// FilenameTransitKeyPub transit key pub file name that consensus nodes will upload (to securely transport DKG in phase 2)
+	FilenameTransitKeyPub  = "transit-key.pub.%v"
+	FilenameTransitKeyPriv = "transit-key.priv.%v"
+
+	// FilenameRandomBeaconCipher consensus node additionally gets the random beacon file
 	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".%v.enc"
-
-	// default files to upload for all role type
-	filesToUpload = []string{
-		bootstrap.PathNodeInfoPub,
-	}
-
-	// consensus node additionally will need the transit key (to securely transport DKG in phase 2)
-	filesToUploadConsensus = FilenameTransitKeyPub
 
 	// default folder to download for all role type
 	folderToDownload = bootstrap.DirnamePublicBootstrap
-
-	// consensus node additionally gets the random beacon file
-	filesToDownloadConsensus = FilenameRandomBeaconCipher
 
 	// commit and semver vars
 	commit = build.Commit()
@@ -54,23 +46,6 @@ func readNodeID() (string, error) {
 	}
 
 	return strings.TrimSpace(string(data)), nil
-}
-
-func getAdditionalFilesToDownload(role flow.Role, nodeID string) []string {
-	switch role {
-	case flow.RoleConsensus:
-		return []string{fmt.Sprintf(filesToDownloadConsensus, nodeID)}
-	}
-	return make([]string, 0)
-}
-
-func getFilesToUpload(role flow.Role) []string {
-	switch role {
-	case flow.RoleConsensus:
-		return append(filesToUpload, filesToUploadConsensus)
-	default:
-		return filesToUpload
-	}
 }
 
 func getFileSHA256(file string) (string, error) {
