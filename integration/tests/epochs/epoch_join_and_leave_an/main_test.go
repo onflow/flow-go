@@ -10,6 +10,6 @@ import (
 )
 
 func TestEpoch(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_RESOURCE_INTENSIVE, "epochs join/leave tests should be run on an machine with adequate resources")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "epochs join/leave tests should be run on an machine with adequate resources")
 	suite.Run(t, new(epochs.EpochJoinAndLeaveANSuite))
 }

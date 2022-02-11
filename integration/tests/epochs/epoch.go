@@ -23,6 +23,7 @@ func (s *StaticEpochTransitionSuite) SetupTest() {
 	s.DKGPhaseLen = 50
 	s.EpochLen = 200
 
+	// run the generic setup, which starts up the network
 	s.Suite.SetupTest()
 }
 
@@ -38,6 +39,9 @@ func (s *DynamicEpochTransitionSuite) SetupTest() {
 	s.StakingAuctionLen = 200
 	s.DKGPhaseLen = 50
 	s.EpochLen = 380
+
+	// run the generic setup, which starts up the network
+	s.Suite.SetupTest()
 }
 
 // TestStaticEpochTransition asserts epoch state transitions over two full epochs
@@ -145,14 +149,14 @@ func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
 	}
 }
 
-type EpochJoinAndLeaveANSuite struct {
-	Suite
-}
-
 // The following Epoch join and leave tests will stake a node by submitting all the transactions
 // that a node operator would submit, start a new container for that node, and remove
 // a container from the network of the same node type. After this orchestration assertions
 // specific to that node type are made to ensure the network is healthy.
+
+type EpochJoinAndLeaveANSuite struct {
+	DynamicEpochTransitionSuite
+}
 
 // TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
@@ -161,7 +165,7 @@ func (s *EpochJoinAndLeaveANSuite) TestEpochJoinAndLeaveAN() {
 }
 
 type EpochJoinAndLeaveVNSuite struct {
-	Suite
+	DynamicEpochTransitionSuite
 }
 
 // TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions
@@ -171,7 +175,7 @@ func (s *EpochJoinAndLeaveVNSuite) TestEpochJoinAndLeaveVN() {
 }
 
 type EpochJoinAndLeaveLNSuite struct {
-	Suite
+	DynamicEpochTransitionSuite
 }
 
 // TestEpochJoinAndLeaveLN should update collection nodes and assert healthy network conditions
@@ -181,7 +185,7 @@ func (s *EpochJoinAndLeaveLNSuite) TestEpochJoinAndLeaveLN() {
 }
 
 type EpochJoinAndLeaveSNSuite struct {
-	Suite
+	DynamicEpochTransitionSuite
 }
 
 // TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions
