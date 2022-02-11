@@ -1,4 +1,4 @@
-package views_progress
+package epoch_static_transition
 
 import (
 	"testing"
