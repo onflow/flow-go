@@ -342,7 +342,8 @@ func mockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 }
 
 // Test cases:
-// * bootstrap with an empty db sets configuration correctly
+// * bootstrap with an empty db sets configuration correctly at beginning of spork
+// * bootstrap with an empty db sets configuration correctly mid spork
 // * bootstrap with a non-empty db sets configuration correctly
 // * bootstrap with halted db does not start
 // * happy case (many blocks in order)

@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
@@ -323,7 +324,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				return builder.ExecutionDataService, nil
 			}).
 			Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				edr, err := state_synchronization.NewExecutionDataRequester(
+				edr, err := edrequester.NewExecutionDataRequester(
 					builder.Logger,
 					metrics.NewNoopCollector(),
 					builder.FinalizationDistributor,
