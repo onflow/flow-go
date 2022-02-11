@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
@@ -111,7 +112,8 @@ func EventsMerkleRootHash(el EventsList) (Identifier, error) {
 		// event fingerprint is the rlp encoding of the wrapperevent
 		// eventID is the standard sha3 hash of the event fingerprint
 		fingerPrint := event.Fingerprint()
-		eventID := MakeID(fingerPrint)
+		var eventID Identifier
+		hash.ComputeSHA3_256((*[32]byte)(&eventID), fingerPrint)
 		_, err = tree.Put(eventID[:], fingerPrint)
 		if err != nil {
 			return ZeroID, err
