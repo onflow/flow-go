@@ -2,19 +2,13 @@ package execution
 
 import (
 	"context"
-	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/integration/tests/common"
 )
-
-func TestExecutionFailingTxReverted(t *testing.T) {
-	suite.Run(t, new(FailingTxRevertedSuite))
-}
 
 type FailingTxRevertedSuite struct {
 	Suite

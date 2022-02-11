@@ -135,8 +135,7 @@ func New(log zerolog.Logger,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 	}
 
-	backend := backend.New(
-		state,
+	backend := backend.New(state,
 		collectionRPC,
 		historicalAccessNodes,
 		blocks,
@@ -153,6 +152,7 @@ func New(log zerolog.Logger,
 		config.PreferredExecutionNodeIDs,
 		config.FixedExecutionNodeIDs,
 		log,
+		backend.DefaultSnapshotHistoryLimit,
 	)
 
 	eng := &Engine{

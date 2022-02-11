@@ -3,6 +3,7 @@ package collection
 import (
 	"context"
 	"math/rand"
+	"time"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/stretchr/testify/require"
@@ -13,9 +14,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type MultiClusterSuite struct {
+	CollectorSuite
+}
+
 // Run consensus on a multi-cluster setup. Ensure that transactions
 // are always included in the appropriate cluster.
-func (suite *CollectorSuite) TestProposal_MultiCluster() {
+func (suite *MultiClusterSuite) TestProposal_MultiCluster() {
+	t := suite.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 	var (
 		nNodes        = 9
 		nClusters     = 3
@@ -43,6 +50,8 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 	}
 
 	suite.Run("correct cluster - no dupes", func() {
+		t := suite.T()
+		t.Logf("%v ================> START RUN TESTING %v", time.Now().UTC(), t.Name())
 		suite.T().Log("ROUND 1")
 
 		// keep track of which cluster is responsible for which transaction ID
@@ -75,9 +84,12 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 		suite.AwaitTransactionsIncluded(
 			append(append(txIDsByCluster[0], txIDsByCluster[1]...), txIDsByCluster[2]...)...,
 		)
+		t.Logf("%v ================> FINISH RUN TESTING %v", time.Now().UTC(), t.Name())
 	})
 
 	suite.Run("correct cluster - with dupes", func() {
+		t := suite.T()
+		t.Logf("%v ================> START RUN TESTING %v", time.Now().UTC(), t.Name())
 		suite.T().Log("ROUND 2")
 
 		// keep track of which cluster is responsible for which transaction ID
@@ -114,9 +126,12 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 		suite.AwaitTransactionsIncluded(
 			append(append(txIDsByCluster[0], txIDsByCluster[1]...), txIDsByCluster[2]...)...,
 		)
+		t.Logf("%v ================> FINISH RUN TESTING %v", time.Now().UTC(), t.Name())
 	})
 
 	suite.Run("wrong cluster - no dupes", func() {
+		t := suite.T()
+		t.Logf("%v ================> START RUN TESTING %v", time.Now().UTC(), t.Name())
 		suite.T().Log("ROUND 3")
 
 		// keep track of which cluster is responsible for which transaction ID
@@ -154,9 +169,12 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 		suite.AwaitTransactionsIncluded(
 			append(append(txIDsByCluster[0], txIDsByCluster[1]...), txIDsByCluster[2]...)...,
 		)
+		t.Logf("%v ================> FINISH RUN TESTING %v", time.Now().UTC(), t.Name())
 	})
 
 	suite.Run("wrong cluster - with dupes", func() {
+		t := suite.T()
+		t.Logf("%v ================> START RUN TESTING %v", time.Now().UTC(), t.Name())
 		suite.T().Log("ROUND 4")
 
 		// keep track of which cluster is responsible for which transaction ID
@@ -194,12 +212,19 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 		suite.AwaitTransactionsIncluded(
 			append(append(txIDsByCluster[0], txIDsByCluster[1]...), txIDsByCluster[2]...)...,
 		)
+		t.Logf("%v ================> FINISH RUN TESTING %v", time.Now().UTC(), t.Name())
 	})
+}
+
+type RecoverySuite struct {
+	CollectorSuite
 }
 
 // Start consensus, pause a node, allow consensus to continue, then restart
 // the node. It should be able to catch up.
-func (suite *CollectorSuite) TestProposal_Recovery() {
+func (suite *RecoverySuite) TestProposal_Recovery() {
+	t := suite.T()
+	t.Logf("%v ================> START TESTING %v", time.Now().UTC(), t.Name())
 
 	// TODO this doesn't quite work with network disconnect/connect for some
 	// reason, skipping for now
@@ -310,4 +335,5 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	// now we can make progress again, but the paused collectors need to catch
 	// up to the current chain state first
 	suite.AwaitTransactionsIncluded(txIDs...)
+	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }

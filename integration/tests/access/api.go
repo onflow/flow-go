@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -19,6 +18,8 @@ import (
 type AccessSuite struct {
 	suite.Suite
 
+	log zerolog.Logger
+
 	// root context for the current test
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -26,34 +27,37 @@ type AccessSuite struct {
 	net *testnet.FlowNetwork
 }
 
-func TestAccessSuite(t *testing.T) {
-	suite.Run(t, new(AccessSuite))
-}
-
-func (suite *AccessSuite) TearDownTest() {
-	// avoid nil pointer errors for skipped tests
-	if suite.cancel != nil {
-		defer suite.cancel()
-	}
-	if suite.net != nil {
-		suite.net.Remove()
-	}
+func (s *AccessSuite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
+	s.net.Remove()
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 func (suite *AccessSuite) SetupTest() {
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "api.go").
+		Str("testcase", suite.T().Name()).
+		Logger()
+	suite.log = logger
+	suite.log.Info().Msgf("================> SetupTest")
+	defer func() {
+		suite.log.Info().Msgf("================> Finish SetupTest")
+	}()
+
 	nodeConfigs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel)),
 	}
 
 	// need one dummy execution node (unused ghost)
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel))
+	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
 	// need one dummy verification node (unused ghost)
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
 
-	// need one controllable collection node (used ghost)
+	// need one controllable collection node (unused ghost)
 	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, collConfig)
 
