@@ -433,10 +433,6 @@ func (tb *TransactionBody) PayloadMessage() []byte {
 //
 // This message is only signed by the payer account.
 func (tb *TransactionBody) EnvelopeMessage() []byte {
-	return fingerprint.Fingerprint(tb.envelopeCanonicalForm())
-}
-
-func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 	authorizers := make([][]byte, len(tb.Authorizers))
 	for i, auth := range tb.Authorizers {
 		authorizers[i] = auth.Bytes()
@@ -488,13 +484,13 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 		signatures[i] = canonicalForm
 	}
 
-	return struct {
+	return fingerprint.Fingerprint(struct {
 		Payload           interface{}
 		PayloadSignatures interface{}
 	}{
 		payload,
 		signatures,
-	}
+	})
 }
 
 func (tx *Transaction) PayloadMessage() []byte {
