@@ -180,7 +180,7 @@ func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessage
 		})
 
 		// Various network conditions can result in errors while forwarding outbound messages.
-		// Because the overall DKG is resilient to individual message failures,
+		// Because the overall DKG is resilient to individual message failures most of time.
 		// it is acceptable to log the error and move on.
 		if err != nil {
 			e.log.Error().Err(err).Msgf("error sending private dkg message after %d attempts", attempts)

@@ -51,8 +51,8 @@ func NewClient(
 }
 
 // ReadBroadcast reads the broadcast messages from the smart contract.
-// Messages are returned in the order in which they were broadcast (received
-// and stored in the smart contract)
+// Messages are returned in the order in which they were received
+// and stored in the smart contract
 func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]model.BroadcastDKGMessage, error) {
 
 	ctx := context.Background()
