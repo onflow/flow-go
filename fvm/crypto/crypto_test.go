@@ -53,18 +53,18 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 	t.Run("verify should fail on incorrect combinations", func(t *testing.T) {
 		correctCombinations := map[runtime.SignatureAlgorithm]map[runtime.HashAlgorithm]struct{}{
 
-			runtime.SignatureAlgorithmBLS_BLS12_381: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmKMAC128_BLS_BLS12_381: struct{}{},
+			runtime.SignatureAlgorithmBLS_BLS12_381: {
+				runtime.HashAlgorithmKMAC128_BLS_BLS12_381: {},
 			},
-			runtime.SignatureAlgorithmECDSA_P256: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256:   struct{}{},
-				runtime.HashAlgorithmSHA3_256:   struct{}{},
-				runtime.HashAlgorithmKECCAK_256: struct{}{},
+			runtime.SignatureAlgorithmECDSA_P256: {
+				runtime.HashAlgorithmSHA2_256:   {},
+				runtime.HashAlgorithmSHA3_256:   {},
+				runtime.HashAlgorithmKECCAK_256: {},
 			},
-			runtime.SignatureAlgorithmECDSA_secp256k1: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256:   struct{}{},
-				runtime.HashAlgorithmSHA3_256:   struct{}{},
-				runtime.HashAlgorithmKECCAK_256: struct{}{},
+			runtime.SignatureAlgorithmECDSA_secp256k1: {
+				runtime.HashAlgorithmSHA2_256:   {},
+				runtime.HashAlgorithmSHA3_256:   {},
+				runtime.HashAlgorithmKECCAK_256: {},
 			},
 		}
 
@@ -132,6 +132,21 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 	})
 
 	t.Run("BLS verification tag size > 32 bytes should pass", func(t *testing.T) {
+		ok, err := crypto.VerifySignatureFromRuntime(
+			crypto.NewDefaultSignatureVerifier(),
+			[]byte("signature"),
+			string("a very large tag with more than thirty two bytes"),
+			[]byte("some random message"),
+			[]byte("public kye"),
+			runtime.SignatureAlgorithmECDSA_P256,
+			runtime.HashAlgorithmKECCAK_256,
+		)
+		require.Error(t, err)
+		require.Equal(t, err.Error(), "[Error Code: 1051] invalid value (a very large tag with more than thirty two bytes): tag length (48) is larger than max length allowed (32 bytes).")
+		require.False(t, ok)
+	})
+
+	t.Run("ECDSA verification tag size > 32 bytes shouldn't pass", func(t *testing.T) {
 		seed := make([]byte, seedLength)
 		rand.Read(seed)
 		pk, err := gocrypto.GeneratePrivateKey(gocrypto.BLSBLS12381, seed)
@@ -174,8 +189,8 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				signTag:   "user",
 				verifyTag: "user",
 				require: func(t *testing.T, sigOk bool, err error) {
-					require.Error(t, err)
-					require.False(t, sigOk)
+					require.NoError(t, err)
+					require.True(t, sigOk)
 				},
 			}, {
 				signTag:   string(flow.UserDomainTag[:]),
@@ -195,7 +210,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				signTag:   string(flow.UserDomainTag[:]),
 				verifyTag: "user",
 				require: func(t *testing.T, sigOk bool, err error) {
-					require.Error(t, err)
+					require.NoError(t, err)
 					require.False(t, sigOk)
 				},
 			}, {
@@ -203,13 +218,6 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				verifyTag: string(flow.UserDomainTag[:]),
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
-					require.False(t, sigOk)
-				},
-			}, {
-				signTag:   "random_tag",
-				verifyTag: "random_tag",
-				require: func(t *testing.T, sigOk bool, err error) {
-					require.Error(t, err)
 					require.False(t, sigOk)
 				},
 			},
