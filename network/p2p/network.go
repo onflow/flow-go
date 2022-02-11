@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -220,12 +219,8 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 		Str("channel_id", channel.String()).
 		Msg("channel successfully registered")
 
-	// TODO: remove ctx field from Conduit
-	// create a cancellable child context
-	ctx, cancel := context.WithCancel(parent)
-
 	// create the conduit
-	conduit, err := n.conduitFactory.NewConduit(ctx, cancel, channel)
+	conduit, err := n.conduitFactory.NewConduit(parent, channel)
 	if err != nil {
 		return nil, fmt.Errorf("could not create conduit using factory: %w", err)
 	}

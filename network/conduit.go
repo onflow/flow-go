@@ -11,7 +11,7 @@ import (
 )
 
 type ConduitFactory interface {
-	NewConduit(context.Context, context.CancelFunc, Channel) (Conduit, error)
+	NewConduit(context.Context, Channel) (Conduit, error)
 	RegisterAdapter(Adapter) error
 }
 

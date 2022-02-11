@@ -67,8 +67,7 @@ func (n *Network) Register(channel network.Channel, engine network.MessageProces
 		return nil, errors.Errorf("channel already taken (%s)", channel)
 	}
 
-	ctx, cancel := context.WithCancel(n.ctx)
-	c, err := n.conduitFactory.NewConduit(ctx, cancel, channel)
+	c, err := n.conduitFactory.NewConduit(n.ctx, channel)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a conduit on the channel: %w", err)
 	}

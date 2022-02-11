@@ -26,13 +26,15 @@ func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 	return nil
 }
 
-func (d *DefaultConduitFactory) NewConduit(ctx context.Context, cancel context.CancelFunc, channel network.Channel) (network.Conduit, error) {
+func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel network.Channel) (network.Conduit, error) {
 	if d.adapter == nil {
 		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")
 	}
 
+	child, cancel := context.WithCancel(ctx)
+
 	return &Conduit{
-		ctx:     ctx,
+		ctx:     child,
 		cancel:  cancel,
 		channel: channel,
 		adapter: d.adapter,
