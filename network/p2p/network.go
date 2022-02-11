@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
@@ -41,6 +42,14 @@ const (
 // NOTE: The protocol state includes nodes from the previous/next epoch that should
 // be included in network communication. We omit any nodes that have been ejected.
 var NotEjectedFilter = filter.Not(filter.Ejected)
+
+type NetworkOptFunction func(*Network)
+
+func WithConduitFactory(f network.ConduitFactory) NetworkOptFunction {
+	return func(n *Network) {
+		n.conduitFactory = f
+	}
+}
 
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
@@ -103,7 +112,7 @@ func NewNetwork(
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
 	identityProvider id.IdentityProvider,
-	conduitFactory network.ConduitFactory,
+	options ...NetworkOptFunction,
 ) (*Network, error) {
 
 	rcache := netcache.NewReceiveCache(uint32(csize), log)
@@ -122,9 +131,13 @@ func NewNetwork(
 		metrics:                     metrics,
 		subMngr:                     sm,
 		identityProvider:            identityProvider,
-		conduitFactory:              conduitFactory,
+		conduitFactory:              conduit.NewDefaultConduitFactory(),
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
+	}
+
+	for _, opt := range options {
+		opt(n)
 	}
 
 	n.mw.SetOverlay(n)

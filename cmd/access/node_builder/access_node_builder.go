@@ -41,7 +41,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -483,7 +482,6 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		p2p.NewChannelSubscriptionManager(middleware),
 		networkMetrics,
 		builder.IdentityProvider,
-		conduit.NewDefaultConduitFactory(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)

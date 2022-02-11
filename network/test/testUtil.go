@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -226,7 +225,6 @@ func GenerateNetworks(
 			sms[i],
 			metrics,
 			id.NewFixedIdentityProvider(ids),
-			conduit.NewDefaultConduitFactory(),
 		)
 		require.NoError(t, err)
 
