@@ -1,6 +1,10 @@
 package flow_test
 
 import (
+	"bufio"
+	"log"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +13,74 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func TestTransaction_PerfModifications(t *testing.T) {
+	f, err := os.Open("transaction.go")
+	if err != nil {
+		log.Fatal(err)
+	}
+	// remember to close the file at the end of the program
+	defer f.Close()
+
+	// read the file line by line using scanner
+	scanner := bufio.NewScanner(f)
+
+	nestedBlock := 0
+
+	mapSegments := make(map[string]string)
+
+	segmentNames := make([]string, 10)
+	segments := make([]string, 10)
+
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), ("///%[[")) {
+			nestedBlock++
+
+			// clear this string in the array cache
+			segments[nestedBlock] = ""
+
+			idxName := strings.Index(scanner.Text(), "{")
+			if idxName > -1 {
+				idxEnd := strings.Index(scanner.Text(), "}")
+				if idxEnd > -1 {
+					runes := []rune(scanner.Text())
+					segmentNames[nestedBlock] = string(runes[(idxName + 1):idxEnd])
+					print("found ")
+					println(segmentNames[nestedBlock])
+					print("block nest level is ")
+					println(nestedBlock)
+				}
+			}
+			continue
+		}
+		if strings.Contains(scanner.Text(), ("///%]]")) {
+
+			// see if the named segment exists.  Add it if not
+			v, found := mapSegments[segmentNames[nestedBlock]]
+
+			if found == false {
+				print("adding new segment: ")
+				println(segmentNames[nestedBlock])
+				mapSegments[segmentNames[nestedBlock]] = segments[nestedBlock]
+			} else {
+				// compare the segments
+				assert.Equal(t, strings.Contains(v, segments[nestedBlock]), true)
+			}
+			nestedBlock--
+			continue
+		}
+		if nestedBlock > 0 {
+			// we're in a segment.  store the trimmed line for later comparison. ignore comments
+			if strings.HasPrefix(strings.TrimLeft(scanner.Text(), "\t"), "//") {
+				continue
+			}
+
+			segments[nestedBlock] = segments[nestedBlock] + strings.TrimLeft(scanner.Text(), "\t")
+			print("appending to segment: ")
+			println(scanner.Text())
+		}
+	}
+}
 
 func TestTransaction_SignatureOrdering(t *testing.T) {
 	tx := flow.NewTransactionBody()

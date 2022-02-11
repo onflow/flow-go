@@ -58,6 +58,10 @@ func (tb TransactionBody) Fingerprint() []byte {
 		authorizers[i] = auth.Bytes()
 	}
 
+	// this comment below is to enforce that this struct
+	// definition is exactly sync'd with any others.  The
+	// constraint is enforced with a test.
+	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-body-payload}
 	var payload = struct {
 		Script                    []byte
 		Arguments                 [][]byte
@@ -79,14 +83,53 @@ func (tb TransactionBody) Fingerprint() []byte {
 		Payer:                     tb.Payer.Bytes(),
 		Authorizers:               authorizers,
 	}
+	///%]]
+	signaturesPayload := make([]interface{}, len(tb.PayloadSignatures))
+
+	for i, s := range tb.PayloadSignatures {
+		// this comment below is to enforce that this struct
+		// definition is exactly sync'd with the other ones
+		///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
+		var canonicalForm = struct {
+			SignerIndex uint
+			KeyID       uint
+			Signature   []byte
+		}{
+			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
+			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+			Signature:   s.Signature,
+		}
+		///%]]
+		signaturesPayload[i] = canonicalForm
+	}
+
+	signaturesEnvelope := make([]interface{}, len(tb.EnvelopeSignatures))
+
+	for i, s := range tb.EnvelopeSignatures {
+		// this comment below is to enforce that this struct
+		// definition is exactly sync'd with the other ones
+		///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
+		var canonicalForm = struct {
+			SignerIndex uint
+			KeyID       uint
+			Signature   []byte
+		}{
+			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
+			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+			Signature:   s.Signature,
+		}
+		///%]]
+		signaturesEnvelope[i] = canonicalForm
+	}
+
 	return fingerprint.Fingerprint(struct {
 		Payload            interface{}
 		PayloadSignatures  interface{}
 		EnvelopeSignatures interface{}
 	}{
 		Payload:            payload,
-		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
-		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).canonicalForm(),
+		PayloadSignatures:  signaturesPayload,
+		EnvelopeSignatures: signaturesEnvelope,
 	})
 }
 
@@ -357,6 +400,10 @@ func (tb *TransactionBody) PayloadMessage() []byte {
 		authorizers[i] = auth.Bytes()
 	}
 
+	// this comment below is to enforce that this struct
+	// definition is exactly sync'd with any others.  The
+	// constraint is enforced with a test.
+	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-body-payload}
 	var payload = struct {
 		Script                    []byte
 		Arguments                 [][]byte
@@ -378,6 +425,7 @@ func (tb *TransactionBody) PayloadMessage() []byte {
 		Payer:                     tb.Payer.Bytes(),
 		Authorizers:               authorizers,
 	}
+	///%]]
 	return fingerprint.Fingerprint(payload)
 }
 
@@ -394,6 +442,10 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 		authorizers[i] = auth.Bytes()
 	}
 
+	// this comment below is to enforce that this struct
+	// definition is exactly sync'd with any others.  The
+	// constraint is enforced with a test.
+	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-body-payload}
 	var payload = struct {
 		Script                    []byte
 		Arguments                 [][]byte
@@ -415,12 +467,33 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 		Payer:                     tb.Payer.Bytes(),
 		Authorizers:               authorizers,
 	}
+	///%]]
+
+	signatures := make([]interface{}, len(tb.PayloadSignatures))
+
+	for i, s := range tb.PayloadSignatures {
+		// this comment below is to enforce that this struct
+		// definition is exactly sync'd with the other ones
+		///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
+		var canonicalForm = struct {
+			SignerIndex uint
+			KeyID       uint
+			Signature   []byte
+		}{
+			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
+			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+			Signature:   s.Signature,
+		}
+		///%]]
+		signatures[i] = canonicalForm
+	}
+
 	return struct {
 		Payload           interface{}
 		PayloadSignatures interface{}
 	}{
 		payload,
-		signaturesList(tb.PayloadSignatures).canonicalForm(),
+		signatures,
 	}
 }
 
@@ -517,6 +590,10 @@ func (s TransactionSignature) ByteSize() int {
 }
 
 func (s TransactionSignature) Fingerprint() []byte {
+	// this comment below is to enforce that this struct
+	// definition is exactly sync'd with any others.  The
+	// constraint is enforced with a test.
+	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
 	var canonicalForm = struct {
 		SignerIndex uint
 		KeyID       uint
@@ -526,6 +603,7 @@ func (s TransactionSignature) Fingerprint() []byte {
 		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
 		Signature:   s.Signature,
 	}
+	///%]]
 	return fingerprint.Fingerprint(canonicalForm)
 }
 
@@ -543,21 +621,3 @@ func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
 }
 
 type signaturesList []TransactionSignature
-
-func (sl signaturesList) canonicalForm() interface{} {
-	signatures := make([]interface{}, len(sl))
-
-	for i, s := range sl {
-		signatures[i] = struct {
-			SignerIndex uint
-			KeyID       uint
-			Signature   []byte
-		}{
-			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-			Signature:   s.Signature,
-		}
-	}
-
-	return signatures
-}
