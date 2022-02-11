@@ -6,8 +6,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/tests/epochs"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpoch(t *testing.T) {
-	suite.Run(t, new(epochs.EpochJoinAndLeaveVNSuite))
+	unittest.SkipUnless(t, unittest.TEST_RESOURCE_INTENSIVE, "epochs join/leave tests should be run on an machine with adequate resources")
+	suite.Run(t, new(epochs.EpochJoinAndLeaveANSuite))
 }

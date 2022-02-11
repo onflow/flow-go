@@ -57,13 +57,10 @@ type Suite struct {
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
-	s.ctx, s.cancel = context.WithCancel(context.Background())
-	// set default values for epoch length config - use a longer staking auction length
-	// by default to allow time for staking nodes to join at the first epoch boundary
-	s.StakingAuctionLen = 200
-	s.DKGPhaseLen = 50
-	s.EpochLen = 380
+	// ensure epoch lengths are set correctly
+	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3)
 
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
 		Str("testfile", "suite.go").
 		Str("testcase", s.T().Name()).
@@ -718,7 +715,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	// assert atleast 20 blocks have been finalized since the node replacement
+	// assert at least 20 blocks have been finalized since the node replacement
 	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 }
 
@@ -726,7 +723,7 @@ func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templat
 // this func can be used to perform sanity.
 // 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
 // is after the first epoch.
-func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
 	// To validate the LN joined the network successfully and is processing transactions we submit a
 	// create account transaction and assert there are no errors.
@@ -737,7 +734,7 @@ func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templat
 // the epoch transition we should observe blocks finalizing and we should be able to submit a transaction
 // that will indicate overall network health
 // 1. Submit transaction to network
-func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	// At this point we can assure that our SN node is participating in finalization and sealing because
 	// there are only 2 SN nodes in the network now we will submit a transaction to the
 	// network to ensure the network is overall healthy.

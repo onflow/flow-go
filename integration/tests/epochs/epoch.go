@@ -3,29 +3,46 @@ package epochs
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// StaticEpochTransitionSuite is the suite used for epoch transition tests
+// with a static identity table.
 type StaticEpochTransitionSuite struct {
-	suite.Suite
+	Suite
+}
+
+func (s *StaticEpochTransitionSuite) SetupTest() {
+	// use shorter epoch phases as no staking operations need to occur in the
+	// staking phase for this test
+	s.StakingAuctionLen = 10
+	s.DKGPhaseLen = 50
+	s.EpochLen = 200
+
+	s.Suite.SetupTest()
+}
+
+// DynamicEpochTransitionSuite  is the suite used for epoch transitions tests
+// with a dynamic identity table.
+type DynamicEpochTransitionSuite struct {
+	Suite
+}
+
+func (s *DynamicEpochTransitionSuite) SetupTest() {
+	// use a longer staking auction length to accommodate staking operations for
+	// joining/leaving nodes
+	s.StakingAuctionLen = 200
+	s.DKGPhaseLen = 50
+	s.EpochLen = 380
 }
 
 // TestStaticEpochTransition asserts epoch state transitions over two full epochs
 // without any nodes joining or leaving.
-func (s *Suite) TestStaticEpochTransition() {
-
-	// use shorter epoch phases as no staking operations need to occur in the
-	// staking phase for this test
-	// TODO
-	s.StakingAuctionLen = 10
-	s.DKGPhaseLen = 50
-	s.EpochLen = 200
+func (s *StaticEpochTransitionSuite) TestStaticEpochTransition() {
 
 	// phaseCheck is a utility struct that contains information about the
 	// final view of each epoch/phase.
@@ -132,14 +149,14 @@ type EpochJoinAndLeaveANSuite struct {
 	Suite
 }
 
-// The following Epoch join and Leave test will stake a node by submitting all the transactions
+// The following Epoch join and leave tests will stake a node by submitting all the transactions
 // that a node operator would submit, start a new container for that node, and remove
 // a container from the network of the same node type. After this orchestration assertions
 // specific to that node type are made to ensure the network is healthy.
-//
-// TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions related to the node change
+
+// TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions
+// after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveANSuite) TestEpochJoinAndLeaveAN() {
-	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs AN tests should be run on an machine with adequate resources")
 	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
 }
 
@@ -147,9 +164,9 @@ type EpochJoinAndLeaveVNSuite struct {
 	Suite
 }
 
-// TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions related to the node change
+// TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions
+// after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveVNSuite) TestEpochJoinAndLeaveVN() {
-	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs VN tests should be run on an machine with adequate resources")
 	s.runTestEpochJoinAndLeave(flow.RoleVerification, s.assertNetworkHealthyAfterVNChange)
 }
 
@@ -157,9 +174,9 @@ type EpochJoinAndLeaveLNSuite struct {
 	Suite
 }
 
-// TestEpochJoinAndLeaveLN should update collection nodes and assert healthy network conditions related to the node change
+// TestEpochJoinAndLeaveLN should update collection nodes and assert healthy network conditions
+// after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveLNSuite) TestEpochJoinAndLeaveLN() {
-	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs LN tests should be run on an machine with adequate resources")
 	s.runTestEpochJoinAndLeave(flow.RoleCollection, s.assertNetworkHealthyAfterLNChange)
 }
 
@@ -167,9 +184,9 @@ type EpochJoinAndLeaveSNSuite struct {
 	Suite
 }
 
-// TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions related to the node change
+// TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions
+// after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveSNSuite) TestEpochJoinAndLeaveSN() {
-	unittest.SkipUnless(s.T(), unittest.TEST_RESOURCE_INTENSIVE, "epochs SN tests should be run on an machine with adequate resources")
 	s.runTestEpochJoinAndLeave(flow.RoleConsensus, s.assertNetworkHealthyAfterSNChange)
 }
 
