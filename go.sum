@@ -1288,8 +1288,8 @@ github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXW
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/onflow/atree v0.1.1 h1:KTJt70E3FEhDDLf6ViyKypqI3iVMlR6gsieOsN4Ewu4=
 github.com/onflow/atree v0.1.1/go.mod h1:95SqSEPgfijF1ZkLKbVgYVrfQzvP0fhayh555v1oLbs=
-github.com/onflow/flow v0.2.3-0.20220131193101-d4e2ca43a621 h1:owMor9/wFpw3fua47UkUeDaFwyySK/dIPiNCCyhoO7c=
-github.com/onflow/flow v0.2.3-0.20220131193101-d4e2ca43a621/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
+github.com/onflow/flow v0.2.3-0.20220207221328-d1ffd1c3053e h1:BZdWgblB8mKKEq/UltES6y/L5Zqr+LFtiuatNwCTt7w=
+github.com/onflow/flow v0.2.3-0.20220207221328-d1ffd1c3053e/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210527134022-58c25247091a/go.mod h1:IZ2e7UyLCYmpQ8Kd7k0A32uXqdqfiV1r2sKs5/riblo=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.1 h1:W0zlLxatN88pC+U2eJ7F517KiI4B+kk3lpguyp8rEsQ=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.1/go.mod h1:MSNt2rodpRXm1n0iGQWL6ltDoJCtXEzlPw9nhE/zQmk=
