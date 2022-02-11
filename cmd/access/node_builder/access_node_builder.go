@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
@@ -184,7 +185,7 @@ type FlowAccessNodeBuilder struct {
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
 	ExecutionDataService       state_synchronization.ExecutionDataService
-	ExecutionDataRequester     *state_synchronization.ExecutionDataRequester
+	ExecutionDataRequester     edrequester.ExecutionDataRequester
 	// for the unstaked access node, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
