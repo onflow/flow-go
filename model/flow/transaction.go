@@ -615,5 +615,3 @@ func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
 		return sigA.SignerIndex < sigB.SignerIndex
 	}
 }
-
-type signaturesList []TransactionSignature
