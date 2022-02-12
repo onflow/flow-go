@@ -628,7 +628,7 @@ func TestQuorumCertificate(t *testing.T) {
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.Error(t, err)
 
-			_, err = state.AtBlockID(block1.ID()).Seed()
+			_, err = state.AtBlockID(block1.ID()).RandomSource()
 			assert.Error(t, err)
 		})
 	})
@@ -653,7 +653,7 @@ func TestQuorumCertificate(t *testing.T) {
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.Error(t, err)
 
-			_, err := state.AtBlockID(block1.ID()).Seed()
+			_, err = state.AtBlockID(block1.ID()).RandomSource()
 			assert.Error(t, err)
 		})
 	})
@@ -664,7 +664,7 @@ func TestQuorumCertificate(t *testing.T) {
 			// since we bootstrap with a root snapshot, this will be the root block
 			_, err := state.AtBlockID(head.ID()).QuorumCertificate()
 			assert.NoError(t, err)
-			randomSeed, err := state.AtBlockID(head.ID()).Seed()
+			randomSeed, err := state.AtBlockID(head.ID()).RandomSource()
 			assert.NoError(t, err)
 			assert.Equal(t, len(randomSeed), seed.RandomSourceLength)
 		})
@@ -699,7 +699,7 @@ func TestQuorumCertificate(t *testing.T) {
 			// should have view matching block1 view
 			assert.Equal(t, block1.Header.View, qc.View)
 
-			_, err := state.AtBlockID(block1.ID()).Seed()
+			_, err = state.AtBlockID(block1.ID()).RandomSource()
 			require.Nil(t, err)
 		})
 	})

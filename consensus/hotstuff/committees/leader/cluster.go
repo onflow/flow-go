@@ -21,8 +21,8 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*Leade
 	}
 
 	identities := cluster.Members()
-	// get the seed
-	randomSeed, err := epoch.Seed()
+	// get the random source of the current epoch
+	randomSeed, err := epoch.RandomSource()
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection seed for cluster (index: %v) at epoch: %v: %w", cluster.Index(), counter, err)
 	}

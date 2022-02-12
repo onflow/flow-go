@@ -29,9 +29,7 @@ func (e Epoch) FinalView() (uint64, error)          { return e.enc.FinalView, ni
 func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
 	return e.enc.InitialIdentities, nil
 }
-func (e Epoch) RandomSource() ([]byte, error) { return e.enc.RandomSource, nil }
-
-func (e Epoch) Seed() ([]byte, error) {
+func (e Epoch) RandomSource() ([]byte, error) {
 	return e.enc.RandomSource, nil
 }
 
@@ -130,10 +128,6 @@ func (es *setupEpoch) DKG() (protocol.DKG, error) {
 }
 
 func (es *setupEpoch) RandomSource() ([]byte, error) {
-	return es.setupEvent.RandomSource, nil
-}
-
-func (es *setupEpoch) Seed() ([]byte, error) {
 	return es.setupEvent.RandomSource, nil
 }
 

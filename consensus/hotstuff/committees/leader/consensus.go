@@ -20,8 +20,8 @@ func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 		return nil, fmt.Errorf("could not get epoch initial identities: %w", err)
 	}
 
-	// get the seed
-	randomSeed, err := epoch.Seed()
+	// get the epoch source of randomness
+	randomSeed, err := epoch.RandomSource()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch seed: %w", err)
 	}

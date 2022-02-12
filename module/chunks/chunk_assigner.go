@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/state/protocol"
@@ -98,7 +97,7 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 
 func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
 	// TODO: seed could be cached to optimize performance
-	randomSource, err := stateSnapshot.Seed() // potentially returns NoValidChildBlockError
+	randomSource, err := stateSnapshot.RandomSource() // potentially returns NoValidChildBlockError
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve source of randomness: %w", err)
 	}

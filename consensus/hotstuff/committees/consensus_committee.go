@@ -156,8 +156,9 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not get epoch initial identities: %w", err)
 		}
-		// CAUTION: this is re-using the same leader selection seed from the now-ending epoch
-		randomSeed, err := current.Seed()
+		// Get the random source
+		// CAUTION: this is re-using the same leader selection random source from the now-ending epoch
+		randomSeed, err := current.RandomSource()
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not get epoch seed: %w", err)
 		}

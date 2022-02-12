@@ -407,10 +407,10 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	return descendantIDs, nil
 }
 
-// Seed returns the seed for the current block snapshot.
+// RandomSource returns the seed for the current block snapshot.
 // Expected error returns:
 // * state.NoValidChildBlockError if no valid child is known
-func (s *Snapshot) Seed() ([]byte, error) {
+func (s *Snapshot) RandomSource() ([]byte, error) {
 
 	// CASE 1: for the root block, generate the seed from the root qc
 	root, err := s.state.Params().Root()
@@ -429,7 +429,6 @@ func (s *Snapshot) Seed() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
 		}
-
 		return seed, nil
 	}
 

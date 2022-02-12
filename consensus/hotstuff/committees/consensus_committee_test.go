@@ -283,6 +283,6 @@ func newMockEpoch(
 	// return nil error to indicate the epoch is committed
 	epoch.On("DKG").Return(nil, nil)
 
-	epoch.On("Seed").Return(seed, nil)
+	epoch.On("RandomSource").Return(seed, nil)
 	return epoch
 }

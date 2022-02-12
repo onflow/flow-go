@@ -269,7 +269,7 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, randomSource1, randomSource2)
 		assert.Equal(t, randomSource1, getRandomSource(deterministicSeed))
-		assert.Equal(t, len(randomSource1), seed.RandomSourceLength)
+		assert.Equal(t, seed.RandomSourceLength, len(randomSource1))
 	})
 }
 

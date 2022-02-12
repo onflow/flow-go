@@ -67,7 +67,7 @@ func (s Snapshot) Phase() (flow.EpochPhase, error) {
 	return s.enc.Phase, nil
 }
 
-func (s Snapshot) Seed() ([]byte, error) {
+func (s Snapshot) RandomSource() ([]byte, error) {
 	return seed.FromParentQCSignature(s.enc.QuorumCertificate.SigData)
 }
 
