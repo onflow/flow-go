@@ -163,10 +163,17 @@ func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
 	}
 
+	// TODO: maybe Aggregate could return signer indices directly?
+	signerIndices := p.signerIndicesFromIdentities(stakingSigners)
+
 	return &flow.QuorumCertificate{
-		View:      p.block.View,
-		BlockID:   p.block.BlockID,
-		SignerIDs: stakingSigners,
-		SigData:   aggregatedStakingSig,
+		View:          p.block.View,
+		BlockID:       p.block.BlockID,
+		SignerIndices: signerIndices,
+		SigData:       aggregatedStakingSig,
 	}, nil
+}
+
+func (p *StakingVoteProcessor) signerIndicesFromIdentities(signerIDs []flow.Identifier) []byte {
+	panic("to be implemented")
 }

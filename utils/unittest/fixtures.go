@@ -15,6 +15,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	hotstuffPacker "github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -316,7 +317,7 @@ func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identi
 	block := BlockWithParentFixture(parent)
 
 	block.Header.ProposerID = proposer
-	block.Header.ParentVoterIDs = []flow.Identifier{proposer}
+	block.Header.ParentVoterIndices = packer.EncodeSignerIndices([]int{1}, 10)
 
 	return *block
 }
@@ -421,7 +422,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 		PayloadHash:        IdentifierFixture(),
 		Timestamp:          time.Now().UTC(),
 		View:               view,
-		ParentVoterIDs:     IdentifierListFixture(4),
+		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
 		ProposerSigData:    SignatureFixture(),
@@ -837,6 +838,14 @@ func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
 	_, _ = crand.Read(id[:])
 	return id
+}
+
+func SignerIndicesFixture(n int) []byte {
+	list := make([]int, n)
+	for i := 0; i < n; i++ {
+		list[i] = i
+	}
+	return packer.EncodeSignerIndices(list, 10)
 }
 
 // WithRole adds a role to an identity fixture.
@@ -1531,10 +1540,10 @@ func PublicKeysFixture(n int, algo crypto.SigningAlgorithm) []crypto.PublicKey {
 
 func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
 	qc := flow.QuorumCertificate{
-		View:      uint64(rand.Uint32()),
-		BlockID:   IdentifierFixture(),
-		SignerIDs: IdentifierListFixture(3),
-		SigData:   QCSigDataFixture(),
+		View:          uint64(rand.Uint32()),
+		BlockID:       IdentifierFixture(),
+		SignerIndices: SignerIndicesFixture(3),
+		SigData:       QCSigDataFixture(),
 	}
 	for _, apply := range opts {
 		apply(&qc)
@@ -1556,9 +1565,9 @@ func QCWithBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
 	}
 }
 
-func QCWithSignerIDs(signerIDs []flow.Identifier) func(*flow.QuorumCertificate) {
+func QCWithSignerIndices(signerIndices []byte) func(*flow.QuorumCertificate) {
 	return func(qc *flow.QuorumCertificate) {
-		qc.SignerIDs = signerIDs
+		qc.SignerIndices = signerIndices
 	}
 }
 
@@ -1701,8 +1710,9 @@ func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCom
 
 func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.EpochCommit) {
 	qcs := make([]*flow.QuorumCertificate, 0, len(assignments))
-	for _, cluster := range assignments {
-		qcs = append(qcs, QuorumCertificateFixture(QCWithSignerIDs(cluster)))
+	for _ = range assignments {
+		// TODO: fix
+		qcs = append(qcs, QuorumCertificateFixture(QCWithSignerIndices([]byte{})))
 	}
 	return func(commit *flow.EpochCommit) {
 		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)
