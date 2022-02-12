@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -19,7 +21,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
