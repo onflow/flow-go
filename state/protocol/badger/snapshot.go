@@ -86,10 +86,10 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	}
 
 	qc := &flow.QuorumCertificate{
-		View:      head.View,
-		BlockID:   s.blockID,
-		SignerIDs: child.ParentVoterIDs,
-		SigData:   child.ParentVoterSigData,
+		View:          head.View,
+		BlockID:       s.blockID,
+		SignerIndices: child.ParentVoterIndices,
+		SigData:       child.ParentVoterSigData,
 	}
 
 	return qc, nil

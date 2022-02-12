@@ -24,6 +24,7 @@ type Committee interface {
 	//   * is ordered in the canonical order
 	//   * contains no duplicates.
 	// The list of all legitimate HotStuff participants for the specified block can be obtained by using `filter.Any`
+	// TODO: selector can be removed
 	Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error)
 
 	// Identity returns the full Identity for specified HotStuff participant.
@@ -31,6 +32,8 @@ type Committee interface {
 	// ERROR conditions:
 	//  * model.InvalidSignerError if participantID does NOT correspond to a _staked_ HotStuff participant at the specified block.
 	Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
+
+	IdentitiesByIndices(blockID flow.Identifier, indices []int) (flow.IdentityList, error)
 
 	// LeaderForView returns the identity of the leader for a given view.
 	// CAUTION: per liveness requirement of HotStuff, the leader must be fork-independent.

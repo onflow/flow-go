@@ -44,9 +44,10 @@ func WithParentBlock(parent *model.Block) func(*model.Block) {
 	}
 }
 
-func WithParentSigners(signerIDs []flow.Identifier) func(*model.Block) {
+// TODO: to fix
+func WithParentSigners(signerIndices []flow.Identifier) func(*model.Block) {
 	return func(block *model.Block) {
-		block.QC.SignerIDs = signerIDs
+		block.QC.SignerIndices = nil
 	}
 }
 

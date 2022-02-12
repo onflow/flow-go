@@ -254,7 +254,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 
 	p.log.Info().
 		Uint64("view", qc.View).
-		Int("num_signers", len(qc.SignerIDs)).
+		// Int("num_signers", len(qc.SignerIDs)).
 		Msg("new qc has been created")
 
 	p.onQCCreated(qc)
@@ -305,15 +305,15 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 		AggregatedRandomBeaconSig:    aggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: reconstructedBeaconSig,
 	}
-	signerIDs, sigData, err := p.packer.Pack(p.block.BlockID, blockSigData)
+	signerIndices, sigData, err := p.packer.Pack(p.block.BlockID, blockSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}
 
 	return &flow.QuorumCertificate{
-		View:      p.block.View,
-		BlockID:   p.block.BlockID,
-		SignerIDs: signerIDs,
-		SigData:   sigData,
+		View:          p.block.View,
+		BlockID:       p.block.BlockID,
+		SignerIndices: signerIndices,
+		SigData:       sigData,
 	}, nil
 }

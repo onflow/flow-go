@@ -14,7 +14,7 @@ type QuorumCertificate struct {
 	// In order to distinguish the signature types, the SigData has to be deserialized. Specifically,
 	// the field `SigData.SigType` (bit vector) indicates for each signer which sig type they provided.
 	// For collection cluster, the SignerIDs includes all the staking sig signers.
-	SignerIDs []Identifier
+	SignerIndices []byte
 
 	// For consensus cluster, the SigData is a serialization of the following fields
 	// - SigType []byte, bit-vector indicating the type of sig produced by the signer.

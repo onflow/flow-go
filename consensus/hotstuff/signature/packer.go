@@ -29,7 +29,7 @@ func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataP
 // To pack the block signature data, we first build a compact data type, and then encode it into bytes.
 // Expected error returns during normal operations:
 //  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
-func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
+func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]byte, []byte, error) {
 	// breaking staking and random beacon signers into signerIDs and sig type for compaction
 	// each signer must have its signerID and sig type stored at the same index in the two slices
 	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
@@ -85,7 +85,8 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 		return nil, nil, fmt.Errorf("could not encode data %v, %w", data, err)
 	}
 
-	return signerIDs, encoded, nil
+	// return signerIDs, encoded, nil
+	panic(fmt.Sprintf("%v to be implemented", encoded))
 }
 
 // Unpack de-serializes the provided signature data.

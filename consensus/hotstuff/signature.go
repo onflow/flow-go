@@ -124,7 +124,7 @@ type Packer interface {
 	// sig is the aggregated signature data.
 	// Expected error returns during normal operations:
 	//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
-	Pack(blockID flow.Identifier, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
+	Pack(blockID flow.Identifier, sig *BlockSignatureData) ([]byte, []byte, error)
 
 	// Unpack de-serializes the provided signature data.
 	// blockID is the block that the aggregated sig is signed for
