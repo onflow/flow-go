@@ -15,6 +15,12 @@ import (
 )
 
 func TestTransaction_PerfModifications(t *testing.T) {
+	// this test is to ensure that the sibling source file doesn't
+	// have errors introduced because of some of the cut/pasted structures.
+	// It will parse the file, assuming tabs for beginning whitespace, and
+	// assuming no '/*' style comments that would break the logic.
+	
+	// open the sibling source file in the same directory
 	f, err := os.Open("transaction.go")
 	if err != nil {
 		log.Fatal(err)
@@ -29,7 +35,12 @@ func TestTransaction_PerfModifications(t *testing.T) {
 
 	mapSegments := make(map[string]string)
 
+	// create 2 arrays of arbitrary length '10'.  Only 1st element is used
+	
+	// keep the segment names, from inside the braces
 	segmentNames := make([]string, 10)
+
+	// store the trimmed, de-commented, code segments for comparison
 	segments := make([]string, 10)
 
 	for scanner.Scan() {
@@ -54,7 +65,6 @@ func TestTransaction_PerfModifications(t *testing.T) {
 			continue
 		}
 		if strings.Contains(scanner.Text(), ("///%]]")) {
-
 			// see if the named segment exists.  Add it if not
 			v, found := mapSegments[segmentNames[nestedBlock]]
 
