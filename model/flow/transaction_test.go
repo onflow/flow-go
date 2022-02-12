@@ -19,7 +19,7 @@ import (
 // It will parse the file, assuming tabs for beginning whitespace, and
 // assuming no '/*' style comments that would break the logic.
 func TestTransaction_PerfModifications(t *testing.T) {
-	
+
 	// open the sibling source file in the same directory
 	f, err := os.Open("transaction.go")
 	if err != nil {
@@ -36,7 +36,7 @@ func TestTransaction_PerfModifications(t *testing.T) {
 	mapSegments := make(map[string]string)
 
 	// create 2 arrays of arbitrary length '10'.  Only 1st element is used
-	
+
 	// keep the segment names, from inside the braces
 	segmentNames := make([]string, 10)
 
