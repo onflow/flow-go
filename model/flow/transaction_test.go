@@ -14,11 +14,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestTransaction_PerfModifications checks that the sibling source file doesn't
+// have errors introduced because of some of the cut/pasted structures.
+// It will parse the file, assuming tabs for beginning whitespace, and
+// assuming no '/*' style comments that would break the logic.
 func TestTransaction_PerfModifications(t *testing.T) {
-	// this test is to ensure that the sibling source file doesn't
-	// have errors introduced because of some of the cut/pasted structures.
-	// It will parse the file, assuming tabs for beginning whitespace, and
-	// assuming no '/*' style comments that would break the logic.
 	
 	// open the sibling source file in the same directory
 	f, err := os.Open("transaction.go")
