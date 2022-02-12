@@ -42,7 +42,7 @@ if [[ "$ARCH" =~ ^(arm64|armv7|armv7s)$ && "${CC_VERSION_STR[0]}" =~ (clang)  ]]
     #  the "-march=native" option is not supported with clang on ARM
     MARCH=""
 else
-    MARCH="-march=haswell"
+    MARCH="-march=westmere"
 fi
 
 # Set RELIC config for Flow
