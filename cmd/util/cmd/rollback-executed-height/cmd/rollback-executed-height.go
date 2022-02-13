@@ -1,4 +1,4 @@
-package remove
+package cmd
 
 import (
 	"github.com/dgraph-io/badger/v2"
@@ -15,6 +15,7 @@ var (
 	flagDataDir string
 )
 
+// rolls back the execution height to the specified height
 var Cmd = &cobra.Command{
 	Use:   "rollback-executed-height",
 	Short: "Rollback the executed height",
@@ -50,7 +51,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("could not find finalized height %v", flagHeight)
 	}
 
-	err := headers.RollbackExecutedBlock(header)
+	err = headers.RollbackExecutedBlock(header)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not roll back executed block at height %v", flagHeight)
 	}
