@@ -84,6 +84,29 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
+// batchUpdate will encode the given entity with JSON and update the binary data
+// under the given key in the badger DB. It will error if the key does not exist
+// yet.
+// batchUpdat assume it's the item of the key exists already
+func batchUpdate(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
+	return func(writeBatch *badger.WriteBatch) error {
+
+		// serialize the entity data
+		val, err := msgpack.Marshal(entity)
+		if err != nil {
+			return fmt.Errorf("could not encode entity: %w", err)
+		}
+
+		// persist the entity data into the DB
+		err = writeBatch.Set(key, val)
+		if err != nil {
+			return fmt.Errorf("could not replace data: %w", err)
+		}
+
+		return nil
+	}
+}
+
 // update will encode the given entity with JSON and update the binary data
 // under the given key in the badger DB. It will error if the key does not exist
 // yet.
