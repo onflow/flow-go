@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
 	"errors"
 	"fmt"
 	"time"
@@ -87,8 +88,6 @@ func New(
 		retry.Activate()
 	}
 
-	seenScripts := make(map[[16]byte]time.Time)
-
 	b := &Backend{
 		state: state,
 		// create the sub-backends
@@ -98,7 +97,7 @@ func New(
 			connFactory:       connFactory,
 			state:             state,
 			log:               log,
-			seenScripts:       seenScripts,
+			seenScripts:       make(map[[md5.Size]byte]time.Time),
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,

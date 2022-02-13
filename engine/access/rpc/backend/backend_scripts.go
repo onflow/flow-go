@@ -25,7 +25,7 @@ type backendScripts struct {
 	state             protocol.State
 	connFactory       ConnectionFactory
 	log               zerolog.Logger
-	seenScripts       map[[md5.Size]byte]time.Time // to keep track of unique scripts sent by clients
+	seenScripts       map[[md5.Size]byte]time.Time // to keep track of unique scripts sent by clients. bounded to 1MB (2^16*2*8) due to fixed key size
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -121,14 +121,15 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 			}
 			return result, nil
 		}
-		// return OK status if it's just a script failure as opposed to an EN failure
+		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
 		if status.Code(err) == codes.InvalidArgument {
 			b.log.Debug().Err(err).
 				Str("execution_node", execNode.String()).
 				Hex("block_id", blockID[:]).
+				Hex("script_hash", encodedScript[:]).
 				Str("script", string(script)).
 				Msg("script failed to execute on the execution node")
-			return nil, status.Errorf(codes.OK, "failed to execute script on execution node %v", execNode.String())
+			return nil, err
 		}
 		errors = multierror.Append(errors, err)
 	}
