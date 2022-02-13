@@ -144,6 +144,52 @@ func filterAccountCreatedEvents(events []flow.Event) []flow.Event {
 	return accountCreatedEvents
 }
 
+const auditContractForDeploymentTransactionTemplate = `
+import FlowContractAudits from 0x%s
+
+transaction(deployAddress: Address, code: String) {
+	prepare(serviceAccount: AuthAccount) {
+		
+		let auditorAdmin = serviceAccount.borrow<&FlowContractAudits.Administrator>(from: FlowContractAudits.AdminStoragePath)
+            ?? panic("Could not borrow a reference to the admin resource")
+
+		let auditor <- auditorAdmin.createNewAuditor()
+
+		auditor.addVoucher(address: deployAddress, recurrent: false, expiryOffset: nil, code: code)
+
+		destroy auditor
+	}
+}
+`
+
+// AuditContractForDeploymentTransaction returns a transaction for generating an audit voucher for contract deploy/update
+func AuditContractForDeploymentTransaction(serviceAccount flow.Address, deployAddress flow.Address, code string) (*flow.TransactionBody, error) {
+	arg1, err := jsoncdc.Encode(cadence.NewAddress(deployAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	codeCdc, err := cadence.NewString(code)
+	if err != nil {
+		return nil, err
+	}
+	arg2, err := jsoncdc.Encode(codeCdc)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := fmt.Sprintf(
+		auditContractForDeploymentTransactionTemplate,
+		serviceAccount.String(),
+	)
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(tx)).
+		AddAuthorizer(serviceAccount).
+		AddArgument(arg1).
+		AddArgument(arg2), nil
+}
+
 func TestPrograms(t *testing.T) {
 
 	t.Run(
@@ -563,6 +609,59 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		tx := fvm.Transaction(txBody, 0)
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, tx.Err)
+	})
+
+	t.Run("account update with set code succeeds when there is a matching audit voucher", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		// Deployent without voucher fails
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+		require.NoError(t, err)
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.Error(t, tx.Err)
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
+
+		// Generate an audit voucher
+		authTxBody, err := AuditContractForDeploymentTransaction(
+			chain.ServiceAddress(),
+			accounts[0],
+			testutil.CounterContract)
+		require.NoError(t, err)
+
+		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		authTxBody.SetPayer(chain.ServiceAddress())
+		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+		authTx := fvm.Transaction(authTxBody, 0)
+
+		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, authTx.Err)
+
+		// Deploying with voucher succeeds
+		txBody = testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 1)
+		txBody.SetPayer(accounts[0])
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+		tx = fvm.Transaction(txBody, 0)
+
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 		assert.NoError(t, tx.Err)
