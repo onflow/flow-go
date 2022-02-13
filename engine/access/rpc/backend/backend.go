@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
 	"errors"
 	"fmt"
 	"time"
@@ -104,6 +105,7 @@ func New(
 			connFactory:       connFactory,
 			state:             state,
 			log:               log,
+			seenScripts:       make(map[[md5.Size]byte]time.Time),
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
