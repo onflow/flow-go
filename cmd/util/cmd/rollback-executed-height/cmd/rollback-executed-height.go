@@ -1,4 +1,4 @@
-package remove
+package cmd
 
 import (
 	"github.com/dgraph-io/badger/v2"
@@ -50,12 +50,12 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("could not find finalized height %v", flagHeight)
 	}
 
-	err := headers.RollbackExecutedBlock(header)
+	err = headers.RollbackExecutedBlock(header)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not roll back executed block at height %v", flagHeight)
 	}
 
-	log.Info().Msgf("executed height rolled back to", flagHeight)
+	log.Info().Msgf("executed height rolled back to %v", flagHeight)
 }
 
 func initHeader(db *badger.DB) (*storagebadger.Headers, error) {
