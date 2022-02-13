@@ -113,9 +113,25 @@ func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storag
 	return operation.BatchInsertExecutionResult(result)(writeBatch)
 }
 
-func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {
+func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, forceReindex bool, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
-	return operation.BatchIndexExecutionResult(blockID, resultID)(writeBatch)
+	if forceReindex {
+		return operation.BatchReindexExecutionResult(blockID, resultID)(writeBatch)
+	}
+
+	err := operation.BatchIndexExecutionResult(blockID, resultID)(writeBatch)
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, storage.ErrAlreadyExists) {
+		return storage.NewResultAlreadyExistsErrorf(
+			fmt.Sprintf("result %v for block %v already exists",
+				resultID,
+				blockID), blockID, resultID, err)
+	}
+
+	return err
 }
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
@@ -132,7 +148,7 @@ func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(*transaction.Tx
 }
 
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
-	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID, false))
+	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID, true))
 	if err != nil {
 		return fmt.Errorf("could not index execution result: %w", err)
 	}
