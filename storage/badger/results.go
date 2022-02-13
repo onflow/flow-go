@@ -148,7 +148,7 @@ func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(*transaction.Tx
 }
 
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
-	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID, true))
+	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID, false))
 	if err != nil {
 		return fmt.Errorf("could not index execution result: %w", err)
 	}
