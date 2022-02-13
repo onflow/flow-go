@@ -120,6 +120,14 @@ func MakeID(entity interface{}) Identifier {
 	return id
 }
 
+func MakeIDFast(data *[]byte) Identifier {
+	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
+	var id Identifier
+	hash.ComputeSHA3_256((*[32]byte)(&id), *data)
+	//binstat.Leave(bs2)
+	return id
+}
+
 // PublicKeyToID creates an ID from a public key.
 func PublicKeyToID(pk crypto.PublicKey) (Identifier, error) {
 	var id Identifier
