@@ -291,7 +291,20 @@ func (e *Manager) ComputeBlock(
 		Msg("computed block result")
 
 	e.edCache.Insert(block.Block.Header, blobTree)
+
 	result.ExecutionDataID = rootID
+
+	if block.Block.Header.ChainID == flow.Testnet {
+		// 60117893 was the last sealed height.
+		// hardcode the ExecutionDataID computation at next unsealed height for testnet
+		if block.Block.Header.Height == 60117894 {
+			resultID60117894, err := flow.HexStringToIdentifier("dfc4e7b1099461a251b0c6d1fa116aa32bdd57bfb54fe6ec6558cd6cc4b5b021")
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("fail to parse ExecutionDataID from string")
+			}
+			result.ExecutionDataID = resultID60117894
+		}
+	}
 
 	return result, nil
 }
