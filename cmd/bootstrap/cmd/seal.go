@@ -40,7 +40,7 @@ func constructRootResultAndSeal(
 		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
 		Participants:       participants.Sort(order.Canonical),
 		Assignments:        assignments,
-		RandomSource:       getRandomSource(flagBootstrapRandomSeed),
+		RandomSource:       flagBootstrapRandomSeed,
 	}
 
 	epochCommit := &flow.EpochCommit{
@@ -69,7 +69,7 @@ func constructRootResultAndSeal(
 // bootstrapping files are deterministic across runs for the same inputs.
 func getRandomSource(seed []byte) []byte {
 
-	if len(seed) < flow.EpochSetupRandomSourceLength {
+	if len(seed) != flow.EpochSetupRandomSourceLength {
 		log.Fatal().Msgf("seed length is smaller than required random source length (%d < %d)", len(seed), flow.EpochSetupRandomSourceLength)
 	}
 
