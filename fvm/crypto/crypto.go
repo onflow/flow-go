@@ -147,16 +147,13 @@ func AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
 
 // AggregateBLSPublicKeys aggregate multiple BLS signatures into one.
 //
-// This function calls AggregateBLSPublicKeys from the crypto package. if invalid inputs are provided, it returns nil.
+// This function calls AggregateBLSPublicKeys from the crypto package.
 func AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	cryptoKeys := make([]crypto.PublicKey, len(keys))
 	for i, key := range keys {
 		sigAlgo := RuntimeToCryptoSigningAlgorithm(key.SignAlgo)
 		cpk, err := crypto.DecodePublicKey(sigAlgo, key.PublicKey)
 		if err != nil {
-			if crypto.IsInvalidInputsError(err) {
-				return nil, nil
-			}
 			return nil, fmt.Errorf("AggregateBLSPublicKeys failed: %w", err)
 		}
 		cryptoKeys[i] = cpk
