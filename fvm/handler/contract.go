@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"sync"
@@ -101,11 +102,17 @@ func (h *ContractHandler) RemoveContract(address runtime.Address, name string, s
 
 type contractUpdateList []programs.ContractUpdate
 
-func (a contractUpdateList) Len() int      { return len(a) }
-func (a contractUpdateList) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-func (a contractUpdateList) Less(i, j int) bool {
-	return a[i].Address.String() < a[j].Address.String() ||
-		(a[i].Address.String() == a[j].Address.String() && a[i].Name < a[j].Name)
+func (l contractUpdateList) Len() int      { return len(l) }
+func (l contractUpdateList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
+func (l contractUpdateList) Less(i, j int) bool {
+	switch bytes.Compare(l[i].Address[:], l[j].Address[:]) {
+	case -1:
+		return true
+	case 0:
+		return l[i].Name < l[j].Name
+	default:
+		return false
+	}
 }
 
 func (h *ContractHandler) Commit() ([]programs.ContractUpdateKey, error) {
