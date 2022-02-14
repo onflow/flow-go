@@ -334,7 +334,7 @@ func (fnb *FlowNodeBuilder) EnqueueTracer() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) ParseAndPrintFlags() {
+func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	// parse configuration parameters
 	pflag.Parse()
 
@@ -346,6 +346,8 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() {
 	})
 
 	log.Msg("flags loaded")
+
+	return fnb.extraFlagsValidation()
 }
 
 func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
@@ -764,7 +766,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Localnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedDeployment(false),
 		)
@@ -1013,9 +1015,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	fnb.BaseFlags()
 
-	fnb.ParseAndPrintFlags()
-
-	if err := fnb.extraFlagsValidation(); err != nil {
+	if err := fnb.ParseAndPrintFlags(); err != nil {
 		return err
 	}
 
