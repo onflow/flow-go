@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // pushCmd represents a command to upload public keys to the transit server

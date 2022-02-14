@@ -9,6 +9,8 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/spf13/cobra"
+
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -16,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -142,7 +143,7 @@ func getFlowClient() *client.Client {
 	if flagANNetworkKey != "" {
 		err := validateANNetworkKey(flagANNetworkKey)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to create flow client invalid access-network-key provided (%s)", flagANNetworkKey, err)
+			log.Fatal().Err(err).Msgf("failed to create flow client invalid access-network-key provided (%s)", flagANNetworkKey)
 		}
 
 		insecureClient = false
@@ -254,7 +255,7 @@ func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes,
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("Number of flow nodes skipped: %d\n", skippedNodes))
 	builder.WriteString(fmt.Sprintf("Number of partner nodes: %d\n", totalNumOfPartnerNodes))
-	builder.WriteString(fmt.Sprint("Number of partner nodes by role:"))
+	builder.WriteString("Number of partner nodes by role:")
 	for role, count := range numOfNodesByType {
 		builder.WriteString(fmt.Sprintf("\t%s : %d", role, count))
 	}
