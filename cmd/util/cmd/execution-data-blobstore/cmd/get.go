@@ -34,7 +34,8 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
-	bs := initBlobservice()
+	bs, ds := initBlobservice()
+	defer ds.Close()
 
 	logger := zerolog.New(os.Stdout)
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/flow-go/module/blobs"
@@ -36,20 +37,16 @@ func Execute() {
 	}
 }
 
-func initBlobservice() network.BlobService {
+func initBlobservice() (network.BlobService, datastore.Batching) {
 	ds, err := badger.NewDatastore(flagBlobstoreDir, &badger.DefaultOptions)
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not init badger datastore")
 	}
 
-	defer ds.Close()
-
 	bstore := blockstore.NewBlockstore(ds)
 
 	blockService := blockservice.New(bstore, nil)
-
-	defer blockService.Close()
 
 	bs := new(mocknetwork.BlobService)
 
@@ -59,7 +56,7 @@ func initBlobservice() network.BlobService {
 			return blockService.GetBlocks(ctx, ks)
 		})
 
-	return bs
+	return bs, ds
 }
 
 func init() {
