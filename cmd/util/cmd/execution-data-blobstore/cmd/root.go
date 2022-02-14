@@ -10,14 +10,14 @@ import (
 	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-
-	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 )
 
 var (
