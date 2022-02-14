@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"syscall"
 	"testing"
 	"time"
 
@@ -457,5 +458,30 @@ func TestIterateBoundaries(t *testing.T) {
 		}
 		require.NoError(t, err, "should iterate backward without error")
 		assert.ElementsMatch(t, keysInRange, found, "backward iteration should go over correct keys")
+	})
+}
+
+func TestTerminateOnFullDisk(t *testing.T) {
+	// happy path
+	t.Run("return nil on no error", func(t *testing.T) {
+		result := terminateOnFullDisk(nil)
+		require.NoError(t, result)
+	})
+	t.Run("benign non disk related error should return the error", func(t *testing.T) {
+		benignError := errors.New("benign error")
+		result := terminateOnFullDisk(benignError)
+		require.ErrorIs(t, result, benignError)
+	})
+	// sad path
+	t.Run("panic on full disk", func(t *testing.T) {
+		// imitate badgerDB error wrapping
+		badgerDiskFullError := syscall.ENOSPC
+		defer func() {
+			if rec := recover(); rec == nil {
+				require.Fail(t, "code should panic")
+			}
+		}()
+		err := terminateOnFullDisk(badgerDiskFullError)
+		require.NoError(t, err)
 	})
 }

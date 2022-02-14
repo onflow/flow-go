@@ -105,12 +105,12 @@ func (r *ExecutionResults) index(blockID, resultID flow.Identifier, force bool) 
 }
 
 func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
-	return operation.TerminateOnFullDisk(operation.RetryOnConflictTx(r.db, transaction.Update, r.store(result)))
+	return operation.RetryOnConflictTx(r.db, transaction.Update, r.store(result))
 }
 
 func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
-	return operation.TerminateOnFullDisk(operation.BatchInsertExecutionResult(result)(writeBatch))
+	return operation.BatchInsertExecutionResult(result)(writeBatch)
 }
 
 func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {

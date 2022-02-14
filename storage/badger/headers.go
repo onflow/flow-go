@@ -118,7 +118,7 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Id
 }
 
 func (h *Headers) Store(header *flow.Header) error {
-	return operation.TerminateOnFullDisk(operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(header)))
+	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(header))
 }
 
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {

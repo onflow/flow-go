@@ -117,7 +117,7 @@ func (r *ExecutionReceipts) byBlockID(blockID flow.Identifier) func(*badger.Txn)
 }
 
 func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
-	return operation.TerminateOnFullDisk(operation.RetryOnConflictTx(r.db, transaction.Update, r.storeTx(receipt)))
+	return operation.RetryOnConflictTx(r.db, transaction.Update, r.storeTx(receipt))
 }
 
 func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {

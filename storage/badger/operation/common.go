@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"syscall"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/vmihailenco/msgpack/v4"
@@ -36,7 +37,7 @@ func batchInsert(key []byte, entity interface{}) func(writeBatch *badger.WriteBa
 		}
 
 		// persist the entity data into the DB
-		err = writeBatch.Set(key, val)
+		err = terminateOnFullDisk(writeBatch.Set(key, val))
 		if err != nil {
 			return fmt.Errorf("could not store data: %w", err)
 		}
@@ -76,7 +77,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// persist the entity data into the DB
-		err = tx.Set(key, val)
+		err = terminateOnFullDisk(tx.Set(key, val))
 		if err != nil {
 			return fmt.Errorf("could not store data: %w", err)
 		}
@@ -106,7 +107,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// persist the entity data into the DB
-		err = tx.Set(key, val)
+		err = terminateOnFullDisk(tx.Set(key, val))
 		if err != nil {
 			return fmt.Errorf("could not replace data: %w", err)
 		}
@@ -385,4 +386,12 @@ func Fail(err error) func(*badger.Txn) error {
 	return func(_ *badger.Txn) error {
 		return err
 	}
+}
+
+// terminateOnFullDisk panics to crash the node if an insert / batchInsert / update fail due to a full disk
+func terminateOnFullDisk(err error) error {
+	if err != nil && errors.Is(err, syscall.ENOSPC) {
+		panic("disk full, terminating node...")
+	}
+	return err
 }
