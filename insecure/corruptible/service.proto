@@ -5,14 +5,14 @@ package corruptible;
 option go_package = "insecure/corruptible";
 
 // to compile this file, run:
-// protoc -I ./ --go_out=./ insecure/corruptible/service.proto
+// protoc insecure/corruptible/service.proto --go_out=plugins=grpc:.
 
 // Zombie implements the service provided by a corruptible conduit.
 // It allows an attack to register itself to the conduit, and hence takes the control
 // of the conduit by sending messages on its behalf.
 service Zombie {
-  rpc Register(AttackerRegisterMessage) returns (ActionResponse) {}
-  rpc Send(Message) returns (ActionResponse) {}
+  rpc RegisterAttacker(AttackerRegisterMessage) returns (ActionResponse) {}
+  rpc ProcessAttackerMessage(Message) returns (ActionResponse) {}
 }
 
 service Attacker {

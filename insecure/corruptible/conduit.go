@@ -3,26 +3,29 @@ package corruptible
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 )
 
-// DefaultConduitFactory is a wrapper around the network Adapter.
-// It directly passes the incoming messages to the corresponding methods of the
-// network Adapter.
-type DefaultConduitFactory struct {
-	adapter network.Adapter
+type ConduitFactory struct {
+	codec    network.Codec
+	myId     flow.Identifier
+	adapter  network.Adapter
+	attacker AttackerClient
 }
 
-func NewDefaultConduitFactory() *DefaultConduitFactory {
-	return &DefaultConduitFactory{}
+func NewCorruptibleConduitFactory(myId flow.Identifier, codec network.Codec) *ConduitFactory {
+	return &ConduitFactory{myId: myId}
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
 // The Adapter is a wrapper around the Network layer that only exposes the set of methods
 // that are needed by a conduit.
-func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
+func (d *ConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 	if d.adapter != nil {
 		return fmt.Errorf("could not register a new network adapter, one already exists")
 	}
@@ -34,7 +37,7 @@ func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 
 // NewConduit creates a conduit on the specified channel.
 // Prior to creating any conduit, the factory requires an Adapter to be registered with it.
-func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel network.Channel) (network.Conduit, error) {
+func (d *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel) (network.Conduit, error) {
 	if d.adapter == nil {
 		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")
 	}
@@ -53,10 +56,13 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel network.
 // sending messages within a single engine process. It sends all messages to
 // what can be considered a bus reserved for that specific engine.
 type Conduit struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	channel network.Channel
-	adapter network.Adapter
+	codec    network.Codec
+	attacker AttackerClient
+	myId     flow.Identifier
+	ctx      context.Context
+	cancel   context.CancelFunc
+	channel  network.Channel
+	adapter  network.Adapter
 }
 
 // Publish sends an event to the network layer for unreliable delivery
@@ -67,6 +73,11 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
+
+	if c.attacker != nil {
+
+	}
+
 	return c.adapter.PublishOnChannel(c.channel, event, targetIDs...)
 }
 
@@ -97,4 +108,38 @@ func (c *Conduit) Close() error {
 	c.cancel()
 	// call the close function
 	return c.adapter.UnRegisterChannel(c.channel)
+}
+
+func (c *Conduit) ProcessAttackerMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*ActionResponse, error) {
+
+}
+
+func (c *Conduit) RegisterAttacker(ctx context.Context, in *AttackerRegisterMessage, opts ...grpc.CallOption) (*ActionResponse, error) {
+
+}
+
+// eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
+func (c *Conduit) eventToMessage(event interface{}, protocol Protocol, num uint32, targetIds ...flow.Identifier) (*Message, error) {
+	var emTargets [][]byte
+	for _, targetID := range targetIds {
+		tempID := targetID // avoid capturing loop variable
+		emTargets = append(emTargets, tempID[:])
+	}
+
+	payload, err := c.codec.Encode(event)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode event: %w", err)
+	}
+
+	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
+
+	return &Message{
+		ChannelID: c.channel.String(),
+		OriginID:  c.myId[:],
+		Targets:   num,
+		TargetIDs: emTargets,
+		Payload:   payload,
+		Type:      msgType,
+		Protocol:  protocol,
+	}, nil
 }
