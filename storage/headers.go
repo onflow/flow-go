@@ -33,4 +33,6 @@ type Headers interface {
 
 	// Finds the ID of the block corresponding to given chunk ID
 	IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
+
+	RollbackExecutedBlock(header *flow.Header) error
 }

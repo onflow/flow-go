@@ -199,6 +199,7 @@ func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 		if header.Height >= highest.Height {
 			return nil
 		}
+
 		err = operation.UpdateExecutedBlock(header.ID())(txn)
 		if err != nil {
 			return fmt.Errorf("cannot update highest executed block: %w", err)

@@ -99,3 +99,8 @@ func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tx
 	}
 	return &transactionResult, nil
 }
+
+// RemoveByBlockID removes transaction results by block ID
+func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
+	return tr.db.Update(operation.RemoveTransactionResultsByBlockID(blockID))
+}
