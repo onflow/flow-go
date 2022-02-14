@@ -3,14 +3,15 @@ package flow
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
-// PayloadData has the data to be sent
-type PayloadData struct {
+// payloadData has the data to be sent
+type payloadData struct {
 	Script                    []byte
 	Arguments                 [][]byte
 	ReferenceBlockID          []byte
@@ -22,11 +23,17 @@ type PayloadData struct {
 	Authorizers               [][]byte
 }
 
-// SignatureData has the data regarding a signature
-type SignatureData struct {
+// signatureData has the data regarding a signature
+type signatureData struct {
 	SignerIndex uint
 	KeyID       uint
 	Signature   []byte
+}
+
+var sigDataPool = sync.Pool{
+	New: func() interface{} {
+		return new(signatureData)
+	},
 }
 
 // TransactionBody includes the main contents of a transaction
@@ -73,6 +80,8 @@ func NewTransactionBody() *TransactionBody {
 }
 
 func (tb TransactionBody) Fingerprint() []byte {
+	// use a pool to avoid heap allocations
+
 	authorizers := make([][]byte, len(tb.Authorizers))
 	for i, auth := range tb.Authorizers {
 		authorizers[i] = auth.Bytes()
@@ -82,7 +91,7 @@ func (tb TransactionBody) Fingerprint() []byte {
 	// definition is exactly sync'd with any others.  The
 	// constraint is enforced with a test.
 	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-body-payload}
-	payload := PayloadData{
+	payload := payloadData{
 		Script:                    tb.Script,
 		Arguments:                 tb.Arguments,
 		ReferenceBlockID:          tb.ReferenceBlockID[:],
@@ -100,11 +109,10 @@ func (tb TransactionBody) Fingerprint() []byte {
 		// this comment below is to enforce that this struct
 		// definition is exactly sync'd with the other ones
 		///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
-		canonicalForm := SignatureData{
-			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-			Signature:   s.Signature,
-		}
+		canonicalForm := sigDataPool.Get().(*signatureData)
+		canonicalForm.SignerIndex = uint(s.SignerIndex) // int is not RLP-serializable
+		canonicalForm.KeyID = uint(s.KeyIndex)          // int is not RLP-serializable
+		canonicalForm.Signature = s.Signature
 		///%]]
 		signaturesPayload[i] = canonicalForm
 	}
@@ -115,16 +123,15 @@ func (tb TransactionBody) Fingerprint() []byte {
 		// this comment below is to enforce that this struct
 		// definition is exactly sync'd with the other ones
 		///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
-		canonicalForm := SignatureData{
-			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-			Signature:   s.Signature,
-		}
+		canonicalForm := sigDataPool.Get().(*signatureData)
+		canonicalForm.SignerIndex = uint(s.SignerIndex) // int is not RLP-serializable
+		canonicalForm.KeyID = uint(s.KeyIndex)          // int is not RLP-serializable
+		canonicalForm.Signature = s.Signature
 		///%]]
 		signaturesEnvelope[i] = canonicalForm
 	}
 
-	return fingerprint.Fingerprint(struct {
+	retval := fingerprint.Fingerprint(struct {
 		Payload            interface{}
 		PayloadSignatures  interface{}
 		EnvelopeSignatures interface{}
@@ -133,6 +140,17 @@ func (tb TransactionBody) Fingerprint() []byte {
 		PayloadSignatures:  signaturesPayload,
 		EnvelopeSignatures: signaturesEnvelope,
 	})
+
+	// release the memory back to the pool
+	for s := range signaturesPayload {
+		sigDataPool.Put(s)
+	}
+
+	for s := range signaturesEnvelope {
+		sigDataPool.Put(s)
+	}
+
+	return retval
 }
 
 func (tb TransactionBody) ByteSize() uint {
@@ -407,7 +425,7 @@ func (tb *TransactionBody) PayloadMessage() []byte {
 	// definition is exactly sync'd with any others.  The
 	// constraint is enforced with a test.
 	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-body-payload}
-	payload := PayloadData{
+	payload := payloadData{
 		Script:                    tb.Script,
 		Arguments:                 tb.Arguments,
 		ReferenceBlockID:          tb.ReferenceBlockID[:],
@@ -435,7 +453,7 @@ func (tb *TransactionBody) EnvelopeMessage() []byte {
 	// definition is exactly sync'd with any others.  The
 	// constraint is enforced with a test.
 	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-body-payload}
-	payload := PayloadData{
+	payload := payloadData{
 		Script:                    tb.Script,
 		Arguments:                 tb.Arguments,
 		ReferenceBlockID:          tb.ReferenceBlockID[:],
@@ -454,22 +472,28 @@ func (tb *TransactionBody) EnvelopeMessage() []byte {
 		// this comment below is to enforce that this struct
 		// definition is exactly sync'd with the other ones
 		///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
-		canonicalForm := SignatureData{
-			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-			Signature:   s.Signature,
-		}
+		canonicalForm := sigDataPool.Get().(*signatureData)
+		canonicalForm.SignerIndex = uint(s.SignerIndex) // int is not RLP-serializable
+		canonicalForm.KeyID = uint(s.KeyIndex)          // int is not RLP-serializable
+		canonicalForm.Signature = s.Signature
 		///%]]
 		signatures[i] = canonicalForm
 	}
 
-	return fingerprint.Fingerprint(struct {
+	retval := fingerprint.Fingerprint(struct {
 		Payload           interface{}
 		PayloadSignatures interface{}
 	}{
 		payload,
 		signatures,
 	})
+
+	// release the memory back to the pool
+	for s := range signatures {
+		sigDataPool.Put(s)
+	}
+
+	return retval
 }
 
 func (tx *Transaction) PayloadMessage() []byte {
@@ -569,13 +593,17 @@ func (s TransactionSignature) Fingerprint() []byte {
 	// definition is exactly sync'd with any others.  The
 	// constraint is enforced with a test.
 	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
-	canonicalForm := SignatureData{
-		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-		Signature:   s.Signature,
-	}
+	canonicalForm := sigDataPool.Get().(*signatureData)
+	canonicalForm.SignerIndex = uint(s.SignerIndex) // int is not RLP-serializable
+	canonicalForm.KeyID = uint(s.KeyIndex)          // int is not RLP-serializable
+	canonicalForm.Signature = s.Signature
 	///%]]
-	return fingerprint.Fingerprint(canonicalForm)
+
+	retval := fingerprint.Fingerprint(canonicalForm)
+
+	sigDataPool.Put(canonicalForm)
+
+	return retval
 }
 
 func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
