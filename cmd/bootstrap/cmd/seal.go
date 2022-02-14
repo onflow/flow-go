@@ -62,19 +62,3 @@ func constructRootResultAndSeal(
 
 	return result, seal
 }
-
-// getRandomSource produces the random source which is included in the root
-// EpochSetup event and is used for leader selection. The random source is
-// generated deterministically based on the seed, so that the
-// bootstrapping files are deterministic across runs for the same inputs.
-func getRandomSource(seed []byte) []byte {
-
-	if len(seed) != flow.EpochSetupRandomSourceLength {
-		log.Fatal().Msgf("seed length is smaller than required random source length (%d < %d)", len(seed), flow.EpochSetupRandomSourceLength)
-	}
-
-	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	copy(randomSource, seed)
-
-	return randomSource
-}

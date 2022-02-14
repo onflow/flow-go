@@ -44,7 +44,7 @@ func init() {
 	cmd.MarkFlagRequired(keyCmd, "address")
 
 	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", []byte{}, fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSAP256))
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", []byte{}, fmt.Sprintf("hex encoded staking seed (min %d bytes)", crypto.PrKeyLenBLSBLS12381))
+	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", []byte{}, fmt.Sprintf("hex encoded staking seed (min %d bytes)", crypto.KeyGenSeedMinLenBLSBLS12381))
 	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", []byte{}, fmt.Sprintf("hex encoded machine account seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSAP256))
 }
 

@@ -4,8 +4,6 @@ import (
 	"crypto"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/engine/consensus/dkg"
