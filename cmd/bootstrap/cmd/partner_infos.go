@@ -10,9 +10,11 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go-sdk/client"
-	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/spf13/cobra"
 )
@@ -41,11 +43,8 @@ const (
 	networkingKeyField
 	stakingKeyField
 	tokensStakedField
-	nodeInfosPubDir       = "node-pub-infos"
-	infoFileNameTemplate  = "node-info.pub.%s.json"
-	partnerStakesFileName = "partner-stakes.json"
-	flowNodeAddrPart      = "nodes.onflow.org"
-	defaultPartnerStake   = "100"
+	flowNodeAddrPart    = "nodes.onflow.org"
+	defaultPartnerStake = 100
 )
 
 // NodePubInfo basic representation of node-pub-info.json data
@@ -58,8 +57,8 @@ type NodePubInfo struct {
 	StakingPubKey string `json:"StakingPubKey"`
 }
 
-// PartnerStakesInfo mapping of NodeID =>
-type PartnerStakesInfo map[string]string
+// PartnerStakesInfo mapping of NodeID => weight of staking key
+type PartnerStakesInfo map[flow.Identifier]uint64
 
 // populatePartnerInfos represents the `populate-partner-infos` command which will read the proposed node
 // table from the staking contract and for each identity in the proposed table generate a node-info-pub
@@ -73,12 +72,10 @@ var populatePartnerInfosCMD = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(populatePartnerInfosCMD)
 
-	populatePartnerInfosCMD.Flags().StringVar(&flagOutputDir, "out", "", "the directory where the generated node-info-pub files will be written")
 	populatePartnerInfosCMD.Flags().StringVar(&flagANAddress, "access-address", "", "the address of the access node used for client connections")
 	populatePartnerInfosCMD.Flags().StringVar(&flagANNetworkKey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
-	populatePartnerInfosCMD.Flags().StringVar(&flagNetworkEnv, "network", "", "the network string, expecting one of ( mainnet | testnet | localnet )")
+	populatePartnerInfosCMD.Flags().StringVar(&flagNetworkEnv, "network", "mainnet", "the network string, expecting one of ( mainnet | testnet | localnet )")
 
-	cmd.MarkFlagRequired(populatePartnerInfosCMD, "out")
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "access-address")
 }
 
@@ -101,12 +98,12 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 
 	partnerStakes := make(PartnerStakesInfo)
 	skippedNodes := 0
-	numOfNodesByType := map[string]int{
-		flow.RoleCollection.String():   0,
-		flow.RoleConsensus.String():    0,
-		flow.RoleExecution.String():    0,
-		flow.RoleVerification.String(): 0,
-		flow.RoleAccess.String():       0,
+	numOfPartnerNodesByRole := map[flow.Role]int{
+		flow.RoleCollection:   0,
+		flow.RoleConsensus:    0,
+		flow.RoleExecution:    0,
+		flow.RoleVerification: 0,
+		flow.RoleAccess:       0,
 	}
 	totalNumOfPartnerNodes := 0
 
@@ -128,13 +125,13 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 
 		writeNodePubInfoFile(nodePubInfo)
 		partnerStakes[nodePubInfo.NodeID] = defaultPartnerStake
-		numOfNodesByType[nodePubInfo.Role]++
+		numOfPartnerNodesByRole[nodePubInfo.Role]++
 		totalNumOfPartnerNodes++
 	}
 
 	writePartnerStakesFile(partnerStakes)
 
-	printNodeCounts(numOfNodesByType, totalNumOfPartnerNodes, skippedNodes)
+	printNodeCounts(numOfPartnerNodesByRole, totalNumOfPartnerNodes, skippedNodes)
 }
 
 // getFlowClient will validate the flagANNetworkKey and return flow client
@@ -184,17 +181,39 @@ func executeGetNodeInfoScript(ctx context.Context, env templates.Environment, cl
 	return info, nil
 }
 
-// parseNodeInfo convert node info retrieved from
-func parseNodeInfo(info cadence.Value) (*NodePubInfo, error) {
+// parseNodeInfo convert node info retrieved from cadence script
+func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
 	fields := info.(cadence.Struct).Fields
-	role := flow.Role(fields[roleField].(cadence.UInt8))
-	return &NodePubInfo{
-		Role:          role.String(),
+	nodeID, err := flow.HexStringToIdentifier(string(fields[idField].(cadence.String)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert flow node ID from hex string to identifier (%s): %w", string(fields[idField].(cadence.String)), err)
+	}
+
+	b, err := hex.DecodeString(string(fields[networkingKeyField].(cadence.String)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode network public key hex (%s): %w", string(fields[networkingKeyField].(cadence.String)), err)
+	}
+	networkPubKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, b)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode network public key: %w", err)
+	}
+
+	b, err = hex.DecodeString(string(fields[stakingKeyField].(cadence.String)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode staking public key hex (%s): %w", string(fields[stakingKeyField].(cadence.String)), err)
+	}
+	stakingPubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, b)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode staking public key: %w", err)
+	}
+
+	return &bootstrap.NodeInfoPub{
+		Role:          flow.Role(fields[roleField].(cadence.UInt8)),
 		Address:       string(fields[networkingAddressField].(cadence.String)),
-		NodeID:        string(fields[idField].(cadence.String)),
-		Stake:         fields[tokensStakedField].(cadence.UFix64).String(),
-		NetworkPubKey: string(fields[networkingKeyField].(cadence.String)),
-		StakingPubKey: string(fields[stakingKeyField].(cadence.String)),
+		NodeID:        nodeID,
+		Stake:         uint64(fields[tokensStakedField].(cadence.UFix64)),
+		NetworkPubKey: encodable.NetworkPubKey{PublicKey: networkPubKey},
+		StakingPubKey: encodable.StakingPubKey{PublicKey: stakingPubKey},
 	}, nil
 }
 
@@ -210,7 +229,7 @@ func validateANNetworkKey(key string) error {
 		return fmt.Errorf("failed to decode public key hex string: %w", err)
 	}
 
-	_, err = crypto.DecodePublicKey(crypto.ECDSA_P256, b)
+	_, err = crypto.DecodePublicKey(crypto.ECDSAP256, b)
 	if err != nil {
 		return fmt.Errorf("failed to decode public key: %w", err)
 	}
@@ -219,22 +238,23 @@ func validateANNetworkKey(key string) error {
 }
 
 // writeNodePubInfoFile writes the node-pub-info file
-func writeNodePubInfoFile(info *NodePubInfo) {
-	fileOutputName := fmt.Sprintf(infoFileNameTemplate, info.NodeID)
-	path := filepath.Join(flagOutputDir, nodeInfosPubDir, fileOutputName)
+func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
+	fileOutputName := fmt.Sprintf(bootstrap.PathNodeInfoPub, info.NodeID)
+	path := filepath.Join(flagOutputDir, fileOutputName)
 	writeJSON(path, info)
 }
 
 // writePartnerStakesFile writes the partner stakes file
 func writePartnerStakesFile(partnerStakes PartnerStakesInfo) {
-	path := filepath.Join(flagOutputDir, partnerStakesFileName)
+	path := filepath.Join(flagOutputDir, bootstrap.PartnerStakesFileName)
 	writeJSON(path, partnerStakes)
 }
 
-func printNodeCounts(numOfNodesByType map[string]int, totalNumOfPartnerNodes, skippedNodes int) {
+func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes, skippedNodes int) {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("Number of Flow nodes skipped: %d\n", skippedNodes))
-	builder.WriteString(fmt.Sprintf("Number of Partner nodes: %d\n", totalNumOfPartnerNodes))
+	builder.WriteString(fmt.Sprintf("Number of flow nodes skipped: %d\n", skippedNodes))
+	builder.WriteString(fmt.Sprintf("Number of partner nodes: %d\n", totalNumOfPartnerNodes))
+	builder.WriteString(fmt.Sprint("Number of partner nodes by role:"))
 	for role, count := range numOfNodesByType {
 		builder.WriteString(fmt.Sprintf("\t%s : %d", role, count))
 	}

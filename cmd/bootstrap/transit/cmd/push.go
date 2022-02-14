@@ -3,9 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
@@ -26,11 +28,17 @@ func init() {
 
 func addPushCmdFlags() {
 	pushCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
+	pushCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 	_ = pushCmd.MarkFlagRequired("token")
 }
 
 // push uploads public keys to the transit server
 func push(_ *cobra.Command, _ []string) {
+	if flagNodeRole != flow.RoleConsensus.String() {
+		log.Info().Str("role", flagNodeRole).Msgf("only consensus nodes are required to push transit keys, exiting.")
+		os.Exit(0)
+	}
+
 	log.Info().Msg("running push")
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
