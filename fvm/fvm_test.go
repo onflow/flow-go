@@ -611,7 +611,11 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		tx := fvm.Transaction(txBody, 0)
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
-		assert.NoError(t, tx.Err)
+
+		assert.Error(t, tx.Err)
+
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
 
 	t.Run("account update with set code succeeds when there is a matching audit voucher", func(t *testing.T) {

@@ -115,7 +115,9 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bo
 	return true, nil
 }
 
-// ValidatePublicKey returns true if public key is valid
+// BLSVerifyPOP verifies a proof of possession (PoP) for the receiver public key.
+//
+// This function calls BLSVerifyPOP from the crypto package. If invalid inputs are provided, it returns false.
 func BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (valid bool, err error) {
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(pk.SignAlgo)
 
@@ -130,6 +132,9 @@ func BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (valid bool, err error) {
 	return crypto.BLSVerifyPOP(cpk, s)
 }
 
+// AggregateBLSSignatures aggregate multiple BLS signatures into one.
+//
+// This function calls AggregateBLSSignatures from the crypto package.
 func AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
 
 	cryptoSigs := make([]crypto.Signature, len(sigs))
@@ -140,6 +145,9 @@ func AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
 	return crypto.AggregateBLSSignatures(cryptoSigs)
 }
 
+// AggregateBLSPublicKeys aggregate multiple BLS signatures into one.
+//
+// This function calls AggregateBLSPublicKeys from the crypto package. if invalid inputs are provided, it returns nil.
 func AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	cryptoKeys := make([]crypto.PublicKey, len(keys))
 	for i, key := range keys {
