@@ -37,14 +37,14 @@ const VersionV3 uint16 = 0x03
 const VersionV4 uint16 = 0x04
 
 // defaultBufioReadSize replaces the default bufio buffer size of 4096 bytes.
-// defaultBufioReadSize can be increased to 16KiB, 32KiB, etc. if it improves performance on
-// typical EN hardware.
-const defaultBufioReadSize = 1024 * 8
+// defaultBufioReadSize can be increased to 8KiB, 16KiB, 32KiB, etc. if it
+// improves performance on typical EN hardware.
+const defaultBufioReadSize = 1024 * 32
 
 // defaultBufioWriteSize replaces the default bufio buffer size of 4096 bytes.
-// defaultBufioWriteSize can be increased to 16KiB, 32KiB, etc. if it improves performance on
-// typical EN hardware.
-const defaultBufioWriteSize = 1024 * 8
+// defaultBufioWriteSize can be increased to 8KiB, 16KiB, 32KiB, etc. if it
+//  improves performance on typical EN hardware.
+const defaultBufioWriteSize = 1024 * 32
 
 type Checkpointer struct {
 	dir            string
