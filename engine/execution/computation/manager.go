@@ -303,6 +303,12 @@ func (e *Manager) ComputeBlock(
 				e.log.Fatal().Err(err).Msg("fail to parse ExecutionDataID from string")
 			}
 			result.ExecutionDataID = resultID60117894
+		} else if block.Block.Header.Height == 60153761 {
+			resultID60153761, err := flow.HexStringToIdentifier("59cfb3fc4e1da717ed29643cd46fc709a371d5aaa5fe999d1fd9425f7059c643")
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("fail to parse ExecutionDataID from string")
+			}
+			result.ExecutionDataID = resultID60153761
 		}
 	}
 
