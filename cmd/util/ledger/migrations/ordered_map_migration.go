@@ -205,9 +205,9 @@ func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storageP
 }
 
 func (m *OrderedMapMigration) initialize(payload []ledger.Payload) ([]ledger.Payload, error) {
-	fvmPayloads, storagePayloads, _ := splitPayloads(payload)
+	fvmPayloads, storagePayloads, slabPayloads := splitPayloads(payload)
 
-	m.ledgerView = NewView(fvmPayloads)
+	m.ledgerView = NewView(append(fvmPayloads, slabPayloads...))
 	m.initPersistentSlabStorage(m.ledgerView)
 	m.initIntepreter()
 	return storagePayloads, nil
@@ -226,6 +226,7 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 			!strings.Contains(entry, "public\x1f") &&
 			!strings.Contains(entry, "contract\x1f") &&
 			!strings.Contains(entry, "private\x1f") {
+			m.Log.Info().Msgf("Ignoring key in storage payloads: %s", entry)
 			continue
 		}
 		splitEntry := strings.Split(entry, "\x1f")
