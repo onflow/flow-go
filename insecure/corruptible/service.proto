@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package corruptible;
+
+option go_package = "insecure/corruptible";
+
+// Zombie implements the service provided by a corruptible conduit.
+// It allows an attack to register itself to the conduit, and hence takes the control
+// of the conduit by sending messages on its behalf.
+service Zombie {
+  rpc Register(AttackerRegisterMessage) returns (ActionResponse) {}
+  rpc Send(CorruptedMessage) returns (ActionResponse) {}
+}
+
+// CorruptedMessage is represents the message exchanged between the Zombi and Attacker services.
+message CorruptedMessage {
+  string ChannelID = 1;
+  bytes OriginID = 2;
+  uint32 targets = 3;
+  repeated bytes TargetIDs = 4;
+  bytes Payload = 5;
+  string Type = 6;
+  Protocol protocol = 7;
+}
+
+enum Protocol {
+  UNKNOWN = 0;
+  UNICAST = 1;
+  MULTICAST = 2;
+  PUBLISH = 3;
+}
+
+// AttackerRegisterMessage is the message an attacker uses to register itself to the chosen Zombie,
+// and takes its control.
+message AttackerRegisterMessage {
+  string ip = 1;
+  string port = 2;
+}
+
+// ActionResponse is used as the gRPC result to denote whether an action was successful on the
+// remote Zombie or not.
+message ActionResponse {
+  bool complete = 1;
+  string error = 2;
+}
