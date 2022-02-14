@@ -380,6 +380,14 @@ func (e *blockComputer) executeTransaction(
 		ComputationUsed: tx.ComputationUsed,
 	}
 
+	lg := e.log.With().
+		Hex("tx_id", txResult.TransactionID[:]).
+		Str("block_id", res.ExecutableBlock.ID().String()).
+		Str("traceID", traceID).
+		Uint64("computation_used", txResult.ComputationUsed).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+		Logger()
+
 	if tx.Err != nil {
 		// limit the size of transaction error that is going to be captured
 		errorMsg := tx.Err.Error()
@@ -389,7 +397,12 @@ func (e *blockComputer) executeTransaction(
 			sb.WriteString(errorMsg[:split])
 			sb.WriteString(" ... ")
 			sb.WriteString(errorMsg[len(errorMsg)-split:])
-			errorMsg = sb.String()
+
+			truncatedError := sb.String()
+
+			lg.Debug().Str("original_error", errorMsg).Str("truncated_error", truncatedError).Msg("error message truncated")
+
+			errorMsg = truncatedError
 		}
 		txResult.ErrorMessage = errorMsg
 	}
@@ -410,13 +423,7 @@ func (e *blockComputer) executeTransaction(
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
 
-	lg := e.log.With().
-		Hex("tx_id", txResult.TransactionID[:]).
-		Str("block_id", res.ExecutableBlock.ID().String()).
-		Str("traceID", traceID).
-		Uint64("computation_used", txResult.ComputationUsed).
-		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
-		Logger()
+
 
 	if tx.Err != nil {
 		lg.Info().
