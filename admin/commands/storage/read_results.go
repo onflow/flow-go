@@ -62,7 +62,7 @@ func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequ
 		resultID = result.PreviousResultID
 	}
 
-	return convertToInterfaceList(results)
+	return commands.ConvertToInterfaceList(results)
 }
 
 func (r *ReadResultsCommand) Validator(req *admin.CommandRequest) error {
