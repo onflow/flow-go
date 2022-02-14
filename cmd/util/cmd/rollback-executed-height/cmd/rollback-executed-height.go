@@ -160,6 +160,9 @@ func removeForBlockID(
 	for _, chunk := range result.Chunks {
 		chunkID := chunk.ID()
 		err := chunks.Remove(chunkID)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil
+		}
 		if err != nil {
 			return fmt.Errorf("could not remove chunk id %v for block id %v: %w", chunkID, blockID, err)
 		}
