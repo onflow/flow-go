@@ -11,6 +11,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -218,4 +219,15 @@ func CidToId(c cid.Cid) (Identifier, error) {
 func IdToCid(f Identifier) cid.Cid {
 	hash, _ := mh.Encode(f[:], mh.SHA2_256)
 	return cid.NewCidV0(hash)
+}
+
+func ByteSliceToId(b []byte) (flow.Identifier, error) {
+	var id flow.Identifier{}
+	if len(b) != IdentifierLen {
+		return id, fmt.Errorf("illegal length for a flow identifier %x: got: %d, expected: %d", b, len(b), IdentifierLen)
+	}
+
+	copy(id[:], b[:])
+
+	return id, nil
 }
