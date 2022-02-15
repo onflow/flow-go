@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go-sdk/client"
@@ -20,43 +18,40 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var (
-	flagOutputDir    string
-	flagANAddress    string
-	flagANNetworkKey string
-	flagNetworkEnv   string
-
-	getNodeInfoScript = []byte(`import FlowIDTableStaking from 0x9eca2b38b18b5dfe
-
-	// This script gets all the info about a node and returns it
-	
-	pub fun main(nodeID: String): FlowIDTableStaking.NodeInfo {
-		return FlowIDTableStaking.NodeInfo(nodeID: nodeID)
-	}`)
-)
-
 const (
-	// Index of each field in the cadence NodeInfo as it corresponds to cadence.Struct.Fields needed to build NodePubInfo struct,
+	// Index of each field in the cadence NodeInfo as it corresponds to cadence.Struct.Fields
 	// fields not needed are left out.
 	idField = iota
 	roleField
 	networkingAddressField
 	networkingKeyField
 	stakingKeyField
-	tokensStakedField
+)
+
+const (
 	flowNodeAddrPart    = "nodes.onflow.org"
 	defaultPartnerStake = 100
 )
 
-// NodePubInfo basic representation of node-pub-info.json data
-type NodePubInfo struct {
-	Role          string `json:"Role"`
-	Address       string `json:"Address"`
-	NodeID        string `json:"NodeID"`
-	Stake         string `json:"Stake"`
-	NetworkPubKey string `json:"NetworkPubKey"`
-	StakingPubKey string `json:"StakingPubKey"`
-}
+var (
+	flagANAddress    string
+	flagANNetworkKey string
+	flagNetworkEnv   string
+
+	getInfoForProposedNodesScript = []byte(`
+		import FlowIDTableStaking from 0x9eca2b38b18b5dfe
+		pub fun main(): [FlowIDTableStaking.NodeInfo] {
+			let nodeIDs = FlowIDTableStaking.getProposedNodeIDs()
+		
+			var infos: [FlowIDTableStaking.NodeInfo] = []
+			for nodeID in nodeIDs {
+				let node = FlowIDTableStaking.NodeInfo(nodeID: nodeID)
+				infos.append(node)
+			}
+		
+			return infos
+	}`)
+)
 
 // PartnerStakesInfo mapping of NodeID => weight of staking key
 type PartnerStakesInfo map[flow.Identifier]uint64
@@ -85,17 +80,7 @@ func init() {
 func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 	ctx := context.Background()
 
-	env, err := common.EnvFromNetwork(flagNetworkEnv)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get environment for network (%s)", flagNetworkEnv)
-	}
-
 	flowClient := getFlowClient()
-
-	proposedNodeIDS, err := executeGetProposedTableScript(ctx, env, flowClient)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get proposed table")
-	}
 
 	partnerStakes := make(PartnerStakesInfo)
 	skippedNodes := 0
@@ -108,12 +93,12 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 	}
 	totalNumOfPartnerNodes := 0
 
-	for _, id := range proposedNodeIDS.Values {
-		info, err := executeGetNodeInfoScript(ctx, env, flowClient, id)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("could not get node info for node (%s)", id)
-		}
+	nodeInfos, err := executeGetProposedNodesInfosScript(ctx, flowClient)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get node info for nodes in the proposed table")
+	}
 
+	for _, info := range nodeInfos.(cadence.Array).Values {
 		nodePubInfo, err := parseNodeInfo(info)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("could not node info")
@@ -162,24 +147,14 @@ func getFlowClient() *client.Client {
 	return flowClient
 }
 
-// executeGetProposedTableScript executes the get proposed table script
-func executeGetProposedTableScript(ctx context.Context, env templates.Environment, flowClient *client.Client) (cadence.Array, error) {
-	proposedTable, err := flowClient.ExecuteScriptAtLatestBlock(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
-	if err != nil {
-		return cadence.Array{}, fmt.Errorf("failed to execute the get proposed table script: %w", err)
-	}
-
-	return proposedTable.(cadence.Array), nil
-}
-
-// executeGetNodeInfoScript executes the get node info script
-func executeGetNodeInfoScript(ctx context.Context, env templates.Environment, client *client.Client, nodeID cadence.Value) (cadence.Value, error) {
-	info, err := client.ExecuteScriptAtLatestBlock(ctx, getNodeInfoScript, []cadence.Value{nodeID})
+// executeGetProposedNodesInfosScript executes the get node info for each ID in the proposed table
+func executeGetProposedNodesInfosScript(ctx context.Context, client *client.Client) (cadence.Value, error) {
+	infos, err := client.ExecuteScriptAtLatestBlock(ctx, getInfoForProposedNodesScript, []cadence.Value{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute the get node info script: %w", err)
 	}
 
-	return info, nil
+	return infos, nil
 }
 
 // parseNodeInfo convert node info retrieved from cadence script
@@ -212,7 +187,7 @@ func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
 		Role:          flow.Role(fields[roleField].(cadence.UInt8)),
 		Address:       string(fields[networkingAddressField].(cadence.String)),
 		NodeID:        nodeID,
-		Stake:         uint64(fields[tokensStakedField].(cadence.UFix64)),
+		Stake:         defaultPartnerStake,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: networkPubKey},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: stakingPubKey},
 	}, nil
@@ -240,15 +215,13 @@ func validateANNetworkKey(key string) error {
 
 // writeNodePubInfoFile writes the node-pub-info file
 func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
-	fileOutputName := fmt.Sprintf(bootstrap.PathNodeInfoPub, info.NodeID)
-	path := filepath.Join(flagOutputDir, fileOutputName)
-	writeJSON(path, info)
+	fileOutputPath := fmt.Sprintf(bootstrap.PathNodeInfoPub, info.NodeID)
+	writeJSON(fileOutputPath, info)
 }
 
 // writePartnerStakesFile writes the partner stakes file
 func writePartnerStakesFile(partnerStakes PartnerStakesInfo) {
-	path := filepath.Join(flagOutputDir, bootstrap.PartnerStakesFileName)
-	writeJSON(path, partnerStakes)
+	writeJSON(bootstrap.PartnerStakesFileName, partnerStakes)
 }
 
 func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes, skippedNodes int) {
