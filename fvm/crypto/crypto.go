@@ -23,7 +23,7 @@ func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byt
 			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
-		hasher = NewBLSKMAC(tag)
+		hasher = crypto.NewBLSKMAC(tag)
 	default:
 		err := errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
@@ -232,7 +232,7 @@ func (DefaultSignatureVerifier) Verify(
 			return false, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
-		hasher = NewBLSKMAC(tag)
+		hasher = crypto.NewBLSKMAC(tag)
 	default:
 		return false, errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 	}
