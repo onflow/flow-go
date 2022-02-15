@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -214,7 +215,7 @@ func CidToFlowID(c cid.Cid) (Identifier, error) {
 	return HashToID(decoded.Digest), nil
 }
 
-func FlowIDToCid(f Identifier) cid.Cid {
+func IdToCid(f Identifier) cid.Cid {
 	hash, _ := mh.Encode(f[:], mh.SHA2_256)
 	return cid.NewCidV0(hash)
 }

@@ -363,7 +363,7 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 // - BlobSizeLimitExceededError if any blob in the blob tree exceeds the maximum blob size
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobservice
 func (s *executionDataServiceImpl) Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error) {
-	rootCid := flow.FlowIDToCid(rootID)
+	rootCid := flow.IdToCid(rootID)
 
 	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
 	logger.Debug().Msg("getting execution data")
