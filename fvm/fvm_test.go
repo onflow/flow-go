@@ -2377,8 +2377,7 @@ func TestBLSMultiSignature(t *testing.T) {
 									hashAlgorithm: HashAlgorithm.KMAC128_BLS_BLS12_381)
 								return boo
 							}
-							`),
-				)
+							`)
 
 				num := 50
 				publicKeys := make([]cadence.Value, 0, num)

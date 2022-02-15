@@ -86,8 +86,8 @@ func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, e
 	return r0, r1
 }
 
-// BLSAggregatePublicKeys provides a mock function with given fields: keys
-func (_m *Environment) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+// AggregateBLSPublicKeys provides a mock function with given fields: keys
+func (_m *Environment) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	ret := _m.Called(keys)
 
 	var r0 *runtime.PublicKey
@@ -109,8 +109,8 @@ func (_m *Environment) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runti
 	return r0, r1
 }
 
-// BLSAggregateSignatures provides a mock function with given fields: sigs
-func (_m *Environment) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
+// AggregateBLSSignatures provides a mock function with given fields: sigs
+func (_m *Environment) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
 	ret := _m.Called(sigs)
 
 	var r0 []byte
