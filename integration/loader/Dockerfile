@@ -4,7 +4,7 @@
 FROM golang:1.17-buster AS build-setup
 
 RUN apt-get update
-RUN apt-get -y install cmake zip sudo
+RUN apt-get -y install cmake zip
 
 ## (1) Build Relic first to maximize caching
 FROM build-setup AS build-relic

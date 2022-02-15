@@ -188,7 +188,7 @@ func main() {
 			return err
 		}).
 		Module("execution metrics", func(node *cmd.NodeConfig) error {
-			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
+			collector = metrics.NewExecutionCollector(node.Tracer)
 			return nil
 		}).
 		Module("execution data service metrics", func(node *cmd.NodeConfig) error {

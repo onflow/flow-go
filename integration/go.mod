@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/DataDog/zstd v1.4.8 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
-	github.com/dapperlabs/testingdock v0.4.3
+	github.com/dapperlabs/testingdock v0.4.4
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.3
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
@@ -18,13 +18,13 @@ require (
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/onflow/cadence v0.21.0
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.9.0
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.9.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.1
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.24.0
-	github.com/onflow/flow-go/crypto v0.21.4-0.20211125190211-7b31c986316e // replaced by version on-disk
+	github.com/onflow/flow-go/crypto v0.24.2
 	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.21.0
@@ -40,5 +40,3 @@ require (
 //replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
 replace github.com/onflow/flow-go => ../
-
-replace github.com/onflow/flow-go/crypto => ../crypto
