@@ -139,3 +139,15 @@ func TestCIDConversion(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, cid, cid2)
 }
+
+// TestByteConversionRoundTrip evaluates the round trip of conversion of identifiers to bytes, and back.
+// The original identifiers must be recovered from the converted bytes.
+func TestByteConversionRoundTrip(t *testing.T) {
+	ids := unittest.IdentifierListFixture(10)
+
+	converted, err := flow.ByteSlicesToIds(flow.IdsToBytes(ids))
+	require.NoError(t, err)
+
+	require.Equal(t, len(ids), len(converted))
+	require.ElementsMatch(t, ids, converted)
+}
