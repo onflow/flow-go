@@ -6,6 +6,66 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 )
 
+var (
+	GetInfoForProposedNodesScriptLocalnet = []byte(`
+		import FlowIDTableStaking from 0xf8d6e0586b0a20c7
+		pub fun main(): [FlowIDTableStaking.NodeInfo] {
+			let nodeIDs = FlowIDTableStaking.getProposedNodeIDs()
+		
+			var infos: [FlowIDTableStaking.NodeInfo] = []
+			for nodeID in nodeIDs {
+				let node = FlowIDTableStaking.NodeInfo(nodeID: nodeID)
+				infos.append(node)
+			}
+		
+			return infos
+	}`)
+
+	GetInfoForProposedNodesScriptTestnet = []byte(`
+		import FlowIDTableStaking from 0x9eca2b38b18b5dfe
+		pub fun main(): [FlowIDTableStaking.NodeInfo] {
+			let nodeIDs = FlowIDTableStaking.getProposedNodeIDs()
+		
+			var infos: [FlowIDTableStaking.NodeInfo] = []
+			for nodeID in nodeIDs {
+				let node = FlowIDTableStaking.NodeInfo(nodeID: nodeID)
+				infos.append(node)
+			}
+		
+			return infos
+	}`)
+
+	getInfoForProposedNodesScriptMainnet = []byte(`
+		import FlowIDTableStaking from 0x8624b52f9ddcd04a
+		pub fun main(): [FlowIDTableStaking.NodeInfo] {
+			let nodeIDs = FlowIDTableStaking.getProposedNodeIDs()
+		
+			var infos: [FlowIDTableStaking.NodeInfo] = []
+			for nodeID in nodeIDs {
+				let node = FlowIDTableStaking.NodeInfo(nodeID: nodeID)
+				infos.append(node)
+			}
+		
+			return infos
+	}`)
+)
+
+func GetNodeInfoForProposedNodesScript(network string) ([]byte, error) {
+	if network == "mainnet" {
+		return getInfoForProposedNodesScriptMainnet, nil
+	}
+
+	if network == "testnet" {
+		return GetInfoForProposedNodesScriptTestnet, nil
+	}
+
+	if network == "localnet" {
+		return GetInfoForProposedNodesScriptLocalnet, nil
+	}
+
+	return nil, fmt.Errorf("invalid network string expecting one of ( mainnet | testnet | localnet )")
+}
+
 func EnvFromNetwork(network string) (templates.Environment, error) {
 	if network == "mainnet" {
 		return templates.Environment{

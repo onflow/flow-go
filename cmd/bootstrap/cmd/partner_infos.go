@@ -37,20 +37,6 @@ var (
 	flagANAddress    string
 	flagANNetworkKey string
 	flagNetworkEnv   string
-
-	getInfoForProposedNodesScript = []byte(`
-		import FlowIDTableStaking from 0x9eca2b38b18b5dfe
-		pub fun main(): [FlowIDTableStaking.NodeInfo] {
-			let nodeIDs = FlowIDTableStaking.getProposedNodeIDs()
-		
-			var infos: [FlowIDTableStaking.NodeInfo] = []
-			for nodeID in nodeIDs {
-				let node = FlowIDTableStaking.NodeInfo(nodeID: nodeID)
-				infos.append(node)
-			}
-		
-			return infos
-	}`)
 )
 
 // PartnerStakesInfo mapping of NodeID => weight of staking key
@@ -149,7 +135,12 @@ func getFlowClient() *client.Client {
 
 // executeGetProposedNodesInfosScript executes the get node info for each ID in the proposed table
 func executeGetProposedNodesInfosScript(ctx context.Context, client *client.Client) (cadence.Value, error) {
-	infos, err := client.ExecuteScriptAtLatestBlock(ctx, getInfoForProposedNodesScript, []cadence.Value{})
+	script, err := common.GetNodeInfoForProposedNodesScript(flagNetworkEnv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cadence script: %w", err)
+	}
+
+	infos, err := client.ExecuteScriptAtLatestBlock(ctx, script, []cadence.Value{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute the get node info script: %w", err)
 	}
