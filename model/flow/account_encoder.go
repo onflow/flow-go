@@ -3,7 +3,7 @@ package flow
 // TODO: these functions will be moved to a separate `encoding` package in a future PR
 
 import (
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/flow-go/model/flow/rlp"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
