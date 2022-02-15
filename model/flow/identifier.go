@@ -11,8 +11,6 @@ import (
 
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/onflow/flow-go-sdk"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 
@@ -221,8 +219,8 @@ func IdToCid(f Identifier) cid.Cid {
 	return cid.NewCidV0(hash)
 }
 
-func ByteSliceToId(b []byte) (flow.Identifier, error) {
-	var id flow.Identifier{}
+func ByteSliceToId(b []byte) (Identifier, error) {
+	var id Identifier
 	if len(b) != IdentifierLen {
 		return id, fmt.Errorf("illegal length for a flow identifier %x: got: %d, expected: %d", b, len(b), IdentifierLen)
 	}
@@ -230,4 +228,20 @@ func ByteSliceToId(b []byte) (flow.Identifier, error) {
 	copy(id[:], b[:])
 
 	return id, nil
+}
+
+func ByteSlicesToIds(b [][]byte) (IdentifierList, error) {
+	total := len(b)
+	ids := make(IdentifierList, total)
+
+	for i := 0; i < total; i++ {
+		id, err := ByteSliceToId(b[i])
+		if err != nil {
+			return nil, err
+		}
+
+		ids[i] = id
+	}
+
+	return ids, nil
 }
