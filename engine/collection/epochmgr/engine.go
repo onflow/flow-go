@@ -192,7 +192,7 @@ func (e *Engine) Ready() <-chan struct{} {
 		finalSnapshot := e.state.Final()
 		phase, err := finalSnapshot.Phase()
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not check phase")
+			e.log.Fatal().Err(err).Msg("could not check phase")
 			return
 		}
 		if phase == flow.EpochPhaseSetup {
