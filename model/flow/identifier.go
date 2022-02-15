@@ -245,3 +245,13 @@ func ByteSlicesToIds(b [][]byte) (IdentifierList, error) {
 
 	return ids, nil
 }
+
+func IdsToBytes(identifiers []Identifier) [][]byte {
+	var byteIds [][]byte
+	for _, id := range identifiers {
+		tempID := id // avoid capturing loop variable
+		byteIds = append(byteIds, tempID[:])
+	}
+
+	return byteIds
+}
