@@ -103,40 +103,41 @@ func (tb TransactionBody) Fingerprint() []byte {
 		Authorizers:               authorizers,
 	}
 	///%]]
-	signaturesPayload := make([]interface{}, len(tb.PayloadSignatures))
+	signaturesPayload := make([]*signatureData, len(tb.PayloadSignatures))
 
 	for i, s := range tb.PayloadSignatures {
 		// this comment below is to enforce that this struct
 		// definition is exactly sync'd with the other ones
-		///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
-		canonicalForm := signatureData{
-			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-			Signature:   s.Signature,
-		}
-		///%]]
-		signaturesPayload[i] = canonicalForm
+		//canonicalForm := signatureData{
+		//	SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
+		//	KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
+		//	Signature:   s.Signature,
+		//%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
+		signaturesPayload[i] = sigDataPool.Get().(*signatureData)
+		signaturesPayload[i].SignerIndex = uint(s.SignerIndex)
+		signaturesPayload[i].KeyID = uint(s.KeyIndex)
+		signaturesPayload[i].Signature = s.Signature
+		//%]]
 	}
 
-	signaturesEnvelope := make([]interface{}, len(tb.EnvelopeSignatures))
+	signaturesEnvelope := make([]*signatureData, len(tb.EnvelopeSignatures))
 
 	for i, s := range tb.EnvelopeSignatures {
 		// this comment below is to enforce that this struct
 		// definition is exactly sync'd with the other ones
-		///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
-		canonicalForm := signatureData{
-			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-			Signature:   s.Signature,
-		}
-		///%]]
+		//%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
+		signaturesEnvelope[i] = sigDataPool.Get().(*signatureData)
+		signaturesEnvelope[i].SignerIndex = uint(s.SignerIndex)
+		signaturesEnvelope[i].KeyID = uint(s.KeyIndex)
+		signaturesEnvelope[i].Signature = s.Signature
+		//%]]
 		signaturesEnvelope[i] = canonicalForm
 	}
 
 	retval := fingerprint.Fingerprint(struct {
-		Payload            interface{}
-		PayloadSignatures  interface{}
-		EnvelopeSignatures interface{}
+		Payload            payloadData
+		PayloadSignatures  signatureData
+		EnvelopeSignatures signatureData
 	}{
 		Payload:            payload,
 		PayloadSignatures:  signaturesPayload,
@@ -468,24 +469,23 @@ func (tb *TransactionBody) EnvelopeMessage() []byte {
 	}
 	///%]]
 
-	signatures := make([]interface{}, len(tb.PayloadSignatures))
+	signatures := make([]*signatureData, len(tb.PayloadSignatures))
 
 	for i, s := range tb.PayloadSignatures {
 		// this comment below is to enforce that this struct
 		// definition is exactly sync'd with the other ones
-		///%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
-		canonicalForm := signatureData{
-			SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
-			KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
-			Signature:   s.Signature,
-		}
-		///%]]
-		signatures[i] = canonicalForm
+		//%[[ EQUALITY-PERF-CONSTRAINT {transaction-signature-canonical-form}
+		//%]]
+
+		signatures[i] = sigDataPool.Get().(*signatureData)
+		signatures[i].SignerIndex = uint(s.SignerIndex)
+		signatures[i].KeyID = uint(s.KeyIndex)
+		signatures[i].Signature = s.Signature
 	}
 
 	retval := fingerprint.Fingerprint(struct {
-		Payload           interface{}
-		PayloadSignatures interface{}
+		Payload           payloadData
+		PayloadSignatures signatureData
 	}{
 		payload,
 		signatures,
