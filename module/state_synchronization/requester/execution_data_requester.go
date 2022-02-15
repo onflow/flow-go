@@ -28,8 +28,9 @@ const (
 	// Timeout for fetching ExecutionData from the db/network
 	fetchTimeout = time.Minute
 
-	fetchWorkers = 4
-
+	// TODO: make these configurable?
+	fetchWorkers            = 4
+	executionDataCacheSize  = 50
 	finalizationQueueLength = 500
 	fetchQueueLength        = 500
 )
@@ -129,7 +130,7 @@ func NewExecutionDataRequester(
 		fetchNotifier:           engine.NewNotifier(),
 		notificationNotifier:    engine.NewNotifier(),
 
-		cache:             newExecutionDataCache(50),
+		cache:             newExecutionDataCache(executionDataCacheSize),
 		notificationState: &status{startHeight: rootBlock.Header.Height},
 	}
 
@@ -346,7 +347,6 @@ func (e *executionDataRequesterImpl) processBlockSeals(block *flow.Block) error 
 	// Finally, enqueue all blocks and notify workers
 
 	highestSealed := last
-	defer e.notificationState.Sealed(highestSealed)
 
 	for _, request := range fetchRequests {
 		logger.Debug().Msgf("enqueueing fetch request for block %d", request.height)
@@ -360,6 +360,7 @@ func (e *executionDataRequesterImpl) processBlockSeals(block *flow.Block) error 
 				Str("sealed_block_id", request.blockID.String()).
 				Uint64("sealed_block_height", request.height).
 				Msg("fetch request queue is full")
+			e.notificationState.Sealed(highestSealed)
 			return nil
 		}
 
@@ -369,6 +370,7 @@ func (e *executionDataRequesterImpl) processBlockSeals(block *flow.Block) error 
 		e.fetchNotifier.Notify()
 	}
 
+	e.notificationState.Sealed(highestSealed)
 	return nil
 }
 
