@@ -16,14 +16,12 @@ type ConduitFactory struct {
 	myId     flow.Identifier
 	adapter  network.Adapter
 	attacker AttackerClient
-	conduits map[string]*Conduit
 }
 
 func NewCorruptibleConduitFactory(myId flow.Identifier, codec network.Codec) *ConduitFactory {
 	return &ConduitFactory{
-		myId:     myId,
-		codec:    codec,
-		conduits: make(map[string]*Conduit),
+		myId:  myId,
+		codec: codec,
 	}
 }
 
@@ -56,13 +54,35 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 		adapter: c.adapter,
 	}
 
-	c.conduits[channel.String()] = con
-
 	return con, nil
 }
 
 func (c *ConduitFactory) ProcessAttackerMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*empty.Empty, error) {
+	event, err := c.codec.Decode(in.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode message: %w", err)
+	}
 
+	targetIds, err := flow.ByteSlicesToIds(in.TargetIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
+	}
+
+	switch in.Protocol {
+	case Protocol_UNICAST:
+		if len(targetIds) > 1 {
+			return nil, fmt.Errorf("illegal state: attacker dictates more than one target ids for unicast: %v", targetIds)
+		}
+		return &empty.Empty{}, c.adapter.UnicastOnChannel(network.Channel(in.ChannelID), event, targetIds[0])
+
+	case Protocol_PUBLISH:
+		return &empty.Empty{}, c.adapter.PublishOnChannel(network.Channel(in.ChannelID), event)
+
+	case Protocol_MULTICAST:
+		return &empty.Empty{}, c.adapter.MulticastOnChannel(network.Channel(in.ChannelID), event, uint(in.Targets), targetIds...)
+	default:
+		return nil, fmt.Errorf("unknown protocol dictated by attacker: %d", in.Protocol)
+	}
 }
 
 // RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
@@ -81,4 +101,8 @@ func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *AttackerRegis
 	c.attacker = NewAttackerClient(clientConn)
 
 	return &empty.Empty{}, nil
+}
+
+func (c *ConduitFactory) Observe(channel network.Channel, event interface{}) bool {
+
 }
