@@ -2,14 +2,19 @@ package cbor
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/fxamacker/cbor/v2"
+
+	"github.com/onflow/flow-go/model/encoding"
 )
 
-type Encoder struct{}
+var _ encoding.Marshaler = (*Marshaler)(nil)
 
-func NewEncoder() *Encoder {
-	return &Encoder{}
+type Marshaler struct{}
+
+func NewMarshaler() *Marshaler {
+	return &Marshaler{}
 }
 
 // "For best performance, reuse EncMode and DecMode after creating them." [1]
@@ -26,16 +31,16 @@ var EncMode = func() cbor.EncMode {
 	return encMode
 }()
 
-func (e *Encoder) Encode(val interface{}) ([]byte, error) {
+func (m *Marshaler) Marshal(val interface{}) ([]byte, error) {
 	return EncMode.Marshal(val)
 }
 
-func (e *Encoder) Decode(b []byte, val interface{}) error {
+func (m *Marshaler) Unmarshal(b []byte, val interface{}) error {
 	return cbor.Unmarshal(b, val)
 }
 
-func (e *Encoder) MustEncode(val interface{}) []byte {
-	b, err := e.Encode(val)
+func (m *Marshaler) MustMarshal(val interface{}) []byte {
+	b, err := m.Marshal(val)
 	if err != nil {
 		panic(err)
 	}
@@ -43,9 +48,21 @@ func (e *Encoder) MustEncode(val interface{}) []byte {
 	return b
 }
 
-func (e *Encoder) MustDecode(b []byte, val interface{}) {
-	err := e.Decode(b, val)
+func (m *Marshaler) MustUnmarshal(b []byte, val interface{}) {
+	err := m.Unmarshal(b, val)
 	if err != nil {
 		panic(err)
 	}
+}
+
+var _ encoding.Codec = (*Codec)(nil)
+
+type Codec struct{}
+
+func (c *Codec) NewEncoder(w io.Writer) encoding.Encoder {
+	return EncMode.NewEncoder(w)
+}
+
+func (c *Codec) NewDecoder(r io.Reader) encoding.Decoder {
+	return cbor.NewDecoder(r)
 }

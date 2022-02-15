@@ -2,10 +2,12 @@ package node_builder
 
 import (
 	"context"
+	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/lifecycle"
@@ -19,6 +21,8 @@ type upstreamConnector struct {
 	logger              zerolog.Logger
 	unstakedNode        *p2p.Node
 	cancel              context.CancelFunc
+	retryInitialTimeout time.Duration
+	maxRetries          uint64
 }
 
 func newUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p2p.Node, logger zerolog.Logger) *upstreamConnector {
@@ -27,6 +31,8 @@ func newUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p
 		bootstrapIdentities: bootstrapIdentities,
 		unstakedNode:        unstakedNode,
 		logger:              logger,
+		retryInitialTimeout: time.Second,
+		maxRetries:          5,
 	}
 }
 func (connector *upstreamConnector) Ready() <-chan struct{} {
@@ -35,93 +41,69 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 		ctx, cancel := context.WithCancel(context.TODO())
 		connector.cancel = cancel
 
-		bootstrapPeerCnt := len(connector.bootstrapIdentities)
-		resultChan := make(chan result, bootstrapPeerCnt)
-		defer close(resultChan)
-
-		// a shorter context for the connection worker
-		workerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		workerCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
+
+		success := atomic.NewBool(false)
+		var wg sync.WaitGroup
 
 		// spawn a connect worker for each bootstrap node
 		for _, b := range connector.bootstrapIdentities {
-			go connector.connect(workerCtx, *b, resultChan)
-		}
+			id := *b
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				lg := connector.logger.With().Str("bootstrap_node", id.NodeID.String()).Logger()
 
-		var successfulConnects []string
-		var errors *multierror.Error
-
-		// wait for all connect workers to finish or the context to be done
-		for i := 0; i < bootstrapPeerCnt; i++ {
-			select {
-			// gather all successes
-			case result := <-resultChan:
-				if result.err != nil {
-					connector.logger.Error().Str("bootstap_node", result.id.String()).Err(result.err).Msg("failed to connect")
-					// gather all the errors
-					errors = multierror.Append(errors, result.err)
-				} else {
-					// gather all the successes
-					successfulConnects = append(successfulConnects, result.id.String())
+				fibRetry, err := retry.NewFibonacci(connector.retryInitialTimeout)
+				if err != nil {
+					lg.Err(err).Msg("cannot create retry mechanism")
+					return
 				}
+				cappedFibRetry := retry.WithMaxRetries(connector.maxRetries, fibRetry)
 
-				// premature exits if needed
-			case <-workerCtx.Done():
-				connector.logger.Warn().Msg("timed out before connections to bootstrap nodes could be established")
-				return
-			}
+				if err = retry.Do(workerCtx, cappedFibRetry, func(ctx context.Context) error {
+					return retry.RetryableError(connector.connect(ctx, id))
+				}); err != nil {
+					lg.Err(err).Msg("failed to connect")
+				} else {
+					lg.Info().Msg("successfully connected to bootstrap node")
+					success.Store(true)
+				}
+			}()
 		}
 
-		// if there was at least one successful connect, then return no error
-		if len(successfulConnects) > 0 {
-			connector.logger.Info().Strs("bootstrap_peers", successfulConnects).Msg("successfully connected to bootstrap node")
-			return
-		}
+		wg.Wait()
 
-		err := errors.ErrorOrNil()
-		// log fatal as there is no point continuing further  the unstaked AN cannot connect to any of the bootstrap peers
-		connector.logger.Fatal().Err(err).
-			Msg("Failed to connect to a bootstrap node. " +
-				"Please ensure the network address and public key of the bootstrap access node are correct " +
-				"and that the node is running and reachable.")
+		if !success.Load() {
+			// log fatal as there is no point continuing further, the unstaked AN cannot connect to any of the bootstrap peers
+			connector.logger.Fatal().
+				Msg("Failed to connect to a bootstrap node. " +
+					"Please ensure the network address and public key of the bootstrap access node are correct " +
+					"and that the node is running and reachable.")
+		}
 	})
 	return connector.lm.Started()
 }
 
-// result is the result returned by the connect worker. The ID is the ID of the bootstrap peer that was attempted,
-// err is the error that occurred or nil
-type result struct {
-	id  flow.Identity
-	err error
-}
-
-// connect is run in the worker routine to connect to an boostrap peer
-// resultChan is used to report the flow.Identity that succeeded or failed along with the error
-func (connector *upstreamConnector) connect(ctx context.Context, bootstrapPeer flow.Identity, resultChan chan<- result) {
+// connect is run to connect to an boostrap peer
+func (connector *upstreamConnector) connect(ctx context.Context, bootstrapPeer flow.Identity) error {
 
 	select {
 	// check for a cancelled/expired context
 	case <-ctx.Done():
-		return
+		return ctx.Err()
 	default:
 	}
 
 	peerAddrInfo, err := p2p.PeerAddressInfo(bootstrapPeer)
 
 	if err != nil {
-		resultChan <- result{
-			id:  flow.Identity{},
-			err: err,
-		}
+		return err
 	}
 
 	// try and connect to the bootstrap server
-	err = connector.unstakedNode.AddPeer(ctx, peerAddrInfo)
-	resultChan <- result{
-		id:  bootstrapPeer,
-		err: err,
-	}
-
+	return connector.unstakedNode.AddPeer(ctx, peerAddrInfo)
 }
 
 func (connector *upstreamConnector) Done() <-chan struct{} {

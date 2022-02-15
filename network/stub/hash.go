@@ -5,24 +5,26 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 )
 
 // eventKey generates a unique fingerprint for the tuple of (sender, event, type of event, channel)
 func eventKey(from flow.Identifier, channel network.Channel, event interface{}) (string, error) {
-	tag, err := encoding.DefaultEncoder.Encode([]byte(fmt.Sprintf("testthenetwork %s %T", channel, event)))
+	marshaler := json.NewMarshaler()
+
+	tag, err := marshaler.Marshal([]byte(fmt.Sprintf("testthenetwork %s %T", channel, event)))
 	if err != nil {
 		return "", fmt.Errorf("could not encode the tag: %w", err)
 	}
 
-	payload, err := encoding.DefaultEncoder.Encode(event)
+	payload, err := marshaler.Marshal(event)
 	if err != nil {
 		return "", fmt.Errorf("could not encode event: %w", err)
 	}
 
-	sender, err := encoding.DefaultEncoder.Encode(from)
+	sender, err := marshaler.Marshal(from)
 	if err != nil {
 		return "", fmt.Errorf("could not encode sender: %w", err)
 	}

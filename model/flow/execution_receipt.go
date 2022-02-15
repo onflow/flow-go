@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"encoding/json"
+
 	"github.com/onflow/flow-go/crypto"
 )
 
@@ -69,6 +71,17 @@ func (er *ExecutionReceiptMeta) ID() Identifier {
 		Spocks:     er.Spocks,
 	}
 	return MakeID(body)
+}
+
+func (er ExecutionReceiptMeta) MarshalJSON() ([]byte, error) {
+	type Alias ExecutionReceiptMeta
+	return json.Marshal(struct {
+		Alias
+		ID string
+	}{
+		Alias: Alias(er),
+		ID:    er.ID().String(),
+	})
 }
 
 // Checksum returns a checksum for the execution receipt including the signatures.

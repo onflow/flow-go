@@ -15,16 +15,17 @@ import (
 // EpochHeights is a structure caching the results of building an epoch with
 // EpochBuilder. It contains the first block height for each phase of the epoch.
 type EpochHeights struct {
-	Counter   uint64 // which epoch this is
-	Staking   uint64 // first height of staking phase
-	Setup     uint64 // first height of setup phase
-	Committed uint64 // first height of committed phase
+	Counter        uint64 // which epoch this is
+	Staking        uint64 // first height of staking phase
+	Setup          uint64 // first height of setup phase
+	Committed      uint64 // first height of committed phase
+	CommittedFinal uint64 // final height of the committed phase
 }
 
 // Range returns the range of all heights that are in this epoch.
 func (epoch EpochHeights) Range() []uint64 {
 	var heights []uint64
-	for height := epoch.Staking; height <= epoch.Committed; height++ {
+	for height := epoch.Staking; height <= epoch.CommittedFinal; height++ {
 		heights = append(heights, height)
 	}
 	return heights
@@ -50,15 +51,20 @@ func (epoch EpochHeights) SetupRange() []uint64 {
 
 // CommittedRange returns the range of all heights in the committed phase.
 func (epoch EpochHeights) CommittedRange() []uint64 {
-	return []uint64{epoch.Committed}
+	var heights []uint64
+	for height := epoch.Committed; height < epoch.CommittedFinal; height++ {
+		heights = append(heights, height)
+	}
+	return heights
 }
 
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
 	t          *testing.T
 	states     []protocol.MutableState
-	blocks     map[flow.Identifier]*flow.Block
-	built      map[uint64]EpochHeights
+	blocksByID map[flow.Identifier]*flow.Block
+	blocks     []*flow.Block
+	built      map[uint64]*EpochHeights
 	setupOpts  []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
 	commitOpts []func(*flow.EpochCommit) // options to apply to the EpochCommit event
 }
@@ -70,10 +76,11 @@ func NewEpochBuilder(t *testing.T, states ...protocol.MutableState) *EpochBuilde
 	require.True(t, len(states) >= 1, "must provide at least one state")
 
 	builder := &EpochBuilder{
-		t:      t,
-		states: states,
-		blocks: make(map[flow.Identifier]*flow.Block),
-		built:  make(map[uint64]EpochHeights),
+		t:          t,
+		states:     states,
+		blocksByID: make(map[flow.Identifier]*flow.Block),
+		blocks:     make([]*flow.Block, 0),
+		built:      make(map[uint64]*EpochHeights),
 	}
 	return builder
 }
@@ -95,7 +102,7 @@ func (builder *EpochBuilder) UsingCommitOpts(opts ...func(*flow.EpochCommit)) *E
 }
 
 // EpochHeights returns heights of each phase within about a built epoch.
-func (builder *EpochBuilder) EpochHeights(counter uint64) (EpochHeights, bool) {
+func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) {
 	epoch, ok := builder.built[counter]
 	return epoch, ok
 }
@@ -164,7 +171,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	var prevResults []*flow.ExecutionResult
 	var sealsForPrev []*flow.Seal
 
-	aBlock, ok := builder.blocks[A.ID()]
+	aBlock, ok := builder.blocksByID[A.ID()]
 	if ok {
 		// A is not the root block. B will contain a receipt for A, and a seal
 		// for the receipt contained in A.
@@ -197,11 +204,12 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  prevResults,
 		Seals:    sealsForPrev,
 	})
-	builder.addBlock(&B)
+
+	builder.addBlock(B)
 
 	// create a receipt for block B, to be included in block C
 	// the receipt for B contains the EpochSetup event
-	receiptB := ReceiptForBlockFixture(&B)
+	receiptB := ReceiptForBlockFixture(B)
 	receiptB.ExecutionResult.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent()}
 
 	// insert block C with a receipt for block B, and a seal for the receipt in
@@ -218,9 +226,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
 		Seals:    sealsForA,
 	})
-	builder.addBlock(&C)
+	builder.addBlock(C)
 	// create a receipt for block C, to be included in block D
-	receiptC := ReceiptForBlockFixture(&C)
+	receiptC := ReceiptForBlockFixture(C)
 
 	// build block D
 	// D contains a seal for block B and a receipt for block C
@@ -233,7 +241,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  []*flow.ExecutionResult{&receiptC.ExecutionResult},
 		Seals:    []*flow.Seal{sealForB},
 	})
-	builder.addBlock(&D)
+	builder.addBlock(D)
 
 	// defaults for the EpochCommit event
 	commitDefaults := []func(*flow.EpochCommit){
@@ -245,7 +253,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// create receipt for block D, to be included in block E
 	// the receipt for block D contains the EpochCommit event
-	receiptD := ReceiptForBlockFixture(&D)
+	receiptD := ReceiptForBlockFixture(D)
 	receiptD.ExecutionResult.ServiceEvents = []flow.ServiceEvent{commit.ServiceEvent()}
 
 	// build block E
@@ -259,9 +267,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  []*flow.ExecutionResult{&receiptD.ExecutionResult},
 		Seals:    []*flow.Seal{sealForC},
 	})
-	builder.addBlock(&E)
+	builder.addBlock(E)
 	// create receipt for block E
-	receiptE := ReceiptForBlockFixture(&E)
+	receiptE := ReceiptForBlockFixture(E)
 
 	// build block F
 	// F contains a seal for block D and the EpochCommit event, as well as a
@@ -275,9 +283,9 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Results:  []*flow.ExecutionResult{&receiptE.ExecutionResult},
 		Seals:    []*flow.Seal{sealForD},
 	})
-	builder.addBlock(&F)
+	builder.addBlock(F)
 	// create receipt for block F
-	receiptF := ReceiptForBlockFixture(&F)
+	receiptF := ReceiptForBlockFixture(F)
 
 	// build block G
 	// G contains a seal for block E and a receipt for block F
@@ -291,14 +299,15 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seals:    []*flow.Seal{sealForE},
 	})
 
-	builder.addBlock(&G)
+	builder.addBlock(G)
 
 	// cache information about the built epoch
-	builder.built[counter] = EpochHeights{
-		Counter:   counter,
-		Staking:   A.Height,
-		Setup:     E.Header.Height,
-		Committed: G.Header.Height,
+	builder.built[counter] = &EpochHeights{
+		Counter:        counter,
+		Staking:        A.Height,
+		Setup:          E.Header.Height,
+		Committed:      G.Header.Height,
+		CommittedFinal: G.Header.Height,
 	}
 
 	return builder
@@ -320,7 +329,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	final, err := state.Final().Head()
 	require.Nil(builder.t, err)
 
-	finalBlock, ok := builder.blocks[final.ID()]
+	finalBlock, ok := builder.blocksByID[final.ID()]
 	require.True(builder.t, ok)
 
 	// A is the first block of the next epoch (see diagram in BuildEpoch)
@@ -341,7 +350,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 			),
 		},
 	})
-	builder.addBlock(&A)
+	builder.addBlock(A)
 
 	return builder
 }
@@ -354,7 +363,7 @@ func (builder *EpochBuilder) BuildBlocks(n uint) {
 	require.NoError(builder.t, err)
 	for i := uint(0); i < n; i++ {
 		next := BlockWithParentFixture(head)
-		builder.addBlock(&next)
+		builder.addBlock(next)
 		head = next.Header
 	}
 }
@@ -362,7 +371,6 @@ func (builder *EpochBuilder) BuildBlocks(n uint) {
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, marking the block as valid, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
-
 	blockID := block.ID()
 	for _, state := range builder.states {
 		err := state.Extend(context.Background(), block)
@@ -374,5 +382,41 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 		require.NoError(builder.t, err)
 	}
 
-	builder.blocks[block.ID()] = block
+	builder.blocksByID[block.ID()] = block
+	builder.blocks = append(builder.blocks, block)
+}
+
+// AddBlocksWithSeals for the n number of blocks specified this func
+// will add a seal for the second highest block in the state and a
+// receipt for the highest block in state to the given block before adding it to the state.
+// NOTE: This func should only be used after BuildEpoch to extend the commit phase
+func (builder *EpochBuilder) AddBlocksWithSeals(n int, counter uint64) *EpochBuilder {
+	for i := 0; i < n; i++ {
+		// Given the last 2 blocks in state A <- B when we add block C it will contain the following.
+		// - seal for A
+		// - execution result for B
+		a := builder.blocks[len(builder.blocks)-2]
+		b := builder.blocks[len(builder.blocks)-1]
+
+		receiptB := ReceiptForBlockFixture(b)
+
+		block := BlockWithParentFixture(b.Header)
+		seal := Seal.Fixture(
+			Seal.WithResult(a.Payload.Results[0]),
+		)
+
+		payload := PayloadFixture(
+			WithReceipts(receiptB),
+			WithSeals(seal),
+		)
+		block.SetPayload(payload)
+
+		builder.addBlock(block)
+
+		// update cache information about the built epoch
+		// we have extended the commit phase
+		builder.built[counter].CommittedFinal = block.Header.Height
+	}
+
+	return builder
 }

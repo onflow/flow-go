@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 )
 
 // Component represents a component which can be started and stopped, and exposes
@@ -19,14 +20,6 @@ type Component interface {
 	module.Startable
 	module.ReadyDoneAware
 }
-
-type NoopComponent struct{}
-
-var _ Component = (*NoopComponent)(nil)
-
-func (c *NoopComponent) Start(irrecoverable.SignalerContext) {}
-func (c *NoopComponent) Ready() <-chan struct{}              { return nil }
-func (c *NoopComponent) Done() <-chan struct{}               { return nil }
 
 type ComponentFactory func() (Component, error)
 
@@ -102,11 +95,8 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			return err // failure to start
 		}
 
-		select {
-		case <-ctx.Done():
-			stop()
-			return ctx.Err()
-		case err := <-irrecoverableErr:
+		if err := util.WaitError(irrecoverableErr, done); err != nil {
+			// an irrecoverable error was encountered
 			stop()
 
 			// send error to the handler
@@ -118,43 +108,23 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			default:
 				panic(fmt.Sprintf("invalid error handling result: %v", result))
 			}
-		case <-done:
-			// Without this additional select, there is a race condition here where the done channel
-			// could have been closed as a result of an irrecoverable error being thrown, so that when
-			// the scheduler yields control back to this goroutine, both channels are available to read
-			// from. If this last case happens to be chosen at random to proceed instead of the one
-			// above, then we would return as if the component shutdown gracefully, when in fact it
-			// encountered an irrecoverable error.
-			select {
-			case err := <-irrecoverableErr:
-				switch result := handler(err); result {
-				case ErrorHandlingRestart:
-					continue
-				case ErrorHandlingStop:
-					return err
-				default:
-					panic(fmt.Sprintf("invalid error handling result: %v", result))
-				}
-			default:
-			}
-
-			// Similarly, the done channel could have closed as a result of the context being canceled.
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-
-			// clean completion
-			return nil
+		} else if ctx.Err() != nil {
+			// the parent context was cancelled
+			stop()
+			return ctx.Err()
 		}
+
+		// clean completion
+		return nil
 	}
 }
 
+// ReadyFunc is called within a ComponentWorker function to indicate that the worker is ready
+// ComponentManager's Ready channel is closed when all workers are ready.
 type ReadyFunc func()
 
 // ComponentWorker represents a worker routine of a component.
-// It takes a SignalerContext which can be used to throw any irrecoverable errors it encouters,
+// It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters,
 // as well as a ReadyFunc which must be called to signal that it is ready. The ComponentManager
 // waits until all workers have signaled that they are ready before closing its own Ready channel.
 type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
@@ -177,91 +147,117 @@ func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &componentManagerBuilderImpl{}
 }
 
+// AddWorker adds a ComponentWorker closure to the ComponentManagerBuilder
+// All worker functions will be run in parallel when the ComponentManager is started.
+// Note: AddWorker is not concurrency-safe, and should only be called on an individual builder
+// within a single goroutine.
 func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
 	c.workers = append(c.workers, worker)
 	return c
 }
 
+// Build returns a new ComponentManager instance with the configured workers
+// Build may be called multiple times to create multiple individual ComponentManagers. This will
+// result in the worker routines being called multiple times. If this is unsafe, do not call it
+// more than once!
 func (c *componentManagerBuilderImpl) Build() *ComponentManager {
 	return &ComponentManager{
-		started: atomic.NewBool(false),
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-		workers: c.workers,
+		started:        atomic.NewBool(false),
+		ready:          make(chan struct{}),
+		done:           make(chan struct{}),
+		workersDone:    make(chan struct{}),
+		shutdownSignal: make(chan struct{}),
+		workers:        c.workers,
 	}
 }
 
 var _ Component = (*ComponentManager)(nil)
 
-// ComponentManager is used to manage the worker routines of a Component
+// ComponentManager is used to manage the worker routines of a Component, and implements all of the
+// methods required by the Component interface, abstracting them away from individual implementations.
+//
+// Since component manager implements the Component interface, its Ready() and Done() methods are
+// idempotent, and can be called immediately after instantiation. The Ready() channel is closed when
+// all worker functions have called their ReadyFunc, and its Done() channel is closed after all worker
+// functions have returned.
+//
+// Shutdown is signalled by cancelling the irrecoverable.SignalerContext passed to Start(). This context
+// is also used by workers to communicate irrecoverable errors. All irrecoverable errors are considered
+// fatal and are propagated to the caller of Start() via the context's Throw method.
 type ComponentManager struct {
 	started        *atomic.Bool
 	ready          chan struct{}
 	done           chan struct{}
-	shutdownSignal <-chan struct{}
+	workersDone    chan struct{}
+	shutdownSignal chan struct{}
 
 	workers []ComponentWorker
 }
 
 // Start initiates the ComponentManager by launching all worker routines.
+// Start must only be called once. It will panic if called more than once.
 func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
-	// only start once
-	if c.started.CAS(false, true) {
-		ctx, cancel := context.WithCancel(parent)
-		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-		c.shutdownSignal = ctx.Done()
-
-		// launch goroutine to propagate irrecoverable error
-		go func() {
-			select {
-			case err := <-errChan:
-				cancel() // shutdown all workers
-
-				// we propagate the error directly to the parent because a failure in a
-				// worker routine is considered irrecoverable
-				parent.Throw(err)
-			case <-c.done:
-				// Without this additional select, there is a race condition here where the done channel
-				// could be closed right after an irrecoverable error is thrown, so that when the scheduler
-				// yields control back to this goroutine, both channels are available to read from. If this
-				// second case happens to be chosen at random to proceed, then we would return and silently
-				// ignore the error.
-				select {
-				case err := <-errChan:
-					cancel()
-					parent.Throw(err)
-				default:
-				}
-			}
-		}()
-
-		var workersReady sync.WaitGroup
-		var workersDone sync.WaitGroup
-		workersReady.Add(len(c.workers))
-		workersDone.Add(len(c.workers))
-
-		// launch workers
-		for _, worker := range c.workers {
-			worker := worker
-			go func() {
-				defer workersDone.Done()
-				var readyOnce sync.Once
-				worker(signalerCtx, func() {
-					readyOnce.Do(func() {
-						workersReady.Done()
-					})
-				})
-			}()
-		}
-
-		// launch goroutine to close ready channel
-		go c.waitForReady(&workersReady)
-
-		// launch goroutine to close done channel
-		go c.waitForDone(&workersDone)
-	} else {
+	// Make sure we only start once. atomically check if started is false then set it to true.
+	// If it was not false, panic
+	if !c.started.CAS(false, true) {
 		panic(module.ErrMultipleStartup)
 	}
+
+	ctx, cancel := context.WithCancel(parent)
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+
+	go c.waitForShutdownSignal(ctx.Done())
+
+	// launch goroutine to propagate irrecoverable error
+	go func() {
+		// Closing the done channel here guarantees that any irrecoverable errors encountered will
+		// be propagated to the parent first. Otherwise, there's a race condition between when this
+		// goroutine and the parent's are scheduled. If the parent is scheduled first, any errors
+		// thrown within workers would not have propagated, and it would only receive the done signal
+		defer func() {
+			<-c.workersDone
+			close(c.done)
+		}()
+
+		// wait until the workersDone channel is closed or an irrecoverable error is encountered
+		if err := util.WaitError(errChan, c.workersDone); err != nil {
+			cancel() // shutdown all workers
+
+			// propagate the error directly to the parent because a failure in a worker routine
+			// is considered irrecoverable
+			parent.Throw(err)
+		}
+	}()
+
+	var workersReady sync.WaitGroup
+	var workersDone sync.WaitGroup
+	workersReady.Add(len(c.workers))
+	workersDone.Add(len(c.workers))
+
+	// launch workers
+	for _, worker := range c.workers {
+		worker := worker
+		go func() {
+			defer workersDone.Done()
+			var readyOnce sync.Once
+			worker(signalerCtx, func() {
+				readyOnce.Do(func() {
+					workersReady.Done()
+				})
+			})
+		}()
+	}
+
+	// launch goroutine to close ready channel
+	go c.waitForReady(&workersReady)
+
+	// launch goroutine to close workersDone channel
+	go c.waitForDone(&workersDone)
+}
+
+func (c *ComponentManager) waitForShutdownSignal(shutdownSignal <-chan struct{}) {
+	<-shutdownSignal
+	close(c.shutdownSignal)
 }
 
 func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
@@ -271,7 +267,7 @@ func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
 
 func (c *ComponentManager) waitForDone(workersDone *sync.WaitGroup) {
 	workersDone.Wait()
-	close(c.done)
+	close(c.workersDone)
 }
 
 // Ready returns a channel which is closed once all the worker routines have been launched and are ready.
@@ -281,7 +277,7 @@ func (c *ComponentManager) Ready() <-chan struct{} {
 }
 
 // Done returns a channel which is closed once the ComponentManager has shut down.
-// This happens when all worker routines have shut down (either gracefully or by throwing an error).
+// This happens after all worker routines have shut down (either gracefully or by throwing an error).
 func (c *ComponentManager) Done() <-chan struct{} {
 	return c.done
 }

@@ -124,6 +124,13 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 	return r.byID(resultID)(tx)
 }
 
+func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error) {
+	return func(tx *transaction.Tx) (*flow.ExecutionResult, error) {
+		result, err := r.byID(resultID)(tx.DBTxn)
+		return result, err
+	}
+}
+
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
 	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID, false))
 	if err != nil {

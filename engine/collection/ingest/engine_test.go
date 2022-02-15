@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/epochs"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -80,7 +80,7 @@ func (suite *Suite) SetupTest() {
 	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions {
-		return stdmap.NewTransactions(1000)
+		return herocache.NewTransactions(1000, log)
 	})
 
 	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
@@ -235,7 +235,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("invalid signature", func() {
 		// TODO cannot check signatures in MVP
-		suite.T().Skip()
+		unittest.SkipUnless(suite.T(), unittest.TEST_WIP, "skipping unimplemented test")
 	})
 
 	suite.Run("invalid address", func() {

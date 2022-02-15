@@ -79,7 +79,7 @@ func (ss *SyncSuite) SetupTest() {
 	// set up the network module mock
 	ss.net = &mocknetwork.Network{}
 	ss.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
+		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return ss.con
 		},
 		nil,
@@ -525,4 +525,21 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	actualHeader := ss.e.finalizedHeader.Get()
 	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
 	require.Equal(ss.T(), actualHeader, &finalizedBlock)
+}
+
+// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// was submitted from network layer.
+func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
+	invalidEvent := uint64(42)
+	engines := []netint.MessageProcessor{ss.e, ss.e.requestHandler}
+	for _, e := range engines {
+		err := e.Process("ch", unittest.IdentifierFixture(), invalidEvent)
+		// shouldn't result in error since byzantine inputs are expected
+		require.NoError(ss.T(), err)
+	}
+
+	// in case of local processing error cannot be consumed since all inputs are trusted
+	err := ss.e.ProcessLocal(invalidEvent)
+	require.Error(ss.T(), err)
+	require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
 }

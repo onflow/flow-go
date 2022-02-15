@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -27,10 +26,10 @@ func main() {
 			*metrics.NetworkCollector
 		}{
 			HotstuffCollector:  metrics.NewHotstuffCollector("some_chain_id"),
-			ExecutionCollector: metrics.NewExecutionCollector(tracer, prometheus.DefaultRegisterer),
+			ExecutionCollector: metrics.NewExecutionCollector(tracer),
 			NetworkCollector:   metrics.NewNetworkCollector(),
 		}
-		diskTotal := rand.Int63n(1024 ^ 3)
+		diskTotal := rand.Int63n(1024 * 1024 * 1024)
 		for i := 0; i < 1000; i++ {
 			blockID := unittest.BlockFixture().ID()
 			collector.StartBlockReceivedToExecuted(blockID)
@@ -42,7 +41,7 @@ func main() {
 			collector.ExecutionBlockExecuted(duration, uint64(rand.Int63n(1e6)), 1, 1)
 			collector.ExecutionStateReadsPerBlock(uint64(rand.Int63n(1e6)))
 
-			diskIncrease := rand.Int63n(1024 ^ 2)
+			diskIncrease := rand.Int63n(1024 * 1024)
 			diskTotal += diskIncrease
 			collector.ExecutionStateStorageDiskTotal(diskTotal)
 			collector.ExecutionStorageStateCommitment(diskIncrease)

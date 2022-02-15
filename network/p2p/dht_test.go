@@ -2,61 +2,39 @@ package p2p
 
 import (
 	"context"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type DHTTestSuite struct {
-	suite.Suite
-	ctx    context.Context
-	cancel context.CancelFunc // used to cancel the context
-}
-
-// TestDHTTestSuite test the libp2p pubsub with DHT for discovery
-func TestDHTTestSuite(t *testing.T) {
-	suite.Run(t, new(DHTTestSuite))
-}
-
-// SetupTests initiates the test setups prior to each test
-func (suite *DHTTestSuite) SetupTest() {
-	suite.ctx, suite.cancel = context.WithCancel(context.Background())
-}
-
-func (suite *DHTTestSuite) TearDownTest() {
-	suite.cancel()
-}
-
 // TestFindPeerWithDHT checks that if a node is configured to participate in the DHT, it is
 // able to create new streams with peers even without knowing their address info beforehand.
-func (suite *DHTTestSuite) TestFindPeerWithDHT() {
+func TestFindPeerWithDHT(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	count := 10
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
-	dhtServerNodes := suite.CreateNodes(2, true)
-	require.Len(suite.T(), dhtServerNodes, 2)
+	sporkId := unittest.IdentifierFixture()
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 2, withDHTOptions(AsServer()))
+	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes := suite.CreateNodes(count-2, false)
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-2, withDHTOptions(AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	defer suite.StopNodes(nodes)
+	defer stopNodes(t, nodes)
 
 	getDhtServerAddr := func(i uint) peer.AddrInfo {
 		return peer.AddrInfo{ID: dhtServerNodes[i].host.ID(), Addrs: dhtServerNodes[i].host.Addrs()}
@@ -64,28 +42,28 @@ func (suite *DHTTestSuite) TestFindPeerWithDHT() {
 
 	// connect even numbered clients to the first DHT server, and odd number clients to the second
 	for i, clientNode := range dhtClientNodes {
-		err := clientNode.host.Connect(suite.ctx, getDhtServerAddr(uint(i%2)))
-		require.NoError(suite.T(), err)
+		err := clientNode.host.Connect(ctx, getDhtServerAddr(uint(i%2)))
+		require.NoError(t, err)
 	}
 
 	// wait for clients to connect to DHT servers and update their routing tables
-	require.Eventually(suite.T(), func() bool {
+	require.Eventually(t, func() bool {
 		for i, clientNode := range dhtClientNodes {
-			if clientNode.dht.RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
+			if clientNode.routing.(*dht.IpfsDHT).RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
 				return false
 			}
 		}
 		return true
-	}, time.Second*5, tickForAssertEventually, "nodes failed to connect")
+	}, time.Second*5, ticksForAssertEventually, "nodes failed to connect")
 
 	// connect the two DHT servers to each other
-	err := dhtServerNodes[0].host.Connect(suite.ctx, getDhtServerAddr(1))
-	require.NoError(suite.T(), err)
+	err := dhtServerNodes[0].host.Connect(ctx, getDhtServerAddr(1))
+	require.NoError(t, err)
 
 	// wait for the first server to connect to the second and update its routing table
-	require.Eventually(suite.T(), func() bool {
-		return dhtServerNodes[0].dht.RoutingTable().Find(getDhtServerAddr(1).ID) != ""
-	}, time.Second*5, tickForAssertEventually, "dht servers failed to connect")
+	require.Eventually(t, func() bool {
+		return dhtServerNodes[0].routing.(*dht.IpfsDHT).RoutingTable().Find(getDhtServerAddr(1).ID) != ""
+	}, time.Second*5, ticksForAssertEventually, "dht servers failed to connect")
 
 	// check that all even numbered clients can create streams with all odd numbered clients
 	for i := 0; i < len(dhtClientNodes); i += 2 {
@@ -96,9 +74,9 @@ func (suite *DHTTestSuite) TestFindPeerWithDHT() {
 
 			// Try to create a stream from client i to client j. This should resort to a DHT
 			// lookup since client i does not know client j's address.
-			unittest.RequireReturnsBefore(suite.T(), func() {
-				_, err = dhtClientNodes[i].CreateStream(suite.ctx, dhtClientNodes[j].host.ID())
-				require.NoError(suite.T(), err)
+			unittest.RequireReturnsBefore(t, func() {
+				_, err = dhtClientNodes[i].CreateStream(ctx, dhtClientNodes[j].host.ID())
+				require.NoError(t, err)
 			}, 1*time.Second, "could not create stream on time")
 		}
 	}
@@ -106,7 +84,10 @@ func (suite *DHTTestSuite) TestFindPeerWithDHT() {
 
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message on that topic. The DHT discovery
 // mechanism is used for nodes to find each other.
-func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
+func TestPubSubWithDHTDiscovery(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	topic := flownet.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
@@ -126,16 +107,17 @@ func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
 	//     /   \                        | /   \ |
 	//   N4     N5                      N4-----N5
 
+	sporkId := unittest.IdentifierFixture()
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes := suite.CreateNodes(1, true)
-	require.Len(suite.T(), dhtServerNodes, 1)
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 1, withDHTOptions(AsServer()))
+	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes := suite.CreateNodes(count-1, false)
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-1, withDHTOptions(AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	defer suite.StopNodes(nodes)
+	defer stopNodes(t, nodes)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
 	// This has to be done before subscribing to any topic, otherwise the node gives up on advertising
@@ -143,28 +125,35 @@ func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
 	// (see: https://github.com/libp2p/go-libp2p-pubsub/issues/442)
 	dhtServerAddr := peer.AddrInfo{ID: dhtServerNode.host.ID(), Addrs: dhtServerNode.host.Addrs()}
 	for _, clientNode := range dhtClientNodes {
-		err := clientNode.host.Connect(suite.ctx, dhtServerAddr)
-		require.NoError(suite.T(), err)
+		err := clientNode.host.Connect(ctx, dhtServerAddr)
+		require.NoError(t, err)
 	}
 
 	// Step 3: Subscribe to the test topic
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
-	ch := make(chan flow.Identifier, count)
+	ch := make(chan peer.ID, count)
+
+	msg := &message.Message{
+		Payload: []byte("hello"),
+	}
+
+	data, err := msg.Marshal()
+	require.NoError(t, err)
+
 	for _, n := range nodes {
-		m := n.id
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
-			msg, err := s.Next(suite.ctx)
-			require.NoError(suite.T(), err)
-			require.NotNil(suite.T(), msg)
-			assert.Equal(suite.T(), []byte("hello"), msg.Data)
-			ch <- m
+			msg, err := s.Next(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, msg)
+			assert.Equal(t, data, msg.Data)
+			ch <- n.host.ID()
 		}
 
 		// Subscribes to the test topic
-		s, err := n.Subscribe(suite.ctx, topic)
-		require.NoError(suite.T(), err)
+		s, err := n.Subscribe(topic)
+		require.NoError(t, err)
 
 		// kick off the reader
 		go subReader(s)
@@ -183,86 +172,34 @@ func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
 		return true
 	}
 	// assert that the graph is fully connected
-	require.Eventually(suite.T(), fullyConnectedGraph, time.Second*5, tickForAssertEventually, "nodes failed to discover each other")
+	require.Eventually(t, fullyConnectedGraph, time.Second*5, ticksForAssertEventually, "nodes failed to discover each other")
 
 	// Step 4: publish a message to the topic
-	require.NoError(suite.T(), dhtServerNode.Publish(suite.ctx, topic, []byte("hello")))
+	require.NoError(t, dhtServerNode.Publish(ctx, topic, data))
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
-	recv := make(map[flow.Identifier]bool, count)
+	recv := make(map[peer.ID]bool, count)
+
+loop:
 	for i := 0; i < count; i++ {
 		select {
 		case res := <-ch:
 			recv[res] = true
 		case <-time.After(3 * time.Second):
-			var missing flow.IdentifierList
+			var missing peer.IDSlice
 			for _, n := range nodes {
-				if _, found := recv[n.id]; !found {
-					missing = append(missing, n.id)
+				if _, found := recv[n.host.ID()]; !found {
+					missing = append(missing, n.host.ID())
 				}
 			}
-			assert.Fail(suite.T(), " messages not received by nodes: "+strings.Join(missing.Strings(), ","))
-			break
+			assert.Fail(t, "messages not received by some nodes", "%v", missing)
+			break loop
 		}
 	}
 
 	// Step 6: unsubscribes all nodes from the topic
 	for _, n := range nodes {
-		assert.NoError(suite.T(), n.UnSubscribe(topic))
-	}
-}
-
-// CreateNode creates the given number of libp2pnodes
-// if dhtServer is true, the DHTServer is used as for Discovery else DHTClient
-func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node) {
-	// keeps track of errors on creating a node
-	var err error
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	defer func() {
-		if err != nil && nodes != nil {
-			// stops all nodes upon an error in starting even one single node
-			suite.StopNodes(nodes)
-		}
-	}()
-
-	handlerFunc := func(network.Stream) {}
-
-	// creating nodes
-	for i := 1; i <= count; i++ {
-		key := generateNetworkingKey(suite.T())
-		noopMetrics := metrics.NewNoopCollector()
-
-		connManager := NewConnManager(logger, noopMetrics)
-
-		pingInfoProvider, _, _, _ := MockPingInfoProvider()
-
-		resolver := dns.NewResolver(noopMetrics)
-
-		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
-			SetRootBlockID(rootBlockID).
-			SetConnectionManager(connManager).
-			SetDHTOptions(AsServer(dhtServer)).
-			SetPingInfoProvider(pingInfoProvider).
-			SetResolver(resolver).
-			SetLogger(logger).
-			SetTopicValidation(false).
-			SetStreamCompressor(WithGzipCompression).
-			Build(suite.ctx)
-		require.NoError(suite.T(), err)
-
-		n.SetFlowProtocolStreamHandler(handlerFunc)
-
-		nodes = append(nodes, n)
-	}
-	return nodes
-}
-
-// StopNodes stop all nodes in the input slice
-func (suite *DHTTestSuite) StopNodes(nodes []*Node) {
-	for _, n := range nodes {
-		done, err := n.Stop()
-		assert.NoError(suite.T(), err)
-		<-done
+		assert.NoError(t, n.UnSubscribe(topic))
 	}
 }

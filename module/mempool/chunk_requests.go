@@ -3,6 +3,7 @@ package mempool
 import (
 	"time"
 
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 )
@@ -49,12 +50,6 @@ func IncrementalAttemptUpdater() ChunkRequestHistoryUpdaterFunc {
 
 // ChunkRequests is an in-memory storage for maintaining chunk data pack requests.
 type ChunkRequests interface {
-	// ByID returns a chunk request by its chunk ID.
-	//
-	// There is a one-to-one correspondence between the chunk requests in memory, and
-	// their chunk ID.
-	ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool)
-
 	// RequestHistory returns the number of times the chunk has been requested,
 	// last time the chunk has been requested, and the retryAfter duration of the
 	// underlying request status of this chunk.
@@ -70,8 +65,14 @@ type ChunkRequests interface {
 
 	// Rem provides deletion functionality from the memory pool.
 	// If there is a chunk request with this ID, Rem removes it and returns true.
-	// Otherwise it returns false.
+	// Otherwise, it returns false.
 	Rem(chunkID flow.Identifier) bool
+
+	// PopAll atomically returns all locators associated with this chunk ID while clearing out the
+	// chunk request status for this chunk id.
+	// Boolean return value indicates whether there are requests in the memory pool associated
+	// with chunk ID.
+	PopAll(chunkID flow.Identifier) (chunks.LocatorMap, bool)
 
 	// IncrementAttempt increments the Attempt field of the corresponding status of the
 	// chunk request in memory pool that has the specified chunk ID.
@@ -90,7 +91,7 @@ type ChunkRequests interface {
 	UpdateRequestHistory(chunkID flow.Identifier, updater ChunkRequestHistoryUpdaterFunc) (uint64, time.Time, time.Duration, bool)
 
 	// All returns all chunk requests stored in this memory pool.
-	All() []*verification.ChunkDataPackRequest
+	All() verification.ChunkDataPackRequestInfoList
 
 	// Size returns total number of chunk requests in the memory pool.
 	Size() uint

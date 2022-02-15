@@ -36,6 +36,6 @@ func initRelic() {
 		algo: BLSBLS12381,
 	}
 	if err := blsInstance.init(); err != nil {
-		panic(fmt.Sprintf("initialization of BLS has failed: %s", err.Error()))
+		panic(fmt.Sprintf("initialization of BLS failed: %s", err.Error()))
 	}
 }

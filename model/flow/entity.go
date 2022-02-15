@@ -2,9 +2,9 @@ package flow
 
 // Entity defines how flow entities should be defined
 // Entities are flat data structures holding multiple data fields.
-// Entities don't includes nested entities, they only include pointers to
-// other entities. for example they keep an slice of entity commits instead
-// of keeping an slice of entity object itself. This simplifies storage, signature and validation
+// Entities don't include nested entities, they only include pointers to
+// other entities. For example, they keep a slice of entity commits instead
+// of keeping a slice of entity object itself. This simplifies storage, signature and validation
 // of entities.
 type Entity interface {
 

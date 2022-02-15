@@ -50,16 +50,3 @@ func Test_LoadingV1Checkpoint(t *testing.T) {
 
 	require.Equal(t, v1Forest, forest)
 }
-
-func Test_CreateCheckpoint(t *testing.T) {
-
-	t.Skip("Used only to generate previous checkpoint version while upgrading")
-
-	writer, err := CreateCheckpointWriterForFile("./test_data", "checkpoint.v1")
-	require.NoError(t, err)
-
-	err = StoreCheckpoint(v1Forest, writer)
-	require.NoError(t, err)
-
-	writer.Close()
-}

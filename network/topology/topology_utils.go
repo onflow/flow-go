@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -42,7 +42,7 @@ func byteSeedFromID(id flow.Identifier) ([]byte, error) {
 		return nil, fmt.Errorf("could not generate hasher: %w", err)
 	}
 
-	encodedId, err := encoding.DefaultEncoder.Encode(id)
+	encodedId, err := json.NewMarshaler().Marshal(id)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode id: %w", err)
 	}

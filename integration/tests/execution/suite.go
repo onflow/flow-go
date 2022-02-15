@@ -17,6 +17,7 @@ import (
 
 type Suite struct {
 	suite.Suite
+	log zerolog.Logger
 	common.TestnetStateTracker
 	cancel      context.CancelFunc
 	net         *testnet.FlowNetwork
@@ -58,11 +59,16 @@ func (s *Suite) MetricsPort() string {
 }
 
 func (s *Suite) SetupTest() {
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "suite.go").
+		Str("testcase", s.T().Name()).
+		Logger()
+	s.log = logger
+	s.log.Info().Msgf("================> SetupTest")
+
 	blockRateFlag := "--block-rate-delay=1ms"
 
-	// setup two access nodes, minimum needed for LN/SN access API and fallback
-	anConfigs := []testnet.NodeConfig{testnet.NewNodeConfig(flow.RoleAccess), testnet.NewNodeConfig(flow.RoleAccess)}
-	s.nodeConfigs = append(s.nodeConfigs, anConfigs...)
+	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
@@ -122,8 +128,8 @@ func (s *Suite) SetupTest() {
 }
 
 func (s *Suite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
 	s.net.Remove()
-	if s.cancel != nil {
-		s.cancel()
-	}
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }

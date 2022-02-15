@@ -9,6 +9,9 @@ import (
 	"math/rand"
 	"reflect"
 
+	"github.com/ipfs/go-cid"
+	mh "github.com/multiformats/go-multihash"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -16,8 +19,10 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
+const IdentifierLen = 32
+
 // Identifier represents a 32-byte unique identifier for an entity.
-type Identifier [32]byte
+type Identifier [IdentifierLen]byte
 
 // IdentifierFilter is a filter on identifiers.
 type IdentifierFilter func(Identifier) bool
@@ -109,19 +114,18 @@ func MakeID(entity interface{}) Identifier {
 	data := fingerprint.Fingerprint(entity)
 	//binstat.LeaveVal(bs1, int64(len(data)))
 	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
-	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(data)
-	id := HashToID(hash)
+	var id Identifier
+	hash.ComputeSHA3_256((*[32]byte)(&id), data)
 	//binstat.Leave(bs2)
 	return id
 }
 
 // PublicKeyToID creates an ID from a public key.
-func PublicKeyToID(pub crypto.PublicKey) (Identifier, error) {
-	b := pub.Encode()
-	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(b)
-	return HashToID(hash), nil
+func PublicKeyToID(pk crypto.PublicKey) (Identifier, error) {
+	var id Identifier
+	pkBytes := pk.Encode()
+	hash.ComputeSHA3_256((*[32]byte)(&id), pkBytes)
+	return id, nil
 }
 
 // GetIDs gets the IDs for a slice of entities.
@@ -143,9 +147,13 @@ func GetIDs(value interface{}) []Identifier {
 
 func MerkleRoot(ids ...Identifier) Identifier {
 	var root Identifier
-	tree := merkle.NewTree()
-	for _, id := range ids {
-		tree.Put(id[:], nil)
+	tree, _ := merkle.NewTree(IdentifierLen) // we verify in a unit test that constructor does not error for this paramter
+	for i, id := range ids {
+		val := make([]byte, 8)
+		binary.BigEndian.PutUint64(val, uint64(i))
+		_, _ = tree.Put(id[:], val) // Tree copies keys and values internally
+		// `Put` only errors for keys whose length does not conform to the pre-configured length. As
+		// Identifiers are fixed-sized arrays, errors are impossible here, which we also verify in a unit test.
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)
@@ -158,14 +166,12 @@ func CheckMerkleRoot(root Identifier, ids ...Identifier) bool {
 }
 
 func ConcatSum(ids ...Identifier) Identifier {
-	var sum Identifier
 	hasher := hash.NewSHA3_256()
 	for _, id := range ids {
 		_, _ = hasher.Write(id[:])
 	}
 	hash := hasher.SumHash()
-	copy(sum[:], hash)
-	return sum
+	return HashToID(hash)
 }
 
 func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
@@ -174,7 +180,7 @@ func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 }
 
 // Sample returns random sample of length 'size' of the ids
-// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher-Yates_shuffle).
 func Sample(size uint, ids ...Identifier) []Identifier {
 	n := uint(len(ids))
 	dup := make([]Identifier, 0, n)
@@ -188,4 +194,27 @@ func Sample(size uint, ids ...Identifier) []Identifier {
 		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
 	return dup[:size]
+}
+
+func CidToFlowID(c cid.Cid) (Identifier, error) {
+	decoded, err := mh.Decode(c.Hash())
+
+	if err != nil {
+		return ZeroID, fmt.Errorf("failed to decode CID: %w", err)
+	}
+
+	if decoded.Code != mh.SHA2_256 {
+		return ZeroID, fmt.Errorf("unsupported CID hash function: %v", decoded.Name)
+	}
+
+	if decoded.Length != IdentifierLen {
+		return ZeroID, fmt.Errorf("invalid CID length: %d", decoded.Length)
+	}
+
+	return HashToID(decoded.Digest), nil
+}
+
+func FlowIDToCid(f Identifier) cid.Cid {
+	hash, _ := mh.Encode(f[:], mh.SHA2_256)
+	return cid.NewCidV0(hash)
 }

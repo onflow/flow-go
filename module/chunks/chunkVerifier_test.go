@@ -99,7 +99,7 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 
 // TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
-	s.T().Skip("Check new partial ledger for missing keys")
+	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
 
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
@@ -115,7 +115,8 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 
 // TestMissingRegisterTouchForRead tests verification given a chunkdatapack missing a register touch (read)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
-	s.T().Skip("Check new partial ledger for missing keys")
+	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
+
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
@@ -214,7 +215,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	col := unittest.CollectionFixture(0)
 	vch.ChunkDataPack.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
-	emptyListHash, err := flow.EventsListHash(flow.EventsList{})
+	emptyListHash, err := flow.EventsMerkleRootHash(flow.EventsList{})
 	assert.NoError(s.T(), err)
 	vch.Chunk.EventCollection = emptyListHash //empty collection emits no events
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
@@ -322,7 +323,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		}
 	}
 
-	eventsListHash, err := flow.EventsListHash(chunkEvents)
+	EventsMerkleRootHash, err := flow.EventsMerkleRootHash(chunkEvents)
 	require.NoError(t, err)
 
 	// Chunk setup
@@ -331,7 +332,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 			CollectionIndex: 0,
 			StartState:      flow.StateCommitment(startState),
 			BlockID:         blockID,
-			EventCollection: eventsListHash,
+			EventCollection: EventsMerkleRootHash,
 		},
 		Index: 0,
 	}

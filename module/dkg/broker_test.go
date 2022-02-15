@@ -244,7 +244,7 @@ func TestBroadcastMessage(t *testing.T) {
 		committee,
 		locals[orig],
 		orig,
-		[]module.DKGContractClient{&mock.DKGContractClient{}},
+		[]module.DKGContractClient{&mock.DKGContractClient{}, &mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
 
@@ -254,13 +254,21 @@ func TestBroadcastMessage(t *testing.T) {
 	// check that the dkg contract client is called with the expected message
 	contractClient := &mock.DKGContractClient{}
 	contractClient.On("Broadcast", expectedMsg).
-		Return(nil).
-		Once()
+		Return(fmt.Errorf("error")).
+		Twice()
 	sender.dkgContractClients[0] = contractClient
 
+	contractClient2 := &mock.DKGContractClient{}
+	contractClient2.On("Broadcast", expectedMsg).
+		Return(nil).
+		Once()
+	sender.dkgContractClients[1] = contractClient2
+
 	sender.Broadcast(msgb)
-	unittest.AssertClosesBefore(t, sender.unit.Done(), time.Second)
+	unittest.AssertClosesBefore(t, sender.unit.Done(), 4*time.Second)
+
 	contractClient.AssertExpectations(t)
+	contractClient2.AssertExpectations(t)
 }
 
 // TestPoll checks that the broker correctly calls the smart contract to fetch

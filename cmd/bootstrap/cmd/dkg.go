@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
@@ -19,9 +19,9 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 	var dkgData dkg.DKGData
 	var err error
 	if flagFastKG {
-		dkgData, err = run.RunFastKG(n, flagBootstrapRandomSeed)
+		dkgData, err = bootstrapDKG.RunFastKG(n, flagBootstrapRandomSeed)
 	} else {
-		dkgData, err = run.RunDKG(n, GenerateRandomSeeds(n))
+		dkgData, err = bootstrapDKG.RunDKG(n, GenerateRandomSeeds(n))
 	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
@@ -38,15 +38,9 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 		nodeID := nodes[i].NodeID
 
 		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
-		privParticpant := dkg.DKGParticipantPriv{
-			NodeID:              nodeID,
-			RandomBeaconPrivKey: encKey,
-			GroupIndex:          i,
-		}
-
 		privKeyShares = append(privKeyShares, encKey)
 
-		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), privParticpant)
+		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), encKey)
 	}
 
 	// write full DKG info that will be used to construct QC

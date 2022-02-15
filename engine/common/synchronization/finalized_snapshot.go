@@ -23,7 +23,8 @@ type FinalizedHeaderCache struct {
 	lastFinalizedHeader       *flow.Header
 	finalizationEventNotifier engine.Notifier // notifier for finalization events
 
-	lm *lifecycle.LifecycleManager
+	lm      *lifecycle.LifecycleManager
+	stopped chan struct{}
 }
 
 // NewFinalizedHeaderCache creates a new finalized header cache.
@@ -33,6 +34,7 @@ func NewFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizat
 		lm:                        lifecycle.NewLifecycleManager(),
 		log:                       log.With().Str("component", "finalized_snapshot_cache").Logger(),
 		finalizationEventNotifier: engine.NewNotifier(),
+		stopped:                   make(chan struct{}),
 	}
 
 	snapshot, err := cache.getHeader()
@@ -97,7 +99,9 @@ func (f *FinalizedHeaderCache) Ready() <-chan struct{} {
 }
 
 func (f *FinalizedHeaderCache) Done() <-chan struct{} {
-	f.lm.OnStop()
+	f.lm.OnStop(func() {
+		<-f.stopped
+	})
 	return f.lm.Stopped()
 }
 
@@ -113,6 +117,8 @@ func (f *FinalizedHeaderCache) onFinalizedBlock(blockID flow.Identifier) {
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
 func (f *FinalizedHeaderCache) finalizationProcessingLoop() {
+	defer close(f.stopped)
+
 	f.log.Debug().Msg("starting finalization processing loop")
 	notifier := f.finalizationEventNotifier.Channel()
 	for {

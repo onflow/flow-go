@@ -26,7 +26,7 @@ func ToSDKID(id flow.Identifier) sdk.Identifier {
 }
 
 func ToSDKAddress(addr flow.Address) sdk.Address {
-	return sdk.BytesToAddress(addr.Bytes())
+	return sdk.Address(addr)
 }
 
 func ToSDKTransactionSignature(sig flow.TransactionSignature) sdk.TransactionSignature {

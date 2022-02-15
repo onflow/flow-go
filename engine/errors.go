@@ -163,3 +163,7 @@ func LogErrorWithMsg(log zerolog.Logger, msg string, err error) {
 	// all other errors should just be logged as usual
 	log.Error().Str("error_type", "internal_error").Err(err).Msg(msg)
 }
+
+func IsIncompatibleInputTypeError(err error) bool {
+	return errors.Is(err, IncompatibleInputTypeError)
+}

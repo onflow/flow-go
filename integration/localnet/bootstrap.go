@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/plus3it/gorecurcopy"
@@ -40,6 +41,7 @@ const (
 	MetricsPort                = 8080
 	RPCPort                    = 9000
 	SecuredRPCPort             = 9001
+	HTTPPort                   = 8000
 )
 
 var (
@@ -147,7 +149,7 @@ func main() {
 		panic(err)
 	}
 
-	_, _, _, containers, err := testnet.BootstrapNetwork(conf, BootstrapDir)
+	_, _, _, containers, _, err := testnet.BootstrapNetwork(conf, BootstrapDir)
 	if err != nil {
 		panic(err)
 	}
@@ -338,6 +340,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 				"TARGET":  container.Role.String(),
 				"VERSION": build.Semver(),
 				"COMMIT":  build.Commit(),
+				"GOARCH":  runtime.GOARCH,
 			},
 			Target: "production",
 		}
@@ -447,6 +450,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", container.ContainerName, SecuredRPCPort),
+		fmt.Sprintf("--http-addr=%s:%d", container.ContainerName, HTTPPort),
 		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",

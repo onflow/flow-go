@@ -64,19 +64,6 @@ func CreateFlowTokenMinterTransaction(service, flowToken flow.Address) *flow.Tra
 		AddAuthorizer(service)
 }
 
-const getFlowTokenBalanceScriptTemplate = `
-import FlowServiceAccount from 0x%s
-
-pub fun main(): UFix64 {
-  let acct = getAccount(0x%s)
-  return FlowServiceAccount.defaultTokenBalance(acct)
-}
-`
-
-func GetFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) []byte {
-	return []byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress))
-}
-
 const mintFlowTokenTransactionTemplate = `
 import FungibleToken from 0x%s
 import FlowToken from 0x%s

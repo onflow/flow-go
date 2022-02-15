@@ -2,6 +2,7 @@ package extract
 
 import (
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path"
 
@@ -22,9 +23,20 @@ var (
 	flagBlockHash         string
 	flagStateCommitment   string
 	flagDatadir           string
+	flagChain             string
 	flagNoMigration       bool
 	flagNoReport          bool
 )
+
+func getChain(chainName string) (chain flow.Chain, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid chain: %s", r)
+		}
+	}()
+	chain = flow.ChainID(chainName).Chain()
+	return
+}
 
 var Cmd = &cobra.Command{
 	Use:   "execution-state-extract",
@@ -40,6 +52,9 @@ func init() {
 	Cmd.Flags().StringVar(&flagOutputDir, "output-dir", "",
 		"Directory to write new Execution State to")
 	_ = Cmd.MarkFlagRequired("output-dir")
+
+	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
+	_ = Cmd.MarkFlagRequired("chain")
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")
@@ -116,11 +131,17 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment[:]))
 
-	err := extractExecutionState(
+	chain, err := getChain(flagChain)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("invalid chain name")
+	}
+
+	err = extractExecutionState(
 		flagExecutionStateDir,
 		stateCommitment,
 		flagOutputDir,
 		log.Logger,
+		chain,
 		!flagNoMigration,
 		!flagNoReport,
 	)

@@ -29,7 +29,7 @@ const defaultIngestionEngineWorkers = 3
 // link between collection nodes and consensus nodes and has a counterpart with
 // the same engine ID in the collection node.
 type Engine struct {
-	*component.ComponentManager
+	component.Component
 	log               zerolog.Logger         // used to log relevant actions with context
 	me                module.Local           // used to access local node information
 	con               network.Conduit        // conduit to receive/send guarantees
@@ -97,7 +97,7 @@ func New(
 		})
 	}
 
-	e.ComponentManager = componentManagerBuilder.Build()
+	e.Component = componentManagerBuilder.Build()
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ReceiveGuarantees, e)
@@ -133,8 +133,16 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns error only in unexpected scenario.
-func (e *Engine) Process(_ network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.messageHandler.Process(originID, event)
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	err := e.messageHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // processAvailableMessages processes the given ingestion engine event.

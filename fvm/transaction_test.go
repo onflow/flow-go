@@ -57,7 +57,7 @@ func TestAccountFreezing(t *testing.T) {
 		rt := fvm.NewInterpreterRuntime()
 		log := zerolog.Nop()
 		vm := fvm.NewVirtualMachine(rt)
-		txInvocator := fvm.NewTransactionInvocator(log)
+		txInvoker := fvm.NewTransactionInvoker(log)
 
 		code := fmt.Sprintf(`
 			transaction {
@@ -73,14 +73,14 @@ func TestAccountFreezing(t *testing.T) {
 
 		context := fvm.NewContext(log, fvm.WithAccountFreezeAvailable(false), fvm.WithChain(chain))
 
-		err = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "cannot find")
 		require.Contains(t, err.Error(), "setAccountFrozen")
 
 		context = fvm.NewContext(log, fvm.WithAccountFreezeAvailable(true), fvm.WithChain(chain))
 
-		err = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		err = txInvoker.Process(vm, &context, proc, st, programsStorage)
 		require.NoError(t, err)
 
 		// account should be frozen now
@@ -189,7 +189,7 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionAccountFrozenChecker(),
 				fvm.NewTransactionAccountFrozenEnabler(),
-				fvm.NewTransactionInvocator(zerolog.Nop())))
+				fvm.NewTransactionInvoker(zerolog.Nop())))
 
 		err := vm.Run(context, procFrozen, st.State().View(), programsStorage)
 		require.NoError(t, err)
@@ -448,7 +448,7 @@ func TestAccountFreezing(t *testing.T) {
 			fvm.WithTransactionProcessors( // run with limited processor to test just core of freezing, but still inside FVM
 				fvm.NewTransactionAccountFrozenChecker(),
 				fvm.NewTransactionAccountFrozenEnabler(),
-				fvm.NewTransactionInvocator(zerolog.Nop())))
+				fvm.NewTransactionInvoker(zerolog.Nop())))
 
 		err := accounts.SetAccountFrozen(frozenAddress, true)
 		require.NoError(t, err)

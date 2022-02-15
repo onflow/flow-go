@@ -48,60 +48,50 @@ func (s *CachingAssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 func (s *CachingAssignmentCollectorTestSuite) TestProcessApproval() {
 	s.T().Parallel()
 
-	s.T().Run("invalid result id", func(t *testing.T) {
-		approval := unittest.ResultApprovalFixture()
-		err := s.collector.ProcessApproval(approval)
-		require.Error(t, err)
-	})
+	approval := unittest.ResultApprovalFixture()
+	err := s.collector.ProcessApproval(approval)
+	require.Error(s.T(), err)
 
-	s.T().Run("invalid block id", func(t *testing.T) {
-		approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(s.result.ID()))
-		err := s.collector.ProcessApproval(approval)
-		require.Error(t, err)
-		require.True(t, engine.IsInvalidInputError(err))
-	})
+	approval = unittest.ResultApprovalFixture(unittest.WithExecutionResultID(s.result.ID()))
+	err = s.collector.ProcessApproval(approval)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsInvalidInputError(err))
 
-	s.T().Run("valid approval", func(t *testing.T) {
-		var expected []*flow.ResultApproval
-		for i := 0; i < 5; i++ {
-			approval := unittest.ResultApprovalFixture(
-				unittest.WithBlockID(s.executedBlock.ID()),
-				unittest.WithExecutionResultID(s.result.ID()),
-				unittest.WithChunk(uint64(i)))
-			err := s.collector.ProcessApproval(approval)
-			require.NoError(t, err)
-			expected = append(expected, approval)
-		}
-		require.ElementsMatch(t, expected, s.collector.GetApprovals())
-	})
+	var expected []*flow.ResultApproval
+	for i := 0; i < 5; i++ {
+		approval := unittest.ResultApprovalFixture(
+			unittest.WithBlockID(s.executedBlock.ID()),
+			unittest.WithExecutionResultID(s.result.ID()),
+			unittest.WithChunk(uint64(i)))
+		err := s.collector.ProcessApproval(approval)
+		require.NoError(s.T(), err)
+		expected = append(expected, approval)
+	}
+	require.ElementsMatch(s.T(), expected, s.collector.GetApprovals())
 }
 
 // TestProcessIncorporatedResult tests that collector caches result when requested to processes flow.IncorporatedResult
 func (s *CachingAssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 	s.T().Parallel()
 
-	s.T().Run("invalid result id", func(t *testing.T) {
-		// processing invalid result should error
-		err := s.collector.ProcessIncorporatedResult(unittest.IncorporatedResult.Fixture(
-			unittest.IncorporatedResult.WithResult(unittest.ExecutionResultFixture()),
-		))
-		require.Error(s.T(), err)
-	})
+	// processing invalid result should error
+	err := s.collector.ProcessIncorporatedResult(unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithResult(unittest.ExecutionResultFixture()),
+	))
+	require.Error(s.T(), err)
 
-	s.T().Run("valid IR", func(t *testing.T) {
-		// processing valid IR should result in no error
-		var expected []*flow.IncorporatedResult
-		for i := 0; i < 5; i++ {
-			IR := unittest.IncorporatedResult.Fixture(
-				unittest.IncorporatedResult.WithResult(s.result),
-			)
-			err := s.collector.ProcessIncorporatedResult(IR)
-			require.NoError(s.T(), err)
-			expected = append(expected, IR)
-		}
+	// processing valid IR should result in no error
+	var expected []*flow.IncorporatedResult
+	for i := 0; i < 5; i++ {
+		IR := unittest.IncorporatedResult.Fixture(
+			unittest.IncorporatedResult.WithResult(s.result),
+		)
+		err := s.collector.ProcessIncorporatedResult(IR)
+		require.NoError(s.T(), err)
+		expected = append(expected, IR)
+	}
 
-		require.ElementsMatch(s.T(), expected, s.collector.GetIncorporatedResults())
-	})
+	require.ElementsMatch(s.T(), expected, s.collector.GetIncorporatedResults())
 }
 
 func (s *CachingAssignmentCollectorTestSuite) TestProcessingStatus() {

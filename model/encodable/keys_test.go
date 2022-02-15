@@ -242,7 +242,7 @@ func TestEncodableRandomBeaconPrivKeyMsgPack(t *testing.T) {
 	b, err := key.MarshalMsgpack()
 	require.NoError(t, err)
 
-	fmt.Printf("bytes: %d", len(b))
+	t.Logf("bytes: %d\n", len(b))
 
 	err = key.UnmarshalMsgpack(b)
 	require.NoError(t, err)

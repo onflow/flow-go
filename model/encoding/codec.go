@@ -1,7 +1,7 @@
 package encoding
 
 import (
-	"github.com/onflow/flow-go/model/encoding/json"
+	"io"
 )
 
 // Encodable is a type that defines a canonical encoding.
@@ -9,28 +9,38 @@ type Encodable interface {
 	Encode() []byte
 }
 
-// Encoder encodes and decodes values to and from bytes.
-type Encoder interface {
-	// Encode encodes a value as bytes.
+// Marshaler marshals and unmarshals values to and from bytes.
+type Marshaler interface {
+	// Marshaler marshals a value to bytes.
 	//
-	// This function returns an error if the value type is not supported by this encoder.
-	Encode(interface{}) ([]byte, error)
+	// This function returns an error if the value type is not supported by this marshaler.
+	Marshal(interface{}) ([]byte, error)
 
-	// Decode decodes bytes into a value.
+	// Unmarshal unmarshals bytes to a value.
 	//
 	// This functions returns an error if the bytes do not fit the provided value type.
-	Decode([]byte, interface{}) error
+	Unmarshal([]byte, interface{}) error
 
-	// MustEncode encodes a value as bytes.
+	// MustMarshal marshals a value to bytes.
 	//
-	// This functions panic if encoding fails.
-	MustEncode(interface{}) []byte
+	// This function panics if marshaling fails.
+	MustMarshal(interface{}) []byte
 
-	// MustDecode decodes bytes into a value.
+	// MustUnmarshal unmarshals bytes to a value.
 	//
-	// This functions panic if decoding fails.
-	MustDecode([]byte, interface{})
+	// This function panics if decoding fails.
+	MustUnmarshal([]byte, interface{})
 }
 
-// DefaultEncoder is the default encoder used by Flow.
-var DefaultEncoder Encoder = json.NewEncoder()
+type Encoder interface {
+	Encode(interface{}) error
+}
+
+type Decoder interface {
+	Decode(interface{}) error
+}
+
+type Codec interface {
+	NewEncoder(w io.Writer) Encoder
+	NewDecoder(r io.Reader) Decoder
+}

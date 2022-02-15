@@ -21,6 +21,10 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic
@@ -44,8 +48,8 @@ jobs:
       fail-fast: false
       matrix:
         go-version:
-          - 1.15
           - 1.16
+          - 1.17
     runs-on: ubuntu-latest
     steps:
     - name: Setup Go
@@ -66,7 +70,7 @@ jobs:
         command: make ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v1
-      if: ${{ matrix.go-version == '1.15' }}
+      if: ${{ matrix.go-version == '1.17' }}
       with:
         file: ./coverage.txt
         flags: unittests
@@ -78,8 +82,8 @@ jobs:
       fail-fast: false
       matrix:
         go-version:
-          - 1.15
           - 1.16
+          - 1.17
     runs-on: ubuntu-latest
     steps:
     - name: Setup Go

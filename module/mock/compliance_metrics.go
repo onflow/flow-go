@@ -64,6 +64,11 @@ func (_m *ComplianceMetrics) CurrentEpochPhase(phase flow.EpochPhase) {
 	_m.Called(phase)
 }
 
+// EpochEmergencyFallbackTriggered provides a mock function with given fields:
+func (_m *ComplianceMetrics) EpochEmergencyFallbackTriggered() {
+	_m.Called()
+}
+
 // FinalizedHeight provides a mock function with given fields: height
 func (_m *ComplianceMetrics) FinalizedHeight(height uint64) {
 	_m.Called(height)

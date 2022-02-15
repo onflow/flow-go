@@ -25,7 +25,7 @@ func Test_IsServiceEvent(t *testing.T) {
 			isServiceEvent, err := handler.IsServiceEvent(cadence.Event{
 				EventType: &cadence.EventType{
 					Location: common.AddressLocation{
-						Address: common.BytesToAddress(event.Address.Bytes()),
+						Address: common.Address(event.Address),
 					},
 					QualifiedIdentifier: event.QualifiedIdentifier(),
 				},
@@ -39,7 +39,7 @@ func Test_IsServiceEvent(t *testing.T) {
 		isServiceEvent, err := handler.IsServiceEvent(cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(flow.Testnet.Chain().ServiceAddress().Bytes()),
+					Address: common.Address(flow.Testnet.Chain().ServiceAddress()),
 				},
 				QualifiedIdentifier: events.EpochCommit.QualifiedIdentifier(),
 			},
@@ -52,7 +52,7 @@ func Test_IsServiceEvent(t *testing.T) {
 		isServiceEvent, err := handler.IsServiceEvent(cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(chain.Chain().ServiceAddress().Bytes()),
+					Address: common.Address(chain.Chain().ServiceAddress()),
 				},
 				QualifiedIdentifier: "SomeContract.SomeEvent",
 			},

@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"sort"
@@ -108,7 +109,7 @@ func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.Regi
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return nil, fmt.Errorf("failed to read key %s on account %s: %w", key, hex.EncodeToString([]byte(owner)), getError)
+		return nil, fmt.Errorf("failed to read key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), getError)
 	}
 
 	// if not part of recent updates count them as read
@@ -137,7 +138,7 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enf
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return fmt.Errorf("failed to update key %s on account %s: %w", key, hex.EncodeToString([]byte(owner)), setError)
+		return fmt.Errorf("failed to update key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), setError)
 	}
 
 	if enforceLimit {
@@ -311,4 +312,14 @@ func IsFVMStateKey(owner, controller, key string) bool {
 	}
 
 	return false
+}
+
+// PrintableKey formats slabs properly and avoids invalid utf8s
+func PrintableKey(key string) string {
+	// slab
+	if key[0] == '$' && len(key) == 9 {
+		i := uint64(binary.BigEndian.Uint64([]byte(key[1:])))
+		return fmt.Sprintf("$%d", i)
+	}
+	return fmt.Sprintf("#%x", []byte(key))
 }

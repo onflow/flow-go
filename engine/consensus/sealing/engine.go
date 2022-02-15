@@ -1,15 +1,16 @@
 package sealing
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -88,7 +89,6 @@ func NewEngine(log zerolog.Logger,
 	state protocol.State,
 	sealsDB storage.Seals,
 	assigner module.ChunkAssigner,
-	verifier module.Verifier,
 	sealsMempool mempool.IncorporatedResultSeals,
 	options Config,
 ) (*Engine, error) {
@@ -134,7 +134,8 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
+	signatureHasher := crypto.NewBLSKMAC(encoding.ResultApprovalTag)
+	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
@@ -247,7 +248,15 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 
 // Process sends event into channel with pending events. Generally speaking shouldn't lock for too long.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.messageHandler.Process(originID, event)
+	err := e.messageHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // processAvailableMessages is processor of pending events which drives events from networking layer to business logic in `Core`.
@@ -262,6 +271,8 @@ func (e *Engine) processAvailableMessages() error {
 
 		event, ok := e.pendingIncorporatedResults.Pop()
 		if ok {
+			e.log.Debug().Msg("got new incorporated result")
+
 			err := e.processIncorporatedResult(event.(*flow.IncorporatedResult))
 			if err != nil {
 				return fmt.Errorf("could not process incorporated result: %w", err)
@@ -276,6 +287,8 @@ func (e *Engine) processAvailableMessages() error {
 			msg, ok = e.pendingApprovals.Get()
 		}
 		if ok {
+			e.log.Debug().Msg("got new result approval")
+
 			err := e.onApproval(msg.OriginID, msg.Payload.(*flow.ResultApproval))
 			if err != nil {
 				return fmt.Errorf("could not process result approval: %w", err)
@@ -366,7 +379,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.messageHandler.Process(e.me.NodeID(), event)
+	err := e.ProcessLocal(event)
 	if err != nil {
 		// receiving an input of incompatible type from a trusted internal component is fatal
 		e.log.Fatal().Err(err).Msg("internal error processing event")
@@ -377,18 +390,9 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.messageHandler.Process(e.me.NodeID(), event)
+	err := e.Process(channel, originID, event)
 	if err != nil {
-		lg := e.log.With().
-			Err(err).
-			Str("channel", channel.String()).
-			Str("origin", originID.String()).
-			Logger()
-		if errors.Is(err, engine.IncompatibleInputTypeError) {
-			lg.Error().Msg("received message with incompatible type")
-			return
-		}
-		lg.Fatal().Msg("internal error processing message")
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 

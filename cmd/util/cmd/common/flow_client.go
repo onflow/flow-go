@@ -15,9 +15,8 @@ import (
 )
 
 const (
-	DefaultAccessNodeIDSMinimum = 2
-	DefaultAccessAPIPort        = "9000"
-	DefaultAccessAPISecurePort  = "9001"
+	DefaultAccessAPIPort       = "9000"
+	DefaultAccessAPISecurePort = "9001"
 )
 
 type FlowClientConfig struct {
@@ -73,7 +72,7 @@ func secureFlowClient(accessAddress, accessApiNodePubKey string) (*client.Client
 // insecureFlowClient creates flow client with insecure GRPC connection
 func insecureFlowClient(accessAddress string) (*client.Client, error) {
 	// create flow client
-	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+	flowClient, err := client.New(accessAddress, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		return nil, fmt.Errorf("failed to create flow client %w", err)
 	}

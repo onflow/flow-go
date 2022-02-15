@@ -44,7 +44,7 @@ func TestHeaderFingerprint(t *testing.T) {
 		ParentVoterSigData crypto.Signature
 		ProposerID         flow.Identifier
 	}
-	rlp.NewEncoder().MustDecode(data, &decoded)
+	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
 	decHeader := flow.Header{
 		ChainID:            decoded.ChainID,
 		ParentID:           decoded.ParentID,

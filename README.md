@@ -42,9 +42,9 @@ The following table lists all work streams and links to their home directory and
 | Work Stream       | Home directory                             |
 | ----------------- | ------------------------------------------ |
 | Access Node       | [/cmd/access](/cmd/access)                 |
-| Collection Node   | [/cmd/collection](/engine/collection)      |
-| Consensus Node    | [/cmd/consensus](/engine/consensus)        |
-| Execution Node    | [/engine/execution](/engine/execution)     |
+| Collection Node   | [/cmd/collection](/cmd/collection)      |
+| Consensus Node    | [/cmd/consensus](/cmd/consensus)        |
+| Execution Node    | [/cmd/execution](/cmd/execution)     |
 | Verification Node | [/cmd/verification](/cmd/verification)     |
 | HotStuff          | [/consensus/hotstuff](/consensus/hotstuff) |
 | Storage           | [/storage](/storage)                       |
@@ -65,7 +65,7 @@ The following table lists all work streams and links to their home directory and
 
 ### Install Dependencies
 
-- Install [Go](https://golang.org/doc/install) (Flow supports Go 1.13 and later)
+- Install [Go](https://golang.org/doc/install) (Flow supports Go 1.16 and later)
 - Install [CMake](https://cmake.org/install/), which is used for building the crypto library
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running
   a local network and integration tests

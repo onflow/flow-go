@@ -23,5 +23,5 @@ func Fingerprint(entity interface{}) []byte {
 		return fingerprinter.Fingerprint()
 	}
 
-	return rlp.NewEncoder().MustEncode(entity)
+	return rlp.NewMarshaler().MustMarshal(entity)
 }

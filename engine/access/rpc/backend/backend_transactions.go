@@ -469,6 +469,13 @@ func (b *backendTransactions) NotifyFinalizedBlockHeight(height uint64) {
 
 func (b *backendTransactions) getTransactionResultFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetTransactionResultRequest) (*execproto.GetTransactionResultResponse, error) {
 	var errors *multierror.Error
+	logAnyError := func() {
+		errToReturn := errors.ErrorOrNil()
+		if errToReturn != nil {
+			b.log.Info().Err(errToReturn).Msg("failed to send transactions to collector nodes")
+		}
+	}
+	defer logAnyError()
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
 		resp, err := b.tryGetTransactionResult(ctx, execNode, req)

@@ -69,8 +69,10 @@ func (c *Compactor) Done() <-chan struct{} {
 
 func (c *Compactor) start() {
 	for {
-		//TODO Log error
-		_ = c.Run()
+		err := c.Run()
+		if err != nil {
+			c.logger.Error().Err(err).Msg("error running compactor")
+		}
 
 		select {
 		case <-c.stopc:
@@ -114,8 +116,10 @@ func (c *Compactor) createCheckpoints() (int, error) {
 	// more then one segment means we can checkpoint safely up to `to`-1
 	// presumably last segment is being written to
 	if to-from > int(c.checkpointDistance) {
+		startTime := time.Now()
+
 		checkpointNumber := to - 1
-		c.logger.Info().Msgf("creating a checkpoint from segment %d to segment %d\n", from, checkpointNumber)
+		c.logger.Info().Msgf("creating checkpoint %d from segment %d to segment %d", checkpointNumber, from, checkpointNumber)
 		err = c.checkpointer.Checkpoint(checkpointNumber, func() (io.WriteCloser, error) {
 			return c.checkpointer.CheckpointWriter(checkpointNumber)
 		})
@@ -123,6 +127,9 @@ func (c *Compactor) createCheckpoints() (int, error) {
 			return -1, fmt.Errorf("error creating checkpoint (%d): %w", checkpointNumber, err)
 		}
 		newLatestCheckpoint = checkpointNumber
+
+		duration := time.Since(startTime)
+		c.logger.Info().Float64("total_time_s", duration.Seconds()).Msgf("created checkpoint %d from segment %d to segment %d", checkpointNumber, from, checkpointNumber)
 	}
 	return newLatestCheckpoint, nil
 }

@@ -23,6 +23,9 @@ type ResolverMetrics interface {
 
 	// OnDNSCacheInvalidated is called whenever dns cache is invalidated for an entry
 	OnDNSCacheInvalidated()
+
+	// OnDNSLookupRequestDropped tracks the number of dns lookup requests that are dropped due to a full queue
+	OnDNSLookupRequestDropped()
 }
 
 type NetworkMetrics interface {
@@ -55,12 +58,6 @@ type NetworkMetrics interface {
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
-
-	// UnstakedOutboundConnections updates the metric tracking the number of outbound connections to unstaked nodes
-	UnstakedOutboundConnections(connectionCount uint)
-
-	// UnstakedInboundConnections updates the metric tracking the number of inbound connections from unstaked nodes
-	UnstakedInboundConnections(connectionCount uint)
 }
 
 type EngineMetrics interface {
@@ -82,6 +79,7 @@ type ComplianceMetrics interface {
 	CurrentDKGPhase1FinalView(view uint64)
 	CurrentDKGPhase2FinalView(view uint64)
 	CurrentDKGPhase3FinalView(view uint64)
+	EpochEmergencyFallbackTriggered()
 }
 
 type CleanerMetrics interface {
@@ -311,6 +309,16 @@ type LedgerMetrics interface {
 type WALMetrics interface {
 	// DiskSize records the amount of disk space used by the storage (in bytes)
 	DiskSize(uint64)
+}
+
+type ExecutionDataServiceMetrics interface {
+	ExecutionDataAddStarted()
+
+	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize uint64)
+
+	ExecutionDataGetStarted()
+
+	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64)
 }
 
 type RuntimeMetrics interface {

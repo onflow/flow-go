@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 )
 
 // TODO replace this type with `network/stub/hub.go`
@@ -61,12 +63,12 @@ type Network struct {
 	node     *Node
 	originID flow.Identifier
 	conduits map[network.Channel]*Conduit
-	component.NoopComponent
+	mocknetwork.Network
 }
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the
 // Conduit instance.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	ctx, cancel := context.WithCancel(n.ctx)
 	con := &Conduit{
 		ctx:     ctx,
@@ -75,11 +77,15 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 		channel: channel,
 		queue:   make(chan message, 1024),
 	}
+
 	go func() {
 		for msg := range con.queue {
-			engine.Submit(channel, msg.originID, msg.event)
+			go func(m message) {
+				_ = engine.Process(channel, m.originID, m.event)
+			}(msg)
 		}
 	}()
+
 	n.conduits[channel] = con
 	return con, nil
 }
@@ -96,12 +102,13 @@ func (n *Network) unregister(channel network.Channel) error {
 // Engine attached to the same channel on another node or nodes.
 // This implementation uses unicast under the hood.
 func (n *Network) submit(event interface{}, channel network.Channel, targetIDs ...flow.Identifier) error {
+	var sendErrors *multierror.Error
 	for _, targetID := range targetIDs {
 		if err := n.unicast(event, channel, targetID); err != nil {
-			return fmt.Errorf("could not unicast the event: %w", err)
+			sendErrors = multierror.Append(sendErrors, fmt.Errorf("could not unicast the event: %w", err))
 		}
 	}
-	return nil
+	return sendErrors.ErrorOrNil()
 }
 
 // unicast is called when the attached Engine to the channel is sending an event to a single target

@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestWithEmulator(t *testing.T) {
@@ -44,6 +45,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 	currentEpochSetup := flow.EpochSetup{
 		Counter:            currentCounter,
+		FirstView:          0,
 		DKGPhase1FinalView: 150,
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
@@ -58,6 +60,8 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		Counter:      currentCounter + 1,
 		Participants: s.netIDs,
 		RandomSource: []byte("random bytes for seed"),
+		FirstView:    301,
+		FinalView:    600,
 	}
 
 	firstBlock := &flow.Header{View: 100}
@@ -141,25 +145,29 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	groupPubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, groupPubKeyBytes)
 	assert.NoError(s.T(), err)
 
+	tag := "some tag"
+	hasher := crypto.NewBLSKMAC(tag)
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
-	signers := make([]*signature.ThresholdProvider, 0, len(nodes))
+	beaconKeys := make([]crypto.PrivateKey, 0, len(nodes))
 	signatures := []crypto.Signature{}
-	indices := []uint{}
+	indices := []int{}
 	for i, n := range nodes {
-		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
+		// TODO: to replace with safeBeaconKeys
+		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
+		// epochLookup := epochs.NewEpochLookup(n.State)
+		// beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, n.safeBeaconKeys)
+		// beaconKey, err := beaconKeyStore.ByView(nextEpochSetup.FirstView)
+		beaconKeys = append(beaconKeys, beaconKey)
 
-		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)
-		signers = append(signers, signer)
-
-		signature, err := signer.Sign(sigData)
+		signature, err := beaconKey.Sign(sigData, hasher)
 		require.NoError(s.T(), err)
 
 		signatures = append(signatures, signature)
-		indices = append(indices, uint(i))
+		indices = append(indices, i)
 
-		ok, err := signer.Verify(sigData, signature, pubKeys[1+i])
+		ok, err := pubKeys[i+1].Verify(signature, sigData, hasher)
 		require.NoError(s.T(), err)
 		assert.True(s.T(), ok, fmt.Sprintf("signature %d share doesn't verify under the public key share", i+1))
 	}
@@ -173,13 +181,11 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	// NOTE: Reconstruction doesn't require a tag or local, but is only accessible
-	// through the broader Provider API, hence the empty arguments.
-	thresholdSigner := signature.NewThresholdProvider("", nil)
-	groupSignature, err := thresholdSigner.Reconstruct(uint(len(s.nodes)), signatures, indices)
+	threshold := signature.RandomBeaconThreshold(numberOfNodes)
+	groupSignature, err := crypto.BLSReconstructThresholdSignature(numberOfNodes, threshold, signatures, indices)
 	require.NoError(s.T(), err)
 
-	ok, err := signers[0].Verify(sigData, groupSignature, groupPubKey)
+	ok, err := groupPubKey.Verify(groupSignature, sigData, hasher)
 	require.NoError(s.T(), err)
 	assert.True(s.T(), ok, "failed to verify threshold signature")
 }
@@ -201,6 +207,6 @@ func (s *DKGSuite) TestNodesDown() {
 // between consensus node and access node, as well as connection issues between
 // access node and execution node, or the execution node being down).
 func (s *DKGSuite) TestEmulatorProblems() {
-	s.T().Skip("flaky test - quarantined")
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky test")
 	s.runTest(numberOfNodes, true)
 }

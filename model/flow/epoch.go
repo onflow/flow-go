@@ -39,6 +39,22 @@ func (p EpochPhase) String() string {
 	}[p]
 }
 
+func GetEpochPhase(phase string) EpochPhase {
+	phases := []EpochPhase{
+		EpochPhaseUndefined,
+		EpochPhaseStaking,
+		EpochPhaseSetup,
+		EpochPhaseCommitted,
+	}
+	for _, p := range phases {
+		if p.String() == phase {
+			return p
+		}
+	}
+
+	return EpochPhaseUndefined
+}
+
 // EpochSetupRandomSourceLength is the required length of the random source
 // included in an EpochSetup service event.
 const EpochSetupRandomSourceLength = 16
@@ -189,8 +205,8 @@ func commitFromEncodable(enc encodableCommit) EpochCommit {
 	}
 }
 
-func (commit *EpochCommit) MarshalJSON() ([]byte, error) {
-	return json.Marshal(encodableFromCommit(commit))
+func (commit EpochCommit) MarshalJSON() ([]byte, error) {
+	return json.Marshal(encodableFromCommit(&commit))
 }
 
 func (commit *EpochCommit) UnmarshalJSON(b []byte) error {

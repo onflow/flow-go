@@ -70,8 +70,52 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 }
 */
 
-func TestIdentityList_Union(t *testing.T) {
+func TestIdentityList_Exists(t *testing.T) {
+	t.Run("should find a given element", func(t *testing.T) {
+		il1 := unittest.IdentityListFixture(10)
+		il2 := unittest.IdentityListFixture(1)
 
+		// sort the first list
+		il1 = il1.Sort(order.Canonical)
+
+		for i := 0; i < 10; i++ {
+			assert.True(t, il1.Exists(il1[i]))
+		}
+		assert.False(t, il1.Exists(il2[0]))
+	})
+}
+
+func TestIdentityList_IdentifierExists(t *testing.T) {
+	t.Run("should find a given identifier", func(t *testing.T) {
+		il1 := unittest.IdentityListFixture(10)
+		il2 := unittest.IdentityListFixture(1)
+
+		// sort the first list
+		il1 = il1.Sort(order.Canonical)
+
+		for i := 0; i < 10; i++ {
+			assert.True(t, il1.IdentifierExists(il1[i].NodeID))
+		}
+		assert.False(t, il1.IdentifierExists(il2[0].NodeID))
+	})
+}
+
+func TestIdentityList_Union(t *testing.T) {
+	t.Run("retains the original identity list", func(t *testing.T) {
+		// An identity list is a slice, i.e. it is vulnerable to in-place modifications via append.
+		// Per convention, all IdentityList operations should leave the original lists invariant.
+		// Here, we purposefully create a slice, whose backing array has enough space to
+		// include the elements we are going to add via Union. Furthermore, we force element duplication
+		// by taking the union of the IdentityList with itself. If the implementation is not careful
+		// about creating copies and works with the slices itself, it will modify the input and fail the test.
+
+		il := unittest.IdentityListFixture(20)
+		il = il[:10]
+		ilBackup := il.Copy()
+
+		_ = il.Union(il)
+		assert.Equal(t, ilBackup, il)
+	})
 	t.Run("should contain all identities", func(t *testing.T) {
 		il1 := unittest.IdentityListFixture(10)
 		il2 := unittest.IdentityListFixture(10)
@@ -120,7 +164,6 @@ func TestIdentityList_Union(t *testing.T) {
 			uniques[identity.NodeID] = struct{}{}
 		}
 	})
-
 }
 
 func TestSample(t *testing.T) {
@@ -305,5 +348,21 @@ func TestIdentityList_EqualTo(t *testing.T) {
 
 		require.True(t, a.EqualTo(b))
 		require.True(t, b.EqualTo(a))
+	})
+}
+
+func TestIdentityList_GetIndex(t *testing.T) {
+	t.Run("should return expected index of identifier in identity list and true", func(t *testing.T) {
+		participants := unittest.IdentityListFixture(3)
+		index, ok := participants.GetIndex(participants[1].NodeID)
+		require.True(t, ok)
+		require.Equal(t, uint(1), index)
+	})
+
+	t.Run("should return 0 and false for identifier not found in identity list", func(t *testing.T) {
+		participants := unittest.IdentityListFixture(3)
+		index, ok := participants.GetIndex(unittest.IdentifierFixture())
+		require.False(t, ok)
+		require.Equal(t, uint(0), index)
 	})
 }

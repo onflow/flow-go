@@ -161,9 +161,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	// get identities from the current epoch first
-	identities := setup.Participants.Copy()
-	lookup := identities.Lookup()
+	// sort the identities so the 'Exists' binary search works
+	identities := setup.Participants.Sort(order.ByNodeIDAsc)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
 	var otherEpochIdentities flow.IdentityList
@@ -186,7 +185,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range previousSetup.Participants {
-			_, exists := lookup[identity.NodeID]
+			exists := identities.Exists(identity)
 			// add identity from previous epoch that is not in current epoch
 			if !exists {
 				otherEpochIdentities = append(otherEpochIdentities, identity)
@@ -203,7 +202,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range nextSetup.Participants {
-			_, exists := lookup[identity.NodeID]
+			exists := identities.Exists(identity)
+
 			// add identity from next epoch that is not in current epoch
 			if !exists {
 				otherEpochIdentities = append(otherEpochIdentities, identity)
@@ -222,6 +222,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 
 	// apply the filter to the participants
 	identities = identities.Filter(selector)
+
 	// apply a deterministic sort to the participants
 	identities = identities.Sort(order.ByNodeIDAsc)
 
@@ -265,7 +266,24 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return result, seal, nil
 }
 
-func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
+// SealingSegment will walk through the chain backward until we reach the block referenced
+// by the latest seal and build a SealingSegment. As we visit each block we check each execution
+// receipt in the block's payload to make sure we have a corresponding execution result, any execution
+// results missing from blocks are stored in the SealingSegment.ExecutionResults field.
+func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
+	var rootHeight uint64
+	err := s.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not get root height: %w", err)
+	}
+	head, err := s.Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get snapshot reference block: %w", err)
+	}
+	if head.Height < rootHeight {
+		return nil, protocol.ErrSealingSegmentBelowRootBlock
+	}
+
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
@@ -273,19 +291,30 @@ func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	var segment []*flow.Block
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.ByBlockID)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not get block: %w", err)
 		}
-		segment = append(segment, block)
+
+		err = builder.AddBlock(block)
+		if err != nil {
+			return fmt.Errorf("could not add block to sealing segment: %w", err)
+		}
+
 		return nil
 	}
+
 	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(seal.BlockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
+	}
+
+	segment, err := builder.SealingSegment()
+	if err != nil {
+		return nil, fmt.Errorf("could not build sealing segment: %w", err)
 	}
 
 	return segment, nil
@@ -423,6 +452,10 @@ func (s *Snapshot) Epochs() protocol.EpochQuery {
 	return &EpochQuery{
 		snap: s,
 	}
+}
+
+func (s *Snapshot) Params() protocol.GlobalParams {
+	return s.state.Params()
 }
 
 // EpochQuery encapsulates querying epochs w.r.t. a snapshot.
