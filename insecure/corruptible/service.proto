@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package corruptible;
 
+import "google/protobuf/empty.proto";
+
 option go_package = "insecure/corruptible";
 
 // to compile this file, run:
@@ -11,12 +13,12 @@ option go_package = "insecure/corruptible";
 // It allows an attack to register itself to the conduit, and hence takes the control
 // of the conduit by sending messages on its behalf.
 service Zombie {
-  rpc RegisterAttacker(AttackerRegisterMessage) returns (ActionResponse) {}
-  rpc ProcessAttackerMessage(Message) returns (ActionResponse) {}
+  rpc RegisterAttacker(AttackerRegisterMessage) returns (google.protobuf.Empty) {}
+  rpc ProcessAttackerMessage(Message) returns (google.protobuf.Empty) {}
 }
 
 service Attacker {
-  rpc Observe(Message) returns (ActionResponse) {}
+  rpc Observe(Message) returns (google.protobuf.Empty) {}
 }
 
 // Message is represents the message exchanged between the Zombi and Attacker services.
@@ -40,13 +42,5 @@ enum Protocol {
 // AttackerRegisterMessage is the message an attacker uses to register itself to the chosen Zombie,
 // and takes its control.
 message AttackerRegisterMessage {
-  string ip = 1;
-  string port = 2;
-}
-
-// ActionResponse is used as the gRPC result to denote whether an action was successful on the
-// remote Zombie or not.
-message ActionResponse {
-  bool complete = 1;
-  string error = 2;
+  string address = 1;
 }
