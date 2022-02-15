@@ -109,10 +109,10 @@ func EncodeKeyPart(kp *ledger.KeyPart) []byte {
 
 func encodeKeyPart(kp *ledger.KeyPart) []byte {
 	buffer := make([]byte, 0, encodedKeyPartLength(kp))
-	return encodeAndAppendKeyPart(kp, buffer)
+	return encodeAndAppendKeyPart(buffer, kp)
 }
 
-func encodeAndAppendKeyPart(kp *ledger.KeyPart, buffer []byte) []byte {
+func encodeAndAppendKeyPart(buffer []byte, kp *ledger.KeyPart) []byte {
 	// encode "Type" field of the key part
 	buffer = utils.AppendUint16(buffer, kp.Type)
 
@@ -185,11 +185,10 @@ func EncodeKey(k *ledger.Key) []byte {
 // encodeKey encodes a key into a byte slice
 func encodeKey(k *ledger.Key) []byte {
 	buffer := make([]byte, 0, encodedKeyLength(k))
-	return encodeAndAppendKey(k, buffer)
+	return encodeAndAppendKey(buffer, k)
 }
 
-// encodeKey encodes a key into a byte slice
-func encodeAndAppendKey(k *ledger.Key, buffer []byte) []byte {
+func encodeAndAppendKey(buffer []byte, k *ledger.Key) []byte {
 	// encode number of key parts
 	buffer = utils.AppendUint16(buffer, uint16(len(k.KeyParts)))
 
@@ -199,7 +198,7 @@ func encodeAndAppendKey(k *ledger.Key, buffer []byte) []byte {
 		buffer = utils.AppendUint32(buffer, uint32(encodedKeyPartLength(&kp)))
 
 		// encode the key part
-		buffer = encodeAndAppendKeyPart(&kp, buffer)
+		buffer = encodeAndAppendKeyPart(buffer, &kp)
 	}
 
 	return buffer
@@ -292,7 +291,7 @@ func encodeValue(v ledger.Value) []byte {
 	return v
 }
 
-func encodeAndAppendValue(v ledger.Value, buffer []byte) []byte {
+func encodeAndAppendValue(buffer []byte, v ledger.Value) []byte {
 	return append(buffer, v...)
 }
 
@@ -379,7 +378,7 @@ func EncodeAndAppendPayloadWithoutPrefix(p *ledger.Payload, buffer []byte) []byt
 	if p == nil {
 		return []byte{}
 	}
-	return encodeAndAppendPayload(p, buffer)
+	return encodeAndAppendPayload(buffer, p)
 }
 
 func EncodedPayloadLengthWithoutPrefix(p *ledger.Payload) int {
@@ -388,22 +387,22 @@ func EncodedPayloadLengthWithoutPrefix(p *ledger.Payload) int {
 
 func encodePayload(p *ledger.Payload) []byte {
 	buffer := make([]byte, 0, encodedPayloadLength(p))
-	return encodeAndAppendPayload(p, buffer)
+	return encodeAndAppendPayload(buffer, p)
 }
 
-func encodeAndAppendPayload(p *ledger.Payload, buffer []byte) []byte {
+func encodeAndAppendPayload(buffer []byte, p *ledger.Payload) []byte {
 
 	// encode encoded key size
 	buffer = utils.AppendUint32(buffer, uint32(encodedKeyLength(&p.Key)))
 
 	// encode key
-	buffer = encodeAndAppendKey(&p.Key, buffer)
+	buffer = encodeAndAppendKey(buffer, &p.Key)
 
 	// encode encoded value size
 	buffer = utils.AppendUint64(buffer, uint64(encodedValueLength(p.Value)))
 
 	// encode value
-	buffer = encodeAndAppendValue(p.Value, buffer)
+	buffer = encodeAndAppendValue(buffer, p.Value)
 
 	return buffer
 }
