@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	GetInfoForProposedNodesScriptLocalnet = []byte(`
+	getInfoForProposedNodesScriptLocalnet = []byte(`
 		import FlowIDTableStaking from 0xf8d6e0586b0a20c7
 		pub fun main(): [FlowIDTableStaking.NodeInfo] {
 			let nodeIDs = FlowIDTableStaking.getProposedNodeIDs()
@@ -21,7 +21,7 @@ var (
 			return infos
 	}`)
 
-	GetInfoForProposedNodesScriptTestnet = []byte(`
+	getInfoForProposedNodesScriptTestnet = []byte(`
 		import FlowIDTableStaking from 0x9eca2b38b18b5dfe
 		pub fun main(): [FlowIDTableStaking.NodeInfo] {
 			let nodeIDs = FlowIDTableStaking.getProposedNodeIDs()
@@ -56,11 +56,11 @@ func GetNodeInfoForProposedNodesScript(network string) ([]byte, error) {
 	}
 
 	if network == "testnet" {
-		return GetInfoForProposedNodesScriptTestnet, nil
+		return getInfoForProposedNodesScriptTestnet, nil
 	}
 
 	if network == "localnet" {
-		return GetInfoForProposedNodesScriptLocalnet, nil
+		return getInfoForProposedNodesScriptLocalnet, nil
 	}
 
 	return nil, fmt.Errorf("invalid network string expecting one of ( mainnet | testnet | localnet )")
