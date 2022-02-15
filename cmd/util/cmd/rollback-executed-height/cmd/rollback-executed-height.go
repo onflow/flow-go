@@ -17,7 +17,7 @@ var (
 	flagHeight  uint64
 	flagDataDir string
 )
-
+// rolls back the execution height to the specified height
 var Cmd = &cobra.Command{
 	Use:   "rollback-executed-height",
 	Short: "Rollback the executed height",
