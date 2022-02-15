@@ -221,7 +221,7 @@ func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (
 		if len(cids) == 1 {
 			s.metrics.ExecutionDataAddFinished(time.Since(start), true, blobTreeSize)
 
-			root, err := flow.CidToFlowID(cids[0])
+			root, err := flow.CidToId(cids[0])
 			return root, blobTree, err
 		}
 

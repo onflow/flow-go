@@ -125,7 +125,7 @@ func referenceMerkleRoot(t *testing.T, ids ...flow.Identifier) flow.Identifier {
 func TestCIDConversion(t *testing.T) {
 	id := unittest.IdentifierFixture()
 	cid := flow.IdToCid(id)
-	id2, err := flow.CidToFlowID(cid)
+	id2, err := flow.CidToId(cid)
 	assert.NoError(t, err)
 	assert.Equal(t, id, id2)
 
@@ -134,7 +134,7 @@ func TestCIDConversion(t *testing.T) {
 	rand.Read(data)
 	cid = blocks.NewBlock(data).Cid()
 
-	id, err = flow.CidToFlowID(cid)
+	id, err = flow.CidToId(cid)
 	cid2 := flow.IdToCid(id)
 	assert.NoError(t, err)
 	assert.Equal(t, cid, cid2)

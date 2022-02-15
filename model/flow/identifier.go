@@ -197,7 +197,7 @@ func Sample(size uint, ids ...Identifier) []Identifier {
 	return dup[:size]
 }
 
-func CidToFlowID(c cid.Cid) (Identifier, error) {
+func CidToId(c cid.Cid) (Identifier, error) {
 	decoded, err := mh.Decode(c.Hash())
 
 	if err != nil {
