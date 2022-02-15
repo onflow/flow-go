@@ -673,22 +673,6 @@ func (e *ScriptEnv) ValueDecoded(duration time.Duration) {
 	e.metrics.ValueDecoded(duration)
 }
 
-func (m *ScriptEnv) BLSVerifyPOP(_ *runtime.PublicKey, _ []byte) (bool, error) {
-	panic("unexpected BLSVerifyPOP call")
-}
-
-func (m *ScriptEnv) AggregateBLSSignatures(_ [][]byte) ([]byte, error) {
-	panic("unexpected BLSAggregateSignatures call")
-}
-
-func (m *ScriptEnv) AggregateBLSPublicKeys(_ []*runtime.PublicKey) (*runtime.PublicKey, error) {
-	panic("unexpected BLSAggregatePublicKeys call")
-}
-
-func (m *ScriptEnv) ResourceOwnerChanged(*interpreter.CompositeValue, common.Address, common.Address) {
-	panic("unexpected ResourceOwnerChanged call")
-}
-
 // Commit commits changes and return a list of updated keys
 func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	// commit changes and return a list of updated keys

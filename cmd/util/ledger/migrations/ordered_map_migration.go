@@ -222,11 +222,11 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 			string(p.Key.KeyParts[2].Value)
 		// if the entry doesn't contain a separator, we just ignore it
 		// since it is storage metadata and does not need migration
-		if !strings.Contains(entry, "storage\x1f") &&
-			!strings.Contains(entry, "public\x1f") &&
-			!strings.Contains(entry, "contract\x1f") &&
-			!strings.Contains(entry, "private\x1f") {
-			m.Log.Info().Msgf("Ignoring key in storage payloads: %s", entry)
+		if !strings.HasPrefix(entry, "storage\x1f") &&
+			!strings.HasPrefix(entry, "public\x1f") &&
+			!strings.HasPrefix(entry, "contract\x1f") &&
+			!strings.HasPrefix(entry, "private\x1f") {
+			m.Log.Warn().Msgf("Ignoring key in storage payloads: %s", entry)
 			continue
 		}
 		splitEntry := strings.Split(entry, "\x1f")

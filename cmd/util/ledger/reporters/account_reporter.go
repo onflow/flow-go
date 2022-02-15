@@ -388,7 +388,7 @@ func (c *balanceProcessor) hasReceiver(address flow.Address) (bool, error) {
 }
 
 func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDomain, id string) (cadence.Value, error) {
-	addr, err := common.HexToAddress(address.Hex())
+	addr, err := common.BytesToAddress(address.Bytes())
 	if err != nil {
 		return nil, err
 	}
