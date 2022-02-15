@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -15,12 +16,14 @@ type ConduitFactory struct {
 	myId     flow.Identifier
 	adapter  network.Adapter
 	attacker AttackerClient
+	conduits map[string]*Conduit
 }
 
 func NewCorruptibleConduitFactory(myId flow.Identifier, codec network.Codec) *ConduitFactory {
 	return &ConduitFactory{
-		myId:  myId,
-		codec: codec,
+		myId:     myId,
+		codec:    codec,
+		conduits: make(map[string]*Conduit),
 	}
 }
 
@@ -46,18 +49,36 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 
 	child, cancel := context.WithCancel(ctx)
 
-	return &Conduit{
+	con := &Conduit{
 		ctx:     child,
 		cancel:  cancel,
 		channel: channel,
 		adapter: c.adapter,
-	}, nil
+	}
+
+	c.conduits[channel.String()] = con
+
+	return con, nil
 }
 
-func (c *ConduitFactory) ProcessAttackerMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*ActionResponse, error) {
+func (c *ConduitFactory) ProcessAttackerMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*empty.Empty, error) {
 
 }
 
-func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *AttackerRegisterMessage, opts ...grpc.CallOption) (*ActionResponse, error) {
+// RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
+// control it.
+// Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
+func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *AttackerRegisterMessage, opts ...grpc.CallOption) (*empty.Empty, error) {
+	if c.attacker != nil {
+		return nil, fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", in.Address)
+	}
 
+	clientConn, err := grpc.Dial(in.Address)
+	if err != nil {
+		return nil, fmt.Errorf("could not establish a client connection to attacker: %w", err)
+	}
+
+	c.attacker = NewAttackerClient(clientConn)
+
+	return &empty.Empty{}, nil
 }
