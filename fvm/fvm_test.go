@@ -2118,7 +2118,6 @@ func TestBLSMultiSignature(t *testing.T) {
 
 				// generate keys and signatures
 				numSigs := 50
-				sks := make([]crypto.PrivateKey, 0, numSigs)
 				sigs := make([]crypto.Signature, 0, numSigs)
 
 				kmac := crypto.NewBLSKMAC("test tag")
@@ -2127,7 +2126,6 @@ func TestBLSMultiSignature(t *testing.T) {
 					// a valid BLS signature
 					s, err := sk.Sign(input, kmac)
 					require.NoError(t, err)
-					sks = append(sks, sk)
 					sigs = append(sigs, s)
 				}
 
@@ -2354,9 +2352,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				message, cadenceMessage := createMessage("random_message")
 				tag := "random_tag"
 
-				code := []byte(
-					fmt.Sprintf(
-						`
+				code := []byte(`
 							import Crypto
 
 							pub fun main(
@@ -2381,8 +2377,7 @@ func TestBLSMultiSignature(t *testing.T) {
 									hashAlgorithm: HashAlgorithm.KMAC128_BLS_BLS12_381)
 								return boo
 							}
-							`,
-					),
+							`),
 				)
 
 				num := 50
