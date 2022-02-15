@@ -412,7 +412,8 @@ func readPayloadFromReader(reader io.Reader, scratch []byte) (*ledger.Payload, e
 		return nil, fmt.Errorf("cannot read long data: %w", err)
 	}
 
-	payload, err := encoding.DecodeAndCopyPayloadWithoutPrefix(scratch)
+	// Decode and copy payload
+	payload, err := encoding.DecodePayloadWithoutPrefix(scratch, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode payload from checkpoint: %w", err)
 	}
