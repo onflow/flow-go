@@ -374,7 +374,8 @@ func EncodePayload(p *ledger.Payload) []byte {
 
 // EncodeAndAppendPayloadWithoutPrefix encodes a ledger payload
 // without prefix (version and type) and appends to buffer.
-func EncodeAndAppendPayloadWithoutPrefix(p *ledger.Payload, buffer []byte) []byte {
+// If payload is nil, empty byte slice is returned.
+func EncodeAndAppendPayloadWithoutPrefix(buffer []byte, p *ledger.Payload) []byte {
 	if p == nil {
 		return []byte{}
 	}
@@ -411,7 +412,9 @@ func encodedPayloadLength(p *ledger.Payload) int {
 	if p == nil {
 		return 0
 	}
-	// Payload is encoded as: encode key length (4 bytes) + encoded key + encoded value length (8 bytes) + encode value
+	// Payload is encoded as:
+	//   encode key length (4 bytes) + encoded key +
+	//   encoded value length (8 bytes) + encode value
 	return 4 + encodedKeyLength(&p.Key) + 8 + encodedValueLength(p.Value)
 }
 

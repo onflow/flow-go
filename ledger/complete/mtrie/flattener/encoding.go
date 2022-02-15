@@ -80,7 +80,7 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 	binary.BigEndian.PutUint32(scratch[pos:], uint32(encPayloadSize))
 	pos += 4
 
-	scratch = encoding.EncodeAndAppendPayloadWithoutPrefix(n.Payload(), scratch[:pos])
+	scratch = encoding.EncodeAndAppendPayloadWithoutPrefix(scratch[:pos], n.Payload())
 
 	return scratch
 }
