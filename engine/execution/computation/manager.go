@@ -312,6 +312,8 @@ func (e *Manager) ComputeBlock(
 		}
 	} else if block.Block.Header.ChainID == flow.Mainnet {
 		// ignore the ExecutionDataID to force result ID to be consistent
+		// this code exists for mainnet16 only, it turns out the ExecutionDataID introduced in this spork
+		// is non-deterministic. We decided to exclude this field from this height. We will fix it in the next spork.
 		if block.Block.Header.Height >= 24188133 {
 			result.ExecutionDataID = flow.ZeroID
 		}
