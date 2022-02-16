@@ -52,6 +52,7 @@ func TestNetwork(t *testing.T) {
 	net := testnet.PrepareFlowNetwork(t, conf)
 
 	var wg sync.WaitGroup
+	defer wg.Wait()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	net.Start(ctx)

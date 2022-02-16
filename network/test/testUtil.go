@@ -146,11 +146,9 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		opt(o)
 	}
 
-	total := len(identities)
-	for i := 0; i < total; i++ {
+	for i, id := range identities {
 		// casts libP2PNode instance to a local variable to avoid closure
 		node := libP2PNodes[i]
-		nodeId := identities[i].NodeID
 
 		// libp2p node factory for this instance of middleware
 		factory := func(ctx context.Context) (*p2p.Node, error) {
@@ -164,7 +162,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
 			factory,
-			nodeId,
+			id.NodeID,
 			metrics,
 			sporkID,
 			p2p.DefaultUnicastTimeout,

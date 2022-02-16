@@ -8,7 +8,6 @@ import (
 	_ "unsafe" // for linking runtimeNano
 
 	madns "github.com/multiformats/go-multiaddr-dns"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -76,11 +75,11 @@ const (
 )
 
 // NewResolver is the factory function for creating an instance of this resolver.
-func NewResolver(cacheSizeLimit uint32, logger zerolog.Logger, collector module.ResolverMetrics, opts ...optFunc) *Resolver {
+func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
 		logger:         logger.With().Str("component", "dns-resolver").Logger(),
 		res:            madns.DefaultResolver,
-		c:              newCache(cacheSizeLimit, logger),
+		c:              newCache(),
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},
@@ -219,7 +218,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 	if !exists {
 		r.collector.OnDNSCacheMiss()
-		return r.lookupResolverForTXTRecord(ctx, txt)
+		return r.lookupResolverForTXTAddr(ctx, txt)
 	}
 
 	if !fresh && r.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
@@ -235,8 +234,8 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 	return addr, nil
 }
 
-// lookupResolverForTXTRecord queries the underlying resolver for the domain and updates the cache if query is successful.
-func (r *Resolver) lookupResolverForTXTRecord(ctx context.Context, txt string) ([]string, error) {
+// lookupResolverForIPAddr queries the underlying resolver for the domain and updates the cache if query is successful.
+func (r *Resolver) lookupResolverForTXTAddr(ctx context.Context, txt string) ([]string, error) {
 	addr, err := r.res.LookupTXT(ctx, txt)
 	if err != nil {
 		return nil, err

@@ -370,11 +370,11 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapp
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			require.NoError(suite.Suite.T(), send(event, sender.con, suite.ids[rcvID].NodeID))
-			wg.Done()
 		}()
 	}
-	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "could not send message on time")
+	wg.Wait()
 	time.Sleep(1 * time.Second)
 
 	// receiver should only see the message once, and the rest should be dropped due to
