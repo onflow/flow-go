@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"os"
@@ -182,26 +181,6 @@ func (r RawStorable) ChildStorables() []atree.Storable {
 
 func (r RawStorable) Storable(_ atree.SlabStorage, _ atree.Address, _ uint64) (atree.Storable, error) {
 	return r, nil
-}
-
-func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storagePayloads []ledger.Payload, slabPayloads []ledger.Payload) {
-	for _, p := range inp {
-		if state.IsFVMStateKey(
-			string(p.Key.KeyParts[0].Value),
-			string(p.Key.KeyParts[1].Value),
-			string(p.Key.KeyParts[2].Value),
-		) {
-			fvmPayloads = append(fvmPayloads, p)
-			continue
-		}
-		if bytes.HasPrefix(p.Key.KeyParts[2].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
-			slabPayloads = append(slabPayloads, p)
-			continue
-		}
-		// otherwise this is a storage payload
-		storagePayloads = append(storagePayloads, p)
-	}
-	return
 }
 
 func (m *OrderedMapMigration) initialize(payload []ledger.Payload) ([]ledger.Payload, error) {
