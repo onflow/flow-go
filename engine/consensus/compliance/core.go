@@ -371,4 +371,7 @@ func (c *Core) prunePendingCache() {
 
 	// always record the metric
 	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+
+	// HOTFIX
+	c.voteAggregator.PruneUpToView(final.View)
 }
