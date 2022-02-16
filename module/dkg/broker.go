@@ -259,14 +259,26 @@ func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.Public
 
 // Disqualify flags that a node is misbehaving and got disqualified
 func (b *Broker) Disqualify(node int, log string) {
-	// The Warn log is used by the integration tests to check if this method is called.
-	b.log.Warn().Msgf("participant %d is disqualifying participant %d because: %s", b.myIndex, node, log)
+	var nodeID flow.Identifier
+	if node < len(b.committee) {
+		nodeID = b.committee[node].NodeID
+	}
+
+	// The warn-level log is used by the integration tests to check if this method is called.
+	b.log.Warn().Msgf("participant %d (this node) is disqualifying participant (index=%d, node_id=%s) because: %s",
+		b.myIndex, node, nodeID, log)
 }
 
 // FlagMisbehavior warns that a node is misbehaving.
 func (b *Broker) FlagMisbehavior(node int, log string) {
-	// The Warn log is used by the integration tests to check if this method is called.
-	b.log.Warn().Msgf("participant %d is flagging participant %d because: %s", b.myIndex, node, log)
+	var nodeID flow.Identifier
+	if node < len(b.committee) {
+		nodeID = b.committee[node].NodeID
+	}
+
+	// The warn-level log is used by the integration tests to check if this method is called.
+	b.log.Warn().Msgf("participant %d (this node) is flagging participant (index=%d, node_id=%s) because: %s",
+		b.myIndex, node, nodeID, log)
 }
 
 // GetPrivateMsgCh returns the channel through which consumers can receive
