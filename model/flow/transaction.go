@@ -113,9 +113,9 @@ func (tb TransactionBody) Fingerprint() []byte {
 	}
 
 	retval := fingerprint.Fingerprint(struct {
-		Payload            interface{}
-		PayloadSignatures  interface{}
-		EnvelopeSignatures interface{}
+		Payload            PayloadData
+		PayloadSignatures  []TxSignatureData
+		EnvelopeSignatures []TxSignatureData
 	}{
 		Payload:            payload,
 		PayloadSignatures:  signaturesPayload,
@@ -447,8 +447,8 @@ func (tb *TransactionBody) EnvelopeMessage() []byte {
 	}
 
 	retval := fingerprint.Fingerprint(struct {
-		Payload           interface{}
-		PayloadSignatures interface{}
+		Payload           PayloadData
+		PayloadSignatures []TxSignatureData
 	}{
 		payload,
 		signatures,
