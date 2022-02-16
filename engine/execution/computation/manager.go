@@ -291,7 +291,33 @@ func (e *Manager) ComputeBlock(
 		Msg("computed block result")
 
 	e.edCache.Insert(block.Block.Header, blobTree)
+
 	result.ExecutionDataID = rootID
+
+	if block.Block.Header.ChainID == flow.Testnet {
+		// 60117893 was the last sealed height.
+		// hardcode the ExecutionDataID computation at next unsealed height for testnet
+		if block.Block.Header.Height == 60117894 {
+			resultID60117894, err := flow.HexStringToIdentifier("dfc4e7b1099461a251b0c6d1fa116aa32bdd57bfb54fe6ec6558cd6cc4b5b021")
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("fail to parse ExecutionDataID from string")
+			}
+			result.ExecutionDataID = resultID60117894
+		} else if block.Block.Header.Height == 60153761 {
+			resultID60153761, err := flow.HexStringToIdentifier("59cfb3fc4e1da717ed29643cd46fc709a371d5aaa5fe999d1fd9425f7059c643")
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("fail to parse ExecutionDataID from string")
+			}
+			result.ExecutionDataID = resultID60153761
+		}
+	} else if block.Block.Header.ChainID == flow.Mainnet {
+		// ignore the ExecutionDataID to force result ID to be consistent
+		// this code exists for mainnet16 only, it turns out the ExecutionDataID introduced in this spork
+		// is non-deterministic. We decided to exclude this field from this height. We will fix it in the next spork.
+		if block.Block.Header.Height >= 24188133 {
+			result.ExecutionDataID = flow.ZeroID
+		}
+	}
 
 	return result, nil
 }

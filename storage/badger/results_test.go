@@ -107,3 +107,31 @@ func TestResultStoreForceIndexOverridesMapping(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestBatchReindex(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewExecutionResults(metrics, db)
+
+		blockID1 := unittest.IdentifierFixture()
+
+		result1 := unittest.ExecutionResultFixture()
+		result2 := unittest.ExecutionResultFixture()
+
+		batch1 := bstorage.NewBatch(db)
+		require.NoError(t, store.BatchStore(result1, batch1))
+		require.NoError(t, store.BatchIndex(blockID1, result1.ID(), false, batch1))
+		require.NoError(t, batch1.Flush())
+
+		batch2 := bstorage.NewBatch(db)
+		require.NoError(t, store.BatchStore(result2, batch2))
+		require.NoError(t, store.BatchIndex(blockID1, result2.ID(), true, batch2))
+		require.NoError(t, batch2.Flush())
+
+		// retrieve index to make sure it points to second ER now
+		byBlockID, err := store.ByBlockID(blockID1)
+
+		require.Equal(t, result2, byBlockID)
+		require.NoError(t, err)
+	})
+}
