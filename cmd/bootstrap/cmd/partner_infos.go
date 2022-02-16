@@ -56,7 +56,7 @@ func init() {
 
 	populatePartnerInfosCMD.Flags().StringVar(&flagANAddress, "access-address", "", "the address of the access node used for client connections")
 	populatePartnerInfosCMD.Flags().StringVar(&flagANNetworkKey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
-	populatePartnerInfosCMD.Flags().StringVar(&flagNetworkEnv, "network", "mainnet", "the network string, expecting one of ( mainnet | testnet | localnet )")
+	populatePartnerInfosCMD.Flags().StringVar(&flagNetworkEnv, "network", "mainnet", "the network string, expecting one of ( mainnet | testnet | emulator )")
 
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "access-address")
 }
@@ -212,7 +212,7 @@ func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
 
 // writePartnerStakesFile writes the partner stakes file
 func writePartnerStakesFile(partnerStakes PartnerStakesInfo) {
-	writeJSON(bootstrap.PartnerStakesFileName, partnerStakes)
+	writeJSON(bootstrap.FileNamePartnerStakes, partnerStakes)
 }
 
 func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes, skippedNodes int) {
