@@ -3,7 +3,6 @@ package voteaggregator
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/utils/unittest"
 	"sync"
 	"testing"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var factoryError = errors.New("factory error")
