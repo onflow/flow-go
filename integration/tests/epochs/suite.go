@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -16,8 +19,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"strings"
-	"time"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -40,6 +41,7 @@ type nodeUpdateValidation func(ctx context.Context, env templates.Environment, r
 
 type Suite struct {
 	suite.Suite
+	log zerolog.Logger
 	common.TestnetStateTracker
 	cancel      context.CancelFunc
 	net         *testnet.FlowNetwork
@@ -49,6 +51,16 @@ type Suite struct {
 }
 
 func (s *Suite) SetupTest() {
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "suite.go").
+		Str("testcase", s.T().Name()).
+		Logger()
+	s.log = logger
+	s.log.Info().Msgf("================> SetupTest")
+	defer func() {
+		s.log.Info().Msgf("================> Finish SetupTest")
+	}()
+
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -110,10 +122,10 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
 	s.net.Remove()
-	if s.cancel != nil {
-		s.cancel()
-	}
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)
@@ -214,7 +226,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		NetworkingKey:           networkingKey,
 		MachineAccountKey:       machineAccountKey,
 		MachineAccountPublicKey: machineAccountPubKey,
-		MachineAccountAddress: machineAccountAddr,
+		MachineAccountAddress:   machineAccountAddr,
 		ContainerName:           containerName,
 	}
 }
@@ -632,6 +644,37 @@ func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environme
 	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")
 }
 
+// assertLatestFinalizedBlockHeightHigher will assert that the difference between snapshot height and latest finalized height
+// is greater than numOfBlocks.
+func (s *Suite) assertLatestFinalizedBlockHeightHigher(ctx context.Context, snapshot *inmem.Snapshot, numOfBlocks uint64) {
+	bootstrapHead, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	header, err := s.client.GetLatestSealedBlockHeader(ctx)
+	require.NoError(s.T(), err)
+
+	// head should now be at-least numOfBlocks blocks higher from when we started
+	require.True(s.T(), header.Height-bootstrapHead.Height >= numOfBlocks, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
+}
+
+// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// This ensures a single transaction can be sealed by the network.
+func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	// createAccount will submit a create account transaction and wait for it to be sealed
+	_, err := s.createAccount(
+		ctx,
+		fullAccountKey,
+		s.client.Account(),
+		s.client.SDKServiceAddress(),
+	)
+	require.NoError(s.T(), err)
+}
+
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
@@ -639,22 +682,14 @@ func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environme
 // head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
 // 3. Check that we can execute a script on the AN
 func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
-	bootstrapHead, err := rootSnapshot.Head()
-	require.NoError(s.T(), err)
+	// assert atleast 20 blocks have been finalized since the node replacement
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
 	clientAddr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName[info.ContainerName])
 	client, err := testnet.NewClient(clientAddr, s.net.Root().Header.ChainID.Chain())
 	require.NoError(s.T(), err)
-	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-
-	head, err := snapshot.Head()
-	require.NoError(s.T(), err)
-
-	// head should now be at-least 20 blocks higher from when we started
-	require.True(s.T(), head.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
 
 	// execute script directly on new AN to ensure it's functional
 	proposedTable, err := client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
@@ -667,35 +702,28 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	bootstrapHead, err := rootSnapshot.Head()
-	require.NoError(s.T(), err)
-
-	header, err := s.client.GetLatestSealedBlockHeader(ctx)
-	require.NoError(s.T(), err)
-
-	// head should now be at-least 20 blocks higher from when we started
-	require.True(s.T(), header.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
+	// assert atleast 20 blocks have been finalized since the node replacement
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 }
 
 // assertNetworkHealthyAfterLNChange after an collection node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
-// is after the first epoch starts.
-// 2. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
+// is after the first epoch.
 func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	fullAccountKey := sdk.NewAccountKey().
-		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
-		SetHashAlgo(sdkcrypto.SHA2_256).
-		SetWeight(sdk.AccountKeyWeightThreshold)
-
 	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
 	// To validate the LN joined the network successfully and is processing transactions we submit a
 	// create account transaction and assert there are no errors.
-	_, err := s.createAccount(
-		ctx,
-		fullAccountKey,
-		s.client.Account(),
-		s.client.SDKServiceAddress(),
-	)
-	require.NoError(s.T(), err)
+	s.submitSmokeTestTransaction(ctx)
+}
+
+// assertNetworkHealthyAfterSNChange after replacing a consensus node in the test and waiting until
+// the epoch transition we should observe blocks finalizing and we should be able to submit a transaction
+// that will indicate overall network health
+// 1. Submit transaction to network
+func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	// At this point we can assure that our SN node is participating in finalization and sealing because
+	// there are only 2 SN nodes in the network now we will submit a transaction to the
+	// network to ensure the network is overall healthy.
+	s.submitSmokeTestTransaction(ctx)
 }

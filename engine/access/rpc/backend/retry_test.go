@@ -42,9 +42,25 @@ func (suite *Suite) TestTransactionRetry() {
 	// txID := transactionBody.ID()
 	// blockID := block.ID()
 	// Setup Handler + Retry
-	backend := New(suite.state, suite.colClient, nil, suite.blocks, suite.headers,
-		suite.collections, suite.transactions, suite.receipts, suite.results, suite.chainID, metrics.NewNoopCollector(), nil,
-		false, DefaultMaxHeightRange, nil, nil, suite.log)
+	backend := New(suite.state,
+		suite.colClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
@@ -106,9 +122,25 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	connFactory := suite.setupConnectionFactory()
 
 	// Setup Handler + Retry
-	backend := New(suite.state, suite.colClient, nil, suite.blocks, suite.headers,
-		suite.collections, suite.transactions, suite.receipts, suite.results, suite.chainID, metrics.NewNoopCollector(), connFactory,
-		false, DefaultMaxHeightRange, nil, nil, suite.log)
+	backend := New(suite.state,
+		suite.colClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		connFactory,
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 

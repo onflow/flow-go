@@ -85,13 +85,29 @@ func NewScriptEnvironment(
 	env.contracts = handler.NewContractHandler(
 		accounts,
 		true,
-		func() []common.Address { return []common.Address{} })
+		func() []common.Address { return []common.Address{} },
+		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
 	if ctx.BlockHeader != nil {
 		env.seedRNG(ctx.BlockHeader)
 	}
 
 	return env
+}
+
+func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (bool, error) {
+	return crypto.BLSVerifyPOP(pk, s)
+}
+
+func (e *ScriptEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+	return crypto.AggregateBLSSignatures(sigs)
+}
+
+func (e *ScriptEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	return crypto.AggregateBLSPublicKeys(keys)
+}
+
+func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
 }
 
 func (e *ScriptEnv) seedRNG(header *flow.Header) {

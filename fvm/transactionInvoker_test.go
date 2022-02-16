@@ -246,7 +246,7 @@ func TestSafetyCheck(t *testing.T) {
 							&sema.ImportedProgramError{
 								Err: &sema.CheckerError{},
 								Location: common.AddressLocation{
-									Address: common.BytesToAddress([]byte{1, 2, 3, 4}),
+									Address: common.MustBytesToAddress([]byte{1, 2, 3, 4}),
 								},
 							},
 						},
@@ -282,6 +282,10 @@ func TestSafetyCheck(t *testing.T) {
 
 type ErrorReturningRuntime struct {
 	TxErrors []error
+}
+
+func (e *ErrorReturningRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
+	panic("SetResourceOwnerChangeHandlerEnabled not expected")
 }
 
 var _ runtime.Runtime = &ErrorReturningRuntime{}

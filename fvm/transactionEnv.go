@@ -54,6 +54,21 @@ type TransactionEnv struct {
 	authorizers        []runtime.Address
 }
 
+func (e *TransactionEnv) BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (bool, error) {
+	return crypto.BLSVerifyPOP(pk, s)
+}
+
+func (e *TransactionEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+	return crypto.AggregateBLSSignatures(sigs)
+}
+
+func (e *TransactionEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	return crypto.AggregateBLSPublicKeys(keys)
+}
+
+func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+}
+
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -99,6 +114,7 @@ func NewTransactionEnvironment(
 	env.contracts = handler.NewContractHandler(accounts,
 		ctx.RestrictedDeploymentEnabled,
 		env.GetAuthorizedAccountsForContractUpdates,
+		env.useContractAuditVoucher,
 	)
 
 	if ctx.BlockHeader != nil {
@@ -171,12 +187,17 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
 	}
-	addresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+	addresses, ok := utils.CadenceValueToAddressSlice(value)
 	if !ok {
 		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
 	}
 	return addresses
+}
+
+func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
+	useVoucher := UseContractAuditVoucherInvocation(e, e.traceSpan)
+	return useVoucher(address, string(code[:]))
 }
 
 func (e *TransactionEnv) isAuthorizerServiceAccount() bool {

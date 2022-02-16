@@ -4,8 +4,10 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"testing"
 
+	blocks "github.com/ipfs/go-block-format"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -115,4 +117,25 @@ func referenceMerkleRoot(t *testing.T, ids ...flow.Identifier) flow.Identifier {
 	hash := tree.Hash()
 	copy(root[:], hash)
 	return root
+}
+
+// TestCIDConversion tests that the CID conversion functions are working as expected
+// It generates Flow ID / CID fixtures and converts them back and forth to check that
+// the conversion is correct.
+func TestCIDConversion(t *testing.T) {
+	id := unittest.IdentifierFixture()
+	cid := flow.FlowIDToCid(id)
+	id2, err := flow.CidToFlowID(cid)
+	assert.NoError(t, err)
+	assert.Equal(t, id, id2)
+
+	// generate random CID
+	data := make([]byte, 4)
+	rand.Read(data)
+	cid = blocks.NewBlock(data).Cid()
+
+	id, err = flow.CidToFlowID(cid)
+	cid2 := flow.FlowIDToCid(id)
+	assert.NoError(t, err)
+	assert.Equal(t, cid, cid2)
 }

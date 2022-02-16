@@ -2,6 +2,7 @@ package node_builder
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,14 +11,16 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -26,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -34,7 +36,7 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
@@ -94,6 +96,15 @@ type AccessNodeConfig struct {
 	retryEnabled                 bool
 	rpcMetricsEnabled            bool
 	baseOptions                  []cmd.Option
+
+	PublicNetworkConfig PublicNetworkConfig
+}
+
+type PublicNetworkConfig struct {
+	// NetworkKey crypto.PublicKey // TODO: do we need a different key for the public network?
+	BindAddress string
+	Network     network.Network
+	Metrics     module.NetworkMetrics
 }
 
 // DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
@@ -128,6 +139,10 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
 		supportsUnstakedFollower:     false,
+		PublicNetworkConfig: PublicNetworkConfig{
+			BindAddress: cmd.NotSet,
+			Metrics:     metrics.NewNoopCollector(),
+		},
 	}
 }
 
@@ -166,6 +181,23 @@ type FlowAccessNodeBuilder struct {
 	RequestEng  *requester.Engine
 	FollowerEng *followereng.Engine
 	SyncEng     *synceng.Engine
+}
+
+// deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
+// These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
+func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
+	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
+	// line params)
+	if builder.bootstrapIdentities != nil {
+		return nil
+	}
+	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	if err != nil {
+		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
+	}
+	builder.bootstrapIdentities = ids
+
+	return nil
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -235,13 +267,9 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
-		// initialize the staking & beacon verifiers, signature joiner
-		staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
-		beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-		merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-
+		packer := hotsignature.NewConsensusSigDataPacker(builder.Committee)
 		// initialize the verifier for the protocol consensus
-		verifier := verification.NewCombinedVerifier(builder.Committee, staking, beacon, merger)
+		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
 
 		followerCore, err := consensus.NewFollower(node.Logger, builder.Committee, node.Storage.Headers, final, verifier,
 			builder.FinalizationDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
@@ -382,14 +410,13 @@ func (builder *FlowAccessNodeBuilder) IsStaked() bool {
 	return builder.staked
 }
 
-func (builder *FlowAccessNodeBuilder) ParseFlags() {
+func (builder *FlowAccessNodeBuilder) ParseFlags() error {
 
 	builder.BaseFlags()
 
 	builder.extraFlags()
 
-	builder.ParseAndPrintFlags()
-
+	return builder.ParseAndPrintFlags()
 }
 
 func (builder *FlowAccessNodeBuilder) extraFlags() {
@@ -423,6 +450,13 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
+		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
+	}).ValidateFlags(func() error {
+		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
+			return errors.New("public-network-address must be set if supports-unstaked-node is true")
+		}
+
+		return nil
 	})
 }
 
