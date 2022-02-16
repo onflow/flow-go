@@ -3,6 +3,7 @@ package voteaggregator
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/utils/unittest"
 	"sync"
 	"testing"
 
@@ -44,7 +45,7 @@ func (s *VoteCollectorsTestSuite) SetupTest() {
 		}
 		return nil, fmt.Errorf("mocked collector %v not found: %w", view, factoryError)
 	}
-	s.collectors = NewVoteCollectors(s.lowestLevel, s.workerPool, s.factoryMethod)
+	s.collectors = NewVoteCollectors(unittest.Logger(), s.lowestLevel, s.workerPool, s.factoryMethod)
 }
 
 func (s *VoteCollectorsTestSuite) TearDownTest() {
