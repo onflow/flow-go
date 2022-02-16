@@ -68,7 +68,7 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 	}
 
 	collector, err := v.createCollector(view, v.workerPool)
-	v.log.Info().Uint64("view", view).Msg("created vote collector")
+	v.log.Debug().Uint64("view", view).Msg("created vote collector")
 	if err != nil {
 		return nil, false, fmt.Errorf("could not create vote collector for view %d: %w", view, err)
 	}
@@ -85,7 +85,7 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 	}
 
 	v.collectors[view] = collector
-	v.log.Info().Uint64("view", view).Msgf("storing vote collector, total: %d", len(v.collectors))
+	v.log.Debug().Uint64("view", view).Msgf("storing vote collector, total: %d", len(v.collectors))
 
 	return collector, true, nil
 }
@@ -113,7 +113,7 @@ func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, bool
 func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
-	v.log.Info().
+	v.log.Debug().
 		Uint64("from", v.lowestRetainedView).
 		Uint64("to", lowestRetainedView).
 		Msgf("pruning vote collectors, total: %d", len(v.collectors))
@@ -142,7 +142,7 @@ func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 		}
 	}
 
-	v.log.Info().
+	v.log.Debug().
 		Uint64("from", v.lowestRetainedView).
 		Uint64("to", lowestRetainedView).
 		Msgf("pruned vote collectors, total: %d", len(v.collectors))
