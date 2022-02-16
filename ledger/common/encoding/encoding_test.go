@@ -168,8 +168,10 @@ func Test_PayloadWithoutPrefixEncodingDecoding(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, newp.Equals(tc.payload))
 
-			// modify encoded value's last byte
-			encoded[len(encoded)-1] = ^encoded[len(encoded)-1]
+			// Reset encoded payload
+			for i := 0; i < len(encoded); i++ {
+				encoded[i] = 0
+			}
 
 			if tc.zeroCopy {
 				// Test if decoded payload is changed after source data is modified
