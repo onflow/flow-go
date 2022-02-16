@@ -14,6 +14,9 @@
       "tests": [
         {
           "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+          "commit_date": "2021-09-22T01:06:25Z",
+          "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
             "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
@@ -24,6 +27,9 @@
         },
         {
           "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+          "commit_date": "2021-09-22T01:06:25Z",
+          "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
             "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
@@ -34,6 +40,9 @@
         },
         {
           "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+          "commit_date": "2021-09-22T01:06:25Z",
+          "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
             "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
@@ -44,6 +53,9 @@
         },
         {
           "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+          "commit_date": "2021-09-22T01:06:25Z",
+          "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
             "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
@@ -54,6 +66,9 @@
         },
         {
           "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+          "commit_date": "2021-09-22T01:06:25Z",
+          "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
             "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",

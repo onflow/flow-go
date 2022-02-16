@@ -153,6 +153,10 @@ func checkTestResults(t *testing.T, expectedTestResults []common.TestResult, act
 		require.Equal(t, expectedTestResult.Test, actualTestResult.Test)
 		require.Equal(t, expectedTestResult.Elapsed, actualTestResult.Elapsed, fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
 		require.Equal(t, expectedTestResult.Result, actualTestResult.Result)
+
+		require.Equal(t, expectedTestResult.CommitDate, actualTestResult.CommitDate)
+		require.Equal(t, expectedTestResult.CommitSha, actualTestResult.CommitSha)
+		require.Equal(t, expectedTestResult.JobRunDate, actualTestResult.JobRunDate)
 	}
 }
 

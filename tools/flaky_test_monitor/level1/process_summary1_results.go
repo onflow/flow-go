@@ -94,6 +94,11 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*common.Package
 				newTestResult.Test = rawTestStep.Test
 				newTestResult.Package = rawTestStep.Package
 
+				// each test holds specific data, irrespective of what the test result
+				newTestResult.CommitDate = common.GetCommitDate()
+				newTestResult.JobRunDate = common.GetJobRunDate()
+				newTestResult.CommitSha = common.GetCommitSha()
+
 				// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
 				// for passing tests, there are usually 2 outputs for a passing test and more outputs for a failing test
 				newTestResult.Output = make([]string, 0)
