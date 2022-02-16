@@ -2,15 +2,15 @@ package handler_test
 
 import (
 	"fmt"
-	stateMock "github.com/onflow/flow-go/fvm/mock/state"
-	"github.com/stretchr/testify/mock"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/handler"
+	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
