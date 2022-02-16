@@ -2,6 +2,7 @@ package reporters
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -20,6 +21,12 @@ import (
 )
 
 const FungibleTokenTrackerReportPrefix = "fungible_token_report"
+
+var domains = []string{
+	common.PathDomainPublic.Identifier(),
+	common.PathDomainPrivate.Identifier(),
+	common.PathDomainStorage.Identifier(),
+}
 
 // FungibleTokenTracker iterates through stored cadence values over all accounts and check for any
 // value with the given resource typeID
@@ -66,37 +73,48 @@ type TokenDataPoint struct {
 	TypeID string `json:"type_id"`
 }
 
+type job struct {
+	owner    flow.Address
+	payloads []ledger.Payload
+}
+
 // Report creates a fungible_token_report_*.json file that contains data on all fungible token Vaults in the state commitment.
 // I recommend using gojq to browse through the data, because of the large uint64 numbers which jq won't be able to handle.
-func (r *FungibleTokenTracker) Report(payload []ledger.Payload) error {
+func (r *FungibleTokenTracker) Report(payloads []ledger.Payload) error {
 	r.rw = r.rwf.ReportWriter(FungibleTokenTrackerReportPrefix)
 	defer r.rw.Close()
 
-	r.progress = progressbar.Default(int64(len(payload)), "Processing:")
-
-	ldg := migrations.NewView(payload)
-	sth := state.NewStateHolder(state.NewState(ldg))
-	addressGen := state.NewStateBoundAddressGenerator(sth, r.chain)
-	addressCount := addressGen.AddressCount()
-
 	wg := &sync.WaitGroup{}
-	jobs := make(chan flow.Address, addressCount)
 
-	for i := uint64(1); i < addressCount; i++ {
-		addr, err := r.chain.AddressAtIndex(i)
-		if err != nil {
-			panic(err)
+	// we need to shard by owner, otherwise ledger won't be thread-safe
+	addressCount := 0
+	payloadsByOwner := make(map[flow.Address][]ledger.Payload)
+
+	for _, pay := range payloads {
+		owner := flow.BytesToAddress(pay.Key.KeyParts[0].Value)
+		if len(owner) > 0 { // ignoring FVM values
+			m, ok := payloadsByOwner[owner]
+			if !ok {
+				payloadsByOwner[owner] = make([]ledger.Payload, 0)
+				addressCount++
+			}
+			payloadsByOwner[owner] = append(m, pay)
 		}
-		jobs <- addr
+	}
+
+	jobs := make(chan job, addressCount)
+	r.progress = progressbar.Default(int64(addressCount), "Processing:")
+
+	for k, v := range payloadsByOwner {
+		jobs <- job{k, v}
 	}
 
 	close(jobs)
 
-	// RAMTIN: hmm, ledger is not thread safe :-?
-	workerCount := 1 // runtime.NumCPU()
+	workerCount := runtime.NumCPU()
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
-		go r.worker(ldg, jobs, wg)
+		go r.worker(jobs, wg)
 	}
 
 	wg.Wait()
@@ -110,20 +128,34 @@ func (r *FungibleTokenTracker) Report(payload []ledger.Payload) error {
 }
 
 func (r *FungibleTokenTracker) worker(
-	l state.View,
-	jobs <-chan flow.Address,
+	jobs <-chan job,
 	wg *sync.WaitGroup) {
-	st := state.NewState(l)
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
-	storage := cadenceRuntime.NewStorage(
-		&migrations.AccountsAtreeLedger{Accounts: accounts},
-	)
+	for j := range jobs {
 
-	for address := range jobs {
-		r.handleAddress(address, storage)
+		view := migrations.NewView(j.payloads)
+		st := state.NewState(view)
+		sth := state.NewStateHolder(st)
+		accounts := state.NewAccounts(sth)
+		storage := cadenceRuntime.NewStorage(
+			&migrations.AccountsAtreeLedger{Accounts: accounts},
+		)
 
-		err := r.progress.Add(1)
+		owner, err := common.BytesToAddress(j.owner[:])
+		if err != nil {
+			panic(err)
+		}
+
+		for _, domain := range domains {
+			storageMap := storage.GetStorageMap(owner, domain)
+			itr := storageMap.Iterator()
+			key, value := itr.Next()
+			for value != nil {
+				r.iterateChildren(append([]string{domain}, key), j.owner, value)
+				key, value = itr.Next()
+			}
+		}
+
+		err = r.progress.Add(1)
 		if err != nil {
 			panic(err)
 		}
@@ -166,28 +198,4 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 	compValue.ForEachField(func(key string, value interpreter.Value) {
 		r.iterateChildren(append(tr, key), addr, value)
 	})
-}
-
-func (r *FungibleTokenTracker) handleAddress(adr flow.Address, storage *cadenceRuntime.Storage) {
-
-	domains := []string{
-		common.PathDomainPublic.Identifier(),
-		common.PathDomainPrivate.Identifier(),
-		common.PathDomainStorage.Identifier(),
-	}
-
-	owner, err := common.BytesToAddress(adr[:])
-	if err != nil {
-		panic(err)
-	}
-
-	for _, domain := range domains {
-		storageMap := storage.GetStorageMap(owner, domain)
-		itr := storageMap.Iterator()
-		key, value := itr.Next()
-		for value != nil {
-			r.iterateChildren(append([]string{domain}, key), adr, value)
-			key, value = itr.Next()
-		}
-	}
 }

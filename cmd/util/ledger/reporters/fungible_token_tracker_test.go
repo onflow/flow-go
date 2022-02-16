@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -121,14 +122,13 @@ func TestFungibleTokenTracker(t *testing.T) {
 
 	data, err := os.ReadFile(reporterFactory.Filename(reporters.FungibleTokenTrackerReportPrefix))
 	require.NoError(t, err)
-	fmt.Println(string(data))
 
-	expectedOutput := `[` +
-		`{"path":"storage/wrappedToken/vault","address":"8c5303eaa26202d6","balance":105,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"},` +
-		`{"path":"storage/flowTokenVault","address":"8c5303eaa26202d6","balance":99999999999699895,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"},` +
-		`{"path":"storage/flowTokenVault","address":"9a0766d93b6608b7","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"},` +
-		`{"path":"storage/flowTokenVault","address":"7e60df042a9c0868","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}` +
-		`]`
+	// wrappedToken
+	require.True(t, strings.Contains(string(data), `{"path":"storage/wrappedToken/vault","address":"8c5303eaa26202d6","balance":105,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
+	// flowTokenVaults
+	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"8c5303eaa26202d6","balance":99999999999699895,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
+	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"9a0766d93b6608b7","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
+	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"7e60df042a9c0868","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
+	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"912d5440f7e3769e","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 
-	require.Equal(t, expectedOutput, string(data))
 }
