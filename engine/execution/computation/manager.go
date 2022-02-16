@@ -310,6 +310,11 @@ func (e *Manager) ComputeBlock(
 			}
 			result.ExecutionDataID = resultID60153761
 		}
+	} else if block.Block.Header.ChainID == flow.Mainnet {
+		// ignore the ExecutionDataID to force result ID to be consistent
+		if block.Block.Header.Height >= 24188133 {
+			result.ExecutionDataID = flow.ZeroID
+		}
 	}
 
 	return result, nil
