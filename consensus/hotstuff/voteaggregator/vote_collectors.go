@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -19,6 +21,7 @@ type NewCollectorFactoryMethod = func(view uint64, workers hotstuff.Workers) (ho
 // This structure is concurrently safe.
 type VoteCollectors struct {
 	*component.ComponentManager
+	log                zerolog.Logger
 	lock               sync.RWMutex
 	lowestRetainedView uint64                            // lowest view, for which we still retain a VoteCollector and process votes
 	collectors         map[uint64]hotstuff.VoteCollector // view -> VoteCollector
@@ -28,7 +31,7 @@ type VoteCollectors struct {
 
 var _ hotstuff.VoteCollectors = (*VoteCollectors)(nil)
 
-func NewVoteCollectors(lowestRetainedView uint64, workerPool hotstuff.Workerpool, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
+func NewVoteCollectors(logger zerolog.Logger, lowestRetainedView uint64, workerPool hotstuff.Workerpool, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
 	// Component manager for wrapped worker pool
 	componentBuilder := component.NewComponentManagerBuilder()
 	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -39,6 +42,7 @@ func NewVoteCollectors(lowestRetainedView uint64, workerPool hotstuff.Workerpool
 
 	return &VoteCollectors{
 		ComponentManager:   componentBuilder.Build(),
+		log:                logger,
 		lowestRetainedView: lowestRetainedView,
 		collectors:         make(map[uint64]hotstuff.VoteCollector),
 		workerPool:         workerPool,
@@ -64,6 +68,7 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 	}
 
 	collector, err := v.createCollector(view, v.workerPool)
+	v.log.Info().Uint64("view", view).Msg("created vote collector")
 	if err != nil {
 		return nil, false, fmt.Errorf("could not create vote collector for view %d: %w", view, err)
 	}
@@ -80,6 +85,8 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 	}
 
 	v.collectors[view] = collector
+	v.log.Info().Uint64("view", view).Msgf("storing vote collector, total: %d", len(v.collectors))
+
 	return collector, true, nil
 }
 
@@ -106,6 +113,11 @@ func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, bool
 func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
+	v.log.Info().
+		Uint64("from", v.lowestRetainedView).
+		Uint64("to", lowestRetainedView).
+		Msgf("pruning vote collectors, total: %d", len(v.collectors))
+
 	if v.lowestRetainedView >= lowestRetainedView {
 		return
 	}
@@ -129,5 +141,11 @@ func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 			delete(v.collectors, w)
 		}
 	}
+
+	v.log.Info().
+		Uint64("from", v.lowestRetainedView).
+		Uint64("to", lowestRetainedView).
+		Msgf("pruned vote collectors, total: %d", len(v.collectors))
+
 	v.lowestRetainedView = lowestRetainedView
 }
