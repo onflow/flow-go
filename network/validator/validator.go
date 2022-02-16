@@ -85,12 +85,13 @@ func TopicValidator(validators ...MessageValidator) pubsub.ValidatorEx {
 		for _, validator := range validators {
 			switch res := validator(ctx, from, &msg); res {
 			case pubsub.ValidationReject:
+				// reject if any individual validator rejects
 				return res
 			case pubsub.ValidationIgnore:
+				// otherwise, ignore if any individual validator ignores
 				result = res
 			}
 		}
-
 		return result
 	}
 }

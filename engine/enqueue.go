@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -38,11 +39,11 @@ type MapFunc func(*Message) (*Message, bool)
 
 type MessageHandler struct {
 	log      zerolog.Logger
-	notifier Notifier
+	notifier module.Notifier
 	patterns []Pattern
 }
 
-func NewMessageHandler(log zerolog.Logger, notifier Notifier, patterns ...Pattern) *MessageHandler {
+func NewMessageHandler(log zerolog.Logger, notifier module.Notifier, patterns ...Pattern) *MessageHandler {
 	return &MessageHandler{
 		log:      log.With().Str("component", "message_handler").Logger(),
 		notifier: notifier,
