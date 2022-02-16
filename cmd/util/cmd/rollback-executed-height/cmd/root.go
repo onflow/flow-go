@@ -12,7 +12,7 @@ var (
 	flagDatadir string
 )
 
-// run with `./remove-execution-fork --datadir /var/flow/data/protocol`
+// run with `./remove-execution-result --datadir /var/flow/data/protocol`
 var rootCmd = &cobra.Command{
 	Use:   "remove-execution-result",
 	Short: "remove execution result",
