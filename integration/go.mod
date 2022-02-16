@@ -43,5 +43,4 @@ replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/crypto => ../crypto
 
-// v0.21.1-patch.2 seems missing
-// replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-patch.2
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-patch.2
