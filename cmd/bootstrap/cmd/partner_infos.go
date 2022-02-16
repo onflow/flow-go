@@ -87,7 +87,7 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 	for _, info := range nodeInfos.(cadence.Array).Values {
 		nodePubInfo, err := parseNodeInfo(info)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("could not node info")
+			log.Fatal().Err(err).Msg("could not parse node info from cadence script")
 		}
 
 		if isFlowNode(nodePubInfo.Address) {
