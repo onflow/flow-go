@@ -19,8 +19,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPrivKey\n",
-            "--- PASS: TestEncodableNetworkPrivKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPrivKey\n"},
+            {"item": "--- PASS: TestEncodableNetworkPrivKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -32,8 +32,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPrivKey\n",
-            "--- PASS: TestEncodableNetworkPrivKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPrivKey\n"},
+            {"item": "--- PASS: TestEncodableNetworkPrivKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -45,8 +45,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPrivKey\n",
-            "--- PASS: TestEncodableNetworkPrivKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPrivKey\n"},
+            {"item": "--- PASS: TestEncodableNetworkPrivKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -58,8 +58,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPrivKeyNil\n",
-            "--- PASS: TestEncodableNetworkPrivKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPrivKeyNil\n"},
+            {"item": "--- PASS: TestEncodableNetworkPrivKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -71,8 +71,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPrivKeyNil\n",
-            "--- PASS: TestEncodableNetworkPrivKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPrivKeyNil\n"},
+            {"item": "--- PASS: TestEncodableNetworkPrivKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -84,8 +84,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPrivKeyNil\n",
-            "--- PASS: TestEncodableNetworkPrivKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPrivKeyNil\n"},
+            {"item": "--- PASS: TestEncodableNetworkPrivKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -97,8 +97,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPubKey\n",
-            "--- PASS: TestEncodableNetworkPubKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPubKey\n"},
+            {"item": "--- PASS: TestEncodableNetworkPubKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -110,8 +110,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPubKey\n",
-            "--- PASS: TestEncodableNetworkPubKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPubKey\n"},
+            {"item": "--- PASS: TestEncodableNetworkPubKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -123,8 +123,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPubKey\n",
-            "--- PASS: TestEncodableNetworkPubKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPubKey\n"},
+            {"item": "--- PASS: TestEncodableNetworkPubKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -136,8 +136,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPubKeyNil\n",
-            "--- PASS: TestEncodableNetworkPubKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPubKeyNil\n"},
+            {"item": "--- PASS: TestEncodableNetworkPubKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -149,8 +149,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPubKeyNil\n",
-            "--- PASS: TestEncodableNetworkPubKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPubKeyNil\n"},
+            {"item": "--- PASS: TestEncodableNetworkPubKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -162,8 +162,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableNetworkPubKeyNil\n",
-            "--- PASS: TestEncodableNetworkPubKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableNetworkPubKeyNil\n"},
+            {"item": "--- PASS: TestEncodableNetworkPubKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -175,8 +175,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKey\n",
-            "--- PASS: TestEncodableRandomBeaconPrivKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPrivKey\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPrivKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -188,8 +188,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKey\n",
-            "--- PASS: TestEncodableRandomBeaconPrivKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPrivKey\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPrivKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -201,8 +201,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKey\n",
-            "--- PASS: TestEncodableRandomBeaconPrivKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPrivKey\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPrivKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -214,8 +214,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyNil\n",
-            "--- PASS: TestEncodableRandomBeaconPrivKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyNil\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPrivKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -227,8 +227,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyNil\n",
-            "--- PASS: TestEncodableRandomBeaconPrivKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyNil\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPrivKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -240,8 +240,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyNil\n",
-            "--- PASS: TestEncodableRandomBeaconPrivKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyNil\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPrivKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -253,8 +253,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPubKey\n",
-            "--- PASS: TestEncodableRandomBeaconPubKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPubKey\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPubKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -266,8 +266,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPubKey\n",
-            "--- PASS: TestEncodableRandomBeaconPubKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPubKey\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPubKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -279,8 +279,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPubKey\n",
-            "--- PASS: TestEncodableRandomBeaconPubKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPubKey\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPubKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -292,8 +292,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPubKeyNil\n",
-            "--- PASS: TestEncodableRandomBeaconPubKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPubKeyNil\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPubKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -305,8 +305,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPubKeyNil\n",
-            "--- PASS: TestEncodableRandomBeaconPubKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPubKeyNil\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPubKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -318,8 +318,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPubKeyNil\n",
-            "--- PASS: TestEncodableRandomBeaconPubKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPubKeyNil\n"},
+            {"item": "--- PASS: TestEncodableRandomBeaconPubKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -331,8 +331,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPrivKey\n",
-            "--- PASS: TestEncodableStakingPrivKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPrivKey\n"},
+            {"item": "--- PASS: TestEncodableStakingPrivKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -344,8 +344,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPrivKey\n",
-            "--- PASS: TestEncodableStakingPrivKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPrivKey\n"},
+            {"item": "--- PASS: TestEncodableStakingPrivKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -357,8 +357,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPrivKey\n",
-            "--- PASS: TestEncodableStakingPrivKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPrivKey\n"},
+            {"item": "--- PASS: TestEncodableStakingPrivKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -370,8 +370,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPrivKeyNil\n",
-            "--- PASS: TestEncodableStakingPrivKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPrivKeyNil\n"},
+            {"item": "--- PASS: TestEncodableStakingPrivKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -383,8 +383,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPrivKeyNil\n",
-            "--- PASS: TestEncodableStakingPrivKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPrivKeyNil\n"},
+            {"item": "--- PASS: TestEncodableStakingPrivKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -396,8 +396,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPrivKeyNil\n",
-            "--- PASS: TestEncodableStakingPrivKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPrivKeyNil\n"},
+            {"item": "--- PASS: TestEncodableStakingPrivKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -409,8 +409,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPubKey\n",
-            "--- PASS: TestEncodableStakingPubKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPubKey\n"},
+            {"item": "--- PASS: TestEncodableStakingPubKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -422,8 +422,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPubKey\n",
-            "--- PASS: TestEncodableStakingPubKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPubKey\n"},
+            {"item": "--- PASS: TestEncodableStakingPubKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -435,8 +435,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPubKey\n",
-            "--- PASS: TestEncodableStakingPubKey (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPubKey\n"},
+            {"item": "--- PASS: TestEncodableStakingPubKey (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -448,8 +448,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPubKeyNil\n",
-            "--- PASS: TestEncodableStakingPubKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPubKeyNil\n"},
+            {"item": "--- PASS: TestEncodableStakingPubKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -461,8 +461,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPubKeyNil\n",
-            "--- PASS: TestEncodableStakingPubKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPubKeyNil\n"},
+            {"item": "--- PASS: TestEncodableStakingPubKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -474,8 +474,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableStakingPubKeyNil\n",
-            "--- PASS: TestEncodableStakingPubKeyNil (0.00s)\n"
+            {"item": "=== RUN   TestEncodableStakingPubKeyNil\n"},
+            {"item": "--- PASS: TestEncodableStakingPubKeyNil (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -487,8 +487,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestIsHexString\n",
-            "--- PASS: TestIsHexString (0.00s)\n"
+            {"item": "=== RUN   TestIsHexString\n"},
+            {"item": "--- PASS: TestIsHexString (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -500,8 +500,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestIsHexString\n",
-            "--- PASS: TestIsHexString (0.00s)\n"
+            {"item": "=== RUN   TestIsHexString\n"},
+            {"item": "--- PASS: TestIsHexString (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -513,8 +513,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestIsHexString\n",
-            "--- PASS: TestIsHexString (0.00s)\n"
+            {"item": "=== RUN   TestIsHexString\n"},
+            {"item": "--- PASS: TestIsHexString (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -526,8 +526,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
-            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+            {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
           ],
           "result": "",
           "elapsed": 0
@@ -539,8 +539,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
-            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+            {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
           ],
           "result": "",
           "elapsed": 0
@@ -552,8 +552,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
-            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+            {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
           ],
           "result": "",
           "elapsed": 0

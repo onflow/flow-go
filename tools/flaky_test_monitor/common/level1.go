@@ -41,9 +41,11 @@ type TestResult struct {
 	JobRunDate time.Time `json:"job_run_date"`
 
 	// test specific data
-	Test    string   `json:"test"`
-	Package string   `json:"package"`
-	Output  []string `json:"output"`
-	Result  string   `json:"result"`
-	Elapsed float32  `json:"elapsed"`
+	Test    string `json:"test"`
+	Package string `json:"package"`
+	Output  []struct {
+		Item string `json:"item"`
+	} `json:"output"`
+	Result  string  `json:"result"`
+	Elapsed float32 `json:"elapsed"`
 }

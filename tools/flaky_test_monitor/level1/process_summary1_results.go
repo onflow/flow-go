@@ -6,17 +6,16 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"time"
 
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-// this interface gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for testing)
+// this interface gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for unit testing)
 type ResultReader interface {
 	getReader() *os.File
 	close()
 
-	// where to save results - will be different for tests vs production
+	// where to save results - will be different for unit tests vs production
 	getResultsFileName() string
 }
 
@@ -101,7 +100,10 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*common.Package
 
 				// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
 				// for passing tests, there are usually 2 outputs for a passing test and more outputs for a failing test
-				newTestResult.Output = make([]string, 0)
+				//newTestResult.Output = make([]string, 0)
+				newTestResult.Output = make([]struct {
+					Item string "json:\"item\""
+				}, 0)
 
 				// append to test result slice, whether it's the first or subsequent test result
 				packageResult.TestMap[rawTestStep.Test] = append(packageResult.TestMap[rawTestStep.Test], newTestResult)
@@ -122,7 +124,10 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*common.Package
 			// subsequent raw json outputs will have different data about the test - whether it passed/failed, what the test output was, etc
 			switch rawTestStep.Action {
 			case "output":
-				lastTestResultPointer.Output = append(lastTestResultPointer.Output, rawTestStep.Output)
+				output := struct {
+					Item string `json:"item"`
+				}{rawTestStep.Output}
+				lastTestResultPointer.Output = append(lastTestResultPointer.Output, output)
 
 			case "pass", "fail", "skip":
 				lastTestResultPointer.Result = rawTestStep.Action
@@ -181,21 +186,11 @@ func postProcessTestRun(packageResultMap map[string]*common.PackageResult) {
 }
 
 func finalizeTestRun(packageResultMap map[string]*common.PackageResult) common.TestRun {
-	commitSha := os.Getenv("COMMIT_SHA")
-	if commitSha == "" {
-		panic("COMMIT_SHA can't be empty")
-	}
-
-	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
-	common.AssertNoError(err, "error parsing COMMIT_DATE")
-
-	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
-	common.AssertNoError(err, "error parsing JOB_STARTED")
-
 	var testRun common.TestRun
-	testRun.CommitDate = commitDate.UTC()
-	testRun.CommitSha = commitSha
-	testRun.JobRunDate = jobStarted.UTC()
+
+	testRun.CommitDate = common.GetCommitDate()
+	testRun.CommitSha = common.GetCommitSha()
+	testRun.JobRunDate = common.GetJobRunDate()
 
 	// add all the package results to the test run
 	for _, pr := range packageResultMap {

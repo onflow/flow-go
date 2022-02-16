@@ -19,8 +19,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -32,8 +32,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -45,8 +45,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -58,8 +58,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -71,8 +71,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -84,8 +84,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -97,8 +97,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -110,8 +110,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -123,8 +123,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -136,8 +136,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -149,22 +149,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -176,22 +176,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -203,22 +203,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -230,22 +230,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -257,22 +257,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -284,22 +284,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -311,22 +311,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -338,22 +338,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -365,22 +365,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -392,22 +392,22 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "    hash_test.go:41: \n",
-            "        \tError Trace:\thash_test.go:41\n",
-            "        \tError:      \tNot equal: \n",
-            "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n",
-            "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n",
-            "        \t            \t\n",
-            "        \t            \tDiff:\n",
-            "        \t            \t--- Expected\n",
-            "        \t            \t+++ Actual\n",
-            "        \t            \t@@ -1,2 +1,2 @@\n",
-            "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n",
-            "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n",
-            "        \t            \t \n",
-            "        \tTest:       \tTestSanitySha2_256\n",
-            "--- FAIL: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "    hash_test.go:41: \n"},
+            {"item": "        \tError Trace:\thash_test.go:41\n"},
+            {"item": "        \tError:      \tNot equal: \n"},
+            {"item": "        \t            \texpected: hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x9}\n"},
+            {"item": "        \t            \tactual  : hash.Hash{0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0xb, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0xa, 0x8}\n"},
+            {"item": "        \t            \t\n"},
+            {"item": "        \t            \tDiff:\n"},
+            {"item": "        \t            \t--- Expected\n"},
+            {"item": "        \t            \t+++ Actual\n"},
+            {"item": "        \t            \t@@ -1,2 +1,2 @@\n"},
+            {"item": "        \t            \t-(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a09\n"},
+            {"item": "        \t            \t+(hash.Hash) (len=32) 0x9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n"},
+            {"item": "        \t            \t \n"},
+            {"item": "        \tTest:       \tTestSanitySha2_256\n"},
+            {"item": "--- FAIL: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "fail",
           "elapsed": 0
@@ -419,8 +419,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -432,8 +432,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -445,8 +445,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -458,8 +458,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -471,8 +471,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -484,8 +484,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -497,8 +497,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -510,8 +510,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -523,8 +523,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -536,8 +536,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -549,8 +549,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -562,8 +562,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -575,8 +575,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -588,8 +588,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -601,8 +601,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -614,8 +614,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -627,8 +627,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -640,8 +640,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -653,8 +653,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -666,8 +666,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -679,8 +679,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -692,8 +692,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -705,8 +705,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -718,8 +718,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -731,8 +731,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -744,8 +744,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -757,8 +757,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -770,8 +770,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -783,8 +783,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -796,8 +796,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -809,9 +809,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739682857435000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739682857435000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -823,9 +823,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739683980033000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739683980033000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -837,9 +837,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739684200452000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739684200452000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -851,9 +851,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739682415309000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739682415309000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -865,9 +865,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739682637108000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739682637108000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -879,9 +879,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739683740724000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739683740724000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -893,9 +893,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739682184421000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739682184421000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -907,9 +907,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739683077064000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739683077064000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -921,9 +921,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739683297507000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739683297507000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -935,9 +935,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632739683518492000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1632739683518492000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -949,9 +949,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739683740970000\n",
-            "--- PASS: TestSha3 (0.24s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739683740970000\n"},
+            {"item": "--- PASS: TestSha3 (0.24s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.24
@@ -963,9 +963,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739682415616000\n",
-            "--- PASS: TestSha3 (0.22s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739682415616000\n"},
+            {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.22
@@ -977,9 +977,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739682637311000\n",
-            "--- PASS: TestSha3 (0.22s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739682637311000\n"},
+            {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.22
@@ -991,9 +991,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739682857668000\n",
-            "--- PASS: TestSha3 (0.22s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739682857668000\n"},
+            {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.22
@@ -1005,9 +1005,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739683077268000\n",
-            "--- PASS: TestSha3 (0.22s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739683077268000\n"},
+            {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.22
@@ -1019,9 +1019,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739683297711000\n",
-            "--- PASS: TestSha3 (0.22s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739683297711000\n"},
+            {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.22
@@ -1033,9 +1033,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739683518781000\n",
-            "--- PASS: TestSha3 (0.22s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739683518781000\n"},
+            {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.22
@@ -1047,9 +1047,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739684200658000\n",
-            "--- PASS: TestSha3 (0.22s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739684200658000\n"},
+            {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.22
@@ -1061,9 +1061,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739683980266000\n",
-            "--- PASS: TestSha3 (0.22s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739683980266000\n"},
+            {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.22
@@ -1075,9 +1075,9 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632739682184858000\n",
-            "--- PASS: TestSha3 (0.23s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1632739682184858000\n"},
+            {"item": "--- PASS: TestSha3 (0.23s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.23
@@ -1089,8 +1089,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -1102,8 +1102,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -1115,8 +1115,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -1128,8 +1128,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -1141,8 +1141,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -1154,8 +1154,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -1167,8 +1167,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -1180,8 +1180,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1193,8 +1193,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -1206,8 +1206,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.11s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.11s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.11
@@ -1219,8 +1219,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1232,8 +1232,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1245,8 +1245,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1258,8 +1258,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1271,8 +1271,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1284,8 +1284,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1297,8 +1297,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1310,8 +1310,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1323,8 +1323,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -1336,8 +1336,8 @@
           "job_run_date": "2021-09-22T04:06:25Z",        
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
