@@ -16,8 +16,8 @@
           "test": "TestSanitySha3_256",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -26,8 +26,8 @@
           "test": "TestSanitySha3_256",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_256\n"},
+            {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -36,8 +36,8 @@
           "test": "TestSanitySha2_256",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "--- PASS: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -46,8 +46,8 @@
           "test": "TestSanitySha2_256",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "--- PASS: TestSanitySha2_256 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_256\n"},
+            {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -56,8 +56,8 @@
           "test": "TestSanitySha3_384",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -66,8 +66,8 @@
           "test": "TestSanitySha3_384",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha3_384\n"},
+            {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -76,8 +76,8 @@
           "test": "TestSanitySha2_384",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -86,8 +86,8 @@
           "test": "TestSanitySha2_384",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
+            {"item": "=== RUN   TestSanitySha2_384\n"},
+            {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -96,8 +96,8 @@
           "test": "TestSanityKmac128",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -106,8 +106,8 @@
           "test": "TestSanityKmac128",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
+            {"item": "=== RUN   TestSanityKmac128\n"},
+            {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -116,9 +116,9 @@
           "test": "TestHashersAPI",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1633358050430256000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1633358050430256000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -127,9 +127,9 @@
           "test": "TestHashersAPI",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1633358050203144000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
+            {"item": "=== RUN   TestHashersAPI\n"},
+            {"item": "    hash_test.go:114: math rand seed is 1633358050203144000\n"},
+            {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
           "result": "pass",
           "elapsed": 0
@@ -138,9 +138,9 @@
           "test": "TestSha3",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1633358050203374000\n",
-            "--- PASS: TestSha3 (0.23s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1633358050203374000\n"},
+            {"item": "--- PASS: TestSha3 (0.23s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.23
@@ -149,9 +149,9 @@
           "test": "TestSha3",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1633358050430467000\n",
-            "--- PASS: TestSha3 (0.22s)\n"
+            {"item": "=== RUN   TestSha3\n"},
+            {"item": "    hash_test.go:158: math rand seed is 1633358050430467000\n"},
+            {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.22
@@ -160,8 +160,8 @@
           "test": "TestSha3/SHA3_256",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -170,8 +170,8 @@
           "test": "TestSha3/SHA3_256",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_256\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.1
@@ -180,8 +180,8 @@
           "test": "TestSha3/SHA3_384",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12
@@ -190,8 +190,8 @@
           "test": "TestSha3/SHA3_384",
           "package": "github.com/onflow/flow-go/crypto/hash",
           "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
+            {"item": "=== RUN   TestSha3/SHA3_384\n"},
+            {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
           "result": "pass",
           "elapsed": 0.12

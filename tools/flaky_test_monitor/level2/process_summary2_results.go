@@ -38,7 +38,7 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 		common.AssertNoError(err, "error reading level 1 json")
 
 		err = json.Unmarshal(level1JsonBytes, &level1TestRun)
-		common.AssertNoError(err, "error unmarshalling level 1 test run")
+		common.AssertNoError(err, "error unmarshalling level 1 test run: "+dirEntries[i].Name())
 
 		// go through each level 1 summary and update level 2 summary
 		for _, packageResult := range level1TestRun.PackageResults {
@@ -141,7 +141,7 @@ func saveMessageHelper(testResult common.TestResult, expectedResult string, mess
 	defer messageFile.Close()
 
 	for _, output := range testResult.Output {
-		_, err = messageFile.WriteString(output)
+		_, err = messageFile.WriteString(output.Item)
 		common.AssertNoError(err, "error writing to failure / no-result file")
 	}
 }
