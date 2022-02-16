@@ -19,6 +19,8 @@ type CommitteeMetricsWrapper struct {
 	metrics   module.HotstuffMetrics
 }
 
+var _ hotstuff.Committee = (*CommitteeMetricsWrapper)(nil)
+
 func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetrics) *CommitteeMetricsWrapper {
 	return &CommitteeMetricsWrapper{
 		committee: committee,

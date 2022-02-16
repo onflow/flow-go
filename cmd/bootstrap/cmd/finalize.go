@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -204,6 +205,13 @@ func finalize(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
 
+	// validate the generated root snapshot is valid
+	verifyResultID := true
+	err = badger.IsValidRootSnapshot(snapshot, verifyResultID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("the generated root snapshot is invalid")
+	}
+
 	// write snapshot to disk
 	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
@@ -232,6 +240,12 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("saved result and seal are matching")
+
+	err = badger.IsValidRootSnapshot(rootSnapshot, verifyResultID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("saved snapshot is invalid")
+	}
+	log.Info().Msgf("saved root snapshot is valid")
 
 	// copy files only if the directories differ
 	log.Info().Str("private_dir", flagInternalNodePrivInfoDir).Str("output_dir", flagOutdir).Msg("attempting to copy private key files")
@@ -271,9 +285,10 @@ func readRootBlockVotes() []*hotstuff.Vote {
 		}
 
 		// read file and append to partners
-		var p hotstuff.Vote
-		readJSON(f, &p)
-		votes = append(votes, &p)
+		var vote hotstuff.Vote
+		readJSON(f, &vote)
+		votes = append(votes, &vote)
+		log.Info().Msgf("read vote %v for block %v from signerID %v", vote.ID(), vote.BlockID, vote.SignerID)
 	}
 	return votes
 }
@@ -466,7 +481,7 @@ func readDKGData() dkg.DKGData {
 
 	dkgData := dkg.DKGData{
 		PrivKeyShares: nil,
-		PubGroupKey:   encodableDKG.GroupKey,
+		PubGroupKey:   encodableDKG.GroupKey.PublicKey,
 		PubKeyShares:  nil,
 	}
 

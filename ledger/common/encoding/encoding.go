@@ -70,7 +70,7 @@ func CheckVersion(rawInput []byte) (rest []byte, version uint16, err error) {
 }
 
 // CheckType extracts encoding byte from a raw encoded message
-// checks it against the supported versions and returns the rest of rawInput (excluding encDecVersion bytes)
+// checks it against expected type and returns the rest of rawInput (excluding type byte)
 func CheckType(rawInput []byte, expectedType uint8) (rest []byte, err error) {
 	t, r, err := utils.ReadUint8(rawInput)
 	if err != nil {
@@ -554,7 +554,7 @@ func EncodeTrieProof(p *ledger.TrieProof) []byte {
 
 	// append encoded proof content
 	proof := encodeTrieProof(p)
-	buffer = append(buffer, proof[:]...)
+	buffer = append(buffer, proof...)
 
 	return buffer
 }
@@ -617,7 +617,7 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	pInst.Inclusion = bitutils.Bit(byteInclusion, 0) == 1
+	pInst.Inclusion = bitutils.ReadBit(byteInclusion, 0) == 1
 
 	// read steps
 	steps, rest, err := utils.ReadUint8(rest)

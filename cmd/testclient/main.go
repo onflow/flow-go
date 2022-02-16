@@ -26,7 +26,7 @@ func main() {
 
 	pflag.Parse()
 
-	c, err := client.New(targetAddr, grpc.WithInsecure())
+	c, err := client.New(targetAddr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		panic(err)
 	}

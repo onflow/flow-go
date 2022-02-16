@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -320,11 +318,8 @@ func IsFVMStateKey(owner, controller, key string) bool {
 func PrintableKey(key string) string {
 	// slab
 	if key[0] == '$' && len(key) == 9 {
-		i := uint64(binary.LittleEndian.Uint64([]byte(key)))
+		i := uint64(binary.BigEndian.Uint64([]byte(key[1:])))
 		return fmt.Sprintf("$%d", i)
 	}
-	if !utf8.ValidString(key) {
-		return strings.ToValidUTF8(key, "?")
-	}
-	return key
+	return fmt.Sprintf("#%x", []byte(key))
 }

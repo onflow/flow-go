@@ -3,9 +3,9 @@
 package network
 
 import (
-	"time"
-
+	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -29,13 +29,13 @@ type Middleware interface {
 	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
 	SetOverlay(Overlay)
 
-	// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
+	// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 	// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 	// as the router.
 	//
 	// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 	// a more efficient candidate.
-	SendDirect(msg *message.Message, peerID flow.Identifier) error
+	SendDirect(msg *message.Message, targetID flow.Identifier) error
 
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
@@ -48,18 +48,17 @@ type Middleware interface {
 	// Unsubscribe unsubscribes the middleware from a channel.
 	Unsubscribe(channel Channel) error
 
-	// Ping pings the target node and returns the ping RTT or an error
-	Ping(targetID peer.ID) (message.PingResponse, time.Duration, error)
-
-	// UpdateAllowList fetches the most recent identity of the nodes from overlay
-	// and updates the underlying libp2p node.
-	UpdateAllowList()
-
 	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
 
-	IsConnected(nodeID peer.ID) (bool, error)
+	// NewBlobService creates a new BlobService for the given channel.
+	NewBlobService(channel Channel, store datastore.Batching, opts ...BlobServiceOption) BlobService
+
+	// NewPingService creates a new PingService for the given ping protocol ID.
+	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService
+
+	IsConnected(nodeID flow.Identifier) (bool, error)
 }
 
 // Overlay represents the interface that middleware uses to interact with the
@@ -74,14 +73,7 @@ type Overlay interface {
 	// GetIdentity returns the Identity associated with the given peer ID, if it exists
 	Identity(peer.ID) (*flow.Identity, bool)
 
-	Receive(peerID peer.ID, channel Channel, msg *message.Message) error
-
-	ReceiveRequest(peerID peer.ID, channel Channel, msg *message.Message, resp Responder) error
-}
-
-type Responder interface {
-	SetError(err error)
-	SetResponse(resp interface{})
+	Receive(nodeID flow.Identifier, msg *message.Message) error
 }
 
 // Connection represents an interface to read from & write to a connection.

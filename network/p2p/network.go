@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,9 +9,11 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
+
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -21,12 +22,18 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-const DefaultCacheSize = 10e4
+const (
+	DefaultCacheSize = 10e4
+	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
+	eventIDPackingPrefix = "libp2ppacking"
+)
 
 // NotEjectedFilter is an identity filter that, when applied to the identity
 // table at a given snapshot, returns all nodes that we should communicate with
@@ -36,10 +43,19 @@ const DefaultCacheSize = 10e4
 // be included in network communication. We omit any nodes that have been ejected.
 var NotEjectedFilter = filter.Not(filter.Ejected)
 
+type NetworkOptFunction func(*Network)
+
+func WithConduitFactory(f network.ConduitFactory) NetworkOptFunction {
+	return func(n *Network) {
+		n.conduitFactory = f
+	}
+}
+
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
+	*component.ComponentManager
 	identityProvider            id.IdentityProvider
 	logger                      zerolog.Logger
 	codec                       network.Codec
@@ -47,21 +63,20 @@ type Network struct {
 	mw                          network.Middleware
 	top                         network.Topology // used to determine fanout connections
 	metrics                     module.NetworkMetrics
-	rcache                      *RcvCache // used to deduplicate incoming messages
+	rcache                      *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
-	requestQueue                network.MessageQueue
 	subMngr                     network.SubscriptionManager // used to keep track of subscribed channels
+	conduitFactory              network.ConduitFactory
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
-	*component.ComponentManager
 }
 
 var _ network.Network = (*Network)(nil)
 
 type registerEngineRequest struct {
-	channel  network.Channel
-	engine   network.Engine
-	respChan chan *registerEngineResp
+	channel          network.Channel
+	messageProcessor network.MessageProcessor
+	respChan         chan *registerEngineResp
 }
 
 type registerEngineResp struct {
@@ -72,6 +87,7 @@ type registerEngineResp struct {
 type registerBlobServiceRequest struct {
 	channel  network.Channel
 	ds       datastore.Batching
+	opts     []network.BlobServiceOption
 	respChan chan *registerBlobServiceResp
 }
 
@@ -96,19 +112,16 @@ func NewNetwork(
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
 	identityProvider id.IdentityProvider,
+	options ...NetworkOptFunction,
 ) (*Network, error) {
 
-	rcache, err := newRcvCache(csize)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize cache: %w", err)
-	}
-
+	rcache := netcache.NewReceiveCache(uint32(csize), log)
 	mw, err := mwFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
 
-	o := &Network{
+	n := &Network{
 		logger:                      log,
 		codec:                       codec,
 		me:                          me,
@@ -118,18 +131,27 @@ func NewNetwork(
 		metrics:                     metrics,
 		subMngr:                     sm,
 		identityProvider:            identityProvider,
+		conduitFactory:              conduit.NewDefaultConduitFactory(),
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 	}
 
-	o.mw.SetOverlay(o)
+	for _, opt := range options {
+		opt(n)
+	}
 
-	o.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(o.runMiddleware).
-		AddWorker(o.processRegisterEngineRequests).
-		AddWorker(o.processRegisterBlobServiceRequests).Build()
+	n.mw.SetOverlay(n)
 
-	return o, nil
+	if err := n.conduitFactory.RegisterAdapter(n); err != nil {
+		return nil, fmt.Errorf("could not register network adapter: %w", err)
+	}
+
+	n.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(n.runMiddleware).
+		AddWorker(n.processRegisterEngineRequests).
+		AddWorker(n.processRegisterBlobServiceRequests).Build()
+
+	return n, nil
 }
 
 func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -139,7 +161,7 @@ func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerCon
 	for {
 		select {
 		case req := <-n.registerEngineRequests:
-			conduit, err := n.handleRegisterEngineRequest(parent, req.channel, req.engine)
+			conduit, err := n.handleRegisterEngineRequest(parent, req.channel, req.messageProcessor)
 			resp := &registerEngineResp{
 				conduit: conduit,
 				err:     err,
@@ -163,7 +185,7 @@ func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.Signal
 	for {
 		select {
 		case req := <-n.registerBlobServiceRequests:
-			blobService, err := n.handleRegisterBlobServiceRequest(parent, req.channel, req.ds)
+			blobService, err := n.handleRegisterBlobServiceRequest(parent, req.channel, req.ds, req.opts)
 			resp := &registerBlobServiceResp{
 				blobService: blobService,
 				err:         err,
@@ -196,7 +218,7 @@ func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready compone
 	<-n.mw.Done()
 }
 
-func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	if !channels.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
@@ -210,35 +232,17 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 		Str("channel_id", channel.String()).
 		Msg("channel successfully registered")
 
-	// TODO: remove ctx field from Conduit
-	// create a cancellable child context
-	ctx, cancel := context.WithCancel(parent)
-
 	// create the conduit
-	conduit := &Conduit{
-		ctx:       ctx,
-		cancel:    cancel,
-		channel:   channel,
-		publish:   n.publish,
-		unicast:   n.unicast,
-		multicast: n.multicast,
-		close:     n.unregister,
+	conduit, err := n.conduitFactory.NewConduit(parent, channel)
+	if err != nil {
+		return nil, fmt.Errorf("could not create conduit using factory: %w", err)
 	}
 
 	return conduit, nil
 }
 
-func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
-	// TODO: this is a hack, we should not rely on knowing the underlying implementation
-	mw, ok := n.mw.(*Middleware)
-	if !ok {
-		return nil, errors.New("middleware was of unexpected type")
-	}
-	if mw.libP2PNode.dht == nil {
-		return nil, errors.New("blob exchange is disabled because content routing is not configured")
-	}
-
-	bs := network.NewBlobService(mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), ds)
+func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel network.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService, error) {
+	bs := n.mw.NewBlobService(channel, ds, opts...)
 
 	// start the blob service using the network's context
 	bs.Start(parent)
@@ -246,23 +250,19 @@ func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.Signaler
 	return bs, nil
 }
 
-func (n *Network) RegisterMessageProcessor(channel network.Channel, processor network.RequestHandler) (network.RequestSender, error) {
-
-}
-
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
 	respChan := make(chan *registerEngineResp)
 
 	select {
 	case <-n.ComponentManager.ShutdownSignal():
 		return nil, ErrNetworkShutdown
 	case n.registerEngineRequests <- &registerEngineRequest{
-		channel:  channel,
-		engine:   engine,
-		respChan: respChan,
+		channel:          channel,
+		messageProcessor: messageProcessor,
+		respChan:         respChan,
 	}:
 		select {
 		case <-n.ComponentManager.ShutdownSignal():
@@ -273,9 +273,18 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 	}
 }
 
+func (n *Network) RegisterPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) (network.PingService, error) {
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	default:
+		return n.mw.NewPingService(pingProtocol, provider), nil
+	}
+}
+
 // RegisterBlobService registers a BlobService on the given channel.
 // The returned BlobService can be used to request blobs from the network.
-func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
+func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
 	respChan := make(chan *registerBlobServiceResp)
 
 	select {
@@ -284,6 +293,7 @@ func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batc
 	case n.registerBlobServiceRequests <- &registerBlobServiceRequest{
 		channel:  channel,
 		ds:       ds,
+		opts:     opts,
 		respChan: respChan,
 	}:
 		select {
@@ -295,9 +305,9 @@ func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batc
 	}
 }
 
-// unregister unregisters the engine for the specified channel. The engine will no longer be able to send or
-// receive messages from that channel
-func (n *Network) unregister(channel network.Channel) error {
+// UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
+// receive messages from that channel.
+func (n *Network) UnRegisterChannel(channel network.Channel) error {
 	err := n.subMngr.Unregister(channel)
 	if err != nil {
 		return fmt.Errorf("failed to unregister engine for channel %s: %w", channel, err)
@@ -320,9 +330,10 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	defer n.Unlock()
 
 	subscribedChannels := n.subMngr.Channels()
+
 	top, err := n.top.GenerateFanout(n.Identities(), subscribedChannels)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate topology: %w", err)
+		return nil, fmt.Errorf("could not generate topology: %w, subscribed: %d", err, len(subscribedChannels))
 	}
 	return top, nil
 }
@@ -337,7 +348,7 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if n.rcache.add(message.EventID, network.Channel(message.ChannelID)) {
+	if !n.rcache.Add(message.EventID) {
 		log := n.logger.With().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
@@ -387,19 +398,10 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
 	//defer binstat.Leave(bs)
 
-	// use a hash with an engine-specific salt to get the payload hash
-	h := hash.NewSHA3_384()
-	_, err = h.Write([]byte("libp2ppacking" + channel))
+	eventId, err := EventId(channel, payload)
 	if err != nil {
-		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
+		return nil, fmt.Errorf("could not generate event id for message: %x", err)
 	}
-
-	_, err = h.Write(payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not hash event: %w", err)
-	}
-
-	payloadHash := h.SumHash()
 
 	var emTargets [][]byte
 	for _, targetID := range targetIDs {
@@ -417,7 +419,7 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: channel.String(),
-		EventID:   payloadHash,
+		EventID:   eventId,
 		OriginID:  originID,
 		TargetIDs: emTargets,
 		Payload:   payload,
@@ -427,10 +429,10 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	return msg, nil
 }
 
-// unicast sends the message in a reliable way to the given recipient.
+// UnicastOnChannel sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
-func (n *Network) unicast(channel network.Channel, message interface{}, targetID flow.Identifier) error {
+func (n *Network) UnicastOnChannel(channel network.Channel, message interface{}, targetID flow.Identifier) error {
 	if targetID == n.me.NodeID() {
 		n.logger.Debug().Msg("network skips self unicasting")
 		return nil
@@ -442,8 +444,6 @@ func (n *Network) unicast(channel network.Channel, message interface{}, targetID
 		return fmt.Errorf("unicast could not generate network message: %w", err)
 	}
 
-	// TODO: add check for message size
-	// TODO: also add the metrics calls here instead
 	err = n.mw.SendDirect(msg, targetID)
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
@@ -452,11 +452,11 @@ func (n *Network) unicast(channel network.Channel, message interface{}, targetID
 	return nil
 }
 
-// publish sends the message in an unreliable way to the given recipients.
+// PublishOnChannel sends the message in an unreliable way to the given recipients.
 // In this context, unreliable means that the message is published over a libp2p pub-sub
 // channel and can be read by any node subscribed to that channel.
 // The selector could be used to optimize or restrict delivery.
-func (n *Network) publish(channel network.Channel, message interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) PublishOnChannel(channel network.Channel, message interface{}, targetIDs ...flow.Identifier) error {
 	filteredIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter())
 
 	if len(filteredIDs) == 0 {
@@ -472,9 +472,9 @@ func (n *Network) publish(channel network.Channel, message interface{}, targetID
 	return nil
 }
 
-// multicast unreliably sends the specified event over the channel to randomly selected 'num' number of recipients
+// MulticastOnChannel unreliably sends the specified event over the channel to randomly selected 'num' number of recipients
 // selected from the specified targetIDs.
-func (n *Network) multicast(channel network.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (n *Network) MulticastOnChannel(channel network.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
 	selectedIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()).Sample(num)
 
 	if len(selectedIDs) == 0 {
@@ -552,44 +552,18 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
 }
 
-func (n *Network) requestQueueSubmitFunc(request interface{}) {
-	// TODO
-	// get the request handler
-
-	var handler network.RequestHandler
-	var success func(interface{})
-	var failure func(error)
-
-	qm := message.(queue.QMessage)
-	handler, err := n.subMngr.GetRequestHandler(channel)
+func EventId(channel network.Channel, payload []byte) (hash.Hash, error) {
+	// use a hash with an engine-specific salt to get the payload hash
+	h := hash.NewSHA3_384()
+	_, err := h.Write([]byte(eventIDPackingPrefix + channel))
 	if err != nil {
-		n.logger.Error().
-			Err(err).
-			Str("channel_id", qm.Target.String()).
-			Str("sender_id", qm.SenderID.String()).
-			Msg("failed to submit message")
-		return
+		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
 	}
 
-	// submits the message to the engine synchronously and
-	// tracks its processing time.
-	// startTimestamp := time.Now()
-
-	resp, err := handler.HandleRequest(request, sender)
-	// if err != nil {
-	// 	n.logger.Error().
-	// 		Err(err).
-	// 		Str("channel_id", qm.Target.String()).
-	// 		Str("sender_id", qm.SenderID.String()).
-	// 		Msg("failed to process message")
-	// }
-
-	// n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
-
+	_, err = h.Write(payload)
 	if err != nil {
-		failure(err)
-		return
+		return nil, fmt.Errorf("could not hash event: %w", err)
 	}
 
-	success(resp)
+	return h.SumHash(), nil
 }

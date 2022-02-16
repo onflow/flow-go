@@ -23,7 +23,7 @@ func Test_Programs(t *testing.T) {
 	newState := state.NewState(utils.NewSimpleView())
 
 	addressLocation := common.AddressLocation{
-		Address: common.BytesToAddress([]byte{2, 3, 4}),
+		Address: common.MustBytesToAddress([]byte{2, 3, 4}),
 		Name:    "address",
 	}
 
