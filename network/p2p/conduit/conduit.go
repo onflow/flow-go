@@ -1,4 +1,4 @@
-package p2p
+package conduit
 
 import (
 	"context"
@@ -8,32 +8,55 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// PublishFunc is a function that broadcasts the specified event
-// to all participants on the given channel.
-type PublishFunc func(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error
+// DefaultConduitFactory is a wrapper around the network Adapter.
+// It directly passes the incoming messages to the corresponding methods of the
+// network Adapter.
+type DefaultConduitFactory struct {
+	adapter network.Adapter
+}
 
-// UnicastFunc is a function that reliably sends the event via reliable 1-1 direct
-// connection in  the underlying network to the target ID.
-type UnicastFunc func(channel network.Channel, event interface{}, targetID flow.Identifier) error
+func NewDefaultConduitFactory() *DefaultConduitFactory {
+	return &DefaultConduitFactory{}
+}
 
-// MulticastFunc is a function that unreliably sends the event in the underlying
-// network to randomly chosen subset of nodes from targetIDs
-type MulticastFunc func(channel network.Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error
+// RegisterAdapter sets the Adapter component of the factory.
+// The Adapter is a wrapper around the Network layer that only exposes the set of methods
+// that are needed by a conduit.
+func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
+	if d.adapter != nil {
+		return fmt.Errorf("could not register a new network adapter, one already exists")
+	}
 
-// CloseFunc is a function that unsubscribes the conduit from the channel
-type CloseFunc func(channel network.Channel) error
+	d.adapter = adapter
+
+	return nil
+}
+
+// NewConduit creates a conduit on the specified channel.
+// Prior to creating any conduit, the factory requires an Adapter to be registered with it.
+func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel network.Channel) (network.Conduit, error) {
+	if d.adapter == nil {
+		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")
+	}
+
+	child, cancel := context.WithCancel(ctx)
+
+	return &Conduit{
+		ctx:     child,
+		cancel:  cancel,
+		channel: channel,
+		adapter: d.adapter,
+	}, nil
+}
 
 // Conduit is a helper of the overlay layer which functions as an accessor for
 // sending messages within a single engine process. It sends all messages to
 // what can be considered a bus reserved for that specific engine.
 type Conduit struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
-	channel   network.Channel
-	publish   PublishFunc
-	unicast   UnicastFunc
-	multicast MulticastFunc
-	close     CloseFunc
+	ctx     context.Context
+	cancel  context.CancelFunc
+	channel network.Channel
+	adapter network.Adapter
 }
 
 // Publish sends an event to the network layer for unreliable delivery
@@ -44,7 +67,7 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
-	return c.publish(c.channel, event, targetIDs...)
+	return c.adapter.PublishOnChannel(c.channel, event, targetIDs...)
 }
 
 // Unicast sends an event in a reliable way to the given recipient.
@@ -54,7 +77,7 @@ func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
-	return c.unicast(c.channel, event, targetID)
+	return c.adapter.UnicastOnChannel(c.channel, event, targetID)
 }
 
 // Multicast unreliably sends the specified event to the specified number of recipients selected from the specified subset.
@@ -63,7 +86,7 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
-	return c.multicast(c.channel, event, num, targetIDs...)
+	return c.adapter.MulticastOnChannel(c.channel, event, num, targetIDs...)
 }
 
 func (c *Conduit) Close() error {
@@ -73,5 +96,5 @@ func (c *Conduit) Close() error {
 	// close the conduit context
 	c.cancel()
 	// call the close function
-	return c.close(c.channel)
+	return c.adapter.UnRegisterChannel(c.channel)
 }
