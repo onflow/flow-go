@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -26,11 +27,14 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
+const DefaultMaxScriptExecutionTimeInSec = 2
+
 // Config defines the configurable options for the gRPC server.
 type Config struct {
-	ListenAddr        string
-	MaxMsgSize        int  // In bytes
-	RpcMetricsEnabled bool // enable GRPC metrics reporting
+	ListenAddr                  string
+	MaxMsgSize                  int  // In bytes
+	RpcMetricsEnabled           bool // enable GRPC metrics reporting
+	MaxScriptExecutionTimeInSec int  // maximum amount of time allowed for script execution
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -58,6 +62,10 @@ func New(
 
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
+	}
+
+	if config.MaxScriptExecutionTimeInSec == 0 {
+		config.MaxScriptExecutionTimeInSec = DefaultMaxScriptExecutionTimeInSec
 	}
 
 	serverOptions := []grpc.ServerOption{
@@ -157,22 +165,40 @@ func (h *handler) ExecuteScriptAtBlockID(
 	req *execution.ExecuteScriptAtBlockIDRequest,
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
 
-	blockID, err := convert.BlockID(req.GetBlockId())
-	if err != nil {
-		return nil, err
-	}
+	executed := make(chan bool, 1)
 
-	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
-	if err != nil {
-		// return code 3 as this passes the litmus test in our context
-		return nil, status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
-	}
+	var blockID flow.Identifier
+	var value []byte
+	var err error
+	go func() {
+		blockID, err = convert.BlockID(req.GetBlockId())
+		if err != nil {
+			executed <- true
+			return
+		}
 
-	res := &execution.ExecuteScriptAtBlockIDResponse{
-		Value: value,
-	}
+		value, err = h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
+		if err != nil {
+			// return code 3 as this passes the litmus test in our context
+			err = status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
+		}
+		executed <- true
+	}()
 
-	return res, nil
+	select {
+	case <-ctx.Done():
+		return nil, status.Error(codes.Canceled, "failed to execute script")
+	case <-time.After(DefaultMaxScriptExecutionTimeInSec * time.Second):
+		return nil, status.Error(codes.DeadlineExceeded, "failed to execute script")
+	case <-executed:
+		if err != nil {
+			return nil, err
+		}
+		res := &execution.ExecuteScriptAtBlockIDResponse{
+			Value: value,
+		}
+		return res, nil
+	}
 }
 
 func (h *handler) GetRegisterAtBlockID(
