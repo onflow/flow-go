@@ -8,6 +8,7 @@ import (
 	_ "unsafe" // for linking runtimeNano
 
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -75,7 +76,7 @@ const (
 )
 
 // NewResolver is the factory function for creating an instance of this resolver.
-func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
+func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
 		logger:         logger.With().Str("component", "dns-resolver").Logger(),
 		res:            madns.DefaultResolver,
@@ -134,7 +135,7 @@ func (r *Resolver) processTxtLookups(ctx irrecoverable.SignalerContext, ready co
 	for {
 		select {
 		case req := <-r.txtRequests:
-			_, err := r.lookupResolverForTXTRecord(ctx, req.txt)
+			_, err := r.lookupResolverForTXTAddr(ctx, req.txt)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
 				invalidated := r.c.invalidateTXTCacheEntry(req.txt)

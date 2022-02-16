@@ -194,7 +194,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 
 func (fnb *FlowNodeBuilder) EnqueueResolver() {
 	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		resolver := dns.NewResolver(dns.DefaultCacheSize, node.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+		resolver := dns.NewResolver(node.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
 		fnb.Resolver = resolver
 		return resolver, nil
 	})
