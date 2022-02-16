@@ -194,7 +194,7 @@ func (k *Key) CanonicalForm() []byte {
 	// this is using 10 for the estimate, to include the two '/'
 	// characters and an extra 3 characters for padding safety
 
-	constant := 10
+	constant := 7
 
 	requiredLen := constant * len(k.KeyParts)
 	for _, kp := range k.KeyParts {
