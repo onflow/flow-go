@@ -44,7 +44,7 @@ type BrokerConfig struct {
 // DefaultBrokerConfig returns the default config for the DKG Broker component.
 func DefaultBrokerConfig() BrokerConfig {
 	return BrokerConfig{
-		PublishMaxRetries:           8,
+		PublishMaxRetries:           10,
 		ReadMaxRetries:              3,
 		RetryMaxConsecutiveFailures: 2,
 		RetryInitialWait:            time.Second,
@@ -77,6 +77,8 @@ type Broker struct {
 	broadcastLock sync.Mutex // lock around outbound broadcasts
 	pollLock      sync.Mutex // lock around polls to read inbound broadcasts
 }
+
+var _ module.DKGBroker = (*Broker)(nil)
 
 // NewBroker instantiates a new epoch-specific broker capable of communicating
 // with other nodes via a network engine and dkg smart-contract.

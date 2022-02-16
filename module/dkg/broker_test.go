@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -37,10 +38,28 @@ func initCommittee(n int) (identities flow.IdentityList, locals []module.Local) 
 	return identities, locals
 }
 
-// TestImplementsDKGBroker ensures that Broker implements the DKGBroker
-// interface.
-func TestImplementsDKGBroker(t *testing.T) {
-	var _ module.DKGBroker = (*Broker)(nil)
+// TestDefaultConfig checks the default config is reasonable given expected real
+// network timing and conditions. If this test fails, re-evaluate defaults with
+// current network conditions.
+//
+// NOTE: This assumes exponential backoff
+func TestDefaultConfig(t *testing.T) {
+
+	phase1Views := 2000       // present configuration for all networks
+	viewsPerSecMainnet := 0.8 // observation from Feb 16 2022
+	phase1LenMainnet := time.Duration(float64(phase1Views)/viewsPerSecMainnet) * time.Second
+
+	conf := DefaultBrokerConfig()
+	// cumulative max delay is sum of delays
+	// 1+2+4+8...+2^n = (2^{n+1}-1)
+	maxDelay := conf.RetryInitialWait<<(conf.PublishMaxRetries+1) - time.Second
+	t.Run("all retries occur within phase 1", func(t *testing.T) {
+		assert.Less(t, maxDelay, phase1LenMainnet)
+	})
+
+	t.Run("last possible retry is after mid-point of phase 1", func(t *testing.T) {
+		assert.Greater(t, maxDelay, phase1LenMainnet/2)
+	})
 }
 
 // TestPrivateSend_Valid checks that the broker correctly converts the message
