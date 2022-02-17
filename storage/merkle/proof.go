@@ -24,15 +24,13 @@ type Proof struct {
 	// Note that we always allocate the minimal number of bytes needed to capture all
 	// the nodes in the path (padded with zero)
 	InterimNodeTypes []byte
-	// ShortPathLengths is read when we reach a short node, and the value represents number of common bits that were included
+	// ShortPathLengths is read when we reach a short node, and the value represents non-zero number of common bits that were included
 	// in the short node (shortNode.count). Elements are ordered from root to leaf.
 	ShortPathLengths []uint16
 	// SiblingHashes is read when we reach a full node. The corresponding element represents
 	// the hash of the non-visited sibling node for each full node on the path. Elements are ordered from root to leaf.
 	SiblingHashes [][]byte
 }
-
-const maxStepsForProofVerification = maxKeyLength * 8
 
 // validateFormat validates the format and size of elements of the proof (syntax check)
 //
@@ -57,7 +55,7 @@ const maxStepsForProofVerification = maxKeyLength * 8
 //      we expect InterimNodeTypes[i] == 0
 //    * a positive number of bits in case of a short node:
 //      we expect InterimNodeTypes[i] == 1
-//      and the number of bits is encoded in the respective element of ShortPathLengths
+//      and the number of bits is non-zero and encoded in the respective element of ShortPathLengths
 //    Hence, the total key length _in bits_ should be: len(SiblingHashes) + sum(ShortPathLengths)
 func (p *Proof) validateFormat() error {
 
@@ -72,13 +70,17 @@ func (p *Proof) validateFormat() error {
 	// validate number of bits that is going to be checked matches the size of the given key
 	keyBitCount := len(p.SiblingHashes)
 	for _, sc := range p.ShortPathLengths {
-		if keyBitCount > maxStepsForProofVerification {
-			return NewMalformedProofErrorf("number of key bits (%d) exceed limit (%d)", keyBitCount, maxStepsForProofVerification)
+		if keyBitCount > maxKeyLenBits {
+			return NewMalformedProofErrorf("number of key bits (%d) exceed limit (%d)", keyBitCount, maxKeyLenBits)
+		}
+		// check the common bits are non-zero
+		if sc == 0 {
+			return NewMalformedProofErrorf("short path length cannot be zero")
 		}
 		keyBitCount += int(sc)
 	}
 	if keyLen*8 != keyBitCount {
-		return NewMalformedProofErrorf("key length (%d) doesn't match the length of ShortPathLengths and SiblingHashes (%d)",
+		return NewMalformedProofErrorf("key length in bits (%d) doesn't match the length of ShortPathLengths and SiblingHashes (%d)",
 			keyLen*8,
 			keyBitCount)
 	}
@@ -86,9 +88,6 @@ func (p *Proof) validateFormat() error {
 	// step3 - check InterimNodeTypes
 
 	// size checks
-	if len(p.InterimNodeTypes) == 0 {
-		return NewMalformedProofErrorf("InterimNodeTypes is empty")
-	}
 	if len(p.InterimNodeTypes) > maxKeyLength {
 		return NewMalformedProofErrorf("InterimNodeTypes is larger than max key length allowed (%d > %d)", len(p.InterimNodeTypes), maxKeyLength)
 	}
