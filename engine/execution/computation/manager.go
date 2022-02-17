@@ -309,7 +309,13 @@ func (e *Manager) ComputeBlock(
 				e.log.Fatal().Err(err).Msg("fail to parse ExecutionDataID from string")
 			}
 			result.ExecutionDataID = resultID60153761
+		} else if block.Block.Header.Height >= 60375033 {
+			// ignore the ExecutionDataID to force result ID to be consistent
+			// this code exists for devnet33 only, it turns out the ExecutionDataID introduced in this spork
+			// is non-deterministic. We decided to exclude this field from this height. We will fix it in the next spork.
+			result.ExecutionDataID = flow.ZeroID
 		}
+
 	} else if block.Block.Header.ChainID == flow.Mainnet {
 		// ignore the ExecutionDataID to force result ID to be consistent
 		// this code exists for mainnet16 only, it turns out the ExecutionDataID introduced in this spork
