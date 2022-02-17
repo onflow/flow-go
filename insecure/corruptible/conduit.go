@@ -21,7 +21,7 @@ type Conduit struct {
 	observer insecure.Observer
 }
 
-// Publish implements a corruptible publishing service that is it sends all incoming messages
+// Publish implements a corruptible publishing service that is it sends all incoming publish messages
 // directly to the conduit factory to decide what to do next.
 // If the conduit factory gracefully rejects to observe the dispatched message,
 // Publish acts as in the non-corrupted mode and behaves correctly as expected.
@@ -48,7 +48,7 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 	return nil
 }
 
-// Unicast implements a corruptible unicasting service that is it sends all incoming messages
+// Unicast implements a corruptible unicasting service that is it sends all incoming unicast messages
 // directly to the conduit factory to decide what to do next.
 // If the conduit factory gracefully rejects to observe the dispatched message,
 // Unicast acts as in the non-corrupted mode and behaves correctly as expected, which is
@@ -74,13 +74,29 @@ func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 	return nil
 }
 
-// Multicast unreliably sends the specified event to the specified number of recipients selected from the specified subset.
+// Multicast implements a corruptible multicasting service that is it sends all incoming multicast events
+// directly to the conduit factory to decide what to do next.
+// If the conduit factory gracefully rejects to observe the dispatched multicast event,
+// Multicast acts as in the non-corrupted mode and behaves correctly as expected, which is
+// unreliably sending the specified event to the specified number of recipients selected from the specified subset.
 // The recipients are selected randomly from targetIDs
 func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
-	return c.adapter.MulticastOnChannel(c.channel, event, num, targetIDs...)
+
+	observed, err := c.observer.Observe(c.ctx, event, c.channel, proto.Protocol_MULTICAST, uint32(num), targetIDs...)
+	if err != nil {
+		return fmt.Errorf("factory could not observe the multicast event: %w", err)
+	}
+
+	if !observed {
+		// if corruptible conduit factor gracefully decides not to observe a message, the
+		// normal flow of passing the message to the networking layer should be followed.
+		return c.adapter.MulticastOnChannel(c.channel, event, num, targetIDs...)
+	}
+
+	return nil
 }
 
 func (c *Conduit) Close() error {
