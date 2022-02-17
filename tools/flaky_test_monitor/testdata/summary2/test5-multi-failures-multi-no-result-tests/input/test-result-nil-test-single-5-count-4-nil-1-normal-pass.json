@@ -60,7 +60,7 @@
             {"item": "    keys_test.go:245: bytes: 194\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         }
       ]

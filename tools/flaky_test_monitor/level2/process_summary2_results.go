@@ -62,9 +62,9 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 				// increment # of passes, fails, skips or no-results for this test
 				testResultSummary.Runs++
 				switch testResult.Result {
-				case "pass":
+				case "1":
 					testResultSummary.Passed++
-				case "fail":
+				case "0":
 					testResultSummary.Failed++
 					saveFailureMessage(testResult)
 				case "skip":
@@ -98,7 +98,7 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 }
 
 func saveFailureMessage(testResult common.TestResult) {
-	saveMessageHelper(testResult, "fail", failuresDir, "failure")
+	saveMessageHelper(testResult, "0", failuresDir, "failure")
 }
 
 func saveNoResultMessage(testResult common.TestResult) {

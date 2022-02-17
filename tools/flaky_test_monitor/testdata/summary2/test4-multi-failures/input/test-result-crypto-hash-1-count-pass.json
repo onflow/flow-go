@@ -5,7 +5,7 @@
   "results": [
     {
       "package": "github.com/onflow/flow-go/crypto/hash",
-      "result": "pass",
+      "result": "1",
       "elapsed": 0.349,
       "output": [
         "PASS\n",
@@ -19,7 +19,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -29,7 +29,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -39,7 +39,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -49,7 +49,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -59,7 +59,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -70,7 +70,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632497249121800000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -81,7 +81,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632497249122032000\n"},
             {"item": "--- PASS: TestSha3 (0.23s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.23
         },
         {
@@ -91,7 +91,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -101,7 +101,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         }
       ]
