@@ -49,11 +49,10 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 
 	child, cancel := context.WithCancel(ctx)
 
-	con := &Conduit{
+	con := &SlaveConduit{
 		ctx:     child,
 		cancel:  cancel,
 		channel: channel,
-		adapter: c.adapter,
 	}
 
 	return con, nil
@@ -96,9 +95,11 @@ func (c *ConduitFactory) RegisterAttacker(_ context.Context, in *proto.AttackerR
 	return &empty.Empty{}, nil
 }
 
-// Observe sends the given event to the registered attacker, if one exists.
-// Boolean return value determines whether the event has successfully dispatched to the attacker, or not.
-func (c *ConduitFactory) Observe(
+// HandleIncomingEvent is called by the slave conduits of this factory to relay their incoming events.
+// If there is an attacker registered to this factory, the event is dispatched to it.
+// Otherwise, the factory follows the correct protocol path by sending the message down to the networking layer
+// to deliver to its targets.
+func (c *ConduitFactory) HandleIncomingEvent(
 	ctx context.Context,
 	event interface{},
 	channel network.Channel,
@@ -122,6 +123,12 @@ func (c *ConduitFactory) Observe(
 	}
 
 	return nil
+}
+
+// EngineIsDoneWithMe is called by the slave conduits of this factory to let it know that the corresponding engine of the
+// conduit is not going to use it anymore, so the channel can be closed safely.
+func (c *ConduitFactory) EngineIsDoneWithMe(channel network.Channel) error {
+	return c.adapter.UnRegisterChannel(channel)
 }
 
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
