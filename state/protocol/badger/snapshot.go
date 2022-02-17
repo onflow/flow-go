@@ -161,9 +161,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	// get identities from the current epoch first
-	identities := setup.Participants.Copy()
-	lookup := identities.Lookup()
+	// sort the identities so the 'Exists' binary search works
+	identities := setup.Participants.Sort(order.ByNodeIDAsc)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
 	var otherEpochIdentities flow.IdentityList
@@ -186,7 +185,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range previousSetup.Participants {
-			_, exists := lookup[identity.NodeID]
+			exists := identities.Exists(identity)
 			// add identity from previous epoch that is not in current epoch
 			if !exists {
 				otherEpochIdentities = append(otherEpochIdentities, identity)
@@ -203,7 +202,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range nextSetup.Participants {
-			_, exists := lookup[identity.NodeID]
+			exists := identities.Exists(identity)
+
 			// add identity from next epoch that is not in current epoch
 			if !exists {
 				otherEpochIdentities = append(otherEpochIdentities, identity)
@@ -222,6 +222,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 
 	// apply the filter to the participants
 	identities = identities.Filter(selector)
+
 	// apply a deterministic sort to the participants
 	identities = identities.Sort(order.ByNodeIDAsc)
 

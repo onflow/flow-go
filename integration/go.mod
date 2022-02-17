@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/DataDog/zstd v1.4.8 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
-	github.com/dapperlabs/testingdock v0.4.3
+	github.com/dapperlabs/testingdock v0.4.4
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.3
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
@@ -25,7 +25,7 @@ require (
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.24.0
 	github.com/onflow/flow-go/crypto v0.24.2
-	github.com/onflow/flow/protobuf/go/flow v0.2.3
+	github.com/onflow/flow/protobuf/go/flow v0.2.4-0.20220215173423-e60766c65a21
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.21.0
 	github.com/stretchr/testify v1.7.0

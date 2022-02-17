@@ -40,6 +40,7 @@ func TestSingleInstance(t *testing.T) {
 }
 
 func TestThreeInstances(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
 	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
@@ -96,7 +97,7 @@ func TestThreeInstances(t *testing.T) {
 }
 
 func TestSevenInstances(t *testing.T) {
-	t.Skip("flakey")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
 	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on

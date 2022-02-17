@@ -1,13 +1,16 @@
 package handler_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/handler"
+	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -127,4 +130,32 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 	err = contractHandler.SetContract(addressWithVoucherRuntime, "testContract2", []byte("ABC"), []common.Address{addressWithVoucherRuntime})
 	require.NoError(t, err)
 	require.True(t, contractHandler.HasUpdates())
+}
+
+func TestContract_DeterministicErrorOnCommit(t *testing.T) {
+	mockAccounts := &stateMock.Accounts{}
+
+	mockAccounts.On("SetContract", mock.Anything, mock.Anything, mock.Anything).Return(func(contractName string, address flow.Address, contract []byte) error {
+		return fmt.Errorf("%s %s", contractName, address.Hex())
+	})
+
+	contractHandler := handler.NewContractHandler(mockAccounts,
+		false,
+		nil,
+		nil)
+
+	address1 := runtime.Address(flow.HexToAddress("0000000000000001"))
+	address2 := runtime.Address(flow.HexToAddress("0000000000000002"))
+
+	err := contractHandler.SetContract(address2, "A", []byte("ABC"), nil)
+	require.NoError(t, err)
+
+	err = contractHandler.SetContract(address1, "B", []byte("ABC"), nil)
+	require.NoError(t, err)
+
+	err = contractHandler.SetContract(address1, "A", []byte("ABC"), nil)
+	require.NoError(t, err)
+
+	_, err = contractHandler.Commit()
+	require.EqualError(t, err, "A 0000000000000001")
 }

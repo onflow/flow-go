@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -126,6 +125,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// submit signed transaction to node
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
