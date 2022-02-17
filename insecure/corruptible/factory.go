@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/insecure/proto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 )
@@ -16,7 +17,7 @@ type ConduitFactory struct {
 	codec    network.Codec
 	myId     flow.Identifier
 	adapter  network.Adapter
-	attacker AttackerClient
+	attacker proto.AttackerClient
 }
 
 func NewCorruptibleConduitFactory(myId flow.Identifier, codec network.Codec) *ConduitFactory {
@@ -58,7 +59,7 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 	return con, nil
 }
 
-func (c *ConduitFactory) ProcessAttackerMessage(ctx context.Context, in *Message, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *ConduitFactory) ProcessAttackerMessage(ctx context.Context, in *proto.Message, opts ...grpc.CallOption) (*empty.Empty, error) {
 	event, err := c.codec.Decode(in.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode message: %w", err)
@@ -70,16 +71,16 @@ func (c *ConduitFactory) ProcessAttackerMessage(ctx context.Context, in *Message
 	}
 
 	switch in.Protocol {
-	case Protocol_UNICAST:
+	case proto.Protocol_UNICAST:
 		if len(targetIds) > 1 {
 			return nil, fmt.Errorf("illegal state: attacker dictates more than one target ids for unicast: %v", targetIds)
 		}
 		return &empty.Empty{}, c.adapter.UnicastOnChannel(network.Channel(in.ChannelID), event, targetIds[0])
 
-	case Protocol_PUBLISH:
+	case proto.Protocol_PUBLISH:
 		return &empty.Empty{}, c.adapter.PublishOnChannel(network.Channel(in.ChannelID), event)
 
-	case Protocol_MULTICAST:
+	case proto.Protocol_MULTICAST:
 		return &empty.Empty{}, c.adapter.MulticastOnChannel(network.Channel(in.ChannelID), event, uint(in.Targets), targetIds...)
 	default:
 		return nil, fmt.Errorf("unknown protocol dictated by attacker: %d", in.Protocol)
@@ -89,7 +90,7 @@ func (c *ConduitFactory) ProcessAttackerMessage(ctx context.Context, in *Message
 // RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
 // control it.
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
-func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *AttackerRegisterMessage, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *proto.AttackerRegisterMessage, opts ...grpc.CallOption) (*empty.Empty, error) {
 	if c.attacker != nil {
 		return nil, fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", in.Address)
 	}
@@ -104,13 +105,13 @@ func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *AttackerRegis
 	return &empty.Empty{}, nil
 }
 
-// observe sends the given event to the registered attacker, if one exists.
+// Observe sends the given event to the registered attacker, if one exists.
 // Boolean return value determines whether the event has successfully dispatched to the attacker, or not.
-func (c *ConduitFactory) observe(
+func (c *ConduitFactory) Observe(
 	ctx context.Context,
 	event interface{},
 	channel network.Channel,
-	protocol Protocol,
+	protocol proto.Protocol,
 	num uint32, targetIds ...flow.Identifier) (bool, error) {
 
 	if c.attacker == nil {
@@ -135,8 +136,8 @@ func (c *ConduitFactory) observe(
 func (c *ConduitFactory) eventToMessage(
 	event interface{},
 	channel network.Channel,
-	protocol Protocol,
-	num uint32, targetIds ...flow.Identifier) (*Message, error) {
+	protocol proto.Protocol,
+	num uint32, targetIds ...flow.Identifier) (*proto.Message, error) {
 
 	payload, err := c.codec.Encode(event)
 	if err != nil {
@@ -145,7 +146,7 @@ func (c *ConduitFactory) eventToMessage(
 
 	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
 
-	return &Message{
+	return &proto.Message{
 		ChannelID: channel.String(),
 		OriginID:  c.myId[:],
 		Targets:   num,
