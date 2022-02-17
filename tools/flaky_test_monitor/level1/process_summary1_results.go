@@ -129,7 +129,19 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*common.Package
 				}{rawTestStep.Output}
 				lastTestResultPointer.Output = append(lastTestResultPointer.Output, output)
 
-			case "pass", "fail", "skip":
+			// we need to convert pass / fail result into a numerical value so it can averaged and tracked on a graph
+			// pass is counted as 1, fail is counted as a 0
+			case "pass":
+				lastTestResultPointer.Result = "1"
+				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
+
+			case "fail":
+				lastTestResultPointer.Result = "0"
+				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
+
+			// skipped tests will be removed after all test results are gathered,
+			// since it would be more complicated to remove it here
+			case "skip":
 				lastTestResultPointer.Result = rawTestStep.Action
 				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
 
@@ -169,7 +181,7 @@ func postProcessTestRun(packageResultMap map[string]*common.PackageResult) {
 
 		for _, testResults := range packageResult.TestMap {
 			for _, testResult := range testResults {
-				if testResult.Result != "pass" && testResult.Result != "fail" {
+				if testResult.Result != "1" && testResult.Result != "0" {
 					// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
 					// we want to highlight these tests so they show up at the top in Granfa
 					// we do this by simulating a really low fail rate so that the average success rate

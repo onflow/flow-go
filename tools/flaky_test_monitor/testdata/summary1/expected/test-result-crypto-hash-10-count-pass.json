@@ -22,7 +22,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -35,7 +35,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -48,7 +48,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -61,7 +61,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -74,7 +74,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -87,7 +87,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -100,7 +100,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -113,7 +113,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -126,7 +126,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -139,7 +139,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -152,7 +152,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -165,7 +165,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -178,7 +178,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -191,7 +191,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -204,7 +204,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -217,7 +217,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -230,7 +230,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -243,7 +243,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -256,7 +256,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -269,7 +269,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -282,7 +282,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -295,7 +295,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -308,7 +308,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -321,7 +321,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -334,7 +334,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -347,7 +347,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -360,7 +360,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -373,7 +373,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -386,7 +386,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -399,7 +399,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -412,7 +412,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -425,7 +425,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -438,7 +438,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -451,7 +451,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -464,7 +464,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -477,7 +477,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -490,7 +490,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -503,7 +503,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -516,7 +516,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -529,7 +529,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -542,7 +542,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -555,7 +555,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -568,7 +568,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -581,7 +581,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -594,7 +594,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -607,7 +607,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -620,7 +620,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -633,7 +633,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -646,7 +646,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -659,7 +659,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -673,7 +673,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739553140451000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -687,7 +687,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739554280043000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -701,7 +701,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739554500707000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -715,7 +715,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739552696815000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -729,7 +729,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739552917474000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -743,7 +743,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739554054239000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -757,7 +757,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739552470379000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -771,7 +771,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739553362249000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -785,7 +785,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739553605325000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -799,7 +799,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1632739553826502000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -813,7 +813,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739554054464000\n"},
             {"item": "--- PASS: TestSha3 (0.23s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.23
         },
         {
@@ -827,7 +827,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739552697024000\n"},
             {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.22
         },
         {
@@ -841,7 +841,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739552917708000\n"},
             {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.22
         },
         {
@@ -855,7 +855,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739553140702000\n"},
             {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.22
         },
         {
@@ -869,7 +869,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739553362497000\n"},
             {"item": "--- PASS: TestSha3 (0.24s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.24
         },
         {
@@ -883,7 +883,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739553605582000\n"},
             {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.22
         },
         {
@@ -897,7 +897,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739553826733000\n"},
             {"item": "--- PASS: TestSha3 (0.23s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.23
         },
         {
@@ -911,7 +911,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739554500935000\n"},
             {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.22
         },
         {
@@ -925,7 +925,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739554280256000\n"},
             {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.22
         },
         {
@@ -939,7 +939,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1632739552470723000\n"},
             {"item": "--- PASS: TestSha3 (0.23s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.23
         },
         {
@@ -952,7 +952,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -965,7 +965,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -978,7 +978,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -991,7 +991,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -1004,7 +1004,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -1017,7 +1017,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -1030,7 +1030,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -1043,7 +1043,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -1056,7 +1056,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -1069,7 +1069,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -1082,7 +1082,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -1095,7 +1095,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -1108,7 +1108,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -1121,7 +1121,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -1134,7 +1134,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -1147,7 +1147,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -1160,7 +1160,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.13s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.13
         },
         {
@@ -1173,7 +1173,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -1186,7 +1186,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -1199,7 +1199,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         }
       ]

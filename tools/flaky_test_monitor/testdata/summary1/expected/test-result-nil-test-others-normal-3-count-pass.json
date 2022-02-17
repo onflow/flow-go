@@ -22,7 +22,7 @@
             {"item": "=== RUN   TestEncodableNetworkPrivKey\n"},
             {"item": "--- PASS: TestEncodableNetworkPrivKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -35,7 +35,7 @@
             {"item": "=== RUN   TestEncodableNetworkPrivKey\n"},
             {"item": "--- PASS: TestEncodableNetworkPrivKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -48,7 +48,7 @@
             {"item": "=== RUN   TestEncodableNetworkPrivKey\n"},
             {"item": "--- PASS: TestEncodableNetworkPrivKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -61,7 +61,7 @@
             {"item": "=== RUN   TestEncodableNetworkPrivKeyNil\n"},
             {"item": "--- PASS: TestEncodableNetworkPrivKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -74,7 +74,7 @@
             {"item": "=== RUN   TestEncodableNetworkPrivKeyNil\n"},
             {"item": "--- PASS: TestEncodableNetworkPrivKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -87,7 +87,7 @@
             {"item": "=== RUN   TestEncodableNetworkPrivKeyNil\n"},
             {"item": "--- PASS: TestEncodableNetworkPrivKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -100,7 +100,7 @@
             {"item": "=== RUN   TestEncodableNetworkPubKey\n"},
             {"item": "--- PASS: TestEncodableNetworkPubKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -113,7 +113,7 @@
             {"item": "=== RUN   TestEncodableNetworkPubKey\n"},
             {"item": "--- PASS: TestEncodableNetworkPubKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -126,7 +126,7 @@
             {"item": "=== RUN   TestEncodableNetworkPubKey\n"},
             {"item": "--- PASS: TestEncodableNetworkPubKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -139,7 +139,7 @@
             {"item": "=== RUN   TestEncodableNetworkPubKeyNil\n"},
             {"item": "--- PASS: TestEncodableNetworkPubKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -152,7 +152,7 @@
             {"item": "=== RUN   TestEncodableNetworkPubKeyNil\n"},
             {"item": "--- PASS: TestEncodableNetworkPubKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -165,7 +165,7 @@
             {"item": "=== RUN   TestEncodableNetworkPubKeyNil\n"},
             {"item": "--- PASS: TestEncodableNetworkPubKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -178,7 +178,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKey\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPrivKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -191,7 +191,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKey\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPrivKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -204,7 +204,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKey\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPrivKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -217,7 +217,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyNil\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPrivKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -230,7 +230,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyNil\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPrivKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -243,7 +243,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyNil\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPrivKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -256,7 +256,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPubKey\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPubKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -269,7 +269,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPubKey\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPubKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -282,7 +282,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPubKey\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPubKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -295,7 +295,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPubKeyNil\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPubKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -308,7 +308,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPubKeyNil\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPubKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -321,7 +321,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPubKeyNil\n"},
             {"item": "--- PASS: TestEncodableRandomBeaconPubKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -334,7 +334,7 @@
             {"item": "=== RUN   TestEncodableStakingPrivKey\n"},
             {"item": "--- PASS: TestEncodableStakingPrivKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -347,7 +347,7 @@
             {"item": "=== RUN   TestEncodableStakingPrivKey\n"},
             {"item": "--- PASS: TestEncodableStakingPrivKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -360,7 +360,7 @@
             {"item": "=== RUN   TestEncodableStakingPrivKey\n"},
             {"item": "--- PASS: TestEncodableStakingPrivKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -373,7 +373,7 @@
             {"item": "=== RUN   TestEncodableStakingPrivKeyNil\n"},
             {"item": "--- PASS: TestEncodableStakingPrivKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -386,7 +386,7 @@
             {"item": "=== RUN   TestEncodableStakingPrivKeyNil\n"},
             {"item": "--- PASS: TestEncodableStakingPrivKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -399,7 +399,7 @@
             {"item": "=== RUN   TestEncodableStakingPrivKeyNil\n"},
             {"item": "--- PASS: TestEncodableStakingPrivKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -412,7 +412,7 @@
             {"item": "=== RUN   TestEncodableStakingPubKey\n"},
             {"item": "--- PASS: TestEncodableStakingPubKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -425,7 +425,7 @@
             {"item": "=== RUN   TestEncodableStakingPubKey\n"},
             {"item": "--- PASS: TestEncodableStakingPubKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -438,7 +438,7 @@
             {"item": "=== RUN   TestEncodableStakingPubKey\n"},
             {"item": "--- PASS: TestEncodableStakingPubKey (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -451,7 +451,7 @@
             {"item": "=== RUN   TestEncodableStakingPubKeyNil\n"},
             {"item": "--- PASS: TestEncodableStakingPubKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -464,7 +464,7 @@
             {"item": "=== RUN   TestEncodableStakingPubKeyNil\n"},
             {"item": "--- PASS: TestEncodableStakingPubKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -477,7 +477,7 @@
             {"item": "=== RUN   TestEncodableStakingPubKeyNil\n"},
             {"item": "--- PASS: TestEncodableStakingPubKeyNil (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -490,7 +490,7 @@
             {"item": "=== RUN   TestIsHexString\n"},
             {"item": "--- PASS: TestIsHexString (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -503,7 +503,7 @@
             {"item": "=== RUN   TestIsHexString\n"},
             {"item": "--- PASS: TestIsHexString (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -516,7 +516,7 @@
             {"item": "=== RUN   TestIsHexString\n"},
             {"item": "--- PASS: TestIsHexString (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {

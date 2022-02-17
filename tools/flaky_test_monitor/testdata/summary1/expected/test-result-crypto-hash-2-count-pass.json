@@ -22,7 +22,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -35,7 +35,7 @@
             {"item": "=== RUN   TestSanitySha3_256\n"},
             {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -48,7 +48,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -61,7 +61,7 @@
             {"item": "=== RUN   TestSanitySha2_256\n"},
             {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -74,7 +74,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -87,7 +87,7 @@
             {"item": "=== RUN   TestSanitySha3_384\n"},
             {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -100,7 +100,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -113,7 +113,7 @@
             {"item": "=== RUN   TestSanitySha2_384\n"},
             {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -126,7 +126,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -139,7 +139,7 @@
             {"item": "=== RUN   TestSanityKmac128\n"},
             {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -153,7 +153,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1633358050430256000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -167,7 +167,7 @@
             {"item": "    hash_test.go:114: math rand seed is 1633358050203144000\n"},
             {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0
         },
         {
@@ -181,7 +181,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1633358050203374000\n"},
             {"item": "--- PASS: TestSha3 (0.23s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.23
         },
         {
@@ -195,7 +195,7 @@
             {"item": "    hash_test.go:158: math rand seed is 1633358050430467000\n"},
             {"item": "--- PASS: TestSha3 (0.22s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.22
         },
         {
@@ -208,7 +208,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -221,7 +221,7 @@
             {"item": "=== RUN   TestSha3/SHA3_256\n"},
             {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.1
         },
         {
@@ -234,7 +234,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         },
         {
@@ -247,7 +247,7 @@
             {"item": "=== RUN   TestSha3/SHA3_384\n"},
             {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
           ],
-          "result": "pass",
+          "result": "1",
           "elapsed": 0.12
         }
       ]
