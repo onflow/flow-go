@@ -3,8 +3,9 @@ package corruptible
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/insecure/proto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 )
@@ -13,13 +14,11 @@ import (
 // sending messages within a single engine process. It sends all messages to
 // what can be considered a bus reserved for that specific engine.
 type Conduit struct {
-	codec    network.Codec
-	attacker AttackerClient
-	myId     flow.Identifier
 	ctx      context.Context
+	adapter  network.Adapter
 	cancel   context.CancelFunc
 	channel  network.Channel
-	adapter  network.Adapter
+	observer insecure.Observer
 }
 
 // Publish sends an event to the network layer for unreliable delivery
@@ -31,11 +30,18 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 
-	if c.attacker != nil {
-
+	observed, err := c.observer.Observe(c.ctx, event, c.channel, proto.Protocol_PUBLISH, 0, targetIDs...)
+	if err != nil {
+		return fmt.Errorf("factory could not observe the publish event: %w", err)
 	}
 
-	return c.adapter.PublishOnChannel(c.channel, event, targetIDs...)
+	if !observed {
+		// if corruptible conduit factor gracefully decides not to observe a message, the
+		// normal flow of passing the message to the networking layer should be followed.
+		return c.adapter.PublishOnChannel(c.channel, event, targetIDs...)
+	}
+
+	return nil
 }
 
 // Unicast sends an event in a reliable way to the given recipient.
