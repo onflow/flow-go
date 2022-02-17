@@ -103,24 +103,25 @@ func (c *ConduitFactory) Observe(
 	event interface{},
 	channel network.Channel,
 	protocol proto.Protocol,
-	num uint32, targetIds ...flow.Identifier) (bool, error) {
+	num uint32, targetIds ...flow.Identifier) error {
 
 	if c.attacker == nil {
-		// no attacker yet registered
-		return false, nil
+		// no attacker yet registered, hence sending message on the network following the
+		// correct expected behavior.
+		return c.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
 	}
 
 	msg, err := c.eventToMessage(event, channel, protocol, num, targetIds...)
 	if err != nil {
-		return false, fmt.Errorf("could not convert event to message: %w", err)
+		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
 	_, err = c.attacker.Observe(ctx, msg)
 	if err != nil {
-		return false, fmt.Errorf("remote attacker could not observe message: %w", err)
+		return fmt.Errorf("remote attacker could not observe message: %w", err)
 	}
 
-	return true, nil
+	return nil
 }
 
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
@@ -148,6 +149,8 @@ func (c *ConduitFactory) eventToMessage(
 	}, nil
 }
 
+// sendOnNetwork dispatches the given event to the networking layer of the node in order to be delivered
+// through the specified protocol to the target identifiers.
 func (c *ConduitFactory) sendOnNetwork(event interface{},
 	channel network.Channel,
 	protocol proto.Protocol,
