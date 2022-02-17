@@ -56,10 +56,6 @@ func TestTransaction_PerfModifications(t *testing.T) {
 				if idxEnd > -1 {
 					runes := []rune(scanner.Text())
 					segmentNames[nestedBlock] = string(runes[(idxName + 1):idxEnd])
-					print("found ")
-					println(segmentNames[nestedBlock])
-					print("block nest level is ")
-					println(nestedBlock)
 				}
 			}
 			continue
@@ -69,8 +65,6 @@ func TestTransaction_PerfModifications(t *testing.T) {
 			v, found := mapSegments[segmentNames[nestedBlock]]
 
 			if found == false {
-				print("adding new segment: ")
-				println(segmentNames[nestedBlock])
 				mapSegments[segmentNames[nestedBlock]] = segments[nestedBlock]
 			} else {
 				// compare the segments
@@ -86,8 +80,6 @@ func TestTransaction_PerfModifications(t *testing.T) {
 			}
 
 			segments[nestedBlock] = segments[nestedBlock] + strings.TrimLeft(scanner.Text(), "\t")
-			print("appending to segment: ")
-			println(scanner.Text())
 		}
 	}
 }
