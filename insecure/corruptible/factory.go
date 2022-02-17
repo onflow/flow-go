@@ -3,6 +3,7 @@ package corruptible
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
@@ -105,4 +106,29 @@ func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *AttackerRegis
 
 func (c *ConduitFactory) Observe(channel network.Channel, event interface{}) bool {
 
+}
+
+// eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
+func (c *ConduitFactory) eventToMessage(
+	event interface{},
+	channel network.Channel,
+	protocol Protocol,
+	num uint32, targetIds ...flow.Identifier) (*Message, error) {
+
+	payload, err := c.codec.Encode(event)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode event: %w", err)
+	}
+
+	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
+
+	return &Message{
+		ChannelID: channel.String(),
+		OriginID:  c.myId[:],
+		Targets:   num,
+		TargetIDs: flow.IdsToBytes(targetIds),
+		Payload:   payload,
+		Type:      msgType,
+		Protocol:  protocol,
+	}, nil
 }

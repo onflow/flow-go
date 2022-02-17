@@ -66,29 +66,3 @@ func (c *Conduit) Close() error {
 	// call the close function
 	return c.adapter.UnRegisterChannel(c.channel)
 }
-
-// eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
-func (c *Conduit) eventToMessage(event interface{}, protocol Protocol, num uint32, targetIds ...flow.Identifier) (*Message, error) {
-	var emTargets [][]byte
-	for _, targetID := range targetIds {
-		tempID := targetID // avoid capturing loop variable
-		emTargets = append(emTargets, tempID[:])
-	}
-
-	payload, err := c.codec.Encode(event)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode event: %w", err)
-	}
-
-	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
-
-	return &Message{
-		ChannelID: c.channel.String(),
-		OriginID:  c.myId[:],
-		Targets:   num,
-		TargetIDs: emTargets,
-		Payload:   payload,
-		Type:      msgType,
-		Protocol:  protocol,
-	}, nil
-}
