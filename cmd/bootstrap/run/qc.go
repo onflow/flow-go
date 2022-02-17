@@ -65,7 +65,11 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 	for _, vote := range votes {
 		err := processor.Process(vote)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("fail to process vote %v for block %v from signer %v: %w",
+				vote.ID(),
+				block.ID(),
+				vote.SignerID,
+				err)
 		}
 	}
 

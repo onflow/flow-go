@@ -13,9 +13,9 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/flow"
 	model "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
@@ -48,6 +48,43 @@ func NewClient(
 		BaseClient: *base,
 		env:        env,
 	}
+}
+
+// ReadBroadcast reads the broadcast messages from the smart contract.
+// Messages are returned in the order in which they were received
+// and stored in the smart contract
+func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]model.BroadcastDKGMessage, error) {
+
+	ctx := context.Background()
+
+	// construct read latest broadcast messages transaction
+	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
+	value, err := c.FlowClient.ExecuteScriptAtBlockID(ctx,
+		sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
+	if err != nil {
+		return nil, fmt.Errorf("could not execute read broadcast script: %w", err)
+	}
+	values := value.(cadence.Array).Values
+
+	// unpack return from contract to `model.DKGMessage`
+	messages := make([]model.BroadcastDKGMessage, 0, len(values))
+	for _, val := range values {
+
+		content := val.(cadence.Struct).Fields[1]
+		jsonString, err := strconv.Unquote(content.String())
+		if err != nil {
+			return nil, fmt.Errorf("could not unquote json string: %w", err)
+		}
+
+		var flowMsg model.BroadcastDKGMessage
+		err = json.Unmarshal([]byte(jsonString), &flowMsg)
+		if err != nil {
+			return nil, fmt.Errorf("could not unmarshal dkg message: %w", err)
+		}
+		messages = append(messages, flowMsg)
+	}
+
+	return messages, nil
 }
 
 // Broadcast broadcasts a message to all other nodes participating in the
@@ -104,7 +141,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	// submit signed transaction to node
-	c.Log.Info().Msg("sending Broadcast transaction")
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending Broadcast transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
@@ -116,43 +153,6 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	return nil
-}
-
-// ReadBroadcast reads the broadcast messages from the smart contract.
-// Messages are returned in the order in which they were broadcast (received
-// and stored in the smart contract)
-func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]model.BroadcastDKGMessage, error) {
-
-	ctx := context.Background()
-
-	// construct read latest broadcast messages transaction
-	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
-	value, err := c.FlowClient.ExecuteScriptAtBlockID(ctx,
-		sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
-	if err != nil {
-		return nil, fmt.Errorf("could not execute read broadcast script: %w", err)
-	}
-	values := value.(cadence.Array).Values
-
-	// unpack return from contract to `model.DKGMessage`
-	messages := make([]model.BroadcastDKGMessage, 0, len(values))
-	for _, val := range values {
-
-		content := val.(cadence.Struct).Fields[1]
-		jsonString, err := strconv.Unquote(content.String())
-		if err != nil {
-			return nil, fmt.Errorf("could not unquote json string: %w", err)
-		}
-
-		var flowMsg model.BroadcastDKGMessage
-		err = json.Unmarshal([]byte(jsonString), &flowMsg)
-		if err != nil {
-			return nil, fmt.Errorf("could not unmarshal dkg message: %w", err)
-		}
-		messages = append(messages, flowMsg)
-	}
-
-	return messages, nil
 }
 
 // SubmitResult submits the final public result of the DKG protocol. This
@@ -226,7 +226,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
-	c.Log.Info().Msg("sending SubmitResult transaction")
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
