@@ -93,7 +93,7 @@ func TestShortHash(t *testing.T) {
 		}
 		path = append(path, k[:maxKeyLength%len(k)]...)
 		// expected value from python reference implementation
-		ref := "22eb614e20aae939ff38a0dced42fdebb95199e725f1c898e2c5141e7c9d6848"
+		ref := "e60e2abb4d45b01c2ccc3ea1c82d424478192fc37b31ca7ec84331b4d0f31846"
 
 		s := short{
 			path:  path,

@@ -54,7 +54,7 @@ func (n *short) Hash() []byte {
 }
 
 // serializedPathSegmentLength serializes the bitCount into two bytes.
-// We are able to represent key length of up to 65535 bits
+// We are able to represent key length of up to 65528 bits
 func serializedPathSegmentLength(bitCount int) [2]byte {
 	var byteCount [2]byte
 	byteCount[0] = byte(bitCount >> 8)

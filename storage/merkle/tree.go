@@ -13,9 +13,12 @@ import (
 // maxKeyLength in bytes:
 // For any key, we need to ensure that the entire path can be stored in a short node.
 // A short node stores the _number of bits_ for the path segment it represents in 2 bytes.
-// Note that a short node with zero path length is not part of our storage model.
-// In summary, we are able to represent key lengths multiple of 8 of up to 65535 bits, i.e. less than 8191 bytes.
-const maxKeyLenBits = 65535
+//
+// Hence, the theoretically possible value range is [0,65535]. However, a short node with
+// zero path length is not part of our storage model. Furthermore, we always represent
+// keys as _byte_ slices, i.e. their number of bits must be an integer-multiple of 8.
+// Therefore, the range of valid key length in bits is [1, 65528].
+const maxKeyLenBits = 65528
 const maxKeyLength = maxKeyLenBits / 8
 
 var EmptyTreeRootHash []byte
