@@ -104,8 +104,31 @@ func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *AttackerRegis
 	return &empty.Empty{}, nil
 }
 
-func (c *ConduitFactory) Observe(channel network.Channel, event interface{}) bool {
+// observe sends the given event to the registered attacker, if one exists.
+// Boolean return value determines whether the event has successfully dispatched to the attacker, or not.
+func (c *ConduitFactory) observe(
+	ctx context.Context,
+	event interface{},
+	channel network.Channel,
+	protocol Protocol,
+	num uint32, targetIds ...flow.Identifier) (bool, error) {
 
+	if c.attacker == nil {
+		// no attacker yet registered
+		return false, nil
+	}
+
+	msg, err := c.eventToMessage(event, channel, protocol, num, targetIds...)
+	if err != nil {
+		return false, fmt.Errorf("could not convert event to message: %w", err)
+	}
+
+	_, err = c.attacker.Observe(ctx, msg)
+	if err != nil {
+		return false, fmt.Errorf("remote attacker could not observe message: %w", err)
+	}
+
+	return true, nil
 }
 
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the attacker.
