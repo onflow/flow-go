@@ -17,9 +17,10 @@ import (
 // Hence, the theoretically possible value range is [0,65535]. However, a short node with
 // zero path length is not part of our storage model. Furthermore, we always represent
 // keys as _byte_ slices, i.e. their number of bits must be an integer-multiple of 8.
-// Therefore, the range of valid key length in bits is [1, 65528].
-const maxKeyLenBits = 65528
-const maxKeyLength = maxKeyLenBits / 8
+// Therefore, the range of valid key length in bytes is [1, 8191] (the corresponding
+// range in bits is [8, 65528]) .
+const maxKeyLength = 8191
+const maxKeyLenBits = maxKeyLength * 8
 
 var EmptyTreeRootHash []byte
 
