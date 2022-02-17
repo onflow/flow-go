@@ -62,7 +62,7 @@ func (c *SlaveConduit) Multicast(event interface{}, num uint, targetIDs ...flow.
 	return nil
 }
 
-// Close informs the
+// Close informs the conduit master that the engine is not going to use this conduit anymore.
 func (c *SlaveConduit) Close() error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s already closed", c.channel)
