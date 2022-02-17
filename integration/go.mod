@@ -17,7 +17,7 @@ require (
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.21.0
+	github.com/onflow/cadence v0.21.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1
 	github.com/onflow/flow-emulator v0.20.3
@@ -42,5 +42,3 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/crypto => ../crypto
-
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.1-patch.2
