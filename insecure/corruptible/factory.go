@@ -59,7 +59,7 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 	return con, nil
 }
 
-func (c *ConduitFactory) ProcessAttackerMessage(ctx context.Context, in *proto.Message, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *ConduitFactory) ProcessAttackerMessage(_ context.Context, in *proto.Message, _ ...grpc.CallOption) (*empty.Empty, error) {
 	event, err := c.codec.Decode(in.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode message: %w", err)
@@ -70,27 +70,18 @@ func (c *ConduitFactory) ProcessAttackerMessage(ctx context.Context, in *proto.M
 		return nil, fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
-	switch in.Protocol {
-	case proto.Protocol_UNICAST:
-		if len(targetIds) > 1 {
-			return nil, fmt.Errorf("illegal state: attacker dictates more than one target ids for unicast: %v", targetIds)
-		}
-		return &empty.Empty{}, c.adapter.UnicastOnChannel(network.Channel(in.ChannelID), event, targetIds[0])
-
-	case proto.Protocol_PUBLISH:
-		return &empty.Empty{}, c.adapter.PublishOnChannel(network.Channel(in.ChannelID), event)
-
-	case proto.Protocol_MULTICAST:
-		return &empty.Empty{}, c.adapter.MulticastOnChannel(network.Channel(in.ChannelID), event, uint(in.Targets), targetIds...)
-	default:
-		return nil, fmt.Errorf("unknown protocol dictated by attacker: %d", in.Protocol)
+	err = c.sendOnNetwork(event, network.Channel(in.ChannelID), in.Protocol, uint(in.Targets), targetIds...)
+	if err != nil {
+		return nil, fmt.Errorf("could not send attacker message to the network: %w", err)
 	}
+
+	return &empty.Empty{}, nil
 }
 
 // RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
 // control it.
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
-func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *proto.AttackerRegisterMessage, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *ConduitFactory) RegisterAttacker(_ context.Context, in *proto.AttackerRegisterMessage, _ ...grpc.CallOption) (*empty.Empty, error) {
 	if c.attacker != nil {
 		return nil, fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", in.Address)
 	}
@@ -155,4 +146,25 @@ func (c *ConduitFactory) eventToMessage(
 		Type:      msgType,
 		Protocol:  protocol,
 	}, nil
+}
+
+func (c *ConduitFactory) sendOnNetwork(event interface{},
+	channel network.Channel,
+	protocol proto.Protocol,
+	num uint, targetIds ...flow.Identifier) error {
+	switch protocol {
+	case proto.Protocol_UNICAST:
+		if len(targetIds) > 1 {
+			return fmt.Errorf("illegal state: one target ids for unicast: %v", targetIds)
+		}
+		return c.adapter.UnicastOnChannel(channel, event, targetIds[0])
+
+	case proto.Protocol_PUBLISH:
+		return c.adapter.PublishOnChannel(channel, event)
+
+	case proto.Protocol_MULTICAST:
+		return c.adapter.MulticastOnChannel(channel, event, num, targetIds...)
+	default:
+		return fmt.Errorf("unknown protocol for sending on network: %d", protocol)
+	}
 }
