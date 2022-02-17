@@ -145,13 +145,13 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 
 	log := validator.log
 
-	expRetry, err := retry.NewExponential(checkMachineAccountRetryBase)
+	backoff, err := retry.NewExponential(checkMachineAccountRetryBase)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create machine account check retry")
 	}
-	backoff := retry.WithJitterPercent(
+	backoff = retry.WithJitterPercent(
 		5, // 5% jitter
-		retry.WithCappedDuration(checkMachineAccountRetryMax, expRetry),
+		retry.WithCappedDuration(checkMachineAccountRetryMax, backoff),
 	)
 
 	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
