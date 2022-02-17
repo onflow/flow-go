@@ -165,6 +165,7 @@ func TestGetTransactions(t *testing.T) {
 				"result": {
 					"block_id": "%s",
 					"status": "Sealed",
+					"status_code": 1,
 					"error_message": "",
 					"computation_used": "0",
 					"events": [
@@ -236,6 +237,7 @@ func TestGetTransactionResult(t *testing.T) {
 		expected := fmt.Sprintf(`{
 			"block_id": "%s",
 			"status": "Executed",
+			"status_code": 10,
 			"error_message": "",
 			"computation_used": "0",
 			"events": [

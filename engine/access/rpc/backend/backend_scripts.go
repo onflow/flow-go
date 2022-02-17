@@ -2,6 +2,8 @@ package backend
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -14,12 +16,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
+const uniqueScriptLoggingTimeWindow = 10 * time.Minute
+
 type backendScripts struct {
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 	connFactory       ConnectionFactory
 	log               zerolog.Logger
+	seenScripts       map[[md5.Size]byte]time.Time // to keep track of unique scripts sent by clients. bounded to 1MB (2^16*2*8) due to fixed key size
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -90,6 +96,8 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
 	}
+	// encode to MD5 as low compute/memory lookup key
+	encodedScript := md5.Sum(script) //nolint:gosec
 
 	// try each of the execution nodes found
 	var errors *multierror.Error
@@ -97,21 +105,31 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	for _, execNode := range execNodes {
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
-			b.log.Debug().
-				Str("execution_node", execNode.String()).
-				Hex("block_id", blockID[:]).
-				Str("script", string(script)).
-				Msg("Successfully executed script")
+			if b.log.GetLevel() == zerolog.DebugLevel {
+				executionTime := time.Now()
+				timestamp, seen := b.seenScripts[encodedScript]
+				// log if the script is unique in the time window
+				if !seen || executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
+					b.log.Debug().
+						Str("execution_node", execNode.String()).
+						Hex("block_id", blockID[:]).
+						Hex("script_hash", encodedScript[:]).
+						Str("script", string(script)).
+						Msg("Successfully executed script")
+					b.seenScripts[encodedScript] = executionTime
+				}
+			}
 			return result, nil
 		}
-		// return OK status if it's just a script failure as opposed to an EN failure
+		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
 		if status.Code(err) == codes.InvalidArgument {
 			b.log.Debug().Err(err).
 				Str("execution_node", execNode.String()).
 				Hex("block_id", blockID[:]).
+				Hex("script_hash", encodedScript[:]).
 				Str("script", string(script)).
 				Msg("script failed to execute on the execution node")
-			return nil, status.Errorf(codes.OK, "failed to execute script on execution node %v", execNode.String())
+			return nil, err
 		}
 		errors = multierror.Append(errors, err)
 	}

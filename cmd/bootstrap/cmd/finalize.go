@@ -284,9 +284,10 @@ func readRootBlockVotes() []*hotstuff.Vote {
 		}
 
 		// read file and append to partners
-		var p hotstuff.Vote
-		readJSON(f, &p)
-		votes = append(votes, &p)
+		var vote hotstuff.Vote
+		readJSON(f, &vote)
+		votes = append(votes, &vote)
+		log.Info().Msgf("read vote %v for block %v from signerID %v", vote.ID(), vote.BlockID, vote.SignerID)
 	}
 	return votes
 }

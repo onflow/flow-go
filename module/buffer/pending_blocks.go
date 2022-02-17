@@ -3,11 +3,14 @@ package buffer
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
 )
 
 type PendingBlocks struct {
 	backend *backend
 }
+
+var _ module.PendingBlockBuffer = (*PendingBlocks)(nil)
 
 func NewPendingBlocks() *PendingBlocks {
 	b := &PendingBlocks{backend: newBackend()}

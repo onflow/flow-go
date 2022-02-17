@@ -39,8 +39,8 @@ type NodeBuilder interface {
 	// ExtraFlags reads the node specific command line arguments and adds it to the FlagSet
 	ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder
 
-	// ParseAndPrintFlags parses all the command line arguments
-	ParseAndPrintFlags()
+	// ParseAndPrintFlags parses and validates all the command line arguments
+	ParseAndPrintFlags() error
 
 	// Initialize performs all the initialization needed at the very start of a node
 	Initialize() error
@@ -100,7 +100,7 @@ type NodeBuilder interface {
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics() error
 
-	// ValidateFlags is an extra method called after parsing flags, intended for extra check of flag validity
+	// ValidateFlags sets any custom validation rules for the command line flags,
 	// for example where certain combinations aren't allowed
 	ValidateFlags(func() error) NodeBuilder
 }
