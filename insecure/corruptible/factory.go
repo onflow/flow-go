@@ -49,10 +49,11 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 
 	child, cancel := context.WithCancel(ctx)
 
-	con := &SlaveConduit{
+	con := &Conduit{
 		ctx:     child,
 		cancel:  cancel,
 		channel: channel,
+		master:  c,
 	}
 
 	return con, nil

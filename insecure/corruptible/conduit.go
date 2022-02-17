@@ -10,10 +10,9 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// SlaveConduit is a helper of the overlay layer which functions as an accessor for
-// sending messages within a single engine process. It sends all messages to
-// what can be considered a bus reserved for that specific engine.
-type SlaveConduit struct {
+// Conduit implements a corruptible conduit that sends all incoming events to its registered master without dispatching them
+// to the networking layer.
+type Conduit struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	channel network.Channel
@@ -21,7 +20,7 @@ type SlaveConduit struct {
 }
 
 // Publish sends the incoming events as publish events to the master of this conduit (i.e., its factory) to handle.
-func (c *SlaveConduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
@@ -35,7 +34,7 @@ func (c *SlaveConduit) Publish(event interface{}, targetIDs ...flow.Identifier) 
 }
 
 // Unicast sends the incoming events as unicast events to the master of this conduit (i.e., its factory) to handle.
-func (c *SlaveConduit) Unicast(event interface{}, targetID flow.Identifier) error {
+func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
@@ -49,7 +48,7 @@ func (c *SlaveConduit) Unicast(event interface{}, targetID flow.Identifier) erro
 }
 
 // Multicast sends the incoming events as multicast events to the master of this conduit (i.e., its factory) to handle.
-func (c *SlaveConduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
@@ -63,7 +62,7 @@ func (c *SlaveConduit) Multicast(event interface{}, num uint, targetIDs ...flow.
 }
 
 // Close informs the conduit master that the engine is not going to use this conduit anymore.
-func (c *SlaveConduit) Close() error {
+func (c *Conduit) Close() error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s already closed", c.channel)
 	}
