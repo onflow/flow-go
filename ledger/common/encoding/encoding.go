@@ -114,7 +114,10 @@ func encodeKeyPart(kp *ledger.KeyPart) []byte {
 	buffer = utils.AppendUint16(buffer, kp.Type)
 
 	// encode "Value" field of the key part
+	// This is to ensure that developers know not to modify kp.Value
+	///%[[ DO NOT MODIFY Value {encode-key-part}
 	buffer = append(buffer, kp.Value...)
+	///%]]
 	return buffer
 }
 
@@ -148,6 +151,7 @@ func decodeKeyPart(inp []byte) (*ledger.KeyPart, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part (content): %w", err)
 	}
+	// using 'NewKeyPart' here, in case the Value is private in the future
 	retval := ledger.NewKeyPart(kpt, kpv)
 	return &retval, nil
 }
