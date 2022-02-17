@@ -4,7 +4,7 @@ package corruptible;
 
 import "google/protobuf/empty.proto";
 
-option go_package = "insecure/corruptible";
+option go_package = "insecure/proto";
 
 // to compile this file, run:
 // protoc insecure/corruptible/service.proto --go_out=plugins=grpc:.
