@@ -44,13 +44,19 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 
 func generateComputationResult(t *testing.T) *execution.ComputationResult {
 
+	kpthree := ledger.NewKeyPart(3, []byte{33})
+	kthree := ledger.NewKey([]*ledger.KeyPart{&kpthree})
+
+	kpone := ledger.NewKeyPart(1, []byte{11})
+	kone := ledger.NewKey([]*ledger.KeyPart{&kpone})
+
+	kptwo := ledger.NewKeyPart(2, []byte{1, 1})
+	kptthree := ledger.NewKeyPart(3, []byte{2, 5})
+	ktwo := ledger.NewKey([]*ledger.KeyPart{&kptwo, &kptthree})
+
 	update1, err := ledger.NewUpdate(
 		ledger.State(unittest.StateCommitmentFixture()),
-		[]ledger.Key{
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(3, []byte{33})}),
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(1, []byte{11})}),
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(2, []byte{1, 1}), ledger.NewKeyPart(3, []byte{2, 5})}),
-		},
+		[]ledger.Key{kthree, kone, ktwo},
 		[]ledger.Value{
 			[]byte{21, 37},
 			nil,
@@ -72,10 +78,12 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 	trieUpdate2, err := pathfinder.UpdateToTrieUpdate(update2, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
+	kpnine := ledger.NewKeyPart(9, []byte{6})
+
 	update3, err := ledger.NewUpdate(
 		ledger.State(unittest.StateCommitmentFixture()),
 		[]ledger.Key{
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
+			ledger.NewKey([]*ledger.KeyPart{&kpnine}),
 		},
 		[]ledger.Value{
 			[]byte{21, 37},
@@ -86,10 +94,11 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 	trieUpdate3, err := pathfinder.UpdateToTrieUpdate(update3, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
+	kpninesix := ledger.NewKeyPart(9, []byte{6})
 	update4, err := ledger.NewUpdate(
 		ledger.State(unittest.StateCommitmentFixture()),
 		[]ledger.Key{
-			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
+			ledger.NewKey([]*ledger.KeyPart{&kpninesix}),
 		},
 		[]ledger.Value{
 			[]byte{21, 37},

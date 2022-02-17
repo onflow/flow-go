@@ -880,7 +880,8 @@ func TestProofGenerationInclusion(t *testing.T) {
 }
 
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {
-	key := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: keydata}}}
+	nkp := ledger.NewKeyPart(0, keydata)
+	key := ledger.Key{KeyParts: []*ledger.KeyPart{&nkp}}
 	value := ledger.Value(valuedata)
 	return &ledger.Payload{Key: key, Value: value}
 }

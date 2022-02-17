@@ -35,23 +35,20 @@ func Test_DumpJSONNonEmpty(t *testing.T) {
 
 	emptyRootHash := forest.GetEmptyRootHash()
 
-	key1 := ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(0, []byte("si")),
-		ledger.NewKeyPart(5, []byte("vis")),
-		ledger.NewKeyPart(3, []byte("pacem")),
-	})
+	kps := ledger.NewKeyPart(0, []byte("si"))
+	kpv := ledger.NewKeyPart(5, []byte("vis"))
+	kpp := ledger.NewKeyPart(3, []byte("pacem"))
+	key1 := ledger.NewKey([]*ledger.KeyPart{&kps, &kpv, &kpp})
 
-	key2 := ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(3, []byte("ex")),
-		ledger.NewKeyPart(6, []byte("navicula")),
-		ledger.NewKeyPart(9, []byte("navis")),
-	})
+	kpe := ledger.NewKeyPart(3, []byte("ex"))
+	kpna := ledger.NewKeyPart(6, []byte("navicula"))
+	kpn := ledger.NewKeyPart(9, []byte("navis"))
+	key2 := ledger.NewKey([]*ledger.KeyPart{&kpe, &kpna, &kpn})
 
-	key3 := ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(9, []byte("lorem")),
-		ledger.NewKeyPart(0, []byte("ipsum")),
-		ledger.NewKeyPart(5, []byte("dolor")),
-	})
+	kpl := ledger.NewKeyPart(9, []byte("lorem"))
+	kpi := ledger.NewKeyPart(0, []byte("ipsum"))
+	kpd := ledger.NewKeyPart(5, []byte("dolor"))
+	key3 := ledger.NewKey([]*ledger.KeyPart{&kpl, &kpi, &kpd})
 
 	update, err := ledger.NewUpdate(ledger.State(emptyRootHash), []ledger.Key{key1, key2, key3}, []ledger.Value{{1}, {2}, {3}})
 	require.NoError(t, err)

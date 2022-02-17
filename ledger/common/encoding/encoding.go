@@ -114,7 +114,7 @@ func encodeKeyPart(kp *ledger.KeyPart) []byte {
 	buffer = utils.AppendUint16(buffer, kp.Type)
 
 	// encode "Value" field of the key part
-	buffer = append(buffer, kp.Value()...)
+	buffer = append(buffer, kp.Value...)
 	return buffer
 }
 

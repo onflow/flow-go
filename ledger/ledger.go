@@ -179,7 +179,7 @@ func (k *Key) Size() int {
 	size := 0
 	for _, kp := range k.KeyParts {
 		// value size + 2 bytes for type
-		size += len(kp.value) + 2
+		size += len(kp.Value) + 2
 	}
 	return size
 }
@@ -198,7 +198,7 @@ func (k *Key) CanonicalForm() []byte {
 
 	requiredLen := constant * len(k.KeyParts)
 	for _, kp := range k.KeyParts {
-		requiredLen += len(kp.value)
+		requiredLen += len(kp.Value)
 	}
 
 	retval := make([]byte, 0, requiredLen)
@@ -209,7 +209,7 @@ func (k *Key) CanonicalForm() []byte {
 		retval = append(retval, byte('/'))
 		retval = append(retval, []byte(typeNumber)...)
 		retval = append(retval, byte('/'))
-		retval = append(retval, kp.value...)
+		retval = append(retval, kp.Value...)
 	}
 
 	// create a byte slice with the correct size and copy
@@ -250,18 +250,13 @@ func (k *Key) Equals(other *Key) bool {
 
 // KeyPart is a typed part of a key
 type KeyPart struct {
-	Type   uint16
-	value  []byte // private so that code uses accessors
-	_value []byte
+	Type  uint16
+	Value []byte // private so that code uses accessors
 }
 
 // NewKeyPart construct a new key part
 func NewKeyPart(typ uint16, val []byte) KeyPart {
-	return KeyPart{Type: typ, value: val}
-}
-
-func (kp *KeyPart) Value() []byte {
-	return kp.value
+	return KeyPart{Type: typ, Value: val}
 }
 
 // Equals compares this key part to another key part
@@ -272,14 +267,14 @@ func (kp *KeyPart) Equals(other *KeyPart) bool {
 	if kp.Type != other.Type {
 		return false
 	}
-	return bytes.Equal(kp.value, other.value)
+	return bytes.Equal(kp.Value, other.Value)
 }
 
 // DeepCopy returns a deep copy of the key part
 func (kp *KeyPart) DeepCopy() *KeyPart {
-	newV := make([]byte, len(kp.value))
-	copy(newV, kp.value)
-	return &KeyPart{Type: kp.Type, value: newV}
+	newV := make([]byte, len(kp.Value))
+	copy(newV, kp.Value)
+	return &KeyPart{Type: kp.Type, Value: newV}
 }
 
 func (kp KeyPart) MarshalJSON() ([]byte, error) {
@@ -288,7 +283,7 @@ func (kp KeyPart) MarshalJSON() ([]byte, error) {
 		Value string
 	}{
 		Type:  kp.Type,
-		Value: hex.EncodeToString(kp.value),
+		Value: hex.EncodeToString(kp.Value),
 	})
 }
 

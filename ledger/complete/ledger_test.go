@@ -664,7 +664,8 @@ func TestWALUpdateIsRunInParallel(t *testing.T) {
 	led, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
-	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
+	nkp := ledger.NewKeyPart(0, []byte{1, 2, 3})
+	key := ledger.NewKey([]*ledger.KeyPart{&nkp})
 
 	values := []ledger.Value{[]byte{1, 2, 3}}
 	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
@@ -712,8 +713,8 @@ func TestWALUpdateFailuresBubbleUp(t *testing.T) {
 
 	led, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
-
-	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
+	nkp := ledger.NewKeyPart(0, []byte{1, 2, 3})
+	key := ledger.NewKey([]*ledger.KeyPart{&nkp})
 
 	values := []ledger.Value{[]byte{1, 2, 3}}
 	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)

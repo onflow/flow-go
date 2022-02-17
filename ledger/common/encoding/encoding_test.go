@@ -35,7 +35,7 @@ func Test_KeyPartEncodingDecoding(t *testing.T) {
 func Test_KeyEncodingDecoding(t *testing.T) {
 	kp1 := utils.KeyPartFixture(1, "key part 1")
 	kp2 := utils.KeyPartFixture(22, "key part 2")
-	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
+	k := ledger.NewKey([]*ledger.KeyPart{&kp1, &kp2})
 	encoded := encoding.EncodeKey(&k)
 	newk, err := encoding.DecodeKey(encoded)
 	require.NoError(t, err)
@@ -61,7 +61,7 @@ func Test_PayloadEncodingDecoding(t *testing.T) {
 	kp2v := []byte("key part 2")
 	kp2 := ledger.NewKeyPart(kp2t, kp2v)
 
-	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
+	k := ledger.NewKey([]*ledger.KeyPart{&kp1, &kp2})
 	v := ledger.Value([]byte{'A'})
 	p := ledger.NewPayload(k, v)
 
@@ -95,12 +95,12 @@ func Test_TrieUpdateEncodingDecoding(t *testing.T) {
 	p1 := utils.PathByUint16(2)
 	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1 part 1"))
 	kp2 := ledger.NewKeyPart(uint16(22), []byte("key 1 part 2"))
-	k1 := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
+	k1 := ledger.NewKey([]*ledger.KeyPart{&kp1, &kp2})
 	pl1 := ledger.NewPayload(k1, []byte{'A'})
 
 	p2 := utils.PathByUint16(2)
 	kp3 := ledger.NewKeyPart(uint16(1), []byte("key2 part 1"))
-	k2 := ledger.NewKey([]ledger.KeyPart{kp3})
+	k2 := ledger.NewKey([]*ledger.KeyPart{&kp3})
 	pl2 := ledger.NewPayload(k2, []byte{'B'})
 
 	tu := &ledger.TrieUpdate{

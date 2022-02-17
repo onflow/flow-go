@@ -28,20 +28,10 @@ func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 
 func registerIDToKey(registerID flow.RegisterID) ledger.Key {
 	newKey := ledger.Key{}
-	newKey.KeyParts = []ledger.KeyPart{
-		{
-			Type:  state.KeyPartOwner,
-			Value: []byte(registerID.Owner),
-		},
-		{
-			Type:  state.KeyPartController,
-			Value: []byte(registerID.Controller),
-		},
-		{
-			Type:  state.KeyPartKey,
-			Value: []byte(registerID.Key),
-		},
-	}
+	nkpo := ledger.NewKeyPart(state.KeyPartOwner, []byte(registerID.Owner))
+	nkpc := ledger.NewKeyPart(state.KeyPartController, []byte(registerID.Controller))
+	nkpk := ledger.NewKeyPart(state.KeyPartKey, []byte(registerID.Key))
+	newKey.KeyParts = []*ledger.KeyPart{&nkpo, &nkpc, &nkpk}
 	return newKey
 }
 

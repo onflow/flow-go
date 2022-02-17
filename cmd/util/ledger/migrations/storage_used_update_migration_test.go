@@ -78,11 +78,10 @@ func TestStorageUsedUpdateMigrationMigration(t *testing.T) {
 }
 
 func createAccountPayloadKey(a flow.Address, key string) ledger.Key {
+	nko := ledger.NewKeyPart(state.KeyPartOwner, a.Bytes())
+	nkc := ledger.NewKeyPart(state.KeyPartController, []byte(""))
+	nkk := ledger.NewKeyPart(state.KeyPartKey, []byte(key))
 	return ledger.Key{
-		KeyParts: []ledger.KeyPart{
-			ledger.NewKeyPart(state.KeyPartOwner, a.Bytes()),
-			ledger.NewKeyPart(state.KeyPartController, []byte("")),
-			ledger.NewKeyPart(state.KeyPartKey, []byte(key)),
-		},
+		KeyParts: []*ledger.KeyPart{&nko, &nkc, &nkk},
 	}
 }

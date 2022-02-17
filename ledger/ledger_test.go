@@ -17,9 +17,8 @@ func BenchmarkCanonicalForm(b *testing.B) {
 	keyParts := make([]KeyPart, 0, 200)
 
 	for i := 0; i < 16; i++ {
-		keyParts = append(keyParts, KeyPart{})
-		keyParts[i].Value = []byte("somedomain1")
-		keyParts[i].Type = 1234
+		kp := NewKeyPart(1234, []byte("somedomain1"))
+		keyParts = append(keyParts, kp)
 	}
 
 	requiredLen := constant * len(keyParts)
@@ -43,9 +42,8 @@ func BenchmarkOriginalCanonicalForm(b *testing.B) {
 	keyParts := make([]KeyPart, 0, 200)
 
 	for i := 0; i < 16; i++ {
-		keyParts = append(keyParts, KeyPart{})
-		keyParts[i].Value = []byte("somedomain1")
-		keyParts[i].Type = 1234
+		kp := NewKeyPart(1234, []byte("somedomain1"))
+		keyParts = append(keyParts, kp)
 	}
 
 	ret := ""

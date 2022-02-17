@@ -221,12 +221,10 @@ func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 }
 
 func getKey(owner, controller, key string) ledger.Key {
-	return ledger.Key{KeyParts: []ledger.KeyPart{
-		{Type: uint16(0), Value: []byte(owner)},
-		{Type: uint16(1), Value: []byte(controller)},
-		{Type: uint16(2), Value: []byte(key)},
-	},
-	}
+	kpo := ledger.NewKeyPart(uint16(0), []byte(owner))
+	kpc := ledger.NewKeyPart(uint16(1), []byte(controller))
+	kpk := ledger.NewKeyPart(uint16(2), []byte(key))
+	return ledger.Key{KeyParts: []*ledger.KeyPart{&kpo, &kpc, &kpk}}
 }
 
 func getRandomCadenceValue() ledger.Value {

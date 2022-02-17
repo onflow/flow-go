@@ -17,7 +17,7 @@ func Test_KeyToPathV0(t *testing.T) {
 
 	kp1 := utils.KeyPartFixture(1, "key part 1")
 	kp2 := utils.KeyPartFixture(22, "key part 2")
-	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
+	k := ledger.NewKey([]*ledger.KeyPart{&kp1, &kp2})
 
 	path, err := pathfinder.KeyToPath(k, 0)
 	require.NoError(t, err)
@@ -37,7 +37,7 @@ func Test_KeyToPathV1(t *testing.T) {
 
 	kp1 := utils.KeyPartFixture(1, "key part 1")
 	kp2 := utils.KeyPartFixture(22, "key part 2")
-	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
+	k := ledger.NewKey([]*ledger.KeyPart{&kp1, &kp2})
 
 	path, err := pathfinder.KeyToPath(k, 1)
 	require.NoError(t, err)

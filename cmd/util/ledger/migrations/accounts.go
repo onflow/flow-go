@@ -89,10 +89,13 @@ type led struct {
 }
 
 func (l *led) Set(owner, controller, key string, value flow.RegisterValue) error {
-	keyparts := []ledger.KeyPart{ledger.NewKeyPart(0, []byte(owner)),
-		ledger.NewKeyPart(1, []byte(controller)),
-		ledger.NewKeyPart(2, []byte(key))}
+	nkpzero := ledger.NewKeyPart(0, []byte(owner))
+	nkpone := ledger.NewKeyPart(1, []byte(controller))
+	nkptwo := ledger.NewKeyPart(2, []byte(key))
+
+	keyparts := []*ledger.KeyPart{&nkpzero, &nkpone, &nkptwo}
 	fk := fullKey(owner, controller, key)
+
 	l.payloads[fk] = ledger.Payload{Key: ledger.NewKey(keyparts), Value: ledger.Value(value)}
 	return nil
 }
