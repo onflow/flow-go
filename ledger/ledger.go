@@ -166,11 +166,11 @@ func (pr Proof) Equals(o Proof) bool {
 
 // Key represents a hierarchical ledger key
 type Key struct {
-	KeyParts []KeyPart
+	KeyParts []*KeyPart
 }
 
 // NewKey construct a new key
-func NewKey(kp []KeyPart) Key {
+func NewKey(kp []*KeyPart) Key {
 	return Key{KeyParts: kp}
 }
 
@@ -179,7 +179,7 @@ func (k *Key) Size() int {
 	size := 0
 	for _, kp := range k.KeyParts {
 		// value size + 2 bytes for type
-		size += len(kp.Value) + 2
+		size += len(kp.value) + 2
 	}
 	return size
 }
@@ -198,7 +198,7 @@ func (k *Key) CanonicalForm() []byte {
 
 	requiredLen := constant * len(k.KeyParts)
 	for _, kp := range k.KeyParts {
-		requiredLen += len(kp.Value)
+		requiredLen += len(kp.value)
 	}
 
 	retval := make([]byte, 0, requiredLen)
@@ -209,7 +209,7 @@ func (k *Key) CanonicalForm() []byte {
 		retval = append(retval, byte('/'))
 		retval = append(retval, []byte(typeNumber)...)
 		retval = append(retval, byte('/'))
-		retval = append(retval, kp.Value...)
+		retval = append(retval, kp.value...)
 	}
 
 	// create a byte slice with the correct size and copy
@@ -221,13 +221,15 @@ func (k *Key) String() string {
 	return string(k.CanonicalForm())
 }
 
-// DeepCopy returns a deep copy of the key
+// DeepCopy returns a reference-counted copy of the key
 func (k *Key) DeepCopy() Key {
-	newKPs := make([]KeyPart, len(k.KeyParts))
+	retval := Key{}
+
+	retval.KeyParts = make([]*KeyPart, len(k.KeyParts))
 	for i, kp := range k.KeyParts {
-		newKPs[i] = *kp.DeepCopy()
+		retval.KeyParts[i] = kp
 	}
-	return Key{KeyParts: newKPs}
+	return retval
 }
 
 // Equals compares this key to another key
@@ -239,7 +241,7 @@ func (k *Key) Equals(other *Key) bool {
 		return false
 	}
 	for i, kp := range k.KeyParts {
-		if !kp.Equals(&other.KeyParts[i]) {
+		if !kp.Equals(other.KeyParts[i]) {
 			return false
 		}
 	}
@@ -248,13 +250,18 @@ func (k *Key) Equals(other *Key) bool {
 
 // KeyPart is a typed part of a key
 type KeyPart struct {
-	Type  uint16
-	Value []byte
+	Type   uint16
+	value  []byte // private so that code uses accessors
+	_value []byte
 }
 
 // NewKeyPart construct a new key part
 func NewKeyPart(typ uint16, val []byte) KeyPart {
-	return KeyPart{Type: typ, Value: val}
+	return KeyPart{Type: typ, value: val}
+}
+
+func (kp *KeyPart) Value() []byte {
+	return kp.value
 }
 
 // Equals compares this key part to another key part
@@ -265,14 +272,14 @@ func (kp *KeyPart) Equals(other *KeyPart) bool {
 	if kp.Type != other.Type {
 		return false
 	}
-	return bytes.Equal(kp.Value, other.Value)
+	return bytes.Equal(kp.value, other.value)
 }
 
 // DeepCopy returns a deep copy of the key part
 func (kp *KeyPart) DeepCopy() *KeyPart {
-	newV := make([]byte, len(kp.Value))
-	copy(newV, kp.Value)
-	return &KeyPart{Type: kp.Type, Value: newV}
+	newV := make([]byte, len(kp.value))
+	copy(newV, kp.value)
+	return &KeyPart{Type: kp.Type, value: newV}
 }
 
 func (kp KeyPart) MarshalJSON() ([]byte, error) {
@@ -281,7 +288,7 @@ func (kp KeyPart) MarshalJSON() ([]byte, error) {
 		Value string
 	}{
 		Type:  kp.Type,
-		Value: hex.EncodeToString(kp.Value),
+		Value: hex.EncodeToString(kp.value),
 	})
 }
 

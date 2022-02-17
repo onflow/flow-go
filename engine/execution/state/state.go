@@ -93,11 +93,11 @@ type state struct {
 }
 
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
-	return ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
-		ledger.NewKeyPart(KeyPartController, []byte(reg.Controller)),
-		ledger.NewKeyPart(KeyPartKey, []byte(reg.Key)),
-	})
+
+	nkpo := ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner))
+	nkpc := ledger.NewKeyPart(KeyPartController, []byte(reg.Controller))
+	nkpk := ledger.NewKeyPart(KeyPartKey, []byte(reg.Key))
+	return ledger.NewKey([]*ledger.KeyPart{&nkpo, &nkpc, &nkpk})
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.

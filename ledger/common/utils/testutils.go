@@ -199,11 +199,11 @@ func QueryFixture() *l.Query {
 	copy(sc[:], scBytes)
 	k1p1 := l.NewKeyPart(uint16(1), []byte("1"))
 	k1p2 := l.NewKeyPart(uint16(22), []byte("2"))
-	k1 := l.NewKey([]l.KeyPart{k1p1, k1p2})
+	k1 := l.NewKey([]*l.KeyPart{&k1p1, &k1p2})
 
 	k2p1 := l.NewKeyPart(uint16(1), []byte("3"))
 	k2p2 := l.NewKeyPart(uint16(22), []byte("4"))
-	k2 := l.NewKey([]l.KeyPart{k2p1, k2p2})
+	k2 := l.NewKey([]*l.KeyPart{&k2p1, &k2p2})
 
 	u, _ := l.NewQuery(sc, []l.Key{k1, k2})
 	return u
@@ -211,14 +211,16 @@ func QueryFixture() *l.Query {
 
 // LightPayload returns a payload with 2 byte key and 2 byte value
 func LightPayload(key uint16, value uint16) *l.Payload {
-	k := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: Uint16ToBinary(key)}}}
+	nkp := l.NewKeyPart(0, Uint16ToBinary(key))
+	k := l.Key{KeyParts: []*l.KeyPart{&nkp}}
 	v := l.Value(Uint16ToBinary(value))
 	return &l.Payload{Key: k, Value: v}
 }
 
 // LightPayload8 returns a payload with 1 byte key and 1 byte value
 func LightPayload8(key uint8, value uint8) *l.Payload {
-	k := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: []byte{key}}}}
+	nkp := l.NewKeyPart(0, []byte{key})
+	k := l.Key{KeyParts: []*l.KeyPart{&nkp}}
 	v := l.Value([]byte{value})
 	return &l.Payload{Key: k, Value: v}
 }
@@ -258,12 +260,12 @@ func UpdateFixture() *l.Update {
 	copy(sc[:], scBytes)
 	k1p1 := l.NewKeyPart(uint16(1), []byte("1"))
 	k1p2 := l.NewKeyPart(uint16(22), []byte("2"))
-	k1 := l.NewKey([]l.KeyPart{k1p1, k1p2})
+	k1 := l.NewKey([]*l.KeyPart{&k1p1, &k1p2})
 	v1 := l.Value([]byte{'A'})
 
 	k2p1 := l.NewKeyPart(uint16(1), []byte("3"))
 	k2p2 := l.NewKeyPart(uint16(22), []byte("4"))
-	k2 := l.NewKey([]l.KeyPart{k2p1, k2p2})
+	k2 := l.NewKey([]*l.KeyPart{&k2p1, &k2p2})
 	v2 := l.Value([]byte{'B'})
 
 	u, _ := l.NewUpdate(sc, []l.Key{k1, k2}, []l.Value{v1, v2})
@@ -339,7 +341,8 @@ func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 	keyByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	keydata := make([]byte, keyByteSize)
 	rand.Read(keydata)
-	key := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: keydata}}}
+	nkp := l.NewKeyPart(0, keydata)
+	key := l.Key{KeyParts: []*l.KeyPart{&nkp}}
 	valueByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	valuedata := make([]byte, valueByteSize)
 	rand.Read(valuedata)
@@ -383,7 +386,7 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []l.Key {
 	alreadySelectKeys := make(map[string]bool)
 	i := 0
 	for i < n {
-		keyParts := make([]l.KeyPart, 0)
+		keyParts := make([]*l.KeyPart, 0)
 		for j := 0; j < m; j++ {
 			byteSize := maxByteSize
 			if minByteSize < maxByteSize {
@@ -391,7 +394,8 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []l.Key {
 			}
 			keyPartData := make([]byte, byteSize)
 			rand.Read(keyPartData)
-			keyParts = append(keyParts, l.NewKeyPart(uint16(j), keyPartData))
+			nkp := l.NewKeyPart(uint16(j), keyPartData)
+			keyParts = append(keyParts, &nkp)
 		}
 		key := l.NewKey(keyParts)
 

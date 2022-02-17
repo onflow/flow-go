@@ -20,7 +20,7 @@ func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 		{
 			ret := make([]byte, 0)
 			for _, kp := range key.KeyParts {
-				ret = append(ret, kp.Value...)
+				ret = append(ret, kp.Value()...)
 			}
 			h := sha256.New()
 			_, err := h.Write(ret)

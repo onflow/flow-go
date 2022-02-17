@@ -114,7 +114,7 @@ func encodeKeyPart(kp *ledger.KeyPart) []byte {
 	buffer = utils.AppendUint16(buffer, kp.Type)
 
 	// encode "Value" field of the key part
-	buffer = append(buffer, kp.Value...)
+	buffer = append(buffer, kp.Value()...)
 	return buffer
 }
 
@@ -148,7 +148,8 @@ func decodeKeyPart(inp []byte) (*ledger.KeyPart, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part (content): %w", err)
 	}
-	return &ledger.KeyPart{Type: kpt, Value: kpv}, nil
+	retval := ledger.NewKeyPart(kpt, kpv)
+	return &retval, nil
 }
 
 // EncodeKey encodes a key into a byte slice
@@ -174,7 +175,7 @@ func encodeKey(k *ledger.Key) []byte {
 	// iterate over key parts
 	for _, kp := range k.KeyParts {
 		// encode the key part
-		encKP := encodeKeyPart(&kp)
+		encKP := encodeKeyPart(kp)
 		// encode the len of the encoded key part
 		buffer = utils.AppendUint32(buffer, uint32(len(encKP)))
 		// append the encoded key part
@@ -231,7 +232,7 @@ func decodeKey(inp []byte) (*ledger.Key, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding key (content): %w", err)
 		}
-		key.KeyParts = append(key.KeyParts, *kp)
+		key.KeyParts = append(key.KeyParts, kp)
 	}
 	return key, nil
 }
