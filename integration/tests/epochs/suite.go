@@ -109,7 +109,7 @@ func (s *Suite) SetupTest() {
 
 	addr := fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort])
 	client, err := testnet.NewClient(addr, s.net.Root().Header.ChainID.Chain())
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to get flow client")
 
 	s.client = client
 }
@@ -122,10 +122,11 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) TearDownTest() {
-	s.log.Info().Msgf("================> Start TearDownTest")
-	s.net.Remove()
-	s.cancel()
-	s.log.Info().Msgf("================> Finish TearDownTest")
+	//s.log.Info().Msgf("================> Start TearDownTest")
+	s.log.Info().Msgf("================> SKIPPING TearDownTest")
+	//s.net.Remove()
+	//s.cancel()
+	//s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)
@@ -165,29 +166,29 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		s.client.Account(),
 		s.client.SDKServiceAddress(),
 	)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to create staking account")
 
 	_, stakeAmount, err := s.client.TokenAmountByRole(role)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to get token amount by role")
 
 	// fund account with token amount to stake
 	result, err := s.fundAccount(ctx, stakingAccountAddress, fmt.Sprintf("%f", stakeAmount+10.0))
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), result.Error)
+	require.NoError(s.T(), err, "failed to submit transaction to fund staking account")
+	require.NoError(s.T(), result.Error, "unexpected error in result of fund staking account transaction")
 
 	stakingAccount, err := s.client.GetAccount(stakingAccountAddress)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, fmt.Sprintf("failed to get staking account from network: %s", stakingAccountAddress))
 
 	// create staking collection
 	result, err = s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount)
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), result.Error)
+	require.NoError(s.T(), err, "failed to submit create staking collection transaction")
+	require.NoError(s.T(), result.Error, "unexpected error in result of create staking collection transaction")
 
 	// if node has a machine account key encode it
 	var encMachinePubKey []byte
 	if machineAccountKey != nil {
 		encMachinePubKey, err = flow.EncodeRuntimeAccountPublicKey(machineAccountPubKey)
-		require.NoError(s.T(), err)
+		require.NoError(s.T(), err, "failed to encode machine account public key")
 	}
 
 	containerName := s.getTestContainerName(role)
@@ -206,12 +207,11 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		fmt.Sprintf("%f", stakeAmount),
 		hex.EncodeToString(encMachinePubKey),
 	)
-
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), result.Error)
+	require.NoError(s.T(), err, "failed to submit register node transaction")
+	require.NoError(s.T(), result.Error, "unexpected error in result of register node transaction")
 
 	result = s.SubmitSetApprovedListTx(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
-	require.NoError(s.T(), result.Error)
+	require.NoError(s.T(), result.Error, "unexpected error in result of set approved list transaction")
 
 	// ensure we are still in staking auction
 	s.assertInPhase(ctx, flow.EpochPhaseStaking)
@@ -235,10 +235,10 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase) {
 	condition := func() bool {
 		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-		require.NoError(s.T(), err)
+		require.NoError(s.T(), err, "failed to get latest protocol snapshot")
 
 		currentPhase, err := snapshot.Phase()
-		require.NoError(s.T(), err)
+		require.NoError(s.T(), err, "failed to get snapshot phase")
 
 		return currentPhase == phase
 	}
@@ -252,7 +252,7 @@ func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase) {
 // transfers tokens to receiver from service account
 func (s *Suite) fundAccount(ctx context.Context, receiver sdk.Address, tokenAmount string) (*sdk.TransactionResult, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to get latest block id")
 
 	env := utils.LocalnetEnv()
 	transferTx, err := utils.MakeTransferTokenTx(
@@ -263,13 +263,13 @@ func (s *Suite) fundAccount(ctx context.Context, receiver sdk.Address, tokenAmou
 		tokenAmount,
 		sdk.Identifier(latestBlockID),
 	)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to make transfer token transaction")
 
 	err = s.client.SignAndSendTransaction(ctx, transferTx)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to sign and send transaction")
 
 	result, err := s.client.WaitForSealed(ctx, transferTx.ID())
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to wait for sealed result")
 	s.client.Account().Keys[0].SequenceNumber++
 
 	return result, nil
@@ -309,10 +309,10 @@ func (s *Suite) createAccount(ctx context.Context,
 	payer sdk.Address,
 ) (sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to get latest block id")
 
 	addr, err := s.client.CreateAccount(ctx, accountKey, payerAccount, payer, sdk.Identifier(latestBlockID))
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to create flow account")
 
 	payerAccount.Keys[0].SequenceNumber++
 	return addr, nil
@@ -321,7 +321,7 @@ func (s *Suite) createAccount(ctx context.Context,
 // creates a staking collection for the given node
 func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to get latest block id")
 
 	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
 
@@ -335,10 +335,9 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 	)
 
 	err = s.client.SignAndSendTransaction(ctx, createStakingCollectionTx)
-	require.NoError(s.T(), err)
-
+	require.NoError(s.T(), err, "failed to sign and send transaction")
 	result, err := s.client.WaitForSealed(ctx, createStakingCollectionTx.ID())
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to wait for sealed result")
 	stakingAccount.Keys[0].SequenceNumber++
 
 	return result, nil
@@ -359,7 +358,7 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	machineKey string,
 ) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
+	require.NoError(s.T(), err, "failed to get latest block id")
 
 	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
 
