@@ -4,8 +4,15 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/crypto"
@@ -13,11 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"strings"
-	"time"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -26,29 +28,49 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const (
-	stakingAuctionViews = 200
-	dkgPhaseViews       = 50
-	epochViewsLength    = 380
+const waitTimeout = 2 * time.Minute
 
-	waitTimeout = 2 * time.Minute
-)
-
-// nodeUpdateValidation func that will be used to validate the network after some changes have been made
+// nodeUpdateValidation func that will be used to validate the health of the network
+// after an identity table change during an epoch transition. This is used in
+// tandem with runTestEpochJoinAndLeave.
+//
 // NOTE: rootSnapshot must be the snapshot that the node (info) was bootstrapped with.
 type nodeUpdateValidation func(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo)
 
+// Suite encapsulates common functionality for epoch integration tests.
 type Suite struct {
 	suite.Suite
+	log zerolog.Logger
 	common.TestnetStateTracker
+	ctx         context.Context
 	cancel      context.CancelFunc
 	net         *testnet.FlowNetwork
 	nodeConfigs []testnet.NodeConfig
 	ghostID     flow.Identifier
 	client      *testnet.Client
+
+	// Epoch config (lengths in views)
+	StakingAuctionLen uint64
+	DKGPhaseLen       uint64
+	EpochLen          uint64
 }
 
+// SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
+	// ensure epoch lengths are set correctly
+	require.Greater(s.T(), s.EpochLen, s.StakingAuctionLen+s.DKGPhaseLen*3)
+
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "suite.go").
+		Str("testcase", s.T().Name()).
+		Logger()
+	s.log = logger
+	s.log.Info().Msgf("================> SetupTest")
+	defer func() {
+		s.log.Info().Msgf("================> Finish SetupTest")
+	}()
+
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -63,9 +85,9 @@ func (s *Suite) SetupTest() {
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
-	// a ghost node masquerading as a consensus node
+	// a ghost node masquerading as an access node
 	s.ghostID = unittest.IdentifierFixture()
-	ghostConNode := testnet.NewNodeConfig(
+	ghostNode := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithID(s.ghostID),
@@ -79,21 +101,20 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
-		ghostConNode,
+		ghostNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, stakingAuctionViews, dkgPhaseViews, epochViewsLength)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
 
 	// start the network
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
-	s.net.Start(ctx)
+
+	s.net.Start(s.ctx)
 
 	// start tracking blocks
-	s.Track(s.T(), ctx, s.Ghost())
+	s.Track(s.T(), s.ctx, s.Ghost())
 
 	addr := fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort])
 	client, err := testnet.NewClient(addr, s.net.Root().Header.ChainID.Chain())
@@ -110,13 +131,14 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) TearDownTest() {
+	s.log.Info().Msgf("================> Start TearDownTest")
 	s.net.Remove()
-	if s.cancel != nil {
-		s.cancel()
-	}
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
-// StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)
+// StakedNodeOperationInfo struct contains all the node information needed to
+// start a node after it is onboarded (staked and registered).
 type StakedNodeOperationInfo struct {
 	NodeID                  flow.Identifier
 	Role                    flow.Role
@@ -131,7 +153,7 @@ type StakedNodeOperationInfo struct {
 	ContainerName           string
 }
 
-// StakeNode will generate initial keys needed for a SN/LN node and onboard this node using the following steps;
+// StakeNode will generate initial keys needed for a SN/LN node and onboard this node using the following steps:
 // 1. Generate keys (networking, staking, machine)
 // 2. Create a new account, this will be the staking account
 // 3. Transfer token amount for the given role to the staking account
@@ -139,6 +161,7 @@ type StakedNodeOperationInfo struct {
 // 5. Create Staking collection for node
 // 6. Register node using staking collection object
 func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role flow.Role) *StakedNodeOperationInfo {
+
 	stakingAccountKey, networkingKey, stakingKey, machineAccountKey, machineAccountPubKey := s.generateAccountKeys(role)
 	nodeID := flow.MakeID(stakingKey.PublicKey().Encode())
 	fullAccountKey := sdk.NewAccountKey().
@@ -670,8 +693,6 @@ func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
 // head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
 // 3. Check that we can execute a script on the AN
 func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
-	// assert atleast 20 blocks have been finalized since the node replacement
-	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
@@ -679,18 +700,22 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	client, err := testnet.NewClient(clientAddr, s.net.Root().Header.ChainID.Chain())
 	require.NoError(s.T(), err)
 
+	// overwrite client to point to the new AN (since we have stopped the initial AN at this point)
+	s.client = client
+	// assert atleast 20 blocks have been finalized since the node replacement
+	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
+
 	// execute script directly on new AN to ensure it's functional
 	proposedTable, err := client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
-
 }
 
 // assertNetworkHealthyAfterVNChange after an verification node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
 func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	// assert atleast 20 blocks have been finalized since the node replacement
+	// assert at least 20 blocks have been finalized since the node replacement
 	s.assertLatestFinalizedBlockHeightHigher(ctx, rootSnapshot, 20)
 }
 
@@ -698,7 +723,7 @@ func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templat
 // this func can be used to perform sanity.
 // 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
 // is after the first epoch.
-func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	// At this point we have reached epoch 1 and our new LN node should be the only LN node in the network.
 	// To validate the LN joined the network successfully and is processing transactions we submit a
 	// create account transaction and assert there are no errors.
@@ -709,7 +734,7 @@ func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templat
 // the epoch transition we should observe blocks finalizing and we should be able to submit a transaction
 // that will indicate overall network health
 // 1. Submit transaction to network
-func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	// At this point we can assure that our SN node is participating in finalization and sealing because
 	// there are only 2 SN nodes in the network now we will submit a transaction to the
 	// network to ensure the network is overall healthy.

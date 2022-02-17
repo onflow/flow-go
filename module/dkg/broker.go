@@ -7,13 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/flow-go/engine"
-
+	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -21,34 +19,49 @@ import (
 	"github.com/onflow/flow-go/module/retrymiddleware"
 )
 
-const (
-	// retryMaxPublish is the maximum number of times the broker will attempt to broadcast
-	// a message or publish a result
-	retryMaxPublish = 8
+// BrokerOpt is a functional option which modifies the DKG Broker config.
+type BrokerOpt func(*BrokerConfig)
 
-	// retryMaxRead is the max number of times the broker will attempt to read messages
-	retryMaxRead = 3
+// BrokerConfig is configuration for the DKG Broker component.
+type BrokerConfig struct {
+	// PublishMaxRetries is the maximum number of times the broker will attempt
+	// to broadcast a message or publish a result.
+	PublishMaxRetries uint64
+	// ReadMaxRetries is the max number of times the broker will attempt to
+	// read messages before giving up.
+	ReadMaxRetries uint64
+	// RetryMaxConsecutiveFailures is the number of consecutive failures allowed
+	// before we switch to a different Access client for subsequent attempts.
+	RetryMaxConsecutiveFailures int
+	// RetryInitialWait is the initial duration to wait between retries for all
+	// retryable requests - increases exponentially for subsequent retries.
+	RetryInitialWait time.Duration
+	// RetryJitterPct is the percentage jitter to introduce to each retry interval
+	// for all retryable requests.
+	RetryJitterPct uint64
+}
 
-	// retryMaxConsecutiveFailures is the number of consecutive failures allowed before we attempt with fallback client
-	retryMaxConsecutiveFailures = 2
-	// retryDuration is the initial duration to wait between retries for all retryable
-	// requests - increases exponentially for subsequent retries
-	retryDuration = time.Second
-
-	// retryJitterPercent is the percentage jitter to introduce to each retry interval
-	// for all retryable requests
-	retryJitterPercent = 25 // 25%
-)
+// DefaultBrokerConfig returns the default config for the DKG Broker component.
+func DefaultBrokerConfig() BrokerConfig {
+	return BrokerConfig{
+		PublishMaxRetries:           10,
+		ReadMaxRetries:              3,
+		RetryMaxConsecutiveFailures: 2,
+		RetryInitialWait:            time.Second,
+		RetryJitterPct:              25,
+	}
+}
 
 // Broker is an implementation of the DKGBroker interface which is intended to
 // be used in conjunction with the DKG MessagingEngine for private messages, and
 // with the DKG smart-contract for broadcast messages.
 type Broker struct {
+	config                    BrokerConfig
 	log                       zerolog.Logger
 	unit                      *engine.Unit
 	dkgInstanceID             string                     // unique identifier of the current dkg run (prevent replay attacks)
-	committee                 flow.IdentityList          // IDs of DKG members
-	me                        module.Local               // used for signing bcast messages
+	committee                 flow.IdentityList          // identities of DKG members
+	me                        module.Local               // used for signing broadcast messages
 	myIndex                   int                        // index of this instance in the committee
 	dkgContractClients        []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
 	lastSuccessfulClientIndex int                        // index of the contract client that was last successful during retries
@@ -58,11 +71,14 @@ type Broker struct {
 	messageOffset             uint                       // offset for next broadcast messages to fetch
 	shutdownCh                chan struct{}              // channel to stop the broker from listening
 
-	broadcasts    uint       // broadcasts counts the number of successful broadcasts
-	broadcastLock sync.Mutex // protects access to broadcasts count variable
+	broadcasts uint // broadcasts counts the number of attempted broadcasts
 
-	pollLock sync.Mutex // lock around polls to read inbound broadcasts
+	clientLock    sync.Mutex // lock around updates to current client
+	broadcastLock sync.Mutex // lock around outbound broadcasts
+	pollLock      sync.Mutex // lock around polls to read inbound broadcasts
 }
+
+var _ module.DKGBroker = (*Broker)(nil)
 
 // NewBroker instantiates a new epoch-specific broker capable of communicating
 // with other nodes via a network engine and dkg smart-contract.
@@ -73,9 +89,17 @@ func NewBroker(
 	me module.Local,
 	myIndex int,
 	dkgContractClients []module.DKGContractClient,
-	tunnel *BrokerTunnel) *Broker {
+	tunnel *BrokerTunnel,
+	opts ...BrokerOpt,
+) *Broker {
+
+	config := DefaultBrokerConfig()
+	for _, apply := range opts {
+		apply(&config)
+	}
 
 	b := &Broker{
+		config:             config,
 		log:                log.With().Str("component", "broker").Str("dkg_instance_id", dkgInstanceID).Logger(),
 		unit:               engine.NewUnit(),
 		dkgInstanceID:      dkgInstanceID,
@@ -120,44 +144,48 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 // Broadcast signs and broadcasts a message to all participants.
 func (b *Broker) Broadcast(data []byte) {
 	b.unit.Launch(func() {
-		// NOTE: We're counting the number of times the underlying DKG
-		// requested a broadcast so we can detect an unhappy path. Thus incrementing
-		// broadcasts before we perform the broadcasts is okay.
+
+		// NOTE: We're counting the number of times the underlying DKG requested
+		// a broadcast so that we can detect an unhappy path (any time there is
+		// more than 1 broadcast message per DKG) Thus incrementing broadcasts
+		// before we perform the broadcasts is okay.
 		b.broadcastLock.Lock()
 		if b.broadcasts > 0 {
-			// The Warn log is used by the integration tests to check if this method
-			// is called more than once within one epoch.
-			b.log.Warn().Msgf("DKG broadcast number %d with header %d", b.broadcasts+1, data[0])
+			// The warn-level log is used by the integration tests to check if this
+			// func is called more than once within one epoch (unhappy path).
+			b.log.Warn().Msgf("preparing to send DKG broadcast number %d with header %d", b.broadcasts+1, data[0])
 		} else {
-			b.log.Info().Msgf("DKG message broadcast with header %d", data[0])
+			b.log.Info().Msgf("preparing to send DKG message broadcast with header %d", data[0])
 		}
 		b.broadcasts++
+		log := b.log.With().Uint("broadcast_number", b.broadcasts).Logger()
 		b.broadcastLock.Unlock()
 
 		bcastMsg, err := b.prepareBroadcastMessage(data)
 		if err != nil {
-			b.log.Fatal().Err(err).Msg("failed to create broadcast message")
+			log.Fatal().Err(err).Msg("failed to create broadcast message")
 		}
 
-		expRetry, err := retry.NewExponential(retryDuration)
+		backoff, err := retry.NewExponential(b.config.RetryInitialWait)
 		if err != nil {
-			b.log.Fatal().Err(err).Msg("create retry mechanism")
+			log.Fatal().Err(err).Msg("create retry mechanism")
 		}
-		maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
-		withJitter := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
+		backoff = retry.WithMaxRetries(b.config.PublishMaxRetries, backoff)
+		backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
 		clientIndex, dkgContractClient := b.getInitialContractClient()
 		onMaxConsecutiveRetries := func(totalAttempts int) {
 			clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
-			b.log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
+			log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 		}
-		afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
+		backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
+		b.broadcastLock.Lock()
 		attempts := 1
-		err = retry.Do(context.Background(), afterConsecutiveFailures, func(ctx context.Context) error {
+		err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 			err := dkgContractClient.Broadcast(bcastMsg)
 			if err != nil {
-				b.log.Error().Err(err).Msgf("error broadcasting, retrying (%d)", attempts)
+				log.Error().Err(err).Msgf("error broadcasting, retrying (attempt %d)", attempts)
 				attempts++
 				return retry.RetryableError(err)
 			}
@@ -166,28 +194,91 @@ func (b *Broker) Broadcast(data []byte) {
 			b.updateLastSuccessfulClient(clientIndex)
 			return nil
 		})
+		b.broadcastLock.Unlock()
 
-		// Various network can conditions can result in errors while broadcasting DKG messages,
-		// because failure to send an individual DKG message doesn't necessarily result in local or global DKG failure
+		// Various network conditions can result in errors while broadcasting DKG messages.
+		// Because the overall DKG is resilient to individual message failures,
 		// it is acceptable to log the error and move on.
 		if err != nil {
-			b.log.Error().Err(err).Msg("failed to broadcast message")
+			log.Error().Err(err).Msgf("failed to broadcast message after %d attempts", attempts)
+			return
 		}
+		log.Info().Msgf("dkg broadcast successfully on attempt %d", attempts)
 	})
+}
+
+// SubmitResult publishes the result of the DKG protocol to the smart contract.
+func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
+
+	// If the DKG failed locally, we will get a nil key vector here. We need to convert
+	// the nil slice to a slice of nil keys before submission.
+	//
+	// In general, if pubKeys does not have one key per participant, we cannot submit
+	// a valid result - therefore we submit a nil vector (indicating that we have
+	// completed the process, but we know that we don't have a valid result).
+	if len(pubKeys) != len(b.committee) {
+		b.log.Warn().Msgf("submitting dkg result with incomplete key vector (len=%d, expected=%d)", len(pubKeys), len(b.committee))
+		// create a key vector with one nil entry for each committee member
+		pubKeys = make([]crypto.PublicKey, len(b.committee))
+	}
+
+	backoff, err := retry.NewExponential(b.config.RetryInitialWait)
+	if err != nil {
+		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
+	}
+	backoff = retry.WithMaxRetries(b.config.PublishMaxRetries, backoff)
+	backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
+
+	clientIndex, dkgContractClient := b.getInitialContractClient()
+	onMaxConsecutiveRetries := func(totalAttempts int) {
+		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
+		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
+	}
+	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
+
+	attempts := 1
+	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
+		err := dkgContractClient.SubmitResult(groupKey, pubKeys)
+		if err != nil {
+			b.log.Error().Err(err).Msgf("error submitting DKG result, retrying (attempt %d)", attempts)
+			attempts++
+			return retry.RetryableError(err)
+		}
+
+		// update our last successful client index for future calls
+		b.updateLastSuccessfulClient(clientIndex)
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to submit dkg result after %d attempts: %w", attempts, err)
+	}
+
+	b.log.Info().Msgf("dkg result submitted successfully on attempt %d", attempts)
+	return nil
 }
 
 // Disqualify flags that a node is misbehaving and got disqualified
 func (b *Broker) Disqualify(node int, log string) {
-	// The Warn log is used by the integration tests to check if this method is
-	// called.
-	b.log.Warn().Msgf("participant %d is disqualifying participant %d because: %s", b.myIndex, node, log)
+	var nodeID flow.Identifier
+	if node < len(b.committee) {
+		nodeID = b.committee[node].NodeID
+	}
+
+	// The warn-level log is used by the integration tests to check if this method is called.
+	b.log.Warn().Msgf("participant %d (this node) is disqualifying participant (index=%d, node_id=%s) because: %s",
+		b.myIndex, node, nodeID, log)
 }
 
 // FlagMisbehavior warns that a node is misbehaving.
 func (b *Broker) FlagMisbehavior(node int, log string) {
-	// The Warn log is used by the integration tests to check if this method is
-	// called.
-	b.log.Warn().Msgf("participant %d is flagging participant %d because: %s", b.myIndex, node, log)
+	var nodeID flow.Identifier
+	if node < len(b.committee) {
+		nodeID = b.committee[node].NodeID
+	}
+
+	// The warn-level log is used by the integration tests to check if this method is called.
+	b.log.Warn().Msgf("participant %d (this node) is flagging participant (index=%d, node_id=%s) because: %s",
+		b.myIndex, node, nodeID, log)
 }
 
 // GetPrivateMsgCh returns the channel through which consumers can receive
@@ -213,25 +304,27 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	b.pollLock.Lock()
 	defer b.pollLock.Unlock()
 
-	expRetry, err := retry.NewExponential(retryDuration)
+	backoff, err := retry.NewExponential(b.config.RetryInitialWait)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
-	maxedExpRetry := retry.WithMaxRetries(retryMaxRead, expRetry)
-	withJitter := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
+	backoff = retry.WithMaxRetries(b.config.ReadMaxRetries, backoff)
+	backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
 	clientIndex, dkgContractClient := b.getInitialContractClient()
 	onMaxConsecutiveRetries := func(totalAttempts int) {
 		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
 		b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
-	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
+	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
 	var msgs []messages.BroadcastDKGMessage
-	err = retry.Do(b.unit.Ctx(), afterConsecutiveFailures, func(ctx context.Context) error {
+	attempt := 1
+	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 		msgs, err = dkgContractClient.ReadBroadcast(b.messageOffset, referenceBlock)
 		if err != nil {
-			err = fmt.Errorf("could not read broadcast messages(offset: %d, ref: %v): %w", b.messageOffset, referenceBlock, err)
+			err = fmt.Errorf("could not read broadcast messages (attempt: %d, offset: %d, ref: %v): %w", attempt, b.messageOffset, referenceBlock, err)
+			attempt++
 			return retry.RetryableError(err)
 		}
 
@@ -242,16 +335,14 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	// Various network conditions can result in errors while reading DKG messages
 	// We will read any missed messages during the next poll because messageOffset is not increased
 	if err != nil {
-		b.log.Error().Err(err).Msg("failed to read messages")
+		b.log.Error().Err(err).Msgf("failed to read messages after %d attempts", attempt)
 		return nil
 	}
 
-	b.unit.Lock()
-	defer b.unit.Unlock()
 	for _, msg := range msgs {
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
-			b.log.Error().Err(err).Msg("bad broadcast message")
+			b.log.Error().Err(err).Msg("unable to verify broadcast message")
 			continue
 		}
 		if !ok {
@@ -268,41 +359,6 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	return nil
 }
 
-// SubmitResult publishes the result of the DKG protocol to the smart contract.
-func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
-	expRetry, err := retry.NewExponential(retryDuration)
-	if err != nil {
-		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
-	}
-	maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
-	withJitter := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
-
-	clientIndex, dkgContractClient := b.getInitialContractClient()
-	onMaxConsecutiveRetries := func(totalAttempts int) {
-		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
-		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
-	}
-	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
-	err = retry.Do(context.Background(), afterConsecutiveFailures, func(ctx context.Context) error {
-		err := dkgContractClient.SubmitResult(pubKey, groupKeys)
-		if err != nil {
-			b.log.Error().Err(err).Msg("error submitting DKG result, retrying")
-			return retry.RetryableError(err)
-		}
-
-		// update our last successful client index for future calls
-		b.updateLastSuccessfulClient(clientIndex)
-		return nil
-	})
-
-	if err != nil {
-		b.log.Fatal().Err(err).Msg("failed to submit dkg result")
-	}
-
-	b.log.Debug().Msg("dkg result submitted")
-	return nil
-}
-
 // Shutdown stop the goroutine that listens to incoming private messages.
 func (b *Broker) Shutdown() {
 	close(b.shutdownCh)
@@ -313,8 +369,8 @@ func (b *Broker) Shutdown() {
 // updateContractClient will return the last successful client index by default for all initial operations or else
 // it will return the appropriate client index with respect to last successful and number of client.
 func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractClient) {
-	b.unit.Lock()
-	defer b.unit.Unlock()
+	b.clientLock.Lock()
+	defer b.clientLock.Unlock()
 	if clientIndex == b.lastSuccessfulClientIndex {
 		if clientIndex == len(b.dkgContractClients)-1 {
 			clientIndex = 0
@@ -330,15 +386,15 @@ func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractC
 
 // getInitialContractClient will return the last successful contract client or the initial
 func (b *Broker) getInitialContractClient() (int, module.DKGContractClient) {
-	b.unit.Lock()
-	defer b.unit.Unlock()
+	b.clientLock.Lock()
+	defer b.clientLock.Unlock()
 	return b.lastSuccessfulClientIndex, b.dkgContractClients[b.lastSuccessfulClientIndex]
 }
 
 // updateLastSuccessfulClient set lastSuccessfulClientIndex in concurrency safe way
 func (b *Broker) updateLastSuccessfulClient(clientIndex int) {
-	b.unit.Lock()
-	defer b.unit.Unlock()
+	b.clientLock.Lock()
+	defer b.clientLock.Unlock()
 
 	b.lastSuccessfulClientIndex = clientIndex
 }

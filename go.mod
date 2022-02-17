@@ -11,7 +11,7 @@ require (
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.22.0-beta
-	github.com/dapperlabs/testingdock v0.4.2
+	github.com/dapperlabs/testingdock v0.4.4
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v2 v2.2007.3
 	github.com/ef-ds/deque v1.0.4
@@ -59,13 +59,13 @@ require (
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.1.1
 	github.com/onflow/cadence v0.21.0
-	github.com/onflow/flow v0.2.3-0.20220124225841-6dd3bed23faf
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.9.0
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.9.0
+	github.com/onflow/flow v0.2.3-0.20220207221328-d1ffd1c3053e
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.1
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.24.0
-	github.com/onflow/flow-go/crypto v0.21.4-0.20211125190211-7b31c986316e
-	github.com/onflow/flow/protobuf/go/flow v0.2.3
+	github.com/onflow/flow-go/crypto v0.24.2
+	github.com/onflow/flow/protobuf/go/flow v0.2.4-0.20220215173423-e60766c65a21
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
@@ -105,5 +105,3 @@ require (
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
-
-replace github.com/onflow/flow-go/crypto => ./crypto

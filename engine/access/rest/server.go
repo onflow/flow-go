@@ -8,12 +8,13 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) (*http.Server, error) {
+func NewServer(backend access.API, listenAddress string, logger zerolog.Logger, chain flow.Chain) (*http.Server, error) {
 
-	router, err := newRouter(backend, logger)
+	router, err := newRouter(backend, logger, chain)
 	if err != nil {
 		return nil, err
 	}
