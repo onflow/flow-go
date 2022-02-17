@@ -207,9 +207,9 @@ func encodeAndAppendKey(buffer []byte, k *ledger.Key) []byte {
 func encodedKeyLength(k *ledger.Key) int {
 	// Key is encoded as: number of key parts (2 bytes) and for each key part,
 	// the key part size (4 bytes) + encoded key part (n bytes).
-	size := 2
+	size := 2 + 4*len(k.KeyParts)
 	for _, kp := range k.KeyParts {
-		size += 4 + encodedKeyPartLength(&kp)
+		size += encodedKeyPartLength(&kp)
 	}
 	return size
 }
