@@ -171,7 +171,7 @@ func (c *ConduitFactory) sendOnNetwork(event interface{},
 	switch protocol {
 	case proto.Protocol_UNICAST:
 		if len(targetIds) > 1 {
-			return fmt.Errorf("illegal state: one target ids for unicast: %v", targetIds)
+			return fmt.Errorf("more than one target ids for unicast: %v", targetIds)
 		}
 		return c.adapter.UnicastOnChannel(channel, event, targetIds[0])
 
