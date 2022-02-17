@@ -100,7 +100,7 @@ func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *proto.Attacke
 		return nil, fmt.Errorf("could not establish a client connection to attacker: %w", err)
 	}
 
-	c.attacker = NewAttackerClient(clientConn)
+	c.attacker = proto.NewAttackerClient(clientConn)
 
 	return &empty.Empty{}, nil
 }
