@@ -22,7 +22,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
             {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
           ],
-          "result": "",
+          "result": "-100",
           "elapsed": 0
         },
         {
@@ -35,7 +35,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
             {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
           ],
-          "result": "",
+          "result": "-100",
           "elapsed": 0
         },
         {
@@ -48,7 +48,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
             {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
           ],
-          "result": "",
+          "result": "-100",
           "elapsed": 0
         },
         {
@@ -61,7 +61,7 @@
             {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
             {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
           ],
-          "result": "",
+          "result": "-100",
           "elapsed": 0
         },
         {

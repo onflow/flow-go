@@ -168,7 +168,22 @@ func postProcessTestRun(packageResultMap map[string]*common.PackageResult) {
 		}
 
 		for _, testResults := range packageResult.TestMap {
-			packageResult.Tests = append(packageResult.Tests, testResults...)
+			for _, testResult := range testResults {
+				if testResult.Result != "pass" && testResult.Result != "fail" {
+					// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
+					// we want to highlight these tests so they show up at the top in Granfa
+					// we do this by simulating a really low fail rate so that the average success rate
+					// will be very low compared to other tests so it will show up on the "flakiest test" panel
+					if testResult.Result == "" {
+						testResult.Result = "-100"
+					} else {
+						// only include passed or failed tests - don't include skipped tests
+						// this is needed to have accurate Grafana metrics for average pass rate
+						continue
+					}
+				}
+				packageResult.Tests = append(packageResult.Tests, testResult)
+			}
 		}
 
 		// clear test result map once all values transfered to slice - needed for testing so will check against an empty map
