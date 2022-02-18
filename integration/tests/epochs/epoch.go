@@ -206,9 +206,17 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	env := utils.LocalnetEnv()
 
-	// grab the first container of this node role type, this is the container we will replace
-	containerToReplace := s.getContainerToReplace(role)
-	require.NotNil(s.T(), containerToReplace)
+	var containerToReplace *testnet.Container
+
+	// replace access_2, avoid replacing access_1 the container used for client connections
+	if role == flow.RoleAccess {
+		containerToReplace = s.getContainerToReplace(role, "access_2")
+		require.NotNil(s.T(), containerToReplace)
+	} else {
+		// grab the first container of this node role type, this is the container we will replace
+		containerToReplace = s.getContainerToReplace(role, "")
+		require.NotNil(s.T(), containerToReplace)
+	}
 
 	// staking our new node and add get the corresponding container for that node
 	info, testContainer := s.StakeNewNode(s.ctx, env, role)

@@ -610,7 +610,13 @@ func (s *Suite) StakeNewNode(ctx context.Context, env templates.Environment, rol
 }
 
 // getContainerToReplace return a container from the network, make sure the container is not a ghost
-func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
+func (s *Suite) getContainerToReplace(role flow.Role, name string) *testnet.Container {
+	//NOTE: when running the access node test suite we get the container to replace
+	// by name so that we can avoid pausing the container we use for client connections
+	if name != "" {
+		return s.net.ContainerByName(name)
+	}
+
 	nodes := s.net.ContainersByRole(role)
 	require.True(s.T(), len(nodes) > 0)
 
