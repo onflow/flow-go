@@ -430,6 +430,23 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		require.NoError(suite.T(), executionResults.Store(er))
 		require.NoError(suite.T(), executionResults.Index(blockID, er.ID()))
 
+		assertIdenticalHash := func(resp *accessproto.ExecutionResultForBlockIDResponse, executionResult *flow.ExecutionResult) {
+			er := resp.ExecutionResult
+			// convert Chunks
+			parsedChunks := flow.ChunkList{}
+			// convert ServiceEvents
+			parsedServiceEvents := flow.ServiceEventList{}
+
+			parsedExecResp := &flow.ExecutionResult{
+				PreviousResultID: convert.MessageToIdentifier(er.PreviousResultId),
+				BlockID:          convert.MessageToIdentifier(er.BlockId),
+				Chunks:           parsedChunks,
+				ServiceEvents:    parsedServiceEvents,
+				ExecutionDataID:  convert.MessageToIdentifier(er.ExecutionDataId),
+			}
+			assert.Equal(suite.T(), executionResult.ID(), parsedExecResp.ID())
+		}
+
 		assertResp := func(resp *accessproto.ExecutionResultForBlockIDResponse, err error, executionResult *flow.ExecutionResult) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
@@ -440,6 +457,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 			assert.Equal(suite.T(), executionResult.BlockID[:], er.BlockId)
 			assert.Equal(suite.T(), executionResult.PreviousResultID[:], er.PreviousResultId)
+			assert.Equal(suite.T(), executionResult.ExecutionDataID, er.ExecutionDataId)
 
 			for i, chunk := range executionResult.Chunks {
 				assert.Equal(suite.T(), chunk.BlockID[:], er.Chunks[i].BlockId)
@@ -461,6 +479,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
 			}
+			assertIdenticalHash(resp, executionResult)
 		}
 
 		suite.Run("nonexisting block", func() {
