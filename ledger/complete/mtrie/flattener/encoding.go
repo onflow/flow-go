@@ -202,6 +202,10 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	nType := scratch[pos]
 	pos++
 
+	if nType != byte(leafNodeType) && nType != byte(interimNodeType) {
+		return nil, fmt.Errorf("failed to decode node type %d", nType)
+	}
+
 	// Decode height (2 bytes)
 	height := binary.BigEndian.Uint16(scratch[pos:])
 	pos += 2
