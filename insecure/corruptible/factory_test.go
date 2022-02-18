@@ -1,4 +1,4 @@
-package corruptible_test
+package corruptible
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/insecure/corruptible"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -14,7 +13,7 @@ import (
 )
 
 func TestRegisterAdapter(t *testing.T) {
-	f := corruptible.NewCorruptibleConduitFactory(unittest.IdentifierFixture(), cbor.NewCodec())
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), cbor.NewCodec())
 
 	adapter := &mocknetwork.Adapter{}
 
@@ -28,7 +27,7 @@ func TestRegisterAdapter(t *testing.T) {
 // TestNewConduit_HappyPath checks when factory has an adapter registered, it can successfully
 // create conduits.
 func TestNewConduit_HappyPath(t *testing.T) {
-	f := corruptible.NewCorruptibleConduitFactory(unittest.IdentifierFixture(), cbor.NewCodec())
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), cbor.NewCodec())
 	channel := network.Channel("test-channel")
 
 	adapter := &mocknetwork.Adapter{}
@@ -38,4 +37,15 @@ func TestNewConduit_HappyPath(t *testing.T) {
 	c, err := f.NewConduit(context.Background(), channel)
 	require.NoError(t, err)
 	require.NotNil(t, c)
+}
+
+// TestNewConduit_MissingAdapter checks when factory does not have an adapter registered,
+// any attempts on creating a conduit fails with an error.
+func TestNewConduit_MissingAdapter(t *testing.T) {
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), cbor.NewCodec())
+	channel := network.Channel("test-channel")
+
+	c, err := f.NewConduit(context.Background(), channel)
+	require.Error(t, err)
+	require.Nil(t, c)
 }
