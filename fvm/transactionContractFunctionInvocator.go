@@ -67,7 +67,11 @@ func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTrace
 	)
 
 	if err != nil {
-		i.logger.Warn().
+		i.logger.
+			Info().
+			Err(err).
+			Str("contract", i.contractLocation.String()).
+			Str("function", i.functionName).
 			Msg("Contract function call executed with error")
 	}
 	return value, err
