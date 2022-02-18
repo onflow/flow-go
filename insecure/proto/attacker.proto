@@ -7,12 +7,12 @@ import "google/protobuf/empty.proto";
 option go_package = "insecure/proto";
 
 // to compile this file, run:
-// protoc insecure/corruptible/service.proto --go_out=plugins=grpc:.
+// protoc insecure/proto/attacker.proto --go_out=plugins=grpc:.
 
-// Zombie implements the service provided by a corruptible conduit.
+// CorruptibleConduitFactory implements the service provided by a corruptible conduit conduit.
 // It allows an attack to register itself to the conduit, and hence takes the control
 // of the conduit by sending messages on its behalf.
-service Zombie {
+service CorruptibleConduitFactory {
   rpc RegisterAttacker(AttackerRegisterMessage) returns (google.protobuf.Empty) {}
   rpc ProcessAttackerMessage(Message) returns (google.protobuf.Empty) {}
 }
@@ -39,7 +39,7 @@ enum Protocol {
   PUBLISH = 3;
 }
 
-// AttackerRegisterMessage is the message an attacker uses to register itself to the chosen Zombie,
+// AttackerRegisterMessage is the message an attacker uses to register itself to the chosen CorruptibleConduitFactory,
 // and takes its control.
 message AttackerRegisterMessage {
   string address = 1;
