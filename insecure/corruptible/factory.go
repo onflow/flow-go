@@ -131,9 +131,9 @@ func (c *ConduitFactory) HandleIncomingEvent(
 	return nil
 }
 
-// EngineIsDoneWithMe is called by the slave conduits of this factory to let it know that the corresponding engine of the
+// EngineClosingChannel is called by the slave conduits of this factory to let it know that the corresponding engine of the
 // conduit is not going to use it anymore, so the channel can be closed safely.
-func (c *ConduitFactory) EngineIsDoneWithMe(channel network.Channel) error {
+func (c *ConduitFactory) EngineClosingChannel(channel network.Channel) error {
 	return c.adapter.UnRegisterChannel(channel)
 }
 

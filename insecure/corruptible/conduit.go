@@ -69,5 +69,5 @@ func (c *Conduit) Close() error {
 	// close the conduit context
 	c.cancel()
 	// call the close function
-	return c.master.EngineIsDoneWithMe(c.channel)
+	return c.master.EngineClosingChannel(c.channel)
 }

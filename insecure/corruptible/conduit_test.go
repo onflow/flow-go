@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -176,4 +177,55 @@ func TestConduitReflectError_Publish(t *testing.T) {
 
 	err := c.Publish(event, targetIds...)
 	require.NoError(t, err)
+}
+
+// TestConduitClose_HappyPath checks that when an engine closing a corruptible conduit, the closing action is relayed to the master (i.e., factory)
+// of the conduit for processing further.
+func TestConduitClose_HappyPath(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	master := &mockinsecure.ConduitMaster{}
+	channel := network.Channel("test-channel")
+
+	c := &Conduit{
+		ctx:     ctx,
+		cancel:  cancel,
+		channel: channel,
+		master:  master,
+	}
+
+	master.On("EngineClosingChannel", channel).
+		Return(nil).
+		Once()
+
+	err := c.Close()
+	require.NoError(t, err)
+
+	// closing conduit must also close its context
+	unittest.RequireCloseBefore(t, ctx.Done(), 10*time.Millisecond, "could not cancel context on time")
+}
+
+// TestConduitClose_Error checks that when an engine closing a corruptible conduit, the closing action is relayed to the master (i.e., factory)
+// of the conduit for processing further, and if the master returns an error for closing the conduit,
+// the error is reflected to original invoker of the corruptible conduit close method.
+func TestConduitClose_Error(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	master := &mockinsecure.ConduitMaster{}
+	channel := network.Channel("test-channel")
+
+	c := &Conduit{
+		ctx:     ctx,
+		cancel:  cancel,
+		channel: channel,
+		master:  master,
+	}
+
+	master.On("EngineClosingChannel", channel).
+		Return(fmt.Errorf("faced an error when closing the channel")).
+		Once()
+
+	err := c.Close()
+	require.Error(t, err)
+
+	// closing conduit must also close its context
+	unittest.RequireCloseBefore(t, ctx.Done(), 10*time.Millisecond, "could not cancel context on time")
 }

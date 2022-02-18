@@ -13,7 +13,7 @@ type ConduitMaster interface {
 	// HandleIncomingEvent sends an incoming event to the conduit master to process.
 	HandleIncomingEvent(context.Context, interface{}, network.Channel, proto.Protocol, uint32, ...flow.Identifier) error
 
-	// EngineIsDoneWithMe informs the conduit master that the corresponding engine of the given channel is not going to
+	// EngineClosingChannel informs the conduit master that the corresponding engine of the given channel is not going to
 	// use it anymore, hence the channel can be closed.
-	EngineIsDoneWithMe(network.Channel) error
+	EngineClosingChannel(network.Channel) error
 }

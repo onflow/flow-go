@@ -20,7 +20,7 @@ type ConduitMaster struct {
 }
 
 // EngineIsDoneWithMe provides a mock function with given fields: _a0
-func (_m *ConduitMaster) EngineIsDoneWithMe(_a0 network.Channel) error {
+func (_m *ConduitMaster) EngineClosingChannel(_a0 network.Channel) error {
 	ret := _m.Called(_a0)
 
 	var r0 error
