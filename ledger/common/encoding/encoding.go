@@ -238,14 +238,18 @@ func DecodeKey(encodedKey []byte) (*ledger.Key, error) {
 // decodeKey decodes inp into Key. If zeroCopy is true, returned key
 // references data in inp.  Otherwise, it is copied.
 func decodeKey(inp []byte, zeroCopy bool) (*ledger.Key, error) {
+	key := &ledger.Key{}
+
 	numOfParts, rest, err := utils.ReadUint16(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key (content): %w", err)
 	}
 
-	key := &ledger.Key{
-		KeyParts: make([]ledger.KeyPart, numOfParts),
+	if numOfParts == 0 {
+		return key, nil
 	}
+
+	key.KeyParts = make([]ledger.KeyPart, numOfParts)
 
 	for i := 0; i < int(numOfParts); i++ {
 		var kpEncSize uint32
