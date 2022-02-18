@@ -107,7 +107,8 @@ func (s *Suite) SetupTest() {
 	// start tracking blocks
 	s.Track(s.T(), ctx, s.Ghost())
 
-	addr := fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort])
+	// connect to access node 1 for client connection
+	addr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName["access_1"])
 	client, err := testnet.NewClient(addr, s.net.Root().Header.ChainID.Chain())
 	require.NoError(s.T(), err, "failed to get flow client")
 
@@ -598,7 +599,11 @@ func (s *Suite) StakeNewNode(ctx context.Context, env templates.Environment, rol
 }
 
 // getContainerToReplace return a container from the network, make sure the container is not a ghost
-func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
+func (s *Suite) getContainerToReplace(role flow.Role, name string) *testnet.Container {
+	if name != "" {
+		return s.net.ContainerByName(name)
+	}
+
 	nodes := s.net.ContainersByRole(role)
 	require.True(s.T(), len(nodes) > 0)
 
