@@ -123,11 +123,10 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) TearDownTest() {
-	//s.log.Info().Msgf("================> Start TearDownTest")
-	s.log.Info().Msgf("================> SKIPPING TearDownTest")
-	//s.net.Remove()
-	//s.cancel()
-	//s.log.Info().Msgf("================> Finish TearDownTest")
+	s.log.Info().Msgf("================> Start TearDownTest")
+	s.net.Remove()
+	s.cancel()
+	s.log.Info().Msgf("================> Finish TearDownTest")
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)
