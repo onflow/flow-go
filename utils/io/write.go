@@ -2,10 +2,12 @@ package io
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // WriteFile writes a byte array to the file at the given path.
@@ -42,4 +44,11 @@ func WriteJSON(path string, data interface{}) error {
 	}
 
 	return WriteFile(path, bz)
+}
+
+func TerminateOnFullDisk(err error) error {
+	if err != nil && errors.Is(err, syscall.ENOSPC) {
+		panic(fmt.Sprintf("disk full, terminating node: %s", err.Error()))
+	}
+	return err
 }
