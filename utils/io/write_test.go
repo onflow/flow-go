@@ -2,9 +2,10 @@ package io
 
 import (
 	"errors"
-	"github.com/stretchr/testify/require"
 	"syscall"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTerminateOnFullDisk(t *testing.T) {

@@ -2,6 +2,7 @@ package transaction
 
 import (
 	dbbadger "github.com/dgraph-io/badger/v2"
+
 	ioutils "github.com/onflow/flow-go/utils/io"
 )
 
