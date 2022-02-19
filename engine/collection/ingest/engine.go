@@ -228,7 +228,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// if we don't know the reference block, we will fail when attempting to query the epoch.
 	refEpoch := refSnapshot.Epochs().Current()
 
-	counter, err := refEpoch.Counter()
+	epochCounter, err := refEpoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not get counter for reference epoch: %w", err)
 	}
@@ -238,7 +238,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// use the transaction pool for the epoch the reference block is part of
-	pool := e.pools.ForEpoch(counter)
+	pool := e.pools.ForEpoch(epochCounter)
 
 	// short-circuit if we have already stored the transaction
 	if pool.Has(txID) {
@@ -258,23 +258,32 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
 	}
 
-	// if we are not yet a member of any cluster, for example if we are joining
-	// the network in the next epoch, we will return an error here
+	// get the cluster we are in for the reference epoch
 	localCluster, _, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
-		// TODO handle
-		return fmt.Errorf("node is not assigned to any cluster in this epoch: %d", counter)
+		// if we aren't assigned to a cluster, check that we are a member of
+		// the reference epoch
+		refIdentities, err := refEpoch.InitialIdentities()
+		if err != nil {
+			return fmt.Errorf("could not get initial identities for reference epoch: %w", err)
+		}
+
+		if _, ok := refIdentities.ByNodeID(e.me.NodeID()); ok {
+			// CAUTION: we are a member of the epoch, but have no assigned cluster!
+			// This is an unexpected condition and indicates a protocol state invariant has been broken
+			return fmt.Errorf("this node should have an assigned cluster in epoch (counter=%d), but has none", epochCounter)
+		}
+		return engine.NewUnverifiableInputError("this node is not assigned a cluster in epoch (counter=%d)", epochCounter)
 	}
 
 	localClusterFingerPrint := localCluster.Fingerprint()
 	txClusterFingerPrint := txCluster.Fingerprint()
-
 	log = log.With().
 		Hex("local_cluster", logging.ID(localClusterFingerPrint)).
 		Hex("tx_cluster", logging.ID(txClusterFingerPrint)).
 		Logger()
 
-	// if our cluster is responsible for the transaction, add it to the mempool
+	// if our cluster is responsible for the transaction, add it to our local mempool
 	if localClusterFingerPrint == txClusterFingerPrint {
 		_ = pool.Add(tx)
 		e.colMetrics.TransactionIngested(txID)
