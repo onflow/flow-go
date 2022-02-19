@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 
 	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -181,7 +181,7 @@ func main() {
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
-			create := func() mempool.Transactions { return herocache.NewTransactions(uint32(txLimit), node.Logger) }
+			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
