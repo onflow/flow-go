@@ -5,7 +5,7 @@ package cbor
 import (
 	"github.com/pkg/errors"
 
-	"github.com/onflow/flow-go/insecure/proto"
+	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -83,7 +83,7 @@ func switchv2code(v interface{}) (uint8, error) {
 	// testing
 	case *message.TestMessage:
 		code = CodeEcho
-	case *proto.Message:
+	case *insecure.Message:
 		code = CodeInsecureMessage
 
 	// dkg
@@ -169,7 +169,7 @@ func switchv2what(v interface{}) (string, error) {
 	// testing
 	case *message.TestMessage:
 		what = "CodeEcho"
-	case *proto.Message:
+	case *insecure.Message:
 		what = "CodeInsecureMessage"
 
 	// dkg
