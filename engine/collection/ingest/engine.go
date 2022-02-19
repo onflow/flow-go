@@ -10,8 +10,10 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -24,12 +26,15 @@ import (
 // to be included in a collection.
 type Engine struct {
 	unit                 *engine.Unit
+	lm                   *lifecycle.LifecycleManager
 	log                  zerolog.Logger
 	engMetrics           module.EngineMetrics
 	colMetrics           module.CollectionMetrics
 	conduit              network.Conduit
 	me                   module.Local
 	state                protocol.State
+	pendingTransactions  engine.MessageStore
+	messageHandler       *engine.MessageHandler
 	pools                *epochs.TransactionPools
 	transactionValidator *access.TransactionValidator
 
@@ -42,6 +47,7 @@ func New(
 	net network.Network,
 	state protocol.State,
 	engMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	colMetrics module.CollectionMetrics,
 	me module.Local,
 	chain flow.Chain,
@@ -65,6 +71,34 @@ func New(
 		},
 	)
 
+	// FIFO queue for transactions
+	queue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(int(config.MaxMessageQueueSize)),
+		fifoqueue.WithLengthObserver(func(len int) {
+			mempoolMetrics.MempoolEntries(metrics.ResourceTransactionIngestQueue, uint(len))
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create transaction message queue: %w", err)
+	}
+	pendingTransactions := &engine.FifoMessageStore{FifoQueue: queue}
+
+	// define how inbound messages are mapped to message queues
+	handler := engine.NewMessageHandler(
+		logger,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*flow.TransactionBody)
+				if ok {
+					engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
+				}
+				return ok
+			},
+			Store: pendingTransactions,
+		},
+	)
+
 	e := &Engine{
 		unit:                 engine.NewUnit(),
 		log:                  logger,
@@ -72,6 +106,8 @@ func New(
 		colMetrics:           colMetrics,
 		me:                   me,
 		state:                state,
+		pendingTransactions:  pendingTransactions,
+		messageHandler:       handler,
 		pools:                pools,
 		config:               config,
 		transactionValidator: transactionValidator,
@@ -103,7 +139,6 @@ func (e *Engine) SubmitLocal(event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(e.me.NodeID(), event)
 		if err != nil {
-			engine.LogError(e.log, err)
 		}
 	})
 }
