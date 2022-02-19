@@ -5,6 +5,7 @@ package ingest
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
@@ -25,8 +27,8 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit                 *engine.Unit
 	lm                   *lifecycle.LifecycleManager
+	wg                   *sync.WaitGroup // used to wait for processing loop to exit
 	log                  zerolog.Logger
 	engMetrics           module.EngineMetrics
 	colMetrics           module.CollectionMetrics
@@ -100,7 +102,8 @@ func New(
 	)
 
 	e := &Engine{
-		unit:                 engine.NewUnit(),
+		lm:                   lifecycle.NewLifecycleManager(),
+		wg:                   new(sync.WaitGroup),
 		log:                  logger,
 		engMetrics:           engMetrics,
 		colMetrics:           colMetrics,
@@ -123,65 +126,78 @@ func New(
 	return e, nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started.
+// Start starts the engine by starting the message processing loop.
+func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
+	e.lm.OnStart(func() {
+		e.wg.Add(1)
+		go e.loop(ctx)
+	})
+}
+
+// Ready returns a ready channel that is closed once the engine has fully started.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	return e.lm.Started()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-		}
-	})
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
-	})
+	return e.lm.Stopped()
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
+	err := e.messageHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
-// process processes engine events.
-//
-// Transactions are validated and routed to the correct cluster, then added
-// to the transaction mempool.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
-	case *flow.TransactionBody:
-		e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
-		defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
-		return e.onTransaction(originID, ev)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+// loop is the main message processing loop for transaction messages.
+func (e *Engine) loop(ctx irrecoverable.SignalerContext) {
+	defer e.wg.Done()
+
+	for {
+		select {
+		case <-e.lm.ShutdownSignal():
+			return
+		case <-e.messageHandler.GetNotifier():
+			err := e.processAvailableMessages()
+			if err != nil {
+				// if an error reaches this point, it is unexpected
+				ctx.Throw(err)
+			}
+		}
+	}
+}
+
+// processAvailableMessages is called when the message queue is non-empty. It
+// will process transactions while the queue is non-empty, then return.
+func (e *Engine) processAvailableMessages() error {
+	for {
+		msg, ok := e.pendingTransactions.Get()
+		if ok {
+			err := e.onTransaction(msg.OriginID, msg.Payload.(*flow.TransactionBody))
+			// log warnings for expected error conditions
+			if engine.IsUnverifiableInputError(err) {
+				e.log.Warn().Err(err).Msg("unable to process unverifiable transaction")
+			} else if engine.IsInvalidInputError(err) {
+				e.log.Warn().Err(err).Msg("discarding invalid transaction")
+			} else if err != nil {
+				// bubble up unexpected error
+				return fmt.Errorf("unexpected error handling transaction: %w", err)
+			}
+			continue
+		}
+
+		// when there is no more messages in the queue, back to the loop to wait
+		// for the next incoming message to arrive.
+		return nil
 	}
 }
 
@@ -189,8 +205,9 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // from outside the system or routed from another collection node.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
 
-	txID := tx.ID()
+	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 
+	txID := tx.ID()
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("tx_id", txID[:]).
@@ -204,7 +221,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// fail fast if this is an unknown reference
 	_, err := refSnapshot.Head()
 	if err != nil {
-		return fmt.Errorf("could not get reference block: %w", err)
+		return engine.NewUnverifiableInputError("could not get reference block for transaction (%x): %w", txID, err)
 	}
 
 	// using the transaction's reference block, determine which cluster we're in.
@@ -232,7 +249,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// check if the transaction is valid
 	err = e.transactionValidator.Validate(tx)
 	if err != nil {
-		return engine.NewInvalidInputErrorf("invalid transaction: %w", err)
+		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}
 
 	// get the locally assigned cluster and the cluster responsible for the transaction
@@ -245,6 +262,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// the network in the next epoch, we will return an error here
 	localCluster, _, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
+		// TODO handle
 		return fmt.Errorf("node is not assigned to any cluster in this epoch: %d", counter)
 	}
 
@@ -272,8 +290,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
 		if err != nil && !errors.Is(err, network.EmptyTargetList) {
-			// if multicast to a target cluster with at least one node failed, return an error
-			return fmt.Errorf("could not route transaction to cluster: %w", err)
+			// if multicast to a target cluster with at least one node failed, log an error and exit
+			e.log.Error().Err(err).Msg("could not route transaction to cluster")
+			return nil
 		}
 		if err == nil {
 			e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
