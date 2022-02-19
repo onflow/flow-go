@@ -4,8 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/insecure/proto"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -48,4 +51,27 @@ func TestNewConduit_MissingAdapter(t *testing.T) {
 	c, err := f.NewConduit(context.Background(), channel)
 	require.Error(t, err)
 	require.Nil(t, c)
+}
+
+// TestRegisterAttacker checks attacker registration to a corruptible conduit factory can be done
+// only once.
+func TestRegisterAttacker(t *testing.T) {
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), cbor.NewCodec())
+	f.attacker = &mockAttacker{}
+
+	event := unittest.MockEntityFixture()
+	targetIds := unittest.IdentifierListFixture(10)
+	channel := network.Channel("test-channel")
+
+	err := f.HandleIncomingEvent(context.Background(), event, channel, proto.Protocol_MULTICAST, uint32(3), targetIds...)
+	require.NoError(t, err)
+}
+
+type mockAttacker struct {
+	incomingBuffer chan *proto.Message
+}
+
+func (m *mockAttacker) Observe(_ context.Context, in *proto.Message, _ ...grpc.CallOption) (*empty.Empty, error) {
+	m.incomingBuffer <- in
+	return &empty.Empty{}, nil
 }
