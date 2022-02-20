@@ -9,9 +9,9 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
@@ -32,7 +32,7 @@ type VoteAggregator struct {
 	notifier            hotstuff.Consumer
 	lowestRetainedView  counters.StrictMonotonousCounter // lowest view, for which we still process votes
 	collectors          hotstuff.VoteCollectors
-	queuedVotesNotifier engine.Notifier
+	queuedVotesNotifier module.Notifier
 	queuedVotes         *fifoqueue.FifoQueue
 }
 
@@ -60,7 +60,7 @@ func NewVoteAggregator(
 		lowestRetainedView:  counters.NewMonotonousCounter(lowestRetainedView),
 		collectors:          collectors,
 		queuedVotes:         queuedVotes,
-		queuedVotesNotifier: engine.NewNotifier(),
+		queuedVotesNotifier: module.NewNotifier(),
 	}
 
 	// manager for own worker routines plus the internal collectors

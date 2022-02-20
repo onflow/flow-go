@@ -20,19 +20,19 @@ type SyncCore interface {
 	GetRequestableItems() (flow.Range, flow.Batch)
 
 	// RangeReceived updates sync state after a Range Request response is received.
-	RangeReceived(startHeight uint64, blockIDs []flow.Identifier, originID peer.ID)
+	RangeReceived(startHeight uint64, blockIDs []flow.Identifier, originID flow.Identifier)
 
 	// BatchReceived updates sync state after a Batch Request response is received.
-	BatchReceived(blockIDs []flow.Identifier, originID peer.ID)
+	BatchReceived(blockIDs []flow.Identifier, originID flow.Identifier)
 
 	// HeightReceived updates sync state after a Sync Height response is received.
-	HeightReceived(height uint64, originID peer.ID)
+	HeightReceived(height uint64, originID flow.Identifier)
 }
 
 type ActiveRange interface {
 	// Update processes a range of blocks received from a Range Request
 	// response and updates the requestable height range.
-	Update(startHeight uint64, blockIDs []flow.Identifier, originID peer.ID)
+	Update(startHeight uint64, blockIDs []flow.Identifier, originID flow.Identifier)
 
 	// LocalFinalizedHeight is called to notify a change in the local finalized height.
 	LocalFinalizedHeight(height uint64)

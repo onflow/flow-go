@@ -18,7 +18,7 @@ import (
 
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	validator "github.com/onflow/flow-go/network/validator"
 )
 
 const (

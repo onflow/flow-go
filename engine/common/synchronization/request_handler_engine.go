@@ -9,57 +9,40 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/finalized_cache"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage"
 )
 
-type ResponseSender interface {
-	SendResponse(interface{}, flow.Identifier) error
-}
-
-type ResponseSenderImpl struct {
-	con network.Conduit
-}
-
-func (r *ResponseSenderImpl) SendResponse(res interface{}, target flow.Identifier) error {
-	switch res.(type) {
-	case *messages.BlockResponse:
-		err := r.con.Unicast(res, target)
-		if err != nil {
-			return fmt.Errorf("could not unicast block response to target %x: %w", target, err)
-		}
-	case *messages.SyncResponse:
-		err := r.con.Unicast(res, target)
-		if err != nil {
-			return fmt.Errorf("could not unicast sync response to target %x: %w", target, err)
-		}
-	default:
-		return fmt.Errorf("unable to unicast unexpected response %+v", res)
-	}
-
-	return nil
-}
-
-func NewResponseSender(con network.Conduit) *ResponseSenderImpl {
-	return &ResponseSenderImpl{
-		con: con,
-	}
-}
-
 type RequestHandlerEngine struct {
 	requestHandler *RequestHandler
+	con            network.Conduit
+	requests       chan *Request
+	cm             *component.ComponentManager
+	component.Component
+}
+
+type Request struct {
+	OriginID flow.Identifier
+	Payload  interface{}
 }
 
 var _ network.MessageProcessor = (*RequestHandlerEngine)(nil)
 
+const defaultRequestQueueSize = 1000
+const defaultNumQueueWorkers = 8
+
 func NewRequestHandlerEngine(
 	logger zerolog.Logger,
-	metrics module.EngineMetrics,
+	metrics module.SyncMetrics,
 	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
 	core module.SyncCore,
-	finalizedHeader *FinalizedHeaderCache,
+	finalizedHeader *finalized_cache.FinalizedHeaderCache,
+	config *HandlerConfig,
 ) (*RequestHandlerEngine, error) {
 	e := &RequestHandlerEngine{}
 
@@ -68,28 +51,104 @@ func NewRequestHandlerEngine(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
-	e.requestHandler = NewRequestHandler(
-		logger,
-		metrics,
-		NewResponseSender(con),
-		me,
+	requestHandler := NewRequestHandler(
 		blocks,
-		core,
+		logger,
 		finalizedHeader,
-		false,
+		metrics,
+		core,
+		config,
 	)
+
+	e.requestHandler = requestHandler
+	e.con = con
+	e.requests = make(chan *Request, defaultRequestQueueSize)
+
+	builder := component.NewComponentManagerBuilder()
+
+	for i := 0; i < defaultNumQueueWorkers; i++ {
+		builder.AddWorker(e.loop)
+	}
+
+	e.cm = builder.Build()
+	e.Component = e.cm
 
 	return e, nil
 }
 
+func (r *RequestHandlerEngine) cleanup(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	<-r.requestHandler.finalizedHeader.Ready()
+
+	ready()
+
+	<-ctx.Done()
+
+	err := r.con.Close()
+
+	if err != nil {
+		ctx.Throw(fmt.Errorf("could not close conduit: %w", err))
+	}
+
+	// TODO: is this safe?
+	r.requests = nil
+}
+
+func (r *RequestHandlerEngine) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case req := <-r.requests:
+			r.processRequest(ctx, req)
+		}
+	}
+}
+
+func (r *RequestHandlerEngine) processRequest(ctx irrecoverable.SignalerContext, req *Request) {
+	response, err := r.requestHandler.HandleRequest(req.Payload, req.OriginID)
+	if err != nil {
+		// log error
+		return
+	}
+
+	err = r.con.Unicast(response, req.OriginID)
+
+	if err != nil {
+		// log error
+		return
+	}
+
+	// TODO: log success
+
+}
+
 func (r *RequestHandlerEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return r.requestHandler.Process(channel, originID, event)
-}
+	select {
+	case <-r.cm.ShutdownSignal():
+		// TODO:
+		return fmt.Errorf("shutdown signal received")
+	default:
+	}
 
-func (r *RequestHandlerEngine) Ready() <-chan struct{} {
-	return r.requestHandler.Ready()
-}
+	switch event.(type) {
+	case *messages.SyncRequest:
+	case *messages.RangeRequest:
+	case *messages.BatchRequest:
+	default:
+		// TODO: wrong type
+		return fmt.Errorf("TODO")
+	}
 
-func (r *RequestHandlerEngine) Done() <-chan struct{} {
-	return r.requestHandler.Done()
+	select {
+	case r.requests <- &Request{
+		OriginID: originID,
+		Payload:  event,
+	}:
+		return nil
+	default:
+		// TODO: queue is full
+		return fmt.Errorf("TODO")
+	}
 }

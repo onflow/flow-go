@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/finalized_cache"
 	"github.com/onflow/flow-go/storage"
 	"github.com/rs/zerolog"
 )
@@ -17,7 +17,7 @@ import (
 type RequestHandler struct {
 	blocks          storage.Blocks
 	logger          zerolog.Logger
-	finalizedHeader *module.FinalizedHeaderCache
+	finalizedHeader *finalized_cache.FinalizedHeaderCache
 	metrics         module.SyncMetrics
 	config          *HandlerConfig
 	core            module.SyncCore
@@ -28,7 +28,25 @@ type HandlerConfig struct {
 	ProcessReceivedHeights bool
 }
 
-func (s *RequestHandler) HandleRequest(request interface{}, originID peer.ID) (interface{}, error) {
+func NewRequestHandler(
+	blocks storage.Blocks,
+	logger zerolog.Logger,
+	finalizedHeader *finalized_cache.FinalizedHeaderCache,
+	metrics module.SyncMetrics,
+	core module.SyncCore,
+	config *HandlerConfig,
+) *RequestHandler {
+	return &RequestHandler{
+		blocks:          blocks,
+		logger:          logger,
+		finalizedHeader: finalizedHeader,
+		metrics:         metrics,
+		config:          config,
+		core:            core,
+	}
+}
+
+func (s *RequestHandler) HandleRequest(request interface{}, originID flow.Identifier) (interface{}, error) {
 	switch r := request.(type) {
 	case *messages.RangeRequest:
 		return s.handleRangeRequest(r, originID)
@@ -41,7 +59,7 @@ func (s *RequestHandler) HandleRequest(request interface{}, originID peer.ID) (i
 	}
 }
 
-func (s *RequestHandler) handleRangeRequest(req *messages.RangeRequest, origin peer.ID) (resp *messages.BlockResponse, err error) {
+func (s *RequestHandler) handleRangeRequest(req *messages.RangeRequest, origin flow.Identifier) (resp *messages.BlockResponse, err error) {
 	s.logger.Debug().Str("origin_id", origin.String()).Msg("received new range request")
 
 	s.metrics.RangeResponseStarted()
@@ -93,13 +111,14 @@ func (s *RequestHandler) handleRangeRequest(req *messages.RangeRequest, origin p
 	}
 
 	resp = &messages.BlockResponse{
-		Blocks: blocks,
+		RequestID: req.RequestID,
+		Blocks:    blocks,
 	}
 
 	return
 }
 
-func (s *RequestHandler) handleBatchRequest(req *messages.BatchRequest, origin peer.ID) (resp *messages.BlockResponse, err error) {
+func (s *RequestHandler) handleBatchRequest(req *messages.BatchRequest, origin flow.Identifier) (resp *messages.BlockResponse, err error) {
 	s.logger.Debug().Str("origin_id", origin.String()).Msg("received new batch request")
 
 	s.metrics.BatchResponseStarted()
@@ -107,8 +126,9 @@ func (s *RequestHandler) handleBatchRequest(req *messages.BatchRequest, origin p
 
 	// TODO!!! the success should not be based on whether or not the error is nil
 	// similar for other defers
+	// TODO TODO TODO
 	defer func() {
-		s.metrics.BatchResponseFinished(time.Since(started), err == 0)
+		s.metrics.BatchResponseFinished(time.Since(started), err == nil)
 	}()
 
 	// deduplicate the block IDs in the batch request
@@ -144,13 +164,14 @@ func (s *RequestHandler) handleBatchRequest(req *messages.BatchRequest, origin p
 	}
 
 	resp = &messages.BlockResponse{
-		Blocks: blocks,
+		RequestID: req.RequestID,
+		Blocks:    blocks,
 	}
 
 	return
 }
 
-func (s *RequestHandler) handleSyncRequest(req *messages.SyncRequest, origin peer.ID) *messages.SyncResponse {
+func (s *RequestHandler) handleSyncRequest(req *messages.SyncRequest, origin flow.Identifier) *messages.SyncResponse {
 	s.logger.Debug().Str("origin_id", origin.String()).Msg("received new sync request")
 
 	s.metrics.SyncHeightResponseStarted()
@@ -167,6 +188,7 @@ func (s *RequestHandler) handleSyncRequest(req *messages.SyncRequest, origin pee
 	localHeight := s.finalizedHeader.Get().Height
 
 	return &messages.SyncResponse{
-		Height: localHeight,
+		RequestID: req.RequestID,
+		Height:    localHeight,
 	}
 }

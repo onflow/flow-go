@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
-	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	validator "github.com/onflow/flow-go/network/validator"
 )
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until

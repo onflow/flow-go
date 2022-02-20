@@ -1,7 +1,6 @@
 package synchronization
 
 import (
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -81,7 +80,7 @@ func (a *ActiveRange) rangeEnd() uint64 {
 	return end
 }
 
-func (a *ActiveRange) Update(startHeight uint64, blockIDs []flow.Identifier, originID peer.ID) {
+func (a *ActiveRange) Update(startHeight uint64, blockIDs []flow.Identifier, originID flow.Identifier) {
 	rangeEnd := a.rangeEnd()
 
 	for i, _ := range blockIDs {
@@ -97,4 +96,17 @@ func (a *ActiveRange) Update(startHeight uint64, blockIDs []flow.Identifier, ori
 			}
 		}
 	}
+}
+
+type responses struct {
+	r         map[uint64]map[flow.Identifier]map[flow.Identifier]struct{}
+	minHeight uint64
+}
+
+func (r *responses) update(startHeight uint64, blockIDs []flow.Identifier, originID flow.Identifier) {
+	// TODO
+}
+
+func (r *responses) prune(height uint64) {
+	// TODO
 }

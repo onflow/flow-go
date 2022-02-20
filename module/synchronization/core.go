@@ -3,8 +3,10 @@ package synchronization
 import (
 	"sync"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/finalized_cache"
 )
 
 // Core contains core logic, configuration, and state for chain state
@@ -23,7 +25,7 @@ type Core struct {
 
 	blockIDs map[flow.Identifier]uint64
 
-	finalizedHeader *module.FinalizedHeaderCache
+	finalizedHeader *finalized_cache.FinalizedHeaderCache
 
 	blockHeightDifferenceThreshold uint64
 }
@@ -34,7 +36,7 @@ var _ module.BlockRequester = (*Core)(nil)
 func NewCore(
 	activeRange module.ActiveRange,
 	targetFinalizedHeight module.TargetFinalizedHeight,
-	finalizedHeader *module.FinalizedHeaderCache,
+	finalizedHeader *finalized_cache.FinalizedHeaderCache,
 	blockHeightDifferenceThreshold uint64,
 ) *Core {
 	activeRange.LocalFinalizedHeight(finalizedHeader.Get().Height)
@@ -88,25 +90,25 @@ func (c *Core) GetRequestableItems() (flow.Range, flow.Batch) {
 }
 
 // RangeReceived updates sync state after a Range Request response is received.
-func (c *Core) RangeReceived(headers []flow.Header, originID flow.Identifier) {
+func (c *Core) RangeReceived(startHeight uint64, blockIDs []flow.Identifier, originID peer.ID) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.activeRange.Update(headers, originID)
+	c.activeRange.Update(startHeight, blockIDs, originID)
 }
 
 // BatchReceived updates sync state after a Batch Request response is received.
-func (c *Core) BatchReceived(headers []flow.Header, originID flow.Identifier) {
+func (c *Core) BatchReceived(blockIDs []flow.Identifier, originID peer.ID) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	for _, header := range headers {
-		delete(c.blockIDs, header.ID())
+	for _, id := range blockIDs {
+		delete(c.blockIDs, id)
 	}
 }
 
 // HeightReceived updates sync state after a Sync Height response is received.
-func (c *Core) HeightReceived(height uint64, originID flow.Identifier) {
+func (c *Core) HeightReceived(height uint64, originID peer.ID) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
