@@ -212,6 +212,7 @@ func finalize(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("the generated root snapshot is invalid")
 	}
 
+	// validate the generated root snapshot QCs
 	err = badger.IsValidRootSnapshotQCs(snapshot)
 	if err != nil {
 		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
@@ -251,6 +252,7 @@ func finalize(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("saved snapshot is invalid")
 	}
 
+	// validate the generated root snapshot QCs
 	err = badger.IsValidRootSnapshotQCs(snapshot)
 	if err != nil {
 		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")

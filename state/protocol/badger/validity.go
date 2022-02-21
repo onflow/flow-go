@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 
@@ -270,12 +271,16 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	return nil
 }
 
+// IsValidRootSnapshotQCs checks internal consistency of QCs that are included in the root state snapshot
+// It verifies QCs for main consensus and for each collection cluster.
 func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
-	//err := validateRootQC(snap)
-	//if err != nil {
-	//	return fmt.Errorf("invalid root QC: %w", err)
-	//}
+	// validate main consensus QC
+	err := validateRootQC(snap)
+	if err != nil {
+		return fmt.Errorf("invalid root QC: %w", err)
+	}
 
+	// validate each collection cluster separately
 	curEpoch := snap.Epochs().Current()
 	clusters, err := curEpoch.Clustering()
 	if err != nil {
@@ -294,6 +299,8 @@ func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
 	return nil
 }
 
+// validateRootQC performs validation of root QC
+// Returns nil on success
 func validateRootQC(snap protocol.Snapshot) error {
 	rootBlock, err := snap.Head()
 	if err != nil {
@@ -310,12 +317,17 @@ func validateRootQC(snap protocol.Snapshot) error {
 		return fmt.Errorf("could not get root QC: %w", err)
 	}
 
+	dkg, err := snap.Epochs().Current().DKG()
+	if err != nil {
+		return fmt.Errorf("could not get DKG for root snapshot: %w", err)
+	}
+
 	hotstuffRootBlock := model.GenesisBlockFromFlow(rootBlock)
-	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, nil, nil)
+	committee, err := committees.NewStaticCommitteeWithDKG(identities, flow.Identifier{}, dkg)
 	if err != nil {
 		return fmt.Errorf("could not create static committee: %w", err)
 	}
-	verifier := &verification.CombinedVerifier{}
+	verifier := verification.NewCombinedVerifier(committee, signature.NewConsensusSigDataPacker(committee))
 	forks := &mocks.ForksReader{}
 	hotstuffValidator := validator.New(committee, forks, verifier)
 	err = hotstuffValidator.ValidateQC(rootQC, hotstuffRootBlock)
@@ -325,6 +337,8 @@ func validateRootQC(snap protocol.Snapshot) error {
 	return nil
 }
 
+// validateClusterQC performs QC validation of single collection cluster
+// Returns nil on success
 func validateClusterQC(cluster protocol.Cluster) error {
 	clusterBlock := cluster.RootBlock()
 	clusterRootBlock := &model.Block{
