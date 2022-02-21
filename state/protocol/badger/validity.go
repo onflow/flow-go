@@ -271,10 +271,10 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 }
 
 func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
-	err := validateRootQC(snap)
-	if err != nil {
-		return fmt.Errorf("invalid root QC: %w", err)
-	}
+	//err := validateRootQC(snap)
+	//if err != nil {
+	//	return fmt.Errorf("invalid root QC: %w", err)
+	//}
 
 	curEpoch := snap.Epochs().Current()
 	clusters, err := curEpoch.Clustering()
