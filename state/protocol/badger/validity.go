@@ -2,6 +2,11 @@ package badger
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -262,5 +267,85 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("final view of epoch less than first block view")
 	}
 
+	return nil
+}
+
+func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
+	err := validateRootQC(snap)
+	if err != nil {
+		return fmt.Errorf("invalid root QC: %w", err)
+	}
+
+	curEpoch := snap.Epochs().Current()
+	clusters, err := curEpoch.Clustering()
+	if err != nil {
+		return fmt.Errorf("could not get clustering for root snapshot: %w", err)
+	}
+	for clusterIndex := range clusters {
+		cluster, err := curEpoch.Cluster(uint(clusterIndex))
+		if err != nil {
+			return fmt.Errorf("could not get cluster %d for root snapshot: %w", clusterIndex, err)
+		}
+		err = validateClusterQC(cluster)
+		if err != nil {
+			return fmt.Errorf("invalid cluster qc %d: %W", clusterIndex, err)
+		}
+	}
+	return nil
+}
+
+func validateRootQC(snap protocol.Snapshot) error {
+	rootBlock, err := snap.Head()
+	if err != nil {
+		return fmt.Errorf("could not get root block: %w", err)
+	}
+
+	identities, err := snap.Identities(filter.HasRole(flow.RoleConsensus))
+	if err != nil {
+		return fmt.Errorf("could not get root snapshot identities: %w", err)
+	}
+
+	rootQC, err := snap.QuorumCertificate()
+	if err != nil {
+		return fmt.Errorf("could not get root QC: %w", err)
+	}
+
+	hotstuffRootBlock := model.GenesisBlockFromFlow(rootBlock)
+	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, nil, nil)
+	if err != nil {
+		return fmt.Errorf("could not create static committee: %w", err)
+	}
+	verifier := &verification.CombinedVerifier{}
+	forks := &mocks.ForksReader{}
+	hotstuffValidator := validator.New(committee, forks, verifier)
+	err = hotstuffValidator.ValidateQC(rootQC, hotstuffRootBlock)
+	if err != nil {
+		return fmt.Errorf("could not validate root qc: %w", err)
+	}
+	return nil
+}
+
+func validateClusterQC(cluster protocol.Cluster) error {
+	clusterBlock := cluster.RootBlock()
+	clusterRootBlock := &model.Block{
+		BlockID:     clusterBlock.ID(),
+		View:        clusterBlock.Header.View,
+		ProposerID:  clusterBlock.Header.ProposerID,
+		QC:          nil,
+		PayloadHash: clusterBlock.Header.PayloadHash,
+		Timestamp:   clusterBlock.Header.Timestamp,
+	}
+
+	committee, err := committees.NewStaticCommittee(cluster.Members(), flow.Identifier{}, nil, nil)
+	if err != nil {
+		return fmt.Errorf("could not create static committee: %w", err)
+	}
+	verifier := verification.NewStakingVerifier()
+	forks := &mocks.ForksReader{}
+	hotstuffValidator := validator.New(committee, forks, verifier)
+	err = hotstuffValidator.ValidateQC(cluster.RootQC(), clusterRootBlock)
+	if err != nil {
+		return fmt.Errorf("could not validate root qc: %w", err)
+	}
 	return nil
 }

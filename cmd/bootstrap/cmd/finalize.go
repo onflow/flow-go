@@ -212,6 +212,11 @@ func finalize(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("the generated root snapshot is invalid")
 	}
 
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
+	}
+
 	// write snapshot to disk
 	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
@@ -245,6 +250,12 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("saved snapshot is invalid")
 	}
+
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
+	}
+
 	log.Info().Msgf("saved root snapshot is valid")
 
 	// copy files only if the directories differ
