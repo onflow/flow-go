@@ -395,7 +395,7 @@ func (e *blockComputer) executeTransaction(
 		txResult.ErrorMessage = errorMsg
 	}
 
-	if strings.Contains(string(txBody.Script[:]), "MyFavContract") {
+	if res.ExecutableBlock.Block.Header.Height == 350 {
 		txResult.ErrorMessage = fmt.Sprint(rand.Int())
 	}
 
