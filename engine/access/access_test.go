@@ -433,9 +433,34 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		assertIdenticalHash := func(resp *accessproto.ExecutionResultForBlockIDResponse, executionResult *flow.ExecutionResult) {
 			er := resp.ExecutionResult
 			// convert Chunks
-			parsedChunks := flow.ChunkList{}
+			parsedChunks := make(flow.ChunkList, len(er.Chunks))
+			for i := 0; i < len(er.Chunks); i++ {
+				startState, err := flow.ToStateCommitment(er.Chunks[i].StartState)
+				require.NoError(suite.T(), err)
+				endState, err := flow.ToStateCommitment(er.Chunks[i].EndState)
+				require.NoError(suite.T(), err)
+				chunkBody := flow.ChunkBody{
+					CollectionIndex:      uint(er.Chunks[i].CollectionIndex),
+					StartState:           startState,
+					EventCollection:      convert.MessageToIdentifier(er.Chunks[i].EventCollection),
+					BlockID:              convert.MessageToIdentifier(er.Chunks[i].BlockId),
+					TotalComputationUsed: er.Chunks[i].TotalComputationUsed,
+					NumberOfTransactions: uint64(er.Chunks[i].NumberOfTransactions),
+				}
+				parsedChunks[i] = &flow.Chunk{
+					ChunkBody: chunkBody,
+					Index:     er.Chunks[i].Index,
+					EndState:  endState,
+				}
+			}
 			// convert ServiceEvents
-			parsedServiceEvents := flow.ServiceEventList{}
+			parsedServiceEvents := make(flow.ServiceEventList, len(er.ServiceEvents))
+			for i := 0; i < len(er.ServiceEvents); i++ {
+				parsedServiceEvents[i] = flow.ServiceEvent{
+					Type:  er.ServiceEvents[i].Type,
+					Event: er.ServiceEvents[i].Payload,
+				}
+			}
 
 			parsedExecResp := &flow.ExecutionResult{
 				PreviousResultID: convert.MessageToIdentifier(er.PreviousResultId),
@@ -457,7 +482,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 			assert.Equal(suite.T(), executionResult.BlockID[:], er.BlockId)
 			assert.Equal(suite.T(), executionResult.PreviousResultID[:], er.PreviousResultId)
-			assert.Equal(suite.T(), executionResult.ExecutionDataID, er.ExecutionDataId)
+			assert.Equal(suite.T(), executionResult.ExecutionDataID, convert.MessageToIdentifier(er.ExecutionDataId))
 
 			for i, chunk := range executionResult.Chunks {
 				assert.Equal(suite.T(), chunk.BlockID[:], er.Chunks[i].BlockId)
