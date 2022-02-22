@@ -168,6 +168,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 	if !ok {
 		return fmt.Errorf("local submission of non-transaction event type (%T) to ingest engine: %w", event, engine.IncompatibleInputTypeError)
 	}
+	e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 	return e.onTransaction(e.me.NodeID(), tx)
 }
 
