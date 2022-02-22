@@ -36,7 +36,7 @@ type FungibleTokenTracker struct {
 	rwf          ReportWriterFactory
 	rw           ReportWriter
 	progress     *progressbar.ProgressBar
-	vaultTypeIDs []string
+	vaultTypeIDs map[string]bool
 }
 
 func FlowTokenTypeID(chain flow.Chain) string {
@@ -44,12 +44,16 @@ func FlowTokenTypeID(chain flow.Chain) string {
 }
 
 func NewFungibleTokenTracker(logger zerolog.Logger, rwf ReportWriterFactory, chain flow.Chain, vaultTypeIDs []string) *FungibleTokenTracker {
-	return &FungibleTokenTracker{
+	ftt := &FungibleTokenTracker{
 		log:          logger,
 		rwf:          rwf,
 		chain:        chain,
-		vaultTypeIDs: vaultTypeIDs,
+		vaultTypeIDs: make(map[string]struct{}),
 	}
+	for _, vt := range vaultTypeIDs {
+		ftt.vaultTypeIDs[vt] = true
+	}
+	return ftt
 }
 
 func (r *FungibleTokenTracker) Name() string {
@@ -92,7 +96,7 @@ func (r *FungibleTokenTracker) Report(payloads []ledger.Payload) error {
 
 	for _, pay := range payloads {
 		owner := flow.BytesToAddress(pay.Key.KeyParts[0].Value)
-		if len(owner) > 0 { // ignoring FVM values
+		if len(owner) > 0 { // ignoring payloads without ownership (fvm ones)
 			m, ok := payloadsByOwner[owner]
 			if !ok {
 				payloadsByOwner[owner] = make([]ledger.Payload, 0)
@@ -171,17 +175,11 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 		return
 	}
 
+	// because compValue.Kind == common.CompositeKindResource
+	// we could pass nil to the IsResourceKinded method
 	if compValue.IsResourceKinded(nil) {
 		typeIDStr := string(compValue.TypeID())
-		hasTargetType := false
-		for _, vt := range r.vaultTypeIDs {
-			if typeIDStr == vt {
-				hasTargetType = true
-				break
-			}
-		}
-
-		if hasTargetType {
+		if _, ok := r.vaultTypeIDs[typeIDStr]; ok {
 			b := uint64(compValue.GetField(nil, nil, "balance").(interpreter.UFix64Value))
 			if b > 0 {
 				r.rw.Write(TokenDataPoint{
@@ -192,10 +190,10 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 				})
 			}
 		}
-	}
 
-	// iterate over fields
-	compValue.ForEachField(func(key string, value interpreter.Value) {
-		r.iterateChildren(append(tr, key), addr, value)
-	})
+		// iterate over fields of the composite value (skip the ones that are not resource typed)
+		compValue.ForEachField(func(key string, value interpreter.Value) {
+			r.iterateChildren(append(tr, key), addr, value)
+		})
+	}
 }
