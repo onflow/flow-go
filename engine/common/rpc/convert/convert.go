@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -392,4 +391,71 @@ func BytesToInmemSnapshot(bytes []byte) (*inmem.Snapshot, error) {
 	}
 
 	return inmem.SnapshotFromEncodable(encodable), nil
+}
+
+func ExecResultProtoToFlowExecResult(proto *entities.ExecutionResult) (*flow.ExecutionResult, error) {
+	// convert Chunks
+	parsedChunks := make(flow.ChunkList, len(proto.Chunks))
+	for i := 0; i < len(proto.Chunks); i++ {
+		startState, err := flow.ToStateCommitment(proto.Chunks[i].StartState)
+		if err != nil {
+			return nil, err
+		}
+		endState, err := flow.ToStateCommitment(proto.Chunks[i].EndState)
+		if err != nil {
+			return nil, err
+		}
+		chunkBody := flow.ChunkBody{
+			CollectionIndex:      uint(proto.Chunks[i].CollectionIndex),
+			StartState:           startState,
+			EventCollection:      MessageToIdentifier(proto.Chunks[i].EventCollection),
+			BlockID:              MessageToIdentifier(proto.Chunks[i].BlockId),
+			TotalComputationUsed: proto.Chunks[i].TotalComputationUsed,
+			NumberOfTransactions: uint64(proto.Chunks[i].NumberOfTransactions),
+		}
+		parsedChunks[i] = &flow.Chunk{
+			ChunkBody: chunkBody,
+			Index:     proto.Chunks[i].Index,
+			EndState:  endState,
+		}
+	}
+	// convert ServiceEvents
+	parsedServiceEvents := make(flow.ServiceEventList, len(proto.ServiceEvents))
+	for i := 0; i < len(proto.ServiceEvents); i++ {
+		var event interface{}
+		rawEvent := proto.ServiceEvents[i].Payload
+		// map keys correctly
+		tp := proto.ServiceEvents[i].Type
+		switch tp {
+		case flow.ServiceEventSetup:
+			setup := new(flow.EpochSetup)
+			err := json.Unmarshal(rawEvent, setup)
+			if err != nil {
+				return nil, err
+			}
+			event = setup
+		case flow.ServiceEventCommit:
+			commit := new(flow.EpochCommit)
+			err := json.Unmarshal(rawEvent, commit)
+			if err != nil {
+				return nil, err
+			}
+			event = commit
+		default:
+			return nil, fmt.Errorf("invalid event type: %s", tp)
+
+		}
+		parsedServiceEvents[i] = flow.ServiceEvent{
+			Type:  proto.ServiceEvents[i].Type,
+			Event: event,
+		}
+	}
+
+	return &flow.ExecutionResult{
+		PreviousResultID: MessageToIdentifier(proto.PreviousResultId),
+		BlockID:          MessageToIdentifier(proto.BlockId),
+		Chunks:           parsedChunks,
+		ServiceEvents:    parsedServiceEvents,
+		ExecutionDataID:  MessageToIdentifier(proto.ExecutionDataId),
+	}, nil
 }

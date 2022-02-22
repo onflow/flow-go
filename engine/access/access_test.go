@@ -424,52 +424,11 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		blockID := unittest.IdentifierFixture()
 
 		er := unittest.ExecutionResultFixture(
-			unittest.WithExecutionResultBlockID(blockID))
+			unittest.WithExecutionResultBlockID(blockID),
+			unittest.WithServiceEvents(2))
 
 		require.NoError(suite.T(), executionResults.Store(er))
 		require.NoError(suite.T(), executionResults.Index(blockID, er.ID()))
-
-		assertIdenticalHash := func(resp *accessproto.ExecutionResultForBlockIDResponse, executionResult *flow.ExecutionResult) {
-			er := resp.ExecutionResult
-			// convert Chunks
-			parsedChunks := make(flow.ChunkList, len(er.Chunks))
-			for i := 0; i < len(er.Chunks); i++ {
-				startState, err := flow.ToStateCommitment(er.Chunks[i].StartState)
-				require.NoError(suite.T(), err)
-				endState, err := flow.ToStateCommitment(er.Chunks[i].EndState)
-				require.NoError(suite.T(), err)
-				chunkBody := flow.ChunkBody{
-					CollectionIndex:      uint(er.Chunks[i].CollectionIndex),
-					StartState:           startState,
-					EventCollection:      convert.MessageToIdentifier(er.Chunks[i].EventCollection),
-					BlockID:              convert.MessageToIdentifier(er.Chunks[i].BlockId),
-					TotalComputationUsed: er.Chunks[i].TotalComputationUsed,
-					NumberOfTransactions: uint64(er.Chunks[i].NumberOfTransactions),
-				}
-				parsedChunks[i] = &flow.Chunk{
-					ChunkBody: chunkBody,
-					Index:     er.Chunks[i].Index,
-					EndState:  endState,
-				}
-			}
-			// convert ServiceEvents
-			parsedServiceEvents := make(flow.ServiceEventList, len(er.ServiceEvents))
-			for i := 0; i < len(er.ServiceEvents); i++ {
-				parsedServiceEvents[i] = flow.ServiceEvent{
-					Type:  er.ServiceEvents[i].Type,
-					Event: er.ServiceEvents[i].Payload,
-				}
-			}
-
-			parsedExecResp := &flow.ExecutionResult{
-				PreviousResultID: convert.MessageToIdentifier(er.PreviousResultId),
-				BlockID:          convert.MessageToIdentifier(er.BlockId),
-				Chunks:           parsedChunks,
-				ServiceEvents:    parsedServiceEvents,
-				ExecutionDataID:  convert.MessageToIdentifier(er.ExecutionDataId),
-			}
-			assert.Equal(suite.T(), executionResult.ID(), parsedExecResp.ID())
-		}
 
 		assertResp := func(resp *accessproto.ExecutionResultForBlockIDResponse, err error, executionResult *flow.ExecutionResult) {
 			require.NoError(suite.T(), err)
@@ -503,7 +462,10 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
 			}
-			assertIdenticalHash(resp, executionResult)
+			parsedExecResult, err := convert.ExecResultProtoToFlowExecResult(resp.ExecutionResult)
+			require.NoError(suite.T(), err)
+			assert.Equal(suite.T(), parsedExecResult, executionResult)
+			assert.Equal(suite.T(), parsedExecResult.ID(), executionResult.ID())
 		}
 
 		suite.Run("nonexisting block", func() {
