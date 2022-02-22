@@ -141,6 +141,7 @@ func (e *Engine) Ready() <-chan struct{} {
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
+	e.lm.OnStop()
 	return e.lm.Stopped()
 }
 
@@ -188,6 +189,8 @@ func (e *Engine) loop(ctx irrecoverable.SignalerContext) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			e.lm.OnStop()
 		case <-e.lm.ShutdownSignal():
 			return
 		case <-e.messageHandler.GetNotifier():
