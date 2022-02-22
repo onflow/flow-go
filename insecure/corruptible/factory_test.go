@@ -135,6 +135,34 @@ func TestFactoryHandleIncomingEvent_PublishOverNetwork(t *testing.T) {
 	testifymock.AssertExpectationsForObjects(t, adapter)
 }
 
+// TestFactoryHandleIncomingEvent_MulticastOverNetwork evaluates that the incoming multicast events to the conduit factory are routed to the
+// network adapter when no attacker registered to the factory.
+func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
+	codec := cbor.NewCodec()
+	// corruptible conduit factory with no attacker registered.
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), codec)
+
+	adapter := &mocknetwork.Adapter{}
+	err := f.RegisterAdapter(adapter)
+	require.NoError(t, err)
+
+	event := &message.TestMessage{Text: "this is a test message"}
+	channel := network.Channel("test-channel")
+	targetIds := unittest.IdentifierListFixture(10)
+
+	params := []interface{}{channel, event, uint(3)}
+	for _, id := range targetIds {
+		params = append(params, id)
+	}
+
+	adapter.On("MulticastOnChannel", params...).Return(nil).Once()
+
+	err = f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
+	require.NoError(t, err)
+
+	testifymock.AssertExpectationsForObjects(t, adapter)
+}
+
 type mockAttacker struct {
 	incomingBuffer chan *insecure.Message
 }
