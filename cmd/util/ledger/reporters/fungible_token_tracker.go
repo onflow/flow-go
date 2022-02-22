@@ -48,7 +48,7 @@ func NewFungibleTokenTracker(logger zerolog.Logger, rwf ReportWriterFactory, cha
 		log:          logger,
 		rwf:          rwf,
 		chain:        chain,
-		vaultTypeIDs: make(map[string]struct{}),
+		vaultTypeIDs: make(map[string]bool),
 	}
 	for _, vt := range vaultTypeIDs {
 		ftt.vaultTypeIDs[vt] = true
