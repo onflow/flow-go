@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"sync"
 	"testing"
@@ -346,8 +347,10 @@ func mockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 type testExecutionDataServiceEntry struct {
 	ExecutionData *state_synchronization.ExecutionData
 	Err           error
-	fn            func() (*state_synchronization.ExecutionData, error)
+	fn            testExecutionDataCallback
 }
+
+type testExecutionDataCallback func(*state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error)
 
 func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServiceEntry) *syncmock.ExecutionDataService {
 	eds := new(syncmock.ExecutionDataService)
@@ -360,9 +363,9 @@ func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServ
 			return nil, &state_synchronization.BlobNotFoundError{}
 		}
 
-		// return the specific execution data
-		if ed.ExecutionData != nil {
-			return ed.ExecutionData, nil
+		// use a callback. this is useful for injecting a pause or custom error behavior
+		if ed.fn != nil {
+			return ed.fn(ed.ExecutionData)
 		}
 
 		// return a custom error
@@ -370,8 +373,8 @@ func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServ
 			return nil, ed.Err
 		}
 
-		// use a callback. this is useful for injecting a pause or custom error behavior
-		return ed.fn()
+		// return the specific execution data
+		return ed.ExecutionData, nil
 	}
 
 	eds.On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).Return(
@@ -502,102 +505,95 @@ func TestRequestBlocksWithSomeMissed(t *testing.T) {
 
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
-	testData := map[flow.Identifier]*testExecutionDataServiceEntry{}
-
-	testBlocksByHeight := map[uint64]*flow.Block{}
-	testBlocksByID := map[flow.Identifier]*flow.Block{}
-	testResultsByID := map[flow.Identifier]*flow.ExecutionResult{}
-	testExecutionDataByID := map[flow.Identifier]*state_synchronization.ExecutionData{}
-
-	blocks := mockBlocksStorage(testBlocksByID, testBlocksByHeight)
-	results := mockResultsStorage(testResultsByID)
-
-	eds := mockExecutionDataService(testData)
-
-	blockCount := 100
-	sealedCount := blockCount - 3
-	firstSeal := blockCount - sealedCount - 1
-
-	startHeight := uint64(0)
-	endHeight := startHeight + uint64(blockCount) - 1
-
-	missingHeight := 50
-
-	var previousBlock *flow.Block
-	var previousResult *flow.ExecutionResult
-	for i := 0; i < blockCount; i++ {
-		var seals []*flow.Header
-
-		if i >= firstSeal {
-			seals = []*flow.Header{
-				testBlocksByHeight[uint64(i-firstSeal)].Header,
+	missingHeight := uint64(50)
+	attempts := 0
+	testData := generateTestData(ctx, t, 100, map[uint64]testExecutionDataCallback{
+		missingHeight: func(ed *state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error) {
+			if attempts < 1*2 { // this func is run twice for every attempt by the mock (once for ExecutionData one for errors)
+				attempts++
+				// This should fail the first 4 fetch attempts
+				return nil, errors.New("simulating fetch error")
 			}
-		}
+			return ed, nil
+		},
+	})
 
-		block := buildBlock(uint64(i), previousBlock, seals)
-
-		ed := unittest.ExecutionDataFixture(block.ID())
-
-		cid := unittest.IdentifierFixture()
-
-		result := buildResult(block, cid, previousResult)
-
-		testBlocksByHeight[block.Header.Height] = block
-		testBlocksByID[block.ID()] = block
-		testResultsByID[block.ID()] = result
-
-		// ignore all the data we don't need to verify the test
-		if i < sealedCount {
-			testExecutionDataByID[block.ID()] = ed
-
-			if i == missingHeight {
-				attempts := 0
-				testData[cid] = &testExecutionDataServiceEntry{
-					fn: func() (*state_synchronization.ExecutionData, error) {
-						if attempts < 10 { // run twice for every attempt
-							attempts++
-							// This should fail the first 4 fetch attempts
-							return nil, errors.New("simulating fetch error")
-						}
-						return ed, nil
-					},
-				}
-			} else {
-				testData[cid] = &testExecutionDataServiceEntry{ExecutionData: ed}
-			}
-		}
-
-		previousBlock = block
-		previousResult = result
-	}
-
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	blocks := mockBlocksStorage(testData.blocksByID, testData.blocksByHeight)
+	results := mockResultsStorage(testData.resultsByID)
 
 	ds := dssync.MutexWrap(datastore.NewMapDatastore())
 	bs := mockBlobService(blockstore.NewBlockstore(ds))
+	eds := mockExecutionDataService(testData.executionDataEntries)
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
 	edr, err := NewExecutionDataRequester(
 		logger,
 		metrics.NewNoopCollector(),
-		finalizationDistributor,
 		ds,
 		bs,
 		eds,
-		testBlocksByHeight[uint64(0)],
+		testData.blocksByHeight[uint64(0)],
 		blocks,
 		results,
+		false,
 	)
 	assert.NoError(t, err)
 
-	runFetch(t, ctx, edr, finalizationDistributor, fetchTestRun{
-		sealedCount:       sealedCount,
-		startHeight:       startHeight,
-		endHeight:         endHeight,
-		blocksByHeight:    testBlocksByHeight,
-		blocksByID:        testBlocksByID,
-		resultsByID:       testResultsByID,
-		executionDataByID: testExecutionDataByID,
-	})
+	finalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
+
+	runFetch(t, ctx, edr, finalizationDistributor, testData)
+}
+
+// Tests that blocks that are missed are properly retried and backfilled
+func TestRequestBlocksWithRandomDelays(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+
+	rand.Seed(time.Now().UnixNano())
+
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+
+	blockCount := 1000
+
+	// delay every third block by a random amount
+	delays := map[uint64]testExecutionDataCallback{}
+	for i := uint64(0); i < uint64(blockCount); i++ {
+		if i%3 > 0 {
+			continue
+		}
+
+		delays[i] = func(ed *state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error) {
+			time.Sleep(time.Duration(rand.Intn(25)) * time.Millisecond)
+			return ed, nil
+		}
+	}
+
+	testData := generateTestData(ctx, t, blockCount, delays)
+
+	blocks := mockBlocksStorage(testData.blocksByID, testData.blocksByHeight)
+	results := mockResultsStorage(testData.resultsByID)
+
+	ds := dssync.MutexWrap(datastore.NewMapDatastore())
+	bs := mockBlobService(blockstore.NewBlockstore(ds))
+	eds := mockExecutionDataService(testData.executionDataEntries)
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
+
+	edr, err := NewExecutionDataRequester(
+		logger,
+		metrics.NewNoopCollector(),
+		ds,
+		bs,
+		eds,
+		testData.blocksByHeight[uint64(0)],
+		blocks,
+		results,
+		false,
+	)
+	assert.NoError(t, err)
+
+	finalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
+
+	runFetch(t, ctx, edr, finalizationDistributor, testData)
 }
 
 func TestHappyCase(t *testing.T) {
@@ -679,17 +675,19 @@ func TestHappyCase(t *testing.T) {
 	edr, err := NewExecutionDataRequester(
 		logger,
 		metrics.NewNoopCollector(),
-		finalizationDistributor,
 		ds,
 		bs,
 		eds,
 		testBlocksByHeight[uint64(0)],
 		blocks,
 		results,
+		false,
 	)
 	assert.NoError(t, err)
 
-	runFetch(t, ctx, edr, finalizationDistributor, fetchTestRun{
+	finalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
+
+	runFetch(t, ctx, edr, finalizationDistributor, &fetchTestRun{
 		sealedCount:       sealedCount,
 		startHeight:       startHeight,
 		endHeight:         endHeight,
@@ -704,14 +702,15 @@ type fetchTestRun struct {
 	sealedCount           int
 	startHeight           uint64
 	endHeight             uint64
-	blocksByID            map[flow.Identifier]*flow.Block
 	blocksByHeight        map[uint64]*flow.Block
+	blocksByID            map[flow.Identifier]*flow.Block
 	resultsByID           map[flow.Identifier]*flow.ExecutionResult
 	executionDataByID     map[flow.Identifier]*state_synchronization.ExecutionData
+	executionDataEntries  map[flow.Identifier]*testExecutionDataServiceEntry
 	expectedIrrecoverable error
 }
 
-func runFetch(t *testing.T, ctx context.Context, edr ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg fetchTestRun) {
+func runFetch(t *testing.T, ctx context.Context, edr ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) {
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go irrecoverableNotExpected(t, ctx, errChan)
 
@@ -722,7 +721,7 @@ func runFetch(t *testing.T, ctx context.Context, edr ExecutionDataRequester, fin
 	sendLast := make(chan struct{}, 1)
 	fetchedExecutionData := make(map[flow.Identifier]*state_synchronization.ExecutionData, cfg.sealedCount)
 	edr.AddOnExecutionDataFetchedConsumer(func(ed *state_synchronization.ExecutionData) {
-		t.Logf("fetched execution data: %#v", ed)
+		// t.Logf("fetched execution data: %#v", ed)
 		fetchedExecutionData[ed.BlockID] = ed
 		outstandingBlocks.Done()
 
@@ -731,7 +730,7 @@ func runFetch(t *testing.T, ctx context.Context, edr ExecutionDataRequester, fin
 		// signal that we're near the end of the expected notifications. this is used to ensure
 		// that the last finalized block is successfully enqueued, and the finalization processor
 		// can backfill any blocks missed due to queue overflow.
-		if cfg.sealedCount-len(fetchedExecutionData) < finalizationQueueLength {
+		if cfg.sealedCount-len(fetchedExecutionData) < finalizationQueueLength-1 {
 			select {
 			case sendLast <- struct{}{}:
 			default:
@@ -756,7 +755,7 @@ func runFetch(t *testing.T, ctx context.Context, edr ExecutionDataRequester, fin
 		parentView = b.Header.View
 
 		// needs a slight delay otherwise it will fill the queue immediately.
-		time.Sleep(500 * time.Microsecond)
+		time.Sleep(1000 * time.Microsecond)
 
 		// the requester can catch up after receiving a finalization block, so on the last
 		// block, pause until the queue is no longer full and add it
@@ -770,6 +769,77 @@ func runFetch(t *testing.T, ctx context.Context, edr ExecutionDataRequester, fin
 	t.Log("All notifications received")
 
 	verifyFetchedExecutionData(t, fetchedExecutionData, cfg.executionDataByID)
+}
+
+func generateTestData(ctx context.Context, t *testing.T, blockCount int, missingHeightFuncs map[uint64]testExecutionDataCallback) *fetchTestRun {
+	edsEntries := map[flow.Identifier]*testExecutionDataServiceEntry{}
+	blocksByHeight := map[uint64]*flow.Block{}
+	blocksByID := map[flow.Identifier]*flow.Block{}
+	resultsByID := map[flow.Identifier]*flow.ExecutionResult{}
+	executionDataByID := map[flow.Identifier]*state_synchronization.ExecutionData{}
+
+	sealedCount := blockCount - 3
+	firstSeal := blockCount - sealedCount + 2 // offset by 2 so the first block can contain multiple seals
+
+	startHeight := uint64(0)
+	endHeight := startHeight + uint64(blockCount) - 1
+
+	var previousBlock *flow.Block
+	var previousResult *flow.ExecutionResult
+	for i := 0; i < blockCount; i++ {
+		var seals []*flow.Header
+
+		if i == firstSeal {
+			// first block with seals contains 3
+			seals = []*flow.Header{
+				// intentionally out of order
+				blocksByHeight[uint64(i-firstSeal+2)].Header,
+				blocksByHeight[uint64(i-firstSeal)].Header,
+				blocksByHeight[uint64(i-firstSeal+1)].Header,
+			}
+			t.Logf("block %d has seals for %d. %d. %d", i, seals[1].Height, seals[2].Height, seals[0].Height)
+		} else if i > firstSeal {
+			seals = []*flow.Header{
+				blocksByHeight[uint64(i-firstSeal+2)].Header,
+			}
+			t.Logf("block %d has seals for %d", i, seals[0].Height)
+		}
+
+		height := uint64(i)
+		block := buildBlock(height, previousBlock, seals)
+
+		ed := unittest.ExecutionDataFixture(block.ID())
+		cid := unittest.IdentifierFixture()
+
+		result := buildResult(block, cid, previousResult)
+
+		blocksByHeight[height] = block
+		blocksByID[block.ID()] = block
+		resultsByID[block.ID()] = result
+
+		// ignore all the data we don't need to verify the test
+		if i < sealedCount {
+			executionDataByID[block.ID()] = ed
+			edsEntries[cid] = &testExecutionDataServiceEntry{ExecutionData: ed}
+			if fn, missing := missingHeightFuncs[height]; missing {
+				edsEntries[cid].fn = fn
+			}
+		}
+
+		previousBlock = block
+		previousResult = result
+	}
+
+	return &fetchTestRun{
+		sealedCount:          sealedCount,
+		startHeight:          startHeight,
+		endHeight:            endHeight,
+		blocksByHeight:       blocksByHeight,
+		blocksByID:           blocksByID,
+		resultsByID:          resultsByID,
+		executionDataByID:    executionDataByID,
+		executionDataEntries: edsEntries,
+	}
 }
 
 func buildBlock(height uint64, parent *flow.Block, seals []*flow.Header) *flow.Block {

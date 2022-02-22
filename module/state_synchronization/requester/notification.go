@@ -19,7 +19,8 @@ type status struct {
 	lastNotified             uint64
 	lastSealed               uint64
 	lastReceived             uint64
-	missingHeights           map[uint64]struct{}
+	lastProcessed            uint64
+	missingHeights           map[uint64]bool
 	outstandingNotifications map[uint64]flow.Identifier
 	halted                   bool
 
@@ -34,7 +35,7 @@ func (m *status) Load() error {
 
 	// load the status data from the db
 
-	m.missingHeights = make(map[uint64]struct{})
+	m.missingHeights = make(map[uint64]bool)
 	m.outstandingNotifications = make(map[uint64]flow.Identifier)
 
 	return nil
@@ -81,10 +82,10 @@ func (m *status) NextNotification() (uint64, flow.Identifier, bool) {
 
 	// check if next height is missing
 	if _, missing := m.missingHeights[next]; missing {
-		return 0, flow.ZeroID, false
+		return next, flow.ZeroID, false
 	}
 
-	return 0, flow.ZeroID, false
+	return next, flow.ZeroID, false
 }
 
 func (m *status) Sealed(height uint64) {
@@ -107,7 +108,14 @@ func (m *status) Fetched(height uint64, blockID flow.Identifier) {
 
 	// this is the next height we're expecting
 	// this also includes special handling for block 0.
-	if height == m.lastReceived+1 || height == 0 {
+
+	if m.lastReceived == 0 && !m.firstNotificationSent {
+		if height == 0 {
+			m.lastReceived = height
+			m.outstandingNotifications[height] = blockID
+			return
+		}
+	} else if height == m.lastReceived+1 {
 		m.lastReceived = height
 		m.outstandingNotifications[height] = blockID
 		return
@@ -115,7 +123,7 @@ func (m *status) Fetched(height uint64, blockID flow.Identifier) {
 
 	// check if it's missing
 	if height <= m.lastReceived {
-		if _, missing := m.missingHeights[height]; missing {
+		if m.missingHeights[height] {
 			delete(m.missingHeights, height)
 			m.outstandingNotifications[height] = blockID
 			return
@@ -125,8 +133,12 @@ func (m *status) Fetched(height uint64, blockID flow.Identifier) {
 	}
 
 	// if there's a gap, record all missing heights
-	for h := m.lastReceived + 1; h < height; h++ {
-		m.missingHeights[h] = struct{}{}
+	start := m.lastReceived + 1
+	if m.lastReceived == 0 && !m.firstNotificationSent {
+		start = 0
+	}
+	for h := start; h < height; h++ {
+		m.missingHeights[h] = true
 	}
 
 	m.lastReceived = height
