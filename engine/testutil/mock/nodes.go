@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
@@ -127,6 +128,8 @@ type CollectionNode struct {
 }
 
 func (n CollectionNode) Ready() <-chan struct{} {
+	ctx, _ := irrecoverable.WithSignaler(context.Background())
+	n.IngestionEngine.Start(ctx)
 	return util.AllReady(
 		n.PusherEngine,
 		n.ProviderEngine,
