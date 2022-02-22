@@ -474,10 +474,10 @@ func (e *executionDataRequesterImpl) processNotification(ctx irrecoverable.Signa
 
 	logger.Debug().Msgf("processing notification request for block %d", request.height)
 
-	next, blockID, _ := e.status.NextNotification()
+	next, _, _ := e.status.NextNotification()
 
-	// if this isn't the next block to notify for, and it's not a duplicate notification, cache it
-	if blockID != request.blockID && next <= request.height {
+	// if this isn't a duplicate notification, cache it
+	if next <= request.height {
 		logger.Debug().Msgf("adding execution data to cache for height %d", request.height)
 		accepted := e.cache.Put(request.height, request.executionData)
 		if !accepted {
@@ -487,10 +487,10 @@ func (e *executionDataRequesterImpl) processNotification(ctx irrecoverable.Signa
 	}
 
 	// process all available notifications
-	e.sendAllAvailableNotifications(ctx, request)
+	e.sendAllAvailableNotifications(ctx)
 }
 
-func (e *executionDataRequesterImpl) sendAllAvailableNotifications(ctx irrecoverable.SignalerContext, request fetchRequest) {
+func (e *executionDataRequesterImpl) sendAllAvailableNotifications(ctx irrecoverable.SignalerContext) {
 	logger := e.log.With().Str("process", "notifications").Logger()
 	for {
 		next, blockID, ok := e.status.NextNotification()
@@ -509,10 +509,7 @@ func (e *executionDataRequesterImpl) sendAllAvailableNotifications(ctx irrecover
 
 		logger.Debug().Msgf("notifying for block %d", next)
 
-		executionData := request.executionData
-		if blockID != request.blockID {
-			executionData, ok = e.cache.Get(next)
-		}
+		executionData, ok := e.cache.Get(next)
 
 		if !ok {
 			logger.Debug().Msgf("execution data not in cache for block %d", next)
