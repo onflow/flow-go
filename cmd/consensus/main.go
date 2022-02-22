@@ -679,6 +679,7 @@ func main() {
 			}
 
 			comp = comp.WithConsensus(hot)
+			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
 			return comp, nil
 		}).
 		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

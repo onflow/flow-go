@@ -154,6 +154,8 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
+	hotstuffModules.FinalizationDistributor.AddOnBlockFinalizedConsumer(proposalEng.OnFinalizedBlock)
+
 	// attach dependencies to the proposal engine
 	proposal = proposalEng.
 		WithConsensus(hotstuff).
