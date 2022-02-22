@@ -7,11 +7,9 @@ import "google/protobuf/empty.proto";
 option go_package = "insecure";
 
 // to compile this file, run:
-// protoc insecure/proto/attacker.proto --go_out=plugins=grpc:.
+// protoc insecure/attacker.proto --go_out=plugins=grpc:.
 
-// CorruptibleConduitFactory implements the service provided by a corruptible conduit conduit.
-// It allows an attack to register itself to the conduit, and hence takes the control
-// of the conduit by sending messages on its behalf.
+// CorruptibleConduitFactory allows an attacker to register itself to the factory, and send messages on behalf of its conduits.
 service CorruptibleConduitFactory {
   rpc RegisterAttacker(AttackerRegisterMessage) returns (google.protobuf.Empty) {}
   rpc ProcessAttackerMessage(Message) returns (google.protobuf.Empty) {}
@@ -21,11 +19,11 @@ service Attacker {
   rpc Observe(Message) returns (google.protobuf.Empty) {}
 }
 
-// Message is represents the message exchanged between the Zombi and Attacker services.
+// Message is represents the message exchanged between the CorruptibleConduitFactory and Attacker services.
 message Message {
   string ChannelID = 1;
   bytes OriginID = 2;
-  uint32 targets = 3;
+  uint32 Targets = 3;
   repeated bytes TargetIDs = 4;
   bytes Payload = 5;
   string Type = 6;
