@@ -3,12 +3,15 @@ package corruptible
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -53,18 +56,37 @@ func TestNewConduit_MissingAdapter(t *testing.T) {
 	require.Nil(t, c)
 }
 
-// TestRegisterAttacker checks attacker registration to a corruptible conduit factory can be done
-// only once.
-func TestRegisterAttacker(t *testing.T) {
-	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), cbor.NewCodec())
-	f.attacker = &mockAttacker{}
+// TestFactoryHandleIncomingEvent_AttackerObserve evaluates that the incoming messages to the conduit factory are routed to the
+// registered attacker if one exists.
+func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
+	codec := cbor.NewCodec()
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), codec)
+	attacker := &mockAttacker{incomingBuffer: make(chan *insecure.Message)}
+	f.attacker = attacker
 
-	event := unittest.MockEntityFixture()
+	event := &message.TestMessage{Text: "this is a test message"}
 	targetIds := unittest.IdentifierListFixture(10)
 	channel := network.Channel("test-channel")
 
-	err := f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
+	go func() {
+		err := f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
+		require.NoError(t, err)
+	}()
+
+	var receivedMsg *insecure.Message
+	unittest.RequireReturnsBefore(t, func() {
+		receivedMsg = <-attacker.incomingBuffer
+	}, 100*time.Millisecond, "mock attack could not receive incoming message on time")
+
+	// checks content of the received message matches what has been sent.
+	require.ElementsMatch(t, receivedMsg.TargetIDs, flow.IdsToBytes(targetIds))
+	require.Equal(t, receivedMsg.Targets, uint32(3))
+	require.Equal(t, receivedMsg.Protocol, insecure.Protocol_MULTICAST)
+	require.Equal(t, receivedMsg.ChannelID, string(channel))
+
+	decodedEvent, err := codec.Decode(receivedMsg.Payload)
 	require.NoError(t, err)
+	require.Equal(t, event, decodedEvent)
 }
 
 type mockAttacker struct {
