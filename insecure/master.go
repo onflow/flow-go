@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// ConduitMaster defines part of the behavior of a corruptible conduit factory that controls the slave conduits it creates.
+// ConduitMaster defines part of the behavior of a corruptible conduit factory that controls the conduits it creates.
 type ConduitMaster interface {
 	// HandleIncomingEvent sends an incoming event to the conduit master to process.
 	HandleIncomingEvent(context.Context, interface{}, network.Channel, Protocol, uint32, ...flow.Identifier) error
