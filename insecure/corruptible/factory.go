@@ -8,7 +8,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go/insecure/proto"
+	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 )
@@ -22,7 +22,7 @@ type ConduitFactory struct {
 	codec    network.Codec
 	myId     flow.Identifier
 	adapter  network.Adapter
-	attacker proto.AttackerClient
+	attacker insecure.AttackerClient
 }
 
 func NewCorruptibleConduitFactory(myId flow.Identifier, codec network.Codec) *ConduitFactory {
@@ -64,7 +64,7 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 	return con, nil
 }
 
-func (c *ConduitFactory) ProcessAttackerMessage(_ context.Context, in *proto.Message, _ ...grpc.CallOption) (*empty.Empty, error) {
+func (c *ConduitFactory) ProcessAttackerMessage(_ context.Context, in *insecure.Message, _ ...grpc.CallOption) (*empty.Empty, error) {
 	event, err := c.codec.Decode(in.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode message: %w", err)
@@ -86,7 +86,7 @@ func (c *ConduitFactory) ProcessAttackerMessage(_ context.Context, in *proto.Mes
 // RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
 // control it.
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
-func (c *ConduitFactory) RegisterAttacker(_ context.Context, in *proto.AttackerRegisterMessage, _ ...grpc.CallOption) (*empty.Empty, error) {
+func (c *ConduitFactory) RegisterAttacker(_ context.Context, in *insecure.AttackerRegisterMessage, _ ...grpc.CallOption) (*empty.Empty, error) {
 	if c.attacker != nil {
 		return nil, fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", in.Address)
 	}
@@ -96,7 +96,7 @@ func (c *ConduitFactory) RegisterAttacker(_ context.Context, in *proto.AttackerR
 		return nil, fmt.Errorf("could not establish a client connection to attacker: %w", err)
 	}
 
-	c.attacker = proto.NewAttackerClient(clientConn)
+	c.attacker = insecure.NewAttackerClient(clientConn)
 
 	return &empty.Empty{}, nil
 }
@@ -109,7 +109,7 @@ func (c *ConduitFactory) HandleIncomingEvent(
 	ctx context.Context,
 	event interface{},
 	channel network.Channel,
-	protocol proto.Protocol,
+	protocol insecure.Protocol,
 	num uint32, targetIds ...flow.Identifier) error {
 
 	if c.attacker == nil {
@@ -141,8 +141,8 @@ func (c *ConduitFactory) EngineClosingChannel(channel network.Channel) error {
 func (c *ConduitFactory) eventToMessage(
 	event interface{},
 	channel network.Channel,
-	protocol proto.Protocol,
-	num uint32, targetIds ...flow.Identifier) (*proto.Message, error) {
+	protocol insecure.Protocol,
+	num uint32, targetIds ...flow.Identifier) (*insecure.Message, error) {
 
 	payload, err := c.codec.Encode(event)
 	if err != nil {
@@ -151,7 +151,7 @@ func (c *ConduitFactory) eventToMessage(
 
 	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
 
-	return &proto.Message{
+	return &insecure.Message{
 		ChannelID: channel.String(),
 		OriginID:  c.myId[:],
 		Targets:   num,
@@ -166,19 +166,19 @@ func (c *ConduitFactory) eventToMessage(
 // through the specified protocol to the target identifiers.
 func (c *ConduitFactory) sendOnNetwork(event interface{},
 	channel network.Channel,
-	protocol proto.Protocol,
+	protocol insecure.Protocol,
 	num uint, targetIds ...flow.Identifier) error {
 	switch protocol {
-	case proto.Protocol_UNICAST:
+	case insecure.Protocol_UNICAST:
 		if len(targetIds) > 1 {
 			return fmt.Errorf("more than one target ids for unicast: %v", targetIds)
 		}
 		return c.adapter.UnicastOnChannel(channel, event, targetIds[0])
 
-	case proto.Protocol_PUBLISH:
+	case insecure.Protocol_PUBLISH:
 		return c.adapter.PublishOnChannel(channel, event)
 
-	case proto.Protocol_MULTICAST:
+	case insecure.Protocol_MULTICAST:
 		return c.adapter.MulticastOnChannel(channel, event, num, targetIds...)
 	default:
 		return fmt.Errorf("unknown protocol for sending on network: %d", protocol)

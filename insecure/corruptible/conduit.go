@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/insecure/proto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 )
@@ -25,7 +24,7 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 
-	err := c.master.HandleIncomingEvent(c.ctx, event, c.channel, proto.Protocol_PUBLISH, 0, targetIDs...)
+	err := c.master.HandleIncomingEvent(c.ctx, event, c.channel, insecure.Protocol_PUBLISH, 0, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("factory could not handle the publish event: %w", err)
 	}
@@ -39,7 +38,7 @@ func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 
-	err := c.master.HandleIncomingEvent(c.ctx, event, c.channel, proto.Protocol_UNICAST, 0, targetID)
+	err := c.master.HandleIncomingEvent(c.ctx, event, c.channel, insecure.Protocol_UNICAST, 0, targetID)
 	if err != nil {
 		return fmt.Errorf("factory could not handle the unicast event: %w", err)
 	}
@@ -53,7 +52,7 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 
-	err := c.master.HandleIncomingEvent(c.ctx, event, c.channel, proto.Protocol_MULTICAST, uint32(num), targetIDs...)
+	err := c.master.HandleIncomingEvent(c.ctx, event, c.channel, insecure.Protocol_MULTICAST, uint32(num), targetIDs...)
 	if err != nil {
 		return fmt.Errorf("factory could not handle the multicast event: %w", err)
 	}

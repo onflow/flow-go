@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go/insecure/proto"
+	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -63,15 +63,15 @@ func TestRegisterAttacker(t *testing.T) {
 	targetIds := unittest.IdentifierListFixture(10)
 	channel := network.Channel("test-channel")
 
-	err := f.HandleIncomingEvent(context.Background(), event, channel, proto.Protocol_MULTICAST, uint32(3), targetIds...)
+	err := f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
 	require.NoError(t, err)
 }
 
 type mockAttacker struct {
-	incomingBuffer chan *proto.Message
+	incomingBuffer chan *insecure.Message
 }
 
-func (m *mockAttacker) Observe(_ context.Context, in *proto.Message, _ ...grpc.CallOption) (*empty.Empty, error) {
+func (m *mockAttacker) Observe(_ context.Context, in *insecure.Message, _ ...grpc.CallOption) (*empty.Empty, error) {
 	m.incomingBuffer <- in
 	return &empty.Empty{}, nil
 }

@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
-	"github.com/onflow/flow-go/insecure/proto"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,7 +30,7 @@ func TestConduitRelayMessage_Publish(t *testing.T) {
 	event := unittest.MockEntityFixture()
 	targetIds := unittest.IdentifierListFixture(10)
 
-	params := []interface{}{ctx, event, channel, proto.Protocol_PUBLISH, uint32(0)}
+	params := []interface{}{ctx, event, channel, insecure.Protocol_PUBLISH, uint32(0)}
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
@@ -59,7 +59,7 @@ func TestConduitRelayMessage_Multicast(t *testing.T) {
 	event := unittest.MockEntityFixture()
 	targetIds := unittest.IdentifierListFixture(10)
 
-	params := []interface{}{ctx, event, channel, proto.Protocol_MULTICAST, uint32(num)}
+	params := []interface{}{ctx, event, channel, insecure.Protocol_MULTICAST, uint32(num)}
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
@@ -87,7 +87,7 @@ func TestConduitRelayMessage_Unicast(t *testing.T) {
 	event := unittest.MockEntityFixture()
 	targetId := unittest.IdentifierFixture()
 
-	master.On("HandleIncomingEvent", ctx, event, channel, proto.Protocol_UNICAST, uint32(0), targetId).
+	master.On("HandleIncomingEvent", ctx, event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
 		Return(nil).
 		Once()
 
@@ -112,7 +112,7 @@ func TestConduitReflectError_Unicast(t *testing.T) {
 	event := unittest.MockEntityFixture()
 	targetId := unittest.IdentifierFixture()
 
-	master.On("HandleIncomingEvent", ctx, event, channel, proto.Protocol_UNICAST, uint32(0), targetId).
+	master.On("HandleIncomingEvent", ctx, event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
 		Return(fmt.Errorf("could not handle event")).
 		Once()
 
@@ -138,7 +138,7 @@ func TestConduitReflectError_Multicast(t *testing.T) {
 	event := unittest.MockEntityFixture()
 	targetIds := unittest.IdentifierListFixture(10)
 
-	params := []interface{}{ctx, event, channel, proto.Protocol_MULTICAST, uint32(num)}
+	params := []interface{}{ctx, event, channel, insecure.Protocol_MULTICAST, uint32(num)}
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
@@ -167,7 +167,7 @@ func TestConduitReflectError_Publish(t *testing.T) {
 	event := unittest.MockEntityFixture()
 	targetIds := unittest.IdentifierListFixture(10)
 
-	params := []interface{}{ctx, event, channel, proto.Protocol_PUBLISH, uint32(0)}
+	params := []interface{}{ctx, event, channel, insecure.Protocol_PUBLISH, uint32(0)}
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
