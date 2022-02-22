@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type VirtualMachine interface {
@@ -292,6 +293,10 @@ func (e *Manager) ComputeBlock(
 
 	e.edCache.Insert(block.Block.Header, blobTree)
 	result.ExecutionDataID = rootID
+
+	if block.Height() == 350 {
+		result.ExecutionDataID = unittest.IdentifierFixture()
+	}
 
 	return result, nil
 }

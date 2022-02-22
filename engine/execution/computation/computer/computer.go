@@ -3,7 +3,6 @@ package computer
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -393,10 +392,6 @@ func (e *blockComputer) executeTransaction(
 			errorMsg = sb.String()
 		}
 		txResult.ErrorMessage = errorMsg
-	}
-
-	if res.ExecutableBlock.Block.Header.Height == 350 {
-		txResult.ErrorMessage = fmt.Sprint(rand.Int())
 	}
 
 	mergeSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEMergeTransactionView)
