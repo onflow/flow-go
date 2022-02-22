@@ -465,6 +465,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			parsedExecResult, err := convert.ExecResultProtoToFlowExecResult(resp.ExecutionResult)
 			require.NoError(suite.T(), err)
 			assert.Equal(suite.T(), parsedExecResult, executionResult)
+			assert.EqualValues(suite.T(), parsedExecResult, executionResult)
 			assert.Equal(suite.T(), parsedExecResult.ID(), executionResult.ID())
 		}
 
