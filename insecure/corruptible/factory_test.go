@@ -90,7 +90,7 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	require.Equal(t, event, decodedEvent)
 }
 
-// TestFactoryHandleIncomingEvent_UnicastOverNetwork evaluates that the incoming messages to the conduit factory are routed to the
+// TestFactoryHandleIncomingEvent_UnicastOverNetwork evaluates that the incoming unicast events to the conduit factory are routed to the
 // network adapter when no attacker registered to the factory.
 func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
 	codec := cbor.NewCodec()
@@ -108,6 +108,28 @@ func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
 	adapter.On("UnicastOnChannel", channel, event, targetId).Return(nil).Once()
 
 	err = f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_UNICAST, uint32(0), targetId)
+	require.NoError(t, err)
+
+	testifymock.AssertExpectationsForObjects(t, adapter)
+}
+
+// TestFactoryHandleIncomingEvent_PublishOverNetwork evaluates that the incoming publish events to the conduit factory are routed to the
+// network adapter when no attacker registered to the factory.
+func TestFactoryHandleIncomingEvent_PublishOverNetwork(t *testing.T) {
+	codec := cbor.NewCodec()
+	// corruptible conduit factory with no attacker registered.
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), codec)
+
+	adapter := &mocknetwork.Adapter{}
+	err := f.RegisterAdapter(adapter)
+	require.NoError(t, err)
+
+	event := &message.TestMessage{Text: "this is a test message"}
+	channel := network.Channel("test-channel")
+
+	adapter.On("PublishOnChannel", channel, event).Return(nil).Once()
+
+	err = f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_PUBLISH, uint32(0))
 	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, adapter)
