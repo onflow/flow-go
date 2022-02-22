@@ -10,7 +10,9 @@ import (
 )
 
 // PayloadData has the data to be sent
-type PayloadData struct {
+// transactionPayloadCanonicalForm is a standardized, low-level format used
+// to prepare transaction payloads for serialization and hashing.
+type transactionPayloadCanonicalForm struct {
 	Script                    []byte
 	Arguments                 [][]byte
 	ReferenceBlockID          []byte
