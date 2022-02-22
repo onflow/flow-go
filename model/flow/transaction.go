@@ -147,7 +147,7 @@ func (tb TransactionBody) ByteSize() uint {
 
 func (tb TransactionBody) ID() Identifier {
 	data := tb.Fingerprint()
-	return MakeIDFast(&data)
+	return MakeIDFromBytes(&data)
 }
 
 func (tb TransactionBody) Checksum() Identifier {
