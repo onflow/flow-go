@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -87,6 +88,29 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	decodedEvent, err := codec.Decode(receivedMsg.Payload)
 	require.NoError(t, err)
 	require.Equal(t, event, decodedEvent)
+}
+
+// TestFactoryHandleIncomingEvent_UnicastOverNetwork evaluates that the incoming messages to the conduit factory are routed to the
+// network adapter when no attacker registered to the factory.
+func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
+	codec := cbor.NewCodec()
+	// corruptible conduit factory with no attacker registered.
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), codec)
+
+	adapter := &mocknetwork.Adapter{}
+	err := f.RegisterAdapter(adapter)
+	require.NoError(t, err)
+
+	event := &message.TestMessage{Text: "this is a test message"}
+	targetId := unittest.IdentifierFixture()
+	channel := network.Channel("test-channel")
+
+	adapter.On("UnicastOnChannel", channel, event, targetId).Return(nil).Once()
+
+	err = f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_UNICAST, uint32(0), targetId)
+	require.NoError(t, err)
+
+	testifymock.AssertExpectationsForObjects(t, adapter)
 }
 
 type mockAttacker struct {
