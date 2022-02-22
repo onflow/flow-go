@@ -23,7 +23,7 @@ type ReportFileWriterFactory struct {
 	log        zerolog.Logger
 }
 
-func NewReportFileWriterFactory(outputDir string, log zerolog.Logger) ReportWriterFactory {
+func NewReportFileWriterFactory(outputDir string, log zerolog.Logger) *ReportFileWriterFactory {
 	return &ReportFileWriterFactory{
 		fileSuffix: int32(time.Now().Unix()),
 		outputDir:  outputDir,
@@ -31,12 +31,12 @@ func NewReportFileWriterFactory(outputDir string, log zerolog.Logger) ReportWrit
 	}
 }
 
-func (r *ReportFileWriterFactory) filename(dataNamespace string) string {
+func (r *ReportFileWriterFactory) Filename(dataNamespace string) string {
 	return path.Join(r.outputDir, fmt.Sprintf("%s_%d.json", dataNamespace, r.fileSuffix))
 }
 
 func (r *ReportFileWriterFactory) ReportWriter(dataNamespace string) ReportWriter {
-	fn := r.filename(dataNamespace)
+	fn := r.Filename(dataNamespace)
 
 	return NewReportFileWriter(fn, r.log)
 }
