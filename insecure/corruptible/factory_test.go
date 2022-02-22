@@ -163,6 +163,58 @@ func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 	testifymock.AssertExpectationsForObjects(t, adapter)
 }
 
+// TestProcessAttackerMessage evaluates that conduit factory relays the messages coming from the attacker to its underlying network adapter.
+func TestProcessAttackerMessage(t *testing.T) {
+	codec := cbor.NewCodec()
+	// corruptible conduit factory with no attacker registered.
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), codec)
+
+	adapter := &mocknetwork.Adapter{}
+	err := f.RegisterAdapter(adapter)
+	require.NoError(t, err)
+
+	event := &message.TestMessage{Text: "this is a test message"}
+	channel := network.Channel("test-channel")
+	targetIds := unittest.IdentifierListFixture(10)
+
+	params := []interface{}{channel, event, uint(3)}
+	for _, id := range targetIds {
+		params = append(params, id)
+	}
+
+	adapter.On("MulticastOnChannel", params...).Return(nil).Once()
+
+	// imitates an RPC call from the attacker
+	msg, err := f.eventToMessage(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
+	require.NoError(t, err)
+
+	_, err = f.ProcessAttackerMessage(context.Background(), msg)
+	require.NoError(t, err)
+
+	testifymock.AssertExpectationsForObjects(t, adapter)
+}
+
+// TestEngineClosingChannel evaluates that factory closes the channel whenever the corresponding engine of that channel attempts
+// on closing it.
+func TestEngineClosingChannel(t *testing.T) {
+	codec := cbor.NewCodec()
+	// corruptible conduit factory with no attacker registered.
+	f := NewCorruptibleConduitFactory(unittest.IdentifierFixture(), codec)
+
+	adapter := &mocknetwork.Adapter{}
+	err := f.RegisterAdapter(adapter)
+	require.NoError(t, err)
+
+	channel := network.Channel("test-channel")
+
+	adapter.On("UnRegisterChannel", channel).Return(nil).Once()
+
+	err = f.EngineClosingChannel(channel)
+	require.NoError(t, err)
+
+	testifymock.AssertExpectationsForObjects(t, adapter)
+}
+
 type mockAttacker struct {
 	incomingBuffer chan *insecure.Message
 }
