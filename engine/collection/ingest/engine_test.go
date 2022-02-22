@@ -120,7 +120,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.conf = DefaultConfig()
 	chain := flow.Testnet.Chain()
-	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, chain, suite.pools, suite.conf)
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, metrics, suite.me, chain, suite.pools, suite.conf)
 	suite.Require().NoError(err)
 }
 
