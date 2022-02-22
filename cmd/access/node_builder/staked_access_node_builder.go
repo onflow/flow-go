@@ -327,18 +327,20 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				edr, err := edrequester.NewExecutionDataRequester(
 					builder.Logger,
 					metrics.NewNoopCollector(),
-					builder.FinalizationDistributor,
 					dstore,
 					blobservice,
 					builder.ExecutionDataService,
 					builder.RootBlock,
 					builder.Storage.Blocks,
 					builder.Storage.Results,
+					builder.executionDataCheckEnabled,
 				)
 
 				if err != nil {
 					return nil, fmt.Errorf("could not create execution data requester: %w", err)
 				}
+
+				builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 
 				builder.ExecutionDataRequester = edr
 

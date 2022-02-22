@@ -17,7 +17,7 @@ import (
 func TestMissingHeights(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		status := &status{
-			missingHeights: map[uint64]struct{}{},
+			missingHeights: map[uint64]bool{},
 		}
 
 		heights := status.MissingHeights()
@@ -27,8 +27,8 @@ func TestMissingHeights(t *testing.T) {
 
 	t.Run("single", func(t *testing.T) {
 		status := &status{
-			missingHeights: map[uint64]struct{}{
-				1: {},
+			missingHeights: map[uint64]bool{
+				1: true,
 			},
 		}
 
@@ -40,10 +40,10 @@ func TestMissingHeights(t *testing.T) {
 
 	t.Run("multiple returns sorted", func(t *testing.T) {
 		status := &status{
-			missingHeights: map[uint64]struct{}{
-				4: {},
-				1: {},
-				2: {},
+			missingHeights: map[uint64]bool{
+				4: true,
+				1: true,
+				2: true,
 			},
 		}
 
@@ -65,7 +65,7 @@ func TestNextNotification(t *testing.T) {
 			outstandingNotifications: map[uint64]flow.Identifier{
 				6: nextBlockID,
 			},
-			missingHeights: map[uint64]struct{}{},
+			missingHeights: map[uint64]bool{},
 		}
 
 		next, blockID, ok := status.NextNotification()
@@ -78,7 +78,7 @@ func TestNextNotification(t *testing.T) {
 		status := &status{
 			lastNotified:   5,
 			lastReceived:   5,
-			missingHeights: map[uint64]struct{}{},
+			missingHeights: map[uint64]bool{},
 		}
 
 		next, blockID, ok := status.NextNotification()
@@ -91,8 +91,8 @@ func TestNextNotification(t *testing.T) {
 		status := &status{
 			lastNotified: 5,
 			lastReceived: 7,
-			missingHeights: map[uint64]struct{}{
-				6: {},
+			missingHeights: map[uint64]bool{
+				6: true,
 			},
 		}
 
@@ -156,7 +156,7 @@ func TestFetched(t *testing.T) {
 		status := &status{
 			lastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
-			missingHeights:           map[uint64]struct{}{},
+			missingHeights:           map[uint64]bool{},
 		}
 
 		status.Fetched(height, blockID)
@@ -172,8 +172,8 @@ func TestFetched(t *testing.T) {
 		status := &status{
 			lastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
-			missingHeights: map[uint64]struct{}{
-				height: {},
+			missingHeights: map[uint64]bool{
+				height: true,
 			},
 		}
 
@@ -191,7 +191,7 @@ func TestFetched(t *testing.T) {
 		status := &status{
 			lastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
-			missingHeights:           map[uint64]struct{}{},
+			missingHeights:           map[uint64]bool{},
 		}
 
 		status.Fetched(height, blockID)
@@ -208,7 +208,7 @@ func TestFetched(t *testing.T) {
 		status := &status{
 			lastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
-			missingHeights:           map[uint64]struct{}{},
+			missingHeights:           map[uint64]bool{},
 		}
 
 		status.Fetched(height, blockID)
@@ -224,7 +224,7 @@ func TestFetched(t *testing.T) {
 			lastNotified:             5,
 			lastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
-			missingHeights:           map[uint64]struct{}{},
+			missingHeights:           map[uint64]bool{},
 		}
 
 		status.Fetched(height, blockID)
@@ -240,7 +240,7 @@ func TestFetched(t *testing.T) {
 			lastNotified:             5,
 			lastReceived:             8,
 			outstandingNotifications: map[uint64]flow.Identifier{},
-			missingHeights:           map[uint64]struct{}{},
+			missingHeights:           map[uint64]bool{},
 		}
 
 		status.Fetched(height, blockID)
@@ -254,7 +254,7 @@ func TestFetched(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		status := &status{
 			outstandingNotifications: map[uint64]flow.Identifier{},
-			missingHeights:           map[uint64]struct{}{},
+			missingHeights:           map[uint64]bool{},
 		}
 
 		status.Fetched(height, blockID)
@@ -271,7 +271,7 @@ func TestFetched(t *testing.T) {
 		status := &status{
 			firstNotificationSent:    true,
 			outstandingNotifications: map[uint64]flow.Identifier{},
-			missingHeights:           map[uint64]struct{}{},
+			missingHeights:           map[uint64]bool{},
 		}
 
 		status.Fetched(height, blockID)
@@ -395,7 +395,7 @@ func TestNotificationTransitions(t *testing.T) {
 		status := &status{
 			// firstNotificationSent:    true,
 			outstandingNotifications: map[uint64]flow.Identifier{},
-			missingHeights:           map[uint64]struct{}{},
+			missingHeights:           map[uint64]bool{},
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -403,7 +403,7 @@ func TestNotificationTransitions(t *testing.T) {
 
 		notifications := engine.NewNotifier()
 
-		done := make(chan struct{})
+		done := make(chan bool)
 		go func() {
 			defer close(done)
 			for {

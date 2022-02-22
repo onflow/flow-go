@@ -11,9 +11,6 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -48,6 +45,7 @@ var ErrRequesterHalted = errors.New("requester was halted due to invalid data")
 
 type ExecutionDataRequester interface {
 	component.Component
+	OnBlockFinalized(flow.Identifier)
 	AddOnExecutionDataFetchedConsumer(fn ExecutionDataReceivedCallback)
 }
 
@@ -69,25 +67,32 @@ type executionDataRequesterImpl struct {
 	// List of callbacks to call when ExecutionData is successfully fetched for a block
 	consumers []ExecutionDataReceivedCallback
 
-	// finalizedBlockQueue accepts new finalized blocks to prevent blocking in the OnBlockFinalized
-	// callback
-	finalizedBlockQueue *fifoqueue.FifoQueue
+	// // finalizedBlockQueue accepts new finalized blocks to prevent blocking in the OnBlockFinalized
+	// // callback
+	// finalizedBlockQueue *fifoqueue.FifoQueue
 
-	// fetchQueue accepts new fetch requests, which are consumed by a pool of fetch workers.
-	fetchQueue *fifoqueue.FifoQueue
+	// // fetchQueue accepts new fetch requests, which are consumed by a pool of fetch workers.
+	// fetchQueue *fifoqueue.FifoQueue
 
-	// fetchRetryQueue accepts fetch retry requests, which are also consumed by the same pool of
-	// fetch workers as fetchQueue, however fetchRetryQueue takes priority.
-	fetchRetryQueue *fifoqueue.FifoQueue
+	// // fetchRetryQueue accepts fetch retry requests, which are also consumed by the same pool of
+	// // fetch workers as fetchQueue, however fetchRetryQueue takes priority.
+	// fetchRetryQueue *fifoqueue.FifoQueue
 
-	// Notifiers for queue consumers
-	finalizedBlocksNotifier engine.Notifier
-	fetchNotifier           engine.Notifier
-	notificationNotifier    engine.Notifier
+	// // Notifiers for queue consumers
+	// finalizedBlocksNotifier engine.Notifier
+	// fetchNotifier           engine.Notifier
+	// notificationNotifier    engine.Notifier
 
-	cache             *executionDataCache
-	notificationState *status
-	consumerMu        sync.RWMutex
+	finalizedBlocks    chan flow.Identifier
+	fetchRequests      chan fetchRequest
+	fetchRetryRequests chan fetchRequest
+	notifications      chan fetchRequest
+
+	cache      *executionDataCache
+	status     *status
+	consumerMu sync.RWMutex
+
+	startupCheck bool
 
 	// TODO: figure out how to deal with this situation. We want to drop the memory footprint and stop processing new blocks, but also not stop the component
 	stop chan struct{}
@@ -96,8 +101,10 @@ type executionDataRequesterImpl struct {
 }
 
 type fetchRequest struct {
-	blockID flow.Identifier
-	height  uint64
+	blockID       flow.Identifier
+	resultID      flow.Identifier
+	height        uint64
+	executionData *state_synchronization.ExecutionData
 }
 
 type ExecutionDataReceivedCallback func(*state_synchronization.ExecutionData)
@@ -106,55 +113,32 @@ type ExecutionDataReceivedCallback func(*state_synchronization.ExecutionData)
 func NewExecutionDataRequester(
 	log zerolog.Logger,
 	edsMetrics module.ExecutionDataServiceMetrics,
-	finalizationDistributor *pubsub.FinalizationDistributor,
 	datastore datastore.Batching,
 	blobservice network.BlobService,
 	eds state_synchronization.ExecutionDataService,
 	rootBlock *flow.Block,
 	blocks storage.Blocks,
 	results storage.ExecutionResults,
+	startupCheck bool,
 ) (ExecutionDataRequester, error) {
-
-	var err error
 	e := &executionDataRequesterImpl{
-		log:       log.With().Str("component", "execution_data_requester").Logger(),
-		ds:        datastore,
-		bs:        blobservice,
-		eds:       eds,
-		rootBlock: rootBlock,
-		blocks:    blocks,
-		results:   results,
-		stop:      make(chan struct{}),
+		log:          log.With().Str("component", "execution_data_requester").Logger(),
+		ds:           datastore,
+		bs:           blobservice,
+		eds:          eds,
+		rootBlock:    rootBlock,
+		blocks:       blocks,
+		results:      results,
+		stop:         make(chan struct{}),
+		startupCheck: startupCheck,
 
-		finalizedBlocksNotifier: engine.NewNotifier(),
-		fetchNotifier:           engine.NewNotifier(),
-		notificationNotifier:    engine.NewNotifier(),
+		cache:  newExecutionDataCache(executionDataCacheSize),
+		status: &status{startHeight: rootBlock.Header.Height},
 
-		cache:             newExecutionDataCache(executionDataCacheSize),
-		notificationState: &status{startHeight: rootBlock.Header.Height},
-	}
-
-	finalizationDistributor.AddOnBlockFinalizedConsumer(e.onBlockFinalized)
-
-	e.finalizedBlockQueue, err = fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(finalizationQueueLength),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for finalized blocks: %w", err)
-	}
-
-	e.fetchQueue, err = fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(fetchQueueLength),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for fetch requests: %w", err)
-	}
-
-	e.fetchRetryQueue, err = fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(fetchQueueLength),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for refetch requests: %w", err)
+		finalizedBlocks:    make(chan flow.Identifier, finalizationQueueLength),
+		fetchRequests:      make(chan fetchRequest, fetchQueueLength),
+		fetchRetryRequests: make(chan fetchRequest, fetchQueueLength),
+		notifications:      make(chan fetchRequest, fetchQueueLength),
 	}
 
 	builder := component.NewComponentManagerBuilder().
@@ -182,25 +166,22 @@ func (e *executionDataRequesterImpl) AddOnExecutionDataFetchedConsumer(fn Execut
 	e.consumers = append(e.consumers, fn)
 }
 
-func (e *executionDataRequesterImpl) onBlockFinalized(blockID flow.Identifier) {
+func (e *executionDataRequesterImpl) OnBlockFinalized(blockID flow.Identifier) {
+	logger := e.log.With().Str("finalized_block_id", blockID.String()).Logger()
+
 	// stop accepting new blocks if the component is shutting down
 	if util.CheckClosed(e.stop) || util.CheckClosed(e.cm.ShutdownSignal()) {
-		e.log.Warn().Str("finalized_block_id", blockID.String()).Msg("ignoring finalized block. component is shutting down")
+		logger.Warn().Msg("ignoring finalized block. component is shutting down")
 		return
 	}
 
-	e.log.Debug().Str("finalized_block_id", blockID.String()).Msg("received finalized block notification")
+	logger.Debug().Msg("received finalized block notification")
 
-	accepted := e.finalizedBlockQueue.Push(blockID)
-	if !accepted {
-		// Silently drop notifications if the queue is full. The seals contained in the block will
-		// be backfilled when the next finalized block is processed. This takes advantage of the
-		// fact that seals are guranteed by hotstuff to be contiguous.
-		e.log.Warn().Str("finalized_block_id", blockID.String()).Msg("finalized block queue is full")
-		return
+	select {
+	case e.finalizedBlocks <- blockID:
+	default:
+		logger.Warn().Msg("finalized block queue is full")
 	}
-
-	e.finalizedBlocksNotifier.Notify()
 }
 
 // finalizedBlockProcessor runs the main process that processes finalized block notifications and
@@ -260,186 +241,135 @@ func (e *executionDataRequesterImpl) finalizationProcessingLoop(ctx irrecoverabl
 			return
 		case <-e.stop:
 			return
-		case <-e.finalizedBlocksNotifier.Channel():
-			e.processAvailableBlocks(ctx)
+		case blockID := <-e.finalizedBlocks:
+			e.processFinalizedBlock(ctx, blockID)
 		}
 	}
 }
 
-func (e *executionDataRequesterImpl) processAvailableBlocks(ctx irrecoverable.SignalerContext) {
-	for {
-		item, ok := e.finalizedBlockQueue.Pop()
+func (e *executionDataRequesterImpl) processFinalizedBlock(ctx irrecoverable.SignalerContext, blockID flow.Identifier) {
+	block, err := e.blocks.ByID(blockID)
 
-		// return when queue is empty
-		if !ok {
-			return
-		}
-
-		blockID := item.(flow.Identifier)
-
-		block, err := e.blocks.ByID(blockID)
-
-		// block must be in the db, otherwise there's a problem with the state
-		if err != nil {
-			ctx.Throw(fmt.Errorf("failed to lookup finalized block %s in protocol state db: %w", blockID, err))
-		}
-
-		err = e.processBlockSeals(block)
-		if err != nil {
-			// all errors indicate a problem fetching data from the db
-			ctx.Throw(fmt.Errorf("failed to process finalized block %s: %w", blockID, err))
-		}
+	// block must be in the db, otherwise there's a problem with the state
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to lookup finalized block %s in protocol state db: %w", blockID, err))
 	}
-}
 
-// Will return an error if any of the seals processed are for a block that does not exist in the db
-func (e *executionDataRequesterImpl) processBlockSeals(block *flow.Block) error {
 	logger := e.log.With().Str("finalized_block_id", block.ID().String()).Logger()
-	logger.Debug().Msgf("checking %d seals in block", len(block.Payload.Seals))
 
+	// loop through all finalized blocks since the last processed block, and extract all seals
+	lastHeight := e.status.lastProcessed
+	logger.Debug().Uint64("start_height", lastHeight+1).Uint64("end_height", block.Header.Height).Msg("checking for seals")
+	for height := lastHeight + 1; height <= block.Header.Height; height++ {
+		logger.Debug().Uint64("height", height).Msg("processing height")
+		err := e.processSealsFromHeight(ctx, height)
+
+		if err != nil {
+			ctx.Throw(fmt.Errorf("failed to process seals from height %d: %w", height, err))
+		}
+
+		e.status.lastProcessed = height
+	}
+
+	logger.Debug().Msg("done processing")
+}
+
+func (e *executionDataRequesterImpl) processSealsFromHeight(ctx irrecoverable.SignalerContext, height uint64) error {
+	block, err := e.blocks.ByHeight(height)
+	if err != nil {
+		return fmt.Errorf("failed to get block for height %d: %w", height, err)
+	}
+
+	logger := e.log.With().Str("finalized_block_id", block.ID().String()).Uint64("finalized_block_height", height).Logger()
 	if len(block.Payload.Seals) == 0 {
+		logger.Debug().Msg("no seals in block")
 		return nil
 	}
 
-	// First, find all seals in the block and sort them by height (ascending)
+	logger.Debug().Msgf("checking %d seals in block", len(block.Payload.Seals))
 
-	fetchRequests := []fetchRequest{}
+	// Find all seals in the block and sort them by height (ascending). This helps with processing
+	// lower height first since notifications are sent in order
 
-	for _, seal := range block.Payload.Seals {
-		sealedBlock, err := e.blocks.ByID(seal.BlockID)
-
-		if err != nil {
-			return fmt.Errorf("failed to lookup sealed block in protocol state db: %w", err)
-		}
-
-		logger.Debug().
-			Str("sealed_block_id", seal.BlockID.String()).
-			Uint64("sealed_block_height", sealedBlock.Header.Height).
-			Msg("checking sealed block")
-
-		fetchRequests = append(fetchRequests, fetchRequest{
-			blockID: seal.BlockID,
-			height:  sealedBlock.Header.Height,
-		})
+	requests, err := e.requestsFromSeals(block.Payload.Seals)
+	if err != nil {
+		return err
 	}
 
-	logger.Debug().Msgf("found %d seals in block", len(fetchRequests))
+	logger.Debug().Msgf("found %d seals in block", len(requests))
 
-	sort.Slice(fetchRequests, func(i, j int) bool {
-		return fetchRequests[i].height < fetchRequests[j].height
+	sort.Slice(requests, func(i, j int) bool {
+		return requests[i].height < requests[j].height
 	})
 
-	// Next check if there is a gap between the lowest sealed block height and the last processed
-	// height, and record any that were missed. This allows us to catch up if we dropped some blocks
-	// because the the queue filled
-
-	last := e.notificationState.LastSealed()
-	if last < fetchRequests[0].height-1 {
-		missedHeights, err := e.missingBefore(last+1, fetchRequests[0].height)
-
-		if err != nil {
-			return fmt.Errorf("failed to lookup missing sealed block in protocol state db: %w", err)
-		}
-
-		fetchRequests = append(missedHeights, fetchRequests...)
-	}
-
-	// Finally, enqueue all blocks and notify workers
-
-	highestSealed := last
-
-	for _, request := range fetchRequests {
+	// Send all blocks to fetch workers (blocking to apply backpressure)
+	for _, request := range requests {
 		logger.Debug().Msgf("enqueueing fetch request for block %d", request.height)
 
-		accepted := e.fetchQueue.Push(request)
-		if !accepted {
-			// Silently drop requests if the queue is full. They will be backfilled when the next
-			// finalized block is processed. This takes advantage of the fact that seals are
-			// guranteed by hotstuff to be contiguous.
-			logger.Warn().
-				Str("sealed_block_id", request.blockID.String()).
-				Uint64("sealed_block_height", request.height).
-				Msg("fetch request queue is full")
-			e.notificationState.Sealed(highestSealed)
+		select {
+		case <-ctx.Done():
 			return nil
+		case <-e.stop:
+			return nil
+		case e.fetchRequests <- request:
 		}
-
-		logger.Debug().Msgf("queue has %d requests", e.fetchQueue.Len())
-
-		highestSealed = request.height
-		e.fetchNotifier.Notify()
 	}
 
-	e.notificationState.Sealed(highestSealed)
 	return nil
 }
 
-func (e *executionDataRequesterImpl) missingBefore(current uint64, end uint64) ([]fetchRequest, error) {
-	missedHeights := []fetchRequest{}
+func (e *executionDataRequesterImpl) requestsFromSeals(seals []*flow.Seal) ([]fetchRequest, error) {
+	requests := []fetchRequest{}
 
-	for current < end {
-		e.log.Debug().Msgf("adding missed sealed height: %d, latest: %d", current, end)
-		missedBlock, err := e.blocks.ByHeight(current)
+	for _, seal := range seals {
+		sealedBlock, err := e.blocks.ByID(seal.BlockID)
+
 		if err != nil {
-			return nil, fmt.Errorf("failed to get block for height %d: %w", current, err)
+			return nil, fmt.Errorf("failed to lookup sealed block in protocol state db: %w", err)
 		}
 
-		missedHeights = append(missedHeights, fetchRequest{
-			blockID: missedBlock.ID(),
-			height:  current,
+		requests = append(requests, fetchRequest{
+			blockID:  seal.BlockID,
+			height:   sealedBlock.Header.Height,
+			resultID: seal.ResultID,
 		})
-
-		current++
 	}
 
-	return missedHeights, nil
+	return requests, nil
 }
 
 // Fetch Worker Methods
 
 func (e *executionDataRequesterImpl) fetchRequestProcessingLoop(ctx irrecoverable.SignalerContext) {
-
-	e.consumerMu.Lock()
-	workerID := e.workerCount
-	e.workerCount++
-	e.consumerMu.Unlock()
-
-	logger := e.log.With().Int("worker_id", workerID).Logger()
 	for {
+		// prioritize shutdowns
+		if util.CheckClosed(ctx.Done()) || util.CheckClosed(e.stop) {
+			return
+		}
+
+		select {
+		case request := <-e.fetchRetryRequests:
+			e.processFetchRequest(ctx, request)
+			continue
+		default:
+			// TODO: check for missed blocks
+			// we need a process finds blocks we wanted to retry, but were unable to put on the retry queue
+			// because it was full. It's ok if we requeue the same block more than once, since it will only
+			// fetch from the network once.
+			// Maybe, the status object can keep track of blocks we need to requeue? when we try
+			// to push a block only the retry queue and it fails, add it to the status object.
+			// when we get here (nothing on retry queue), check if there are any missed retries and enqueue
+			// as many as we can, and remove them from notification state.
+		}
+
 		select {
 		case <-ctx.Done():
 			return
 		case <-e.stop:
 			return
-		case <-e.fetchNotifier.Channel():
-			logger.Debug().Msgf("fetching available requests")
-			e.processAvailableFetchRequests(ctx)
-			logger.Debug().Msgf("done fetching requests")
+		case request := <-e.fetchRequests:
+			e.processFetchRequest(ctx, request)
 		}
-	}
-}
-
-func (e *executionDataRequesterImpl) processAvailableFetchRequests(ctx irrecoverable.SignalerContext) {
-
-	e.log.Debug().Msg("processing fetch requests")
-	for {
-		// retries get priority since the seal height is most likely lower
-		item, ok := e.fetchRetryQueue.Pop()
-		if ok {
-			e.processFetchRequest(ctx, item.(fetchRequest))
-			continue
-		}
-
-		// Check for missing backfills
-
-		item, ok = e.fetchQueue.Pop()
-		if ok {
-			e.processFetchRequest(ctx, item.(fetchRequest))
-			continue
-		}
-
-		// return when queue is empty
-		return
 	}
 }
 
@@ -448,9 +378,13 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 
 	logger.Debug().Msgf("processing fetch request for block %d", request.height)
 
-	executionData, err := e.byBlockID(ctx, request.blockID)
+	// The ExecutionResult contains the root CID for the block's execution data
+	result, err := e.results.ByBlockID(request.blockID)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to lookup execution result for block: %w", err))
+	}
 
-	logger.Debug().Msgf("done processing fetch request for block %d", request.height)
+	executionData, err := e.fetchExecutionData(ctx, result.ExecutionDataID)
 
 	if errors.Is(err, &state_synchronization.MalformedDataError{}) || errors.Is(err, &state_synchronization.BlobSizeLimitExceededError{}) {
 		// This means an execution result was sealed with an invalid execution data id (invalid data).
@@ -466,49 +400,42 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to get execution data for block")
 
-		accepted := e.fetchRetryQueue.Push(request)
-		if !accepted {
+		select {
+		case e.fetchRetryRequests <- request:
+		default:
 			logger.Warn().Msg("fetch retry queue is full")
-			// TODO: do I need to track this somewhere?
-			// will need a process that periodically re-queues missed requests
-			// possible solution: when retry queue is empty and there is a gap between next notify and last processed, requeue blocks in between
+			// TODO: track this in notification state
 			return nil
 		}
-
-		e.fetchNotifier.Notify()
 		return nil
 	}
+	logger.Debug().Msgf("Fetched execution data for block %d", request.height)
 
-	logger.Debug().Msgf("fetched execution data for height %d", request.height)
+	e.status.Fetched(request.height, request.blockID)
+	request.executionData = executionData
 
-	logger.Debug().Msgf("fetch queue has %d requests", e.fetchQueue.Len())
-	logger.Debug().Msgf("fetch retry queue has %d requests", e.fetchRetryQueue.Len())
-
-	accepted := e.cache.Put(request.height, executionData)
-	if !accepted {
-		logger.Warn().Msg("execution data cache is full")
+	logger.Debug().Msgf("Enqueueing notification request for execution data for block %d", request.height)
+	select {
+	case <-ctx.Done():
+		return nil
+	case <-e.stop:
+		return nil
+	case e.notifications <- request:
 	}
-
-	e.notificationState.Fetched(request.height, request.blockID)
-	e.notificationNotifier.Notify()
+	logger.Debug().Msgf("Sent requested notification for execution data for block %d", request.height)
 
 	return nil
 }
 
-// byBlockID fetches the ExecutionData for a block by its ID
-func (e *executionDataRequesterImpl) byBlockID(signalerCtx irrecoverable.SignalerContext, blockID flow.Identifier) (*state_synchronization.ExecutionData, error) {
-	// The ExecutionResult contains the root CID for the block's execution data
-	result, err := e.results.ByBlockID(blockID)
-	if err != nil {
-		signalerCtx.Throw(fmt.Errorf("failed to lookup execution result for block: %w", err))
-	}
+// fetchExecutionData fetches the ExecutionData by its ID
+func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier) (*state_synchronization.ExecutionData, error) {
 
 	ctx, cancel := context.WithTimeout(signalerCtx, fetchTimeout)
 	defer cancel()
 
 	// Fetch the ExecutionData for blockID from the blobstore. If it doesn't exist locally, it will
 	// be fetched from the network.
-	executionData, err := e.eds.Get(ctx, result.ExecutionDataID)
+	executionData, err := e.eds.Get(ctx, executionDataID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data for block: %w", err)
@@ -520,6 +447,7 @@ func (e *executionDataRequesterImpl) byBlockID(signalerCtx irrecoverable.Signale
 // Notification Worker Methods
 
 func (e *executionDataRequesterImpl) notificationProcessingLoop(ctx irrecoverable.SignalerContext) {
+	e.log.Warn().Msg("notification processing loop started")
 	for {
 		// prioritize shutdowns
 		if util.CheckClosed(ctx.Done()) || util.CheckClosed(e.stop) {
@@ -528,50 +456,92 @@ func (e *executionDataRequesterImpl) notificationProcessingLoop(ctx irrecoverabl
 
 		select {
 		case <-ctx.Done():
+			e.log.Warn().Msg("notification processing loop terminated")
 			return
 		case <-e.stop:
+			e.log.Warn().Msg("notification processing loop stopped")
 			return
-		case <-e.notificationNotifier.Channel():
-			e.processAvailableNotifications(ctx)
+		case request := <-e.notifications:
+			e.log.Debug().Msgf("received notification request for block %d", request.height)
+			e.processNotification(ctx, request)
 		}
 	}
 }
 
-func (e *executionDataRequesterImpl) processAvailableNotifications(ctx irrecoverable.SignalerContext) {
+// TODO: need a loop here to catch up if it ever falls behind
+func (e *executionDataRequesterImpl) processNotification(ctx irrecoverable.SignalerContext, request fetchRequest) {
+	logger := e.log.With().Str("process", "notifications").Logger()
+
+	logger.Debug().Msgf("processing notification request for block %d", request.height)
+
+	next, blockID, _ := e.status.NextNotification()
+
+	// if this isn't the next block to notify for, and it's not a duplicate notification, cache it
+	if blockID != request.blockID && next <= request.height {
+		logger.Debug().Msgf("adding execution data to cache for height %d", request.height)
+		accepted := e.cache.Put(request.height, request.executionData)
+		if !accepted {
+			logger.Warn().Msg("execution data cache is full")
+		}
+		logger.Debug().Msgf("cache %#v", e.cache.heights)
+	}
+
+	// process all available notifications
+	e.sendAllAvailableNotifications(ctx, request)
+}
+
+func (e *executionDataRequesterImpl) sendAllAvailableNotifications(ctx irrecoverable.SignalerContext, request fetchRequest) {
 	logger := e.log.With().Str("process", "notifications").Logger()
 	for {
-		next, blockID, ok := e.notificationState.NextNotification()
-		if !ok {
-			logger.Debug().Msg("no more notifications to process")
-			missing := e.notificationState.MissingHeights()
-			logger.Debug().Msgf("%#v", missing)
+		next, blockID, ok := e.status.NextNotification()
 
-			logger.Debug().Msgf("next should be %d", e.notificationState.lastNotified+1)
+		// we haven't finished fetching the next block to notify
+		if !ok {
+			logger.Debug().Msgf("waiting to notify for block %d", next)
+			logger.Debug().Msgf("lastNotified: %d, lastReceived: %d, lastSealed: %d, missing: %#v",
+				e.status.lastNotified,
+				e.status.lastReceived,
+				e.status.lastSealed,
+				e.status.MissingHeights(),
+			)
 			return
 		}
 
 		logger.Debug().Msgf("notifying for block %d", next)
 
-		executionData, ok := e.cache.Get(next)
+		executionData := request.executionData
+		if blockID != request.blockID {
+			executionData, ok = e.cache.Get(next)
+		}
+
 		if !ok {
 			logger.Debug().Msgf("execution data not in cache for block %d", next)
+			logger.Debug().Msgf("cache %#v", e.cache.heights)
 			// get it from disk
-			var err error
-			executionData, err = e.eds.Get(ctx, blockID)
+			result, err := e.results.ByBlockID(blockID)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("failed to lookup execution result for block: %w", err))
+			}
+
+			executionData, err = e.eds.Get(ctx, result.ExecutionDataID)
+
 			if err != nil {
 				// At this point the data has been downloaded and validated, so it should be available
-				// should this just delete the data and refetch?
-				// TODO: handle this better
+				// TODO: handle this better. should this just delete the data and refetch?
 				ctx.Throw(fmt.Errorf("failed to get execution data for block: %w", err))
 			}
 		}
+		// logger.Debug().Msgf("notifying data %#v %#v %#v", next, executionData, ok)
 
 		// send notifications
 		e.notifyConsumers(executionData)
 
 		// update notification manifest that we've sent notifications for this block height, and cleanup the cache
-		e.notificationState.Notified(next)
+		e.status.Notified(next)
 		e.cache.Delete(next)
+
+		logger.Debug().Msgf("removing ed cache data for height %d", next)
+		logger.Debug().Msgf("cache %#v", e.cache.heights)
 	}
 }
 
@@ -594,41 +564,47 @@ func (e *executionDataRequesterImpl) bootstrap(ctx irrecoverable.SignalerContext
 	// TODO: if this is a fresh start, we'll need to provide the latest sealed block height as the
 	// target to catch up to before starting the finalization loop
 
-	return e.checkDatastore(ctx, e.notificationState.lastReceived)
+	return e.checkDatastore(ctx, e.status.lastReceived)
 }
 
 func (e *executionDataRequesterImpl) loadSyncState(ctx irrecoverable.SignalerContext) error {
 
 	// TODO: load this from disk
 
-	err := e.notificationState.Load()
+	err := e.status.Load()
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to load notification state. using default")
-		e.notificationState = &status{}
+		e.status = &status{}
 		// TODO: check if error is not found or something else
 	}
 
-	if e.notificationState.halted {
+	if e.status.halted {
 		e.log.Error().Msg("HALTING REQUESTER: requester was halted on a previous run due to invalid data")
 		close(e.stop)
 		return ErrRequesterHalted
 	}
 
 	// defaults to the start block when booting with a fresh db
-	if e.notificationState.lastNotified == 0 {
-		e.notificationState.lastNotified = e.rootBlock.Header.Height
-		e.log.Debug().Msgf("setting lastNotified to root block height: %d", e.notificationState.lastNotified)
+	if e.status.lastNotified == 0 {
+		e.status.lastNotified = e.rootBlock.Header.Height
+		e.log.Debug().Msgf("setting lastNotified to root block height: %d", e.status.lastNotified)
 	}
 
 	// at boot, we only have the start block and last block notifications were sent for,
 	// then we scan through the db to find the other metrics.
-	e.notificationState.lastReceived = e.notificationState.lastNotified
-	e.notificationState.lastSealed = e.notificationState.lastNotified
+	e.status.lastReceived = e.status.lastNotified
+	e.status.lastSealed = e.status.lastNotified
+	e.status.lastProcessed = e.status.lastNotified
 
 	return nil
 }
 
 func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerContext, lastSealedHeight uint64) error {
+	// skip check if disabled
+	if !e.startupCheck {
+		return nil
+	}
+
 	genesis := e.rootBlock.Header.Height
 
 	// Search from genesis to the lastSealedHeight, and confirm data is still available for all heights
@@ -660,25 +636,16 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 
 		if exists {
 			// only track the state if this block needs a notification
-			if height > e.notificationState.lastNotified {
-				e.notificationState.Fetched(height, block.ID())
-				e.notificationNotifier.Notify()
+			if height > e.status.lastNotified {
+				e.status.Fetched(height, block.ID())
 			}
 			continue
 		}
 
 		// block until fetch is accepted
-		for {
-			request := fetchRequest{
-				blockID: block.ID(),
-				height:  height,
-			}
-			if accepted := e.fetchRetryQueue.Push(request); accepted {
-				e.fetchNotifier.Notify()
-				break
-			}
-			// TODO: don't use sleep
-			time.Sleep(100 * time.Millisecond)
+		e.fetchRetryRequests <- fetchRequest{
+			blockID: block.ID(),
+			height:  height,
 		}
 	}
 
@@ -729,7 +696,7 @@ func (e *executionDataRequesterImpl) checkMissing(ctx irrecoverable.SignalerCont
 
 	// possible solution: when retry queue is empty and there is a gap between next notify and last processed, requeue blocks in between
 
-	missing := e.notificationState.MissingHeights()
+	missing := e.status.MissingHeights()
 
 	if len(missing) == 0 {
 		return nil
@@ -745,17 +712,9 @@ func (e *executionDataRequesterImpl) checkMissing(ctx irrecoverable.SignalerCont
 
 		// TODO: do I want to block here?
 		// block until fetch is accepted
-		for {
-			request := fetchRequest{
-				blockID: block.ID(),
-				height:  height,
-			}
-			if accepted := e.fetchRetryQueue.Push(request); accepted {
-				e.fetchNotifier.Notify()
-				break
-			}
-			// TODO: don't use sleep
-			time.Sleep(100 * time.Millisecond)
+		e.fetchRetryRequests <- fetchRequest{
+			blockID: block.ID(),
+			height:  height,
 		}
 	}
 
