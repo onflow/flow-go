@@ -354,6 +354,8 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 	return nil
 }
 
+// ProcessFinalizedBlock performs pruning of stale data based on finalization event
+// removes pending blocks below the finalized height and prunes vote aggregator
 func (c *Core) ProcessFinalizedBlock(final *flow.Header) {
 	// remove all pending blocks at or below the finalized height
 	c.pending.PruneByHeight(final.Height)
