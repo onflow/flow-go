@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
@@ -209,4 +210,24 @@ func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
 	err = cs.engine.ProcessLocal(invalidEvent)
 	require.Error(cs.T(), err)
 	require.True(cs.T(), engine.IsIncompatibleInputTypeError(err))
+}
+
+// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+// Tests the whole processing pipeline.
+func (cs *ComplianceSuite) TestOnFinalizedBlock() {
+	finalizedBlock := unittest.BlockHeaderFixture()
+	cs.head = &finalizedBlock
+
+	done := atomic.NewBool(false)
+	cs.voteAggregator.On("PruneUpToView", finalizedBlock.View).Run(func(mock.Arguments) {
+		done.Toggle()
+	}).Return(nil).Once()
+	cs.engine.OnFinalizedBlock(finalizedBlock.ID())
+
+	// matching engine has at least 100ms ticks for processing events
+	time.Sleep(1 * time.Second)
+
+	require.Eventually(cs.T(), done.Load, time.Second, time.Millisecond*20)
+
+	cs.voteAggregator.AssertExpectations(cs.T())
 }
