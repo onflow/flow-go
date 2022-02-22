@@ -29,6 +29,7 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`assembling network and staking keys` +
 	`reading root block data` +
 	`reading root block votes` +
+	`read vote .*` +
 	`reading dkg data` +
 	`constructing root QC` +
 	`computing collection node clusters` +
