@@ -25,7 +25,11 @@ type ConduitFactory struct {
 	attacker insecure.AttackerClient
 }
 
-func NewCorruptibleConduitFactory(myId flow.Identifier, codec network.Codec) *ConduitFactory {
+func NewCorruptibleConduitFactory(chainId flow.ChainID, myId flow.Identifier, codec network.Codec) *ConduitFactory {
+	if chainId != flow.BftTestnet {
+		panic("illegal chain id for using corruptible conduit factory")
+	}
+
 	return &ConduitFactory{
 		myId:  myId,
 		codec: codec,
