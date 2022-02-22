@@ -25,7 +25,9 @@ type transactionPayloadCanonicalForm struct {
 }
 
 // TxSignatureData has the data regarding a signature
-type TxSignatureData struct {
+// transactionSignatureCanonicalForm is a standardized, low-level format used
+// to prepare transaction signatures for serialization and hashing.
+type transactionSignatureCanonicalForm struct {
 	SignerIndex uint
 	KeyID       uint
 	Signature   []byte
