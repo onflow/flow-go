@@ -424,8 +424,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		blockID := unittest.IdentifierFixture()
 
 		er := unittest.ExecutionResultFixture(
-			unittest.WithExecutionResultBlockID(blockID),
-			unittest.WithServiceEvents(2))
+			unittest.WithExecutionResultBlockID(blockID))
 
 		require.NoError(suite.T(), executionResults.Store(er))
 		require.NoError(suite.T(), executionResults.Index(blockID, er.ID()))
@@ -480,8 +479,8 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			require.Len(suite.T(), er.Chunks, len(executionResult.Chunks))
 			require.Len(suite.T(), er.ServiceEvents, len(executionResult.ServiceEvents))
 
-			assert.Equal(suite.T(), executionResult.BlockID[:], er.BlockId)
-			assert.Equal(suite.T(), executionResult.PreviousResultID[:], er.PreviousResultId)
+			assert.Equal(suite.T(), executionResult.BlockID, convert.MessageToIdentifier(er.BlockId))
+			assert.Equal(suite.T(), executionResult.PreviousResultID, convert.MessageToIdentifier(er.PreviousResultId))
 			assert.Equal(suite.T(), executionResult.ExecutionDataID, convert.MessageToIdentifier(er.ExecutionDataId))
 
 			for i, chunk := range executionResult.Chunks {
