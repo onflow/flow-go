@@ -146,6 +146,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpochPhase, "dynamic-startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpoch, "dynamic-startup-epoch", "current", "the target epoch for dynamic-startup, use \"current\" to start node in the current epoch")
 	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in which the node will check if it can start")
+
+	fnb.flags.BoolVar(&fnb.BaseConfig.InsecureSecretsDB, "--insecure-secrets-db", false, "allow the node to start up without an secrets DB encryption key")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -526,15 +528,17 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 	log := sutil.NewLogger(fnb.Logger)
 
 	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
-	// attempt to read an encryption key for the secrets DB from the canonical path
-	// TODO enforce encryption in an upcoming spork https://github.com/dapperlabs/flow-go/issues/5893
-	encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
-	if errors.Is(err, os.ErrNotExist) {
-		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
-	} else if err != nil {
-		fnb.Logger.Fatal().Err(err).Msg("failed to read secrets db encryption key")
-	} else {
-		opts = opts.WithEncryptionKey(encryptionKey)
+
+	if !fnb.InsecureSecretsDB {
+		// attempt to read an encryption key for the secrets DB from the canonical path
+		encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
+		if errors.Is(err, os.ErrNotExist) {
+			fnb.Logger.Fatal().Err(err).Msg("secrets db encryption key not found")
+		} else if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("failed to read secrets db encryption key")
+		} else {
+			opts = opts.WithEncryptionKey(encryptionKey)
+		}
 	}
 
 	secretsDB, err := bstorage.InitSecret(opts)

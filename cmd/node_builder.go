@@ -124,6 +124,7 @@ type BaseConfig struct {
 	datadir                         string
 	secretsdir                      string
 	secretsDBEnabled                bool
+	InsecureSecretsDB               bool
 	level                           string
 	metricsPort                     uint
 	BootstrapDir                    string
