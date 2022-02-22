@@ -120,7 +120,7 @@ func MakeID(entity interface{}) Identifier {
 	return id
 }
 
-func MakeIDFast(data *[]byte) Identifier {
+func MakeIDFromBytes(data *[]byte) Identifier {
 	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
 	var id Identifier
 	hash.ComputeSHA3_256((*[32]byte)(&id), *data)

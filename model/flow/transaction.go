@@ -24,7 +24,7 @@ type transactionPayloadCanonicalForm struct {
 	Authorizers               [][]byte
 }
 
-// TxSignatureData has the data regarding a signature
+// transactionSignatureCanonicalForm has the data regarding a signature
 // transactionSignatureCanonicalForm is a standardized, low-level format used
 // to prepare transaction signatures for serialization and hashing.
 type transactionSignatureCanonicalForm struct {
@@ -88,7 +88,7 @@ func (tb TransactionBody) Fingerprint() []byte {
 	// definition is exactly sync'd with any others.  The
 	// constraint is enforced with a test.
 	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-body-payload}
-	payload := PayloadData{
+	payload := transactionPayloadCanonicalForm{
 		Script:                    tb.Script,
 		Arguments:                 tb.Arguments,
 		ReferenceBlockID:          tb.ReferenceBlockID[:],
@@ -100,7 +100,7 @@ func (tb TransactionBody) Fingerprint() []byte {
 		Authorizers:               authorizers,
 	}
 	///%]]
-	signaturesPayload := make([]TxSignatureData, len(tb.PayloadSignatures))
+	signaturesPayload := make([]transactionSignatureCanonicalForm, len(tb.PayloadSignatures))
 
 	for i, s := range tb.PayloadSignatures {
 		signaturesPayload[i].SignerIndex = uint(s.SignerIndex) // int is not RLP-serializable
@@ -108,7 +108,7 @@ func (tb TransactionBody) Fingerprint() []byte {
 		signaturesPayload[i].Signature = s.Signature
 	}
 
-	signaturesEnvelope := make([]TxSignatureData, len(tb.EnvelopeSignatures))
+	signaturesEnvelope := make([]transactionSignatureCanonicalForm, len(tb.EnvelopeSignatures))
 
 	for i, s := range tb.EnvelopeSignatures {
 		signaturesEnvelope[i].SignerIndex = uint(s.SignerIndex) // int is not RLP-serializable
@@ -117,9 +117,9 @@ func (tb TransactionBody) Fingerprint() []byte {
 	}
 
 	retval := fingerprint.Fingerprint(struct {
-		Payload            PayloadData
-		PayloadSignatures  []TxSignatureData
-		EnvelopeSignatures []TxSignatureData
+		Payload            transactionPayloadCanonicalForm
+		PayloadSignatures  []transactionSignatureCanonicalForm
+		EnvelopeSignatures []transactionSignatureCanonicalForm
 	}{
 		Payload:            payload,
 		PayloadSignatures:  signaturesPayload,
@@ -401,7 +401,7 @@ func (tb *TransactionBody) PayloadMessage() []byte {
 	// definition is exactly sync'd with any others.  The
 	// constraint is enforced with a test.
 	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-body-payload}
-	payload := PayloadData{
+	payload := transactionPayloadCanonicalForm{
 		Script:                    tb.Script,
 		Arguments:                 tb.Arguments,
 		ReferenceBlockID:          tb.ReferenceBlockID[:],
@@ -429,7 +429,7 @@ func (tb *TransactionBody) EnvelopeMessage() []byte {
 	// definition is exactly sync'd with any others.  The
 	// constraint is enforced with a test.
 	///%[[ EQUALITY-PERF-CONSTRAINT {transaction-body-payload}
-	payload := PayloadData{
+	payload := transactionPayloadCanonicalForm{
 		Script:                    tb.Script,
 		Arguments:                 tb.Arguments,
 		ReferenceBlockID:          tb.ReferenceBlockID[:],
@@ -442,7 +442,7 @@ func (tb *TransactionBody) EnvelopeMessage() []byte {
 	}
 	///%]]
 
-	signatures := make([]TxSignatureData, len(tb.PayloadSignatures))
+	signatures := make([]transactionSignatureCanonicalForm, len(tb.PayloadSignatures))
 
 	for i, s := range tb.PayloadSignatures {
 		signatures[i].SignerIndex = uint(s.SignerIndex) // int is not RLP-serializable
@@ -451,8 +451,8 @@ func (tb *TransactionBody) EnvelopeMessage() []byte {
 	}
 
 	retval := fingerprint.Fingerprint(struct {
-		Payload           PayloadData
-		PayloadSignatures []TxSignatureData
+		Payload           transactionPayloadCanonicalForm
+		PayloadSignatures []transactionSignatureCanonicalForm
 	}{
 		payload,
 		signatures,
@@ -554,7 +554,7 @@ func (s TransactionSignature) ByteSize() int {
 }
 
 func (s TransactionSignature) Fingerprint() []byte {
-	return fingerprint.Fingerprint(TxSignatureData{
+	return fingerprint.Fingerprint(transactionSignatureCanonicalForm{
 		SignerIndex: uint(s.SignerIndex), // int is not RLP-serializable
 		KeyID:       uint(s.KeyIndex),    // int is not RLP-serializable
 		Signature:   s.Signature,
