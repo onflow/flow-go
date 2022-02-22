@@ -159,10 +159,16 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	return nil
 }
 
-// ProcessLocal processes an event originating on the local node.
+// ProcessLocal processes an event originating on the local node. For local messages,
+// we skip the message queue and immediately process the transaction, blocking
+// the caller until we are finished. This way, we can provide context to the
+// user about whether their transaction was accepted.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	// all errors are unexpected
-	return e.messageHandler.Process(e.me.NodeID(), event)
+	tx, ok := event.(*flow.TransactionBody)
+	if !ok {
+		return fmt.Errorf("local submission of non-transaction event type (%T) to ingest engine: %w", event, engine.IncompatibleInputTypeError)
+	}
+	return e.onTransaction(e.me.NodeID(), tx)
 }
 
 // SubmitLocal submits an event originating on the local node.
