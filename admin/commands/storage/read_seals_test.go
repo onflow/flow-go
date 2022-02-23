@@ -10,6 +10,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/model/flow"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -53,7 +54,7 @@ func TestReadSealsByID(t *testing.T) {
 	result, err := command.Handler(ctx, req)
 	require.NoError(t, err)
 
-	resultMap, err := convertToMap(seal)
+	resultMap, err := commands.ConvertToMap(seal)
 	require.NoError(t, err)
 
 	assert.DeepEqual(t, result, resultMap)
