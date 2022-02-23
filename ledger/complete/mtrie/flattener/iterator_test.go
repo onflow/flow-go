@@ -151,8 +151,8 @@ func TestUniqueNodeIterator(t *testing.T) {
 
 	t.Run("forest", func(t *testing.T) {
 
-		// Forest is a slice of mtries to guarantee order.
-		f := make([]*trie.MTrie, 0)
+		// tries is a slice of mtries to guarantee order.
+		var tries []*trie.MTrie
 
 		emptyTrie := trie.NewEmptyMTrie()
 
@@ -170,8 +170,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		trie1, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 		require.NoError(t, err)
 
-		f = append(f, trie1)
-
+		// trie1
 		//              n4
 		//             /
 		//            /
@@ -180,6 +179,8 @@ func TestUniqueNodeIterator(t *testing.T) {
 		//      /         \
 		//   n1 (p1/v1)     n2 (p2/v2)
 		//
+
+		tries = append(tries, trie1)
 
 		// New trie reuses its parent's left sub-trie.
 
@@ -197,8 +198,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		trie2, err := trie.NewTrieWithUpdatedRegisters(trie1, paths, payloads, true)
 		require.NoError(t, err)
 
-		f = append(f, trie2)
-
+		// trie2
 		//              n8
 		//             /   \
 		//            /      \
@@ -207,6 +207,8 @@ func TestUniqueNodeIterator(t *testing.T) {
 		//                /       \
 		//              n5         n6
 		//            (p3/v3)    (p4/v4)
+
+		tries = append(tries, trie2)
 
 		// New trie reuses its parent's right sub-trie, and left sub-trie's leaf node.
 
@@ -219,8 +221,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		trie3, err := trie.NewTrieWithUpdatedRegisters(trie2, paths, payloads, true)
 		require.NoError(t, err)
 
-		f = append(f, trie3)
-
+		// trie3
 		//              n11
 		//             /   \
 		//            /      \
@@ -229,6 +230,8 @@ func TestUniqueNodeIterator(t *testing.T) {
 		//       /       \
 		//     n9         n2
 		//  (p1/v5)    (shared)
+
+		tries = append(tries, trie3)
 
 		expectedNodes := []*node.Node{
 			// unique nodes from trie1
@@ -245,13 +248,12 @@ func TestUniqueNodeIterator(t *testing.T) {
 			trie3.RootNode().LeftChild().LeftChild(), // n9
 			trie3.RootNode().LeftChild(),             // n10
 			trie3.RootNode(),                         // n11
-
 		}
 
 		// Use visitedNodes to prevent revisiting shared sub-tries.
 		visitedNodes := make(map[*node.Node]uint64)
 		i := 0
-		for _, trie := range f {
+		for _, trie := range tries {
 			for itr := flattener.NewUniqueNodeIterator(trie, visitedNodes); itr.Next(); {
 				n := itr.Value()
 				visitedNodes[n] = uint64(i)
