@@ -124,11 +124,22 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 
 	t := timestamppb.New(h.Timestamp)
 
+	parentVoterIds := make([][]byte, len(h.ParentVoterIDs))
+	for i, parentVoterId := range h.ParentVoterIDs {
+		parentVoterIds[i] = parentVoterId[:]
+	}
+
 	return &entities.BlockHeader{
-		Id:        id[:],
-		ParentId:  h.ParentID[:],
-		Height:    h.Height,
-		Timestamp: t,
+		Id:                 id[:],
+		ParentId:           h.ParentID[:],
+		Height:             h.Height,
+		PayloadHash:        h.PayloadHash[:],
+		Timestamp:          t,
+		View:               h.View,
+		ParentVoterIds:     parentVoterIds,
+		ParentVoterSigData: h.ParentVoterSigData,
+		ProposerId:         h.ProposerID[:],
+		ProposerSigData:    h.ProposerSigData,
 	}, nil
 }
 
