@@ -2,10 +2,12 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -16,6 +18,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/util"
 
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
@@ -86,7 +91,13 @@ func (suite *Suite) TestPing() {
 	backend := New(
 		suite.state,
 		suite.colClient,
-		nil, nil, nil, nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -95,6 +106,7 @@ func (suite *Suite) TestPing() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	err := backend.Ping(context.Background())
@@ -110,7 +122,14 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -119,6 +138,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// query the handler for the latest finalized block
@@ -134,33 +154,329 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 }
 
-func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
-	// setup the snapshot mock
-	snap := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
-	suite.state.On("Final").Return(snap).Once()
+// TestGetLatestProtocolStateSnapshot_NoTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the sealing segment for the state requested at latest finalized  block does not contain any blocks that
+// spans an epoch or epoch phase transition.
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// blocks in current state
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit| <- G(S_E)
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
 
-	backend := New(
-		suite.state,
-		nil, nil, nil, nil,
-		nil, nil, nil, nil,
-		suite.chainID,
-		metrics.NewNoopCollector(),
-		nil,
-		false,
-		100,
-		nil,
-		nil,
-		suite.log,
-	)
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
 
-	// query the handler for the latest sealed snapshot
-	bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
-	suite.Require().NoError(err)
+		// setup AtBlockID mock returns for state
+		for _, height := range epoch1.Range() {
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height)).Once()
+		}
 
-	// make sure the returned bytes is equal to the serialized snapshot
-	convertedSnapshot, err := convert.SnapshotToBytes(snap)
-	suite.Require().NoError(err)
-	suite.Require().Equal(bytes, convertedSnapshot)
+		// Take snapshot at height of block D (epoch1.heights[3]) for valid segment and valid snapshot
+		// where it's sealing segment is B <- C <- D
+		snap := state.AtHeight(epoch1.Range()[3])
+		suite.state.On("Final").Return(snap).Once()
+
+		backend := New(
+			suite.state,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			100,
+			nil,
+			nil,
+			suite.log,
+			DefaultSnapshotHistoryLimit,
+		)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return the snapshot at the same height we requested
+		// because it has a valid sealing segment with no blocks spanning an epoch or phase transition
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetLatestProtocolStateSnapshot_TransitionSpans tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the sealing segment for the state requested for latest finalized block  contains a block that
+// spans an epoch transition and blocks that span epoch phase transitions.
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+
+		// building 2 epochs allows us to take a snapshot at a point in time where
+		// an epoch transition happens
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+		epoch2, ok := epochBuilder.EpochHeights(2)
+		require.True(suite.T(), ok)
+
+		// setup AtHeight mock returns for state
+		for _, height := range append(epoch1.Range(), epoch2.Range()...) {
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
+		}
+
+		// Take snapshot at height of the first block of epoch2, the sealing segment of this snapshot
+		// will have contain block spanning an epoch transition as well as an epoch phase transition.
+		// This will cause our GetLatestProtocolStateSnapshot func to return a snapshot
+		// at block with height 3, the first block of the staking phase of epoch1.
+
+		snap := state.AtHeight(epoch2.Range()[0])
+		suite.state.On("Final").Return(snap).Once()
+
+		backend := New(
+			suite.state,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			100,
+			nil,
+			nil,
+			suite.log,
+			DefaultSnapshotHistoryLimit,
+		)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().NoError(err)
+		fmt.Println()
+
+		// we expect the endpoint to return last valid snapshot which is the snapshot at block D (height 3)
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[3]))
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the sealing segment for the state requested at latest finalized  block contains a blocks that
+// spans an epoch phase transition.
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// blocks in current state
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit| <- G(S_E)
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// setup AtBlockID mock returns for state
+		for _, height := range epoch1.Range() {
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
+		}
+
+		// Take snapshot at height of block E (epoch1.heights[4]) the sealing segment for this snapshot
+		// is C(S_A) <- D(S_B) |setup| <- E(S_C) which spans the epoch setup phase. This will force
+		// our RPC endpoint to return a snapshot at block D which is the snapshot at the boundary where the phase
+		// transition happens.
+		snap := state.AtHeight(epoch1.Range()[4])
+		suite.state.On("Final").Return(snap).Once()
+
+		backend := New(
+			suite.state,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			100,
+			nil,
+			nil,
+			suite.log,
+			DefaultSnapshotHistoryLimit,
+		)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return last valid snapshot which is the snapshot at block D (height 3)
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[3]))
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetLatestProtocolStateSnapshot_EpochTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the sealing segment for the state requested at latest finalized  block contains a blocks that
+// spans an epoch transition.
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// blocks in current state
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit| <- G(S_E)
+		epochBuilder.BuildEpoch()
+
+		// add more blocks to our state in the commit phase, this will allow
+		// us to take a snapshot at the height where the epoch1 -> epoch2 transition
+		// and no block spans an epoch phase transition. The third block added will
+		// have a seal for the first block in the commit phase allowing us to avoid
+		// spanning an epoch phase transition.
+		epochBuilder.AddBlocksWithSeals(3, 1)
+		epochBuilder.CompleteEpoch()
+
+		// Now we build our second epoch
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+		epoch2, ok := epochBuilder.EpochHeights(2)
+		require.True(suite.T(), ok)
+
+		// setup AtHeight mock returns for state
+		for _, height := range append(epoch1.Range(), epoch2.Range()...) {
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
+		}
+
+		// Take snapshot at the first block of epoch2 . The sealing segment
+		// for this snapshot contains a block (highest) that spans the epoch1 -> epoch2
+		// transition.
+		snap := state.AtHeight(epoch2.Range()[0])
+		suite.state.On("Final").Return(snap).Once()
+
+		backend := New(
+			suite.state,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			100,
+			nil,
+			nil,
+			suite.log,
+			DefaultSnapshotHistoryLimit,
+		)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return last valid snapshot which is the snapshot at the final block
+		// of the previous epoch
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[len(epoch1.Range())-1]))
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetLatestProtocolStateSnapshot_EpochTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
+// where the length of the sealing segment is greater than the configured snapshotHistoryLimit
+func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state).BuildEpoch().CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// setup AtBlockID mock returns for state
+		for _, height := range epoch1.Range() {
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
+		}
+
+		// Take snapshot at height of block E (epoch1.heights[4]) the sealing segment for this snapshot
+		// is C(S_A) <- D(S_B) |setup| <- E(S_C) which spans the epoch setup phase. This will force
+		// our RPC endpoint to return a snapshot at block D which is the snapshot at the boundary where a phase
+		// transition happens.
+		snap := state.AtHeight(epoch1.Range()[4])
+		suite.state.On("Final").Return(snap).Once()
+
+		// very short history limit, any segment with any blocks spanning any transition should force the endpoint to return a history limit error
+		snapshotHistoryLimit := 1
+		backend := New(
+			suite.state,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			nil,
+			suite.log,
+			snapshotHistoryLimit,
+		)
+
+		// the handler should return a snapshot history limit error
+		_, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		suite.Require().ErrorIs(err, SnapshotHistoryLimitErr)
+	})
 }
 
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
@@ -172,8 +488,14 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil,
-		nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -182,6 +504,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// query the handler for the latest sealed block
@@ -209,9 +532,14 @@ func (suite *Suite) TestGetTransaction() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.transactions,
-		nil, nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -220,6 +548,7 @@ func (suite *Suite) TestGetTransaction() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
@@ -242,7 +571,10 @@ func (suite *Suite) TestGetCollection() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.collections,
 		suite.transactions,
 		nil,
@@ -255,6 +587,7 @@ func (suite *Suite) TestGetCollection() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
@@ -330,12 +663,13 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		suite.results,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		connFactory,
+		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
 		nil,
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// Successfully return empty event list
@@ -390,7 +724,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.assertAllExpectations()
 }
 
-// TestTransactionPendingToExpiredStatusTransition tests that the status
+// TestTransactionExpiredStatusTransition tests that the status
 // of transaction changes from Pending to Expired when enough blocks pass
 func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -454,6 +788,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// should return pending status when we have not observed an expiry block
@@ -605,12 +940,13 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		suite.results,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		connFactory,
+		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		100,
 		nil,
 		flow.IdentifierList(enIDs.NodeIDs()).Strings(),
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -667,6 +1003,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
@@ -697,9 +1034,14 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 	backend := New(
 		suite.state,
-		nil, nil,
+		nil,
+		nil,
 		suite.blocks,
-		nil, nil, nil, nil, nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -708,6 +1050,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	// query the handler for the latest finalized header
@@ -819,9 +1162,12 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
@@ -832,6 +1178,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -846,9 +1193,12 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			receipts,
 			nil,
 			suite.chainID,
@@ -857,8 +1207,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			false,
 			DefaultMaxHeightRange,
 			nil,
-			validENIDs.Strings(),
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request with an empty block id list and expect an empty list of events and no error
@@ -869,6 +1220,96 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	suite.assertAllExpectations()
 }
+
+func (suite *Suite) TestGetExecutionResultByID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	validExecutorIdentities := flow.IdentityList{}
+	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+
+	nonexistingID := unittest.IdentifierFixture()
+	blockID := unittest.IdentifierFixture()
+	executionResult := unittest.ExecutionResultFixture(
+		unittest.WithExecutionResultBlockID(blockID))
+
+	ctx := context.Background()
+
+	results := new(storagemock.ExecutionResults)
+	results.
+		On("ByID", nonexistingID).
+		Return(nil, storage.ErrNotFound)
+
+	results.
+		On("ByID", executionResult.ID()).
+		Return(executionResult, nil)
+
+	suite.Run("nonexisting execution result for id", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
+			suite.receipts,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
+			suite.log,
+			DefaultSnapshotHistoryLimit,
+		)
+
+		// execute request
+		_, err := backend.GetExecutionResultByID(ctx, nonexistingID)
+
+		assert.Error(suite.T(), err)
+	})
+
+	suite.Run("existing execution result id", func() {
+		// create the handler
+		backend := New(
+			suite.state,
+			nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
+			nil,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
+			suite.log,
+			DefaultSnapshotHistoryLimit,
+		)
+
+		// execute request
+		er, err := backend.GetExecutionResultByID(ctx, executionResult.ID())
+		suite.checkResponse(er, err)
+
+		require.Equal(suite.T(), executionResult, er)
+	})
+
+	results.AssertExpectations(suite.T())
+	suite.assertAllExpectations()
+}
+
 func (suite *Suite) TestGetExecutionResultByBlockID() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
@@ -881,7 +1322,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	blockID := unittest.IdentifierFixture()
 	executionResult := unittest.ExecutionResultFixture(
 		unittest.WithExecutionResultBlockID(blockID),
-		unittest.WIthServiceEvents(2))
+		unittest.WithServiceEvents(2))
 
 	ctx := context.Background()
 
@@ -901,9 +1342,12 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			suite.receipts,
 			results,
 			suite.chainID,
@@ -914,6 +1358,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			nil,
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -927,9 +1372,12 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, nil,
 			nil,
-			suite.headers, nil, nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			nil,
 			results,
 			suite.chainID,
@@ -938,8 +1386,9 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			false,
 			DefaultMaxHeightRange,
 			nil,
-			validENIDs.Strings(),
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -1072,17 +1521,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("invalid request max height < min height", func() {
 		backend := New(
 			suite.state,
-			nil, nil, nil, suite.headers, nil, nil,
+			nil,
+			nil,
+			nil,
+			suite.headers,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
 			nil,
 			nil,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
@@ -1104,20 +1559,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		// create handler
 		backend := New(
 			state,
-			nil, nil,
+			nil,
+			nil,
 			suite.blocks,
 			suite.headers,
-			nil, nil,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		// execute request
@@ -1138,20 +1596,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		backend := New(
 			state,
-			nil, nil,
+			nil,
+			nil,
 			suite.blocks,
 			suite.headers,
-			nil, nil,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1171,20 +1632,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		// create handler
 		backend := New(
 			state,
-			nil, nil,
+			nil,
+			nil,
 			suite.blocks,
 			suite.headers,
-			nil, nil,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			1, // set maximum range to 1
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
@@ -1204,20 +1668,23 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		// create handler
 		backend := New(
 			state,
-			nil, nil,
+			nil,
+			nil,
 			suite.blocks,
 			suite.headers,
-			nil, nil,
+			nil,
+			nil,
 			suite.receipts,
 			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			connFactory,
+			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			DefaultMaxHeightRange,
 			nil,
 			fixedENIdentifiersStr,
 			suite.log,
+			DefaultSnapshotHistoryLimit,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1277,19 +1744,23 @@ func (suite *Suite) TestGetAccount() {
 	// create the handler with the mock
 	backend := New(
 		suite.state,
-		nil, nil, nil,
+		nil,
+		nil,
+		nil,
 		suite.headers,
-		nil, nil,
+		nil,
+		nil,
 		suite.receipts,
 		suite.results,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		connFactory,
+		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1353,19 +1824,23 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	// create the handler with the mock
 	backend := New(
 		suite.state,
-		nil, nil, nil,
+		nil,
+		nil,
+		nil,
 		suite.headers,
-		nil, nil,
+		nil,
+		nil,
 		suite.receipts,
 		suite.results,
 		flow.Testnet,
 		metrics.NewNoopCollector(),
-		connFactory,
+		connFactory, // the connection factory should be used to get the execution node client
 		false,
 		DefaultMaxHeightRange,
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1385,9 +1860,15 @@ func (suite *Suite) TestGetNetworkParameters() {
 
 	expectedChainID := flow.Mainnet
 
-	backend := New(
-		nil, nil, nil, nil, nil, nil, nil,
-		nil, nil,
+	backend := New(nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 		flow.Mainnet,
 		metrics.NewNoopCollector(),
 		nil,
@@ -1396,6 +1877,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		nil,
 		nil,
 		suite.log,
+		DefaultSnapshotHistoryLimit,
 	)
 
 	params := backend.GetNetworkParameters(context.Background())
@@ -1531,6 +2013,78 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		preferredENs := allExecutionNodes[0:2]
 		expectedList := preferredENs
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
+	})
+}
+
+// TestExecuteScriptOnExecutionNode tests the method backend.scripts.executeScriptOnExecutionNode for script execution
+func (suite *Suite) TestExecuteScriptOnExecutionNode() {
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).
+		Return(suite.execClient, &mockCloser{}, nil)
+
+	// create the handler with the mock
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		nil,
+		suite.headers,
+		nil,
+		nil,
+		suite.receipts,
+		suite.results,
+		flow.Mainnet,
+		metrics.NewNoopCollector(),
+		connFactory, // the connection factory should be used to get the execution node client
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+	)
+
+	// mock parameters
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	script := []byte("dummy script")
+	arguments := [][]byte(nil)
+	executionNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	execReq := execproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments,
+	}
+	execRes := execproto.ExecuteScriptAtBlockIDResponse{
+		Value: []byte{4, 5, 6},
+	}
+
+	suite.Run("happy path script execution success", func() {
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).Return(&execRes, nil).Once()
+		res, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		suite.execClient.AssertExpectations(suite.T())
+		suite.checkResponse(res, err)
+	})
+
+	suite.Run("script execution failure returns status OK", func() {
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).
+			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
+		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		suite.execClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
+	})
+
+	suite.Run("execution node internal failure returns status code Internal", func() {
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, &execReq).
+			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
+		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		suite.execClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.Internal)
 	})
 }
 

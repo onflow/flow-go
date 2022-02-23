@@ -559,6 +559,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock)).
+		Uint64("height", executableBlock.Block.Header.Height).
 		Msg("executing block")
 
 	startedAt := time.Now()
@@ -625,6 +626,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("final_state", finalState[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
 		Bool("sealed", isExecutedBlockSealed).
 		Bool("broadcasted", broadcasted).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).

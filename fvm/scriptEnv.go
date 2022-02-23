@@ -85,7 +85,8 @@ func NewScriptEnvironment(
 	env.contracts = handler.NewContractHandler(
 		accounts,
 		true,
-		func() []common.Address { return []common.Address{} })
+		func() []common.Address { return []common.Address{} },
+		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
 	if ctx.BlockHeader != nil {
 		env.seedRNG(ctx.BlockHeader)

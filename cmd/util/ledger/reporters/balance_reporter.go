@@ -128,7 +128,16 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 		return
 	}
 
-	owner := common.BytesToAddress([]byte(id.Owner))
+	owner, err := common.BytesToAddress([]byte(id.Owner))
+	if err != nil {
+		r.Log.
+			Error().
+			Err(err).
+			Str("owner", id.Owner).
+			Msg("Could not decode owner")
+		return
+	}
+
 	decoder := interpreter.CBORDecMode.NewByteStreamDecoder(p.Value)
 
 	storable, err := interpreter.DecodeStorable(decoder, atree.StorageIDUndefined)

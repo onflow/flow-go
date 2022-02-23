@@ -2,6 +2,7 @@ package wal_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -168,7 +169,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "00000010")) //make sure we have enough segments saved
 		})
 
-		// create a new forest and reply WAL
+		// create a new forest and replay WAL
 		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
@@ -420,6 +421,58 @@ func Test_Checkpointing(t *testing.T) {
 	})
 }
 
+func TestCheckpointFileError(t *testing.T) {
+
+	unittest.RunWithTempDir(t, func(dir string) {
+
+		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+		require.NoError(t, err)
+
+		// create WAL
+
+		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
+		values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+		update, err := ledger.NewUpdate(ledger.State(trie.EmptyTrieRootHash()), keys, values)
+		require.NoError(t, err)
+
+		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
+		require.NoError(t, err)
+
+		err = wal.RecordUpdate(trieUpdate)
+		require.NoError(t, err)
+
+		// some buffer time of the checkpointer to run
+		time.Sleep(1 * time.Second)
+		<-wal.Done()
+
+		require.FileExists(t, path.Join(dir, "00000001")) //make sure WAL segment is saved
+
+		wal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+		require.NoError(t, err)
+
+		checkpointer, err := wal2.NewCheckpointer()
+		require.NoError(t, err)
+
+		t.Run("write error", func(t *testing.T) {
+			errWrite := errors.New("unexpected write error")
+
+			err = checkpointer.Checkpoint(1, func() (io.WriteCloser, error) {
+				return newWriteCloserWithErrors(errWrite, nil), nil
+			})
+			require.ErrorIs(t, err, errWrite)
+		})
+
+		t.Run("close error", func(t *testing.T) {
+			errClose := errors.New("unexpected close error")
+
+			err = checkpointer.Checkpoint(1, func() (io.WriteCloser, error) {
+				return newWriteCloserWithErrors(nil, errClose), nil
+			})
+			require.ErrorIs(t, err, errClose)
+		})
+	})
+}
+
 // randomlyModifyFile picks random byte and modifies it
 // this should be enough to cause checkpoint loading to fail
 // as it contains checksum
@@ -503,4 +556,24 @@ func loadIntoForest(forest *mtrie.Forest, forestSequencing *flattener.FlattenedF
 		}
 	}
 	return nil
+}
+
+type writeCloserWithErrors struct {
+	writeError error
+	closeError error
+}
+
+func newWriteCloserWithErrors(writeError error, closeError error) *writeCloserWithErrors {
+	return &writeCloserWithErrors{
+		writeError: writeError,
+		closeError: closeError,
+	}
+}
+
+func (wc *writeCloserWithErrors) Write(p []byte) (n int, err error) {
+	return 0, wc.writeError
+}
+
+func (wc *writeCloserWithErrors) Close() error {
+	return wc.closeError
 }

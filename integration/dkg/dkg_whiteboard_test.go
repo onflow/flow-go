@@ -1,11 +1,12 @@
 package dkg
 
 import (
-	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +83,7 @@ func createNode(
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgKeys, err := badger.NewBeaconPrivateKeys(core.Metrics, core.SecretsDB)
+	dkgState, err := badger.NewDKGState(core.Metrics, core.SecretsDB)
 	require.NoError(t, err)
 
 	// configure the state snapthost at firstBlock to return the desired
@@ -105,8 +106,11 @@ func createNode(
 	epochQuery.Add(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
+	snapshot.On("Phase").Return(flow.EpochPhaseStaking, nil)
+	snapshot.On("Head").Return(firstBlock, nil)
 	state := new(protocolmock.MutableState)
 	state.On("AtBlockID", firstBlock).Return(snapshot)
+	state.On("Final").Return(snapshot)
 	core.State = state
 
 	// brokerTunnel is used to communicate between the messaging engine and the
@@ -144,7 +148,7 @@ func createNode(
 		core.Log,
 		core.Me,
 		core.State,
-		dkgKeys,
+		dkgState,
 		dkg.NewControllerFactory(
 			controllerFactoryLogger,
 			core.Me,
@@ -158,9 +162,12 @@ func createNode(
 	// reactorEngine consumes the EpochSetupPhaseStarted event
 	core.ProtocolEvents.AddConsumer(reactorEngine)
 
+	safeBeaconKeys := badger.NewSafeBeaconPrivateKeys(dkgState)
+
 	node := node{
 		GenericNode:     core,
-		keyStorage:      dkgKeys,
+		dkgState:        dkgState,
+		safeBeaconKeys:  safeBeaconKeys,
 		messagingEngine: messagingEngine,
 		reactorEngine:   reactorEngine,
 	}
@@ -177,7 +184,6 @@ func TestWithWhiteboard(t *testing.T) {
 	// whiteboard is a shared object where DKG nodes can publish/read broadcast
 	// messages, as well as publish end results, using a special
 	// DKGContractClient.
-	// TODO: replace with a real smart-contract and emulator
 	whiteboard := newWhiteboard()
 
 	chainID := flow.Testnet
@@ -265,6 +271,8 @@ func TestWithWhiteboard(t *testing.T) {
 
 	t.Logf("there are %d result(s)", len(whiteboard.results))
 	assert.Equal(t, 1, len(whiteboard.results))
+	tag := "some tag"
+	hasher := crypto.NewBLSKMAC(tag)
 
 	for _, result := range whiteboard.results {
 		signers := whiteboard.resultSubmitters[flow.MakeID(result)]
@@ -274,21 +282,24 @@ func TestWithWhiteboard(t *testing.T) {
 
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
-	signers := make([]*signature.ThresholdProvider, 0, N)
+	beaconKeys := make([]crypto.PrivateKey, 0, N)
 	signatures := []crypto.Signature{}
-	indices := []uint{}
+	indices := []int{}
 	for i, n := range nodes {
-		priv, err := n.keyStorage.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+
+		// TODO: to replace with safeBeaconKeys
+		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
+		// epochLookup := epochs.NewEpochLookup(n.State)
+		// beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, n.safeBeaconKeys)
+		// beaconKey, err := beaconKeyStore.ByView(nextEpochSetup.FirstView)
+		beaconKeys = append(beaconKeys, beaconKey)
 
-		signer := signature.NewThresholdProvider("TAG", priv)
-		signers = append(signers, signer)
-
-		signature, err := signer.Sign(sigData)
+		signature, err := beaconKey.Sign(sigData, hasher)
 		require.NoError(t, err)
 
 		signatures = append(signatures, signature)
-		indices = append(indices, uint(i))
+		indices = append(indices, i)
 	}
 
 	// shuffle the signatures and indices before constructing the group
@@ -300,15 +311,13 @@ func TestWithWhiteboard(t *testing.T) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	// NOTE: Reconstruction doesn't require a tag or local, but is only accessible
-	// through the broader Provider API, hence the empty arguments.
-	thresholdSigner := signature.NewThresholdProvider("", nil)
-	groupSignature, err := thresholdSigner.Reconstruct(uint(len(nodes)), signatures, indices)
+	threshold := signature.RandomBeaconThreshold(len(nodes))
+	groupSignature, err := crypto.BLSReconstructThresholdSignature(len(nodes), threshold, signatures, indices)
 	require.NoError(t, err)
 
 	result := whiteboard.resultBySubmitter[nodes[0].Me.NodeID()]
 	groupPk := result.groupKey
-	ok, err := signers[0].Verify(sigData, groupSignature, groupPk)
+	ok, err := groupPk.Verify(groupSignature, sigData, hasher)
 	require.NoError(t, err)
 	assert.True(t, ok, "failed to verify threshold signature")
 }

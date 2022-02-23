@@ -58,6 +58,7 @@ type Engine struct {
 	httpServer          *http.Server
 	restServer          *http.Server
 	config              Config
+	chain               flow.Chain
 	unsecureGrpcAddress net.Addr
 	secureGrpcAddress   net.Addr
 	restAPIAddress      net.Addr
@@ -103,9 +104,6 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
 
-	// add the logging interceptor
-	interceptors = append(interceptors, loggingInterceptor(log)...)
-
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
 		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).unaryServerInterceptor
@@ -113,11 +111,12 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
 
-	if len(interceptors) > 0 {
-		// create a chained unary interceptor
-		chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
-		grpcOpts = append(grpcOpts, chainedInterceptors)
-	}
+	// add the logging interceptor, ensure it is innermost wrapper
+	interceptors = append(interceptors, loggingInterceptor(log)...)
+
+	// create a chained unary interceptor
+	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+	grpcOpts = append(grpcOpts, chainedInterceptors)
 
 	// create an unsecured grpc server
 	unsecureGrpcServer := grpc.NewServer(grpcOpts...)
@@ -136,8 +135,7 @@ func New(log zerolog.Logger,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 	}
 
-	backend := backend.New(
-		state,
+	backend := backend.New(state,
 		collectionRPC,
 		historicalAccessNodes,
 		blocks,
@@ -154,6 +152,7 @@ func New(log zerolog.Logger,
 		config.PreferredExecutionNodeIDs,
 		config.FixedExecutionNodeIDs,
 		log,
+		backend.DefaultSnapshotHistoryLimit,
 	)
 
 	eng := &Engine{
@@ -164,6 +163,7 @@ func New(log zerolog.Logger,
 		secureGrpcServer:   secureGrpcServer,
 		httpServer:         httpServer,
 		config:             config,
+		chain:              chainID.Chain(),
 	}
 
 	accessproto.RegisterAccessAPIServer(
@@ -332,8 +332,12 @@ func (e *Engine) serveREST() {
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	restAPIHandler := rest.NewHandlers(e.backend, e.log)
-	e.restServer = rest.NewServer(restAPIHandler, e.config.RESTListenAddr, e.log)
+	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log, e.chain)
+	if err != nil {
+		e.log.Err(err).Msg("failed to initialize the REST server")
+		return
+	}
+	e.restServer = r
 
 	l, err := net.Listen("tcp", e.config.RESTListenAddr)
 	if err != nil {

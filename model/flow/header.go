@@ -28,7 +28,7 @@ type Header struct {
 	Timestamp time.Time // Timestamp is the time at which this block was proposed.
 	// The proposer can choose any time, so this should not be trusted as accurate.
 
-	View uint64 // View is the view number at which this block was proposed.
+	View uint64 // View number at which this block was proposed.
 
 	ParentVoterIDs []Identifier // List of voters who signed the parent block.
 	// A quorum certificate can be extrated from the header.

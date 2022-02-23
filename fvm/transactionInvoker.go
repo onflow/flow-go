@@ -84,7 +84,7 @@ func (i *TransactionInvoker) Process(
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
 		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
-			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
+			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
 		sth.EnableLimitEnforcement()
@@ -132,7 +132,14 @@ func (i *TransactionInvoker) Process(
 			},
 		)
 		if err != nil {
-			txError = fmt.Errorf("transaction invocation failed: %w", errors.HandleRuntimeError(err))
+			var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
+			if errors.As(err, &interactionLimiExceededErr) {
+				// If it is this special interaction limit error, just set it directly as the tx error
+				txError = err
+			} else {
+				// Otherwise, do what we use to do
+				txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
+			}
 		}
 
 		// break the loop
@@ -158,6 +165,7 @@ func (i *TransactionInvoker) Process(
 	if feesError != nil {
 		txError = feesError
 	}
+
 	sth.EnableLimitEnforcement()
 
 	// applying contract changes
@@ -166,7 +174,7 @@ func (i *TransactionInvoker) Process(
 	// this needs to happen before checking limits, so that contract changes are committed to the state
 	updatedKeys, err := env.Commit()
 	if err != nil && txError == nil {
-		txError = fmt.Errorf("transaction invocation failed: %w", err)
+		txError = fmt.Errorf("transaction invocation failed when committing Environment: %w", err)
 	}
 
 	// if there is still no error check if all account storage limits are ok
@@ -196,7 +204,7 @@ func (i *TransactionInvoker) Process(
 
 		updatedKeys, err = env.Commit()
 		if err != nil && feesError == nil {
-			feesError = fmt.Errorf("transaction invocation failed: %w", err)
+			feesError = fmt.Errorf("transaction invocation failed after deducting fees: %w", err)
 		}
 
 		// if fee deduction fails just do clean up and exit
@@ -212,14 +220,6 @@ func (i *TransactionInvoker) Process(
 
 			return feesError
 		}
-	} else {
-		// transaction is ok, log as successful
-		i.logger.Info().
-			Str("txHash", txIDStr).
-			Uint64("blockHeight", blockHeight).
-			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
-			Int("retried", proc.Retried).
-			Msg("transaction executed successfully")
 	}
 
 	// if tx failed this will only contain fee deduction logs

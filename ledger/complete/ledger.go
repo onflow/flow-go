@@ -103,6 +103,32 @@ func (l *Ledger) InitialState() ledger.State {
 	return ledger.State(l.forest.GetEmptyRootHash())
 }
 
+// ValueSizes read the values of the given keys at the given state.
+// It returns value sizes in the same order as given registerIDs and errors (if any)
+func (l *Ledger) ValueSizes(query *ledger.Query) (valueSizes []int, err error) {
+	start := time.Now()
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
+	if err != nil {
+		return nil, err
+	}
+	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
+	valueSizes, err = l.forest.ValueSizes(trieRead)
+	if err != nil {
+		return nil, err
+	}
+
+	l.metrics.ReadValuesNumber(uint64(len(paths)))
+	readDuration := time.Since(start)
+	l.metrics.ReadDuration(readDuration)
+
+	if len(paths) > 0 {
+		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(paths))) * time.Nanosecond
+		l.metrics.ReadDurationPerItem(durationPerValue)
+	}
+
+	return valueSizes, err
+}
+
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
@@ -305,26 +331,6 @@ func (l *Ledger) ExportCheckpointAt(
 		payloadSize = newPayloadSize
 	}
 
-	// run reporters
-	for _, reporter := range reporters {
-		l.logger.Info().
-			Str("name", reporter.Name()).
-			Msg("starting reporter")
-
-		start := time.Now()
-		err = reporter.Report(payloads)
-		elapsed := time.Since(start)
-
-		l.logger.Info().
-			Str("timeTaken", elapsed.String()).
-			Str("name", reporter.Name()).
-			Msg("reporter done")
-		if err != nil {
-			return ledger.State(hash.DummyHash),
-				fmt.Errorf("error running reporter (%s): %w", reporter.Name(), err)
-		}
-	}
-
 	l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
 
 	// get paths
@@ -341,6 +347,10 @@ func (l *Ledger) ExportCheckpointAt(
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 	}
+
+	statecommitment := ledger.State(newTrie.RootHash())
+
+	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
 
 	l.logger.Info().Msg("creating a checkpoint for the new trie")
 
@@ -362,7 +372,33 @@ func (l *Ledger) ExportCheckpointAt(
 	}
 	writer.Close()
 
-	return ledger.State(newTrie.RootHash()), nil
+	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
+
+	l.logger.Info().Msgf("generating reports")
+
+	// run reporters
+	for _, reporter := range reporters {
+		l.logger.Info().
+			Str("name", reporter.Name()).
+			Msg("starting reporter")
+
+		start := time.Now()
+		err = reporter.Report(payloads)
+		elapsed := time.Since(start)
+
+		l.logger.Info().
+			Str("timeTaken", elapsed.String()).
+			Str("name", reporter.Name()).
+			Msg("reporter done")
+		if err != nil {
+			return ledger.State(hash.DummyHash),
+				fmt.Errorf("error running reporter (%s): %w", reporter.Name(), err)
+		}
+	}
+
+	l.logger.Info().Msgf("all reports genereated")
+
+	return statecommitment, nil
 }
 
 // MostRecentTouchedState returns a state which is most recently touched.

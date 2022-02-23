@@ -1,8 +1,8 @@
 package crypto
 
 import (
+	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/cadence/runtime"
 
@@ -16,7 +16,7 @@ func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byt
 	var hasher hash.Hasher
 
 	switch hashAlgo {
-	case hash.SHA2_256, hash.SHA3_256, hash.SHA2_384, hash.SHA3_384:
+	case hash.SHA2_256, hash.SHA3_256, hash.SHA2_384, hash.SHA3_384, hash.Keccak_256:
 		var err error
 		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
 			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
@@ -72,6 +72,8 @@ func RuntimeToCryptoHashingAlgorithm(s runtime.HashAlgorithm) hash.HashingAlgori
 		return hash.SHA3_384
 	case runtime.HashAlgorithmKMAC128_BLS_BLS12_381:
 		return hash.KMAC128
+	case runtime.HashAlgorithmKECCAK_256:
+		return hash.Keccak_256
 	default:
 		return hash.UnknownHashingAlgorithm
 	}
@@ -90,6 +92,8 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 		return runtime.HashAlgorithmSHA3_384
 	case hash.KMAC128:
 		return runtime.HashAlgorithmKMAC128_BLS_BLS12_381
+	case hash.Keccak_256:
+		return runtime.HashAlgorithmKECCAK_256
 	default:
 		return runtime.HashAlgorithmUnknown
 	}
@@ -124,25 +128,25 @@ func VerifySignatureFromRuntime(
 
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
-		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
+		return false, errors.NewValueErrorf(fmt.Sprintf("%d", signatureAlgorithm), "signature algorithm type not found")
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
-		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
+		return false, errors.NewValueErrorf(fmt.Sprintf("%d", hashAlgorithm), "hashing algorithm type not found")
 	}
 
 	// check ECDSA compatibilites
 	if sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1 {
 		// hashing compatibility
-		if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
+		if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 && hashAlgo != hash.Keccak_256 {
 			return false, errors.NewValueErrorf(sigAlgo.String(), "cannot use hashing algorithm type %s with signature signature algorithm type %s",
 				hashAlgo, sigAlgo)
 		}
 
-		// tag compatibility
-		if !tagECDSACheck(tag) {
-			return false, errors.NewValueErrorf(sigAlgo.String(), "tag %s is not supported", tag)
+		// tag length compatibility
+		if len(tag) > flow.DomainTagLength {
+			return false, errors.NewValueErrorf(tag, "tag length (%d) is larger than max length allowed (%d bytes).", len(tag), flow.DomainTagLength)
 		}
 
 		// check BLS compatibilites
@@ -155,7 +159,7 @@ func VerifySignatureFromRuntime(
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
-		return false, errors.NewValueErrorf(string(rawPublicKey), "cannot decode public key: %w", err)
+		return false, errors.NewValueErrorf(hex.EncodeToString(rawPublicKey), "cannot decode public key: %w", err)
 	}
 
 	valid, err := verifier.Verify(
@@ -170,28 +174,6 @@ func VerifySignatureFromRuntime(
 	}
 
 	return valid, nil
-}
-
-// check compatible tags with ECDSA
-//
-// Only tags with a prefix flow.UserTagString and zero paddings are accepted.
-func tagECDSACheck(tag string) bool {
-
-	if len(tag) > flow.DomainTagLength ||
-		!strings.HasPrefix(tag, flow.UserTagString) {
-
-		return false
-	}
-
-	// check the remaining bytes are zeros
-	remaining := tag[len(flow.UserTagString):]
-	for _, b := range []byte(remaining) {
-		if b != 0 {
-			return false
-		}
-	}
-
-	return true
 }
 
 type SignatureVerifier interface {
@@ -221,7 +203,7 @@ func (DefaultSignatureVerifier) Verify(
 	var hasher hash.Hasher
 
 	switch hashAlgo {
-	case hash.SHA2_256, hash.SHA3_256:
+	case hash.SHA2_256, hash.SHA3_256, hash.Keccak_256:
 		var err error
 		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
 			return false, errors.NewValueErrorf(err.Error(), "verification failed")
