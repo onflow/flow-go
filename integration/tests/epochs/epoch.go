@@ -210,11 +210,11 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// replace access_2, avoid replacing access_1 the container used for client connections
 	if role == flow.RoleAccess {
-		containerToReplace = s.getContainerToReplace(role, "access_2")
+		containerToReplace = s.net.ContainerByName("access_2")
 		require.NotNil(s.T(), containerToReplace)
 	} else {
 		// grab the first container of this node role type, this is the container we will replace
-		containerToReplace = s.getContainerToReplace(role, "")
+		containerToReplace = s.getContainerToReplace(role)
 		require.NotNil(s.T(), containerToReplace)
 	}
 
