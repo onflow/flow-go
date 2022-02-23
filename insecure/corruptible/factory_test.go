@@ -17,7 +17,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestRegisterAdapter(t *testing.T) {
+// TestRegisterAdapter_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one adapter.
+func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec())
 
 	adapter := &mocknetwork.Adapter{}
