@@ -417,3 +417,19 @@ type PingMetrics interface {
 	// NodeInfo tracks the software version, sealed height and hotstuff view of a node
 	NodeInfo(node *flow.Identity, nodeInfo string, version string, sealedHeight uint64, hotstuffCurView uint64)
 }
+
+type HeroCacheMetrics interface {
+	// BucketsWithAvailableSlotsCount keeps track of number of buckets with certain available number of slots.
+	BucketsWithAvailableSlotsCount(uint64, uint64)
+
+	// OnNewEntityAdded is called whenever a new entity is successfully added to the cache.
+	OnNewEntityAdded()
+
+	// OnEntityEjected is called whenever adding a new entity to the cache results in ejection of another entity.
+	// This normally happens when the cache is full.
+	OnEntityEjected()
+
+	OnKeyReplaced()
+	OnDuplicateEntityDropped()
+	Size(uint64)
+}

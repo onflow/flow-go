@@ -262,7 +262,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	}
 
 	c.slotCount++
-	entityIndex := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
+	entityIndex, ejection := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
 	c.buckets[b].slots[slotToUse].slotAge = c.slotCount
 	c.buckets[b].slots[slotToUse].entityIndex = entityIndex
 	c.buckets[b].slots[slotToUse].entityId32of256 = entityId32of256
