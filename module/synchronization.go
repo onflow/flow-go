@@ -3,7 +3,6 @@
 package module
 
 import (
-	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -47,7 +46,7 @@ type ActiveRange interface {
 type TargetFinalizedHeight interface {
 	// Update processes a height received from a Sync Height Response
 	// and updates the finalized height estimate.
-	Update(height uint64, originID peer.ID)
+	Update(height uint64, originID flow.Identifier)
 
 	// Get returns the estimated finalized height of the overall chain.
 	Get() uint64

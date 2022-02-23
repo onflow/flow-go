@@ -99,7 +99,7 @@ func NewEngine(
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
 		engineLog,
-		engine.NewNotifier(),
+		module.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterBlockProposal)
