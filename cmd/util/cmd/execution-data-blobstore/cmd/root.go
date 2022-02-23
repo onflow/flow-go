@@ -45,19 +45,18 @@ func initBlobservice() (network.BlobService, datastore.Batching) {
 		log.Fatal().Err(err).Msg("could not init badger datastore")
 	}
 
-	bstore := blockstore.NewBlockstore(ds)
+	blockStore := blockstore.NewBlockstore(ds)
 
-	blockService := blockservice.New(bstore, nil)
+	blockService := blockservice.New(blockStore, nil)
 
-	bs := new(mocknetwork.BlobService)
+	blobService := new(mocknetwork.BlobService)
 
-	bs.
-		On("GetBlobs", mock.Anything, mock.AnythingOfType("[]cid.Cid")).
+	blobService.On("GetBlobs", mock.Anything, mock.AnythingOfType("[]cid.Cid")).
 		Return(func(ctx context.Context, ks []cid.Cid) <-chan blobs.Blob {
 			return blockService.GetBlocks(ctx, ks)
 		})
 
-	return bs, ds
+	return blobService, ds
 }
 
 func init() {
