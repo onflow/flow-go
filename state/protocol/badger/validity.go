@@ -340,15 +340,7 @@ func validateRootQC(snap protocol.Snapshot) error {
 // validateClusterQC performs QC validation of single collection cluster
 // Returns nil on success
 func validateClusterQC(cluster protocol.Cluster) error {
-	clusterBlock := cluster.RootBlock()
-	clusterRootBlock := &model.Block{
-		BlockID:     clusterBlock.ID(),
-		View:        clusterBlock.Header.View,
-		ProposerID:  clusterBlock.Header.ProposerID,
-		QC:          nil,
-		PayloadHash: clusterBlock.Header.PayloadHash,
-		Timestamp:   clusterBlock.Header.Timestamp,
-	}
+	clusterRootBlock := model.GenesisBlockFromFlow(cluster.RootBlock().Header)
 
 	committee, err := committees.NewStaticCommittee(cluster.Members(), flow.Identifier{}, nil, nil)
 	if err != nil {
