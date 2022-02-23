@@ -5,10 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
@@ -74,6 +72,8 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
+	// For this test we use a mock attacker, that puts the incoming messages into a channel. Then in this test we keep reading from that channel till
+	// either a message arrives or a timeout. Reading a message from that channel means attackers Observe has been called.
 	var receivedMsg *insecure.Message
 	unittest.RequireReturnsBefore(t, func() {
 		receivedMsg = <-attacker.incomingBuffer
@@ -213,13 +213,4 @@ func TestEngineClosingChannel(t *testing.T) {
 	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, adapter)
-}
-
-type mockAttacker struct {
-	incomingBuffer chan *insecure.Message
-}
-
-func (m *mockAttacker) Observe(_ context.Context, in *insecure.Message, _ ...grpc.CallOption) (*empty.Empty, error) {
-	m.incomingBuffer <- in
-	return &empty.Empty{}, nil
 }
