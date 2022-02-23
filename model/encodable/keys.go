@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"../flow/rlp"
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/flow-go/model/flow/rlp"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/crypto"
