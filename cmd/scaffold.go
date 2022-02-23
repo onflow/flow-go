@@ -294,6 +294,13 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 		}
 		fnb.RegisterDefaultAdminCommands()
 		fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			// set up all admin commands
+			for commandName, commandFunc := range fnb.adminCommands {
+				command := commandFunc(fnb.NodeConfig)
+				fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+				fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
+			}
+
 			var opts []admin.CommandRunnerOption
 
 			if node.AdminCert != NotSet {
@@ -1035,8 +1042,6 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 		}
 	}
 
-	fnb.EnqueueAdminServerInit()
-
 	fnb.EnqueueTracer()
 
 	return nil
@@ -1107,12 +1112,7 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		}
 	}
 
-	// set up all admin commands
-	for commandName, commandFunc := range fnb.adminCommands {
-		command := commandFunc(fnb.NodeConfig)
-		fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
-		fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
-	}
+	fnb.EnqueueAdminServerInit()
 
 	// run all modules
 	for _, f := range fnb.modules {

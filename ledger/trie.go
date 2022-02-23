@@ -3,6 +3,7 @@ package ledger
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	cryptoHash "github.com/onflow/flow-go/crypto/hash"
@@ -13,6 +14,10 @@ import (
 // Path captures storage path of a payload;
 // where we store a payload in the ledger
 type Path hash.Hash
+
+func (p Path) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(p[:]))
+}
 
 // DummyPath is an arbitrary path value, used in function error returns.
 var DummyPath = Path(hash.DummyHash)
@@ -146,6 +151,10 @@ func (u *TrieUpdate) Equals(other *TrieUpdate) bool {
 
 // RootHash captures the root hash of a trie
 type RootHash hash.Hash
+
+func (rh RootHash) MarshalJSON() ([]byte, error) {
+	return json.Marshal(rh.String())
+}
 
 func (rh RootHash) String() string {
 	return hex.EncodeToString(rh[:])
