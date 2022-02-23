@@ -462,10 +462,9 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
 			}
-			parsedExecResult, err := convert.ExecResultProtoToFlowExecResult(resp.ExecutionResult)
+			parsedExecResult, err := convert.ProtoToExecutionResult(resp.ExecutionResult)
 			require.NoError(suite.T(), err)
 			assert.Equal(suite.T(), parsedExecResult, executionResult)
-			assert.EqualValues(suite.T(), parsedExecResult, executionResult)
 			assert.Equal(suite.T(), parsedExecResult.ID(), executionResult.ID())
 		}
 

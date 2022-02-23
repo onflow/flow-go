@@ -395,40 +395,39 @@ func BytesToInmemSnapshot(bytes []byte) (*inmem.Snapshot, error) {
 	return inmem.SnapshotFromEncodable(encodable), nil
 }
 
-func ExecResultProtoToFlowExecResult(proto *entities.ExecutionResult) (*flow.ExecutionResult, error) {
+func ProtoToExecutionResult(proto *entities.ExecutionResult) (*flow.ExecutionResult, error) {
 	// convert Chunks
 	parsedChunks := make(flow.ChunkList, len(proto.Chunks))
-	for i := 0; i < len(proto.Chunks); i++ {
-		startState, err := flow.ToStateCommitment(proto.Chunks[i].StartState)
+	for i, chunk := range proto.Chunks {
+		startState, err := flow.ToStateCommitment(chunk.StartState)
 		if err != nil {
 			return nil, err
 		}
-		endState, err := flow.ToStateCommitment(proto.Chunks[i].EndState)
+		endState, err := flow.ToStateCommitment(chunk.EndState)
 		if err != nil {
 			return nil, err
 		}
 		chunkBody := flow.ChunkBody{
-			CollectionIndex:      uint(proto.Chunks[i].CollectionIndex),
+			CollectionIndex:      uint(chunk.CollectionIndex),
 			StartState:           startState,
-			EventCollection:      MessageToIdentifier(proto.Chunks[i].EventCollection),
-			BlockID:              MessageToIdentifier(proto.Chunks[i].BlockId),
-			TotalComputationUsed: proto.Chunks[i].TotalComputationUsed,
-			NumberOfTransactions: uint64(proto.Chunks[i].NumberOfTransactions),
+			EventCollection:      MessageToIdentifier(chunk.EventCollection),
+			BlockID:              MessageToIdentifier(chunk.BlockId),
+			TotalComputationUsed: chunk.TotalComputationUsed,
+			NumberOfTransactions: uint64(chunk.NumberOfTransactions),
 		}
 		parsedChunks[i] = &flow.Chunk{
 			ChunkBody: chunkBody,
-			Index:     proto.Chunks[i].Index,
+			Index:     chunk.Index,
 			EndState:  endState,
 		}
 	}
 	// convert ServiceEvents
 	parsedServiceEvents := make(flow.ServiceEventList, len(proto.ServiceEvents))
-	for i := 0; i < len(proto.ServiceEvents); i++ {
+	for i, serviceEvent := range proto.ServiceEvents {
 		var event interface{}
-		rawEvent := proto.ServiceEvents[i].Payload
+		rawEvent := serviceEvent.Payload
 		// map keys correctly
-		tp := proto.ServiceEvents[i].Type
-		switch tp {
+		switch serviceEvent.Type {
 		case flow.ServiceEventSetup:
 			setup := new(flow.EpochSetup)
 			err := json.Unmarshal(rawEvent, setup)
@@ -444,11 +443,10 @@ func ExecResultProtoToFlowExecResult(proto *entities.ExecutionResult) (*flow.Exe
 			}
 			event = commit
 		default:
-			return nil, fmt.Errorf("invalid event type: %s", tp)
-
+			return nil, fmt.Errorf("invalid event type: %s", serviceEvent.Type)
 		}
 		parsedServiceEvents[i] = flow.ServiceEvent{
-			Type:  proto.ServiceEvents[i].Type,
+			Type:  serviceEvent.Type,
 			Event: event,
 		}
 	}
