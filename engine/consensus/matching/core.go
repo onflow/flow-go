@@ -186,7 +186,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		Uint64("block_view", executedBlock.View).
 		Uint64("block_height", executedBlock.Height).
 		Logger()
-	log.Debug().Msg("execution receipt received")
+	log.Info().Msg("execution receipt received")
 
 	// if Execution Receipt is for block whose height is lower or equal to already sealed height
 	//  => drop Receipt
