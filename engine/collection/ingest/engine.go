@@ -292,6 +292,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// check if the transaction is valid
 	err = e.transactionValidator.Validate(tx)
 	if err != nil {
+		log.Debug().Err(err).Msg("trace - transaction failed validation")
 		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}
 
@@ -300,6 +301,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// get the locally assigned cluster and the cluster responsible for the transaction
 	txCluster, ok := clusters.ByTxID(txID)
 	if !ok {
+		log.Debug().Msg("trace - no cluster for transaction")
 		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
 	}
 
@@ -314,14 +316,17 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		// the reference epoch
 		refIdentities, err := refEpoch.InitialIdentities()
 		if err != nil {
+			e.log.Debug().Err(err).Msg("trace - cannot get initial identities")
 			return fmt.Errorf("could not get initial identities for reference epoch: %w", err)
 		}
 
 		if _, ok := refIdentities.ByNodeID(e.me.NodeID()); ok {
+			e.log.Debug().Msg("trace - cannot get cluster for this node when it should have one")
 			// CAUTION: we are a member of the epoch, but have no assigned cluster!
 			// This is an unexpected condition and indicates a protocol state invariant has been broken
 			return fmt.Errorf("this node should have an assigned cluster in epoch (counter=%d), but has none", epochCounter)
 		}
+		e.log.Debug().Msg("trace - node not assigned cluster (expected case)")
 		return engine.NewUnverifiableInputError("this node is not assigned a cluster in epoch (counter=%d)", epochCounter)
 	}
 
