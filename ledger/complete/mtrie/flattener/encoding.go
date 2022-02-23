@@ -239,7 +239,6 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 
 	// Decode and create hash.Hash (32 bytes)
 	nodeHash, err := hash.ToHash(scratch[pos : pos+encHashSize])
-	pos += encHashSize
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode hash of serialized node: %w", err)
 	}
