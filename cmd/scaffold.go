@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -120,6 +121,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultConfig.profilerDuration,
 		"the duration to run the auto-profile for")
+	fnb.flags.IntVar(&fnb.BaseConfig.profilerMemProfileRate, "profiler-mem-profile-rate", defaultConfig.profilerMemProfileRate,
+		"controls the fraction of memory allocations that are recorded and reported in the memory profile. 0 means turn off heap profiling entirely")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
 	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
@@ -456,6 +459,8 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
+	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
+	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
 	if !fnb.BaseConfig.profilerEnabled {
 		return
 	}
