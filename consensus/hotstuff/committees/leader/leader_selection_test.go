@@ -72,7 +72,7 @@ func TestBsearch(t *testing.T) {
 	}
 	sel := make([]int, 0, 10)
 	for i := 0; i < 10; i++ {
-		index := binarySearch(uint64(i), sums)
+		index := binarySearchStrictlyBigger(uint64(i), sums)
 		sel = append(sel, index)
 	}
 	require.Equal(t, []int{0, 1, 1, 2, 2, 2, 3, 3, 3, 3}, sel)
