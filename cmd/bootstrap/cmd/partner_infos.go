@@ -39,8 +39,8 @@ var (
 	flagNetworkEnv   string
 )
 
-// PartnerStakesInfo mapping of NodeID => weight of staking key
-type PartnerStakesInfo map[flow.Identifier]uint64
+// partnerStakesInfo mapping of NodeID => weight of staking key
+type partnerStakesInfo map[flow.Identifier]uint64
 
 // populatePartnerInfos represents the `populate-partner-infos` command which will read the proposed node
 // table from the staking contract and for each identity in the proposed table generate a node-info-pub
@@ -68,7 +68,7 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 
 	flowClient := getFlowClient()
 
-	partnerStakes := make(PartnerStakesInfo)
+	partnerStakes := make(partnerStakesInfo)
 	skippedNodes := 0
 	numOfPartnerNodesByRole := map[flow.Role]int{
 		flow.RoleCollection:   0,
@@ -211,14 +211,14 @@ func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
 }
 
 // writePartnerStakesFile writes the partner stakes file
-func writePartnerStakesFile(partnerStakes PartnerStakesInfo) {
+func writePartnerStakesFile(partnerStakes partnerStakesInfo) {
 	writeJSON(bootstrap.FileNamePartnerStakes, partnerStakes)
 }
 
 func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes, skippedNodes int) {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("Number of flow nodes skipped: %d\n", skippedNodes))
-	builder.WriteString(fmt.Sprintf("Number of partner nodes: %d\n", totalNumOfPartnerNodes))
+	builder.WriteString(fmt.Sprintf("Total number of flow nodes (skipped): %d\n", skippedNodes))
+	builder.WriteString(fmt.Sprintf("Total number of partner nodes: %d\n", totalNumOfPartnerNodes))
 	builder.WriteString("Number of partner nodes by role:")
 	for role, count := range numOfNodesByType {
 		builder.WriteString(fmt.Sprintf("\t%s : %d", role, count))
