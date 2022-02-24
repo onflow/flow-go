@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var (
+const (
 	getInfoForProposedNodesScript = `
 		import FlowIDTableStaking from 0x%s
 		pub fun main(): [FlowIDTableStaking.NodeInfo] {
