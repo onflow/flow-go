@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -455,4 +456,12 @@ func (sk *PrKeyBLSBLS12381) signWithXMDSHA256(data []byte) Signature {
 		(*C.uchar)(&hash[0]),
 		(C.int)(len(hash)))
 	return s
+}
+
+func CallCgo() {
+	C.callC()
+}
+
+func CallGo() {
+
 }

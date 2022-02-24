@@ -45,8 +45,8 @@ else
     MARCH="-march=native"
 fi
 
-# Set RELIC config for Flow
-COMP=(-DCFLAGS="-O3 -funroll-loops -fomit-frame-pointer ${MARCH} -mtune=native")
+# Set RELIC config for Flow #-mtune=native")
+COMP=(-DCFLAGS="-O3 -funroll-loops -fomit-frame-pointer ${MARCH} ")
 GENERAL=(-DTIMER=CYCLE -DCHECK=OFF -DVERBS=OFF)
 LIBS=(-DSHLIB=OFF -DSTLIB=ON)
 RAND=(-DRAND=HASHD -DSEED=)

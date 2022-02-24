@@ -470,3 +470,7 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
     free(pks);
     bn_free(r);   
 }
+
+void  callC(){
+
+}

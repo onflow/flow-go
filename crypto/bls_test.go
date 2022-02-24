@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -938,4 +939,21 @@ func BenchmarkAggregate(b *testing.B) {
 		}
 		b.StopTimer()
 	})
+}
+
+func BenchmarkZZZCGO(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		CallCgo()
+	}
+	b.StopTimer() // call `C.(void f() {})` b.N times
+}
+
+// BenchmarkGo must be called with `-gcflags -l` to avoid inlining.
+func BenchmarkZZZGo(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		CallGo()
+	}
+	b.StopTimer() // call `func() {}` b.N times
 }
