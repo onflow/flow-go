@@ -498,25 +498,39 @@ func (suite *ExecutionDataRequesterSuite) TestBootstrapFromExistingStateMidSpork
 
 }
 
-// Tests that blocks that are missed are properly retried and backfilled
+// Tests that blocks that are missed are properly retried and notifications are received in order
 func TestRequestBlocksWithSomeMissed(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
-	missingHeight := uint64(50)
-	attempts := 0
-	testData := generateTestData(ctx, t, 100, map[uint64]testExecutionDataCallback{
-		missingHeight: func(ed *state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error) {
-			if attempts < 1*2 { // this func is run twice for every attempt by the mock (once for ExecutionData one for errors)
+	blockCount := 10000
+
+	rand.Seed(time.Now().UnixMilli())
+
+	// every third block fails to download 3 times before succeeding
+	missing := map[uint64]testExecutionDataCallback{}
+
+	for i := uint64(0); i < uint64(blockCount); i++ {
+		if i%3 > 0 {
+			continue
+		}
+
+		failures := rand.Intn(10)
+		attempts := 0
+		missing[i] = func(ed *state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error) {
+			if attempts < failures*2 { // this func is run twice for every attempt by the mock (once for ExecutionData one for errors)
 				attempts++
-				// This should fail the first 4 fetch attempts
+				// This should fail the first n fetch attempts
+				time.Sleep(time.Duration(rand.Intn(25)) * time.Millisecond)
 				return nil, errors.New("simulating fetch error")
 			}
 			return ed, nil
-		},
-	})
+		}
+	}
+
+	testData := generateTestData(ctx, t, blockCount, missing)
 
 	blocks := mockBlocksStorage(testData.blocksByID, testData.blocksByHeight)
 	results := mockResultsStorage(testData.resultsByID)
@@ -541,7 +555,7 @@ func TestRequestBlocksWithSomeMissed(t *testing.T) {
 
 	finalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 
-	runFetch(t, ctx, edr, finalizationDistributor, testData)
+	runRequesterTest(t, ctx, edr, finalizationDistributor, testData)
 }
 
 // Tests that blocks that are missed are properly retried and backfilled
@@ -593,7 +607,7 @@ func TestRequestBlocksWithRandomDelays(t *testing.T) {
 
 	finalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 
-	runFetch(t, ctx, edr, finalizationDistributor, testData)
+	runRequesterTest(t, ctx, edr, finalizationDistributor, testData)
 }
 
 func TestHappyCase(t *testing.T) {
@@ -687,7 +701,7 @@ func TestHappyCase(t *testing.T) {
 
 	finalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 
-	runFetch(t, ctx, edr, finalizationDistributor, &fetchTestRun{
+	runRequesterTest(t, ctx, edr, finalizationDistributor, &fetchTestRun{
 		sealedCount:       sealedCount,
 		startHeight:       startHeight,
 		endHeight:         endHeight,
@@ -710,7 +724,7 @@ type fetchTestRun struct {
 	expectedIrrecoverable error
 }
 
-func runFetch(t *testing.T, ctx context.Context, edr ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) {
+func runRequesterTest(t *testing.T, ctx context.Context, edr ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) {
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go irrecoverableNotExpected(t, ctx, errChan)
 
@@ -755,7 +769,7 @@ func runFetch(t *testing.T, ctx context.Context, edr ExecutionDataRequester, fin
 		parentView = b.Header.View
 
 		// needs a slight delay otherwise it will fill the queue immediately.
-		time.Sleep(1000 * time.Microsecond)
+		time.Sleep(5 * time.Millisecond)
 
 		// the requester can catch up after receiving a finalization block, so on the last
 		// block, pause until the queue is no longer full and add it
@@ -765,10 +779,11 @@ func runFetch(t *testing.T, ctx context.Context, edr ExecutionDataRequester, fin
 	}
 
 	// Pause until we've received all of the expected notifications
+	// TODO: this should honor context timeouts
 	outstandingBlocks.Wait()
 	t.Log("All notifications received")
 
-	verifyFetchedExecutionData(t, fetchedExecutionData, cfg.executionDataByID)
+	verifyFetchedExecutionData(t, fetchedExecutionData, cfg)
 }
 
 func generateTestData(ctx context.Context, t *testing.T, blockCount int, missingHeightFuncs map[uint64]testExecutionDataCallback) *fetchTestRun {
@@ -885,10 +900,16 @@ func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan 
 	}
 }
 
-func verifyFetchedExecutionData(t *testing.T, actual map[flow.Identifier]*state_synchronization.ExecutionData, expected map[flow.Identifier]*state_synchronization.ExecutionData) {
+func verifyFetchedExecutionData(t *testing.T, actual map[flow.Identifier]*state_synchronization.ExecutionData, cfg *fetchTestRun) {
+	expected := cfg.executionDataByID
 	assert.Len(t, actual, len(expected))
 
-	for blockID, expectedED := range expected {
+	for i := 0; i < cfg.sealedCount; i++ {
+		height := cfg.startHeight + uint64(i)
+		block := cfg.blocksByHeight[height]
+		blockID := block.ID()
+
+		expectedED := expected[blockID]
 		actualED, has := actual[blockID]
 		if !has {
 			assert.Fail(t, "missing execution data for block %v", blockID)
