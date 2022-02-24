@@ -25,11 +25,20 @@ const (
 	// Timeout for fetching ExecutionData from the db/network
 	fetchTimeout = time.Minute
 
-	// TODO: make these configurable?
-	fetchWorkers            = 4
-	executionDataCacheSize  = 50
-	finalizationQueueLength = 500
-	fetchQueueLength        = 500
+	// Number of goroutines to use for downloading new ExecutionData from the network.
+	fetchWorkers = 4
+
+	// The number of ExecutionData objects to keep when waiting to send notifications. Dropped
+	// data is refetched from disk.
+	executionDataCacheSize = 50
+
+	// Max number of block finalization notifications to enqueue. Dropped notifications are
+	// backfilled once a new finalized block notification is processed.
+	finalizationQueueLength = 2
+
+	// Note: this must be greater than fetchWorkers, otherwise the retry queue could overflow
+	// resulting in lost retry requests
+	fetchQueueLength = 500
 )
 
 var ErrRequesterHalted = errors.New("requester was halted due to invalid data")
@@ -94,9 +103,6 @@ type executionDataRequesterImpl struct {
 
 	startupCheck bool
 
-	// TODO: figure out how to deal with this situation. We want to drop the memory footprint and stop processing new blocks, but also not stop the component
-	stop chan struct{}
-
 	workerCount int
 }
 
@@ -129,7 +135,6 @@ func NewExecutionDataRequester(
 		rootBlock:    rootBlock,
 		blocks:       blocks,
 		results:      results,
-		stop:         make(chan struct{}),
 		startupCheck: startupCheck,
 
 		cache:  newExecutionDataCache(executionDataCacheSize),
@@ -170,7 +175,7 @@ func (e *executionDataRequesterImpl) OnBlockFinalized(blockID flow.Identifier) {
 	logger := e.log.With().Str("finalized_block_id", blockID.String()).Logger()
 
 	// stop accepting new blocks if the component is shutting down
-	if util.CheckClosed(e.stop) || util.CheckClosed(e.cm.ShutdownSignal()) {
+	if util.CheckClosed(e.cm.ShutdownSignal()) {
 		logger.Warn().Msg("ignoring finalized block. component is shutting down")
 		return
 	}
@@ -232,14 +237,12 @@ func (e *executionDataRequesterImpl) notificationProcessor(ctx irrecoverable.Sig
 func (e *executionDataRequesterImpl) finalizationProcessingLoop(ctx irrecoverable.SignalerContext) {
 	for {
 		// prioritize shutdowns
-		if util.CheckClosed(ctx.Done()) || util.CheckClosed(e.stop) {
+		if util.CheckClosed(ctx.Done()) {
 			return
 		}
 
 		select {
 		case <-ctx.Done():
-			return
-		case <-e.stop:
 			return
 		case blockID := <-e.finalizedBlocks:
 			e.processFinalizedBlock(ctx, blockID)
@@ -259,7 +262,12 @@ func (e *executionDataRequesterImpl) processFinalizedBlock(ctx irrecoverable.Sig
 
 	// loop through all finalized blocks since the last processed block, and extract all seals
 	lastHeight := e.status.lastProcessed
-	logger.Debug().Uint64("start_height", lastHeight+1).Uint64("end_height", block.Header.Height).Msg("checking for seals")
+
+	logger.Debug().
+		Uint64("start_height", lastHeight+1).
+		Uint64("end_height", block.Header.Height).
+		Msg("checking for seals")
+
 	for height := lastHeight + 1; height <= block.Header.Height; height++ {
 		logger.Debug().Uint64("height", height).Msg("processing height")
 		err := e.processSealsFromHeight(ctx, height)
@@ -277,10 +285,11 @@ func (e *executionDataRequesterImpl) processFinalizedBlock(ctx irrecoverable.Sig
 func (e *executionDataRequesterImpl) processSealsFromHeight(ctx irrecoverable.SignalerContext, height uint64) error {
 	block, err := e.blocks.ByHeight(height)
 	if err != nil {
-		return fmt.Errorf("failed to get block for height %d: %w", height, err)
+		return fmt.Errorf("failed to get block: %w", err)
 	}
 
 	logger := e.log.With().Str("finalized_block_id", block.ID().String()).Uint64("finalized_block_height", height).Logger()
+
 	if len(block.Payload.Seals) == 0 {
 		logger.Debug().Msg("no seals in block")
 		return nil
@@ -289,7 +298,8 @@ func (e *executionDataRequesterImpl) processSealsFromHeight(ctx irrecoverable.Si
 	logger.Debug().Msgf("checking %d seals in block", len(block.Payload.Seals))
 
 	// Find all seals in the block and sort them by height (ascending). This helps with processing
-	// lower height first since notifications are sent in order
+	// lower height first since notifications are sent in order and seals are not guaranteed to
+	// be sorted
 
 	requests, err := e.requestsFromSeals(block.Payload.Seals)
 	if err != nil {
@@ -308,8 +318,6 @@ func (e *executionDataRequesterImpl) processSealsFromHeight(ctx irrecoverable.Si
 
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-e.stop:
 			return nil
 		case e.fetchRequests <- request:
 		}
@@ -343,7 +351,7 @@ func (e *executionDataRequesterImpl) requestsFromSeals(seals []*flow.Seal) ([]fe
 func (e *executionDataRequesterImpl) fetchRequestProcessingLoop(ctx irrecoverable.SignalerContext) {
 	for {
 		// prioritize shutdowns
-		if util.CheckClosed(ctx.Done()) || util.CheckClosed(e.stop) {
+		if util.CheckClosed(ctx.Done()) {
 			return
 		}
 
@@ -352,20 +360,10 @@ func (e *executionDataRequesterImpl) fetchRequestProcessingLoop(ctx irrecoverabl
 			e.processFetchRequest(ctx, request)
 			continue
 		default:
-			// TODO: check for missed blocks
-			// we need a process finds blocks we wanted to retry, but were unable to put on the retry queue
-			// because it was full. It's ok if we requeue the same block more than once, since it will only
-			// fetch from the network once.
-			// Maybe, the status object can keep track of blocks we need to requeue? when we try
-			// to push a block only the retry queue and it fails, add it to the status object.
-			// when we get here (nothing on retry queue), check if there are any missed retries and enqueue
-			// as many as we can, and remove them from notification state.
 		}
 
 		select {
 		case <-ctx.Done():
-			return
-		case <-e.stop:
 			return
 		case request := <-e.fetchRequests:
 			e.processFetchRequest(ctx, request)
@@ -393,8 +391,11 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 		// maybe we can flag it as bad and not reattempt
 
 		// TODO: add metric
-		logger.Error().Err(err).Msg("HALTING REQUESTER: invalid execution data found")
-		close(e.stop)
+		logger.Error().Err(err).
+			Str("execution_data_id", result.ExecutionDataID.String()).
+			Msg("HALTING REQUESTER: invalid execution data found")
+
+		ctx.Throw(ErrRequesterHalted)
 	}
 
 	if err != nil {
@@ -403,8 +404,10 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 		select {
 		case e.fetchRetryRequests <- request:
 		default:
-			logger.Warn().Msg("fetch retry queue is full")
-			// TODO: track this in notification state
+			// Since the retry queue is always checked first, there can be at most fetchWorkers + 1
+			// outstanding retry requests. In practice, this can only happen if the retry channel's
+			// buffer size is misconfigured.
+			logger.Error().Msg("fetch retry queue is full")
 			return nil
 		}
 		return nil
@@ -417,8 +420,6 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 	logger.Debug().Msgf("Enqueueing notification request for execution data for block %d", request.height)
 	select {
 	case <-ctx.Done():
-		return nil
-	case <-e.stop:
 		return nil
 	case e.notifications <- request:
 	}
@@ -438,7 +439,7 @@ func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverabl
 	executionData, err := e.eds.Get(ctx, executionDataID)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get execution data for block: %w", err)
+		return nil, err
 	}
 
 	return executionData, nil
@@ -450,16 +451,13 @@ func (e *executionDataRequesterImpl) notificationProcessingLoop(ctx irrecoverabl
 	e.log.Warn().Msg("notification processing loop started")
 	for {
 		// prioritize shutdowns
-		if util.CheckClosed(ctx.Done()) || util.CheckClosed(e.stop) {
+		if util.CheckClosed(ctx.Done()) {
 			return
 		}
 
 		select {
 		case <-ctx.Done():
 			e.log.Warn().Msg("notification processing loop terminated")
-			return
-		case <-e.stop:
-			e.log.Warn().Msg("notification processing loop stopped")
 			return
 		case request := <-e.notifications:
 			e.log.Debug().Msgf("received notification request for block %d", request.height)
@@ -577,8 +575,7 @@ func (e *executionDataRequesterImpl) loadSyncState(ctx irrecoverable.SignalerCon
 
 	if e.status.halted {
 		e.log.Error().Msg("HALTING REQUESTER: requester was halted on a previous run due to invalid data")
-		close(e.stop)
-		return ErrRequesterHalted
+		ctx.Throw(ErrRequesterHalted)
 	}
 
 	// defaults to the start block when booting with a fresh db
@@ -625,7 +622,12 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 		exists, err := e.checkExecutionData(ctx, result.ExecutionDataID)
 
 		if errors.Is(err, ErrRequesterHalted) {
-			e.log.Error().Err(err).Str("block_id", block.ID().String()).Msg("HALTING REQUESTER: invalid execution data found")
+			e.log.Error().Err(err).
+				Str("block_id", block.ID().String()).
+				Str("execution_data_id", result.ExecutionDataID.String()).
+				Msg("HALTING REQUESTER: invalid execution data found")
+
+			ctx.Throw(ErrRequesterHalted)
 		}
 		if err != nil {
 			return err
@@ -670,8 +672,11 @@ func (e *executionDataRequesterImpl) checkExecutionData(ctx irrecoverable.Signal
 	if errors.Is(err, &state_synchronization.BlobSizeLimitExceededError{}) {
 		// This shouldn't be possible. It would mean that the data was updated in the db to
 		// be well-formed but oversized
-		close(e.stop)
-		return true, ErrRequesterHalted
+		e.log.Error().Err(err).
+			Str("execution_data_id", rootID.String()).
+			Msg("HALTING REQUESTER: invalid execution data found")
+
+		ctx.Throw(ErrRequesterHalted)
 	}
 
 	if errors.Is(err, &state_synchronization.MalformedDataError{}) {
@@ -729,11 +734,3 @@ func (e *executionDataRequesterImpl) checkMissing(ctx irrecoverable.SignalerCont
 // [ ] Ensure there is backpressure when downloads backup
 // [ ] Handle invalid data blobs gracefully
 // [ ] Don't refetch invalid data from network (avoid blob thrashing)
-
-// BFT Attacks:
-// [ ] Far future date (not possible when following seals)
-// [ ] Invalid blob (make sure to only download it once)
-// [ ]
-// [ ]
-// [ ]
-// [ ]

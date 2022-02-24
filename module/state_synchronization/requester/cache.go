@@ -18,7 +18,7 @@ type executionDataCache struct {
 	data    map[uint64]*state_synchronization.ExecutionData
 	heights []uint64
 
-	mu sync.Mutex
+	mu sync.RWMutex
 }
 
 func newExecutionDataCache(maxCapacity int) *executionDataCache {
@@ -29,8 +29,8 @@ func newExecutionDataCache(maxCapacity int) *executionDataCache {
 }
 
 func (c *executionDataCache) Get(height uint64) (*state_synchronization.ExecutionData, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	data, ok := c.data[height]
 	if !ok {
@@ -57,10 +57,6 @@ func (c *executionDataCache) Put(height uint64, data *state_synchronization.Exec
 	c.data[height] = data
 	c.heights = insert(c.heights, height)
 
-	if len(c.heights) != len(c.data) {
-		panic("execution data cache out of sync")
-	}
-
 	return true
 }
 
@@ -70,10 +66,6 @@ func (c *executionDataCache) Delete(height uint64) bool {
 
 	delete(c.data, height)
 	c.heights = remove(c.heights, height)
-
-	if len(c.heights) != len(c.data) {
-		panic("execution data cache out of sync")
-	}
 
 	return false
 }
@@ -91,32 +83,33 @@ func (c *executionDataCache) evict(newHeight uint64) bool {
 	return true
 }
 
+// insert adds a new height into the correct position in a slice in descending order
 func insert(heights []uint64, h uint64) []uint64 {
 	if len(heights) == 0 {
 		return []uint64{h}
 	}
 
+	if h > heights[0] {
+		// it's the new largest, add to the front
+		return append([]uint64{h}, heights...)
+	}
+
+	if h < heights[len(heights)-1] {
+		// it's the new smallest, add to the end
+		return append(heights, h)
+	}
+
 	// find the insert position given a descending order slice
 	pos := sort.Search(len(heights), func(i int) bool { return heights[i] <= h })
 
-	switch {
-	case pos < len(heights) && heights[pos] == h:
+	if pos < len(heights) && heights[pos] == h {
 		// it already exist, skip
 		return heights
-
-	case pos == 0:
-		// it's the largest, and should got in the front
-		return append([]uint64{h}, heights...)
-
-	case pos >= len(heights):
-		// it's the smallest and should go on the end
-		return append(heights, h)
-
-	default:
-		// place it in the correct index in the middle
-		tail := append([]uint64{h}, heights[pos:]...)
-		return append(heights[:pos], tail...)
 	}
+
+	// place it in the correct index in the middle
+	tail := append([]uint64{h}, heights[pos:]...)
+	return append(heights[:pos], tail...)
 }
 
 func remove(heights []uint64, h uint64) []uint64 {
