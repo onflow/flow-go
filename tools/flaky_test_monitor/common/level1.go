@@ -16,10 +16,8 @@ type RawTestStep struct {
 
 // TestRun models full level 1 summary of a test run from "go test -json".
 type TestRun struct {
-	CommitSha      string          `json:"commit_sha"`
-	CommitDate     time.Time       `json:"commit_date"`
-	JobRunDate     time.Time       `json:"job_run_date"`
-	PackageResults []PackageResult `json:"results"`
+	TestMap map[string][]TestResult `json:"-"`
+	Rows    []TestResultRow         `json:"rows"`
 }
 
 // PackageResult models test result of an entire package which can have multiple tests
@@ -30,6 +28,10 @@ type PackageResult struct {
 	Output  []string                `json:"output"`
 	Tests   []TestResult            `json:"tests"`
 	TestMap map[string][]TestResult `json:"-"`
+}
+
+type TestResultRow struct {
+	TestResult TestResult `json:"json"`
 }
 
 // TestResult models result of a single test that's part of a larger package result

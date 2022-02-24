@@ -2,11 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -24,10 +22,9 @@ func TestProcessSummary1TestRun(t *testing.T) {
 		"1 count 2 skipped the rest pass": "test-result-crypto-hash-1-count-skip-pass.json",
 
 		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
-		"1 count skip all packages": "test-result-crypto-hash-1-count-skip-all-packages.json",
-		"2 count all pass":          "test-result-crypto-hash-2-count-pass.json",
-		"10 count all pass":         "test-result-crypto-hash-10-count-pass.json",
-		"10 count some failures":    "test-result-crypto-hash-10-count-fail.json",
+		"2 count all pass":       "test-result-crypto-hash-2-count-pass.json",
+		"10 count all pass":      "test-result-crypto-hash-10-count-pass.json",
+		"10 count some failures": "test-result-crypto-hash-10-count-fail.json",
 
 		// nil tests - tests below don't generate pass/fail result due to `go test` bug
 		// with using `fmt.printf("log message")` without newline `\n`
@@ -69,26 +66,7 @@ func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 
 	err = json.Unmarshal(expectedJsonBytes, &expectedTestRun)
 	require.Nil(t, err)
-
-	// convert to UTC to remove any local time zone settings -
-	// even though the time stamp in the test json can be in UTC (or not), there will still be a local time zone set that will fail equality check - this removes the timezone setting
-	expectedTestRun.CommitDate = expectedTestRun.CommitDate.UTC()
-	expectedTestRun.JobRunDate = expectedTestRun.JobRunDate.UTC()
-
-	// sort all package results alphabetically
-	sort.SliceStable(expectedTestRun.PackageResults, func(i, j int) bool {
-		return expectedTestRun.PackageResults[i].Package < expectedTestRun.PackageResults[j].Package
-	})
-
-	// sort all tests alphabetically within each package - otherwise, equality check will fail
-	for k := range expectedTestRun.PackageResults {
-		sort.Slice(expectedTestRun.PackageResults[k].Tests, func(i, j int) bool {
-			return expectedTestRun.PackageResults[k].Tests[i].Test < expectedTestRun.PackageResults[k].Tests[j].Test
-		})
-
-		// init TestMap to empty - otherwise get comparison failure because would be nil
-		expectedTestRun.PackageResults[k].TestMap = make(map[string][]common.TestResult)
-	}
+	require.NotEmpty(t, expectedTestRun.Rows)
 
 	// these hard coded values simulate a real test run that would obtain these environment variables dynamically
 	// we are simulating this scenario by setting the environment variables explicitly in the test before calling the main processing script which will look for them
@@ -107,56 +85,17 @@ func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 }
 
 func checkTestRuns(t *testing.T, expectedTestRun common.TestRun, actualTestRun common.TestRun) {
-	// it's difficult to determine why 2 test runs aren't equal, so we will check the different sub components of them to see where a potential discrepancy exists
-	require.Equal(t, expectedTestRun.CommitDate, actualTestRun.CommitDate)
-	require.Equal(t, expectedTestRun.CommitSha, actualTestRun.CommitSha)
-	require.Equal(t, expectedTestRun.JobRunDate, actualTestRun.JobRunDate)
-	require.Equal(t, len(expectedTestRun.PackageResults), len(actualTestRun.PackageResults))
+	// number of TestResults should be the same between expected and actual
+	require.Equal(t, len(expectedTestRun.Rows), len(actualTestRun.Rows))
 
-	// check each package
-	for packageIndex := range expectedTestRun.PackageResults {
-		expectedPackageResults := expectedTestRun.PackageResults[packageIndex]
-		actualPackageResults := actualTestRun.PackageResults[packageIndex]
-
-		require.Equal(t, expectedPackageResults.Elapsed, actualPackageResults.Elapsed)
-		require.Equal(t, expectedPackageResults.Package, actualPackageResults.Package)
-		require.Equal(t, expectedPackageResults.Result, actualPackageResults.Result)
-		require.Empty(t, expectedPackageResults.TestMap, actualPackageResults.TestMap)
-
-		// check outputs of each package result
-		require.Equal(t, len(expectedPackageResults.Output), len(actualPackageResults.Output))
-		for packageOutputIndex := range expectedPackageResults.Output {
-			require.Equal(t, expectedPackageResults.Output[packageOutputIndex], actualPackageResults.Output[packageOutputIndex])
-		}
-
-		// check tests results of each package
-		checkTestResults(t, expectedPackageResults.Tests, actualPackageResults.Tests)
+	// check that all expected TestResults are in actual TestResults
+	for actualRowIndex := range actualTestRun.Rows {
+		require.Contains(t, actualTestRun.Rows, expectedTestRun.Rows[actualRowIndex], expectedTestRun.Rows[actualRowIndex].TestResult)
 	}
-	// finally, compare the entire actual test run against what's expected - if there were any discrepancies they should have been caught by now
-	require.Equal(t, expectedTestRun, actualTestRun)
-}
 
-func checkTestResults(t *testing.T, expectedTestResults []common.TestResult, actualTestResults []common.TestResult) {
-	require.Equal(t, len(expectedTestResults), len(actualTestResults))
-	for testResultIndex := range expectedTestResults {
-
-		expectedTestResult := expectedTestResults[testResultIndex]
-		actualTestResult := actualTestResults[testResultIndex]
-
-		// check all outputs of each test result
-		require.Equal(t, len(expectedTestResult.Output), len(actualTestResult.Output), fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
-		for testResultOutputIndex := range expectedTestResult.Output {
-			require.Equal(t, expectedTestResult.Output[testResultOutputIndex], actualTestResult.Output[testResultOutputIndex], fmt.Sprintf("TestResult[%d] Output[%d]", testResultIndex, testResultOutputIndex))
-		}
-
-		require.Equal(t, expectedTestResult.Package, actualTestResult.Package)
-		require.Equal(t, expectedTestResult.Test, actualTestResult.Test)
-		require.Equal(t, expectedTestResult.Elapsed, actualTestResult.Elapsed, fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
-		require.Equal(t, expectedTestResult.Result, actualTestResult.Result)
-
-		require.Equal(t, expectedTestResult.CommitDate, actualTestResult.CommitDate)
-		require.Equal(t, expectedTestResult.CommitSha, actualTestResult.CommitSha)
-		require.Equal(t, expectedTestResult.JobRunDate, actualTestResult.JobRunDate)
+	// check that all actual TestResults are in expected TestResults
+	for exptedRowIndex := range expectedTestRun.Rows {
+		require.Contains(t, expectedTestRun.Rows, actualTestRun.Rows[exptedRowIndex], actualTestRun.Rows[exptedRowIndex].TestResult)
 	}
 }
 

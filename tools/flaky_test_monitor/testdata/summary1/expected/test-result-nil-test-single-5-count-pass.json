@@ -1,83 +1,79 @@
 {
-  "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-  "commit_date": "2021-09-22T01:06:25Z",
-  "job_run_date": "2021-09-22T04:06:25Z",
-  "results": [
+  "rows": [
     {
-      "package": "github.com/onflow/flow-go/model/encodable",
-      "result":"pass",
-      "elapsed": 0.353,
-      "output": [
-        "PASS\n",
-        "ok  \tgithub.com/onflow/flow-go/model/encodable\t0.353s\n"
-      ],
-      "tests": [
-        {
-          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
-          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-          "commit_date": "2021-09-22T01:06:25Z",
-          "job_run_date": "2021-09-22T04:06:25Z",
-          "package": "github.com/onflow/flow-go/model/encodable",
-          "output": [
-            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
-            {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
-          ],
-          "result": "-100",
-          "elapsed": 0
-        },
-        {
-          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
-          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-          "commit_date": "2021-09-22T01:06:25Z",
-          "job_run_date": "2021-09-22T04:06:25Z",
-          "package": "github.com/onflow/flow-go/model/encodable",
-          "output": [
-            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
-            {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
-          ],
-          "result": "-100",
-          "elapsed": 0
-        },
-        {
-          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
-          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-          "commit_date": "2021-09-22T01:06:25Z",
-          "job_run_date": "2021-09-22T04:06:25Z",
-          "package": "github.com/onflow/flow-go/model/encodable",
-          "output": [
-            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
-            {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
-          ],
-          "result": "-100",
-          "elapsed": 0
-        },
-        {
-          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
-          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-          "commit_date": "2021-09-22T01:06:25Z",
-          "job_run_date": "2021-09-22T04:06:25Z",
-          "package": "github.com/onflow/flow-go/model/encodable",
-          "output": [
-            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
-            {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
-          ],
-          "result": "-100",
-          "elapsed": 0
-        },
-        {
-          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
-          "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-          "commit_date": "2021-09-22T01:06:25Z",
-          "job_run_date": "2021-09-22T04:06:25Z",
-          "package": "github.com/onflow/flow-go/model/encodable",
-          "output": [
-            {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
-            {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
-          ],
-          "result": "-100",
-          "elapsed": 0
-        }
-      ]
+      "json": {
+        "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "output": [
+          {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+          {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
+        ],
+        "result": "-100",
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "output": [
+          {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+          {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
+        ],
+        "result": "-100",
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "output": [
+          {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+          {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
+        ],
+        "result": "-100",
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "output": [
+          {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+          {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
+        ],
+        "result": "-100",
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "output": [
+          {"item": "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+          {"item": "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"}
+        ],
+        "result": "-100",
+        "elapsed": 0
+      }
     }
   ]
 }
