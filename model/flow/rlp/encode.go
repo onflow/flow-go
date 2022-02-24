@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"reflect"
 	"sync"
+	"sync/atomic"
 )
 
 var (
@@ -69,12 +70,44 @@ func Encode(w io.Writer, val interface{}) error {
 // Please see package-level documentation for the encoding rules.
 func EncodeToBytes(val interface{}) ([]byte, error) {
 	eb := encbufPool.Get().(*encbuf)
-	defer encbufPool.Put(eb)
-	eb.reset()
-	if err := eb.encode(val); err != nil {
+
+	eb.lhsize = 0
+	eb.str = eb.str[:0]
+
+	// any listhead objects that are still in this array should be returned
+	for i, _ := range eb.lheads {
+		putlisthead(eb.lheads[i])
+	}
+
+	// clear the lheads collection
+	eb.lheads = eb.lheads[:0]
+
+	rval := reflect.ValueOf(val)
+	writer, err := cachedWriter(rval.Type())
+	if err != nil {
 		return nil, err
 	}
-	return eb.toBytes(), nil
+
+	if err := writer(rval, eb); err != nil {
+		return nil, err
+	}
+
+	out := make([]byte, eb.size())
+	strpos := 0
+	pos := 0
+	for _, head := range eb.lheads {
+		// write string data before header
+		n := copy(out[pos:], eb.str[strpos:head.offset])
+		pos += n
+		strpos += n
+		// write the header
+		enc := head.encode(out[pos:])
+		pos += len(enc)
+	}
+	// copy string data after the last list header
+	copy(out[pos:], eb.str[strpos:])
+	encbufPool.Put(eb)
+	return out, nil
 }
 
 // EncodeToReader returns a reader from which the RLP encoding of val
@@ -94,6 +127,85 @@ func EncodeToReader(val interface{}) (size int, r io.Reader, err error) {
 type listhead struct {
 	offset int // index of this header in string data
 	size   int // total size of encoded data (including list headers)
+	index  int // index of this structure in the cache, or -1 if
+	//   the allocation was outside of the cache
+}
+
+const LISTHEAD_CACHE_SIZE = 100000
+
+// using 'int32' type here because that's required in the atomic methods
+var used []int32 = make([]int32, LISTHEAD_CACHE_SIZE, LISTHEAD_CACHE_SIZE)
+
+// this holds the data structures
+var backingstore []listhead = make([]listhead, LISTHEAD_CACHE_SIZE, LISTHEAD_CACHE_SIZE)
+
+var lastused int = 0
+
+// get is used in a similar way to the 'Get' in sync.Pool.  Its purpose
+// is to attempt to return an unused structure from the cache.  If the
+// cache is completely in use, then the function returns a newly allocated
+// structure
+func get() (pchunk *listhead) {
+	// use in a thread-safe way, it could change, and that's ok
+	last := lastused
+
+	// TODO: if there are thousands of cache objects in use, then it
+	// would make sense to use bit arithmetic to determine if an
+	// index is available.  There are also built-ins in gcc for determining
+	// the first non-zero bit in an integer, that correspond to specific
+	// assembly instructions.
+
+	// search for a free chunk, a
+	for i := last; i < LISTHEAD_CACHE_SIZE; i++ {
+		// first use the fast, non-thread-safe check, followed
+		// by the slower thread-safe check if that passed
+		if used[i] == 0 && atomic.SwapInt32(&used[i], 1) == 0 {
+			retval := &backingstore[i]
+			retval.index = i
+			return retval
+		}
+	}
+
+	for i := 0; i < last; i++ {
+		if used[i] == 0 && atomic.SwapInt32(&used[i], 1) == 0 {
+			retval := &backingstore[i]
+			retval.index = i
+			return retval
+		}
+	}
+
+	// handle when there is no space left, using the default allocator
+	retval := &listhead{
+		offset: 0,
+		size:   0,
+		index:  -1,
+	}
+	return retval
+}
+
+// put is similar to the 'Put' method in 'sync.Pool'.  Its purpose is
+// to return a data structure to the cache.
+func putlisthead(val *listhead) bool {
+	// this function will mark the data structure as available
+	// return values:
+	// 	true in the normal case, where the value is changed
+	//      false if the value was already changed
+	if val.index < 0 {
+		// abnormal case
+		return false
+	}
+
+	// as soon as this is 0, the get() function can use it
+	if atomic.SwapInt32(&used[val.index], 0) == 0 {
+		lastused = val.index
+
+		// the value was already marked as unused, so
+		// return false
+		return false
+	}
+	lastused = val.index
+
+	return true
 }
 
 // encode writes head to the given buffer, which must be at least
@@ -135,18 +247,13 @@ var encbufPool = sync.Pool{
 	New: func() interface{} { return new(encbuf) },
 }
 
-var listheadPool = sync.Pool{
-	New: func() interface{} { return new(listhead) },
-}
-
 func (w *encbuf) reset() {
 	w.lhsize = 0
 	w.str = w.str[:0]
 
 	// any listhead objects that are still in this array should be returned
-	for i, plh := range w.lheads {
-		listheadPool.Put(plh)
-		w.lheads[i] = nil
+	for i, _ := range w.lheads {
+		putlisthead(w.lheads[i])
 	}
 	w.lheads = w.lheads[:0]
 }
@@ -203,7 +310,7 @@ func (w *encbuf) encodeUint(i uint64) {
 // of the header. The caller must call listEnd with this index after encoding
 // the content of the list.
 func (w *encbuf) list() int {
-	plh := listheadPool.Get().(*listhead)
+	plh := get()
 	plh.offset = len(w.str)
 	plh.size = w.lhsize
 
