@@ -5,20 +5,26 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SyncRequest is part of the synchronization protocol and represents a node on
-// the network sharing the height of its latest finalized block and requesting
-// the same information from the recipient.
-type SyncRequest struct {
-	RequestID uint64
-	Height    uint64
+type RequestWrapper struct {
+	RequestID      uint64
+	RequestPayload interface{}
 }
 
+type ResponseWrapper struct {
+	RequestID       uint64
+	ResponsePayload interface{}
+}
+
+// SyncRequest is part of the synchronization protocol and represents a node on
+// the network requesting the latest finalized block from the recipient.
+type SyncRequest struct{}
+
 // SyncResponse is part of the synchronization protocol and represents the reply
-// to a synchronization request that contains the latest finalized block height
-// of the responding node.
+// to a synchronization request that contains the latest finalized block of the
+// responding node.
 type SyncResponse struct {
-	RequestID uint64
-	Height    uint64
+	Height  uint64
+	BlockID flow.Identifier
 }
 
 // RangeRequest is part of the synchronization protocol and represents an active
@@ -26,7 +32,6 @@ type SyncResponse struct {
 // requests finalized blocks by a range of block heights, including from and to
 // heights.
 type RangeRequest struct {
-	RequestID  uint64
 	FromHeight uint64
 	ToHeight   uint64
 }
@@ -35,21 +40,18 @@ type RangeRequest struct {
 // (pulling) attempt to synchronize with the consensus state of the network. It
 // requests finalized or unfinalized blocks by a list of block IDs.
 type BatchRequest struct {
-	RequestID uint64
-	BlockIDs  []flow.Identifier
+	BlockIDs []flow.Identifier
 }
 
 // BlockResponse is part of the synchronization protocol and represents the
 // reply to any active synchronization attempts. It contains a list of blocks
 // that should correspond to the request.
 type BlockResponse struct {
-	RequestID uint64
-	Blocks    []*flow.Block
+	Blocks []*flow.Block
 }
 
 // ClusterBlockResponse is the same thing as BlockResponse, but for cluster
 // consensus.
 type ClusterBlockResponse struct {
-	Nonce  uint64
 	Blocks []*cluster.Block
 }

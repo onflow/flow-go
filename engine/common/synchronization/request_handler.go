@@ -3,12 +3,9 @@ package synchronization
 import (
 	"errors"
 	"fmt"
-	"time"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/finalized_cache"
 	"github.com/onflow/flow-go/storage"
 	"github.com/rs/zerolog"
@@ -18,57 +15,24 @@ type RequestHandler struct {
 	blocks          storage.Blocks
 	logger          zerolog.Logger
 	finalizedHeader *finalized_cache.FinalizedHeaderCache
-	metrics         module.SyncMetrics
-	config          *HandlerConfig
-	core            module.SyncCore
-}
-
-type HandlerConfig struct {
-	MaxResponseSize        uint64
-	ProcessReceivedHeights bool
+	maxResponseSize uint64
 }
 
 func NewRequestHandler(
 	blocks storage.Blocks,
 	logger zerolog.Logger,
 	finalizedHeader *finalized_cache.FinalizedHeaderCache,
-	metrics module.SyncMetrics,
-	core module.SyncCore,
-	config *HandlerConfig,
+	maxResponseSize uint64,
 ) *RequestHandler {
 	return &RequestHandler{
 		blocks:          blocks,
-		logger:          logger,
+		logger:          logger.With().Str("component", "request_handler").Logger(),
 		finalizedHeader: finalizedHeader,
-		metrics:         metrics,
-		config:          config,
-		core:            core,
+		maxResponseSize: maxResponseSize,
 	}
 }
 
-func (s *RequestHandler) HandleRequest(request interface{}, originID flow.Identifier) (interface{}, error) {
-	switch r := request.(type) {
-	case *messages.RangeRequest:
-		return s.handleRangeRequest(r, originID)
-	case *messages.BatchRequest:
-		return s.handleBatchRequest(r, originID)
-	case *messages.SyncRequest:
-		return s.handleSyncRequest(r, originID), nil
-	default:
-		return nil, fmt.Errorf("received input with type %T from %v: %w", request, originID.String(), engine.IncompatibleInputTypeError)
-	}
-}
-
-func (s *RequestHandler) handleRangeRequest(req *messages.RangeRequest, origin flow.Identifier) (resp *messages.BlockResponse, err error) {
-	s.logger.Debug().Str("origin_id", origin.String()).Msg("received new range request")
-
-	s.metrics.RangeResponseStarted()
-	started := time.Now()
-
-	defer func() {
-		s.metrics.RangeResponseFinished(time.Since(started), err == nil)
-	}()
-
+func (s *RequestHandler) HandleRangeRequest(req *messages.RangeRequest) (resp *messages.BlockResponse, err error) {
 	// get the local finalized height to determine if we can fulfill the request
 	localHeight := s.finalizedHeader.Get().Height
 
@@ -77,8 +41,8 @@ func (s *RequestHandler) handleRangeRequest(req *messages.RangeRequest, origin f
 		return
 	}
 
-	// enforce client-side max request size
-	maxHeight := req.FromHeight + uint64(s.config.MaxResponseSize) - 1
+	// limit response size
+	maxHeight := req.FromHeight + uint64(s.maxResponseSize) - 1
 
 	if maxHeight < req.ToHeight {
 		req.ToHeight = maxHeight
@@ -111,26 +75,13 @@ func (s *RequestHandler) handleRangeRequest(req *messages.RangeRequest, origin f
 	}
 
 	resp = &messages.BlockResponse{
-		RequestID: req.RequestID,
-		Blocks:    blocks,
+		Blocks: blocks,
 	}
 
 	return
 }
 
-func (s *RequestHandler) handleBatchRequest(req *messages.BatchRequest, origin flow.Identifier) (resp *messages.BlockResponse, err error) {
-	s.logger.Debug().Str("origin_id", origin.String()).Msg("received new batch request")
-
-	s.metrics.BatchResponseStarted()
-	started := time.Now()
-
-	// TODO!!! the success should not be based on whether or not the error is nil
-	// similar for other defers
-	// TODO TODO TODO
-	defer func() {
-		s.metrics.BatchResponseFinished(time.Since(started), err == nil)
-	}()
-
+func (s *RequestHandler) HandleBatchRequest(req *messages.BatchRequest) (resp *messages.BlockResponse, err error) {
 	// deduplicate the block IDs in the batch request
 	blockIDs := make(map[flow.Identifier]struct{})
 
@@ -138,7 +89,7 @@ func (s *RequestHandler) handleBatchRequest(req *messages.BatchRequest, origin f
 		blockIDs[blockID] = struct{}{}
 
 		// enforce client-side max request size
-		if len(blockIDs) == int(s.config.MaxResponseSize) {
+		if len(blockIDs) == int(s.maxResponseSize) {
 			break
 		}
 	}
@@ -164,31 +115,17 @@ func (s *RequestHandler) handleBatchRequest(req *messages.BatchRequest, origin f
 	}
 
 	resp = &messages.BlockResponse{
-		RequestID: req.RequestID,
-		Blocks:    blocks,
+		Blocks: blocks,
 	}
 
 	return
 }
 
-func (s *RequestHandler) handleSyncRequest(req *messages.SyncRequest, origin flow.Identifier) *messages.SyncResponse {
-	s.logger.Debug().Str("origin_id", origin.String()).Msg("received new sync request")
-
-	s.metrics.SyncHeightResponseStarted()
-	started := time.Now()
-
-	defer func() {
-		s.metrics.SyncHeightResponseFinished(time.Since(started), req.Height)
-	}()
-
-	if s.config.ProcessReceivedHeights {
-		s.core.HeightReceived(req.Height, origin)
-	}
-
-	localHeight := s.finalizedHeader.Get().Height
+func (s *RequestHandler) HandleSyncRequest(req *messages.SyncRequest) *messages.SyncResponse {
+	localHeader := s.finalizedHeader.Get()
 
 	return &messages.SyncResponse{
-		RequestID: req.RequestID,
-		Height:    localHeight,
+		Height:  localHeader.Height,
+		BlockID: localHeader.ID(),
 	}
 }

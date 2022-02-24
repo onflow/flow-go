@@ -25,7 +25,7 @@ type SyncCore interface {
 	BatchReceived(blockIDs []flow.Identifier, originID flow.Identifier)
 
 	// HeightReceived updates sync state after a Sync Height response is received.
-	HeightReceived(height uint64, originID flow.Identifier)
+	HeightReceived(blockID flow.Identifier, height uint64, originID flow.Identifier)
 }
 
 type ActiveRange interface {
