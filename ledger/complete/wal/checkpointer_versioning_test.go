@@ -82,8 +82,7 @@ func CreateCheckpointV3() {
 	trie1, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
 
-	f.AddTrie(trie1)
-
+	// trie1
 	//              n4
 	//             /
 	//            /
@@ -92,6 +91,8 @@ func CreateCheckpointV3() {
 	//      /         \
 	//   n1 (p1/v1)     n2 (p2/v2)
 	//
+
+	f.AddTrie(trie1)
 
 	// New trie reuses its parent's left sub-trie.
 
@@ -109,8 +110,7 @@ func CreateCheckpointV3() {
 	trie2, err := trie.NewTrieWithUpdatedRegisters(trie1, paths, payloads, true)
 	require.NoError(t, err)
 
-	f.AddTrie(trie2)
-
+	// trie2
 	//              n8
 	//             /   \
 	//            /      \
@@ -119,6 +119,8 @@ func CreateCheckpointV3() {
 	//                /       \
 	//              n5         n6
 	//            (p3/v3)    (p4/v4)
+
+	f.AddTrie(trie2)
 
 	// New trie reuses its parent's right sub-trie, and left sub-trie's leaf node.
 
@@ -131,8 +133,7 @@ func CreateCheckpointV3() {
 	trie3, err := trie.NewTrieWithUpdatedRegisters(trie2, paths, payloads, true)
 	require.NoError(t, err)
 
-	f.AddTrie(trie3)
-
+	// trie3
 	//              n11
 	//             /   \
 	//            /      \
@@ -141,6 +142,8 @@ func CreateCheckpointV3() {
 	//       /       \
 	//     n9         n2
 	//  (p1/v5)    (shared)
+
+	f.AddTrie(trie3)
 
 	flattenedForest, err := flattener.FlattenForest(f)
 	require.NoError(t, err)
