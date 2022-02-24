@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -19,7 +21,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -77,6 +78,7 @@ type AccessNodeConfig struct {
 	staked                       bool
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
+	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
 	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports unstaked access nodes/unstaked consensus follower engines
@@ -142,6 +144,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
+		observerNetworkingKeyPath: cmd.NotSet,
 	}
 }
 
@@ -190,10 +193,12 @@ func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
 	if builder.bootstrapIdentities != nil {
 		return nil
 	}
+
 	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
 	if err != nil {
 		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
 	}
+
 	builder.bootstrapIdentities = ids
 
 	return nil
@@ -409,14 +414,13 @@ func (builder *FlowAccessNodeBuilder) IsStaked() bool {
 	return builder.staked
 }
 
-func (builder *FlowAccessNodeBuilder) ParseFlags() {
+func (builder *FlowAccessNodeBuilder) ParseFlags() error {
 
 	builder.BaseFlags()
 
 	builder.extraFlags()
 
-	builder.ParseAndPrintFlags()
-
+	return builder.ParseAndPrintFlags()
 }
 
 func (builder *FlowAccessNodeBuilder) extraFlags() {
@@ -447,6 +451,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
+		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
@@ -516,8 +521,8 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 
 	ids := make([]*flow.Identity, len(addresses))
 	for i, address := range addresses {
-
 		key := keys[i]
+
 		// json unmarshaller needs a quotes before and after the string
 		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
 		// hence this additional check to ensure the key is indeed quoted
@@ -532,14 +537,12 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		id := &flow.Identity{
+		ids[i] = &flow.Identity{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the unstaked network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
 			NetworkPubKey: networkKey,
 		}
-
-		ids = append(ids, id)
 	}
 	return ids, nil
 }

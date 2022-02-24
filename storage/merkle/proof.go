@@ -7,33 +7,30 @@ import (
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
-// Proof captures all data needed for proving inclusion of a single key/value pair inside a merkle trie
-// verifying proof requires knowledge of the trie path structure (node types) and traversing
-// the trie from the leaf to the root and computing hash values.
+// Proof captures all data needed for proving inclusion of a single key/value pair inside a merkle trie.
+// Verifying a proof requires knowledge of the trie path structure (node types), traversing
+// the trie from the leaf to the root, and computing hash values.
 type Proof struct {
 	// Key used to insert and look up the value
 	Key []byte
 	// Value stored in the trie for the given key
 	Value []byte
 	// InterimNodeTypes is designed to be consumed bit by bit to determine if the next node
-	// is a short nodes or full nodes while traversing the trie downward (0: fullnode, 1: shortnode).
+	// is a short node or full node while traversing the trie downward (0: fullnode, 1: shortnode).
 	// The very first bit corresponds to the root of the trie and last bit is the last
-	// interim node before reaching to the leaf.
-	// Note that we always allocated the minimal number of bytes needed to capture all
+	// interim node before reaching the leaf.
+	// The slice represents a bit vector where the lowest index byte represents the first 8 node types,
+	// while the most significant bit of the byte represents the first node type (big endianness).
+	// Note that we always allocate the minimal number of bytes needed to capture all
 	// the nodes in the path (padded with zero)
 	InterimNodeTypes []byte
-	// ShortPathLengths is read when we reach a short node, and the value represents number of common bits that were included
+	// ShortPathLengths is read when we reach a short node, and the value represents non-zero number of common bits that were included
 	// in the short node (shortNode.count). Elements are ordered from root to leaf.
-	// WARNING, similar to the serializedPathSegmentLength method using by the trie, the uint16 encoding here requires special handling of value zero,
-	// since shortNode.count can only have values in the range of [1, 65536], and a uint16 supports range of [0, 65535],
-	// zero should be mapped to 65536 (all other values are the same)
 	ShortPathLengths []uint16
 	// SiblingHashes is read when we reach a full node. The corresponding element represents
 	// the hash of the non-visited sibling node for each full node on the path. Elements are ordered from root to leaf.
 	SiblingHashes [][]byte
 }
-
-const maxStepsForProofVerification = maxKeyLength * 8
 
 // validateFormat validates the format and size of elements of the proof (syntax check)
 //
@@ -51,23 +48,21 @@ const maxStepsForProofVerification = maxKeyLength * 8
 //    Hence, len(ShortPathLengths) + len(SiblingHashes) specifies how many _interim_
 //    vertices are on the merkle path. Consequently, we require the same number of _bits_
 //    in InterimNodeTypes. Therefore, we know that InterimNodeTypes should have a length
-//    of `(numberBits+7)>>3` _bytes_.
-// 2. The key length (measured in bytes) has to be in the interval [1, 8192].
+//    of `(numberBits+7)>>3` _bytes_, and the remaining padding bits must be zeros.
+// 2. The key length (measured in bytes) has to be in the interval [1, maxKeyLength].
 //    Furthermore, each interim vertex on the merkle path represents:
 //    * either a single bit in case of a full node:
 //      we expect InterimNodeTypes[i] == 0
 //    * a positive number of bits in case of a short node:
 //      we expect InterimNodeTypes[i] == 1
-//      and the number of bits is encoded in the respective element of ShortPathLengths
+//      and the number of bits is non-zero and encoded in the respective element of ShortPathLengths
 //    Hence, the total key length _in bits_ should be: len(SiblingHashes) + sum(ShortPathLengths)
 func (p *Proof) validateFormat() error {
 
 	// step1 - validate the key as the very first step
-	if len(p.Key) == 0 {
-		return NewMalformedProofErrorf("key is empty")
-	}
-	if len(p.Key) > maxKeyLength {
-		return NewMalformedProofErrorf("key length is larger than max key length allowed (%d > %d)", len(p.Key), maxKeyLength)
+	keyLen := len(p.Key)
+	if keyLen == 0 || maxKeyLength < keyLen {
+		return NewMalformedProofErrorf("key length in bytes must be in interval [1, %d], but is %d", maxKeyLength, keyLen)
 	}
 
 	// step2 - check ShortPathLengths and SiblingHashes
@@ -75,22 +70,24 @@ func (p *Proof) validateFormat() error {
 	// validate number of bits that is going to be checked matches the size of the given key
 	keyBitCount := len(p.SiblingHashes)
 	for _, sc := range p.ShortPathLengths {
-		if keyBitCount > maxStepsForProofVerification {
-			return NewMalformedProofErrorf("number of key bits (%d) exceed limit (%d)", keyBitCount, maxStepsForProofVerification)
+		if keyBitCount > maxKeyLenBits {
+			return NewMalformedProofErrorf("number of key bits (%d) exceed limit (%d)", keyBitCount, maxKeyLenBits)
 		}
-		keyBitCount += CountUint16EncodingToInt(sc)
+		// check the common bits are non-zero
+		if sc == 0 {
+			return NewMalformedProofErrorf("short path length cannot be zero")
+		}
+		keyBitCount += int(sc)
 	}
-
-	if len(p.Key)*8 != keyBitCount {
-		return NewMalformedProofErrorf("key length doesn't match the length of ShortPathLengths and SiblingHashes")
+	if keyLen*8 != keyBitCount {
+		return NewMalformedProofErrorf("key length in bits (%d) doesn't match the length of ShortPathLengths and SiblingHashes (%d)",
+			keyLen*8,
+			keyBitCount)
 	}
 
 	// step3 - check InterimNodeTypes
 
 	// size checks
-	if len(p.InterimNodeTypes) == 0 {
-		return NewMalformedProofErrorf("InterimNodeTypes is empty")
-	}
 	if len(p.InterimNodeTypes) > maxKeyLength {
 		return NewMalformedProofErrorf("InterimNodeTypes is larger than max key length allowed (%d > %d)", len(p.InterimNodeTypes), maxKeyLength)
 	}
@@ -102,19 +99,13 @@ func (p *Proof) validateFormat() error {
 
 	// semantic checks
 
-	// Verify that number of bits that are set to 1 equals to the number of full nodes, i.e. len(SiblingHashes).
+	// Verify that number of bits that are set to 1 equals to the number of short nodes, i.e. len(ShortPathLengths).
 	numberOfShortNodes := 0
 	for _, d := range p.InterimNodeTypes {
 		numberOfShortNodes += bits.OnesCount8(d)
 	}
-
 	if numberOfShortNodes != len(p.ShortPathLengths) {
 		return NewMalformedProofErrorf("len(ShortPathLengths) (%d) does not match number of set bits in InterimNodeTypes (%d)", len(p.ShortPathLengths), numberOfShortNodes)
-	}
-
-	numberOfFullNodes := steps - numberOfShortNodes
-	if numberOfFullNodes != len(p.SiblingHashes) {
-		return NewMalformedProofErrorf("len(SiblingHashes) (%d) does not match number of set bits in InterimNodeTypes (%d)", numberOfFullNodes, len(p.SiblingHashes))
 	}
 
 	// check that tailing auxiliary bits (to make a complete full byte) are all zero
@@ -186,24 +177,24 @@ func (p *Proof) Verify(expectedRootHash []byte) error {
 		// Short node
 
 		// read and pop from ShortPathLengths
-		shortPathLengths := CountUint16EncodingToInt(p.ShortPathLengths[shortPathLengthIndex])
+		shortPathLength := int(p.ShortPathLengths[shortPathLengthIndex])
 		shortPathLengthIndex--
 
 		// construct the common path
-		commonPath := bitutils.MakeBitVector(shortPathLengths)
-		for c := shortPathLengths - 1; c >= 0; c-- {
+		commonPath := bitutils.MakeBitVector(shortPathLength)
+		for c := shortPathLength - 1; c >= 0; c-- {
 			if bitutils.ReadBit(p.Key, keyIndex) == 1 {
 				bitutils.SetBit(commonPath, c)
 			}
 			keyIndex--
 		}
 		// compute the hash for the short node
-		currentHash = computeShortHash(shortPathLengths, commonPath, currentHash)
+		currentHash = computeShortHash(shortPathLength, commonPath, currentHash)
 	}
 
 	// the final hash value should match whith what was expected
 	if !bytes.Equal(currentHash, expectedRootHash) {
-		return NewInvalidProofErrorf("root hash doesn't match, expected %X, computed %X", expectedRootHash, currentHash)
+		return newInvalidProofErrorf("root hash doesn't match, expected %X, computed %X", expectedRootHash, currentHash)
 	}
 
 	return nil

@@ -294,6 +294,13 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 		}
 		fnb.RegisterDefaultAdminCommands()
 		fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			// set up all admin commands
+			for commandName, commandFunc := range fnb.adminCommands {
+				command := commandFunc(fnb.NodeConfig)
+				fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+				fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
+			}
+
 			var opts []admin.CommandRunnerOption
 
 			if node.AdminCert != NotSet {
@@ -334,7 +341,7 @@ func (fnb *FlowNodeBuilder) EnqueueTracer() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) ParseAndPrintFlags() {
+func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 	// parse configuration parameters
 	pflag.Parse()
 
@@ -346,6 +353,8 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() {
 	})
 
 	log.Msg("flags loaded")
+
+	return fnb.extraFlagsValidation()
 }
 
 func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
@@ -764,7 +773,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Localnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedDeployment(false),
 		)
@@ -1013,9 +1022,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	fnb.BaseFlags()
 
-	fnb.ParseAndPrintFlags()
-
-	if err := fnb.extraFlagsValidation(); err != nil {
+	if err := fnb.ParseAndPrintFlags(); err != nil {
 		return err
 	}
 
@@ -1034,8 +1041,6 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 			return err
 		}
 	}
-
-	fnb.EnqueueAdminServerInit()
 
 	fnb.EnqueueTracer()
 
@@ -1107,12 +1112,7 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		}
 	}
 
-	// set up all admin commands
-	for commandName, commandFunc := range fnb.adminCommands {
-		command := commandFunc(fnb.NodeConfig)
-		fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
-		fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
-	}
+	fnb.EnqueueAdminServerInit()
 
 	// run all modules
 	for _, f := range fnb.modules {

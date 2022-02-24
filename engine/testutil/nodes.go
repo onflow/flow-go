@@ -149,7 +149,8 @@ func GenericNodeWithStateFixture(t testing.TB,
 	chainID flow.ChainID) testmock.GenericNode {
 
 	me := LocalFixture(t, identity)
-	stubnet := stub.NewNetwork(stateFixture.State, me, hub)
+	net, err := stub.NewNetwork(stateFixture.State, me, hub)
+	require.NoError(t, err)
 
 	return testmock.GenericNode{
 		Log:            log,
@@ -164,7 +165,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Payloads:       stateFixture.Storage.Payloads,
 		Blocks:         stateFixture.Storage.Blocks,
 		Me:             me,
-		Net:            stubnet,
+		Net:            net,
 		DBDir:          stateFixture.DBDir,
 		ChainID:        chainID,
 		ProtocolEvents: stateFixture.ProtocolEvents,

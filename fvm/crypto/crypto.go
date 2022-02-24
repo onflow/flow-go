@@ -3,7 +3,6 @@ package crypto
 import (
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/cadence/runtime"
 
@@ -145,9 +144,9 @@ func VerifySignatureFromRuntime(
 				hashAlgo, sigAlgo)
 		}
 
-		// tag compatibility
-		if !tagECDSACheck(tag) {
-			return false, errors.NewValueErrorf(sigAlgo.String(), "tag %s is not supported", tag)
+		// tag length compatibility
+		if len(tag) > flow.DomainTagLength {
+			return false, errors.NewValueErrorf(tag, "tag length (%d) is larger than max length allowed (%d bytes).", len(tag), flow.DomainTagLength)
 		}
 
 		// check BLS compatibilites
@@ -175,28 +174,6 @@ func VerifySignatureFromRuntime(
 	}
 
 	return valid, nil
-}
-
-// check compatible tags with ECDSA
-//
-// Only tags with a prefix flow.UserTagString and zero paddings are accepted.
-func tagECDSACheck(tag string) bool {
-
-	if len(tag) > flow.DomainTagLength ||
-		!strings.HasPrefix(tag, flow.UserTagString) {
-
-		return false
-	}
-
-	// check the remaining bytes are zeros
-	remaining := tag[len(flow.UserTagString):]
-	for _, b := range []byte(remaining) {
-		if b != 0 {
-			return false
-		}
-	}
-
-	return true
 }
 
 type SignatureVerifier interface {
