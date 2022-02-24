@@ -20,21 +20,11 @@ type TestRun struct {
 	Rows    []TestResultRow         `json:"rows"`
 }
 
-// PackageResult models test result of an entire package which can have multiple tests
-type PackageResult struct {
-	Package string                  `json:"package"`
-	Result  string                  `json:"result"`
-	Elapsed float32                 `json:"elapsed"`
-	Output  []string                `json:"output"`
-	Tests   []TestResult            `json:"tests"`
-	TestMap map[string][]TestResult `json:"-"`
-}
-
 type TestResultRow struct {
 	TestResult TestResult `json:"json"`
 }
 
-// TestResult models result of a single test that's part of a larger package result
+// TestResult models result of a single test
 type TestResult struct {
 	// data that spans multiple tests - it's added at the test level because it will be used
 	// by BigQuery tables and will need to be flattened
