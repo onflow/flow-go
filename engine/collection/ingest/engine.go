@@ -3,9 +3,9 @@
 package ingest
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -14,8 +14,8 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -27,8 +27,7 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	lm                   *lifecycle.LifecycleManager
-	wg                   *sync.WaitGroup // used to wait for processing loop to exit
+	*component.ComponentManager
 	log                  zerolog.Logger
 	engMetrics           module.EngineMetrics
 	colMetrics           module.CollectionMetrics
@@ -102,8 +101,6 @@ func New(
 	)
 
 	e := &Engine{
-		lm:                   lifecycle.NewLifecycleManager(),
-		wg:                   new(sync.WaitGroup),
 		log:                  logger,
 		engMetrics:           engMetrics,
 		colMetrics:           colMetrics,
@@ -116,38 +113,28 @@ func New(
 		transactionValidator: transactionValidator,
 	}
 
+	e.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(e.processTransactions).
+		Build()
+
 	conduit, err := net.Register(engine.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
-
 	e.conduit = conduit
 
 	return e, nil
 }
 
-// Start starts the engine by starting the message processing loop.
-func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
-	e.lm.OnStart(func() {
-		e.wg.Add(1)
-		go e.loop(ctx)
-	})
-}
-
-// Ready returns a ready channel that is closed once the engine has fully started.
-func (e *Engine) Ready() <-chan struct{} {
-	return e.lm.Started()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-func (e *Engine) Done() <-chan struct{} {
-	e.lm.OnStop()
-	return e.lm.Stopped()
-}
-
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	select {
+	case <-e.ComponentManager.ShutdownSignal():
+		return component.ErrComponentShutdown
+	default:
+	}
+
 	err := e.messageHandler.Process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -159,49 +146,18 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	return nil
 }
 
-// ProcessLocal processes an event originating on the local node. For local messages,
-// we skip the message queue and immediately process the transaction, blocking
-// the caller until we are finished. This way, we can provide context to the
-// user about whether their transaction was accepted.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	tx, ok := event.(*flow.TransactionBody)
-	if !ok {
-		return fmt.Errorf("local submission of non-transaction event type (%T) to ingest engine: %w", event, engine.IncompatibleInputTypeError)
-	}
-	e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
-	return e.onTransaction(e.me.NodeID(), tx)
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.ProcessLocal(event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
 // loop is the main message processing loop for transaction messages.
-func (e *Engine) loop(ctx irrecoverable.SignalerContext) {
-	defer e.wg.Done()
+func (e *Engine) processTransactions(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 
 	for {
 		select {
 		case <-ctx.Done():
-			e.lm.OnStop()
-		case <-e.lm.ShutdownSignal():
+			return
+		case <-e.ComponentManager.ShutdownSignal():
 			return
 		case <-e.messageHandler.GetNotifier():
-			err := e.processAvailableMessages()
+			err := e.processAvailableMessages(ctx)
 			if err != nil {
 				// if an error reaches this point, it is unexpected
 				ctx.Throw(err)
@@ -212,8 +168,17 @@ func (e *Engine) loop(ctx irrecoverable.SignalerContext) {
 
 // processAvailableMessages is called when the message queue is non-empty. It
 // will process transactions while the queue is non-empty, then return.
-func (e *Engine) processAvailableMessages() error {
+//
+// All expected error conditions are handled within this function. Unexpected
+// errors which should cause the component to stop are passed up.
+func (e *Engine) processAvailableMessages(ctx context.Context) error {
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
 		msg, ok := e.pendingTransactions.Get()
 		if ok {
 			err := e.onTransaction(msg.OriginID, msg.Payload.(*flow.TransactionBody))
