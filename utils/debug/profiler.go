@@ -13,6 +13,13 @@ import (
 	"github.com/onflow/flow-go/engine"
 )
 
+var profilerEnabled bool
+
+// SetProfilerEnabled enable or disable generating profiler data
+func SetProfilerEnabled(enabled bool) {
+	profilerEnabled = enabled
+}
+
 type AutoProfiler struct {
 	unit     *engine.Unit
 	dir      string // where we store profiles
@@ -21,7 +28,8 @@ type AutoProfiler struct {
 	duration time.Duration
 }
 
-func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration) (*AutoProfiler, error) {
+func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
+	SetProfilerEnabled(enabled)
 
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
@@ -49,6 +57,10 @@ func (p *AutoProfiler) Done() <-chan struct{} {
 }
 
 func (p *AutoProfiler) start() {
+	if !profilerEnabled {
+		return
+	}
+
 	p.log.Info().Msg("starting profile trace")
 	// write pprof trace files
 	p.pprof("heap")
