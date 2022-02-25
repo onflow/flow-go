@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -134,6 +135,7 @@ type BaseConfig struct {
 	profilerDir                     string
 	profilerInterval                time.Duration
 	profilerDuration                time.Duration
+	profilerMemProfileRate          int
 	tracerEnabled                   bool
 	tracerSensitivity               uint
 	metricsEnabled                  bool
@@ -214,6 +216,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerDir:                     "profiler",
 		profilerInterval:                15 * time.Minute,
 		profilerDuration:                10 * time.Second,
+		profilerMemProfileRate:          runtime.MemProfileRate,
 		tracerEnabled:                   false,
 		tracerSensitivity:               4,
 		metricsEnabled:                  true,
