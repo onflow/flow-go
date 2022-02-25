@@ -162,8 +162,6 @@ func (e *Engine) processQueuedTransactions(ctx irrecoverable.SignalerContext, re
 		select {
 		case <-ctx.Done():
 			return
-		case <-e.ComponentManager.ShutdownSignal():
-			return
 		case <-e.messageHandler.GetNotifier():
 			err := e.processAvailableMessages(ctx)
 			if err != nil {
