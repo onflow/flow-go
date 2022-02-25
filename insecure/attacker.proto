@@ -12,11 +12,11 @@ option go_package = "insecure";
 // CorruptibleConduitFactory allows an attacker to register itself to the factory, and send messages on behalf of its conduits.
 service CorruptibleConduitFactory {
   rpc RegisterAttacker(AttackerRegisterMessage) returns (google.protobuf.Empty) {}
-  rpc ProcessAttackerMessage(Message) returns (google.protobuf.Empty) {}
+  rpc ProcessAttackerMessage(stream Message) returns (google.protobuf.Empty) {}
 }
 
 service Attacker {
-  rpc Observe(Message) returns (google.protobuf.Empty) {}
+  rpc Observe(stream Message) returns (google.protobuf.Empty) {}
 }
 
 // Message is represents the message exchanged between the CorruptibleConduitFactory and Attacker services.

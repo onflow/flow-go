@@ -3,11 +3,7 @@
 package mockinsecure
 
 import (
-	context "context"
-
 	insecure "github.com/onflow/flow-go/insecure"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -16,25 +12,16 @@ type AttackerServer struct {
 	mock.Mock
 }
 
-// Observe provides a mock function with given fields: _a0, _a1
-func (_m *AttackerServer) Observe(_a0 context.Context, _a1 *insecure.Message) (*emptypb.Empty, error) {
-	ret := _m.Called(_a0, _a1)
+// Observe provides a mock function with given fields: _a0
+func (_m *AttackerServer) Observe(_a0 insecure.Attacker_ObserveServer) error {
+	ret := _m.Called(_a0)
 
-	var r0 *emptypb.Empty
-	if rf, ok := ret.Get(0).(func(context.Context, *insecure.Message) *emptypb.Empty); ok {
-		r0 = rf(_a0, _a1)
+	var r0 error
+	if rf, ok := ret.Get(0).(func(insecure.Attacker_ObserveServer) error); ok {
+		r0 = rf(_a0)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*emptypb.Empty)
-		}
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *insecure.Message) error); ok {
-		r1 = rf(_a0, _a1)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }

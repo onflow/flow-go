@@ -19,7 +19,7 @@ import (
 
 // TestRegisterAdapter_FailDoubleRegistration checks that CorruptibleConduitFactory can be registered with only one adapter.
 func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
-	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec())
+	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec())
 
 	adapter := &mocknetwork.Adapter{}
 
@@ -33,7 +33,7 @@ func TestRegisterAdapter_FailDoubleRegistration(t *testing.T) {
 // TestNewConduit_HappyPath checks when factory has an adapter registered, it can successfully
 // create conduits.
 func TestNewConduit_HappyPath(t *testing.T) {
-	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec())
+	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec())
 	channel := network.Channel("test-channel")
 
 	adapter := &mocknetwork.Adapter{}
@@ -48,7 +48,7 @@ func TestNewConduit_HappyPath(t *testing.T) {
 // TestNewConduit_MissingAdapter checks when factory does not have an adapter registered,
 // any attempts on creating a conduit fails with an error.
 func TestNewConduit_MissingAdapter(t *testing.T) {
-	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec())
+	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), cbor.NewCodec())
 	channel := network.Channel("test-channel")
 
 	c, err := f.NewConduit(context.Background(), channel)
@@ -60,9 +60,9 @@ func TestNewConduit_MissingAdapter(t *testing.T) {
 // registered attacker if one exists.
 func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	codec := cbor.NewCodec()
-	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), codec)
-	attacker := &mockAttacker{incomingBuffer: make(chan *insecure.Message)}
-	f.attacker = attacker
+	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec)
+	attacker := newMockAttackerObserverClient()
+	f.attackerObserveClient = attacker
 
 	event := &message.TestMessage{Text: "this is a test message"}
 	targetIds := unittest.IdentifierListFixture(10)
@@ -96,7 +96,7 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
 	codec := cbor.NewCodec()
 	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), codec)
+	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec)
 
 	adapter := &mocknetwork.Adapter{}
 	err := f.RegisterAdapter(adapter)
@@ -119,7 +119,7 @@ func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
 func TestFactoryHandleIncomingEvent_PublishOverNetwork(t *testing.T) {
 	codec := cbor.NewCodec()
 	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), codec)
+	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec)
 
 	adapter := &mocknetwork.Adapter{}
 	err := f.RegisterAdapter(adapter)
@@ -141,7 +141,7 @@ func TestFactoryHandleIncomingEvent_PublishOverNetwork(t *testing.T) {
 func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 	codec := cbor.NewCodec()
 	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), codec)
+	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec)
 
 	adapter := &mocknetwork.Adapter{}
 	err := f.RegisterAdapter(adapter)
@@ -168,7 +168,7 @@ func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 func TestProcessAttackerMessage(t *testing.T) {
 	codec := cbor.NewCodec()
 	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), codec)
+	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec)
 
 	adapter := &mocknetwork.Adapter{}
 	err := f.RegisterAdapter(adapter)
@@ -189,7 +189,7 @@ func TestProcessAttackerMessage(t *testing.T) {
 	msg, err := f.eventToMessage(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
 	require.NoError(t, err)
 
-	_, err = f.ProcessAttackerMessage(context.Background(), msg)
+	err = f.processAttackerMessage(msg)
 	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, adapter)
@@ -200,7 +200,7 @@ func TestProcessAttackerMessage(t *testing.T) {
 func TestEngineClosingChannel(t *testing.T) {
 	codec := cbor.NewCodec()
 	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(flow.BftTestnet, unittest.IdentifierFixture(), codec)
+	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec)
 
 	adapter := &mocknetwork.Adapter{}
 	err := f.RegisterAdapter(adapter)

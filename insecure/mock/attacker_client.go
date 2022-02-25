@@ -6,7 +6,6 @@ import (
 	context "context"
 
 	grpc "google.golang.org/grpc"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
 	insecure "github.com/onflow/flow-go/insecure"
 
@@ -18,29 +17,29 @@ type AttackerClient struct {
 	mock.Mock
 }
 
-// Observe provides a mock function with given fields: ctx, in, opts
-func (_m *AttackerClient) Observe(ctx context.Context, in *insecure.Message, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+// Observe provides a mock function with given fields: ctx, opts
+func (_m *AttackerClient) Observe(ctx context.Context, opts ...grpc.CallOption) (insecure.Attacker_ObserveClient, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, ctx)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *emptypb.Empty
-	if rf, ok := ret.Get(0).(func(context.Context, *insecure.Message, ...grpc.CallOption) *emptypb.Empty); ok {
-		r0 = rf(ctx, in, opts...)
+	var r0 insecure.Attacker_ObserveClient
+	if rf, ok := ret.Get(0).(func(context.Context, ...grpc.CallOption) insecure.Attacker_ObserveClient); ok {
+		r0 = rf(ctx, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*emptypb.Empty)
+			r0 = ret.Get(0).(insecure.Attacker_ObserveClient)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *insecure.Message, ...grpc.CallOption) error); ok {
-		r1 = rf(ctx, in, opts...)
+	if rf, ok := ret.Get(1).(func(context.Context, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, opts...)
 	} else {
 		r1 = ret.Error(1)
 	}

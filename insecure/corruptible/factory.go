@@ -3,13 +3,16 @@ package corruptible
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -19,20 +22,24 @@ import (
 // factory, which in turn is relayed to the register attacker.
 // The attacker can asynchronously dictate the conduit factory to send messages on behalf of the node this factory resides on.
 type ConduitFactory struct {
-	codec    network.Codec
-	myId     flow.Identifier
-	adapter  network.Adapter
-	attacker insecure.AttackerClient
+	*component.ComponentManager
+	logger                zerolog.Logger
+	codec                 network.Codec
+	myId                  flow.Identifier
+	adapter               network.Adapter
+	attackerObserveClient insecure.Attacker_ObserveClient
 }
 
-func NewCorruptibleConduitFactory(chainId flow.ChainID, myId flow.Identifier, codec network.Codec) *ConduitFactory {
+func NewCorruptibleConduitFactory(logger zerolog.Logger, chainId flow.ChainID, myId flow.Identifier, codec network.Codec) *ConduitFactory {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corruptible conduit factory")
 	}
 
 	return &ConduitFactory{
-		myId:  myId,
-		codec: codec,
+		ComponentManager: component.NewComponentManagerBuilder().Build(),
+		myId:             myId,
+		codec:            codec,
+		logger:           logger.With().Str("module", "corruptible-conduit-factory").Logger(),
 	}
 }
 
@@ -68,41 +75,88 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 	return con, nil
 }
 
-func (c *ConduitFactory) ProcessAttackerMessage(_ context.Context, in *insecure.Message, _ ...grpc.CallOption) (*empty.Empty, error) {
-	event, err := c.codec.Decode(in.Payload)
+func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
+	for {
+		select {
+		case <-c.ComponentManager.ShutdownSignal():
+			if c.attackerObserveClient != nil {
+				_, err := c.attackerObserveClient.CloseAndRecv()
+				if err != nil {
+					c.logger.Fatal().Err(err).Msg("could not close processing stream from attacker")
+					return err
+				}
+			}
+		default:
+			msg, err := stream.Recv()
+			if err == io.EOF {
+				c.logger.Info().Msg("attacker closed processing stream")
+				return stream.SendAndClose(&empty.Empty{})
+			}
+			if err != nil {
+				c.logger.Fatal().Err(err).Msg("could not read attacker's stream")
+				return stream.SendAndClose(&empty.Empty{})
+			}
+			if err := c.processAttackerMessage(msg); err != nil {
+				c.logger.Fatal().Err(err).Msg("could not process attacker's message")
+				return stream.SendAndClose(&empty.Empty{})
+			}
+		}
+
+	}
+}
+
+// processAttackerMessage dispatches the attacker message on the Flow network on behalf of this node.
+func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
+	event, err := c.codec.Decode(msg.Payload)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode message: %w", err)
+		return fmt.Errorf("could not decode message: %w", err)
 	}
 
-	targetIds, err := flow.ByteSlicesToIds(in.TargetIDs)
+	targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
+		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
-	err = c.sendOnNetwork(event, network.Channel(in.ChannelID), in.Protocol, uint(in.Targets), targetIds...)
+	err = c.sendOnNetwork(event, network.Channel(msg.ChannelID), msg.Protocol, uint(msg.Targets), targetIds...)
 	if err != nil {
-		return nil, fmt.Errorf("could not send attacker message to the network: %w", err)
+		return fmt.Errorf("could not send attacker message to the network: %w", err)
 	}
 
-	return &empty.Empty{}, nil
+	return nil
 }
 
 // RegisterAttacker is a gRPC end-point for this conduit factory that lets an attacker register itself to it, so that the attacker can
 // control it.
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
-func (c *ConduitFactory) RegisterAttacker(_ context.Context, in *insecure.AttackerRegisterMessage, _ ...grpc.CallOption) (*empty.Empty, error) {
-	if c.attacker != nil {
-		return nil, fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", in.Address)
+func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *insecure.AttackerRegisterMessage) (*empty.Empty, error) {
+	select {
+	case <-c.ComponentManager.ShutdownSignal():
+		return nil, fmt.Errorf("conduit factory has been shut down")
+	default:
+		return &empty.Empty{}, c.registerAttacker(ctx, in.Address)
+	}
+}
+
+func (c *ConduitFactory) registerAttacker(ctx context.Context, address string) error {
+	if c.attackerObserveClient != nil {
+		c.logger.Error().Str("address", address).Msg("attacker double-register detected")
+		return fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", address)
 	}
 
-	clientConn, err := grpc.Dial(in.Address)
+	clientConn, err := grpc.Dial(address)
 	if err != nil {
-		return nil, fmt.Errorf("could not establish a client connection to attacker: %w", err)
+		return fmt.Errorf("could not establish a client connection to attacker: %w", err)
 	}
 
-	c.attacker = insecure.NewAttackerClient(clientConn)
+	attackerClient := insecure.NewAttackerClient(clientConn)
+	c.attackerObserveClient, err = attackerClient.Observe(ctx)
+	if err != nil {
+		return fmt.Errorf("could not establish an observe stream to the attacker: %w", err)
+	}
 
-	return &empty.Empty{}, nil
+	c.logger.Info().Str("address", address).Msg("attacker registered successfully")
+
+	return nil
 }
 
 // HandleIncomingEvent is called by the slave conduits of this factory to relay their incoming events.
@@ -116,7 +170,7 @@ func (c *ConduitFactory) HandleIncomingEvent(
 	protocol insecure.Protocol,
 	num uint32, targetIds ...flow.Identifier) error {
 
-	if c.attacker == nil {
+	if c.attackerObserveClient == nil {
 		// no attacker yet registered, hence sending message on the network following the
 		// correct expected behavior.
 		return c.sendOnNetwork(event, channel, protocol, uint(num), targetIds...)
@@ -127,9 +181,9 @@ func (c *ConduitFactory) HandleIncomingEvent(
 		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
-	_, err = c.attacker.Observe(ctx, msg)
+	err = c.attackerObserveClient.Send(msg)
 	if err != nil {
-		return fmt.Errorf("remote attacker could not observe message: %w", err)
+		return fmt.Errorf("could not send message to attacker to observe: %w", err)
 	}
 
 	return nil
