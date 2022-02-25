@@ -38,14 +38,14 @@ type Config struct {
 // API to enable receiving transactions into the system.
 type Engine struct {
 	unit    *engine.Unit
-	logger  zerolog.Logger
+	log     zerolog.Logger
 	handler *handler     // the gRPC service implementation
 	server  *grpc.Server // the gRPC server
 	config  Config
 }
 
 // New returns a new ingress server.
-func New(config Config, backend Backend, chainID flow.ChainID) *Engine {
+func New(config Config, backend Backend, log zerolog.Logger, chainID flow.ChainID) *Engine {
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
@@ -65,6 +65,7 @@ func New(config Config, backend Backend, chainID flow.ChainID) *Engine {
 
 	e := &Engine{
 		unit: engine.NewUnit(),
+		log:  log.With().Str("engine", "collection_rpc").Logger(),
 		handler: &handler{
 			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
 			backend:                      backend,
@@ -103,19 +104,17 @@ func (e *Engine) Done() <-chan struct{} {
 // When this function returns, the server is considered ready.
 func (e *Engine) serve() {
 
-	log := e.logger.With().Str("module", "ingress").Logger()
-
-	log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
+	e.log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
 
 	l, err := net.Listen("tcp", e.config.ListenAddr)
 	if err != nil {
-		log.Err(err).Msg("failed to start server")
+		e.log.Fatal().Err(err).Msg("failed to start server")
 		return
 	}
 
 	err = e.server.Serve(l)
 	if err != nil {
-		log.Err(err).Msg("fatal error in server")
+		e.log.Error().Err(err).Msg("fatal error in server")
 	}
 }
 
