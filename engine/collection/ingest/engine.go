@@ -226,7 +226,6 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// fail fast if this is an unknown reference
 	_, err := refSnapshot.Head()
 	if err != nil {
-		log.Debug().Msg("trace - cannot validate transaction with unknown reference block")
 		return engine.NewUnverifiableInputError("could not get reference block for transaction (%x): %w", txID, err)
 	}
 
@@ -236,21 +235,15 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	epochCounter, err := refEpoch.Counter()
 	if err != nil {
-		log.Debug().Msg("trace - cannot retrieve epoch counter for transaction")
 		return fmt.Errorf("could not get counter for reference epoch: %w", err)
 	}
 	clusters, err := refEpoch.Clustering()
 	if err != nil {
-		log.Debug().Msg("trace - cannot retrieve clusters for transaction")
 		return fmt.Errorf("could not get clusters for reference epoch: %w", err)
 	}
 
-	log.Debug().Msg("trace - retrieving pool for transaction")
-
 	// use the transaction pool for the epoch the reference block is part of
 	pool := e.pools.ForEpoch(epochCounter)
-
-	log.Debug().Msg("trace - retrieved pool for transaction")
 
 	// short-circuit if we have already stored the transaction
 	if pool.Has(txID) {
@@ -258,50 +251,36 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return nil
 	}
 
-	log.Debug().Msg("trace - transaction is not already present in mempool")
-
 	// check if the transaction is valid
 	err = e.transactionValidator.Validate(tx)
 	if err != nil {
-		log.Debug().Err(err).Msg("trace - transaction failed validation")
 		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}
-
-	log.Debug().Msg("trace - transaction passed validation")
 
 	// get the locally assigned cluster and the cluster responsible for the transaction
 	txCluster, ok := clusters.ByTxID(txID)
 	if !ok {
-		log.Debug().Msg("trace - no cluster for transaction")
 		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
 	}
-
-	log.Debug().Msg("trace - got transaction cluster")
 
 	// get the cluster we are in for the reference epoch
 	localCluster, _, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
-		e.log.Debug().Msg("trace - no cluster found for this node")
 
 		// if we aren't assigned to a cluster, check that we are a member of
 		// the reference epoch
 		refIdentities, err := refEpoch.InitialIdentities()
 		if err != nil {
-			e.log.Debug().Err(err).Msg("trace - cannot get initial identities")
 			return fmt.Errorf("could not get initial identities for reference epoch: %w", err)
 		}
 
 		if _, ok := refIdentities.ByNodeID(e.me.NodeID()); ok {
-			e.log.Debug().Msg("trace - cannot get cluster for this node when it should have one")
 			// CAUTION: we are a member of the epoch, but have no assigned cluster!
 			// This is an unexpected condition and indicates a protocol state invariant has been broken
 			return fmt.Errorf("this node should have an assigned cluster in epoch (counter=%d), but has none", epochCounter)
 		}
-		e.log.Debug().Msg("trace - node not assigned cluster (expected case)")
 		return engine.NewUnverifiableInputError("this node is not assigned a cluster in epoch (counter=%d)", epochCounter)
 	}
-
-	log.Debug().Msg("trace - got local cluster")
 
 	localClusterFingerPrint := localCluster.Fingerprint()
 	txClusterFingerPrint := txCluster.Fingerprint()
@@ -312,10 +291,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// if our cluster is responsible for the transaction, add it to our local mempool
 	if localClusterFingerPrint == txClusterFingerPrint {
-		log.Debug().Msg("trace - adding transaction to pool")
 		_ = pool.Add(tx)
 		e.colMetrics.TransactionIngested(txID)
-		log.Debug().Msg("added transaction to pool")
 	}
 
 	// if the message was submitted internally (ie. via the Access API)
