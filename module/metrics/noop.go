@@ -21,7 +21,8 @@ func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string, messageTy
 func (nc *NoopCollector) MessageAdded(priority int)                                              {}
 func (nc *NoopCollector) MessageRemoved(priority int)                                            {}
 func (nc *NoopCollector) QueueDuration(duration time.Duration, priority int)                     {}
-func (nc *NoopCollector) InboundProcessDuration(topic string, duration time.Duration)            {}
+func (nc *NoopCollector) MessageProcessingStarted(topic string)                                  {}
+func (nc *NoopCollector) MessageProcessingFinished(topic string, duration time.Duration)         {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                              {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)                          {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)                           {}
