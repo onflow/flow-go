@@ -52,8 +52,5 @@ const (
 	// DKG
 	CodeDKGMessage
 
-	// BFT Testing
-	CodeInsecureMessage
-	
 	CodeMax
 )

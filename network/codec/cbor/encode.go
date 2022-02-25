@@ -83,8 +83,6 @@ func switchv2code(v interface{}) (uint8, error) {
 	// testing
 	case *message.TestMessage:
 		code = CodeEcho
-	case *insecure.Message:
-		code = CodeInsecureMessage
 
 	// dkg
 	case *messages.DKGMessage:
