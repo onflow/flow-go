@@ -135,6 +135,11 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
+	builder.EnqueueMetricsServerInit()
+	if err := builder.RegisterBadgerMetrics(); err != nil {
+		return err
+	}
+
 	builder.PreInit(builder.initUnstakedLocal())
 
 	return nil
