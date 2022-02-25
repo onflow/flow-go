@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+type TestData struct {
+	ExpectedTestRun    TestRun
+	RawJSONTestRunFile string
+}
+
 // AssertNoError checks that the passed in error is nil and panics
 // with the supplied message if that's not the case.
 // Useful helper to eliminate the need to keep checking for errors.

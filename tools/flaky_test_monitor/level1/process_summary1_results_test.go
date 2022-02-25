@@ -14,8 +14,67 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-// data driven table test
-func TestProcessSummary1TestRun(t *testing.T) {
+func GetTestData_Level1_SingleNilTest() common.TestRun {
+	commitDate, err := time.Parse(time.RFC3339, "2021-09-22T01:06:25Z")
+	common.AssertNoError(err, "time parse - commit date")
+
+	jobRunDate, err := time.Parse(time.RFC3339, "2021-09-22T04:06:25Z")
+	common.AssertNoError(err, "time parse - job run date")
+
+	row1 := common.TestResultRow{
+		TestResult: common.TestResult{
+			CommitSha:  "46baf6c6be29af9c040bc14195e195848598bbae",
+			CommitDate: commitDate,
+			JobRunDate: jobRunDate,
+			Test:       "TestEncodableRandomBeaconPrivKeyMsgPack",
+			Package:    "github.com/onflow/flow-go/model/encodable",
+			Result:     "-100",
+			Elapsed:    0,
+			Output: []struct {
+				Item string "json:\"item\""
+			}{
+				{Item: "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+				{Item: "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"},
+			},
+		},
+	}
+
+	testRun := common.TestRun{
+		Rows: []common.TestResultRow{
+			row1,
+		},
+	}
+	return testRun
+}
+
+func TestProcessSummary1TestRun_Struct(t *testing.T) {
+	const rawJsonFilePath = "../testdata/summary1/raw"
+
+	// data driven table test
+	testDataMap := map[string]common.TestData{
+		"1 count single nil test": {
+			ExpectedTestRun:    GetTestData_Level1_SingleNilTest(),
+			RawJSONTestRunFile: "test-result-nil-test-single-1-count-pass.json",
+		},
+	}
+
+	require.NoError(t, os.Setenv("COMMIT_DATE", "2021-09-21T18:06:25-07:00"))
+	require.NoError(t, os.Setenv("COMMIT_SHA", "46baf6c6be29af9c040bc14195e195848598bbae"))
+	require.NoError(t, os.Setenv("JOB_STARTED", "2021-09-21T21:06:25-07:00"))
+
+	for k, testData := range testDataMap {
+		t.Run(k, func(t *testing.T) {
+			// simulate generating raw "go test -json" output by loading output from saved file
+			resultReader := FileResultReader{
+				rawJsonFile: filepath.Join(rawJsonFilePath, testData.RawJSONTestRunFile),
+			}
+			actualTestRun := processSummary1TestRun(&resultReader)
+			checkTestRuns(t, testData.ExpectedTestRun, actualTestRun)
+		})
+	}
+}
+
+func TestProcessSummary1TestRun_JSON(t *testing.T) {
 	testDataMap := map[string]string{
 		"1 count all pass":                "test-result-crypto-hash-1-count-pass.json",
 		"1 count 1 fail the rest pass":    "test-result-crypto-hash-1-count-fail.json",
