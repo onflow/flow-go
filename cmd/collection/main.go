@@ -69,7 +69,7 @@ func main() {
 		startupTime                            time.Time
 
 		followerState protocol.MutableState
-		ingestConf    ingest.Config
+		ingestConf    ingest.Config = ingest.DefaultConfig()
 		ingressConf   ingress.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
@@ -337,6 +337,7 @@ func main() {
 				node.Network,
 				node.State,
 				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				colMetrics,
 				node.Me,
 				node.RootChainID.Chain(),
