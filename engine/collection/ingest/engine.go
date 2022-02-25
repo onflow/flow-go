@@ -114,7 +114,7 @@ func New(
 	}
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(e.processTransactions).
+		AddWorker(e.processQueuedTransactions).
 		Build()
 
 	conduit, err := net.Register(engine.PushTransactions, e)
@@ -126,8 +126,9 @@ func New(
 	return e, nil
 }
 
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
+// Process processes a transaction message from the network and enqueues the
+// message. Validation and ingestion is performed in the processQueuedTransactions
+// worker.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	select {
 	case <-e.ComponentManager.ShutdownSignal():
@@ -146,8 +147,15 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	return nil
 }
 
-// loop is the main message processing loop for transaction messages.
-func (e *Engine) processTransactions(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// ProcessTransaction processes a transaction message submitted from another
+// local component. The transaction is validated and ingested synchronously.
+// This is used by the GRPC API, for transactions from Access nodes.
+func (e *Engine) ProcessTransaction(tx *flow.TransactionBody) error {
+	return e.onTransaction(e.me.NodeID(), tx)
+}
+
+// processQueuedTransactions is the main message processing loop for transaction messages.
+func (e *Engine) processQueuedTransactions(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
