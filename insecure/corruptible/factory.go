@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/rs/zerolog"
@@ -206,15 +205,12 @@ func (c *ConduitFactory) eventToMessage(
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
-	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
-
 	return &insecure.Message{
 		ChannelID: channel.String(),
 		OriginID:  c.myId[:],
 		Targets:   num,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
-		Type:      msgType,
 		Protocol:  protocol,
 	}, nil
 }

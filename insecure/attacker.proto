@@ -26,8 +26,7 @@ message Message {
   uint32 Targets = 3;
   repeated bytes TargetIDs = 4;
   bytes Payload = 5;
-  string Type = 6;
-  Protocol protocol = 7;
+  Protocol protocol = 6;
 }
 
 enum Protocol {
