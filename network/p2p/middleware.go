@@ -313,9 +313,6 @@ func (m *Middleware) stop() {
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
-	m.metrics.DirectMessageStarted(msg.ChannelID)
-	defer m.metrics.DirectMessageFinished(msg.ChannelID)
-
 	// translates identifier to peer id
 	peerID, err := m.idTranslator.GetPeerID(targetID)
 	if err != nil {
@@ -331,6 +328,9 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	}
 
 	maxTimeout := m.unicastMaxMsgDuration(msg)
+
+	m.metrics.DirectMessageStarted(msg.ChannelID)
+	defer m.metrics.DirectMessageFinished(msg.ChannelID)
 
 	// pass in a context with timeout to make the unicast call fail fast
 	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
@@ -371,8 +371,6 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	if err != nil {
 		return fmt.Errorf("failed to close the stream for %s: %w", targetID, err)
 	}
-
-	m.metrics.DirectMessageFinished(msg.ChannelID)
 
 	channel := metrics.ChannelOneToOne
 	if _, isStaked := m.ov.Identities().ByNodeID(targetID); !isStaked {
