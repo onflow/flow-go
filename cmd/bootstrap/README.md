@@ -80,7 +80,7 @@ go run -tags relic ./cmd/bootstrap key --address "example.com:1234" --role "cons
      but is not required at node start
 
 
-### Phase 2: Generating final root information
+## Phase 2: Generating final root information
 
 This step will generate the entire root information for all nodes (incl. keys for all Dapper-controlled nodes).
 
@@ -147,3 +147,15 @@ go run -tags relic ./cmd/bootstrap finalize \
    - root Quorum Certificate for `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
    - REQUIRED at NODE START by all collectors of the respective cluster
    - file can be made accessible to all nodes at boot up (or recovery after crash)
+
+## Generating networking key for Observer
+
+This generates the networking key used by observers to connect to the public libp2p network. It is a different key format than staked nodes and should only be used for observers.
+
+```bash
+go run -tags relic ./cmd/bootstrap observer-network-key  -o ./path/
+```
+
+In this example, the following file will be generated: `./path/network-key`
+
+This key must be kept secret as it's used to encrypt and sign network requests sent by the observers.

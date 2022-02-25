@@ -43,4 +43,5 @@ var (
 	PathNodeRootBlockVote            = filepath.Join(DirPrivateRoot, "private-node-info_%v", "root-block-vote.json")
 	FilenameRootBlockVote            = FilenameRootBlockVotePrefix + "%v.json"
 	PathSecretsEncryptionKey         = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameSecretsEncryptionKey) // %v will be replaced by NodeID
+	FilenameObserverNetworkKey       = "network-key"
 )
