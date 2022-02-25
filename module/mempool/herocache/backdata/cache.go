@@ -361,7 +361,6 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 		}
 
 		// entity ID already exists in the bucket
-		c.availableSlotHistogram[availableSlotCount]++
 		return 0, false
 	}
 
