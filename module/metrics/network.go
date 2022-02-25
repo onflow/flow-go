@@ -232,7 +232,7 @@ func (nc *NetworkCollector) DirectMessageStarted(topic string) {
 }
 
 func (nc *NetworkCollector) DirectMessageFinished(topic string) {
-	nc.numDirectMessagesSending.WithLabelValues(topic).Inc()
+	nc.numDirectMessagesSending.WithLabelValues(topic).Dec()
 }
 
 // MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
