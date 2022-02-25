@@ -54,5 +54,6 @@ const (
 
 	// BFT Testing
 	CodeInsecureMessage
+	
 	CodeMax
 )
