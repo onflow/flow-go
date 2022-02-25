@@ -314,6 +314,7 @@ func (m *Middleware) stop() {
 // a more efficient candidate.
 func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
 	m.metrics.DirectMessageStarted(msg.ChannelID)
+	defer m.metrics.DirectMessageFinished(msg.ChannelID)
 
 	// translates identifier to peer id
 	peerID, err := m.idTranslator.GetPeerID(targetID)
