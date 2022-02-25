@@ -13,8 +13,8 @@ const (
 	CodeBlockVote
 
 	// protocol state sync
-	CodeSyncRequest
-	CodeSyncResponse
+	CodeLatestFinalizedBlockRequest
+	CodeLatestFinalizedBlockResponse
 	CodeRangeRequest
 	CodeBatchRequest
 	CodeBlockResponse

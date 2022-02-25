@@ -121,10 +121,10 @@ func (s *RequestHandler) HandleBatchRequest(req *messages.BatchRequest) (resp *m
 	return
 }
 
-func (s *RequestHandler) HandleSyncRequest(req *messages.SyncRequest) *messages.SyncResponse {
+func (s *RequestHandler) HandleLatestFinalizedBlockRequest(req *messages.LatestFinalizedBlockRequest) *messages.LatestFinalizedBlockResponse {
 	localHeader := s.finalizedHeader.Get()
 
-	return &messages.SyncResponse{
+	return &messages.LatestFinalizedBlockResponse{
 		Height:  localHeader.Height,
 		BlockID: localHeader.ID(),
 	}

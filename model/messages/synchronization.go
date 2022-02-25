@@ -15,14 +15,13 @@ type ResponseWrapper struct {
 	ResponsePayload interface{}
 }
 
-// SyncRequest is part of the synchronization protocol and represents a node on
+// LatestFinalizedBlockRequest is part of the synchronization protocol and represents a node on
 // the network requesting the latest finalized block from the recipient.
-type SyncRequest struct{}
+type LatestFinalizedBlockRequest struct{}
 
-// SyncResponse is part of the synchronization protocol and represents the reply
-// to a synchronization request that contains the latest finalized block of the
-// responding node.
-type SyncResponse struct {
+// LatestFinalizedBlockResponse is part of the synchronization protocol and represents the reply
+// to a synchronization request that contains the latest finalized block of the responding node.
+type LatestFinalizedBlockResponse struct {
 	Height  uint64
 	BlockID flow.Identifier
 }

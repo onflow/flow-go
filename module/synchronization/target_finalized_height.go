@@ -4,9 +4,10 @@ import (
 	"math/rand"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
-type TargetHeight struct {
+type TargetHeightTracker struct {
 	oldestIndex int
 	windowSize  int
 	heights     []uint64
@@ -14,8 +15,10 @@ type TargetHeight struct {
 	cachedValue uint64
 }
 
-func NewTargetHeight(windowSize int) *TargetHeight {
-	return &TargetHeight{
+var _ module.TargetHeightTracker = (*TargetHeightTracker)(nil)
+
+func NewTargetHeightTracker(windowSize int) *TargetHeightTracker {
+	return &TargetHeightTracker{
 		windowSize:  windowSize,
 		heights:     make([]uint64, 0, windowSize),
 		oldestIndex: 0,
@@ -24,7 +27,7 @@ func NewTargetHeight(windowSize int) *TargetHeight {
 	}
 }
 
-func (t *TargetHeight) Update(height uint64, originID flow.Identifier) {
+func (t *TargetHeightTracker) ProcessHeight(height uint64, originID flow.Identifier) {
 	if len(t.heights) < t.windowSize {
 		t.heights = append(t.heights, height)
 	} else {
@@ -37,7 +40,7 @@ func (t *TargetHeight) Update(height uint64, originID flow.Identifier) {
 	}
 }
 
-func (t *TargetHeight) Get() uint64 {
+func (t *TargetHeightTracker) GetTargetHeight() uint64 {
 	// TODO: compute weighted median by age
 
 	if t.updated {

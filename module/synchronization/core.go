@@ -107,7 +107,7 @@ func (c *Core) BatchReceived(blockIDs []flow.Identifier, originID flow.Identifie
 }
 
 // HeightReceived updates sync state after a Sync Height response is received.
-func (c *Core) HeightReceived(height uint64, originID flow.Identifier) {
+func (c *Core) LatestFinalizedBlockReceived(blockID flow.Identifier, height uint64, originID flow.Identifier) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

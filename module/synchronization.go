@@ -24,30 +24,30 @@ type SyncCore interface {
 	// BatchReceived updates sync state after a Batch Request response is received.
 	BatchReceived(blockIDs []flow.Identifier, originID flow.Identifier)
 
-	// HeightReceived updates sync state after a Sync Height response is received.
-	HeightReceived(blockID flow.Identifier, height uint64, originID flow.Identifier)
+	// LatestBlockReceived updates sync state after a Latest Finalized Block Request response is received.
+	LatestFinalizedBlockReceived(blockID flow.Identifier, height uint64, originID flow.Identifier)
 }
 
-type ActiveRange interface {
-	// Update processes a range of blocks received from a Range Request
+type ActiveRangeTracker interface {
+	// ProcessRange processes a range of blocks received from a Range Request
 	// response and updates the requestable height range.
-	Update(startHeight uint64, blockIDs []flow.Identifier, originID flow.Identifier)
+	ProcessRange(startHeight uint64, blockIDs []flow.Identifier, originID flow.Identifier)
 
-	// LocalFinalizedHeight is called to notify a change in the local finalized height.
-	LocalFinalizedHeight(height uint64)
+	// UpdateLowerBound is called to set the lower bound of the tracker.
+	UpdateLowerBound(height uint64)
 
-	// TargetFinalizedHeight is called to notify a change in the target finalized height.
-	TargetFinalizedHeight(height uint64)
+	// UpdateUpperBound is called to set the upper bound of the tracker.
+	UpdateUpperBound(height uint64)
 
 	// Get returns the range of requestable block heights.
-	Get() flow.Range
+	GetActiveRange() flow.Range
 }
 
-type TargetFinalizedHeight interface {
-	// Update processes a height received from a Sync Height Response
+type TargetHeightTracker interface {
+	// Update processes a height received from a Latest Finalized Block Response
 	// and updates the finalized height estimate.
-	Update(height uint64, originID flow.Identifier)
+	ProcessHeight(height uint64, originID flow.Identifier)
 
 	// Get returns the estimated finalized height of the overall chain.
-	Get() uint64
+	GetTargetHeight() uint64
 }
