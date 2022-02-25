@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -14,47 +15,19 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-func GetTestData_Level1_SingleNilTest() common.TestRun {
-	commitDate, err := time.Parse(time.RFC3339, "2021-09-22T01:06:25Z")
-	common.AssertNoError(err, "time parse - commit date")
-
-	jobRunDate, err := time.Parse(time.RFC3339, "2021-09-22T04:06:25Z")
-	common.AssertNoError(err, "time parse - job run date")
-
-	row1 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  "46baf6c6be29af9c040bc14195e195848598bbae",
-			CommitDate: commitDate,
-			JobRunDate: jobRunDate,
-			Test:       "TestEncodableRandomBeaconPrivKeyMsgPack",
-			Package:    "github.com/onflow/flow-go/model/encodable",
-			Result:     "-100",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
-				{Item: "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"},
-			},
-		},
-	}
-
-	testRun := common.TestRun{
-		Rows: []common.TestResultRow{
-			row1,
-		},
-	}
-	return testRun
-}
-
 func TestProcessSummary1TestRun_Struct(t *testing.T) {
 	const rawJsonFilePath = "../testdata/summary1/raw"
 
 	// data driven table test
-	testDataMap := map[string]common.TestData{
+	testDataMap := map[string]TestData{
 		"1 count single nil test": {
-			ExpectedTestRun:    GetTestData_Level1_SingleNilTest(),
+			ExpectedTestRun:    GetTestData_Level1_1CountSingleNilTest(),
 			RawJSONTestRunFile: "test-result-nil-test-single-1-count-pass.json",
+		},
+
+		"1 count all pass": {
+			ExpectedTestRun:    GetTestData_Level1_1CountPass(),
+			RawJSONTestRunFile: "test-result-crypto-hash-1-count-pass.json",
 		},
 	}
 
@@ -149,12 +122,13 @@ func checkTestRuns(t *testing.T, expectedTestRun common.TestRun, actualTestRun c
 
 	// check that all expected TestResults are in actual TestResults
 	for actualRowIndex := range actualTestRun.Rows {
-		require.Contains(t, actualTestRun.Rows, expectedTestRun.Rows[actualRowIndex], expectedTestRun.Rows[actualRowIndex].TestResult)
+		// require.Contains(t, actualTestRun.Rows, expectedTestRun.Rows[actualRowIndex], "expected TestResult doesn't exist in actual: ", expectedTestRun.Rows[actualRowIndex].TestResult)
+		require.Contains(t, actualTestRun.Rows, expectedTestRun.Rows[actualRowIndex], printTestResult(expectedTestRun.Rows[actualRowIndex].TestResult))
 	}
 
 	// check that all actual TestResults are in expected TestResults
 	for exptedRowIndex := range expectedTestRun.Rows {
-		require.Contains(t, expectedTestRun.Rows, actualTestRun.Rows[exptedRowIndex], actualTestRun.Rows[exptedRowIndex].TestResult)
+		require.Contains(t, expectedTestRun.Rows, actualTestRun.Rows[exptedRowIndex], printTestResult(actualTestRun.Rows[exptedRowIndex].TestResult))
 	}
 }
 
@@ -185,4 +159,20 @@ func (fileResultReader *FileResultReader) close() {
 func (fileResultReader FileResultReader) getResultsFileName() string {
 	t := time.Now()
 	return "test-run-" + strings.ReplaceAll(t.Format("2006-01-02-15-04-05.0000"), ".", "-") + ".json"
+}
+
+func printTestResult(testResult common.TestResult) string {
+	builder := strings.Builder{}
+	builder.WriteString("*** Test Result (not found) ***")
+	builder.WriteString("\nTest: " + testResult.Test)
+	builder.WriteString("\nCommit SHA: " + testResult.CommitSha)
+	builder.WriteString("\nPackage: " + testResult.Package)
+	builder.WriteString("\nCommit Date: " + testResult.CommitDate.String())
+	builder.WriteString("\nJob Run Date: " + testResult.JobRunDate.String())
+	builder.WriteString("\nElapsed: " + fmt.Sprintf("%f", testResult.Elapsed))
+	builder.WriteString("\nResult: " + testResult.Result)
+	for i, bar := range testResult.Output {
+		builder.WriteString("\nOutput[" + fmt.Sprintf("%d", i) + "]" + bar.Item)
+	}
+	return builder.String()
 }
