@@ -28,9 +28,9 @@ func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetr
 	}
 }
 
-func (w CommitteeMetricsWrapper) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (w CommitteeMetricsWrapper) IdentitiesByIndices(blockID flow.Identifier, indices []int) (flow.IdentityList, error) {
 	processStart := time.Now()
-	identities, err := w.committee.Identities(blockID, selector)
+	identities, err := w.committee.IdentitiesByIndices(blockID, indices)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return identities, err
 }

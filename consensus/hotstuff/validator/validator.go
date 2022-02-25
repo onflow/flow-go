@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -47,8 +46,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 
 	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
 	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive stake)
-	// TODO: filter.Any can be removed
-	allParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
+	allParticipants, err := v.committee.Identities(block.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
 	}

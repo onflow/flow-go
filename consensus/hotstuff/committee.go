@@ -18,20 +18,18 @@ import (
 // for determining the valid collector-HotStuff participants.
 type Committee interface {
 
-	// Identities returns a IdentityList with legitimate HotStuff participants for the specified block.
-	// The list of participants is filtered by the provided selector. The returned list of HotStuff participants
-	//   * contains nodes that are allowed to sign the specified block (legitimate participants with NON-ZERO STAKE)
-	//   * is ordered in the canonical order
-	//   * contains no duplicates.
-	// The list of all legitimate HotStuff participants for the specified block can be obtained by using `filter.Any`
-	// TODO: selector can be removed
-	Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error)
-
 	// Identity returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO STAKE at the specified block.
 	// ERROR conditions:
 	//  * model.InvalidSignerError if participantID does NOT correspond to a _staked_ HotStuff participant at the specified block.
 	Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
+
+	// Identities returns a IdentityList with legitimate HotStuff participants for the specified block.
+	// The returned list of HotStuff participants
+	//   * contains nodes that are allowed to sign the specified block (legitimate participants with NON-ZERO STAKE)
+	//   * is ordered in the canonical order
+	//   * contains no duplicates.
+	Identities(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// LeaderForView returns the identity of the leader for a given view.
 	// CAUTION: per liveness requirement of HotStuff, the leader must be fork-independent.

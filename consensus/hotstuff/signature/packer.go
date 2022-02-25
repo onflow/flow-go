@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 // ConsensusSigDataPacker implements the hotstuff.Packer interface.
@@ -37,7 +36,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	sigTypes := make([]hotstuff.SigType, 0, count)
 
 	// retrieve all authorized consensus participants at the given block
-	consensus, err := p.committees.Identities(blockID, filter.Any)
+	consensus, err := p.committees.Identities(blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
 	}
@@ -109,7 +108,7 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 	}
 
 	// read all the possible signer IDs at the given block
-	consensus, err := p.committees.Identities(blockID, filter.Any)
+	consensus, err := p.committees.Identities(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
 	}
