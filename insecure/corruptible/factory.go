@@ -85,6 +85,7 @@ func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleCondu
 					return err
 				}
 			}
+			return nil
 		default:
 			msg, err := stream.Recv()
 			if err == io.EOF {
@@ -100,7 +101,6 @@ func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleCondu
 				return stream.SendAndClose(&empty.Empty{})
 			}
 		}
-
 	}
 }
 
