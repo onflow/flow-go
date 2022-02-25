@@ -23,7 +23,7 @@ func getAccount(
 		return nil, err
 	}
 
-	computationMeteringHandler := handler.NewComputationMeteringHandler(DefaultComputationLimit)
+	computationMeteringHandler := handler.NewComputationMeteringHandler(DefaultComputationLimit, handler.WithCoumputationWeightFactors(map[string]uint64{"function_or_loop_call": 1}))
 
 	if ctx.ServiceAccountEnabled {
 		env := NewScriptEnvironment(ctx, vm, sth, programs, computationMeteringHandler)

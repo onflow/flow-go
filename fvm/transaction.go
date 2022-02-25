@@ -20,7 +20,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 		ID:                         tx.ID(),
 		Transaction:                tx,
 		TxIndex:                    txIndex,
-		ComputationMeteringHandler: handler.NewComputationMeteringHandler(DefaultComputationLimit),
+		ComputationMeteringHandler: handler.NewComputationMeteringHandler(DefaultComputationLimit, handler.WithCoumputationWeightFactors(map[string]uint64{"function_or_loop_call": 1})),
 	}
 }
 

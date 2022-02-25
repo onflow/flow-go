@@ -21,7 +21,7 @@ func Script(code []byte) *ScriptProcedure {
 	return &ScriptProcedure{
 		Script:                     code,
 		ID:                         flow.HashToID(scriptHash),
-		ComputationMeteringHandler: handler.NewComputationMeteringHandler(DefaultComputationLimit),
+		ComputationMeteringHandler: handler.NewComputationMeteringHandler(DefaultComputationLimit, handler.WithCoumputationWeightFactors(map[string]uint64{"function_or_loop_call": 1})),
 	}
 }
 

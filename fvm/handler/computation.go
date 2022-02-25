@@ -43,7 +43,7 @@ func (c *computationMeter) AddUsed(amount uint64, label ComputationCostLabel) er
 	c.handler.weights[string(label)] += amount
 	costFactor, ok := c.handler.factors[string(label)]
 	if !ok {
-		costFactor = 1
+		return nil
 	}
 
 	c.used += costFactor * amount
