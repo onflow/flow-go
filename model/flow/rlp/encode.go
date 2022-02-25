@@ -153,7 +153,7 @@ func get() (pchunk *listhead) {
 	// would make sense to use bit arithmetic to determine if an
 	// index is available.  There are also built-ins in gcc for determining
 	// the first non-zero bit in an integer, that correspond to specific
-	// assembly instructions.
+	// assembly instructions.  see __builtin_clz or __builtin_clzll
 
 	// search for a free chunk, a
 	for i := last; i < LISTHEAD_CACHE_SIZE; i++ {
