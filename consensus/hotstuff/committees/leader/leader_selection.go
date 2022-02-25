@@ -156,7 +156,7 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16
 		randomness := rng.UintN(cumsum)
 
 		// binary search to find the leader index by the random number
-		leader := binarySearch(randomness, weightSums)
+		leader := binarySearchStrictlyBigger(randomness, weightSums)
 
 		leaders = append(leaders, uint16(leader))
 	}

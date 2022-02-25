@@ -48,7 +48,7 @@ func TestBsearchVSsortSearch(t *testing.T) {
 	}
 	sel := make([]int, 0, 10)
 	for i := 0; i < 10; i++ {
-		index := binarySearch(uint64(i), sums)
+		index := binarySearchStrictlyBigger(uint64(i), sums)
 		sel = append(sel, index)
 	}
 
@@ -95,7 +95,7 @@ func TestBsearchWithNormalSearch(t *testing.T) {
 		expected, err := bruteSearch(value, sums)
 		require.NoError(t, err)
 
-		actual := binarySearch(value, sums)
+		actual := binarySearchStrictlyBigger(value, sums)
 		require.NoError(t, err)
 
 		require.Equal(t, expected, actual)
