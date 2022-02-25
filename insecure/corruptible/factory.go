@@ -164,7 +164,6 @@ func (c *ConduitFactory) registerAttacker(ctx context.Context, address string) e
 // Otherwise, the factory follows the correct protocol path by sending the message down to the networking layer
 // to deliver to its targets.
 func (c *ConduitFactory) HandleIncomingEvent(
-	ctx context.Context,
 	event interface{},
 	channel network.Channel,
 	protocol insecure.Protocol,

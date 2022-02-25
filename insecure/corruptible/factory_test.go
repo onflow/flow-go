@@ -69,7 +69,7 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 	channel := network.Channel("test-channel")
 
 	go func() {
-		err := f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
+		err := f.HandleIncomingEvent(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
 		require.NoError(t, err)
 	}()
 
@@ -108,7 +108,7 @@ func TestFactoryHandleIncomingEvent_UnicastOverNetwork(t *testing.T) {
 
 	adapter.On("UnicastOnChannel", channel, event, targetId).Return(nil).Once()
 
-	err = f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_UNICAST, uint32(0), targetId)
+	err = f.HandleIncomingEvent(event, channel, insecure.Protocol_UNICAST, uint32(0), targetId)
 	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, adapter)
@@ -130,7 +130,7 @@ func TestFactoryHandleIncomingEvent_PublishOverNetwork(t *testing.T) {
 
 	adapter.On("PublishOnChannel", channel, event).Return(nil).Once()
 
-	err = f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_PUBLISH, uint32(0))
+	err = f.HandleIncomingEvent(event, channel, insecure.Protocol_PUBLISH, uint32(0))
 	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, adapter)
@@ -158,7 +158,7 @@ func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 
 	adapter.On("MulticastOnChannel", params...).Return(nil).Once()
 
-	err = f.HandleIncomingEvent(context.Background(), event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
+	err = f.HandleIncomingEvent(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
 	require.NoError(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, adapter)

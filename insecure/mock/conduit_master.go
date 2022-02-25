@@ -3,8 +3,6 @@
 package mockinsecure
 
 import (
-	context "context"
-
 	insecure "github.com/onflow/flow-go/insecure"
 	flow "github.com/onflow/flow-go/model/flow"
 
@@ -32,20 +30,20 @@ func (_m *ConduitMaster) EngineClosingChannel(_a0 network.Channel) error {
 	return r0
 }
 
-// HandleIncomingEvent provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4, _a5
-func (_m *ConduitMaster) HandleIncomingEvent(_a0 context.Context, _a1 interface{}, _a2 network.Channel, _a3 insecure.Protocol, _a4 uint32, _a5 ...flow.Identifier) error {
-	_va := make([]interface{}, len(_a5))
-	for _i := range _a5 {
-		_va[_i] = _a5[_i]
+// HandleIncomingEvent provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
+func (_m *ConduitMaster) HandleIncomingEvent(_a0 interface{}, _a1 network.Channel, _a2 insecure.Protocol, _a3 uint32, _a4 ...flow.Identifier) error {
+	_va := make([]interface{}, len(_a4))
+	for _i := range _a4 {
+		_va[_i] = _a4[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, _a0, _a1, _a2, _a3, _a4)
+	_ca = append(_ca, _a0, _a1, _a2, _a3)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, interface{}, network.Channel, insecure.Protocol, uint32, ...flow.Identifier) error); ok {
-		r0 = rf(_a0, _a1, _a2, _a3, _a4, _a5...)
+	if rf, ok := ret.Get(0).(func(interface{}, network.Channel, insecure.Protocol, uint32, ...flow.Identifier) error); ok {
+		r0 = rf(_a0, _a1, _a2, _a3, _a4...)
 	} else {
 		r0 = ret.Error(0)
 	}
