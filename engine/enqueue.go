@@ -6,6 +6,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -91,4 +93,34 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 
 func (e *MessageHandler) GetNotifier() <-chan struct{} {
 	return e.notifier.Channel()
+}
+
+// MessageStoreChannelWorker returns a component worker and a channel of messages.
+// Once started, the worker will feed the channel with messages from the
+// MessageStore, as long as it is non-empty.
+func MessageStoreChannelWorker(stores []MessageStore, notifier <-chan struct{}) (component.ComponentWorker, <-chan *Message) {
+	// channel of messages funneled out of the message store by the worker
+	out := make(chan *Message)
+
+	// component worker which feeds a channel
+	worker := func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-notifier:
+				for _, store := range stores {
+					for {
+						msg, ok := store.Get()
+						if !ok {
+							break
+						}
+						out <- msg
+					}
+				}
+			}
+		}
+	}
+
+	return worker, out
 }

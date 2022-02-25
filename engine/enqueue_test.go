@@ -13,13 +13,15 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestEngine tests the integration of MessageHandler and FifoQueue that buffer and deliver
 // matched messages to corresponding handlers
 type TestEngine struct {
-	unit           *engine.Unit
+	*component.ComponentManager
 	log            zerolog.Logger
 	ready          sync.WaitGroup
 	messageHandler *engine.MessageHandler
@@ -104,12 +106,16 @@ func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 	)
 
 	eng := &TestEngine{
-		unit:           engine.NewUnit(),
 		log:            log,
 		messageHandler: handler,
 		queueA:         queueA,
 		queueB:         queueB,
 	}
+
+	workerA, messagesA := engine.MessageStoreChannelWorker(queueA)
+
+	eng.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker()
 
 	return eng, nil
 }
@@ -130,7 +136,8 @@ func (e *TestEngine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-func (e *TestEngine) loop() {
+func (e *TestEngine) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
 	// let Ready() wait until the loop has started
 	// otherwise the message producer's doNotify will not be able to push messages
 	// to the e.notify channel
