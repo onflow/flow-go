@@ -20,14 +20,19 @@ func TestProcessSummary1TestRun_Struct(t *testing.T) {
 
 	// data driven table test
 	testDataMap := map[string]TestData{
-		"1 count single nil test": {
-			ExpectedTestRun:    GetTestData_Level1_1CountSingleNilTest(),
-			RawJSONTestRunFile: "test-result-nil-test-single-1-count-pass.json",
-		},
-
 		"1 count all pass": {
 			ExpectedTestRun:    GetTestData_Level1_1CountPass(),
 			RawJSONTestRunFile: "test-result-crypto-hash-1-count-pass.json",
+		},
+
+		"1 count 1 fail the rest pass": {
+			ExpectedTestRun:    GetTestData_Level1_1Count1FailRestPass(),
+			RawJSONTestRunFile: "test-result-crypto-hash-1-count-fail.json",
+		},
+
+		"1 count single nil test": {
+			ExpectedTestRun:    GetTestData_Level1_1CountSingleNilTest(),
+			RawJSONTestRunFile: "test-result-nil-test-single-1-count-pass.json",
 		},
 	}
 
@@ -122,13 +127,12 @@ func checkTestRuns(t *testing.T, expectedTestRun common.TestRun, actualTestRun c
 
 	// check that all expected TestResults are in actual TestResults
 	for actualRowIndex := range actualTestRun.Rows {
-		// require.Contains(t, actualTestRun.Rows, expectedTestRun.Rows[actualRowIndex], "expected TestResult doesn't exist in actual: ", expectedTestRun.Rows[actualRowIndex].TestResult)
-		require.Contains(t, actualTestRun.Rows, expectedTestRun.Rows[actualRowIndex], printTestResult(expectedTestRun.Rows[actualRowIndex].TestResult))
+		require.Contains(t, actualTestRun.Rows, expectedTestRun.Rows[actualRowIndex], printTestResult(expectedTestRun.Rows[actualRowIndex].TestResult, "expected not in actual"))
 	}
 
 	// check that all actual TestResults are in expected TestResults
 	for exptedRowIndex := range expectedTestRun.Rows {
-		require.Contains(t, expectedTestRun.Rows, actualTestRun.Rows[exptedRowIndex], printTestResult(actualTestRun.Rows[exptedRowIndex].TestResult))
+		require.Contains(t, expectedTestRun.Rows, actualTestRun.Rows[exptedRowIndex], printTestResult(actualTestRun.Rows[exptedRowIndex].TestResult, "actual not in expected"))
 	}
 }
 
@@ -161,9 +165,9 @@ func (fileResultReader FileResultReader) getResultsFileName() string {
 	return "test-run-" + strings.ReplaceAll(t.Format("2006-01-02-15-04-05.0000"), ".", "-") + ".json"
 }
 
-func printTestResult(testResult common.TestResult) string {
+func printTestResult(testResult common.TestResult, message string) string {
 	builder := strings.Builder{}
-	builder.WriteString("*** Test Result (not found) ***")
+	builder.WriteString("*** Test Result (not found) " + message + "***")
 	builder.WriteString("\nTest: " + testResult.Test)
 	builder.WriteString("\nCommit SHA: " + testResult.CommitSha)
 	builder.WriteString("\nPackage: " + testResult.Package)
