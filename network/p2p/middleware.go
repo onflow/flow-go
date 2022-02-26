@@ -352,7 +352,10 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	}
 
 	deadline, _ := ctx.Deadline()
-	stream.SetWriteDeadline(deadline)
+	err = stream.SetWriteDeadline(deadline)
+	if err != nil {
+		m.log.Err(err).Msg("failed to set write deadline for stream")
+	}
 
 	// create a gogo protobuf writer
 	bufw := bufio.NewWriter(stream)
@@ -410,7 +413,10 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	ctx, cancel := context.WithTimeout(m.ctx, LargeMsgUnicastTimeout)
 
 	deadline, _ := ctx.Deadline()
-	s.SetReadDeadline(deadline)
+	err = s.SetReadDeadline(deadline)
+	if err != nil {
+		log.Err(err).Msg("failed to set read deadline for stream")
+	}
 
 	//create a new readConnection with the context of the middleware
 	conn := newReadConnection(
