@@ -113,7 +113,7 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 	}, nil
 }
 
-// WeightedRandomSelection - given a seed and a given count, pre-generate the indexs of leader.
+// WeightedRandomSelection - given a seed and a given count, pre-generate the indices of leader.
 // The chance to be selected as leader is proportional to its weight.
 // If an identity has 0 stake (weight is 0), it won't be selected as leader.
 // This algorithm is essentially Fitness proportionate selection:
@@ -138,7 +138,7 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16
 	weightSums := make([]uint64, 0, len(weights))
 
 	// cumulative sum of weights
-	// after cumulating the weights, the sum is the total weight
+	// after cumulating the weights, the sum is the total weight;
 	// total weight is used to specify the range of the random number.
 	var cumsum uint64
 	for _, weight := range weights {
@@ -156,31 +156,35 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16
 		randomness := rng.UintN(cumsum)
 
 		// binary search to find the leader index by the random number
-		leader := binarySearch(randomness, weightSums)
+		leader := binarySearchStrictlyBigger(randomness, weightSums)
 
 		leaders = append(leaders, uint16(leader))
 	}
 	return leaders, nil
 }
 
-// binary search to find the index of the first item in the given array that is
+// binarySearchStriclyBigger finds the index of the first item in the given array that is
 // strictly bigger to the given value.
 // There are a few assumptions on inputs:
 // - `arr` must be non-empty
 // - items in `arr` must be in non-decreasing order
 // - `value` must be less than the last item in `arr`
-func binarySearch(value uint64, arr []uint64) int {
-	return bsearch(0, len(arr)-1, value, arr)
-}
+func binarySearchStrictlyBigger(value uint64, arr []uint64) int {
+	left := 0
+	arrayLen := len(arr)
+	right := arrayLen - 1
+	mid := arrayLen >> 1
+	for {
+		if arr[mid] <= value {
+			left = mid + 1
+		} else {
+			right = mid
+		}
 
-func bsearch(left, right int, value uint64, arr []uint64) int {
-	if left == right {
-		return left
-	}
+		if left >= right {
+			return left
+		}
 
-	mid := (left + right) / 2
-	if value < arr[mid] {
-		return bsearch(left, mid, value, arr)
+		mid = int(left+right) >> 1
 	}
-	return bsearch(mid+1, right, value, arr)
 }
