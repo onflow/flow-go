@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
