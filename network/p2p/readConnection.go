@@ -30,7 +30,8 @@ type readConnection struct {
 }
 
 // newReadConnection creates a new readConnection
-func newReadConnection(ctx context.Context,
+func newReadConnection(
+	ctx context.Context,
 	stream libp2pnetwork.Stream,
 	callback func(msg *message.Message, peerID peer.ID),
 	log zerolog.Logger,
@@ -44,7 +45,6 @@ func newReadConnection(ctx context.Context,
 	}
 
 	c := readConnection{
-		ctx:        ctx,
 		stream:     stream,
 		remoteID:   stream.Conn().RemotePeer(),
 		callback:   callback,
@@ -75,6 +75,7 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 		}
 
 		var msg message.Message
+
 		// read the next message (blocking call)
 		err := r.ReadMsg(&msg)
 
