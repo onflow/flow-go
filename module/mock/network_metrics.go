@@ -18,6 +18,16 @@ func (_m *NetworkMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
+// DirectMessageFinished provides a mock function with given fields: topic
+func (_m *NetworkMetrics) DirectMessageFinished(topic string) {
+	_m.Called(topic)
+}
+
+// DirectMessageStarted provides a mock function with given fields: topic
+func (_m *NetworkMetrics) DirectMessageStarted(topic string) {
+	_m.Called(topic)
+}
+
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
