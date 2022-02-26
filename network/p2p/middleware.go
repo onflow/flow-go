@@ -351,18 +351,29 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("failed to create stream for %s: %w", targetID, err)
 	}
 
+	deadline, _ := ctx.Deadline()
+	stream.SetWriteDeadline(deadline)
+
 	// create a gogo protobuf writer
 	bufw := bufio.NewWriter(stream)
 	writer := ggio.NewDelimitedWriter(bufw)
 
 	err = writer.WriteMsg(msg)
 	if err != nil {
+		resetErr := stream.Reset()
+		if resetErr != nil {
+			m.log.Err(resetErr).Msg("failed to reset stream")
+		}
 		return fmt.Errorf("failed to send message to %s: %w", targetID, err)
 	}
 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
+		resetErr := stream.Reset()
+		if resetErr != nil {
+			m.log.Err(resetErr).Msg("failed to reset stream")
+		}
 		return fmt.Errorf("failed to flush stream for %s: %w", targetID, err)
 	}
 
@@ -396,17 +407,28 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	}
 	_, isStaked := m.ov.Identities().ByNodeID(nodeID)
 
+	ctx, cancel := context.WithTimeout(m.ctx, LargeMsgUnicastTimeout)
+
+	deadline, _ := ctx.Deadline()
+	s.SetReadDeadline(deadline)
+
 	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx,
-		s, m.processAuthenticatedMessage,
+	conn := newReadConnection(
+		ctx,
+		s,
+		m.processAuthenticatedMessage,
 		log.With().Hex("remote_flow_id", logging.ID(nodeID)).Logger(),
 		m.metrics,
 		LargeMsgMaxUnicastMsgSize,
-		isStaked)
+		isStaked,
+	)
 
 	// kick off the reception loop to continuously receive messages
 	m.wg.Add(1)
-	go conn.receiveLoop(m.wg)
+	go func() {
+		conn.receiveLoop(m.wg)
+		cancel()
+	}()
 }
 
 // Subscribe subscribes the middleware to a channel.
