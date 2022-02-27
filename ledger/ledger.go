@@ -221,7 +221,7 @@ func (k *Key) String() string {
 	return string(k.CanonicalForm())
 }
 
-// DeepCopy returns a reference-counted copy of the key
+// DeepCopy returns a copy of the key
 func (k *Key) DeepCopy() Key {
 	retval := Key{}
 
