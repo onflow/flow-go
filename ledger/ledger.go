@@ -251,7 +251,7 @@ func (k *Key) Equals(other *Key) bool {
 // KeyPart is a typed part of a key
 type KeyPart struct {
 	Type  uint16
-	Value []byte // private so that code uses accessors
+	Value []byte
 }
 
 // NewKeyPart construct a new key part
