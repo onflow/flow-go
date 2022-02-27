@@ -199,7 +199,7 @@ func (bs *BlockState) HighestSealed() (*messages.BlockProposal, bool) {
 }
 
 func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *messages.BlockProposal {
-	timeout := 2 * blockStateTimeout
+	timeout := 3 * blockStateTimeout
 	require.Eventually(t,
 		func() bool {
 			if bs.highestSealed != nil {
