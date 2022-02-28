@@ -722,7 +722,6 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			}
 
 			// remove the executed block
-			//assert.True(executedID == executed.ID())
 			executionQueues.Rem(executed.ID())
 
 			return nil
@@ -958,7 +957,6 @@ func (e *Engine) matchOrRequestCollections(
 			// if we've requested this collection, it means other block might also contain this collection.
 			// in this case, add this block to the map so that when the collection is received,
 			// we could update the executable block
-			//assert.True(executableBlockID == executableBlock.ID())
 			blocksNeedingCollection.ExecutableBlocks[executableBlock.ID()] = executableBlock
 
 			// since the collection is still being requested, we don't have the transactions
@@ -988,7 +986,6 @@ func (e *Engine) matchOrRequestCollections(
 		// the storage doesn't have this collection, meaning this is our first time seeing this
 		// collection guarantee, create an entry to store in collectionsBackdata in order to
 		// update the executable blocks when the collection is received.
-		//assert.True(executableBlockID == executableBlock.ID())
 		blocksNeedingCollection := &entity.BlocksByCollection{
 			CollectionID:     guarantee.ID(),
 			ExecutableBlocks: map[flow.Identifier]*entity.ExecutableBlock{executableBlock.ID(): executableBlock},
