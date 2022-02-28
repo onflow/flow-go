@@ -50,6 +50,10 @@ type NetworkMetrics interface {
 	// QueueDuration tracks the time spent by a message with the given priority in the queue
 	QueueDuration(duration time.Duration, priority int)
 
+	DirectMessageStarted(topic string)
+
+	DirectMessageFinished(topic string)
+
 	// MessageProcessingStarted tracks the start of a call to process a message from the given topic
 	MessageProcessingStarted(topic string)
 
