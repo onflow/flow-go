@@ -307,7 +307,7 @@ func validateRootQC(snap protocol.Snapshot) error {
 		return fmt.Errorf("could not get root block: %w", err)
 	}
 
-	identities, err := snap.Identities(filter.HasRole(flow.RoleConsensus))
+	identities, err := snap.Identities(filter.IsVotingConsensusCommitteeMember)
 	if err != nil {
 		return fmt.Errorf("could not get root snapshot identities: %w", err)
 	}
