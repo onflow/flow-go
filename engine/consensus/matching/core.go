@@ -8,7 +8,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -141,6 +140,21 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 // * error: any error indicates an unexpected problem in the protocol logic. The node's
 //   internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
+	// setup logger to capture basic information about the receipt
+	log := c.log.With().
+		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
+		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
+		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
+		Hex("executor_id", receipt.ExecutorID[:]).
+		Logger()
+
+	if c.receipts.HasReceipt(receipt) {
+		log.Debug().Msg("skipping processing of already known receipt")
+		return false, nil
+	}
+
 	startTime := time.Now()
 	defer func() {
 		c.metrics.OnReceiptProcessingDuration(time.Since(startTime))
@@ -153,15 +167,6 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	}
 	defer receiptSpan.Finish()
 
-	// setup logger to capture basic information about the receipt
-	log := c.log.With().
-		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
-		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
-		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
-		Hex("executor_id", receipt.ExecutorID[:]).
-		Logger()
 	initialState, finalState, err := getStartAndEndStates(receipt)
 	if err != nil {
 		if errors.Is(err, flow.ErrNoChunks) {
@@ -230,14 +235,16 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		return false, fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
-	_, err = c.storeReceipt(receipt, executedBlock)
+	added, err := c.storeReceipt(receipt, executedBlock)
 	if err != nil {
 		return false, fmt.Errorf("failed to store receipt: %w", err)
 	}
 
-	log.Info().Msg("execution result processed and stored")
+	if added {
+		log.Info().Msg("execution result processed and stored")
+	}
 
-	return true, nil
+	return added, nil
 }
 
 // storeReceipt adds the receipt to the receipts mempool as well as to the persistent storage layer.

@@ -84,6 +84,16 @@ func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block
 	return vertex.(*ReceiptsOfSameResult), nil
 }
 
+func (et *ExecutionTree) HasReceipt(receipt *flow.ExecutionReceipt) bool {
+	et.RLock()
+	defer et.RUnlock()
+	vertex, found := et.forest.GetVertex((&receipt.ExecutionResult).ID())
+	if !found {
+		return false
+	}
+	return vertex.(*ReceiptsOfSameResult).Has(receipt.ID())
+}
+
 // AddReceipt adds the given execution receipt to the memory pool. Requires
 // height of the block the receipt is for. We enforce data consistency on
 // an API level by using the block header as input.
