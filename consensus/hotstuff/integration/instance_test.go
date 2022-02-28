@@ -221,10 +221,10 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				voterIDs = append(voterIDs, vote.SignerID)
 			}
 			qc := &flow.QuorumCertificate{
-				View:      votes[0].View,
-				BlockID:   votes[0].BlockID,
-				SignerIDs: voterIDs,
-				SigData:   nil,
+				View:    votes[0].View,
+				BlockID: votes[0].BlockID,
+				signer:  voterIDs,
+				SigData: nil,
 			}
 			return qc
 		},

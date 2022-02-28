@@ -32,7 +32,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	// breaking staking and random beacon signers into signerIDs and sig type for compaction
 	// each signer must have its signerID and sig type stored at the same index in the two slices
 	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
-	signerIDs := make([]flow.Identifier, 0, count)
+	signerIndices := make([]int, 0, count)
 	sigTypes := make([]hotstuff.SigType, 0, count)
 
 	// retrieve all authorized consensus participants at the given block
@@ -43,12 +43,12 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 
 	// lookup is a map from node identifier to node identity
 	// it is used to check the given signers are all valid signers at the given block
-	lookup := consensus.Lookup()
+	indexLookup := consensus.IndexLookup()
 
 	for _, stakingSigner := range sig.StakingSigners {
-		_, ok := lookup[stakingSigner]
+		signerIndex, ok := indexLookup[stakingSigner]
 		if ok {
-			signerIDs = append(signerIDs, stakingSigner)
+			signerIndices = append(signerIndices, signerIndex)
 			sigTypes = append(sigTypes, hotstuff.SigTypeStaking)
 		} else {
 			return nil, nil, fmt.Errorf("staking signer %v not found in the committee at block: %v", stakingSigner, blockID)
