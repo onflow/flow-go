@@ -16,15 +16,8 @@ type SetProfilerEnabledCommand struct{}
 
 func (s *SetProfilerEnabledCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	enabled := req.ValidatorData.(bool)
-
-	result := "enabled"
-	if !enabled {
-		result = "disabled"
-	}
-
 	debug.SetProfilerEnabled(enabled)
-
-	return fmt.Sprintf("profiler is %v", result), nil
+	return "ok", nil
 }
 
 func (s *SetProfilerEnabledCommand) Validator(req *admin.CommandRequest) error {
