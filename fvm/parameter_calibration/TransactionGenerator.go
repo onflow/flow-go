@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"math/rand"
 	"strings"
 	"sync"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // get a random transaction type from a pool of transaction types
