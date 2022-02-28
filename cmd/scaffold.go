@@ -541,14 +541,9 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 
 	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
 
-	role, err := flow.ParseRole(fnb.NodeRole)
-	if err != nil {
-		fnb.Logger.Fatal().Str("role", fnb.NodeRole).Err(err).Msg("unable to parse node role")
-	}
-
 	// NOTE: SN nodes need to explicitly set --insecure-secrets-db to true in order to
 	// disable secrets database encryption
-	if role == flow.RoleConsensus && fnb.InsecureSecretsDB {
+	if fnb.NodeRole == flow.RoleConsensus.String() && fnb.InsecureSecretsDB {
 		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
 	} else {
 		if encryptionKey := fnb.loadSecretsEncryptionKey(); encryptionKey != nil {
