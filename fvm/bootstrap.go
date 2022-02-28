@@ -4,16 +4,11 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -580,10 +575,11 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 		// and set it up with the QC/DKG participant resource
 		txError, err = b.vm.invokeMetaTransaction(
 			b.ctx,
-			registerNodeTransaction(service,
+			Transaction(blueprints.RegisterNodeTransaction(service,
 				flowToken,
 				nodeAddress,
 				id),
+				0),
 			b.sth,
 			b.programs,
 		)
@@ -613,7 +609,7 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 	if err != nil {
 		panic(err)
 	}
-	publicKeys[0] = bytesToCadenceArray(encodedPublicKey)
+	publicKeys[0] = blueprints.BytesToCadenceArray(encodedPublicKey)
 
 	contract := contracts.FlowLockedTokens(
 		fungibleTokenAddress.Hex(),
@@ -656,93 +652,6 @@ func (b *BootstrapProcedure) deployStakingCollection(service flow.Address, fungi
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
-}
-
-// registerNodeTransaction creates a new node struct object.
-// Then, if the node is a collector node, creates a new account and adds a QC object to it
-// If the node is a consensus node, it creates a new account and adds a DKG object to it
-func registerNodeTransaction(
-	service flow.Address,
-	flowTokenAddress flow.Address,
-	nodeAddress flow.Address,
-	id *flow.Identity,
-) *TransactionProcedure {
-
-	env := templates.Environment{
-		FlowTokenAddress:         flowTokenAddress.HexWithPrefix(),
-		IDTableAddress:           service.HexWithPrefix(),
-		QuorumCertificateAddress: service.HexWithPrefix(),
-		DkgAddress:               service.HexWithPrefix(),
-		EpochAddress:             service.HexWithPrefix(),
-	}
-
-	// Use NetworkingKey as the public key of the machine account.
-	// We do this for tests/localnet but normally it should be a separate key.
-	accountKey := flow.AccountPublicKey{
-		PublicKey: id.NetworkPubKey,
-		SignAlgo:  id.NetworkPubKey.Algorithm(),
-		HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
-		Weight:    1000,
-	}
-
-	encAccountKey, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
-	if err != nil {
-		panic(err)
-	}
-
-	cadencePublicKeys := cadence.NewArray(
-		[]cadence.Value{
-			bytesToCadenceArray(encAccountKey),
-		},
-	)
-
-	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", id.Stake))
-	if err != nil {
-		panic(err)
-	}
-
-	cdcNodeID, err := cadence.NewString(id.NodeID.String())
-	if err != nil {
-		panic(err)
-	}
-
-	cdcAddress, err := cadence.NewString(id.Address)
-	if err != nil {
-		panic(err)
-	}
-
-	cdcNetworkPubKey, err := cadence.NewString(id.NetworkPubKey.String()[2:])
-	if err != nil {
-		panic(err)
-	}
-
-	cdcStakingPubKey, err := cadence.NewString(id.StakingPubKey.String()[2:])
-	if err != nil {
-		panic(err)
-	}
-
-	// register node
-	return Transaction(
-		flow.NewTransactionBody().
-			SetScript(templates.GenerateEpochRegisterNodeScript(env)).
-			AddArgument(jsoncdc.MustEncode(cdcNodeID)).
-			AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(id.Role)))).
-			AddArgument(jsoncdc.MustEncode(cdcAddress)).
-			AddArgument(jsoncdc.MustEncode(cdcNetworkPubKey)).
-			AddArgument(jsoncdc.MustEncode(cdcStakingPubKey)).
-			AddArgument(jsoncdc.MustEncode(cdcAmount)).
-			AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
-			AddAuthorizer(nodeAddress),
-		0,
-	)
-}
-
-func bytesToCadenceArray(b []byte) cadence.Array {
-	values := make([]cadence.Value, len(b))
-	for i, v := range b {
-		values[i] = cadence.NewUInt8(v)
-	}
-	return cadence.NewArray(values)
 }
 
 const (
