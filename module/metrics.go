@@ -87,13 +87,13 @@ type CleanerMetrics interface {
 }
 
 type CacheMetrics interface {
-	// report the total number of cached items
+	// CacheEntries report the total number of cached items
 	CacheEntries(resource string, entries uint)
-	// report the number of times the queried item is found in the cache
+	// CacheHit report the number of times the queried item is found in the cache
 	CacheHit(resource string)
-	// report the number of items the queried item is not found in the cache, nor found in the database
+	// CacheNotFound report the number of items the queried item is not found in the cache, nor found in the database
 	CacheNotFound(resource string)
-	// report the number of items the queried item is not found in the cache, but found in the database
+	// CacheMiss report the number of items the queried item is not found in the cache, but found in the database
 	CacheMiss(resource string)
 }
 
@@ -419,17 +419,24 @@ type PingMetrics interface {
 }
 
 type HeroCacheMetrics interface {
-	// BucketsWithAvailableSlotsCount keeps track of number of buckets with certain available number of slots.
-	BucketsWithAvailableSlotsCount(uint64, uint64)
+	// BucketsWithAvailableSlotsCountHeroCache keeps track of number of buckets with certain available number of slots.
+	BucketsWithAvailableSlotsCountHeroCache(uint64, uint64)
 
-	// OnNewEntityAdded is called whenever a new entity is successfully added to the cache.
-	OnNewEntityAdded()
+	// OnNewEntityAddedHeroCache is called whenever a new entity is successfully added to the cache.
+	OnNewEntityAddedHeroCache()
 
-	// OnEntityEjected is called whenever adding a new entity to the cache results in ejection of another entity.
+	// OnEntityEjectedAtFullCapacityHeroCache is called whenever adding a new entity to the cache results in ejection of another entity.
 	// This normally happens when the cache is full.
-	OnEntityEjected()
+	OnEntityEjectedAtFullCapacityHeroCache()
 
-	OnKeyReplaced()
+	// OnValidKeyReplaced is called whenever adding a new entity to the cache results in a valid existing key replaced. This happens when
+	// a bucket of keys gets full. Then adding any new entity will replace a valid key inside that bucket.
+	OnValidKeyReplaced()
+
+	// OnDuplicateEntityDropped is tracking the total number of duplicate entities written to the cache. A duplicate entity is dropped by the
+	// cache when it is written to the cache, and this metric is tracking the total number of those queries.
 	OnDuplicateEntityDropped()
+
+	// Size keeps track of the total number of entities maintained by the cache.
 	Size(uint64)
 }
