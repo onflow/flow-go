@@ -11,7 +11,10 @@ func TestComputationMeteringHandler(t *testing.T) {
 	const used = uint64(7)
 
 	t.Run("Get Limit", func(t *testing.T) {
-		h := NewComputationMeteringHandler(limit)
+		h := NewComputationMeteringHandler(limit,
+			WithCoumputationWeightFactors(map[string]uint64{
+				"test": 1,
+			}))
 
 		l := h.Limit()
 
@@ -19,7 +22,10 @@ func TestComputationMeteringHandler(t *testing.T) {
 	})
 
 	t.Run("Set/Get Used", func(t *testing.T) {
-		h := NewComputationMeteringHandler(limit)
+		h := NewComputationMeteringHandler(limit,
+			WithCoumputationWeightFactors(map[string]uint64{
+				"test": 1,
+			}))
 
 		err := h.AddUsed(used, "test")
 		require.NoError(t, err)
@@ -30,12 +36,15 @@ func TestComputationMeteringHandler(t *testing.T) {
 	})
 
 	t.Run("Set/Get Used twice", func(t *testing.T) {
-		h := NewComputationMeteringHandler(limit)
+		h := NewComputationMeteringHandler(limit,
+			WithCoumputationWeightFactors(map[string]uint64{
+				"test": 1,
+			}))
 
-		err := h.AddUsed(used)
+		err := h.AddUsed(used, "test")
 		require.NoError(t, err)
 
-		err = h.AddUsed(used)
+		err = h.AddUsed(used, "test")
 		require.NoError(t, err)
 
 		u := h.Used()
@@ -44,7 +53,10 @@ func TestComputationMeteringHandler(t *testing.T) {
 	})
 
 	t.Run("Sub Meter", func(t *testing.T) {
-		h := NewComputationMeteringHandler(limit)
+		h := NewComputationMeteringHandler(limit,
+			WithCoumputationWeightFactors(map[string]uint64{
+				"test": 1,
+			}))
 
 		subMeter := h.StartSubMeter(2 * limit)
 
@@ -67,7 +79,10 @@ func TestComputationMeteringHandler(t *testing.T) {
 	})
 
 	t.Run("Sub Sub Meter", func(t *testing.T) {
-		h := NewComputationMeteringHandler(limit)
+		h := NewComputationMeteringHandler(limit,
+			WithCoumputationWeightFactors(map[string]uint64{
+				"test": 1,
+			}))
 
 		subMeter := h.StartSubMeter(2 * limit)
 
@@ -104,7 +119,10 @@ func TestComputationMeteringHandler(t *testing.T) {
 	})
 
 	t.Run("Sub Sub Meter - discard in wrong order", func(t *testing.T) {
-		h := NewComputationMeteringHandler(limit)
+		h := NewComputationMeteringHandler(limit,
+			WithCoumputationWeightFactors(map[string]uint64{
+				"test": 1,
+			}))
 		subMeter := h.StartSubMeter(2 * limit)
 		_ = h.StartSubMeter(3 * limit)
 

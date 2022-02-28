@@ -19,9 +19,8 @@ func Script(code []byte) *ScriptProcedure {
 	scriptHash := hash.DefaultHasher.ComputeHash(code)
 
 	return &ScriptProcedure{
-		Script:                     code,
-		ID:                         flow.HashToID(scriptHash),
-		ComputationMeteringHandler: handler.NewComputationMeteringHandler(DefaultComputationLimit, handler.WithCoumputationWeightFactors(map[string]uint64{"function_or_loop_call": 1})),
+		Script: code,
+		ID:     flow.HashToID(scriptHash),
 	}
 }
 
@@ -50,6 +49,10 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 }
 
 func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
+	proc.ComputationMeteringHandler = handler.NewComputationMeteringHandler(
+		DefaultGasLimit,
+		handler.WithCoumputationWeightFactors(map[string]uint64{"function_or_loop_call": 1}))
+
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, proc, sth, programs)
 		txError, failure := errors.SplitErrorTypes(err)

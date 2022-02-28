@@ -434,7 +434,7 @@ func NewBasicBlockExecutor(chain flow.Chain, logger zerolog.Logger) (*BasicBlock
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithMaxStateInteractionSize(2_000_000_000),
-		fvm.WithComputationLimit(20_000_000),
+		fvm.WithGasLimit(20_000_000),
 		fvm.WithChain(chain),
 	}
 	fvmContext := fvm.NewContext(logger, opts...)

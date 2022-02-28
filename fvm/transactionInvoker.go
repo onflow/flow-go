@@ -243,7 +243,7 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 	}
 
 	// start a new computation meter for deducting transaction fees.
-	subMeter := env.computationHandler.StartSubMeter(DefaultComputationLimit)
+	subMeter := env.computationHandler.StartSubMeter(DefaultGasLimit)
 	defer func() {
 		merr := subMeter.Discard()
 		if merr == nil {

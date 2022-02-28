@@ -2900,7 +2900,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			txBody.SetPayer(address)
 
 			if tc.gasLimit == 0 {
-				txBody.SetGasLimit(fvm.DefaultComputationLimit)
+				txBody.SetGasLimit(fvm.DefaultGasLimit)
 			} else {
 				txBody.SetGasLimit(tc.gasLimit)
 			}

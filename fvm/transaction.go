@@ -20,7 +20,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 		ID:                         tx.ID(),
 		Transaction:                tx,
 		TxIndex:                    txIndex,
-		ComputationMeteringHandler: handler.NewComputationMeteringHandler(DefaultComputationLimit, handler.WithCoumputationWeightFactors(map[string]uint64{"function_or_loop_call": 1})),
+		ComputationMeteringHandler: handler.NewComputationMeteringHandler(DefaultGasLimit),
 	}
 }
 
@@ -59,6 +59,10 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 			panic(r)
 		}
 	}()
+
+	proc.ComputationMeteringHandler = handler.NewComputationMeteringHandler(
+		handler.ComputationLimit(ctx.GasLimit, proc.Transaction.GasLimit, DefaultGasLimit),
+		handler.WithCoumputationWeightFactors(map[string]uint64{"function_or_loop_call": 1}))
 
 	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
 		st.SetPayerIsServiceAccount()

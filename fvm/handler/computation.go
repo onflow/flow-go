@@ -1,6 +1,8 @@
 package handler
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type ComputationCostLabel string
 
@@ -93,6 +95,18 @@ func (c *ComputationMeteringHandler) StartSubMeter(limit uint64) SubComputationM
 type ComputationMeteringOption func(*ComputationMeteringHandler)
 
 var _ ComputationMeter = &ComputationMeteringHandler{}
+
+func ComputationLimit(ctxGasLimit, txGasLimit, defaultGasLimit uint64) uint64 {
+	// if gas limit is set to zero fallback to the gas limit set by the context
+	if txGasLimit == 0 {
+		// if context gasLimit is also zero, fallback to the default gas limit
+		if ctxGasLimit == 0 {
+			return defaultGasLimit
+		}
+		return ctxGasLimit
+	}
+	return txGasLimit
+}
 
 func NewComputationMeteringHandler(computationLimit uint64, options ...ComputationMeteringOption) *ComputationMeteringHandler {
 	h := &ComputationMeteringHandler{

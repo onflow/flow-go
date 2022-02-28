@@ -16,7 +16,7 @@ type Context struct {
 	Blocks                        Blocks
 	Metrics                       handler.MetricsReporter
 	Tracer                        module.Tracer
-	ComputationLimit              uint64
+	GasLimit                      uint64
 	ComputationCostMatrix         map[string]uint64
 	MaxStateKeySize               uint64
 	MaxStateValueSize             uint64
@@ -60,8 +60,8 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	DefaultComputationLimit             = 100_000_000 // 100K
-	DefaultEventCollectionByteSizeLimit = 256_000     // 256KB
+	DefaultGasLimit                     = 100_000 // 100K
+	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
 	DefaultMaxNumOfTxRetries            = 3
 )
 
@@ -71,7 +71,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		Blocks:                        nil,
 		Metrics:                       &handler.NoopMetricsReporter{},
 		Tracer:                        nil,
-		ComputationLimit:              DefaultComputationLimit,
+		GasLimit:                      DefaultGasLimit,
 		ComputationCostMatrix:         make(map[string]uint64),
 		MaxStateKeySize:               state.DefaultMaxKeySize,
 		MaxStateValueSize:             state.DefaultMaxValueSize,
@@ -112,10 +112,10 @@ func WithChain(chain flow.Chain) Option {
 	}
 }
 
-// WithComputationLimit sets the computation limit for a virtual machine context.
-func WithComputationLimit(limit uint64) Option {
+// WithGasLimit sets the gas limit for a virtual machine context.
+func WithGasLimit(limit uint64) Option {
 	return func(ctx Context) Context {
-		ctx.ComputationLimit = limit
+		ctx.GasLimit = limit
 		return ctx
 	}
 }

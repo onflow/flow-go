@@ -416,15 +416,17 @@ func (e *blockComputer) executeTransaction(
 		lg.Info().Msg("transaction executed successfully")
 	}
 
-	d := zerolog.Dict()
-	for s, u := range tx.ComputationMeteringHandler.Weights() {
-		d.Uint64(s, u)
+	if e.log.GetLevel() >= zerolog.InfoLevel {
+		d := zerolog.Dict()
+		for s, u := range tx.ComputationMeteringHandler.Weights() {
+			d.Uint64(s, u)
+		}
+		e.log.Info().
+			Str("txHash", tx.ID.String()).
+			Dict("weights", d).
+			Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+			Msg("transaction computation parameters")
 	}
-	e.log.Error().
-		Str("txHash", tx.ID.String()).
-		Dict("weights", d).
-		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
-		Msg("transaction executed")
 
 	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationMeteringHandler.Used(), len(tx.Events), tx.Err != nil)
 	return nil
