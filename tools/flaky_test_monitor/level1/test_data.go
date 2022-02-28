@@ -73,6 +73,28 @@ func getPassedTestElapsed(name string, elapsed float32, elapsedStr string) commo
 	return row
 }
 
+func getPassedTestElapsedOutput(name string, elapsed float32, elapsedStr string, output string) common.TestResultRow {
+	row := common.TestResultRow{
+		TestResult: common.TestResult{
+			CommitSha:  getCommitSha(),
+			CommitDate: getCommitDate(),
+			JobRunDate: getJobRunDate(),
+			Test:       name,
+			Package:    getCryptoHashPackage(),
+			Result:     "1",
+			Elapsed:    elapsed,
+			Output: []struct {
+				Item string "json:\"item\""
+			}{
+				{Item: "=== RUN   " + name + "\n"},
+				{Item: output},
+				{Item: "--- PASS: " + name + " (" + elapsedStr + "s)\n"},
+			},
+		},
+	}
+	return row
+}
+
 func GetTestData_Level1_1CountSingleNilTest() common.TestRun {
 	row1 := common.TestResultRow{
 		TestResult: common.TestResult{
@@ -106,45 +128,8 @@ func GetTestData_Level1_1CountPass() common.TestRun {
 	row3 := getPassedTest("TestSanitySha3_384")
 	row4 := getPassedTest("TestSanitySha2_384")
 	row5 := getPassedTest("TestSanityKmac128")
-
-	row6 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestHashersAPI",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestHashersAPI\n"},
-				{Item: "    hash_test.go:114: math rand seed is 1632497249121800000\n"},
-				{Item: "--- PASS: TestHashersAPI (0.00s)\n"},
-			},
-		},
-	}
-
-	row7 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.23,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3\n"},
-				{Item: "    hash_test.go:158: math rand seed is 1632497249122032000\n"},
-				{Item: "--- PASS: TestSha3 (0.23s)\n"},
-			},
-		},
-	}
-
+	row6 := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632497249121800000\n")
+	row7 := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632497249122032000\n")
 	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
 	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
@@ -201,45 +186,8 @@ func GetTestData_Level1_1Count1FailRestPass() common.TestRun {
 	row3 := getPassedTest("TestSanitySha2_256")
 	row4 := getPassedTest("TestSanitySha2_384")
 	row5 := getPassedTest("TestSanityKmac128")
-
-	row6 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestHashersAPI",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestHashersAPI\n"},
-				{Item: "    hash_test.go:114: math rand seed is 1632498687765218000\n"},
-				{Item: "--- PASS: TestHashersAPI (0.00s)\n"},
-			},
-		},
-	}
-
-	row7 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.23,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3\n"},
-				{Item: "    hash_test.go:158: math rand seed is 1632498687765661000\n"},
-				{Item: "--- PASS: TestSha3 (0.23s)\n"},
-			},
-		},
-	}
-
+	row6 := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632498687765218000\n")
+	row7 := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632498687765661000\n")
 	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
 	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
@@ -264,26 +212,7 @@ func GetTestData_Level1_1Count2SkippedRestPass() common.TestRun {
 	row2 := getPassedTest("TestSanitySha3_384")
 	row3 := getPassedTest("TestSanitySha2_384")
 	row4 := getPassedTest("TestSanityKmac128")
-
-	row5 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.24,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3\n"},
-				{Item: "    hash_test.go:160: math rand seed is 1633518697589650000\n"},
-				{Item: "--- PASS: TestSha3 (0.24s)\n"},
-			},
-		},
-	}
-
+	row5 := getPassedTestElapsedOutput("TestSha3", 0.24, "0.24", "    hash_test.go:160: math rand seed is 1633518697589650000\n")
 	row6 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
 	row7 := getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13")
 
@@ -307,82 +236,10 @@ func GetTestData_Level1_2CountPass() common.TestRun {
 	row3 := getPassedTest("TestSanitySha3_384")
 	row4 := getPassedTest("TestSanitySha2_384")
 	row5 := getPassedTest("TestSanityKmac128")
-
-	row6a := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestHashersAPI",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestHashersAPI\n"},
-				{Item: "    hash_test.go:114: math rand seed is 1633358050203144000\n"},
-				{Item: "--- PASS: TestHashersAPI (0.00s)\n"},
-			},
-		},
-	}
-
-	row6b := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestHashersAPI",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestHashersAPI\n"},
-				{Item: "    hash_test.go:114: math rand seed is 1633358050430256000\n"},
-				{Item: "--- PASS: TestHashersAPI (0.00s)\n"},
-			},
-		},
-	}
-
-	row7a := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.23,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3\n"},
-				{Item: "    hash_test.go:158: math rand seed is 1633358050203374000\n"},
-				{Item: "--- PASS: TestSha3 (0.23s)\n"},
-			},
-		},
-	}
-
-	row7b := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.22,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3\n"},
-				{Item: "    hash_test.go:158: math rand seed is 1633358050430467000\n"},
-				{Item: "--- PASS: TestSha3 (0.22s)\n"},
-			},
-		},
-	}
+	row6a := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1633358050203144000\n")
+	row6b := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1633358050430256000\n")
+	row7a := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1633358050203374000\n")
+	row7b := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1633358050430467000\n")
 
 	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
 	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
@@ -409,6 +266,117 @@ func GetTestData_Level1_2CountPass() common.TestRun {
 			row8,
 			row9,
 		},
+	}
+	return testRun
+}
+
+func GetTestData_Level1_10CountPass() common.TestRun {
+	row1 := getPassedTest("TestSanitySha3_256")
+	row2 := getPassedTest("TestSanitySha2_256")
+	row3 := getPassedTest("TestSanitySha3_384")
+	row4 := getPassedTest("TestSanitySha2_384")
+	row5 := getPassedTest("TestSanityKmac128")
+
+	row6a := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739552470379000\n")
+	row6b := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739552696815000\n")
+	row6c := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739552917474000\n")
+	row6d := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553140451000\n")
+	row6e := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553362249000\n")
+	row6f := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553605325000\n")
+	row6g := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553826502000\n")
+	row6h := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739554054239000\n")
+	row6i := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739554280043000\n")
+	row6j := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739554500707000\n")
+
+	row7a := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739552470723000\n")
+	row7b := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739552697024000\n")
+	row7c := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739552917708000\n")
+	row7d := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739553140702000\n")
+	row7e := getPassedTestElapsedOutput("TestSha3", 0.24, "0.24", "    hash_test.go:158: math rand seed is 1632739553362497000\n")
+	row7f := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739553605582000\n")
+	row7g := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739553826733000\n")
+	row7h := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739554054464000\n")
+	row7i := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739554280256000\n")
+	row7j := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739554500935000\n")
+
+	row8a := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row8b := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row8c := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row8d := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row8e := getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12")
+	row8f := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row8g := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row8h := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row8i := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row8j := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+
+	row9a := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+	row9b := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+	row9c := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+	row9d := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+	row9e := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+	row9f := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+	row9g := getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13")
+	row9h := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+	row9i := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+	row9j := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+
+	var testResultRows []common.TestResultRow
+
+	for i := 0; i < 10; i++ {
+		testResultRows = append(testResultRows, row1)
+		testResultRows = append(testResultRows, row2)
+		testResultRows = append(testResultRows, row3)
+		testResultRows = append(testResultRows, row4)
+		testResultRows = append(testResultRows, row5)
+	}
+
+	testResultRows = append(testResultRows, row6a)
+	testResultRows = append(testResultRows, row6b)
+	testResultRows = append(testResultRows, row6c)
+	testResultRows = append(testResultRows, row6d)
+	testResultRows = append(testResultRows, row6e)
+	testResultRows = append(testResultRows, row6f)
+	testResultRows = append(testResultRows, row6g)
+	testResultRows = append(testResultRows, row6h)
+	testResultRows = append(testResultRows, row6i)
+	testResultRows = append(testResultRows, row6j)
+
+	testResultRows = append(testResultRows, row7a)
+	testResultRows = append(testResultRows, row7b)
+	testResultRows = append(testResultRows, row7c)
+	testResultRows = append(testResultRows, row7d)
+	testResultRows = append(testResultRows, row7e)
+	testResultRows = append(testResultRows, row7f)
+	testResultRows = append(testResultRows, row7g)
+	testResultRows = append(testResultRows, row7h)
+	testResultRows = append(testResultRows, row7i)
+	testResultRows = append(testResultRows, row7j)
+
+	testResultRows = append(testResultRows, row8a)
+	testResultRows = append(testResultRows, row8b)
+	testResultRows = append(testResultRows, row8c)
+	testResultRows = append(testResultRows, row8d)
+	testResultRows = append(testResultRows, row8e)
+	testResultRows = append(testResultRows, row8f)
+	testResultRows = append(testResultRows, row8g)
+	testResultRows = append(testResultRows, row8h)
+	testResultRows = append(testResultRows, row8i)
+	testResultRows = append(testResultRows, row8j)
+
+	testResultRows = append(testResultRows, row9a)
+	testResultRows = append(testResultRows, row9b)
+	testResultRows = append(testResultRows, row9c)
+	testResultRows = append(testResultRows, row9d)
+	testResultRows = append(testResultRows, row9e)
+	testResultRows = append(testResultRows, row9f)
+	testResultRows = append(testResultRows, row9g)
+	testResultRows = append(testResultRows, row9h)
+	testResultRows = append(testResultRows, row9i)
+	testResultRows = append(testResultRows, row9j)
+
+	testRun := common.TestRun{
+		Rows: testResultRows,
 	}
 	return testRun
 }

@@ -46,6 +46,11 @@ func TestProcessSummary1TestRun_Struct(t *testing.T) {
 			RawJSONTestRunFile: "test-result-crypto-hash-2-count-pass.json",
 		},
 
+		"10 count all pass": {
+			ExpectedTestRun:    GetTestData_Level1_10CountPass(),
+			RawJSONTestRunFile: "test-result-crypto-hash-10-count-pass.json",
+		},
+
 		"1 count single nil test": {
 			ExpectedTestRun:    GetTestData_Level1_1CountSingleNilTest(),
 			RawJSONTestRunFile: "test-result-nil-test-single-1-count-pass.json",
