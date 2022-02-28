@@ -536,16 +536,17 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 
 	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
 
-	if fnb.InsecureSecretsDB {
+	role, err := flow.ParseRole(fnb.NodeRole)
+	if err != nil {
+		fnb.Logger.Fatal().Str("role", fnb.NodeRole).Err(err).Msg("unable to parse node role")
+	}
+
+	// NOTE: SN nodes need to explicitly set --insecure-secrets-db to true in order to
+	// disable secrets database encryption
+	if role == flow.RoleConsensus && fnb.InsecureSecretsDB {
 		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
 	} else {
-		// attempt to read an encryption key for the secrets DB from the canonical path
-		encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
-		if errors.Is(err, os.ErrNotExist) {
-			fnb.Logger.Fatal().Err(err).Msg("secrets db encryption key not found")
-		} else if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("failed to read secrets db encryption key")
-		} else {
+		if encryptionKey := fnb.loadSecretsEncryptionKey(); encryptionKey != nil {
 			opts = opts.WithEncryptionKey(encryptionKey)
 		}
 	}
@@ -560,6 +561,23 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 		}
 		return nil
 	})
+}
+
+// loadSecretsEncryptionKey attempt to read an encryption key for the secrets DB from the canonical path
+func (fnb *FlowNodeBuilder) loadSecretsEncryptionKey() []byte {
+	encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
+	if errors.Is(err, os.ErrNotExist) {
+		if fnb.NodeRole == flow.RoleConsensus.String() {
+			// missing key is a fatal error for SN nodes
+			fnb.Logger.Fatal().Err(err).Msg("secrets db encryption key not found")
+		} else {
+			fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
+		}
+	} else if err != nil {
+		fnb.Logger.Fatal().Err(err).Msg("failed to read secrets db encryption key")
+	}
+
+	return encryptionKey
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
