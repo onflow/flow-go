@@ -167,6 +167,7 @@ func NewConsensusFollower(
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
 		logLevel:       "info",
+		exposeMetrics:  false,
 	}
 
 	for _, opt := range opts {
