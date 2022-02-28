@@ -208,6 +208,8 @@ func TestEngineClosingChannel(t *testing.T) {
 
 	channel := network.Channel("test-channel")
 
+	// on invoking adapter.UnRegisterChannel(channel), it must return a nil, which means
+	// that the channel has been unregistered by the adapter successfully.
 	adapter.On("UnRegisterChannel", channel).Return(nil).Once()
 
 	err = f.EngineClosingChannel(channel)
