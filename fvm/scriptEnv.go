@@ -436,7 +436,8 @@ func (e *ScriptEnv) GetComputationLimit() uint64 {
 }
 
 func (e *ScriptEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.AddUsed(used, "function_or_loop_call")
+	e.computationHandler.AddUsed(used, "function_or_loop_call")
+	return nil
 }
 
 func (e *ScriptEnv) GetComputationUsed() uint64 {

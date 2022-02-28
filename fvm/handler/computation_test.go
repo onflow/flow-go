@@ -27,8 +27,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 				"test": 1,
 			}))
 
-		err := h.AddUsed(used, "test")
-		require.NoError(t, err)
+		h.AddUsed(used, "test")
 
 		u := h.Used()
 
@@ -41,11 +40,9 @@ func TestComputationMeteringHandler(t *testing.T) {
 				"test": 1,
 			}))
 
-		err := h.AddUsed(used, "test")
-		require.NoError(t, err)
+		h.AddUsed(used, "test")
 
-		err = h.AddUsed(used, "test")
-		require.NoError(t, err)
+		h.AddUsed(used, "test")
 
 		u := h.Used()
 
@@ -63,12 +60,12 @@ func TestComputationMeteringHandler(t *testing.T) {
 		l := h.Limit()
 		require.Equal(t, 2*limit, l)
 
-		err := h.AddUsed(used, "test")
-		require.NoError(t, err)
+		h.AddUsed(used, "test")
+
 		u := h.Used()
 		require.Equal(t, used, u)
 
-		err = subMeter.Discard()
+		err := subMeter.Discard()
 		require.NoError(t, err)
 
 		l = h.Limit()
@@ -86,20 +83,19 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 		subMeter := h.StartSubMeter(2 * limit)
 
-		err := h.AddUsed(used, "test")
-		require.NoError(t, err)
+		h.AddUsed(used, "test")
 
 		subSubMeter := h.StartSubMeter(3 * limit)
 
 		l := h.Limit()
 		require.Equal(t, 3*limit, l)
 
-		err = h.AddUsed(2*used, "test")
-		require.NoError(t, err)
+		h.AddUsed(2*used, "test")
+
 		u := h.Used()
 		require.Equal(t, 2*used, u)
 
-		err = subSubMeter.Discard()
+		err := subSubMeter.Discard()
 		require.NoError(t, err)
 
 		l = h.Limit()

@@ -77,7 +77,6 @@ func NewTransactionEnvironment(
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
-	// computationLimit(ctx, tx)
 
 	env := &TransactionEnv{
 		vm:                 vm,
@@ -209,6 +208,7 @@ func (e *TransactionEnv) GetValue(owner, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("getting value failed: %w", err)
 	}
 	valueByteSize = len(v)
+
 	e.computationHandler.AddUsed(uint64(valueByteSize), "GetValue")
 	return v, nil
 }
@@ -562,7 +562,8 @@ func (e *TransactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *TransactionEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.AddUsed(used, "function_or_loop_call")
+	e.computationHandler.AddUsed(used, "function_or_loop_call")
+	return nil
 }
 
 func (e *TransactionEnv) GetComputationUsed() uint64 {

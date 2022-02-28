@@ -11,7 +11,7 @@ type ComputationMeter interface {
 	// Limit gets computation limit
 	Limit() uint64
 	// AddUsed adds more computation used to the current computation used
-	AddUsed(amount uint64, label ComputationCostLabel) error
+	AddUsed(amount uint64, label ComputationCostLabel)
 	// Used gets the current computation used
 	Used() uint64
 }
@@ -41,15 +41,14 @@ func (c *computationMeter) Limit() uint64 {
 	return c.limit
 }
 
-func (c *computationMeter) AddUsed(amount uint64, label ComputationCostLabel) error {
+func (c *computationMeter) AddUsed(amount uint64, label ComputationCostLabel) {
 	c.handler.weights[string(label)] += amount
 	costFactor, ok := c.handler.factors[string(label)]
 	if !ok {
-		return nil
+		return
 	}
 
 	c.used += costFactor * amount
-	return nil
 }
 
 func (c *computationMeter) Used() uint64 {
@@ -133,8 +132,8 @@ func (c *ComputationMeteringHandler) Limit() uint64 {
 	return c.computation.Limit()
 }
 
-func (c *ComputationMeteringHandler) AddUsed(amount uint64, label ComputationCostLabel) error {
-	return c.computation.AddUsed(amount, label)
+func (c *ComputationMeteringHandler) AddUsed(amount uint64, label ComputationCostLabel) {
+	c.computation.AddUsed(amount, label)
 }
 
 func (c *ComputationMeteringHandler) Used() uint64 {

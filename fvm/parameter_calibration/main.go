@@ -115,7 +115,10 @@ func main() {
 	}
 
 	f, err := os.Create(filenameFlag)
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
+
 	if err != nil {
 		panic("")
 	}
@@ -198,6 +201,9 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 	}
 
 	err = accounts[0].MintTokens(blockExecutor, 100_0000_0000)
+	if err != nil {
+		panic(err)
+	}
 
 	err = serviceAccount.AddArrayToStorage(blockExecutor, []string{longString, longString, longString, longString, longString})
 	if err != nil {
@@ -220,6 +226,9 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 		for j := 0; j < transactionsPerBlock; j++ {
 			txType := Pool.GetRandomTransactionType()
 			gtx, err := txType.GenerateTransaction(ttctx)
+			if err != nil {
+				panic(err)
+			}
 			generatedTransactions[j] = gtx
 			txBody := gtx.Transaction.
 				AddAuthorizer(serviceAccount.Address).

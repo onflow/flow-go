@@ -45,7 +45,7 @@ func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTrace
 	var span opentracing.Span
 
 	if tenv, ok := env.(*TransactionEnv); ok {
-		_ = tenv.computationHandler.AddUsed(1, "ContractFunctionInvoke")
+		tenv.computationHandler.AddUsed(1, "ContractFunctionInvoke")
 	}
 
 	ctx := env.Context()

@@ -519,7 +519,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	}
 
 	f, err := os.Create("data.csv")
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	if err != nil {
 
