@@ -29,7 +29,7 @@ FLITE is a tool for running a full version of the Flow blockchain.
 
 ## Bootstrapping
 
-Before running the Flow network it is necessary to run a bootstrapping process. 
+Before running the Flow network it is necessary to run a bootstrapping process.
 This generates keys for each of the nodes and a genesis block to build on.
 
 Bootstrap a new network:
@@ -264,3 +264,11 @@ flow transactions send transfer_tokens.cdc 9999.9 <ACCOUNT_ADDRESS> -n localnet 
 > replace `<ACCOUNT_ADDRESS>` in the command above with an address that you created on your localnet.
 
 After the transaction is sealed, the account with `<ACCOUNT_ADDRESS>` should have the balance increased by 9999.9 tokens.
+
+# admin tool
+The admin tool is enabled by default for all node type except access node.
+
+For instance, in order to use admin tool to change log level, first find the local port that maps to `9002` which is the admin tool address, if the local port is `3702`, then run:
+```
+curl localhost:3702/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-log-level", "data": "debug"}'
+```

@@ -41,7 +41,7 @@ const (
 	MetricsPort                = 8080
 	RPCPort                    = 9000
 	SecuredRPCPort             = 9001
-	AdminToolPort              = 9005
+	AdminToolPort              = 9002
 	AdminToolLocalPort         = 3700
 	HTTPPort                   = 8000
 )
