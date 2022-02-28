@@ -31,6 +31,48 @@ func getCryptoHashPackage() string {
 	return "github.com/onflow/flow-go/crypto/hash"
 }
 
+func getPassedTest(name string) common.TestResultRow {
+	row := common.TestResultRow{
+		TestResult: common.TestResult{
+			CommitSha:  getCommitSha(),
+			CommitDate: getCommitDate(),
+			JobRunDate: getJobRunDate(),
+			Test:       name,
+			Package:    getCryptoHashPackage(),
+			Result:     "1",
+			Elapsed:    0,
+			Output: []struct {
+				Item string "json:\"item\""
+			}{
+				{Item: "=== RUN   " + name + "\n"},
+				{Item: "--- PASS: " + name + " (0.00s)\n"},
+			},
+		},
+	}
+	return row
+}
+
+func getPassedTestElapsed(name string, elapsed float32, elapsedStr string) common.TestResultRow {
+	row := common.TestResultRow{
+		TestResult: common.TestResult{
+			CommitSha:  getCommitSha(),
+			CommitDate: getCommitDate(),
+			JobRunDate: getJobRunDate(),
+			Test:       name,
+			Package:    getCryptoHashPackage(),
+			Result:     "1",
+			Elapsed:    elapsed,
+			Output: []struct {
+				Item string "json:\"item\""
+			}{
+				{Item: "=== RUN   " + name + "\n"},
+				{Item: "    --- PASS: " + name + " (" + elapsedStr + "s)\n"},
+			},
+		},
+	}
+	return row
+}
+
 func GetTestData_Level1_1CountSingleNilTest() common.TestRun {
 	row1 := common.TestResultRow{
 		TestResult: common.TestResult{
@@ -59,95 +101,11 @@ func GetTestData_Level1_1CountSingleNilTest() common.TestRun {
 }
 
 func GetTestData_Level1_1CountPass() common.TestRun {
-	row1 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha3_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha3_256\n"},
-				{Item: "--- PASS: TestSanitySha3_256 (0.00s)\n"},
-			},
-		},
-	}
-
-	row2 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha2_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha2_256\n"},
-				{Item: "--- PASS: TestSanitySha2_256 (0.00s)\n"},
-			},
-		},
-	}
-
-	row3 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha3_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha3_384\n"},
-				{Item: "--- PASS: TestSanitySha3_384 (0.00s)\n"},
-			},
-		},
-	}
-
-	row4 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha2_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha2_384\n"},
-				{Item: "--- PASS: TestSanitySha2_384 (0.00s)\n"},
-			},
-		},
-	}
-
-	row5 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanityKmac128",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanityKmac128\n"},
-				{Item: "--- PASS: TestSanityKmac128 (0.00s)\n"},
-			},
-		},
-	}
+	row1 := getPassedTest("TestSanitySha3_256")
+	row2 := getPassedTest("TestSanitySha2_256")
+	row3 := getPassedTest("TestSanitySha3_384")
+	row4 := getPassedTest("TestSanitySha2_384")
+	row5 := getPassedTest("TestSanityKmac128")
 
 	row6 := common.TestResultRow{
 		TestResult: common.TestResult{
@@ -187,41 +145,8 @@ func GetTestData_Level1_1CountPass() common.TestRun {
 		},
 	}
 
-	row8 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3/SHA3_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.1,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3/SHA3_256\n"},
-				{Item: "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"},
-			},
-		},
-	}
-
-	row9 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3/SHA3_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.12,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3/SHA3_384\n"},
-				{Item: "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"},
-			},
-		},
-	}
+	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
 	testRun := common.TestRun{
 		Rows: []common.TestResultRow{
@@ -272,77 +197,10 @@ func GetTestData_Level1_1Count1FailRestPass() common.TestRun {
 		},
 	}
 
-	row2 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha3_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha3_384\n"},
-				{Item: "--- PASS: TestSanitySha3_384 (0.00s)\n"},
-			},
-		},
-	}
-
-	row3 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha2_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha2_256\n"},
-				{Item: "--- PASS: TestSanitySha2_256 (0.00s)\n"},
-			},
-		},
-	}
-
-	row4 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha2_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha2_384\n"},
-				{Item: "--- PASS: TestSanitySha2_384 (0.00s)\n"},
-			},
-		},
-	}
-
-	row5 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanityKmac128",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanityKmac128\n"},
-				{Item: "--- PASS: TestSanityKmac128 (0.00s)\n"},
-			},
-		},
-	}
+	row2 := getPassedTest("TestSanitySha3_384")
+	row3 := getPassedTest("TestSanitySha2_256")
+	row4 := getPassedTest("TestSanitySha2_384")
+	row5 := getPassedTest("TestSanityKmac128")
 
 	row6 := common.TestResultRow{
 		TestResult: common.TestResult{
@@ -382,41 +240,8 @@ func GetTestData_Level1_1Count1FailRestPass() common.TestRun {
 		},
 	}
 
-	row8 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3/SHA3_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.11,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3/SHA3_256\n"},
-				{Item: "    --- PASS: TestSha3/SHA3_256 (0.11s)\n"},
-			},
-		},
-	}
-
-	row9 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3/SHA3_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.12,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3/SHA3_384\n"},
-				{Item: "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"},
-			},
-		},
-	}
+	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
+	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
 	testRun := common.TestRun{
 		Rows: []common.TestResultRow{
@@ -435,77 +260,10 @@ func GetTestData_Level1_1Count1FailRestPass() common.TestRun {
 }
 
 func GetTestData_Level1_1Count2SkippedRestPass() common.TestRun {
-	row1 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha3_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha3_256\n"},
-				{Item: "--- PASS: TestSanitySha3_256 (0.00s)\n"},
-			},
-		},
-	}
-
-	row2 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha3_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha3_384\n"},
-				{Item: "--- PASS: TestSanitySha3_384 (0.00s)\n"},
-			},
-		},
-	}
-
-	row3 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha2_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha2_384\n"},
-				{Item: "--- PASS: TestSanitySha2_384 (0.00s)\n"},
-			},
-		},
-	}
-
-	row4 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanityKmac128",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanityKmac128\n"},
-				{Item: "--- PASS: TestSanityKmac128 (0.00s)\n"},
-			},
-		},
-	}
+	row1 := getPassedTest("TestSanitySha3_256")
+	row2 := getPassedTest("TestSanitySha3_384")
+	row3 := getPassedTest("TestSanitySha2_384")
+	row4 := getPassedTest("TestSanityKmac128")
 
 	row5 := common.TestResultRow{
 		TestResult: common.TestResult{
@@ -526,41 +284,8 @@ func GetTestData_Level1_1Count2SkippedRestPass() common.TestRun {
 		},
 	}
 
-	row6 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3/SHA3_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.11,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3/SHA3_256\n"},
-				{Item: "    --- PASS: TestSha3/SHA3_256 (0.11s)\n"},
-			},
-		},
-	}
-
-	row7 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3/SHA3_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.13,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3/SHA3_384\n"},
-				{Item: "    --- PASS: TestSha3/SHA3_384 (0.13s)\n"},
-			},
-		},
-	}
+	row6 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
+	row7 := getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13")
 
 	testRun := common.TestRun{
 		Rows: []common.TestResultRow{
@@ -577,95 +302,11 @@ func GetTestData_Level1_1Count2SkippedRestPass() common.TestRun {
 }
 
 func GetTestData_Level1_2CountPass() common.TestRun {
-	row1 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha3_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha3_256\n"},
-				{Item: "--- PASS: TestSanitySha3_256 (0.00s)\n"},
-			},
-		},
-	}
-
-	row2 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha2_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha2_256\n"},
-				{Item: "--- PASS: TestSanitySha2_256 (0.00s)\n"},
-			},
-		},
-	}
-
-	row3 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha3_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha3_384\n"},
-				{Item: "--- PASS: TestSanitySha3_384 (0.00s)\n"},
-			},
-		},
-	}
-
-	row4 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha2_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha2_384\n"},
-				{Item: "--- PASS: TestSanitySha2_384 (0.00s)\n"},
-			},
-		},
-	}
-
-	row5 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanityKmac128",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanityKmac128\n"},
-				{Item: "--- PASS: TestSanityKmac128 (0.00s)\n"},
-			},
-		},
-	}
+	row1 := getPassedTest("TestSanitySha3_256")
+	row2 := getPassedTest("TestSanitySha2_256")
+	row3 := getPassedTest("TestSanitySha3_384")
+	row4 := getPassedTest("TestSanitySha2_384")
+	row5 := getPassedTest("TestSanityKmac128")
 
 	row6a := common.TestResultRow{
 		TestResult: common.TestResult{
@@ -743,41 +384,8 @@ func GetTestData_Level1_2CountPass() common.TestRun {
 		},
 	}
 
-	row8 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3/SHA3_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.1,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3/SHA3_256\n"},
-				{Item: "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"},
-			},
-		},
-	}
-
-	row9 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSha3/SHA3_384",
-			Package:    getCryptoHashPackage(),
-			Result:     "1",
-			Elapsed:    0.12,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSha3/SHA3_384\n"},
-				{Item: "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"},
-			},
-		},
-	}
+	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
+	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
 	testRun := common.TestRun{
 		Rows: []common.TestResultRow{
