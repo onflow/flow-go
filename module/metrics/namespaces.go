@@ -16,9 +16,11 @@ const (
 // Network subsystems represent the various layers of networking.
 const (
 	// subsystemLibp2p = "libp2p"
-	subsystemGossip = "gossip"
-	subsystemEngine = "engine"
-	subsystemQueue  = "queue"
+	subsystemGossip       = "gossip"
+	subsystemEngine       = "engine"
+	subsystemQueue        = "queue"
+	subsystemDnsCache     = "dns"
+	subsystemReceiveCache = "receive_cache"
 )
 
 // Storage subsystems represent the various components of the storage layer.

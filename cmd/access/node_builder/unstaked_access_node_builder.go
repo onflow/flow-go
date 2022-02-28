@@ -11,14 +11,17 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
-	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
@@ -252,13 +255,17 @@ func (builder *UnstakedAccessNodeBuilder) Build() (cmd.Node, error) {
 func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// topology is nil since its automatically managed by libp2p
-		network, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil)
+		receiveCache := netcache.NewReceiveCache(p2p.DefaultCacheSize,
+			builder.Logger,
+			metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer))
+
+		// topology is nil since it is automatically managed by libp2p
+		net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
 		if err != nil {
 			return nil, err
 		}
 
-		builder.Network = converter.NewNetwork(network, engine.SyncCommittee, engine.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, engine.SyncCommittee, engine.PublicSyncCommittee)
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 

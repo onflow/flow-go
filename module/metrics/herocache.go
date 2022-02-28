@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/onflow/flow-go/module"
 )
 
 const subsystemHeroCache = "hero_cache_"
@@ -13,6 +15,20 @@ type HeroCacheCollector struct {
 	validKeyReplacedTotal            prometheus.Counter
 	duplicateWriteQueriesTotal       prometheus.Counter
 	existingEntitiesTotal            prometheus.Gauge
+}
+
+type HeroCacheMetricsRegistrationFunc func(uint64) module.HeroCacheMetrics
+
+func NetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) HeroCacheMetricsRegistrationFunc {
+	return func(totalBuckets uint64) module.HeroCacheMetrics {
+		return NewHeroCacheCollector(namespaceNetwork, subsystemReceiveCache, totalBuckets, registrar)
+	}
+}
+
+func NetworkDnsCacheMetricsFactory(registrar prometheus.Registerer) HeroCacheMetricsRegistrationFunc {
+	return func(totalBuckets uint64) module.HeroCacheMetrics {
+		return NewHeroCacheCollector(namespaceNetwork, subsystemDnsCache, totalBuckets, registrar)
+	}
 }
 
 func NewHeroCacheCollector(nameSpace string, subSystem string, totalBuckets uint64, registrar prometheus.Registerer) *HeroCacheCollector {

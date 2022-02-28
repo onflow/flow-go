@@ -8,7 +8,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -57,7 +59,8 @@ type slotBucket struct {
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
 type Cache struct {
-	logger zerolog.Logger
+	logger  zerolog.Logger
+	metrics module.HeroCacheMetrics
 	// NOTE: as a BackData implementation, Cache must be non-blocking.
 	// Concurrency management is done by overlay Backend.
 	sizeLimit    uint32
@@ -103,7 +106,12 @@ type Cache struct {
 // The default overSizeFactor factor is different in the package code because slotsPerBucket is > 3.
 const DefaultOversizeFactor = uint32(8)
 
-func NewCache(sizeLimit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, logger zerolog.Logger) *Cache {
+func NewCache(sizeLimit uint32,
+	oversizeFactor uint32,
+	ejectionMode heropool.EjectionMode,
+	logger zerolog.Logger,
+	metricsFactory metrics.HeroCacheMetricsRegistrationFunc) *Cache {
+
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
 	bucketNum := capacity / slotsPerBucket
@@ -114,6 +122,7 @@ func NewCache(sizeLimit uint32, oversizeFactor uint32, ejectionMode heropool.Eje
 
 	bd := &Cache{
 		logger:                 logger,
+		metrics:                metricsFactory(bucketNum),
 		bucketNum:              bucketNum,
 		sizeLimit:              sizeLimit,
 		buckets:                make([]slotBucket, bucketNum),

@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -183,13 +184,11 @@ func GenerateNetworks(
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	csize int,
 	tops []network.Topology,
 	sms []network.SubscriptionManager,
 ) []network.Network {
 	count := len(ids)
 	nets := make([]network.Network, 0)
-	metrics := metrics.NewNoopCollector()
 
 	// checks if necessary to generate topology managers
 	if tops == nil {
@@ -214,17 +213,23 @@ func GenerateNetworks(
 		me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID())))
 		me.On("Address").Return(ids[i].Address)
 
+		receiveCache := netcache.NewReceiveCache(p2p.DefaultCacheSize,
+			log,
+			func(_ uint64) module.HeroCacheMetrics {
+				return metrics.NewNoopCollector()
+			})
+
 		// create the network
 		net, err := p2p.NewNetwork(
 			log,
 			cbor.NewCodec(),
 			me,
 			func() (network.Middleware, error) { return mws[i], nil },
-			csize,
 			tops[i],
 			sms[i],
-			metrics,
+			metrics.NewNoopCollector(),
 			id.NewFixedIdentityProvider(ids),
+			receiveCache,
 		)
 		require.NoError(t, err)
 
@@ -294,13 +299,12 @@ func GenerateIDsMiddlewaresNetworks(
 	t *testing.T,
 	n int,
 	log zerolog.Logger,
-	csize int,
 	tops []network.Topology,
 	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable) {
 	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(ctx, t, log, ids, mws, csize, tops, sms)
+	networks := GenerateNetworks(ctx, t, log, ids, mws, tops, sms)
 	return ids, mws, networks, observables
 }
 

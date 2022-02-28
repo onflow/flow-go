@@ -13,8 +13,9 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
-	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
@@ -30,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	relaynet "github.com/onflow/flow-go/network/relay"
@@ -314,15 +316,19 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// topology returns empty list since peers are not known upfront
 		top := topology.EmptyListTopology{}
 
-		network, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top)
+		receiveCache := netcache.NewReceiveCache(p2p.DefaultCacheSize,
+			builder.Logger,
+			metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer))
+
+		net, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top, receiveCache)
 		if err != nil {
 			return nil, err
 		}
 
-		builder.AccessNodeConfig.PublicNetworkConfig.Network = network
+		builder.AccessNodeConfig.PublicNetworkConfig.Network = net
 
 		node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)
-		return network, nil
+		return net, nil
 	})
 }
 

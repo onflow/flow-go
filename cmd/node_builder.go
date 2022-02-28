@@ -12,8 +12,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -141,7 +142,7 @@ type BaseConfig struct {
 	receiptsCacheSize               uint
 	db                              *badger.DB
 	PreferredUnicastProtocols       []string
-	NetworkReceivedMessageCacheSize int
+	NetworkReceivedMessageCacheSize uint32
 	topologyProtocolName            string
 	topologyEdgeProbability         float64
 }

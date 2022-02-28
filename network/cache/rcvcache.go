@@ -28,12 +28,13 @@ func (r receiveCacheEntry) Checksum() flow.Identifier {
 }
 
 // NewReceiveCache creates and returns a new ReceiveCache
-func NewReceiveCache(sizeLimit uint32, logger zerolog.Logger) *ReceiveCache {
+func NewReceiveCache(sizeLimit uint32, logger zerolog.Logger, metricsFactory herocache.MetricsRegistrationFunc) *ReceiveCache {
 	return &ReceiveCache{
 		c: stdmap.NewBackendWithBackData(herocache.NewCache(sizeLimit,
 			herocache.DefaultOversizeFactor,
 			heropool.LRUEjection, // receive cache must be LRU.
-			logger.With().Str("mempool", "receive-cache").Logger())),
+			logger.With().Str("mempool", "receive-cache").Logger(),
+			metricsFactory)),
 	}
 }
 

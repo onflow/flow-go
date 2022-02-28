@@ -9,6 +9,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 type DNSCache struct {
@@ -16,12 +17,12 @@ type DNSCache struct {
 	txtCache *stdmap.Backend
 }
 
-func NewDNSCache(sizeLimit uint32, logger zerolog.Logger) *DNSCache {
+func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, metricsFactory metrics.HeroCacheMetricsRegistrationFunc) *DNSCache {
 	return &DNSCache{
 		txtCache: stdmap.NewBackendWithBackData(
-			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger)),
+			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger, metricsFactory)),
 		ipCache: stdmap.NewBackendWithBackData(
-			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger)),
+			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger, metricsFactory)),
 	}
 }
 

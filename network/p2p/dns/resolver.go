@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/util"
 )
 
@@ -76,11 +77,11 @@ const (
 )
 
 // NewResolver is the factory function for creating an instance of this resolver.
-func NewResolver(cacheSizeLimit uint32, logger zerolog.Logger, collector module.ResolverMetrics, opts ...optFunc) *Resolver {
+func NewResolver(cacheSizeLimit uint32, logger zerolog.Logger, collector module.ResolverMetrics, metricsFactory metrics.HeroCacheMetricsRegistrationFunc, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
 		logger:         logger.With().Str("component", "dns-resolver").Logger(),
 		res:            madns.DefaultResolver,
-		c:              newCache(cacheSizeLimit, logger),
+		c:              newCache(cacheSizeLimit, logger, metricsFactory),
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},
