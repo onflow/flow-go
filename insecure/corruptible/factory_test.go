@@ -213,5 +213,6 @@ func TestEngineClosingChannel(t *testing.T) {
 	err = f.EngineClosingChannel(channel)
 	require.NoError(t, err)
 
+	// adapter's UnRegisterChannel method must be called once.
 	testifymock.AssertExpectationsForObjects(t, adapter)
 }
