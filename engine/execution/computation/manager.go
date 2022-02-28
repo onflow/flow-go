@@ -266,6 +266,10 @@ func (e *Manager) ComputeBlock(
 			TransactionResults: result.TransactionResults,
 		}
 
+		e.log.Debug().
+			Interface("execution_data", ed).
+			Msg("execution data created")
+
 		var err error
 		rootID, blobTree, err = e.eds.Add(uploadCtx, ed)
 
