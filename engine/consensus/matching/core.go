@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	glog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -162,8 +163,8 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
 	receiptSpan, _, isSampled := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
 	if isSampled {
-		receiptSpan.LogFields(log.String("result_id", receipt.ExecutionResult.ID().String()))
-		receiptSpan.LogFields(log.String("executor", receipt.ExecutorID.String()))
+		receiptSpan.LogFields(glog.String("result_id", receipt.ExecutionResult.ID().String()))
+		receiptSpan.LogFields(glog.String("executor", receipt.ExecutorID.String()))
 	}
 	defer receiptSpan.Finish()
 
