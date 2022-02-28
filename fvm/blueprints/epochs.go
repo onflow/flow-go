@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	"github.com/onflow/flow-go/model/bootstrap"
 
 	"github.com/onflow/flow-go/module/epochs"
