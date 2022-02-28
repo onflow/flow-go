@@ -85,13 +85,19 @@ func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block
 }
 
 func (et *ExecutionTree) HasReceipt(receipt *flow.ExecutionReceipt) bool {
+	resultID := (&receipt.ExecutionResult).ID()
+	receiptID := receipt.ID()
+
 	et.RLock()
 	defer et.RUnlock()
-	vertex, found := et.forest.GetVertex((&receipt.ExecutionResult).ID())
+
+	vertex, found := et.forest.GetVertex(resultID)
+
 	if !found {
 		return false
 	}
-	return vertex.(*ReceiptsOfSameResult).Has(receipt.ID())
+
+	return vertex.(*ReceiptsOfSameResult).Has(receiptID)
 }
 
 // AddReceipt adds the given execution receipt to the memory pool. Requires
