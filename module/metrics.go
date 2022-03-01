@@ -434,7 +434,7 @@ type HeroCacheMetrics interface {
 
 	// OnEntityEjectedAtFullCapacityHeroCache is called whenever adding a new entity to the cache results in ejection of another entity.
 	// This normally happens when the cache is full.
-	OnEntityEjectedAtFullCapacityHeroCache()
+	OnEntityEjectedAtFull()
 
 	// OnValidKeyReplaced is called whenever adding a new entity to the cache results in a valid existing key replaced. This happens when
 	// a bucket of keys gets full. Then adding any new entity will replace a valid key inside that bucket.
