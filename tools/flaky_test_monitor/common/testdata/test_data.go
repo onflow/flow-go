@@ -13,6 +13,13 @@ type TestDataLevel1 struct {
 	RawJSONTestRunFile string
 }
 
+type TestDataLevel2 struct {
+	Directory        string
+	HasFailures      bool
+	HasNoResultTests bool
+	TestRuns         []common.TestRun
+}
+
 // ************** Helper Functions *****************
 // following functions are used to construct expected TestRun data
 
@@ -139,6 +146,41 @@ func getFailedTest_TestSanitySha2_256() common.TestResultRow {
 	return row
 }
 
+func GetFailedTest_TestSanitySha3_256() common.TestResultRow {
+	row := common.TestResultRow{
+		TestResult: common.TestResult{
+			CommitSha:  getCommitSha(),
+			CommitDate: getCommitDate(),
+			JobRunDate: getJobRunDate(),
+			Test:       "TestSanitySha3_256",
+			Package:    getCryptoHashPackage(),
+			Result:     "0",
+			Elapsed:    0,
+			Output: []struct {
+				Item string "json:\"item\""
+			}{
+				{Item: "=== RUN   TestSanitySha3_256\n"},
+				{Item: "    hash_test.go:21: \n"},
+				{Item: "        \tError Trace:\thash_test.go:21\n"},
+				{Item: "        \tError:      \tNot equal: \n"},
+				{Item: "        \t            \texpected: hash.Hash{0x36, 0xf0, 0x28, 0x58, 0xb, 0xb0, 0x2c, 0xc8, 0x27, 0x2a, 0x9a, 0x2, 0xf, 0x42, 0x0, 0xe3, 0x46, 0xe2, 0x76, 0xae, 0x66, 0x4e, 0x45, 0xee, 0x80, 0x74, 0x55, 0x74, 0xe2, 0xf5, 0xab, 0x81}\n"},
+				{Item: "        \t            \tactual  : hash.Hash{0x36, 0xf0, 0x28, 0x58, 0xb, 0xb0, 0x2c, 0xc8, 0x27, 0x2a, 0x9a, 0x2, 0xf, 0x42, 0x0, 0xe3, 0x46, 0xe2, 0x76, 0xae, 0x66, 0x4e, 0x45, 0xee, 0x80, 0x74, 0x55, 0x74, 0xe2, 0xf5, 0xab, 0x80}\n"},
+				{Item: "        \t            \t\n"},
+				{Item: "        \t            \tDiff:\n"},
+				{Item: "        \t            \t--- Expected\n"},
+				{Item: "        \t            \t+++ Actual\n"},
+				{Item: "        \t            \t@@ -1,2 +1,2 @@\n"},
+				{Item: "        \t            \t-(hash.Hash) (len=32) 0x36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab81\n"},
+				{Item: "        \t            \t+(hash.Hash) (len=32) 0x36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80\n"},
+				{Item: "        \t            \t \n"},
+				{Item: "        \tTest:       \tTestSanitySha3_256\n"},
+				{Item: "--- FAIL: TestSanitySha3_256 (0.00s)\n"},
+			},
+		},
+	}
+	return row
+}
+
 func getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.TestResultRow {
 	row := common.TestResultRow{
 		TestResult: common.TestResult{
@@ -160,7 +202,7 @@ func getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.TestResultRow {
 	return row
 }
 
-// ************** Expected Test Run Functions *****************
+// ************** Level 1 - Expected Test Run Functions *****************
 // following functions are used by unit tests for constructing expected TestRun data
 
 func GetTestData_Level1_1CountSingleNilTest() common.TestRun {
@@ -218,38 +260,7 @@ func GetTestData_Level1_1CountPass() common.TestRun {
 }
 
 func GetTestData_Level1_1Count1FailRestPass() common.TestRun {
-	row1 := common.TestResultRow{
-		TestResult: common.TestResult{
-			CommitSha:  getCommitSha(),
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       "TestSanitySha3_256",
-			Package:    getCryptoHashPackage(),
-			Result:     "0",
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   TestSanitySha3_256\n"},
-				{Item: "    hash_test.go:21: \n"},
-				{Item: "        \tError Trace:\thash_test.go:21\n"},
-				{Item: "        \tError:      \tNot equal: \n"},
-				{Item: "        \t            \texpected: hash.Hash{0x36, 0xf0, 0x28, 0x58, 0xb, 0xb0, 0x2c, 0xc8, 0x27, 0x2a, 0x9a, 0x2, 0xf, 0x42, 0x0, 0xe3, 0x46, 0xe2, 0x76, 0xae, 0x66, 0x4e, 0x45, 0xee, 0x80, 0x74, 0x55, 0x74, 0xe2, 0xf5, 0xab, 0x81}\n"},
-				{Item: "        \t            \tactual  : hash.Hash{0x36, 0xf0, 0x28, 0x58, 0xb, 0xb0, 0x2c, 0xc8, 0x27, 0x2a, 0x9a, 0x2, 0xf, 0x42, 0x0, 0xe3, 0x46, 0xe2, 0x76, 0xae, 0x66, 0x4e, 0x45, 0xee, 0x80, 0x74, 0x55, 0x74, 0xe2, 0xf5, 0xab, 0x80}\n"},
-				{Item: "        \t            \t\n"},
-				{Item: "        \t            \tDiff:\n"},
-				{Item: "        \t            \t--- Expected\n"},
-				{Item: "        \t            \t+++ Actual\n"},
-				{Item: "        \t            \t@@ -1,2 +1,2 @@\n"},
-				{Item: "        \t            \t-(hash.Hash) (len=32) 0x36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab81\n"},
-				{Item: "        \t            \t+(hash.Hash) (len=32) 0x36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80\n"},
-				{Item: "        \t            \t \n"},
-				{Item: "        \tTest:       \tTestSanitySha3_256\n"},
-				{Item: "--- FAIL: TestSanitySha3_256 (0.00s)\n"},
-			},
-		},
-	}
-
+	row1 := GetFailedTest_TestSanitySha3_256()
 	row2 := getPassedTest("TestSanitySha3_384")
 	row3 := getPassedTest("TestSanitySha2_256")
 	row4 := getPassedTest("TestSanitySha2_384")
@@ -611,4 +622,38 @@ func GetTestData_Leve1_3CountNilWithNormalTests() common.TestRun {
 		Rows: testResultRows,
 	}
 	return testRun
+}
+
+// ************** Level 2 - Expected Test Runs Functions *****************
+// following functions are used by unit tests for constructing expected TestRuns data
+
+func GetTestData_Level2_1FailureRestPass() []common.TestRun {
+	row1_1 := GetFailedTest_TestSanitySha3_256()
+	row2_1 := getPassedTest("TestSanitySha3_384")
+	row3_1 := getPassedTest("TestSanitySha2_256")
+	row4_1 := getPassedTest("TestSanitySha2_384")
+	row5_1 := getPassedTest("TestSanityKmac128")
+	row6_1 := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632498687765218000\n")
+	row7_1 := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632498687765661000\n")
+	row8_1 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
+	row9_1 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
+
+	var testResult1Rows []common.TestResultRow
+	testResult1Rows = append(testResult1Rows, row1_1)
+	testResult1Rows = append(testResult1Rows, row2_1)
+	testResult1Rows = append(testResult1Rows, row3_1)
+	testResult1Rows = append(testResult1Rows, row4_1)
+	testResult1Rows = append(testResult1Rows, row5_1)
+	testResult1Rows = append(testResult1Rows, row6_1)
+	testResult1Rows = append(testResult1Rows, row7_1)
+	testResult1Rows = append(testResult1Rows, row8_1)
+	testResult1Rows = append(testResult1Rows, row9_1)
+
+	testRun1 := common.TestRun{
+		Rows: testResult1Rows,
+	}
+
+	var testRuns []common.TestRun
+	testRuns = append(testRuns, testRun1)
+	return testRuns
 }

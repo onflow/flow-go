@@ -14,7 +14,7 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 
 	config := common.ReadProperties(propertyFileDirectory)
 
-	var testSummary2 common.TestSummary2
+	var testSummary2 common.TestsLevel2Summary
 
 	level2JsonBytes, err := os.ReadFile(level2FilePath)
 	common.AssertNoError(err, "error reading level 2 json")
@@ -34,9 +34,9 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 	// 2. tests with failures (ordered by most failures)
 	// 3. tests with durations > 0 (ordered by longest durations)
 
-	noResultsTRS := []common.TestResultSummary{}
-	failuresTRS := []common.TestResultSummary{}
-	durationTRS := []common.TestResultSummary{}
+	noResultsTRS := []common.TestRunsLevel2Summary{}
+	failuresTRS := []common.TestRunsLevel2Summary{}
+	durationTRS := []common.TestRunsLevel2Summary{}
 
 	// go through all level 2 test results to figure out grouping for tests with
 	// most failures, no-results, longest running

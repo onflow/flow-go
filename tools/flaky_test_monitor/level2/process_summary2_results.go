@@ -13,8 +13,74 @@ import (
 const failuresDir = "./failures/"
 const noResultsDir = "./no-results/"
 
+func processSummary2TestRunFromStructs(testRuns []common.TestRun) common.TestsLevel2Summary {
+	// create directory to store failure messages
+	err := os.Mkdir(failuresDir, 0755)
+	common.AssertNoError(err, "error creating failures directory")
+
+	// create directory to store no-results messages
+	err = os.Mkdir(noResultsDir, 0755)
+	common.AssertNoError(err, "error creating no-results directory")
+
+	testSummary2 := common.TestsLevel2Summary{}
+	testSummary2.TestResults = make(map[string]*common.TestRunsLevel2Summary)
+
+	// go through all level 1 test runs create level 2 summary
+	for i := 0; i < len(testRuns); i++ {
+		for _, testResultRow := range testRuns[i].Rows {
+			// check if already started collecting summary for this test
+			mapKey := testResultRow.TestResult.Package + "/" + testResultRow.TestResult.Test
+			testResultSummary, testResultSummaryExists := testSummary2.TestResults[mapKey]
+
+			// this test doesn't have a summary so create it
+			// no need to specify other fields explicitly - default values will suffice
+			if !testResultSummaryExists {
+				testResultSummary = &common.TestRunsLevel2Summary{
+					Test:    testResultRow.TestResult.Test,
+					Package: testResultRow.TestResult.Package,
+				}
+			}
+			// keep track of each duration so can later calculate average duration
+			testResultSummary.Durations = append(testResultSummary.Durations, testResultRow.TestResult.Elapsed)
+
+			// increment # of passes, fails, skips or no-results for this test
+			testResultSummary.Runs++
+			switch testResultRow.TestResult.Result {
+			case "1":
+				testResultSummary.Passed++
+			case "0":
+				testResultSummary.Failed++
+				saveFailureMessage(testResultRow.TestResult)
+			case "skip":
+				testResultSummary.Skipped++
+
+				// don't count skip as a run
+				testResultSummary.Runs--
+
+				// truncate last duration - don't count durations of skips
+				testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
+			case "":
+				testResultSummary.NoResult++
+				// don't count no result as a run
+				testResultSummary.Runs--
+
+				// truncate last duration - don't count durations of no-results
+				testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
+				saveNoResultMessage(testResultRow.TestResult)
+			default:
+				panic(fmt.Sprintf("unexpected test result: %s", testResultRow.TestResult.Result))
+			}
+
+			testSummary2.TestResults[mapKey] = testResultSummary
+		}
+	}
+	// calculate averages and other calculations that can only be completed after all test runs have been read
+	postProcessTestSummary2(testSummary2)
+	return testSummary2
+}
+
 // process level 1 summary files in a single directory and output level 2 summary
-func processSummary2TestRun(level1Directory string) common.TestSummary2 {
+func processSummary2TestRun(level1Directory string) common.TestsLevel2Summary {
 	dirEntries, err := os.ReadDir(filepath.Join(level1Directory))
 	common.AssertNoError(err, "error reading level 1 directory")
 
@@ -26,8 +92,8 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 	err = os.Mkdir(noResultsDir, 0755)
 	common.AssertNoError(err, "error creating no-results directory")
 
-	testSummary2 := common.TestSummary2{}
-	testSummary2.TestResults = make(map[string]*common.TestResultSummary)
+	testSummary2 := common.TestsLevel2Summary{}
+	testSummary2.TestResults = make(map[string]*common.TestRunsLevel2Summary)
 
 	// go through all level 1 summaries in a folder to create level 2 summary
 	for i := 0; i < len(dirEntries); i++ {
@@ -41,54 +107,52 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 		common.AssertNoError(err, "error unmarshalling level 1 test run: "+dirEntries[i].Name())
 
 		// go through each level 1 summary and update level 2 summary
-		for _, packageResult := range level1TestRun.PackageResults {
-			for _, testResult := range packageResult.Tests {
-				// check if already started collecting summary for this test
-				mapKey := testResult.Package + "/" + testResult.Test
-				testResultSummary, testResultSummaryExists := testSummary2.TestResults[mapKey]
+		for _, testResultRow := range level1TestRun.Rows {
+			// check if already started collecting summary for this test
+			mapKey := testResultRow.TestResult.Package + "/" + testResultRow.TestResult.Test
+			testResultSummary, testResultSummaryExists := testSummary2.TestResults[mapKey]
 
-				// this test doesn't have a summary so create it
-				// no need to specify other fields explicitly - default values will suffice
-				if !testResultSummaryExists {
-					testResultSummary = &common.TestResultSummary{
-						Test:    testResult.Test,
-						Package: testResult.Package,
-					}
+			// this test doesn't have a summary so create it
+			// no need to specify other fields explicitly - default values will suffice
+			if !testResultSummaryExists {
+				testResultSummary = &common.TestRunsLevel2Summary{
+					Test:    testResultRow.TestResult.Test,
+					Package: testResultRow.TestResult.Package,
 				}
-
-				// keep track of each duration so can later calculate average duration
-				testResultSummary.Durations = append(testResultSummary.Durations, testResult.Elapsed)
-
-				// increment # of passes, fails, skips or no-results for this test
-				testResultSummary.Runs++
-				switch testResult.Result {
-				case "1":
-					testResultSummary.Passed++
-				case "0":
-					testResultSummary.Failed++
-					saveFailureMessage(testResult)
-				case "skip":
-					testResultSummary.Skipped++
-
-					// don't count skip as a run
-					testResultSummary.Runs--
-
-					// truncate last duration - don't count durations of skips
-					testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
-				case "":
-					testResultSummary.NoResult++
-					// don't count no result as a run
-					testResultSummary.Runs--
-
-					// truncate last duration - don't count durations of no-results
-					testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
-					saveNoResultMessage(testResult)
-				default:
-					panic(fmt.Sprintf("unexpected test result: %s", testResult.Result))
-				}
-
-				testSummary2.TestResults[mapKey] = testResultSummary
 			}
+
+			// keep track of each duration so can later calculate average duration
+			testResultSummary.Durations = append(testResultSummary.Durations, testResultRow.TestResult.Elapsed)
+
+			// increment # of passes, fails, skips or no-results for this test
+			testResultSummary.Runs++
+			switch testResultRow.TestResult.Result {
+			case "1":
+				testResultSummary.Passed++
+			case "0":
+				testResultSummary.Failed++
+				saveFailureMessage(testResultRow.TestResult)
+			case "skip":
+				testResultSummary.Skipped++
+
+				// don't count skip as a run
+				testResultSummary.Runs--
+
+				// truncate last duration - don't count durations of skips
+				testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
+			case "":
+				testResultSummary.NoResult++
+				// don't count no result as a run
+				testResultSummary.Runs--
+
+				// truncate last duration - don't count durations of no-results
+				testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
+				saveNoResultMessage(testResultRow.TestResult)
+			default:
+				panic(fmt.Sprintf("unexpected test result: %s", testResultRow.TestResult.Result))
+			}
+
+			testSummary2.TestResults[mapKey] = testResultSummary
 		}
 	}
 
@@ -146,7 +210,7 @@ func saveMessageHelper(testResult common.TestResult, expectedResult string, mess
 	}
 }
 
-func postProcessTestSummary2(testSummary2 common.TestSummary2) {
+func postProcessTestSummary2(testSummary2 common.TestsLevel2Summary) {
 	for _, testResultSummary := range testSummary2.TestResults {
 		// calculate average duration for each test summary
 		var durationSum float32 = 0
