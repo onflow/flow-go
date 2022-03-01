@@ -223,7 +223,7 @@ func DefaultBaseConfig() *BaseConfig {
 		metricsEnabled:                  true,
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
-		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
+		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
 		topologyProtocolName:            string(topology.TopicBased),
 		topologyEdgeProbability:         topology.MaximumEdgeProbability,
 	}

@@ -30,7 +30,9 @@ import (
 )
 
 const (
-	DefaultCacheSize = 10e4
+	// DefaultReceiveCacheSize represents size of receive cache that keeps hash of incoming messages
+	// for sake of deduplication.
+	DefaultReceiveCacheSize = 10e4
 	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
 	eventIDPackingPrefix = "libp2ppacking"
 )

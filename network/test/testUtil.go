@@ -213,7 +213,7 @@ func GenerateNetworks(
 		me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID())))
 		me.On("Address").Return(ids[i].Address)
 
-		receiveCache := netcache.NewReceiveCache(p2p.DefaultCacheSize,
+		receiveCache := netcache.NewReceiveCache(p2p.DefaultReceiveCacheSize,
 			log,
 			unittest.NoopHeroCacheMetricsRegistrationFunc)
 
