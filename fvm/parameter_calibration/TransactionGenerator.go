@@ -118,7 +118,7 @@ func (m *MixedTxType) GenerateTransaction(context TransactionTypeContext) (Gener
 		if tt.slopePoints == 0 {
 			loopLength = tt.paramMax/uint64(len(m.simpleTypes)) + 1
 		} else {
-			loopLength = tt.paramMax/uint64(len(m.simpleTypes)) + 1 // rand.Uint64()%(tt.paramMax/uint64(len(m.simpleTypes))) + 1
+			loopLength = tt.paramMax/uint64(len(m.simpleTypes))/5 + 1 // rand.Uint64()%(tt.paramMax/uint64(len(m.simpleTypes))) + 1
 		}
 		bodies[i] = loopTemplateTx(loopLength, tt.body)
 	}
@@ -166,7 +166,7 @@ func (s *SimpleTxType) GenerateTransaction(context TransactionTypeContext) (Gene
 	if s.slopePoints == 0 {
 		loopLength = s.paramMax + 1
 	} else {
-		loopLength = s.paramMax + 1 // rand.Uint64()%s.paramMax + 1
+		loopLength = s.paramMax/5 + 1 // rand.Uint64()%s.paramMax + 1
 	}
 
 	script := simpleTemplateTx(loopLength, s.body)
