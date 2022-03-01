@@ -64,7 +64,7 @@ func generateVote(c *cobra.Command, args []string) {
 		NodeID:        nodeID,
 		Address:       nodeInfo.Address,
 		Role:          nodeInfo.Role,
-		Stake:         1000,
+		Weight:        1000,
 		StakingPubKey: stakingPrivKey.PublicKey(),
 		NetworkPubKey: nodeInfo.NetworkPrivKey.PrivateKey.PublicKey(),
 	}

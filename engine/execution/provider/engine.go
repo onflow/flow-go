@@ -261,7 +261,7 @@ func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier)
 		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
 	}
 
-	if origin.Stake == 0 {
+	if origin.Weight == 0 {
 		return nil, engine.NewInvalidInputErrorf("node %s has zero weight at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
 	}
 	return origin, nil

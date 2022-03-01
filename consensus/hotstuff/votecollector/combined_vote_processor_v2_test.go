@@ -639,12 +639,12 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		minRequiredStake := uint64(0)
 		// draw weight for each signer randomly
 		stakingSigners := unittest.IdentityListFixture(int(stakingSignersCount), func(identity *flow.Identity) {
-			identity.Stake = stakingWeightRange.Draw(t, identity.String()).(uint64)
-			minRequiredStake += identity.Stake
+			identity.Weight = stakingWeightRange.Draw(t, identity.String()).(uint64)
+			minRequiredStake += identity.Weight
 		})
 		beaconSigners := unittest.IdentityListFixture(int(beaconSignersCount), func(identity *flow.Identity) {
-			identity.Stake = beaconWeightRange.Draw(t, identity.String()).(uint64)
-			minRequiredStake += identity.Stake
+			identity.Weight = beaconWeightRange.Draw(t, identity.String()).(uint64)
+			minRequiredStake += identity.Weight
 		})
 
 		// proposing block
@@ -715,13 +715,13 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		for _, signer := range stakingSigners {
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithStakingSig())
 			vote.SignerID = signer.ID()
-			expectStakingAggregatorCalls(vote, signer.Stake)
+			expectStakingAggregatorCalls(vote, signer.Weight)
 			votes = append(votes, vote)
 		}
 		for _, signer := range beaconSigners {
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer.ID()
-			expectStakingAggregatorCalls(vote, signer.Stake)
+			expectStakingAggregatorCalls(vote, signer.Weight)
 			expectedSig := crypto.Signature(vote.SigData[hsig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {

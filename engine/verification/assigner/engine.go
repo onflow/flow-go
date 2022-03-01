@@ -263,7 +263,7 @@ func stakedAsVerification(state protocol.State, blockID flow.Identifier, identif
 	}
 
 	// checks identity has weight
-	if identity.Stake == 0 {
+	if identity.Weight == 0 {
 		return false, nil
 	}
 

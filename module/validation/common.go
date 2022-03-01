@@ -43,7 +43,7 @@ func ensureStakedNodeWithRole(identity *flow.Identity, expectedRole flow.Role) e
 	}
 
 	// check if the identity has non-zero weight
-	if identity.Stake == 0 {
+	if identity.Weight == 0 {
 		return engine.NewInvalidInputErrorf("node has zero weight (%x)", identity.NodeID)
 	}
 

@@ -848,7 +848,7 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 
 func WithStake(stake uint64) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		identity.Stake = stake
+		identity.Weight = stake
 	}
 }
 
@@ -917,7 +917,7 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 		NodeID:        nodeID,
 		Address:       fmt.Sprintf("address-%v", nodeID[0:7]),
 		Role:          flow.RoleConsensus,
-		Stake:         1000,
+		Weight:        1000,
 		StakingPubKey: stakingKey.PublicKey(),
 	}
 	for _, apply := range opts {

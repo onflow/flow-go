@@ -39,7 +39,7 @@ type Identity struct {
 	// the process of un-staking, have 0 weight.
 	//
 	// TODO: to be renamed to Weight
-	Stake uint64
+	Weight uint64
 	// Ejected represents whether a node has been permanently removed from the
 	// network. A node may be ejected for either:
 	// * committing one protocol felony
@@ -73,7 +73,7 @@ func ParseIdentity(identity string) (*Identity, error) {
 		NodeID:  nodeID,
 		Address: address,
 		Role:    role,
-		Stake:   weight,
+		Weight:  weight,
 	}
 
 	return &iy, nil
@@ -81,7 +81,7 @@ func ParseIdentity(identity string) (*Identity, error) {
 
 // String returns a string representation of the identity.
 func (iy Identity) String() string {
-	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Stake)
+	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Weight)
 }
 
 // ID returns a unique identifier for the identity.
@@ -114,7 +114,7 @@ type stealthIdentity struct {
 }
 
 func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
-	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
+	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Weight, nil, nil}
 	if iy.StakingPubKey != nil {
 		ie.StakingPubKey = iy.StakingPubKey.Encode()
 	}
@@ -185,7 +185,7 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
 	identity.Role = ie.Role
-	identity.Stake = ie.Stake
+	identity.Weight = ie.Stake
 	var err error
 	if ie.StakingPubKey != nil {
 		if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
@@ -249,7 +249,7 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 	if iy.Role != other.Role {
 		return false
 	}
-	if iy.Stake != other.Stake {
+	if iy.Weight != other.Weight {
 		return false
 	}
 	if iy.Ejected != other.Ejected {
@@ -404,7 +404,7 @@ func (il IdentityList) Fingerprint() Identifier {
 func (il IdentityList) TotalStake() uint64 {
 	var total uint64
 	for _, identity := range il {
-		total += identity.Stake
+		total += identity.Weight
 	}
 	return total
 }

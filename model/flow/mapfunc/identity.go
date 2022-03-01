@@ -6,7 +6,7 @@ import (
 
 func WithStake(stake uint64) flow.IdentityMapFunc {
 	return func(identity flow.Identity) flow.Identity {
-		identity.Stake = stake
+		identity.Weight = stake
 		return identity
 	}
 }

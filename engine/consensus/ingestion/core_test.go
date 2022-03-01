@@ -287,7 +287,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 	// which this node requested to unstake
 	colID, ok := suite.finalIdentities.ByNodeID(suite.collID)
 	suite.Require().True(ok)
-	colID.Stake = 0
+	colID.Weight = 0
 
 	guarantee := suite.validGuarantee()
 

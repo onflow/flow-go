@@ -120,7 +120,7 @@ func TestDeterministic(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(N_NODES)
 	for i, identity := range identities {
-		identity.Stake = uint64(i + 1)
+		identity.Weight = uint64(i + 1)
 	}
 
 	leaders1, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
@@ -212,7 +212,7 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(N_NODES)
 	for i, identity := range identities {
-		identity.Stake = uint64(i)
+		identity.Weight = uint64(i)
 	}
 
 	seed1 := make([]byte, 32)
@@ -253,7 +253,7 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(N_NODES)
 	for i, identity := range identities {
-		identity.Stake = uint64(i + 1)
+		identity.Weight = uint64(i + 1)
 	}
 
 	leaders, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
@@ -271,7 +271,7 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 	for nodeID, selectedCount := range selected {
 		identity, ok := identities.ByNodeID(nodeID)
 		require.True(t, ok)
-		target := uint64(N_VIEWS) * identity.Stake / 10
+		target := uint64(N_VIEWS) * identity.Weight / 10
 
 		var diff uint64
 		if selectedCount > target {
@@ -319,7 +319,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 		weightless := unittest.IdentityListFixture(5, unittest.WithStake(0))
 		weightful := unittest.IdentityListFixture(5)
 		for i, identity := range weightful {
-			identity.Stake = uint64(i + 1)
+			identity.Weight = uint64(i + 1)
 		}
 
 		identities := append(weightless, weightful...)
@@ -354,8 +354,8 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 			// index 233-777
 			n := rng.UintN(777-233) + 233
 			m := rng.UintN(777-233) + 233
-			identities[n].Stake = 1
-			identities[m].Stake = 1
+			identities[n].Weight = 1
+			identities[m].Weight = 1
 
 			// the following code check the zero weight node should not be selected
 			stakeful := identities.Filter(filter.HasStake(true))
@@ -388,7 +388,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 
 				n := rng.UintN(1000)
 				stake := n + 1
-				identities[n].Stake = stake
+				identities[n].Weight = stake
 				onlyStaked := identities[n]
 
 				selections, err := ComputeLeaderSelectionFromSeed(0, someSeed, 1000, identities)

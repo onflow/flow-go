@@ -284,7 +284,7 @@ func (node NodeInfo) Identity() *flow.Identity {
 		NodeID:        node.NodeID,
 		Address:       node.Address,
 		Role:          node.Role,
-		Stake:         node.Stake,
+		Weight:        node.Stake,
 		StakingPubKey: node.StakingPubKey(),
 		NetworkPubKey: node.NetworkPubKey(),
 	}
@@ -297,7 +297,7 @@ func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Stake,
+		identity.Weight,
 		identity.NetworkPubKey,
 		identity.StakingPubKey)
 }
@@ -307,7 +307,7 @@ func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Stake,
+		identity.Weight,
 		networkKey,
 		stakingKey,
 	)

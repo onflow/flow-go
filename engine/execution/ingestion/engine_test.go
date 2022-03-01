@@ -318,9 +318,9 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 
 func (ctx testingContext) mockStakedAtBlockID(blockID flow.Identifier, staked bool) *protocol.Snapshot {
 	identity := *ctx.identity
-	identity.Stake = 0
+	identity.Weight = 0
 	if staked {
-		identity.Stake = 100
+		identity.Weight = 100
 	}
 	snap := new(protocol.Snapshot)
 	snap.On("Identity", identity.NodeID).Return(&identity, nil)

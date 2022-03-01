@@ -62,7 +62,7 @@ func NewWeightedSignatureAggregator(
 	idToInfo := make(map[flow.Identifier]signerInfo)
 	for i, id := range ids {
 		idToInfo[id.NodeID] = signerInfo{
-			weight: id.Stake,
+			weight: id.Weight,
 			index:  i,
 		}
 	}

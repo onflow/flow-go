@@ -271,7 +271,7 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 		if !ok {
 			return nil, invalidCadenceTypeError("nodeInfo.initialWeight", cdcNodeInfoFields[13], cadence.UInt64(0))
 		}
-		identity.Stake = uint64(initialWeight)
+		identity.Weight = uint64(initialWeight)
 
 		// convert nodeID string into identifier
 		nodeIDHex, ok := cdcNodeInfoFields[0].(cadence.String)

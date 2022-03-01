@@ -880,7 +880,7 @@ func registerNodeTransaction(
 		},
 	)
 
-	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", id.Stake))
+	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", id.Weight))
 	if err != nil {
 		panic(err)
 	}

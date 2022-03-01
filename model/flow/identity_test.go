@@ -253,8 +253,8 @@ func TestIdentity_EqualTo(t *testing.T) {
 	})
 
 	t.Run("Weight diff", func(t *testing.T) {
-		a := &flow.Identity{Stake: 1}
-		b := &flow.Identity{Stake: 2}
+		a := &flow.Identity{Weight: 1}
+		b := &flow.Identity{Weight: 2}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -289,7 +289,7 @@ func TestIdentity_EqualTo(t *testing.T) {
 			NodeID:        flow.Identifier{1, 2, 3},
 			Address:       "address",
 			Role:          flow.RoleCollection,
-			Stake:         23,
+			Weight:        23,
 			Ejected:       false,
 			StakingPubKey: pks[0],
 			NetworkPubKey: pks[1],
@@ -298,7 +298,7 @@ func TestIdentity_EqualTo(t *testing.T) {
 			NodeID:        flow.Identifier{1, 2, 3},
 			Address:       "address",
 			Role:          flow.RoleCollection,
-			Stake:         23,
+			Weight:        23,
 			Ejected:       false,
 			StakingPubKey: pks[0],
 			NetworkPubKey: pks[1],

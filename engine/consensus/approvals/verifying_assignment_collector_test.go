@@ -231,7 +231,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 
 	s.Run("verifier zero-weight", func() {
 		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		identity.Stake = 0 // zero weight
+		identity.Weight = 0 // zero weight
 
 		state := &protocol.State{}
 		state.On("AtBlockID", mock.Anything).Return(

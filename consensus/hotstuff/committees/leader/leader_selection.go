@@ -98,7 +98,7 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 
 	weights := make([]uint64, 0, len(identities))
 	for _, id := range identities {
-		weights = append(weights, id.Stake)
+		weights = append(weights, id.Weight)
 	}
 
 	leaders, err := WeightedRandomSelection(seed, count, weights)

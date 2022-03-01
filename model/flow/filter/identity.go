@@ -78,7 +78,7 @@ func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter {
 // HasStake returns a filter for nodes with non-zero stake.
 func HasStake(hasStake bool) flow.IdentityFilter {
 	return func(identity *flow.Identity) bool {
-		return (identity.Stake > 0) == hasStake
+		return (identity.Weight > 0) == hasStake
 	}
 }
 
