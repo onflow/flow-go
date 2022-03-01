@@ -422,6 +422,7 @@ func (e *TransactionEnv) GetCode(location runtime.Location) ([]byte, error) {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetCode)
 		defer sp.Finish()
 	}
+
 	e.computationHandler.AddUsed(1, "GetCode")
 
 	contractLocation, ok := location.(common.AddressLocation)
@@ -544,7 +545,7 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetAccountContractNames")
+	e.computationHandler.AddUsed(1, "GenerateUUID")
 
 	if e.uuidGenerator == nil {
 		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
@@ -841,6 +842,7 @@ func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountKey)
 		defer sp.Finish()
 	}
+
 	e.computationHandler.AddUsed(1, "GetAccountKey")
 
 	accKey, err := e.accountKeys.GetAccountKey(address, keyIndex)

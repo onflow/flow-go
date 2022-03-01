@@ -129,6 +129,8 @@ func (e *ScriptEnv) GetValue(owner, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("getting value failed: %w", err)
 	}
 	valueByteSize = len(v)
+
+	e.computationHandler.AddUsed(uint64(valueByteSize), "GetValue")
 	return v, nil
 }
 
@@ -142,6 +144,7 @@ func (e *ScriptEnv) SetValue(owner, key, value []byte) error {
 		)
 		defer sp.Finish()
 	}
+	e.computationHandler.AddUsed(uint64(len(value)), "SetValue")
 
 	err := e.accounts.SetValue(
 		flow.BytesToAddress(owner),
@@ -160,6 +163,8 @@ func (e *ScriptEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "ValueExists")
+
 	v, err := e.GetValue(owner, key)
 	if err != nil {
 		return false, fmt.Errorf("checking value existence failed: %w", err)
@@ -168,15 +173,13 @@ func (e *ScriptEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 	return len(v) > 0, nil
 }
 
-func (e *ScriptEnv) AccountExists(address common.Address) (exists bool, err error) {
-	return e.accounts.Exists(flow.Address(address))
-}
-
 func (e *ScriptEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageUsed)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetStorageUsed")
 
 	value, err = e.accounts.GetStorageUsed(flow.Address(address))
 	if err != nil {
@@ -191,6 +194,8 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageCapacity)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetStorageCapacity")
 
 	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
 	result, invokeErr := accountStorageCapacity(address)
@@ -215,6 +220,8 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "GetAccountBalance")
+
 	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountBalance(address)
 
@@ -230,6 +237,8 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetAccountAvailableBalance")
 
 	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountAvailableBalance(address)
@@ -251,6 +260,9 @@ func (e *ScriptEnv) ResolveLocation(
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvResolveLocation)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "ResolveLocation")
+
 	addressLocation, isAddress := location.(common.AddressLocation)
 
 	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
@@ -318,6 +330,8 @@ func (e *ScriptEnv) GetAccountContractNames(address runtime.Address) ([]string, 
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "GetAccountContractNames")
+
 	a := flow.Address(address)
 
 	freezeError := e.accounts.CheckAccountNotFrozen(a)
@@ -333,6 +347,8 @@ func (e *ScriptEnv) GetCode(location runtime.Location) ([]byte, error) {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetCode)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetCode")
 
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
@@ -360,6 +376,8 @@ func (e *ScriptEnv) GetProgram(location common.Location) (*interpreter.Program, 
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "GetProgram")
+
 	if addressLocation, ok := location.(common.AddressLocation); ok {
 		address := flow.Address(addressLocation.Address)
 
@@ -382,6 +400,8 @@ func (e *ScriptEnv) SetProgram(location common.Location, program *interpreter.Pr
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvSetProgram)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "SetProgram")
 
 	err := e.programs.Set(location, program)
 	if err != nil {
@@ -424,6 +444,8 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
 	}
 
+	e.computationHandler.AddUsed(1, "GenerateUUID")
+
 	uuid, err := e.uuidGenerator.GenerateUUID()
 	if err != nil {
 		return 0, fmt.Errorf("generating uuid failed: %w", err)
@@ -465,6 +487,8 @@ func (e *ScriptEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgo
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "Hash")
+
 	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	return crypto.HashWithTag(hashAlgo, tag, data)
 }
@@ -500,6 +524,7 @@ func (e *ScriptEnv) VerifySignature(
 }
 
 func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
+	e.computationHandler.AddUsed(1, "ValidatePublicKey")
 	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
@@ -511,6 +536,8 @@ func (e *ScriptEnv) GetCurrentBlockHeight() (uint64, error) {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetCurrentBlockHeight)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetCurrentBlockHeight")
 
 	if e.ctx.BlockHeader == nil {
 		return 0, errors.NewOperationNotSupportedError("GetCurrentBlockHeight")
@@ -542,6 +569,8 @@ func (e *ScriptEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error)
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetBlockAtHeight)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetBlockAtHeight")
 
 	if e.ctx.Blocks == nil {
 		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
@@ -584,6 +613,8 @@ func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "GetAccountKey")
+
 	if e.accountKeys != nil {
 		accKey, err := e.accountKeys.GetAccountKey(address, index)
 		if err != nil {
@@ -608,6 +639,8 @@ func (e *ScriptEnv) GetAccountContractCode(address runtime.Address, name string)
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountContractCode)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetAccountContractCode")
 
 	code, err = e.GetCode(common.AddressLocation{
 		Address: address,
@@ -651,26 +684,31 @@ func (e *ScriptEnv) RecordTrace(operation string, location common.Location, dura
 
 func (e *ScriptEnv) ProgramParsed(location common.Location, duration time.Duration) {
 	e.RecordTrace("parseProgram", location, duration, nil)
+	e.computationHandler.AddUsed(1, "ProgramParsed")
 	e.metrics.ProgramParsed(location, duration)
 }
 
 func (e *ScriptEnv) ProgramChecked(location common.Location, duration time.Duration) {
 	e.RecordTrace("checkProgram", location, duration, nil)
+	e.computationHandler.AddUsed(1, "ProgramChecked")
 	e.metrics.ProgramChecked(location, duration)
 }
 
 func (e *ScriptEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
 	e.RecordTrace("interpretProgram", location, duration, nil)
+	e.computationHandler.AddUsed(1, "ProgramInterpreted")
 	e.metrics.ProgramInterpreted(location, duration)
 }
 
 func (e *ScriptEnv) ValueEncoded(duration time.Duration) {
 	e.RecordTrace("encodeValue", nil, duration, nil)
+	e.computationHandler.AddUsed(1, "ValueEncoded")
 	e.metrics.ValueEncoded(duration)
 }
 
 func (e *ScriptEnv) ValueDecoded(duration time.Duration) {
 	e.RecordTrace("decodeValue", nil, duration, nil)
+	e.computationHandler.AddUsed(1, "ValueDecoded")
 	e.metrics.ValueDecoded(duration)
 }
 
@@ -686,6 +724,7 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
 func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	e.computationHandler.AddUsed(1, "AllocateStorageIndex")
 	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
