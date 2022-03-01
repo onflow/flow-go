@@ -386,6 +386,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 		return 0, false
 	}
 
+	c.availableSlotHistogram[availableSlotCount]++
 	c.metrics.BucketAvailableSlotsCount(availableSlotCount)
 	return slotToUse, true
 }
