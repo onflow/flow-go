@@ -31,6 +31,12 @@ func NetworkDnsCacheMetricsFactory(registrar prometheus.Registerer) HeroCacheMet
 	}
 }
 
+func TransactionsCacheMetricsFactory(registrar prometheus.Registerer) HeroCacheMetricsRegistrationFunc {
+	return func(totalBuckets uint64) module.HeroCacheMetrics {
+		return NewHeroCacheCollector(namespaceNetwork, subsystemDnsCache, totalBuckets, registrar)
+	}
+}
+
 func NewHeroCacheCollector(nameSpace string, subSystem string, totalBuckets uint64, registrar prometheus.Registerer) *HeroCacheCollector {
 
 	full := float64(totalBuckets)

@@ -12,8 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
@@ -34,9 +32,7 @@ func TestReceiveCacheTestSuite(t *testing.T) {
 func (r *ReceiveCacheTestSuite) SetupTest() {
 	const size = 10
 
-	c := netcache.NewReceiveCache(size, unittest.Logger(), func(_ uint64) module.HeroCacheMetrics {
-		return &metrics.NoopCollector{}
-	})
+	c := netcache.NewReceiveCache(size, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 
 	r.c = c
 	r.size = size

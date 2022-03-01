@@ -65,7 +65,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 
-	suite.pool = herocache.NewTransactions(1000, unittest.Logger())
+	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
@@ -376,7 +376,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	t := suite.T()
 
 	// use a mempool with 2000 transactions, one per block
-	suite.pool = herocache.NewTransactions(2000, unittest.Logger())
+	suite.pool = herocache.NewTransactions(2000, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
@@ -523,7 +523,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	}
 
 	// reset the pool and builder
-	suite.pool = herocache.NewTransactions(10, unittest.Logger())
+	suite.pool = herocache.NewTransactions(10, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	// insert a transaction referring genesis (now expired)
@@ -565,7 +565,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 
 	// start with an empty mempool
-	suite.pool = herocache.NewTransactions(1000, unittest.Logger())
+	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -829,7 +829,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.genesis = model.Genesis()
 		suite.chainID = suite.genesis.Header.ChainID
 
-		suite.pool = herocache.NewTransactions(1000, unittest.Logger())
+		suite.pool = herocache.NewTransactions(1000, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 
 		suite.dbdir = unittest.TempDir(b)
 		suite.db = unittest.BadgerDB(b, suite.dbdir)

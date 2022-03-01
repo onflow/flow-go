@@ -7,6 +7,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // ReceiveCache implements an LRU cache of the received eventIDs that delivered to their engines
@@ -28,7 +29,7 @@ func (r receiveCacheEntry) Checksum() flow.Identifier {
 }
 
 // NewReceiveCache creates and returns a new ReceiveCache
-func NewReceiveCache(sizeLimit uint32, logger zerolog.Logger, metricsFactory herocache.MetricsRegistrationFunc) *ReceiveCache {
+func NewReceiveCache(sizeLimit uint32, logger zerolog.Logger, metricsFactory metrics.HeroCacheMetricsRegistrationFunc) *ReceiveCache {
 	return &ReceiveCache{
 		c: stdmap.NewBackendWithBackData(herocache.NewCache(sizeLimit,
 			herocache.DefaultOversizeFactor,

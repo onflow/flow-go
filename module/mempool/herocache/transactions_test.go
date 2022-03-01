@@ -17,7 +17,7 @@ func TestTransactionPool(t *testing.T) {
 	tx1 := unittest.TransactionBodyFixture()
 	tx2 := unittest.TransactionBodyFixture()
 
-	transactions := herocache.NewTransactions(1000, unittest.Logger())
+	transactions := herocache.NewTransactions(1000, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 
 	t.Run("should be able to add first", func(t *testing.T) {
 		added := transactions.Add(&tx1)
@@ -62,7 +62,7 @@ func TestTransactionPool(t *testing.T) {
 func TestConcurrentWriteAndRead(t *testing.T) {
 	total := 100
 	txs := unittest.TransactionBodyListFixture(total)
-	transactions := herocache.NewTransactions(uint32(total), unittest.Logger())
+	transactions := herocache.NewTransactions(uint32(total), unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 
 	wg := sync.WaitGroup{}
 	wg.Add(total)
@@ -98,7 +98,7 @@ func TestConcurrentWriteAndRead(t *testing.T) {
 func TestAllReturnsInOrder(t *testing.T) {
 	total := 100
 	txs := unittest.TransactionBodyListFixture(total)
-	transactions := herocache.NewTransactions(uint32(total), unittest.Logger())
+	transactions := herocache.NewTransactions(uint32(total), unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 
 	// storing all transactions
 	for i := 0; i < total; i++ {

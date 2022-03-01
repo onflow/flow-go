@@ -130,7 +130,9 @@ func (suite *Suite) SetupTest() {
 	suite.AddEpoch(suite.counter)
 	suite.AddEpoch(suite.counter + 1)
 
-	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions { return herocache.NewTransactions(1000, suite.log) })
+	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions {
+		return herocache.NewTransactions(1000, suite.log, unittest.NoopHeroCacheMetricsRegistrationFunc)
+	})
 
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)

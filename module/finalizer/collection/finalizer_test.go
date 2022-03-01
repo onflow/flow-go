@@ -34,7 +34,7 @@ func TestFinalizer(t *testing.T) {
 
 		var state *cluster.State
 
-		pool := herocache.NewTransactions(1000, unittest.Logger())
+		pool := herocache.NewTransactions(1000, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {

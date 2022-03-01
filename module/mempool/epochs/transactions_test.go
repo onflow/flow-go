@@ -18,7 +18,9 @@ import (
 // subsequent calls to Get should return the same transaction pool
 func TestConsistency(t *testing.T) {
 
-	create := func() mempool.Transactions { return herocache.NewTransactions(100, unittest.Logger()) }
+	create := func() mempool.Transactions {
+		return herocache.NewTransactions(100, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
+	}
 	pools := epochs.NewTransactionPools(create)
 	epoch := rand.Uint64()
 
@@ -29,7 +31,9 @@ func TestConsistency(t *testing.T) {
 // test that different epochs don't interfere, also test concurrent access
 func TestMultipleEpochs(t *testing.T) {
 
-	create := func() mempool.Transactions { return herocache.NewTransactions(100, unittest.Logger()) }
+	create := func() mempool.Transactions {
+		return herocache.NewTransactions(100, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
+	}
 	pools := epochs.NewTransactionPools(create)
 
 	var wg sync.WaitGroup
@@ -58,7 +62,9 @@ func TestMultipleEpochs(t *testing.T) {
 
 func TestCombinedSize(t *testing.T) {
 
-	create := func() mempool.Transactions { return herocache.NewTransactions(100, unittest.Logger()) }
+	create := func() mempool.Transactions {
+		return herocache.NewTransactions(100, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
+	}
 	pools := epochs.NewTransactionPools(create)
 
 	nEpochs := rand.Uint64() % 10

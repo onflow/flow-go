@@ -215,9 +215,7 @@ func GenerateNetworks(
 
 		receiveCache := netcache.NewReceiveCache(p2p.DefaultCacheSize,
 			log,
-			func(_ uint64) module.HeroCacheMetrics {
-				return metrics.NewNoopCollector()
-			})
+			unittest.NoopHeroCacheMetricsRegistrationFunc)
 
 		// create the network
 		net, err := p2p.NewNetwork(
