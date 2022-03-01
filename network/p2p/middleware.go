@@ -78,13 +78,14 @@ type Middleware struct {
 	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
-	rootBlockID                flow.Identifier
+	sporkID                    flow.Identifier
 	validators                 []network.MessageValidator
 	peerManagerFactory         PeerManagerFactoryFunc
 	peerManager                *PeerManager
-	unicastMessageTimeout      time.Duration
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
+	directMessageConfigs       map[network.Topic]DirectMessageConfig
+	directMessageConfigsLock   sync.RWMutex
 	component.Component
 }
 
@@ -122,28 +123,23 @@ func NewMiddleware(
 	libP2PNodeFactory LibP2PFactoryFunc,
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
-	rootBlockID flow.Identifier,
-	unicastMessageTimeout time.Duration,
+	sporkID flow.Identifier,
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
 
-	if unicastMessageTimeout <= 0 {
-		unicastMessageTimeout = DefaultUnicastTimeout
-	}
-
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                   log,
-		wg:                    &sync.WaitGroup{},
-		me:                    flowID,
-		libP2PNodeFactory:     libP2PNodeFactory,
-		metrics:               metrics,
-		rootBlockID:           rootBlockID,
-		validators:            DefaultValidators(log, flowID),
-		unicastMessageTimeout: unicastMessageTimeout,
-		peerManagerFactory:    nil,
-		idTranslator:          idTranslator,
+		log:                  log,
+		wg:                   &sync.WaitGroup{},
+		me:                   flowID,
+		libP2PNodeFactory:    libP2PNodeFactory,
+		metrics:              metrics,
+		sporkID:              sporkID,
+		validators:           DefaultValidators(log, flowID),
+		peerManagerFactory:   nil,
+		idTranslator:         idTranslator,
+		directMessageConfigs: make(map[network.Topic]DirectMessageConfig),
 	}
 
 	for _, opt := range opts {
@@ -316,33 +312,33 @@ func (m *Middleware) stop() {
 //
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
-func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) (err error) {
+func (m *Middleware) SendDirect(channel network.Channel, msg *message.Message, targetID flow.Identifier) (err error) {
 	// translates identifier to peer id
 	peerID, err := m.idTranslator.GetPeerID(targetID)
 	if err != nil {
 		return fmt.Errorf("could not find peer id for target id: %w", err)
 	}
 
-	maxMsgSize := unicastMaxMsgSize(msg)
-	if msg.Size() > maxMsgSize {
+	topic := engine.TopicFromChannel(channel, m.sporkID)
+	config := m.getDirectMessageConfig(topic)
+
+	if msg.Size() > config.MaxMsgSize {
 		// message size goes beyond maximum size that the serializer can handle.
 		// proceeding with this message results in closing the connection by the target side, and
 		// delivery failure.
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), config.MaxMsgSize)
 	}
 
-	maxTimeout := m.unicastMaxMsgDuration(msg)
-
-	m.metrics.DirectMessageStarted(msg.ChannelID)
-	defer m.metrics.DirectMessageFinished(msg.ChannelID)
+	m.metrics.DirectMessageStarted(channel.String())
+	defer m.metrics.DirectMessageFinished(channel.String())
 
 	// pass in a context with timeout to make the unicast call fail fast
-	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
+	ctx, cancel := context.WithTimeout(m.ctx, config.MaxMsgTimeout)
 	defer cancel()
 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
-	tag := fmt.Sprintf("%v:%v", msg.ChannelID, msg.Type)
+	tag := fmt.Sprintf("%v:%v", channel, msg.Type)
 	m.libP2PNode.host.ConnManager().Protect(peerID, tag)
 	defer m.libP2PNode.host.ConnManager().Unprotect(peerID, tag)
 
@@ -401,100 +397,117 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	return nil
 }
 
-// handleIncomingStream handles an incoming stream from a remote peer
-// it is a callback that gets called for each incoming stream by libp2p with a new stream object
-func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
-	// qualify the logger with local and remote address
-	log := streamLogger(m.log, s)
+func (m *Middleware) getDirectMessageConfig(topic network.Topic) DirectMessageConfig {
+	m.directMessageConfigsLock.RLock()
+	config, ok := m.directMessageConfigs[topic]
+	m.directMessageConfigsLock.RUnlock()
 
-	log.Info().Msg("incoming stream received")
-
-	success := false
-
-	defer func() {
-		if success {
-			err := s.Close()
-			if err != nil {
-				log.Err(err).Msg("failed to close stream")
-			}
-		} else {
-			err := s.Reset()
-			if err != nil {
-				log.Err(err).Msg("failed to reset stream")
-			}
-		}
-	}()
-
-	// TODO: We need to allow per-topic timeouts and message size limits.
-	// This allows us to configure higher limits for topics on which we expect
-	// to receive large messages (e.g. Chunk Data Packs), and use the normal
-	// limits for other topics. In order to enable this, we will need to register
-	// a separate stream handler for each topic.
-	ctx, cancel := context.WithTimeout(m.ctx, LargeMsgUnicastTimeout)
-	defer cancel()
-
-	deadline, _ := ctx.Deadline()
-
-	err := s.SetReadDeadline(deadline)
-	if err != nil {
-		log.Err(err).Msg("failed to set read deadline for stream")
-		return
+	if ok {
+		return config
 	}
 
-	// create the reader
-	r := ggio.NewDelimitedReader(s, LargeMsgMaxUnicastMsgSize)
+	return DirectMessageConfig{
+		MaxMsgSize:    DefaultMaxUnicastMsgSize,
+		MaxMsgTimeout: DefaultUnicastTimeout,
+	}
+}
 
-	for {
-		if ctx.Err() != nil {
-			return
-		}
+func (m *Middleware) streamHandler(channel network.Channel, handler network.DirectMessageHandler) libp2pnetwork.StreamHandler {
+	return func(stream libp2pnetwork.Stream) {
+		// qualify the logger with local and remote address
+		log := streamLogger(m.log, stream)
 
-		var msg message.Message
+		log.Info().Msg("incoming stream received")
 
-		// read the next message (blocking call)
-		err = r.ReadMsg(&msg)
+		success := false
 
+		defer func() {
+			if success {
+				err := stream.Close()
+				if err != nil {
+					log.Err(err).Msg("failed to close stream")
+				}
+			} else {
+				err := stream.Reset()
+				if err != nil {
+					log.Err(err).Msg("failed to reset stream")
+				}
+			}
+		}()
+
+		config := m.getDirectMessageConfig(network.Topic(stream.Protocol()))
+
+		ctx, cancel := context.WithTimeout(m.ctx, config.MaxMsgTimeout)
+		defer cancel()
+
+		deadline, _ := ctx.Deadline()
+
+		err := stream.SetReadDeadline(deadline)
 		if err != nil {
-			if err == io.EOF {
-				break
+			log.Err(err).Msg("failed to set read deadline for stream")
+			return
+		}
+
+		// create the reader
+		r := ggio.NewDelimitedReader(stream, config.MaxMsgSize)
+
+		for {
+			if ctx.Err() != nil {
+				return
 			}
 
-			m.log.Err(err).Msg("failed to read message")
-			return
+			var msg message.Message
+
+			// read the next message (blocking call)
+			err = r.ReadMsg(&msg)
+
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+
+				m.log.Err(err).Msg("failed to read message")
+				return
+			}
+
+			m.wg.Add(1)
+			go func(msg *message.Message) {
+				defer m.wg.Done()
+
+				// log metrics with the channel name as OneToOne
+				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+				handler(channel)
+				m.processAuthenticatedMessage(msg, stream.Conn().RemotePeer())
+			}(&msg)
 		}
 
-		// TODO: once we've implemented per topic message size limits per the TODO above,
-		// we can remove this check
-		maxSize := unicastMaxMsgSize(&msg)
-		if msg.Size() > maxSize {
-			// message size exceeded
-			m.log.Error().
-				Hex("sender", msg.OriginID).
-				Hex("event_id", msg.EventID).
-				Str("event_type", msg.Type).
-				Str("channel", msg.ChannelID).
-				Int("maxSize", maxSize).
-				Msg("received message exceeded permissible message maxSize")
-			return
-		}
-
-		m.wg.Add(1)
-		go func(msg *message.Message) {
-			defer m.wg.Done()
-
-			// log metrics with the channel name as OneToOne
-			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-			m.processAuthenticatedMessage(msg, s.Conn().RemotePeer())
-		}(&msg)
+		success = true
 	}
+}
 
-	success = true
+type DirectMessageConfig struct {
+	MaxMsgSize    int
+	MaxMsgTimeout time.Duration
+}
+
+func (m *Middleware) SetDirectMessageConfig(channel network.Channel, config DirectMessageConfig) {
+	m.directMessageConfigsLock.Lock()
+	defer m.directMessageConfigsLock.Unlock()
+
+	m.directMessageConfigs[engine.TopicFromChannel(channel, m.sporkID)] = config
+}
+
+func (m *Middleware) SetDirectMessageHandler(channel network.Channel, handler network.DirectMessageHandler) {
+	m.libP2PNode.Host().SetStreamHandler(
+		protocol.ID(engine.TopicFromChannel(channel, m.sporkID)),
+		m.streamHandler(handler),
+	)
 }
 
 // Subscribe subscribes the middleware to a channel.
 func (m *Middleware) Subscribe(channel network.Channel) error {
 
-	topic := engine.TopicFromChannel(channel, m.rootBlockID)
+	topic := engine.TopicFromChannel(channel, m.sporkID)
 
 	var validators []psValidator.MessageValidator
 	if !engine.PublicChannels().Contains(channel) {
@@ -522,7 +535,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 // Unsubscribe unsubscribes the middleware from a channel.
 func (m *Middleware) Unsubscribe(channel network.Channel) error {
-	topic := engine.TopicFromChannel(channel, m.rootBlockID)
+	topic := engine.TopicFromChannel(channel, m.sporkID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
@@ -596,7 +609,7 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
-	topic := engine.TopicFromChannel(channel, m.rootBlockID)
+	topic := engine.TopicFromChannel(channel, m.sporkID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
@@ -616,29 +629,6 @@ func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 		return false, fmt.Errorf("could not find peer id for target id: %w", err)
 	}
 	return m.libP2PNode.IsConnected(peerID)
-}
-
-// unicastMaxMsgSize returns the max permissible size for a unicast message
-func unicastMaxMsgSize(msg *message.Message) int {
-	switch msg.Type {
-	case "messages.ChunkDataResponse":
-		return LargeMsgMaxUnicastMsgSize
-	default:
-		return DefaultMaxUnicastMsgSize
-	}
-}
-
-// unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
-func (m *Middleware) unicastMaxMsgDuration(msg *message.Message) time.Duration {
-	switch msg.Type {
-	case "messages.ChunkDataResponse":
-		if LargeMsgUnicastTimeout > m.unicastMessageTimeout {
-			return LargeMsgMaxUnicastMsgSize
-		}
-		return m.unicastMessageTimeout
-	default:
-		return m.unicastMessageTimeout
-	}
 }
 
 // peerManagerUpdate request an update from the peer manager to connect to new peers and disconnect from unwanted peers

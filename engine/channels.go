@@ -241,13 +241,13 @@ func IsClusterChannel(channel network.Channel) bool {
 // TopicFromChannel returns the unique LibP2P topic form the channel.
 // The channel is made up of name string suffixed with root block id.
 // The root block id is used to prevent cross talks between nodes on different sporks.
-func TopicFromChannel(channel network.Channel, rootBlockID flow.Identifier) network.Topic {
+func TopicFromChannel(channel network.Channel, sporkID flow.Identifier) network.Topic {
 	// skip root block suffix, if this is a cluster specific channel. A cluster specific channel is inherently
 	// unique for each epoch
 	if IsClusterChannel(channel) {
 		return network.Topic(channel)
 	}
-	return network.Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID.String()))
+	return network.Topic(fmt.Sprintf("%s/%s", string(channel), sporkID.String()))
 }
 
 func ChannelFromTopic(topic network.Topic) (network.Channel, bool) {

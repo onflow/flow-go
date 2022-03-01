@@ -104,20 +104,6 @@ func (n *Network) submit(channel network.Channel, event interface{}, targetIDs .
 	return nil
 }
 
-// unicast is called when the attached Engine to the channel is sending an event to a single target
-// Engine attached to the same channel on another node.
-func (n *Network) UnicastOnChannel(channel network.Channel, event interface{}, targetID flow.Identifier) error {
-	m := &PendingMessage{
-		From:      n.GetID(),
-		Channel:   channel,
-		Event:     event,
-		TargetIDs: []flow.Identifier{targetID},
-	}
-
-	n.buffer(m)
-	return nil
-}
-
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
@@ -127,14 +113,6 @@ func (n *Network) PublishOnChannel(channel network.Channel, event interface{}, t
 		return fmt.Errorf("publish found empty target ID list for the message")
 	}
 
-	return n.submit(channel, event, targetIDs...)
-}
-
-// multicast is called when an engine attached to the channel is sending an event to a number of randomly chosen
-// Engines attached to the same channel on other nodes. The targeted nodes are selected based on the selector.
-// In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) MulticastOnChannel(channel network.Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error {
-	targetIDs = flow.Sample(num, targetIDs...)
 	return n.submit(channel, event, targetIDs...)
 }
 

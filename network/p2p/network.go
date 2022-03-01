@@ -282,6 +282,19 @@ func (n *Network) RegisterPingService(pingProtocol protocol.ID, provider network
 	}
 }
 
+func (n *Network) RegisterDirectMessageHandler(channel network.Channel, handler network.DirectMessageHandler) error {
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return ErrNetworkShutdown
+	default:
+		return
+	}
+}
+
+func (n *Network) SendDirectMessage(channel network.Channel, message interface{}, targetID flow.Identifier) error {
+
+}
+
 // RegisterBlobService registers a BlobService on the given channel.
 // The returned BlobService can be used to request blobs from the network.
 func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) (network.BlobService, error) {
@@ -429,29 +442,6 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	return msg, nil
 }
 
-// UnicastOnChannel sends the message in a reliable way to the given recipient.
-// It uses 1-1 direct messaging over the underlying network to deliver the message.
-// It returns an error if unicasting fails.
-func (n *Network) UnicastOnChannel(channel network.Channel, message interface{}, targetID flow.Identifier) error {
-	if targetID == n.me.NodeID() {
-		n.logger.Debug().Msg("network skips self unicasting")
-		return nil
-	}
-
-	// generates network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channel, message, targetID)
-	if err != nil {
-		return fmt.Errorf("unicast could not generate network message: %w", err)
-	}
-
-	err = n.mw.SendDirect(msg, targetID)
-	if err != nil {
-		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
-	}
-
-	return nil
-}
-
 // PublishOnChannel sends the message in an unreliable way to the given recipients.
 // In this context, unreliable means that the message is published over a libp2p pub-sub
 // channel and can be read by any node subscribed to that channel.
@@ -467,25 +457,6 @@ func (n *Network) PublishOnChannel(channel network.Channel, message interface{},
 
 	if err != nil {
 		return fmt.Errorf("failed to publish on channel %s: %w", channel, err)
-	}
-
-	return nil
-}
-
-// MulticastOnChannel unreliably sends the specified event over the channel to randomly selected 'num' number of recipients
-// selected from the specified targetIDs.
-func (n *Network) MulticastOnChannel(channel network.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
-	selectedIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()).Sample(num)
-
-	if len(selectedIDs) == 0 {
-		return network.EmptyTargetList
-	}
-
-	err := n.sendOnChannel(channel, message, selectedIDs)
-
-	// publishes the message to the selected targets
-	if err != nil {
-		return fmt.Errorf("failed to multicast on channel %s: %w", channel, err)
 	}
 
 	return nil

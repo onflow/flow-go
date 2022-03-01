@@ -25,12 +25,7 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 // Message models a single message that is supposed to get exchanged by the
 // gossip network
 type Message struct {
-	ChannelID            string   `protobuf:"bytes,1,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
-	EventID              []byte   `protobuf:"bytes,2,opt,name=EventID,proto3" json:"EventID,omitempty"`
-	OriginID             []byte   `protobuf:"bytes,3,opt,name=OriginID,proto3" json:"OriginID,omitempty"` // Deprecated: Do not use.
-	TargetIDs            [][]byte `protobuf:"bytes,4,rep,name=TargetIDs,proto3" json:"TargetIDs,omitempty"`
 	Payload              []byte   `protobuf:"bytes,5,opt,name=Payload,proto3" json:"Payload,omitempty"`
-	Type                 string   `protobuf:"bytes,6,opt,name=Type,proto3" json:"Type,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -69,47 +64,11 @@ func (m *Message) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Message proto.InternalMessageInfo
 
-func (m *Message) GetChannelID() string {
-	if m != nil {
-		return m.ChannelID
-	}
-	return ""
-}
-
-func (m *Message) GetEventID() []byte {
-	if m != nil {
-		return m.EventID
-	}
-	return nil
-}
-
-// Deprecated: Do not use.
-func (m *Message) GetOriginID() []byte {
-	if m != nil {
-		return m.OriginID
-	}
-	return nil
-}
-
-func (m *Message) GetTargetIDs() [][]byte {
-	if m != nil {
-		return m.TargetIDs
-	}
-	return nil
-}
-
 func (m *Message) GetPayload() []byte {
 	if m != nil {
 		return m.Payload
 	}
 	return nil
-}
-
-func (m *Message) GetType() string {
-	if m != nil {
-		return m.Type
-	}
-	return ""
 }
 
 func init() {
@@ -119,19 +78,13 @@ func init() {
 func init() { proto.RegisterFile("message.proto", fileDescriptor_33c57e4bae7b9afd) }
 
 var fileDescriptor_33c57e4bae7b9afd = []byte{
-	// 188 bytes of a gzipped FileDescriptorProto
+	// 93 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0xcd, 0x4d, 0x2d, 0x2e,
-	0x4e, 0x4c, 0x4f, 0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x87, 0x72, 0x95, 0xd6, 0x32,
-	0x72, 0xb1, 0xfb, 0x42, 0xd8, 0x42, 0x32, 0x5c, 0x9c, 0xce, 0x19, 0x89, 0x79, 0x79, 0xa9, 0x39,
-	0x9e, 0x2e, 0x12, 0x8c, 0x0a, 0x8c, 0x1a, 0x9c, 0x41, 0x08, 0x01, 0x21, 0x09, 0x2e, 0x76, 0xd7,
-	0xb2, 0xd4, 0xbc, 0x12, 0x4f, 0x17, 0x09, 0x26, 0x05, 0x46, 0x0d, 0x9e, 0x20, 0x18, 0x57, 0x48,
-	0x8e, 0x8b, 0xc3, 0xbf, 0x28, 0x33, 0x3d, 0x33, 0xcf, 0xd3, 0x45, 0x82, 0x19, 0x24, 0xe5, 0xc4,
-	0x24, 0xc1, 0x18, 0x04, 0x17, 0x03, 0x99, 0x1b, 0x92, 0x58, 0x94, 0x9e, 0x5a, 0xe2, 0xe9, 0x52,
-	0x2c, 0xc1, 0xa2, 0xc0, 0xac, 0xc1, 0x13, 0x84, 0x10, 0x00, 0x99, 0x1b, 0x90, 0x58, 0x99, 0x93,
-	0x9f, 0x98, 0x22, 0xc1, 0x0a, 0x31, 0x17, 0xca, 0x15, 0x12, 0xe2, 0x62, 0x09, 0xa9, 0x2c, 0x48,
-	0x95, 0x60, 0x03, 0x3b, 0x05, 0xcc, 0x76, 0x12, 0x38, 0xf1, 0x48, 0x8e, 0xf1, 0xc2, 0x23, 0x39,
-	0xc6, 0x07, 0x8f, 0xe4, 0x18, 0x67, 0x3c, 0x96, 0x63, 0x48, 0x62, 0x03, 0xfb, 0xc8, 0x18, 0x10,
-	0x00, 0x00, 0xff, 0xff, 0xee, 0xe2, 0xac, 0x4c, 0xe2, 0x00, 0x00, 0x00,
+	0x4e, 0x4c, 0x4f, 0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x87, 0x72, 0x95, 0x94, 0xb9,
+	0xd8, 0x7d, 0x21, 0x4c, 0x21, 0x09, 0x2e, 0xf6, 0x80, 0xc4, 0xca, 0x9c, 0xfc, 0xc4, 0x14, 0x09,
+	0x56, 0x05, 0x46, 0x0d, 0x9e, 0x20, 0x18, 0xd7, 0x49, 0xe0, 0xc4, 0x23, 0x39, 0xc6, 0x0b, 0x8f,
+	0xe4, 0x18, 0x1f, 0x3c, 0x92, 0x63, 0x9c, 0xf1, 0x58, 0x8e, 0x21, 0x89, 0x0d, 0x6c, 0x8c, 0x31,
+	0x20, 0x00, 0x00, 0xff, 0xff, 0x11, 0x90, 0x25, 0x78, 0x57, 0x00, 0x00, 0x00,
 }
 
 func (m *Message) Marshal() (dAtA []byte, err error) {
@@ -158,49 +111,12 @@ func (m *Message) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= len(m.XXX_unrecognized)
 		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if len(m.Type) > 0 {
-		i -= len(m.Type)
-		copy(dAtA[i:], m.Type)
-		i = encodeVarintMessage(dAtA, i, uint64(len(m.Type)))
-		i--
-		dAtA[i] = 0x32
-	}
 	if len(m.Payload) > 0 {
 		i -= len(m.Payload)
 		copy(dAtA[i:], m.Payload)
 		i = encodeVarintMessage(dAtA, i, uint64(len(m.Payload)))
 		i--
 		dAtA[i] = 0x2a
-	}
-	if len(m.TargetIDs) > 0 {
-		for iNdEx := len(m.TargetIDs) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.TargetIDs[iNdEx])
-			copy(dAtA[i:], m.TargetIDs[iNdEx])
-			i = encodeVarintMessage(dAtA, i, uint64(len(m.TargetIDs[iNdEx])))
-			i--
-			dAtA[i] = 0x22
-		}
-	}
-	if len(m.OriginID) > 0 {
-		i -= len(m.OriginID)
-		copy(dAtA[i:], m.OriginID)
-		i = encodeVarintMessage(dAtA, i, uint64(len(m.OriginID)))
-		i--
-		dAtA[i] = 0x1a
-	}
-	if len(m.EventID) > 0 {
-		i -= len(m.EventID)
-		copy(dAtA[i:], m.EventID)
-		i = encodeVarintMessage(dAtA, i, uint64(len(m.EventID)))
-		i--
-		dAtA[i] = 0x12
-	}
-	if len(m.ChannelID) > 0 {
-		i -= len(m.ChannelID)
-		copy(dAtA[i:], m.ChannelID)
-		i = encodeVarintMessage(dAtA, i, uint64(len(m.ChannelID)))
-		i--
-		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -222,29 +138,7 @@ func (m *Message) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.ChannelID)
-	if l > 0 {
-		n += 1 + l + sovMessage(uint64(l))
-	}
-	l = len(m.EventID)
-	if l > 0 {
-		n += 1 + l + sovMessage(uint64(l))
-	}
-	l = len(m.OriginID)
-	if l > 0 {
-		n += 1 + l + sovMessage(uint64(l))
-	}
-	if len(m.TargetIDs) > 0 {
-		for _, b := range m.TargetIDs {
-			l = len(b)
-			n += 1 + l + sovMessage(uint64(l))
-		}
-	}
 	l = len(m.Payload)
-	if l > 0 {
-		n += 1 + l + sovMessage(uint64(l))
-	}
-	l = len(m.Type)
 	if l > 0 {
 		n += 1 + l + sovMessage(uint64(l))
 	}
@@ -289,138 +183,6 @@ func (m *Message) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: Message: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ChannelID", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMessage
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthMessage
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthMessage
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ChannelID = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field EventID", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMessage
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthMessage
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthMessage
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.EventID = append(m.EventID[:0], dAtA[iNdEx:postIndex]...)
-			if m.EventID == nil {
-				m.EventID = []byte{}
-			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field OriginID", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMessage
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthMessage
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthMessage
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.OriginID = append(m.OriginID[:0], dAtA[iNdEx:postIndex]...)
-			if m.OriginID == nil {
-				m.OriginID = []byte{}
-			}
-			iNdEx = postIndex
-		case 4:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field TargetIDs", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMessage
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthMessage
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthMessage
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.TargetIDs = append(m.TargetIDs, make([]byte, postIndex-iNdEx))
-			copy(m.TargetIDs[len(m.TargetIDs)-1], dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Payload", wireType)
@@ -454,38 +216,6 @@ func (m *Message) Unmarshal(dAtA []byte) error {
 			if m.Payload == nil {
 				m.Payload = []byte{}
 			}
-			iNdEx = postIndex
-		case 6:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMessage
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthMessage
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthMessage
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Type = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

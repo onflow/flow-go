@@ -37,6 +37,8 @@ type Middleware interface {
 	// a more efficient candidate.
 	SendDirect(msg *message.Message, targetID flow.Identifier) error
 
+	SetDirectMessageHandler(channel Channel, handler DirectMessageHandler) error
+
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 	// effort.

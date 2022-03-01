@@ -70,25 +70,6 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 	return c.adapter.PublishOnChannel(c.channel, event, targetIDs...)
 }
 
-// Unicast sends an event in a reliable way to the given recipient.
-// It uses 1-1 direct messaging over the underlying network to deliver the event.
-// It returns an error if the unicast fails.
-func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
-	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel %s closed", c.channel)
-	}
-	return c.adapter.UnicastOnChannel(c.channel, event, targetID)
-}
-
-// Multicast unreliably sends the specified event to the specified number of recipients selected from the specified subset.
-// The recipients are selected randomly from targetIDs
-func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
-	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel %s closed", c.channel)
-	}
-	return c.adapter.MulticastOnChannel(c.channel, event, num, targetIDs...)
-}
-
 func (c *Conduit) Close() error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s already closed", c.channel)
