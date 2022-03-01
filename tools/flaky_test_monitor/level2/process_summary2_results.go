@@ -59,7 +59,7 @@ func processSummary2TestRunFromStructs(testRuns []common.TestRun) common.TestsLe
 
 				// truncate last duration - don't count durations of skips
 				testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
-			case "":
+			case "-100":
 				testResultSummary.NoResult++
 				// don't count no result as a run
 				testResultSummary.Runs--
@@ -166,7 +166,7 @@ func saveFailureMessage(testResult common.TestResult) {
 }
 
 func saveNoResultMessage(testResult common.TestResult) {
-	saveMessageHelper(testResult, "", noResultsDir, "no-result")
+	saveMessageHelper(testResult, "-100", noResultsDir, "no-result")
 }
 
 // for each failed / no-result test, we want to save the raw output message as a text file

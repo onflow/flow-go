@@ -20,7 +20,13 @@ func TestProcessSummary2TestRun(t *testing.T) {
 			HasNoResultTests: false,
 			TestRuns:         testdata.GetTestData_Level2_1FailureRestPass(),
 		},
-		// "1 level 1 summary, 1 no-result test, no other tests": {"test2-1-no-result-test", false, true},
+
+		"1 level 1 summary, 1 no-result test, no other tests": {
+			Directory:        "test2-1-no-result-test",
+			HasFailures:      false,
+			HasNoResultTests: true,
+			TestRuns:         testdata.GetTestsData_Level2_1NoResultNoOtherTests(),
+		},
 		// "many level 1 summaries, many no-result tests":                             {"test3-multi-no-result-tests", false, true},
 		// "many level 1 summaries, many failures, many passes":                       {"test4-multi-failures", true, false},
 		// "many level 1 summaries, many failures, many passes, many no-result tests": {"test5-multi-failures-multi-no-result-tests", true, true},

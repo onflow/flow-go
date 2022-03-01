@@ -657,3 +657,18 @@ func GetTestData_Level2_1FailureRestPass() []common.TestRun {
 	testRuns = append(testRuns, testRun1)
 	return testRuns
 }
+
+func GetTestsData_Level2_1NoResultNoOtherTests() []common.TestRun {
+	row1_1 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
+
+	var testResult1Rows []common.TestResultRow
+	testResult1Rows = append(testResult1Rows, row1_1)
+
+	testRun1 := common.TestRun{
+		Rows: testResult1Rows,
+	}
+
+	var testRuns []common.TestRun
+	testRuns = append(testRuns, testRun1)
+	return testRuns
+}
