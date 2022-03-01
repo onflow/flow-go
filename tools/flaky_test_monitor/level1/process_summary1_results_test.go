@@ -69,6 +69,12 @@ func TestProcessSummary1TestRun_Struct(t *testing.T) {
 			ExpectedTestRun:    GetTestData_Level1_5CountSingleNilTest(),
 			RawJSONTestRunFile: "test-result-nil-test-single-5-count-pass.json",
 		},
+
+		//normal test at the end of a test run with multiple nil tests in front of it
+		"4 nil tests in a row, 1 normal test": {
+			ExpectedTestRun:    GetTestData_Level1_5CountMultipleNilTests(),
+			RawJSONTestRunFile: "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
+		},
 	}
 
 	require.NoError(t, os.Setenv("COMMIT_DATE", "2021-09-21T18:06:25-07:00"))

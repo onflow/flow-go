@@ -542,3 +542,20 @@ func GetTestData_Level1_5CountSingleNilTest() common.TestRun {
 	}
 	return testRun
 }
+
+func GetTestData_Level1_5CountMultipleNilTests() common.TestRun {
+	var testResultRows []common.TestResultRow
+	row1 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
+	row2 := getPassedTestElapsedOutput("TestEncodableRandomBeaconPrivKeyMsgPack", 0, "0.00", "    keys_test.go:245: bytes: 194\n")
+	row2.TestResult.Package = "github.com/onflow/flow-go/model/encodable"
+
+	for i := 0; i < 4; i++ {
+		testResultRows = append(testResultRows, row1)
+	}
+	testResultRows = append(testResultRows, row2)
+
+	testRun := common.TestRun{
+		Rows: testResultRows,
+	}
+	return testRun
+}
