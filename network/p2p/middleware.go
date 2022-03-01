@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -30,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -65,9 +65,13 @@ var _ network.Middleware = (*Middleware)(nil)
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx                        context.Context
-	log                        zerolog.Logger
-	ov                         network.Overlay
+	ctx context.Context
+	log zerolog.Logger
+	ov  network.Overlay
+	// TODO: using a waitgroup here doesn't actually guarantee that we'll wait for all
+	// goroutines to exit, because new goroutines could be started after we've already
+	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
+	// and worker routines.
 	wg                         *sync.WaitGroup
 	libP2PNode                 *Node
 	libP2PNodeFactory          LibP2PFactoryFunc
@@ -312,7 +316,7 @@ func (m *Middleware) stop() {
 //
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
-func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
+func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) (err error) {
 	// translates identifier to peer id
 	peerID, err := m.idTranslator.GetPeerID(targetID)
 	if err != nil {
@@ -328,6 +332,10 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	}
 
 	maxTimeout := m.unicastMaxMsgDuration(msg)
+
+	m.metrics.DirectMessageStarted(msg.ChannelID)
+	defer m.metrics.DirectMessageFinished(msg.ChannelID)
+
 	// pass in a context with timeout to make the unicast call fail fast
 	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
 	defer cancel()
@@ -347,6 +355,32 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("failed to create stream for %s: %w", targetID, err)
 	}
 
+	success := false
+
+	defer func() {
+		if success {
+			// close the stream immediately
+			err = stream.Close()
+			if err != nil {
+				err = fmt.Errorf("failed to close the stream for %s: %w", targetID, err)
+			}
+
+			// OneToOne communication metrics are reported with topic OneToOne
+			m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+		} else {
+			resetErr := stream.Reset()
+			if resetErr != nil {
+				m.log.Err(resetErr).Msg("failed to reset stream")
+			}
+		}
+	}()
+
+	deadline, _ := ctx.Deadline()
+	err = stream.SetWriteDeadline(deadline)
+	if err != nil {
+		return fmt.Errorf("failed to set write deadline for stream: %w", err)
+	}
+
 	// create a gogo protobuf writer
 	bufw := bufio.NewWriter(stream)
 	writer := ggio.NewDelimitedWriter(bufw)
@@ -362,18 +396,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("failed to flush stream for %s: %w", targetID, err)
 	}
 
-	// close the stream immediately
-	err = stream.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close the stream for %s: %w", targetID, err)
-	}
-
-	channel := metrics.ChannelOneToOne
-	if _, isStaked := m.ov.Identities().ByNodeID(targetID); !isStaked {
-		channel = metrics.ChannelOneToOneUnstaked
-	}
-	// OneToOne communication metrics are reported with topic OneToOne
-	m.metrics.NetworkMessageSent(msg.Size(), channel, msg.Type)
+	success = true
 
 	return nil
 }
@@ -386,23 +409,86 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	log.Info().Msg("incoming stream received")
 
-	nodeID, err := m.idTranslator.GetFlowID(s.Conn().RemotePeer())
+	success := false
+
+	defer func() {
+		if success {
+			err := s.Close()
+			if err != nil {
+				log.Err(err).Msg("failed to close stream")
+			}
+		} else {
+			err := s.Reset()
+			if err != nil {
+				log.Err(err).Msg("failed to reset stream")
+			}
+		}
+	}()
+
+	// TODO: We need to allow per-topic timeouts and message size limits.
+	// This allows us to configure higher limits for topics on which we expect
+	// to receive large messages (e.g. Chunk Data Packs), and use the normal
+	// limits for other topics. In order to enable this, we will need to register
+	// a separate stream handler for each topic.
+	ctx, cancel := context.WithTimeout(m.ctx, LargeMsgUnicastTimeout)
+	defer cancel()
+
+	deadline, _ := ctx.Deadline()
+
+	err := s.SetReadDeadline(deadline)
 	if err != nil {
-		log.Err(err).Str("peer_id", s.Conn().RemotePeer().Pretty()).Msg("could not translate peer ID of incoming stream")
+		log.Err(err).Msg("failed to set read deadline for stream")
+		return
 	}
-	_, isStaked := m.ov.Identities().ByNodeID(nodeID)
 
-	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx,
-		s, m.processAuthenticatedMessage,
-		log.With().Hex("remote_flow_id", logging.ID(nodeID)).Logger(),
-		m.metrics,
-		LargeMsgMaxUnicastMsgSize,
-		isStaked)
+	// create the reader
+	r := ggio.NewDelimitedReader(s, LargeMsgMaxUnicastMsgSize)
 
-	// kick off the reception loop to continuously receive messages
-	m.wg.Add(1)
-	go conn.receiveLoop(m.wg)
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+
+		var msg message.Message
+
+		// read the next message (blocking call)
+		err = r.ReadMsg(&msg)
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+
+			m.log.Err(err).Msg("failed to read message")
+			return
+		}
+
+		// TODO: once we've implemented per topic message size limits per the TODO above,
+		// we can remove this check
+		maxSize := unicastMaxMsgSize(&msg)
+		if msg.Size() > maxSize {
+			// message size exceeded
+			m.log.Error().
+				Hex("sender", msg.OriginID).
+				Hex("event_id", msg.EventID).
+				Str("event_type", msg.Type).
+				Str("channel", msg.ChannelID).
+				Int("maxSize", maxSize).
+				Msg("received message exceeded permissible message maxSize")
+			return
+		}
+
+		m.wg.Add(1)
+		go func(msg *message.Message) {
+			defer m.wg.Done()
+
+			// log metrics with the channel name as OneToOne
+			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+			m.processAuthenticatedMessage(msg, s.Conn().RemotePeer())
+		}(&msg)
+	}
+
+	success = true
 }
 
 // Subscribe subscribes the middleware to a channel.
