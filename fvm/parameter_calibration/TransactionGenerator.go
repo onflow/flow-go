@@ -187,21 +187,21 @@ func (s *SimpleTxType) Name() string {
 
 // AdjustParameterRange adjusts the parameter range of the transaction type so that the generated transactions take up to desiredMaxTime
 func (s *SimpleTxType) AdjustParameterRange(parameter uint64, executionTime uint64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	prevParamMax := s.paramMax
-
-	s.slope = (float64(s.slopePoints)*s.slope + (float64(executionTime) / float64(parameter))) / float64(s.slopePoints+1)
-	s.slopePoints++
-
-	s.paramMax = uint64(desiredMaxTime / s.slope)
-	if s.paramMax < 1 {
-		s.paramMax = 1
-	}
-	if (float64(s.paramMax)-float64(prevParamMax))/float64(prevParamMax) > 2.0 {
-		s.paramMax = prevParamMax * 2
-	}
+	//s.mu.Lock()
+	//defer s.mu.Unlock()
+	//
+	//prevParamMax := s.paramMax
+	//
+	//s.slope = (float64(s.slopePoints)*s.slope + (float64(executionTime) / float64(parameter))) / float64(s.slopePoints+1)
+	//s.slopePoints++
+	//
+	//s.paramMax = uint64(desiredMaxTime / s.slope)
+	//if s.paramMax < 1 {
+	//	s.paramMax = 1
+	//}
+	//if (float64(s.paramMax)-float64(prevParamMax))/float64(prevParamMax) > 2.0 {
+	//	s.paramMax = prevParamMax * 2
+	//}
 }
 
 func (s *SimpleTxType) GetSlope() float64 {
