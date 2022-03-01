@@ -266,7 +266,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	slotToUse, unique := c.slotIndexInBucket(b, entityId32of256, entityId)
 	if !unique {
 		// entityId already exists
-		c.metrics.OnDuplicateWriteQuery()
+		c.metrics.OnAddingDuplicateEntityAttempt()
 		return false
 	}
 

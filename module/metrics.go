@@ -440,7 +440,8 @@ type HeroCacheMetrics interface {
 	// Hence, adding a new entity to that bucket will replace the oldest valid key inside that bucket.
 	OnBucketFull()
 
-	// OnDuplicateWriteQuery is tracking the total number of duplicate entities written to the cache. A duplicate entity is dropped by the
-	// cache when it is written to the cache, and this metric is tracking the total number of those queries.
-	OnDuplicateWriteQuery()
+	// OnAddingDuplicateEntityAttempt is tracking the total number of attempts on adding a duplicate entity to the cache.
+	// A duplicate entity is dropped by the cache when it is written to the cache,
+	// and this metric is tracking the total number of those queries.
+	OnAddingDuplicateEntityAttempt()
 }

@@ -126,8 +126,9 @@ func (h *HeroCacheCollector) OnBucketFull() {
 	h.fullBucketsFoundTimes.Inc()
 }
 
-// OnDuplicateWriteQuery is tracking the total number of duplicate entities written to the cache. A duplicate entity is dropped by the
-// cache when it is written to the cache, and this metric is tracking the total number of those queries.
-func (h *HeroCacheCollector) OnDuplicateWriteQuery() {
+// OnAddingDuplicateEntityAttempt is tracking the total number of attempts on adding a duplicate entity to the cache.
+// A duplicate entity is dropped by the cache when it is written to the cache,
+// and this metric is tracking the total number of those queries.
+func (h *HeroCacheCollector) OnAddingDuplicateEntityAttempt() {
 	h.duplicateWriteQueriesTotal.Inc()
 }

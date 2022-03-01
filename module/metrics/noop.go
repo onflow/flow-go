@@ -159,4 +159,4 @@ func (nc *NoopCollector) BucketAvailableSlotsCount(uint64)                      
 func (nc *NoopCollector) OnNewEntityAdded()                                                     {}
 func (nc *NoopCollector) OnEntityEjectedAtFullCapacity()                                        {}
 func (nc *NoopCollector) OnBucketFull()                                                         {}
-func (nc *NoopCollector) OnDuplicateWriteQuery()                                                {}
+func (nc *NoopCollector) OnAddingDuplicateEntityAttempt()                                       {}
