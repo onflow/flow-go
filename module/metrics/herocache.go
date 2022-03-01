@@ -80,20 +80,12 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, totalBuckets uint
 		Help:      "total number of queries writing an already existing (duplicate) entity to the cache",
 	})
 
-	existingEntitiesTotal := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: nameSpace,
-		Subsystem: subsystemHeroCache,
-		Name:      cacheName + "_" + "size_entities_total",
-		Help:      "total number of entities maintained on the cache",
-	})
-
 	registrar.MustRegister(
 		bucketSlotAvailableHistogram,
 		newEntitiesWriteCountTotal,
 		entityEjectedAtFullCapacityTotal,
 		fullBucketFoundTimes,
-		duplicateWriteQueriesTotal,
-		existingEntitiesTotal)
+		duplicateWriteQueriesTotal)
 
 	return &HeroCacheCollector{
 		bucketSlotAvailableHistogram:     bucketSlotAvailableHistogram,
