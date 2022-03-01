@@ -118,7 +118,7 @@ func (h *HeroCacheCollector) OnNewEntityAddedHeroCache() {
 
 // OnEntityEjectedAtFullCapacityHeroCache is called whenever adding a new entity to the cache results in ejection of another entity.
 // This normally happens when the cache is full.
-func (h *HeroCacheCollector) OnEntityEjectedAtFull() {
+func (h *HeroCacheCollector) OnEntityEjectedAtFullCapacity() {
 	h.entityEjectedAtFullCapacityTotal.Inc()
 }
 
