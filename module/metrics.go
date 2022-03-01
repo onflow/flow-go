@@ -426,8 +426,8 @@ type PingMetrics interface {
 }
 
 type HeroCacheMetrics interface {
-	// BucketsWithAvailableSlotsCountHeroCache keeps track of number of buckets with certain available number of slots.
-	BucketsWithAvailableSlotsCountHeroCache(uint64)
+	// BucketAvailableSlotsCountHeroCache keeps track of number of available slots in buckets of the cache.
+	BucketAvailableSlotsCountHeroCache(uint64)
 
 	// OnNewEntityAddedHeroCache is called whenever a new entity is successfully added to the cache.
 	OnNewEntityAddedHeroCache()
@@ -445,5 +445,5 @@ type HeroCacheMetrics interface {
 	OnDuplicateWriteQuery()
 
 	// Size keeps track of the total number of entities maintained by the cache.
-	Size(uint64)
+	Size(uint32)
 }

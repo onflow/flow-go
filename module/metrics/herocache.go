@@ -39,17 +39,18 @@ func TransactionsCacheMetricsFactory(registrar prometheus.Registerer) HeroCacheM
 
 func NewHeroCacheCollector(nameSpace string, subSystem string, totalBuckets uint64, registrar prometheus.Registerer) *HeroCacheCollector {
 
-	full := float64(totalBuckets)
-	oneFourth := 0.25 * full
-	half := 0.5 * full
-	threeForth := 0.75 * full
+	hundredPercent := float64(totalBuckets)
+	tenPercent := 0.1 * hundredPercent
+	twentyPercent := 0.25 * hundredPercent
+	fiftyPercent := 0.5 * hundredPercent
+	seventyFivePercent := 0.75 * hundredPercent
 
 	bucketSlotAvailableHistogram := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache + subSystem,
-		Buckets:   []float64{oneFourth, half, threeForth, full},
-		Name:      "bucket_count_per_available_slot",
-		Help:      "histogram of number of buckets with same number of available slots",
+		Buckets:   []float64{1, 2, tenPercent, twentyPercent, fiftyPercent, seventyFivePercent, hundredPercent},
+		Name:      "bucket_available_slot_count",
+		Help:      "histogram of number of available slots in buckets of cache",
 	})
 
 	newEntitiesWriteCountTotal := prometheus.NewCounter(prometheus.CounterOpts{
@@ -105,8 +106,8 @@ func NewHeroCacheCollector(nameSpace string, subSystem string, totalBuckets uint
 	}
 }
 
-// BucketsWithAvailableSlotsCountHeroCache keeps track of number of buckets with certain available number of slots.
-func (h *HeroCacheCollector) BucketsWithAvailableSlotsCountHeroCache(availableSlots uint64) {
+// BucketAvailableSlotsCountHeroCache keeps track of number of available slots in buckets of cache.
+func (h *HeroCacheCollector) BucketAvailableSlotsCountHeroCache(availableSlots uint64) {
 	h.bucketSlotAvailableHistogram.Observe(float64(availableSlots))
 }
 
@@ -134,6 +135,6 @@ func (h *HeroCacheCollector) OnDuplicateWriteQuery() {
 }
 
 // Size keeps track of the total number of entities maintained by the cache.
-func (h *HeroCacheCollector) Size(size uint64) {
+func (h *HeroCacheCollector) Size(size uint32) {
 	h.existingEntitiesTotal.Set(float64(size))
 }

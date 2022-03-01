@@ -11,12 +11,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
@@ -236,7 +237,10 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	node.Me, err = local.New(identity.Identity(), privKeys.StakingKey)
 	require.NoError(t, err)
 
-	pools := epochs.NewTransactionPools(func() mempool.Transactions { return herocache.NewTransactions(1000, node.Log) })
+	pools := epochs.NewTransactionPools(
+		func() mempool.Transactions {
+			return herocache.NewTransactions(1000, node.Log, unittest.NoopHeroCacheMetricsRegistrationFunc)
+		})
 	transactions := storage.NewTransactions(node.Metrics, node.PublicDB)
 	collections := storage.NewCollections(node.PublicDB, transactions)
 	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.PublicDB)
