@@ -27,6 +27,6 @@ type ExecutionDataConsumer func(*state_synchronization.ExecutionData)
 type stateStreamer struct {
 }
 
-func NewStateStreamer(serverAddr string) *stateStreamer {
+func NewStateStreamer(serverAddr string, startHeight uint64) *stateStreamer {
 	return &stateStreamer{}
 }
