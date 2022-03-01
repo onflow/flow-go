@@ -1,4 +1,4 @@
-package main
+package testdata
 
 import (
 	"time"
@@ -6,10 +6,15 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-type TestData struct {
+// TestDataLevel1 is used by tests to store what the expected test result should be and what the raw
+// JSON input file is
+type TestDataLevel1 struct {
 	ExpectedTestRun    common.TestRun
 	RawJSONTestRunFile string
 }
+
+// ************** Helper Functions *****************
+// following functions are used to construct expected TestRun data
 
 func getCommitDate() time.Time {
 	commitDate, err := time.Parse(time.RFC3339, "2021-09-22T01:06:25Z")
@@ -154,6 +159,9 @@ func getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.TestResultRow {
 	}
 	return row
 }
+
+// ************** Expected Test Run Functions *****************
+// following functions are used by unit tests for constructing expected TestRun data
 
 func GetTestData_Level1_1CountSingleNilTest() common.TestRun {
 	row1 := common.TestResultRow{

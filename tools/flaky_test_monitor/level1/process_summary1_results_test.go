@@ -13,43 +13,44 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common/testdata"
 )
 
 func TestProcessSummary1TestRun_Struct(t *testing.T) {
 	const rawJsonFilePath = "../testdata/summary1/raw"
 
 	// data driven table test
-	testDataMap := map[string]TestData{
+	testDataMap := map[string]testdata.TestDataLevel1{
 		"1 count all pass": {
-			ExpectedTestRun:    GetTestData_Level1_1CountPass(),
+			ExpectedTestRun:    testdata.GetTestData_Level1_1CountPass(),
 			RawJSONTestRunFile: "test-result-crypto-hash-1-count-pass.json",
 		},
 
 		"1 count 1 fail the rest pass": {
-			ExpectedTestRun:    GetTestData_Level1_1Count1FailRestPass(),
+			ExpectedTestRun:    testdata.GetTestData_Level1_1Count1FailRestPass(),
 			RawJSONTestRunFile: "test-result-crypto-hash-1-count-fail.json",
 		},
 
 		"1 count 2 skipped the rest pass": {
-			ExpectedTestRun:    GetTestData_Level1_1Count2SkippedRestPass(),
+			ExpectedTestRun:    testdata.GetTestData_Level1_1Count2SkippedRestPass(),
 			RawJSONTestRunFile: "test-result-crypto-hash-1-count-skip-pass.json",
 		},
 
 		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
 		"2 count all pass": {
-			ExpectedTestRun:    GetTestData_Level1_2CountPass(),
+			ExpectedTestRun:    testdata.GetTestData_Level1_2CountPass(),
 			RawJSONTestRunFile: "test-result-crypto-hash-2-count-pass.json",
 		},
 
 		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
 		"10 count all pass": {
-			ExpectedTestRun:    GetTestData_Level1_10CountPass(),
+			ExpectedTestRun:    testdata.GetTestData_Level1_10CountPass(),
 			RawJSONTestRunFile: "test-result-crypto-hash-10-count-pass.json",
 		},
 
 		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
 		"10 count some failures": {
-			ExpectedTestRun:    GetTestData_Level1_10CountSomeFailures(),
+			ExpectedTestRun:    testdata.GetTestData_Level1_10CountSomeFailures(),
 			RawJSONTestRunFile: "test-result-crypto-hash-10-count-fail.json",
 		},
 
@@ -59,27 +60,27 @@ func TestProcessSummary1TestRun_Struct(t *testing.T) {
 		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
 		// this is a single unit test that produces a nil test result
 		"1 count single nil test": {
-			ExpectedTestRun:    GetTestData_Level1_1CountSingleNilTest(),
+			ExpectedTestRun:    testdata.GetTestData_Level1_1CountSingleNilTest(),
 			RawJSONTestRunFile: "test-result-nil-test-single-1-count-pass.json",
 		},
 
 		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
 		//multiple nil tests in a row
 		"5 nil tests in a row": {
-			ExpectedTestRun:    GetTestData_Level1_5CountSingleNilTest(),
+			ExpectedTestRun:    testdata.GetTestData_Level1_5CountSingleNilTest(),
 			RawJSONTestRunFile: "test-result-nil-test-single-5-count-pass.json",
 		},
 
 		//normal test at the end of a test run with multiple nil tests in front of it
 		"4 nil tests in a row, 1 normal test": {
-			ExpectedTestRun:    GetTestData_Level1_5CountMultipleNilTests(),
+			ExpectedTestRun:    testdata.GetTestData_Level1_5CountMultipleNilTests(),
 			RawJSONTestRunFile: "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
 		},
 
 		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
 		// group of unit tests with a single nil test result
 		"3 count nil test with normal tests": {
-			ExpectedTestRun:    GetTestData_Leve1_3CountNilWithNormalTests(),
+			ExpectedTestRun:    testdata.GetTestData_Leve1_3CountNilWithNormalTests(),
 			RawJSONTestRunFile: "test-result-nil-test-others-normal-3-count-pass.json",
 		},
 	}
