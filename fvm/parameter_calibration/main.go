@@ -233,7 +233,8 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 			txBody := gtx.Transaction.
 				AddAuthorizer(serviceAccount.Address).
 				SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
-				SetPayer(serviceAccount.Address)
+				SetPayer(serviceAccount.Address).
+				SetGasLimit(100000000)
 
 			err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
 			if err != nil {
