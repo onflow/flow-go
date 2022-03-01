@@ -46,22 +46,23 @@ type TransactionTypePool struct {
 }
 
 func (p *TransactionTypePool) GetRandomTransactionType() TransactionType {
-	// 2 out of 3 transactions should be of type `SimpleTxType`
-	if rand.Intn(3) == 0 {
-		return p.Pool[rand.Intn(len(p.Pool))]
-	}
-	// otherwise, return a `MixedTxType` with 2 different SimpleTxTypes
-	a := rand.Intn(len(p.Pool))
-	b := a
-	for b == a {
-		b = rand.Intn(len(p.Pool))
-	}
-	return &MixedTxType{
-		simpleTypes: []*SimpleTxType{
-			p.Pool[a].(*SimpleTxType),
-			p.Pool[b].(*SimpleTxType),
-		},
-	}
+	return p.Pool[rand.Intn(len(p.Pool))]
+	//// 2 out of 3 transactions should be of type `SimpleTxType`
+	//if rand.Intn(3) == 0 {
+	//	return p.Pool[rand.Intn(len(p.Pool))]
+	//}
+	//// otherwise, return a `MixedTxType` with 2 different SimpleTxTypes
+	//a := rand.Intn(len(p.Pool))
+	//b := a
+	//for b == a {
+	//	b = rand.Intn(len(p.Pool))
+	//}
+	//return &MixedTxType{
+	//	simpleTypes: []*SimpleTxType{
+	//		p.Pool[a].(*SimpleTxType),
+	//		p.Pool[b].(*SimpleTxType),
+	//	},
+	//}
 }
 
 func simpleTemplateTx(rep uint64, body string) string {
