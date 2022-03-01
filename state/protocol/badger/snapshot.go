@@ -214,10 +214,10 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, fmt.Errorf("invalid epoch phase: %s", phase)
 	}
 
-	// add the identities from next/last epoch, with stake set to 0
+	// add the identities from next/last epoch, with weight set to 0
 	identities = append(
 		identities,
-		otherEpochIdentities.Map(mapfunc.WithStake(0))...,
+		otherEpochIdentities.Map(mapfunc.WithWeight(0))...,
 	)
 
 	// apply the filter to the participants
