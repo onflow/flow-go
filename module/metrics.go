@@ -426,24 +426,21 @@ type PingMetrics interface {
 }
 
 type HeroCacheMetrics interface {
-	// BucketAvailableSlotsCountHeroCache keeps track of number of available slots in buckets of the cache.
-	BucketAvailableSlotsCountHeroCache(uint64)
+	// BucketAvailableSlotsCount keeps track of number of available slots in buckets of the cache.
+	BucketAvailableSlotsCount(uint64)
 
-	// OnNewEntityAddedHeroCache is called whenever a new entity is successfully added to the cache.
-	OnNewEntityAddedHeroCache()
+	// OnNewEntityAdded is called whenever a new entity is successfully added to the cache.
+	OnNewEntityAdded()
 
 	// OnEntityEjectedAtFullCapacityHeroCache is called whenever adding a new entity to the cache results in ejection of another entity.
 	// This normally happens when the cache is full.
 	OnEntityEjectedAtFullCapacity()
 
-	// OnValidKeyReplaced is called whenever adding a new entity to the cache results in a valid existing key replaced. This happens when
-	// a bucket of keys gets full. Then adding any new entity will replace a valid key inside that bucket.
-	OnValidKeyReplaced()
+	// OnBucketFull is called whenever a bucket is found full and all of its keys are valid.
+	// Hence, adding a new entity to that bucket will replace the oldest valid key inside that bucket.
+	OnBucketFull()
 
 	// OnDuplicateWriteQuery is tracking the total number of duplicate entities written to the cache. A duplicate entity is dropped by the
 	// cache when it is written to the cache, and this metric is tracking the total number of those queries.
 	OnDuplicateWriteQuery()
-
-	// Size keeps track of the total number of entities maintained by the cache.
-	Size(uint32)
 }

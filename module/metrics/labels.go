@@ -75,7 +75,8 @@ const (
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
-	ResourceNetworkingReceiveCache   = "networking_received_messages" // networking layer
+	ResourceNetworkingReceiveCache   = "networking_received_message" // networking layer
+	ResourceNetworkingDnsCache       = "networking_dns_cache"        // networking layer
 
 	ResourceClusterBlockProposalQueue = "cluster_compliance_proposal_queue" // collection node, compliance engine
 	ResourceClusterBlockVoteQueue     = "cluster_compliance_vote_queue"     // collection node, compliance engine

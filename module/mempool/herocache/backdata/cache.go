@@ -268,10 +268,10 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	}
 
 	if linkedId, _, ok := c.linkedEntityOf(b, slotToUse); ok {
-		// we are replacing an already linked (but old) slot that has a valid value, hence
+		// bucket is full, and we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
 		c.invalidateEntity(b, slotToUse)
-		c.metrics.OnValidKeyReplaced()
+		c.metrics.OnBucketFull()
 		c.logger.Warn().
 			Hex("replaced_entity_id", logging.ID(linkedId)).
 			Hex("added_entity_id", logging.ID(entityId)).
@@ -386,7 +386,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 		return 0, false
 	}
 
-	c.metrics.BucketAvailableSlotsCountHeroCache(availableSlotCount)
+	c.metrics.BucketAvailableSlotsCount(availableSlotCount)
 	return slotToUse, true
 }
 

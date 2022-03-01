@@ -38,8 +38,7 @@ const (
 
 // Collection subsystem
 const (
-	subsystemProposal          = "proposal"
-	subsystemTransactionsCache = "transactions"
+	subsystemProposal = "proposal"
 )
 
 // Consensus subsystems represent the different components of the consensus algorithm.
