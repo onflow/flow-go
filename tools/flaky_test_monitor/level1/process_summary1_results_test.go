@@ -75,6 +75,13 @@ func TestProcessSummary1TestRun_Struct(t *testing.T) {
 			ExpectedTestRun:    GetTestData_Level1_5CountMultipleNilTests(),
 			RawJSONTestRunFile: "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
 		},
+
+		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
+		// group of unit tests with a single nil test result
+		"3 count nil test with normal tests": {
+			ExpectedTestRun:    GetTestData_Leve1_3CountNilWithNormalTests(),
+			RawJSONTestRunFile: "test-result-nil-test-others-normal-3-count-pass.json",
+		},
 	}
 
 	require.NoError(t, os.Setenv("COMMIT_DATE", "2021-09-21T18:06:25-07:00"))

@@ -32,13 +32,17 @@ func getCryptoHashPackage() string {
 }
 
 func getPassedTest(name string) common.TestResultRow {
+	return getPassedTestPackage(name, getCryptoHashPackage())
+}
+
+func getPassedTestPackage(name string, packageName string) common.TestResultRow {
 	row := common.TestResultRow{
 		TestResult: common.TestResult{
 			CommitSha:  getCommitSha(),
 			CommitDate: getCommitDate(),
 			JobRunDate: getJobRunDate(),
 			Test:       name,
-			Package:    getCryptoHashPackage(),
+			Package:    packageName,
 			Result:     "1",
 			Elapsed:    0,
 			Output: []struct {
@@ -553,6 +557,47 @@ func GetTestData_Level1_5CountMultipleNilTests() common.TestRun {
 		testResultRows = append(testResultRows, row1)
 	}
 	testResultRows = append(testResultRows, row2)
+
+	testRun := common.TestRun{
+		Rows: testResultRows,
+	}
+	return testRun
+}
+
+func GetTestData_Leve1_3CountNilWithNormalTests() common.TestRun {
+	var testResultRows []common.TestResultRow
+	row1 := getPassedTestPackage("TestEncodableNetworkPrivKey", "github.com/onflow/flow-go/model/encodable")
+	row2 := getPassedTestPackage("TestEncodableNetworkPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
+	row3 := getPassedTestPackage("TestEncodableNetworkPubKey", "github.com/onflow/flow-go/model/encodable")
+	row4 := getPassedTestPackage("TestEncodableNetworkPubKeyNil", "github.com/onflow/flow-go/model/encodable")
+	row5 := getPassedTestPackage("TestEncodableRandomBeaconPrivKey", "github.com/onflow/flow-go/model/encodable")
+	row6 := getPassedTestPackage("TestEncodableRandomBeaconPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
+	row7 := getPassedTestPackage("TestEncodableRandomBeaconPubKey", "github.com/onflow/flow-go/model/encodable")
+	row8 := getPassedTestPackage("TestEncodableRandomBeaconPubKeyNil", "github.com/onflow/flow-go/model/encodable")
+	row9 := getPassedTestPackage("TestEncodableStakingPrivKey", "github.com/onflow/flow-go/model/encodable")
+	row10 := getPassedTestPackage("TestEncodableStakingPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
+	row11 := getPassedTestPackage("TestEncodableStakingPubKey", "github.com/onflow/flow-go/model/encodable")
+	row12 := getPassedTestPackage("TestEncodableStakingPubKeyNil", "github.com/onflow/flow-go/model/encodable")
+	row13 := getPassedTestPackage("TestIsHexString", "github.com/onflow/flow-go/model/encodable")
+
+	row14 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
+
+	for i := 0; i < 3; i++ {
+		testResultRows = append(testResultRows, row1)
+		testResultRows = append(testResultRows, row2)
+		testResultRows = append(testResultRows, row3)
+		testResultRows = append(testResultRows, row4)
+		testResultRows = append(testResultRows, row5)
+		testResultRows = append(testResultRows, row6)
+		testResultRows = append(testResultRows, row7)
+		testResultRows = append(testResultRows, row8)
+		testResultRows = append(testResultRows, row9)
+		testResultRows = append(testResultRows, row10)
+		testResultRows = append(testResultRows, row11)
+		testResultRows = append(testResultRows, row12)
+		testResultRows = append(testResultRows, row13)
+		testResultRows = append(testResultRows, row14)
+	}
 
 	testRun := common.TestRun{
 		Rows: testResultRows,
