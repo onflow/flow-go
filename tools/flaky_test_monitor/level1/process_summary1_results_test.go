@@ -53,9 +53,21 @@ func TestProcessSummary1TestRun_Struct(t *testing.T) {
 			RawJSONTestRunFile: "test-result-crypto-hash-10-count-fail.json",
 		},
 
+		// nil tests - tests below don't generate pass/fail result due to `go test` bug
+		// with using `fmt.printf("log message")` without newline `\n`
+
+		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
+		// this is a single unit test that produces a nil test result
 		"1 count single nil test": {
 			ExpectedTestRun:    GetTestData_Level1_1CountSingleNilTest(),
 			RawJSONTestRunFile: "test-result-nil-test-single-1-count-pass.json",
+		},
+
+		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
+		//multiple nil tests in a row
+		"5 nil tests in a row": {
+			ExpectedTestRun:    GetTestData_Level1_5CountSingleNilTest(),
+			RawJSONTestRunFile: "test-result-nil-test-single-5-count-pass.json",
 		},
 	}
 

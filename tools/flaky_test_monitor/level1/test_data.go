@@ -130,6 +130,27 @@ func getFailedTest_TestSanitySha2_256() common.TestResultRow {
 	return row
 }
 
+func getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.TestResultRow {
+	row := common.TestResultRow{
+		TestResult: common.TestResult{
+			CommitSha:  getCommitSha(),
+			CommitDate: getCommitDate(),
+			JobRunDate: getJobRunDate(),
+			Test:       "TestEncodableRandomBeaconPrivKeyMsgPack",
+			Package:    "github.com/onflow/flow-go/model/encodable",
+			Result:     "-100",
+			Elapsed:    0,
+			Output: []struct {
+				Item string "json:\"item\""
+			}{
+				{Item: "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n"},
+				{Item: "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"},
+			},
+		},
+	}
+	return row
+}
+
 func GetTestData_Level1_1CountSingleNilTest() common.TestRun {
 	row1 := common.TestResultRow{
 		TestResult: common.TestResult{
@@ -501,6 +522,20 @@ func GetTestData_Level1_10CountSomeFailures() common.TestRun {
 	testResultRows = append(testResultRows, row8h)
 	testResultRows = append(testResultRows, row8i)
 	testResultRows = append(testResultRows, row8j)
+
+	testRun := common.TestRun{
+		Rows: testResultRows,
+	}
+	return testRun
+}
+
+func GetTestData_Level1_5CountSingleNilTest() common.TestRun {
+	var testResultRows []common.TestResultRow
+	row1 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
+
+	for i := 0; i < 5; i++ {
+		testResultRows = append(testResultRows, row1)
+	}
 
 	testRun := common.TestRun{
 		Rows: testResultRows,
