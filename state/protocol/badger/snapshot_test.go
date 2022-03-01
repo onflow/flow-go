@@ -186,7 +186,7 @@ func TestIdentities(t *testing.T) {
 			filters := []flow.IdentityFilter{
 				filter.HasRole(flow.RoleCollection),
 				filter.HasNodeID(identities.SamplePct(0.1).NodeIDs()...),
-				filter.HasStake(true),
+				filter.HasWeight(true),
 			}
 
 			for _, filterfunc := range filters {

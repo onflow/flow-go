@@ -103,7 +103,7 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	// STEP 3: sanity checks for individual roles
 	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake
 	// in communication but not in respective node functions
-	activeParticipants := setup.Participants.Filter(filter.HasStake(true))
+	activeParticipants := setup.Participants.Filter(filter.HasWeight(true))
 
 	// we need at least one node of each role
 	roles := make(map[flow.Role]uint)

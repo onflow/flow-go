@@ -13,7 +13,7 @@ func IsNodeStakedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasStake(true),
+		filter.HasWeight(true),
 		filter.Not(filter.Ejected),
 	)
 }
@@ -27,7 +27,7 @@ func IsNodeStakedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow.Rol
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasStake(true),
+		filter.HasWeight(true),
 		filter.Not(filter.Ejected),
 		filter.HasRole(role),
 	)

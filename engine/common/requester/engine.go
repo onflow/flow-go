@@ -92,7 +92,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 	if cfg.ValidateStaking {
 		selector = filter.And(
 			selector,
-			filter.HasStake(true),
+			filter.HasWeight(true),
 		)
 	}
 

@@ -49,7 +49,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 	// make sure we don't respond to requests sent by self or non-staked nodes
 	selector = filter.And(
 		selector,
-		filter.HasStake(true),
+		filter.HasWeight(true),
 		filter.Not(filter.HasNodeID(me.NodeID())),
 	)
 

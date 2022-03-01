@@ -358,7 +358,7 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 			identities[m].Weight = 1
 
 			// the following code check the zero weight node should not be selected
-			stakeful := identities.Filter(filter.HasStake(true))
+			stakeful := identities.Filter(filter.HasWeight(true))
 
 			count := 1000
 			selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
