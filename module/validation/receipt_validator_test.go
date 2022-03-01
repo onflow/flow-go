@@ -85,7 +85,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check stake first
 
-	// replace stake with invalid one
+	// replace weight with invalid one
 	s.Identities[s.ExeID].Stake = 0
 
 	err := s.receiptValidator.Validate(receipt)

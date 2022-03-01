@@ -86,7 +86,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 
 	// a real cluster member which continues to be a valid member
 	realClusterMember := suite.members[1]
-	// a real cluster member which loses all its stake between cluster initialization
+	// a real cluster member which loses all its weight between cluster initialization
 	// and the test's reference block
 	realNoWeightClusterMember := suite.members[2]
 	realNoWeightClusterMember.Stake = 0

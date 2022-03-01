@@ -86,7 +86,7 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 		}
 	}
 
-	// there should be no nodes with zero stake
+	// there should be no nodes with zero weight
 	// TODO: we might want to remove the following as we generally want to allow nodes with
 	// zero weight in the protocol state.
 	for _, participant := range setup.Participants {

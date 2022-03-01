@@ -311,23 +311,23 @@ func TestInvalidTotalWeight(t *testing.T) {
 
 func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 
-	// check that if there is some zero staked node, the selections for each view should be the same as
-	// with no zero staked nodes.
+	// check that if there is some node with 0 weight, the selections for each view should be the same as
+	// with no zero weight nodes.
 	t.Run("small dataset", func(t *testing.T) {
 		const N_VIEWS = 100
 
-		stakeless := unittest.IdentityListFixture(5, unittest.WithStake(0))
-		stakeful := unittest.IdentityListFixture(5)
-		for i, identity := range stakeful {
+		weightless := unittest.IdentityListFixture(5, unittest.WithStake(0))
+		weightful := unittest.IdentityListFixture(5)
+		for i, identity := range weightful {
 			identity.Stake = uint64(i + 1)
 		}
 
-		identities := append(stakeless, stakeful...)
+		identities := append(weightless, weightful...)
 
 		selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 		require.NoError(t, err)
 
-		selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, stakeful)
+		selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, weightful)
 		require.NoError(t, err)
 
 		for i := 0; i < N_VIEWS; i++ {
@@ -350,14 +350,14 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 			// create 1002 nodes with all 0 stake
 			identities := unittest.IdentityListFixture(1002, unittest.WithStake(0))
 
-			// create 2 nodes with 1 stake, and place them in between
+			// create 2 nodes with 1 weight, and place them in between
 			// index 233-777
 			n := rng.UintN(777-233) + 233
 			m := rng.UintN(777-233) + 233
 			identities[n].Stake = 1
 			identities[m].Stake = 1
 
-			// the following code check the zero staker should not be selected
+			// the following code check the zero weight node should not be selected
 			stakeful := identities.Filter(filter.HasStake(true))
 
 			count := 1000
@@ -379,7 +379,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 			}
 		}
 
-		t.Run("if there is only 1 node has stake, then it will be always be the leader and the only leader", func(t *testing.T) {
+		t.Run("if there is only 1 node has weight, then it will be always be the leader and the only leader", func(t *testing.T) {
 			rng, err := random.NewChacha20PRG(someSeed, []byte("leader_selec"))
 			require.NoError(t, err)
 

@@ -29,6 +29,7 @@ type Identity struct {
 	NodeID  Identifier
 	Address string
 	Role    Role
+	// TODO
 	// Stake represents the node's *weight*. The stake (quantity of $FLOW held
 	// in escrow during the node's participation) is strictly managed by the
 	// service account. The protocol software strictly considers weight, which
@@ -65,14 +66,14 @@ func ParseIdentity(identity string) (*Identity, error) {
 	}
 	address := matches[3] + matches[4]
 	role, _ := ParseRole(matches[1])
-	stake, _ := strconv.ParseUint(matches[5], 10, 64)
+	weight, _ := strconv.ParseUint(matches[5], 10, 64)
 
 	// create the identity
 	iy := Identity{
 		NodeID:  nodeID,
 		Address: address,
 		Role:    role,
-		Stake:   stake,
+		Stake:   weight,
 	}
 
 	return &iy, nil

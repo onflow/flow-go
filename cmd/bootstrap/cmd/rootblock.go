@@ -35,7 +35,7 @@ func init() {
 func addRootBlockCmdFlags() {
 	// required parameters for network configuration and generation of root node identities
 	rootBlockCmd.Flags().StringVar(&flagConfig, "config", "",
-		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
+		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)") // TODO
 	rootBlockCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
 	rootBlockCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+

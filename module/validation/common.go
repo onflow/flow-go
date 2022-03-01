@@ -42,9 +42,9 @@ func ensureStakedNodeWithRole(identity *flow.Identity, expectedRole flow.Role) e
 		return engine.NewInvalidInputErrorf("expected node %x to have identity %v but got %v", identity.NodeID, expectedRole, identity.Role)
 	}
 
-	// check if the identity has a stake
+	// check if the identity has non-zero weight
 	if identity.Stake == 0 {
-		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
+		return engine.NewInvalidInputErrorf("node has zero weight (%x)", identity.NodeID)
 	}
 
 	// check that node was not ejected

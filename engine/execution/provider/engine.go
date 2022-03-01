@@ -262,7 +262,7 @@ func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier)
 	}
 
 	if origin.Stake == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s is not staked at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
+		return nil, engine.NewInvalidInputErrorf("node %s has zero weight at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
 	}
 	return origin, nil
 }

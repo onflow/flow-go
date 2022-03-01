@@ -69,7 +69,7 @@ func init() {
 func addFinalizeCmdFlags() {
 	// required parameters for network configuration and generation of root node identities
 	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
-		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
+		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)") // TODO
 	finalizeCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+

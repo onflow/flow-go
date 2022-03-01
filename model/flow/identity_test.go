@@ -252,7 +252,7 @@ func TestIdentity_EqualTo(t *testing.T) {
 		require.False(t, b.EqualTo(a))
 	})
 
-	t.Run("Stake diff", func(t *testing.T) {
+	t.Run("Weight diff", func(t *testing.T) {
 		a := &flow.Identity{Stake: 1}
 		b := &flow.Identity{Stake: 2}
 

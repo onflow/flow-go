@@ -254,7 +254,7 @@ func stakedAsVerification(state protocol.State, blockID flow.Identifier, identif
 
 	// checks role of node is verification
 	if identity.Role != flow.RoleVerification {
-		return false, fmt.Errorf("node is staked for an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
+		return false, fmt.Errorf("node has an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
 	}
 
 	// checks identity has not been ejected
@@ -262,7 +262,7 @@ func stakedAsVerification(state protocol.State, blockID flow.Identifier, identif
 		return false, nil
 	}
 
-	// checks identity has stake
+	// checks identity has weight
 	if identity.Stake == 0 {
 		return false, nil
 	}

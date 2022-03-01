@@ -282,7 +282,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 // at this epoch boundary).
 func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 
-	// in the finalized state the collectors has 0 stake but is not ejected
+	// in the finalized state the collectors has 0 weight but is not ejected
 	// this is what happens when we finalize the final block of the epoch during
 	// which this node requested to unstake
 	colID, ok := suite.finalIdentities.ByNodeID(suite.collID)
