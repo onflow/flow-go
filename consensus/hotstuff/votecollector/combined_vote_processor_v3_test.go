@@ -829,7 +829,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			rbRector:         reconstructor,
 			onQCCreated:      onQCCreated,
 			packer:           packer,
-			minRequiredStake: minRequiredStake,
+			minRequiredStake: minRequiredWeight,
 			done:             *atomic.NewBool(false),
 		}
 
