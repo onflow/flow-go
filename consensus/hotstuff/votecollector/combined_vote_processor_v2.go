@@ -77,7 +77,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 	}
 
 	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
-	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalWeight())
 
 	return NewCombinedVoteProcessor(
 		log,

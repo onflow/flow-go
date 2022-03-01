@@ -22,23 +22,30 @@ import (
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
-// Identity represents a node identity.
+// Identity represents the public identity of one network participant (node).
 type Identity struct {
 	// NodeID uniquely identifies a particular node. A node's ID is fixed for
 	// the duration of that node's participation in the network.
-	NodeID  Identifier
+	NodeID Identifier
+	// Address is the network address where the node can be reached.
 	Address string
-	Role    Role
-	// TODO
-	// Stake represents the node's *weight*. The stake (quantity of $FLOW held
-	// in escrow during the node's participation) is strictly managed by the
-	// service account. The protocol software strictly considers weight, which
-	// represents how much voting power a given node has.
+	// Role is the node's role in the network and defines its abilities and
+	// responsibilities.
+	Role Role
+	// Weight represents the node's authority to perform certain tasks relative
+	// to other nodes. For example, in the consensus committee, the node's weight
+	// represents the weight assigned to its votes.
 	//
-	// NOTE: Nodes that are registered for an upcoming epoch, or that are in
-	// the process of un-staking, have 0 weight.
+	// A node's weight is distinct from its stake. Stake represents the quantity
+	// of FLOW tokens held by the network in escrow during the course of the node's
+	// participation in the network. The stake is strictly managed by the service
+	// account smart contracts.
 	//
-	// TODO: to be renamed to Weight
+	// Nodes which are registered to join at the next epoch will appear in the
+	// identity table but are considered to have zero weight up until their first
+	// epoch begins. Likewise nodes which were registered in the previous epoch
+	// but have left at the most recent epoch boundary will appear in the identity
+	// table with zero weight.
 	Weight uint64
 	// Ejected represents whether a node has been permanently removed from the
 	// network. A node may be ejected for either:
@@ -98,7 +105,7 @@ type encodableIdentity struct {
 	NodeID        Identifier
 	Address       string
 	Role          Role
-	Stake         uint64
+	Weight        uint64
 	StakingPubKey []byte
 	NetworkPubKey []byte
 }
@@ -108,7 +115,7 @@ type stealthIdentity struct {
 	NodeID        Identifier
 	Address       string `json:"-"`
 	Role          Role
-	Stake         uint64
+	Weight        uint64
 	StakingPubKey []byte
 	NetworkPubKey []byte
 }
@@ -185,7 +192,7 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
 	identity.Role = ie.Role
-	identity.Weight = ie.Stake
+	identity.Weight = ie.Weight
 	var err error
 	if ie.StakingPubKey != nil {
 		if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
@@ -400,8 +407,8 @@ func (il IdentityList) Fingerprint() Identifier {
 	return MerkleRoot(GetIDs(il)...)
 }
 
-// TotalStake returns the total stake of all given identities.
-func (il IdentityList) TotalStake() uint64 {
+// TotalWeight returns the total weight of all given identities.
+func (il IdentityList) TotalWeight() uint64 {
 	var total uint64
 	for _, identity := range il {
 		total += identity.Weight

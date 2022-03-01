@@ -55,7 +55,7 @@ func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *mode
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalWeight())
 
 	return &StakingVoteProcessor{
 		log:              log,
