@@ -531,7 +531,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 		Str("sender_id", qm.SenderID.String()).
 		Logger()
 
-	eng, err := n.subMngr.GetEngine(qm.Target)
+	eng, err := n.subscriptionManager.GetEngine(qm.Target)
 	if err != nil {
 		logger.Err(err).Msg("failed to submit message")
 		return
