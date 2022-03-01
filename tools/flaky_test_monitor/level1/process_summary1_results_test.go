@@ -35,20 +35,22 @@ func TestProcessSummary1TestRun_Struct(t *testing.T) {
 			RawJSONTestRunFile: "test-result-crypto-hash-1-count-skip-pass.json",
 		},
 
-		// // raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
-		// "2 count all pass":       "test-result-crypto-hash-2-count-pass.json",
-		// "10 count all pass":      "test-result-crypto-hash-10-count-pass.json",
-		// "10 count some failures": "test-result-crypto-hash-10-count-fail.json",
-
 		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
 		"2 count all pass": {
 			ExpectedTestRun:    GetTestData_Level1_2CountPass(),
 			RawJSONTestRunFile: "test-result-crypto-hash-2-count-pass.json",
 		},
 
+		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
 		"10 count all pass": {
 			ExpectedTestRun:    GetTestData_Level1_10CountPass(),
 			RawJSONTestRunFile: "test-result-crypto-hash-10-count-pass.json",
+		},
+
+		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
+		"10 count some failures": {
+			ExpectedTestRun:    GetTestData_Level1_10CountSomeFailures(),
+			RawJSONTestRunFile: "test-result-crypto-hash-10-count-fail.json",
 		},
 
 		"1 count single nil test": {
