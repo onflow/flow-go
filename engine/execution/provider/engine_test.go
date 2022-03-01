@@ -87,7 +87,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 
 		ps.On("AtBlockID", blockID).Return(ss)
-		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStake(0)), nil)
+		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithWeight(0)), nil)
 		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(chunkDataPack, nil)
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 

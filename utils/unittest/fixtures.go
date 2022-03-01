@@ -846,9 +846,10 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 	}
 }
 
-func WithStake(stake uint64) func(*flow.Identity) {
+// WithWeight sets the weight on an identity fixture.
+func WithWeight(weight uint64) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		identity.Weight = stake
+		identity.Weight = weight
 	}
 }
 

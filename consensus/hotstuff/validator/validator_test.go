@@ -404,10 +404,10 @@ type QCSuite struct {
 
 func (qs *QCSuite) SetupTest() {
 
-	// create a list of 10 nodes with one stake each
+	// create a list of 10 nodes with 1-weight each
 	qs.participants = unittest.IdentityListFixture(10,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithStake(1),
+		unittest.WithWeight(1),
 	)
 
 	// signers are a qualified majority at 7

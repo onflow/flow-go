@@ -51,7 +51,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	// initialize the paramaters
 	cs.cluster = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleCollection),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	cs.myID = cs.cluster[0].NodeID
 

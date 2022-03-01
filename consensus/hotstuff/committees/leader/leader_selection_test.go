@@ -22,7 +22,7 @@ var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 
 // We test that leader selection works for a committee of size one
 func TestSingleConsensusNode(t *testing.T) {
-	identity := unittest.IdentityFixture(unittest.WithStake(8))
+	identity := unittest.IdentityFixture(unittest.WithWeight(8))
 	selection, err := ComputeLeaderSelectionFromSeed(0, someSeed, 10, []*flow.Identity{identity})
 	require.NoError(t, err)
 	for i := uint64(0); i < 10; i++ {
@@ -293,7 +293,7 @@ func BenchmarkLeaderSelection(b *testing.B) {
 
 	identities := make([]*flow.Identity, 0, N_NODES)
 	for i := 0; i < N_NODES; i++ {
-		identities = append(identities, unittest.IdentityFixture(unittest.WithStake(uint64(i))))
+		identities = append(identities, unittest.IdentityFixture(unittest.WithWeight(uint64(i))))
 	}
 
 	for n := 0; n < b.N; n++ {
@@ -304,19 +304,19 @@ func BenchmarkLeaderSelection(b *testing.B) {
 }
 
 func TestInvalidTotalWeight(t *testing.T) {
-	identities := unittest.IdentityListFixture(4, unittest.WithStake(0))
+	identities := unittest.IdentityListFixture(4, unittest.WithWeight(0))
 	_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 10, identities)
 	require.Error(t, err)
 }
 
-func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
+func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 
 	// check that if there is some node with 0 weight, the selections for each view should be the same as
-	// with no zero weight nodes.
+	// with no zero-weight nodes.
 	t.Run("small dataset", func(t *testing.T) {
 		const N_VIEWS = 100
 
-		weightless := unittest.IdentityListFixture(5, unittest.WithStake(0))
+		weightless := unittest.IdentityListFixture(5, unittest.WithWeight(0))
 		weightful := unittest.IdentityListFixture(5)
 		for i, identity := range weightful {
 			identity.Weight = uint64(i + 1)
@@ -348,7 +348,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 
 		for i := 0; i < 100; i++ {
 			// create 1002 nodes with all 0 stake
-			identities := unittest.IdentityListFixture(1002, unittest.WithStake(0))
+			identities := unittest.IdentityListFixture(1002, unittest.WithWeight(0))
 
 			// create 2 nodes with 1 weight, and place them in between
 			// index 233-777
@@ -384,7 +384,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 			require.NoError(t, err)
 
 			for i := 0; i < 100; i++ {
-				identities := unittest.IdentityListFixture(1000, unittest.WithStake(0))
+				identities := unittest.IdentityListFixture(1000, unittest.WithWeight(0))
 
 				n := rng.UintN(1000)
 				stake := n + 1
