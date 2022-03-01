@@ -245,6 +245,9 @@ func (c *Cache) Clear() {
 
 	c.buckets = make([]slotBucket, c.bucketNum)
 	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
+	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
+	c.interactionCounter = 0
+	c.lastTelemetryDump = 0
 	c.slotCount = 0
 }
 
