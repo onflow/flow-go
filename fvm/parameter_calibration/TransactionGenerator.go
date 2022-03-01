@@ -114,11 +114,13 @@ func (m *MixedTxType) GenerateTransaction(context TransactionTypeContext) (Gener
 
 	bodies := make([]string, len(m.simpleTypes))
 	for i, tt := range m.simpleTypes {
-		parameter := rand.Uint64()%(tt.paramMax/uint64(len(m.simpleTypes))) + 1
+		var loopLength uint64
 		if tt.slopePoints == 0 {
-			parameter = tt.paramMax/uint64(len(m.simpleTypes)) + 1
+			loopLength = tt.paramMax/uint64(len(m.simpleTypes)) + 1
+		} else {
+			loopLength = tt.paramMax/uint64(len(m.simpleTypes)) + 1 // rand.Uint64()%(tt.paramMax/uint64(len(m.simpleTypes))) + 1
 		}
-		bodies[i] = loopTemplateTx(parameter, tt.body)
+		bodies[i] = loopTemplateTx(loopLength, tt.body)
 	}
 
 	script := templateTx(bodies...)
@@ -160,18 +162,21 @@ func (s *SimpleTxType) GenerateTransaction(context TransactionTypeContext) (Gene
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	parameter := rand.Uint64()%s.paramMax + 1
+	var loopLength uint64
 	if s.slopePoints == 0 {
-		parameter = s.paramMax + 1
+		loopLength = s.paramMax + 1
+	} else {
+		loopLength = s.paramMax + 1 // rand.Uint64()%s.paramMax + 1
 	}
-	script := simpleTemplateTx(parameter, s.body)
+
+	script := simpleTemplateTx(loopLength, s.body)
 	script = context.ReplaceAddresses(script)
-	tx := flow.NewTransactionBody().SetGasLimit(1_000_000).SetScript([]byte(script))
+	tx := flow.NewTransactionBody().SetGasLimit(10_000_000).SetScript([]byte(script))
 
 	return GeneratedTransaction{
 		Transaction: tx,
 		Type:        s,
-		Parameter:   parameter,
+		Parameter:   loopLength,
 	}, nil
 }
 
@@ -210,64 +215,64 @@ var _ TransactionType = &SimpleTxType{}
 var Pool = TransactionTypePool{
 	Pool: []TransactionType{
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 586823,
 			body:     "",
 			name:     "reference tx",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 268918,
 			body:     "i.toString()",
 			name:     "convert int to string",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 137209,
 			body:     `"x".concat(i.toString())`,
 			name:     "convert int to string and concatenate it",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 366892,
 			body:     `signer.address`,
 			name:     "get signer address",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 131482,
 			body:     `getAccount(signer.address)`,
 			name:     "get public account",
 		},
 		&SimpleTxType{
-			paramMax: 500,
+			paramMax: 1089,
 			body:     `getAccount(signer.address).balance`,
 			name:     "get account and get balance",
 		},
 		&SimpleTxType{
-			paramMax: 500,
+			paramMax: 1317,
 			body:     `getAccount(signer.address).availableBalance`,
 			name:     "get account and get available balance",
 		},
 		&SimpleTxType{
-			paramMax: 2000,
+			paramMax: 32273,
 			body:     `getAccount(signer.address).storageUsed`,
 			name:     "get account and get storage used",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 1577,
 			body:     `getAccount(signer.address).storageCapacity`,
 			name:     "get account and get storage capacity",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 72169,
 			body:     `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`,
 			name:     "get signer vault",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 32369,
 			body: `let receiverRef = getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
 				.borrow<&{FungibleToken.Receiver}>()!`,
 			name: "get signer receiver",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 4394,
 			body: `let receiverRef =  getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
 				.borrow<&{FungibleToken.Receiver}>()!
@@ -276,24 +281,24 @@ var Pool = TransactionTypePool{
 			name: "transfer tokens",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 93077,
 			body: `signer.load<String>(from: /storage/testpath)
 				signer.save("", to: /storage/testpath)`,
 			name: "load and save empty string on signers address",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 95005,
 			body: `signer.load<String>(from: /storage/testpath)
 				signer.save("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", to: /storage/testpath)`,
 			name: "load and save long string on signers address",
 		},
 		&SimpleTxType{
-			paramMax: 100,
+			paramMax: 338,
 			body:     `let acct = AuthAccount(payer: signer)`,
 			name:     "create new account",
 		},
 		&SimpleTxType{
-			paramMax: 100,
+			paramMax: 280,
 			body: `
 				let acct = AuthAccount(payer: signer)
 				acct.contracts.add(name: "EmptyContract", code: "61636365737328616c6c2920636f6e747261637420456d707479436f6e7472616374207b7d".decodeHex())
@@ -301,17 +306,17 @@ var Pool = TransactionTypePool{
 			name: "create new account and deploy contract",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 118866,
 			body:     `TestContract.empty()`,
 			name:     "call empty contract function",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 53391,
 			body:     `TestContract.emit()`,
 			name:     "emit event",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 14188,
 			body: `let strings = signer.borrow<&[String]>(from: /storage/test)!
 				var j = 0
 				var lenSum = 0
@@ -322,7 +327,7 @@ var Pool = TransactionTypePool{
 			name: "borrow array from storage",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 19225,
 			body: `let strings = signer.copy<[String]>(from: /storage/test)!
 				var j = 0
 				var lenSum = 0
@@ -333,7 +338,7 @@ var Pool = TransactionTypePool{
 			name: "copy array from storage",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 1002,
 			body: `let strings = signer.copy<[String]>(from: /storage/test)!
 				var j = 0
 				var lenSum = 0
@@ -347,12 +352,12 @@ var Pool = TransactionTypePool{
 			name: "copy array from storage and save a duplicate",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 5147,
 			body:     `signer.addPublicKey("f847b84000fb479cb398ab7e31d6f048c12ec5b5b679052589280cacde421af823f93fe927dfc3d1e371b172f97ceeac1bc235f60654184c83f4ea70dd3b7785ffb3c73802038203e8".decodeHex())`,
 			name:     "add key to account",
 		},
 		&SimpleTxType{
-			paramMax: 1000,
+			paramMax: 2956,
 			body: `
 				signer.addPublicKey("f847b84000fb479cb398ab7e31d6f048c12ec5b5b679052589280cacde421af823f93fe927dfc3d1e371b172f97ceeac1bc235f60654184c83f4ea70dd3b7785ffb3c73802038203e8".decodeHex())
 				signer.removePublicKey(1)
@@ -360,9 +365,37 @@ var Pool = TransactionTypePool{
 			name: "add and remove key to/from account",
 		},
 		&SimpleTxType{
-			paramMax: 100,
+			paramMax: 9519,
 			body:     `TestContract.mintNFT()`,
 			name:     "mint NFT",
 		},
 	},
 }
+
+/*
+reference tx 0.0008965043725548607
+convert int to string 0.0019021032132351444
+convert int to string and concatenate it 0.003644069664727692
+get signer address 0.0013627983083240906
+get public account 0.003802797860297355
+get account and get balance 0.4589855321006071
+get account and get available balance 0.3795063117766648
+get account and get storage used 0.015492741660975237
+get account and get storage capacity 0.3168937469440481
+get signer vault 0.006928146420386147
+get signer receiver 0.015446848725147693
+transfer tokens 0.11378142139922551
+load and save empty string on signers address 0.005371884335269915
+load and save long string on signers address 0.005262836957112487
+create new account 1.4778613109038294
+create new account and deploy contract 1.7798558435076237
+call empty contract function 0.0042064064196769245
+emit event 0.009364837959575923
+borrow array from storage 0.03523907668395154
+copy array from storage 0.026006660839544348
+copy array from storage and save a duplicate 0.4989533979727946
+add key to account 0.09713563390921647
+add and remove key to/from account 0.16911184458028658
+mint NFT 0.05252269085227618
+
+*/
