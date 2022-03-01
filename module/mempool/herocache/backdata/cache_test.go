@@ -346,7 +346,12 @@ func TestArrayBackData_Rem(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d-limit-%d-items-%dfrom-%dcount", tc.limit, tc.items, tc.from, tc.count), func(t *testing.T) {
-			bd := NewCache(tc.limit, 8, heropool.RandomEjection, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
+			bd := NewCache(
+				tc.limit,
+				8,
+				heropool.RandomEjection,
+				unittest.Logger(),
+				unittest.NoopHeroCacheMetricsRegistrationFunc)
 			entities := unittest.EntityListFixture(uint(tc.items))
 
 			testAddEntities(t, bd, entities)

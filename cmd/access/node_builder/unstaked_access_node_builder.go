@@ -270,6 +270,11 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 			builder.Logger,
 			metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer))
 
+		err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+		if err != nil {
+			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+		}
+
 		// topology is nil since it is automatically managed by libp2p
 		net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
 		if err != nil {

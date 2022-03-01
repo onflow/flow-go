@@ -44,3 +44,7 @@ func NewReceiveCache(sizeLimit uint32, logger zerolog.Logger, metricsFactory met
 func (r *ReceiveCache) Add(eventID []byte) bool {
 	return r.c.Add(receiveCacheEntry{eventID: flow.HashToID(eventID)}) // ignore eviction status
 }
+
+func (r ReceiveCache) Size() uint {
+	return r.c.Size()
+}

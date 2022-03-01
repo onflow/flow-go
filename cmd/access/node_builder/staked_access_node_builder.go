@@ -320,6 +320,11 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 			builder.Logger,
 			metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer))
 
+		err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+		if err != nil {
+			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+		}
+
 		net, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top, receiveCache)
 		if err != nil {
 			return nil, err

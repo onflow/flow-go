@@ -49,7 +49,12 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 	limit := uint(50_000)
 
 	backData := stdmap.NewBackendWithBackData(
-		herocache.NewCache(uint32(limit), 8, heropool.LRUEjection, unittest.Logger()),
+		herocache.NewCache(
+			uint32(limit),
+			8,
+			heropool.LRUEjection,
+			unittest.Logger(),
+			unittest.NoopHeroCacheMetricsRegistrationFunc),
 		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000_000))

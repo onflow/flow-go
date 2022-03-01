@@ -20,9 +20,17 @@ type DNSCache struct {
 func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, metricsFactory metrics.HeroCacheMetricsRegistrationFunc) *DNSCache {
 	return &DNSCache{
 		txtCache: stdmap.NewBackendWithBackData(
-			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger, metricsFactory)),
+			herocache.NewCache(
+				sizeLimit,
+				8,
+				heropool.LRUEjection,
+				logger, metricsFactory)),
 		ipCache: stdmap.NewBackendWithBackData(
-			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger, metricsFactory)),
+			herocache.NewCache(sizeLimit,
+				8,
+				heropool.LRUEjection,
+				logger,
+				metricsFactory)),
 	}
 }
 
