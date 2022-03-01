@@ -266,7 +266,7 @@ func (builder *UnstakedAccessNodeBuilder) Build() (cmd.Node, error) {
 func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		receiveCache := netcache.NewReceiveCache(p2p.DefaultReceiveCacheSize,
+		receiveCache := netcache.NewReceiveCache(builder.NetworkReceivedMessageCacheSize,
 			builder.Logger,
 			metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer))
 

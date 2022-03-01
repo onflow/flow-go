@@ -316,7 +316,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// topology returns empty list since peers are not known upfront
 		top := topology.EmptyListTopology{}
 
-		receiveCache := netcache.NewReceiveCache(p2p.DefaultReceiveCacheSize,
+		receiveCache := netcache.NewReceiveCache(builder.NetworkReceivedMessageCacheSize,
 			builder.Logger,
 			metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer))
 
