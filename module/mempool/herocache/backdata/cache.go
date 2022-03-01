@@ -274,7 +274,8 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 		c.metrics.OnValidKeyReplaced()
 		c.logger.Warn().
 			Hex("replaced_entity_id", logging.ID(linkedId)).
-			Hex("added_entity_id", logging.ID(linkedId)).Msg("adding entity to cache resulted in replacing a valid key, potential collision")
+			Hex("added_entity_id", logging.ID(entityId)).
+			Msg("adding entity to cache resulted in replacing a valid key, potential collision")
 	}
 
 	c.slotCount++
