@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -20,8 +23,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 )
 
 var dir = flag.String("dir", ".", "dir containing checkpoint and wal files")
