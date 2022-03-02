@@ -684,31 +684,26 @@ func (e *ScriptEnv) RecordTrace(operation string, location common.Location, dura
 
 func (e *ScriptEnv) ProgramParsed(location common.Location, duration time.Duration) {
 	e.RecordTrace("parseProgram", location, duration, nil)
-	e.computationHandler.AddUsed(1, "ProgramParsed")
 	e.metrics.ProgramParsed(location, duration)
 }
 
 func (e *ScriptEnv) ProgramChecked(location common.Location, duration time.Duration) {
 	e.RecordTrace("checkProgram", location, duration, nil)
-	e.computationHandler.AddUsed(1, "ProgramChecked")
 	e.metrics.ProgramChecked(location, duration)
 }
 
 func (e *ScriptEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
 	e.RecordTrace("interpretProgram", location, duration, nil)
-	e.computationHandler.AddUsed(1, "ProgramInterpreted")
 	e.metrics.ProgramInterpreted(location, duration)
 }
 
 func (e *ScriptEnv) ValueEncoded(duration time.Duration) {
 	e.RecordTrace("encodeValue", nil, duration, nil)
-	e.computationHandler.AddUsed(1, "ValueEncoded")
 	e.metrics.ValueEncoded(duration)
 }
 
 func (e *ScriptEnv) ValueDecoded(duration time.Duration) {
 	e.RecordTrace("decodeValue", nil, duration, nil)
-	e.computationHandler.AddUsed(1, "ValueDecoded")
 	e.metrics.ValueDecoded(duration)
 }
 

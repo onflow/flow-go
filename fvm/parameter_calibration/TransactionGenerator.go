@@ -165,7 +165,7 @@ func (s *SimpleTxType) GenerateTransaction(context TransactionTypeContext) (Gene
 
 	var loopLength uint64
 	if s.slopePoints == 0 {
-		loopLength = s.paramMax + 1
+		loopLength = s.paramMax/5 + 1 // s.paramMax + 1
 	} else {
 		loopLength = s.paramMax/5 + 1 // rand.Uint64()%s.paramMax + 1
 	}
