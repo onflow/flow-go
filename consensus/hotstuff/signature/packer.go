@@ -67,7 +67,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 // It returns:
 //  - (sigData, nil) if successfully unpacked the signature data
 //  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
-func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []byte, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	data, err := p.Decode(sigData)
 	if err != nil {
@@ -179,9 +179,6 @@ func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners
 	for i, member := range fullMembers {
 		if _, ok := stakingSignersLookup[member]; ok {
 			indices = append(indices, i)
-			if err != nil {
-				return nil, nil, fmt.Errorf("could not add staking signer index for %v at index %v", member, i)
-			}
 			delete(stakingSignersLookup, member)
 
 			sigType = append(sigType, hotstuff.SigTypeStaking)
@@ -190,9 +187,6 @@ func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners
 
 		if _, ok := beaconSignersLookup[member]; ok {
 			indices = append(indices, i)
-			if err != nil {
-				return nil, nil, fmt.Errorf("could not add beacon signer index for %v at index %v", member, i)
-			}
 			delete(beaconSignersLookup, member)
 
 			sigType = append(sigType, hotstuff.SigTypeRandomBeacon)
@@ -244,14 +238,14 @@ func decodeSignerIndicesAndSigType(signerIDs []flow.Identifier, sigType []byte) 
 	randomBeaconSigners := make([]flow.Identifier, 0, len(signerIDs))
 
 	for i, sigType := range sigTypes {
-		signerID := sigerIDs[i]
+		signerID := signerIDs[i]
 
 		if sigType == hotstuff.SigTypeStaking {
 			stakingSigners = append(stakingSigners, signerID)
 		} else if sigType == hotstuff.SigTypeRandomBeacon {
 			randomBeaconSigners = append(randomBeaconSigners, signerID)
 		} else {
-			return nil, fmt.Errorf("unknown sigType %v, %w", sigType, model.ErrInvalidFormat)
+			return nil, nil, fmt.Errorf("unknown sigType %v, %w", sigType, model.ErrInvalidFormat)
 		}
 	}
 
