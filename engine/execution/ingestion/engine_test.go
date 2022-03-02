@@ -144,7 +144,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	deltas, err := NewDeltas(1000)
 	require.NoError(t, err)
 
-	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
+	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
@@ -169,7 +169,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		deltas,
 		10,
 		false,
-		checkStakedAtBlock,
+		checkAuthorizedAtBlock,
 		false,
 	)
 	require.NoError(t, err)
@@ -1001,7 +1001,7 @@ func Test_SPOCKGeneration(t *testing.T) {
 	})
 }
 
-func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
+func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
 	runWithEngine(t, func(ctx testingContext) {
@@ -1152,7 +1152,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	deltas, err := NewDeltas(10)
 	require.NoError(t, err)
 
-	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
+	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
@@ -1177,7 +1177,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		deltas,
 		10,
 		false,
-		checkStakedAtBlock,
+		checkAuthorizedAtBlock,
 		false,
 	)
 
