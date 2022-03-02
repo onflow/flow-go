@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/util"
 )
 
