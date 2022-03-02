@@ -115,7 +115,7 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 
 // WeightedRandomSelection - given a seed and a given count, pre-generate the indices of leader.
 // The chance to be selected as leader is proportional to its weight.
-// If an identity has 0 stake (weight is 0), it won't be selected as leader.
+// If an identity has 0 weight, it won't be selected as leader.
 // This algorithm is essentially Fitness proportionate selection:
 // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
 func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16, error) {

@@ -962,7 +962,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 			conf.NodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
-			0,               // no stake
+			0,               // no weight
 			conf.NetworkingPrivKey,
 			dummyStakingKey,
 		)

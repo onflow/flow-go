@@ -353,7 +353,7 @@ func (e *Engine) validateChunkDataPackWithTracing(ctx context.Context,
 // Regarding the integrity: the chunk data pack should have a matching start state with the chunk itself, as well as a matching collection ID with the
 // given collection.
 //
-// Regarding the authenticity: the chunk data pack should be coming from a sender that is an staked execution node at the block of the chunk.
+// Regarding the authenticity: the chunk data pack should be coming from a sender that is an authorized execution node at the block of the chunk.
 func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	senderID flow.Identifier,
 	chunkDataPack *flow.ChunkDataPack,
@@ -371,7 +371,7 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	blockID := chunk.BlockID
 	authorized := e.validateAuthorizedExecutionNodeAtBlockID(senderID, blockID)
 	if !authorized {
-		return fmt.Errorf("unstaked execution node sender at block ID: %x, resultID: %x, chunk ID: %x",
+		return fmt.Errorf("unauthorized execution node sender at block ID: %x, resultID: %x, chunk ID: %x",
 			blockID,
 			result.ID(),
 			chunk.ID())
@@ -441,7 +441,7 @@ func (e Engine) validateNonSystemChunkCollection(chunkDataPack *flow.ChunkDataPa
 	return nil
 }
 
-// validateAuthorizedExecutionNodeAtBlockID validates sender ID of a chunk data pack response as an staked
+// validateAuthorizedExecutionNodeAtBlockID validates sender ID of a chunk data pack response as an authorized
 // execution node at the given block ID.
 func (e Engine) validateAuthorizedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) bool {
 	snapshot := e.state.AtBlockID(blockID)

@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// signerInfo holds information about a signer, its stake and index
+// signerInfo holds information about a signer, its weight and index
 type signerInfo struct {
 	weight uint64
 	index  int

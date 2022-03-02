@@ -181,7 +181,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 // validateOrigin validates that the message has a valid sender (origin). We
 // only accept guarantees from an origin that is part of the identity table
 // at the collection's reference block. Furthermore, the origin must be
-// a staked, non-ejected collector node.
+// an unauthorized, non-ejected collector node.
 // Expected errors during normal operation:
 //  * engine.InvalidInputError if the origin violates any requirements
 //  * engine.UnverifiableInputError if the reference block of the collection is unknown

@@ -83,13 +83,13 @@ func (s *ReceiptValidationSuite) TestReceiptFromZeroWeightNode() {
 	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check stake first
+		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check weight first
 
 	// replace weight with invalid one
 	s.Identities[s.ExeID].Weight = 0
 
 	err := s.receiptValidator.Validate(receipt)
-	s.Require().Error(err, "should reject invalid stake")
+	s.Require().Error(err, "should reject invalid weight")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
@@ -103,7 +103,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidRole() {
 	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check stake first
+		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check weight first
 
 	// replace identity with invalid one
 	s.Identities[s.ExeID] = unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))

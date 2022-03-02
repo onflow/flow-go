@@ -46,7 +46,7 @@ type Engine struct {
 func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, me module.Local, state protocol.State,
 	channel network.Channel, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
 
-	// make sure we don't respond to requests sent by self or non-staked nodes
+	// make sure we don't respond to requests sent by self or unauthorized nodes
 	selector = filter.And(
 		selector,
 		filter.HasWeight(true),
