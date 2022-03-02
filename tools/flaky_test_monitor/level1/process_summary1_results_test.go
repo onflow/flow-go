@@ -224,8 +224,8 @@ func printTestResult(testResult common.TestResult, message string) string {
 	builder.WriteString("\nJob Run Date: " + testResult.JobRunDate.String())
 	builder.WriteString("\nElapsed: " + fmt.Sprintf("%f", testResult.Elapsed))
 	builder.WriteString("\nResult: " + testResult.Result)
-	for i, bar := range testResult.Output {
-		builder.WriteString("\nOutput[" + fmt.Sprintf("%d", i) + "]" + bar.Item)
+	for i, output := range testResult.Output {
+		builder.WriteString("\nOutput[" + fmt.Sprintf("%d", i) + "]" + output.Item)
 	}
 	return builder.String()
 }

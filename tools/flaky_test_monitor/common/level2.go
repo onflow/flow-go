@@ -8,7 +8,7 @@ import (
 
 // TestsLevel2Summary models full level 2 summary of multiple tests from 1 or more level 1 test runs
 type TestsLevel2Summary struct {
-	TestResults map[string]*TestRunsLevel2Summary `json:"tests"`
+	TestResultsMap map[string]*TestRunsLevel2Summary `json:"tests"`
 }
 
 // TestRunsLevel2Summary models all results from a specific test over many (level 1) test runs
@@ -31,7 +31,7 @@ func AssertTestSummariesEqual(t *testing.T, expectedTestRunsLevel2Summary, actua
 	require.Equal(t, expectedTestRunsLevel2Summary.Package, actualTestRunsLevel2Summary.Package)
 	require.Equal(t, expectedTestRunsLevel2Summary.Test, actualTestRunsLevel2Summary.Test)
 
-	require.Equal(t, expectedTestRunsLevel2Summary.Runs, actualTestRunsLevel2Summary.Runs)
+	require.Equal(t, expectedTestRunsLevel2Summary.Runs, actualTestRunsLevel2Summary.Runs, "test: "+expectedTestRunsLevel2Summary.Test)
 	require.Equal(t, expectedTestRunsLevel2Summary.Passed, actualTestRunsLevel2Summary.Passed)
 	require.Equal(t, expectedTestRunsLevel2Summary.Failed, actualTestRunsLevel2Summary.Failed)
 	require.Equal(t, expectedTestRunsLevel2Summary.Skipped, actualTestRunsLevel2Summary.Skipped)

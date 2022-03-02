@@ -25,7 +25,7 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 	// there should be at least 1 level 2 test result in the supplied file
 	// if the json format is different in the supplied file, there won't be a marshalling error thrown
 	// this is an indirect way to tell if the json format was wrong (i.e. not a level 2 json format)
-	if len(testSummary2.TestResults) == 0 {
+	if len(testSummary2.TestResultsMap) == 0 {
 		panic("invalid summary 2 file - no test results found")
 	}
 
@@ -40,7 +40,7 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 
 	// go through all level 2 test results to figure out grouping for tests with
 	// most failures, no-results, longest running
-	for _, trs := range testSummary2.TestResults {
+	for _, trs := range testSummary2.TestResultsMap {
 		if trs.NoResult > 0 {
 			noResultsTRS = append(noResultsTRS, *trs)
 		}

@@ -23,14 +23,14 @@ func processSummary2TestRunFromStructs(testRuns []common.TestRun) common.TestsLe
 	common.AssertNoError(err, "error creating no-results directory")
 
 	testSummary2 := common.TestsLevel2Summary{}
-	testSummary2.TestResults = make(map[string]*common.TestRunsLevel2Summary)
+	testSummary2.TestResultsMap = make(map[string]*common.TestRunsLevel2Summary)
 
 	// go through all level 1 test runs create level 2 summary
 	for i := 0; i < len(testRuns); i++ {
 		for _, testResultRow := range testRuns[i].Rows {
 			// check if already started collecting summary for this test
 			mapKey := testResultRow.TestResult.Package + "/" + testResultRow.TestResult.Test
-			testResultSummary, testResultSummaryExists := testSummary2.TestResults[mapKey]
+			testResultSummary, testResultSummaryExists := testSummary2.TestResultsMap[mapKey]
 
 			// this test doesn't have a summary so create it
 			// no need to specify other fields explicitly - default values will suffice
@@ -71,7 +71,7 @@ func processSummary2TestRunFromStructs(testRuns []common.TestRun) common.TestsLe
 				panic(fmt.Sprintf("unexpected test result: %s", testResultRow.TestResult.Result))
 			}
 
-			testSummary2.TestResults[mapKey] = testResultSummary
+			testSummary2.TestResultsMap[mapKey] = testResultSummary
 		}
 	}
 	// calculate averages and other calculations that can only be completed after all test runs have been read
@@ -93,7 +93,7 @@ func processSummary2TestRun(level1Directory string) common.TestsLevel2Summary {
 	common.AssertNoError(err, "error creating no-results directory")
 
 	testSummary2 := common.TestsLevel2Summary{}
-	testSummary2.TestResults = make(map[string]*common.TestRunsLevel2Summary)
+	testSummary2.TestResultsMap = make(map[string]*common.TestRunsLevel2Summary)
 
 	// go through all level 1 summaries in a folder to create level 2 summary
 	for i := 0; i < len(dirEntries); i++ {
@@ -110,7 +110,7 @@ func processSummary2TestRun(level1Directory string) common.TestsLevel2Summary {
 		for _, testResultRow := range level1TestRun.Rows {
 			// check if already started collecting summary for this test
 			mapKey := testResultRow.TestResult.Package + "/" + testResultRow.TestResult.Test
-			testResultSummary, testResultSummaryExists := testSummary2.TestResults[mapKey]
+			testResultSummary, testResultSummaryExists := testSummary2.TestResultsMap[mapKey]
 
 			// this test doesn't have a summary so create it
 			// no need to specify other fields explicitly - default values will suffice
@@ -152,7 +152,7 @@ func processSummary2TestRun(level1Directory string) common.TestsLevel2Summary {
 				panic(fmt.Sprintf("unexpected test result: %s", testResultRow.TestResult.Result))
 			}
 
-			testSummary2.TestResults[mapKey] = testResultSummary
+			testSummary2.TestResultsMap[mapKey] = testResultSummary
 		}
 	}
 
@@ -211,7 +211,7 @@ func saveMessageHelper(testResult common.TestResult, expectedResult string, mess
 }
 
 func postProcessTestSummary2(testSummary2 common.TestsLevel2Summary) {
-	for _, testResultSummary := range testSummary2.TestResults {
+	for _, testResultSummary := range testSummary2.TestResultsMap {
 		// calculate average duration for each test summary
 		var durationSum float32 = 0
 		for _, duration := range testResultSummary.Durations {
