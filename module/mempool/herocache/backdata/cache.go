@@ -17,7 +17,7 @@ import (
 func runtimeNano() int64
 
 const (
-	SlotsPerBucket = uint64(16)
+	slotsPerBucket = uint64(16)
 
 	// slotAgeUnallocated defines an unallocated slot with zero age.
 	slotAgeUnallocated = uint64(0)
@@ -54,7 +54,7 @@ type slot struct {
 
 // slotBucket represents a bucket of slots.
 type slotBucket struct {
-	slots [SlotsPerBucket]slot
+	slots [slotsPerBucket]slot
 }
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
@@ -113,8 +113,8 @@ func NewCache(sizeLimit uint32,
 
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
-	bucketNum := capacity / SlotsPerBucket
-	if capacity%SlotsPerBucket != 0 {
+	bucketNum := capacity / slotsPerBucket
+	if capacity%slotsPerBucket != 0 {
 		// accounting for remainder.
 		bucketNum++
 	}
@@ -127,7 +127,7 @@ func NewCache(sizeLimit uint32,
 		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
 		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode),
-		availableSlotHistogram: make([]uint64, SlotsPerBucket+1), // +1 is to account for empty buckets as well.
+		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
 	}
 
 	return bd
@@ -244,7 +244,7 @@ func (c *Cache) Clear() {
 
 	c.buckets = make([]slotBucket, c.bucketNum)
 	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
-	c.availableSlotHistogram = make([]uint64, SlotsPerBucket+1)
+	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	c.interactionCounter = 0
 	c.lastTelemetryDump = 0
 	c.slotCount = 0
@@ -297,7 +297,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 // The boolean return value determines whether an entity with given id exists in the BackData.
 func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotIndex, bool) {
 	entityId32of256, b := c.entityId32of256AndBucketIndex(entityID)
-	for s := slotIndex(0); s < slotIndex(SlotsPerBucket); s++ {
+	for s := slotIndex(0); s < slotIndex(slotsPerBucket); s++ {
 		if c.buckets[b].slots[s].entityId32of256 != entityId32of256 {
 			continue
 		}
@@ -351,7 +351,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 
 	oldestSlotInBucket := c.slotCount + 1 // initializes the oldest slot to current max.
 
-	for s := slotIndex(0); s < slotIndex(SlotsPerBucket); s++ {
+	for s := slotIndex(0); s < slotIndex(slotsPerBucket); s++ {
 		if c.buckets[b].slots[s].slotAge < oldestSlotInBucket {
 			// record slot s as oldest slot
 			oldestSlotInBucket = c.buckets[b].slots[s].slotAge
@@ -389,7 +389,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 	}
 
 	c.availableSlotHistogram[availableSlotCount]++
-	c.collector.BucketAvailableSlotsCount(availableSlotCount)
+	c.collector.BucketAvailableSlotsCount(availableSlotCount, slotsPerBucket)
 	return slotToUse, true
 }
 
@@ -397,7 +397,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 // This scalar index is used to represent this (bucketIndex, slotIndex) pair in the underlying
 // entities list.
 func (c Cache) ownerIndexOf(b bucketIndex, s slotIndex) uint64 {
-	return (uint64(b) * SlotsPerBucket) + uint64(s)
+	return (uint64(b) * slotsPerBucket) + uint64(s)
 }
 
 // linkedEntityOf returns the entity linked to this (bucketIndex, slotIndex) pair from the underlying entities list.

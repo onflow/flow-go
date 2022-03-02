@@ -4,7 +4,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
-	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 )
 
 const subsystemHeroCache = "hero_cache"
@@ -37,18 +36,12 @@ func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer) *He
 
 func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometheus.Registerer) *HeroCacheCollector {
 
-	hundredPercent := float64(herocache.SlotsPerBucket)
-	tenPercent := 0.1 * hundredPercent
-	twentyPercent := 0.25 * hundredPercent
-	fiftyPercent := 0.5 * hundredPercent
-	seventyFivePercent := 0.75 * hundredPercent
-
 	bucketSlotAvailableHistogram := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
-		Buckets:   []float64{0, 1, 2, tenPercent, twentyPercent, fiftyPercent, seventyFivePercent, hundredPercent},
-		Name:      cacheName + "_" + "bucket_available_slot_count",
-		Help:      "histogram of number of available slots in buckets of cache",
+		Buckets:   []float64{0, 0.05, 0.1, 0.25, 0.5, 0.75, 1},
+		Name:      cacheName + "_" + "bucket_available_slot_percent_count",
+		Help:      "histogram of buckets vs normalized capacity of available slots (between 0 and 1)",
 	})
 
 	newEntitiesWriteCountTotal := prometheus.NewCounter(prometheus.CounterOpts{
@@ -96,8 +89,9 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 }
 
 // BucketAvailableSlotsCount keeps track of number of available slots in buckets of cache.
-func (h *HeroCacheCollector) BucketAvailableSlotsCount(availableSlots uint64) {
-	h.bucketSlotAvailableHistogram.Observe(float64(availableSlots))
+func (h *HeroCacheCollector) BucketAvailableSlotsCount(availableSlots uint64, totalSlots uint64) {
+	normalizedAvailableSlots := float64(availableSlots) / float64(totalSlots)
+	h.bucketSlotAvailableHistogram.Observe(normalizedAvailableSlots)
 }
 
 // OnNewEntityAdded is called whenever a new entity is successfully added to the cache.

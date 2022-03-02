@@ -427,7 +427,7 @@ type PingMetrics interface {
 
 type HeroCacheMetrics interface {
 	// BucketAvailableSlotsCount keeps track of number of available slots in buckets of the cache.
-	BucketAvailableSlotsCount(uint64)
+	BucketAvailableSlotsCount(uint64, uint64)
 
 	// OnNewEntityAdded is called whenever a new entity is successfully added to the cache.
 	OnNewEntityAdded()

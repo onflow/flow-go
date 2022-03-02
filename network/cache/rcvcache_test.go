@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
