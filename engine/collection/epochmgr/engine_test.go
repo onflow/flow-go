@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -131,7 +132,7 @@ func (suite *Suite) SetupTest() {
 	suite.AddEpoch(suite.counter + 1)
 
 	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions {
-		return herocache.NewTransactions(1000, suite.log, unittest.NoopHeroCacheMetricsRegistrationFunc)
+		return herocache.NewTransactions(1000, suite.log, metrics.NewNoopCollector())
 	})
 
 	var err error

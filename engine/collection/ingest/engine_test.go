@@ -80,7 +80,7 @@ func (suite *Suite) SetupTest() {
 	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions {
-		return herocache.NewTransactions(1000, log, unittest.NoopHeroCacheMetricsRegistrationFunc)
+		return herocache.NewTransactions(1000, log, metrics.NewNoopCollector())
 	})
 
 	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)

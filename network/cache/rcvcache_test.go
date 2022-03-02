@@ -32,7 +32,7 @@ func TestReceiveCacheTestSuite(t *testing.T) {
 func (r *ReceiveCacheTestSuite) SetupTest() {
 	const size = 10
 
-	c := netcache.NewReceiveCache(size, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
+	c := netcache.NewReceiveCache(size, unittest.Logger(), metrics.NewNoopCollector())
 
 	r.c = c
 	r.size = size

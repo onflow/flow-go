@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -19,7 +20,7 @@ import (
 func TestConsistency(t *testing.T) {
 
 	create := func() mempool.Transactions {
-		return herocache.NewTransactions(100, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
+		return herocache.NewTransactions(100, unittest.Logger(), metrics.NewNoopCollector())
 	}
 	pools := epochs.NewTransactionPools(create)
 	epoch := rand.Uint64()
@@ -32,7 +33,7 @@ func TestConsistency(t *testing.T) {
 func TestMultipleEpochs(t *testing.T) {
 
 	create := func() mempool.Transactions {
-		return herocache.NewTransactions(100, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
+		return herocache.NewTransactions(100, unittest.Logger(), metrics.NewNoopCollector())
 	}
 	pools := epochs.NewTransactionPools(create)
 
@@ -63,7 +64,7 @@ func TestMultipleEpochs(t *testing.T) {
 func TestCombinedSize(t *testing.T) {
 
 	create := func() mempool.Transactions {
-		return herocache.NewTransactions(100, unittest.Logger(), unittest.NoopHeroCacheMetricsRegistrationFunc)
+		return herocache.NewTransactions(100, unittest.Logger(), metrics.NewNoopCollector())
 	}
 	pools := epochs.NewTransactionPools(create)
 

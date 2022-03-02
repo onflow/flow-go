@@ -239,7 +239,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 
 	pools := epochs.NewTransactionPools(
 		func() mempool.Transactions {
-			return herocache.NewTransactions(1000, node.Log, unittest.NoopHeroCacheMetricsRegistrationFunc)
+			return herocache.NewTransactions(1000, node.Log, metrics.NewNoopCollector())
 		})
 	transactions := storage.NewTransactions(node.Metrics, node.PublicDB)
 	collections := storage.NewCollections(node.PublicDB, transactions)
