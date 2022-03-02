@@ -29,50 +29,24 @@ func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataP
 // Expected error returns during normal operations:
 //  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
 func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]byte, []byte, error) {
-	// breaking staking and random beacon signers into signerIDs and sig type for compaction
-	// each signer must have its signerID and sig type stored at the same index in the two slices
-	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
-	signerIndices := make([]int, 0, count)
-	sigTypes := make([]hotstuff.SigType, 0, count)
-
 	// retrieve all authorized consensus participants at the given block
-	consensus, err := p.committees.Identities(blockID)
+	fullMembers, err := p.committees.Identities(blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
 	}
 
-	// lookup is a map from node identifier to node identity
-	// it is used to check the given signers are all valid signers at the given block
-	indexLookup := consensus.IndexLookup()
-
-	for _, stakingSigner := range sig.StakingSigners {
-		signerIndex, ok := indexLookup[stakingSigner]
-		if ok {
-			signerIndices = append(signerIndices, signerIndex)
-			sigTypes = append(sigTypes, hotstuff.SigTypeStaking)
-		} else {
-			return nil, nil, fmt.Errorf("staking signer %v not found in the committee at block: %v", stakingSigner, blockID)
-		}
-	}
-
-	for _, beaconSigner := range sig.RandomBeaconSigners {
-		_, ok := lookup[beaconSigner]
-		if ok {
-			signerIDs = append(signerIDs, beaconSigner)
-			sigTypes = append(sigTypes, hotstuff.SigTypeRandomBeacon)
-		} else {
-			return nil, nil, fmt.Errorf("random beacon signer %v not found in the committee at block: %v", beaconSigner, blockID)
-		}
-	}
-
-	// serialize the sig type for compaction
-	serialized, err := serializeToBitVector(sigTypes)
+	// breaking staking and random beacon signers into signerIDs and sig type for compaction
+	// each signer must have its signerID and sig type stored at the same index in the two slices
+	// For v2, RandomBeaconSigners is nil, because all StakingSigners are random beacon signers.
+	// For v3, RandomBeaconSigners is not nil, each RandomBeaconSigner also signed staking sig, so the returned signerIDs, should
+	// include both StakingSigners and RandomBeaconSigners
+	signerIndices, sigType, err := encodeSignerIndicesAndSigType(fullMembers.NodeIDs(), sig.StakingSigners, sig.RandomBeaconSigners)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not serialize sig types to bytes at block: %v, %w", blockID, err)
+		return nil, nil, fmt.Errorf("could not encode signer indices and sig types: %w", err)
 	}
 
 	data := packer.SignatureData{
-		SigType:                      serialized,
+		SigType:                      sigType,
 		AggregatedStakingSig:         sig.AggregatedStakingSig,
 		AggregatedRandomBeaconSig:    sig.AggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: sig.ReconstructedRandomBeaconSig,
@@ -84,8 +58,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 		return nil, nil, fmt.Errorf("could not encode data %v, %w", data, err)
 	}
 
-	// return signerIDs, encoded, nil
-	panic(fmt.Sprintf("%v to be implemented", encoded))
+	return signerIndices, encoded, nil
 }
 
 // Unpack de-serializes the provided signature data.
@@ -94,49 +67,16 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 // It returns:
 //  - (sigData, nil) if successfully unpacked the signature data
 //  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
-func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []byte, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	data, err := p.Decode(sigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode sig data %s: %w", err, model.ErrInvalidFormat)
 	}
 
-	// deserialize the compact sig types
-	sigTypes, err := deserializeFromBitVector(data.SigType, len(signerIDs))
+	stakingSigners, randomBeaconSigners, err := decodeSignerIndicesAndSigType(signerIDs, data.SigType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize sig types from bytes: %w", err)
-	}
-
-	// read all the possible signer IDs at the given block
-	consensus, err := p.committees.Identities(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
-	}
-
-	// lookup is a map from node identifier to node identity
-	// it is used to check the given signerIDs are all valid signers at the given block
-	lookup := consensus.Lookup()
-
-	// read each signer's signerID and sig type from two different slices
-	// group signers by its sig type
-	stakingSigners := make([]flow.Identifier, 0, len(signerIDs))
-	randomBeaconSigners := make([]flow.Identifier, 0, len(signerIDs))
-
-	for i, sigType := range sigTypes {
-		signerID := signerIDs[i]
-		_, ok := lookup[signerID]
-		if !ok {
-			return nil, fmt.Errorf("unknown signer ID (%v) at the given block (%v): %w",
-				signerID, blockID, model.ErrInvalidFormat)
-		}
-
-		if sigType == hotstuff.SigTypeStaking {
-			stakingSigners = append(stakingSigners, signerID)
-		} else if sigType == hotstuff.SigTypeRandomBeacon {
-			randomBeaconSigners = append(randomBeaconSigners, signerID)
-		} else {
-			return nil, fmt.Errorf("unknown sigType %v, %w", sigType, model.ErrInvalidFormat)
-		}
+		return nil, fmt.Errorf("could not decode signer indices and sig type: %w", err)
 	}
 
 	return &hotstuff.BlockSignatureData{
@@ -227,4 +167,93 @@ func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType,
 	}
 
 	return types, nil
+}
+
+func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners []flow.Identifier, beaconSigners []flow.Identifier) ([]byte, []byte, error) {
+	stakingSignersLookup := buildLookup(stakingSigners)
+	beaconSignersLookup := buildLookup(beaconSigners)
+
+	indices := make([]int, 0, len(fullMembers))
+	sigType := make([]hotstuff.SigType, 0, len(fullMembers))
+
+	for i, member := range fullMembers {
+		if _, ok := stakingSignersLookup[member]; ok {
+			indices = append(indices, i)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not add staking signer index for %v at index %v", member, i)
+			}
+			delete(stakingSignersLookup, member)
+
+			sigType = append(sigType, hotstuff.SigTypeStaking)
+			continue
+		}
+
+		if _, ok := beaconSignersLookup[member]; ok {
+			indices = append(indices, i)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not add beacon signer index for %v at index %v", member, i)
+			}
+			delete(beaconSignersLookup, member)
+
+			sigType = append(sigType, hotstuff.SigTypeRandomBeacon)
+			continue
+		}
+	}
+
+	if len(stakingSignersLookup) > 0 {
+		return nil, nil, fmt.Errorf("unknown staking signers %v", stakingSignersLookup)
+	}
+
+	if len(beaconSignersLookup) > 0 {
+		return nil, nil, fmt.Errorf("unknown beacon signers %v", beaconSignersLookup)
+	}
+
+	signerIndices := packer.EncodeSignerIndices(indices, len(fullMembers))
+
+	serialized, err := serializeToBitVector(sigType)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not serialize sig types to bytes: %w", err)
+	}
+
+	return signerIndices, serialized, nil
+}
+
+func buildLookup(identities []flow.Identifier) map[flow.Identifier]struct{} {
+	lookup := make(map[flow.Identifier]struct{})
+	for _, id := range identities {
+		lookup[id] = struct{}{}
+	}
+	return lookup
+}
+
+func decodeSignerIndicesAndSigType(signerIDs []flow.Identifier, sigType []byte) ([]flow.Identifier, []flow.Identifier, error) {
+	// deserialize the compact sig types
+	sigTypes, err := deserializeFromBitVector(sigType, len(signerIDs))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to deserialize sig types from bytes: %w", err)
+	}
+
+	if len(signerIDs) != len(sigTypes) {
+		return nil, nil, fmt.Errorf("mismatching sigerIDs and sigTypes, %v signerIDs and %v sigTypes",
+			len(signerIDs), len(sigTypes))
+	}
+
+	// read each signer's signerID and sig type from two different slices
+	// group signers by its sig type
+	stakingSigners := make([]flow.Identifier, 0, len(signerIDs))
+	randomBeaconSigners := make([]flow.Identifier, 0, len(signerIDs))
+
+	for i, sigType := range sigTypes {
+		signerID := sigerIDs[i]
+
+		if sigType == hotstuff.SigTypeStaking {
+			stakingSigners = append(stakingSigners, signerID)
+		} else if sigType == hotstuff.SigTypeRandomBeacon {
+			randomBeaconSigners = append(randomBeaconSigners, signerID)
+		} else {
+			return nil, fmt.Errorf("unknown sigType %v, %w", sigType, model.ErrInvalidFormat)
+		}
+	}
+
+	return stakingSigners, randomBeaconSigners, nil
 }

@@ -51,7 +51,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
 	}
 
-	signerIndices, err := packer.DecodeSignerIndices(qc.SignerIndices)
+	signerIndices, err := packer.DecodeSignerIndices(qc.SignerIndices, len(allParticipants))
 	if err != nil {
 		return newInvalidBlockError(block, fmt.Errorf("qc.SignerIndices is invalid: %w", err))
 	}
@@ -89,7 +89,14 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 }
 
 func filterByIndices(identities flow.IdentityList, indices []int) (flow.IdentityList, error) {
-	panic("To be implemented")
+	list := make([]*flow.Identity, 0, len(identities))
+	for _, index := range indices {
+		if index > len(identities)-1 {
+			return nil, fmt.Errorf("signer index %v is out of range %v", index, len(identities)-1)
+		}
+		list = append(list, identities[index])
+	}
+	return list, nil
 }
 
 // ValidateProposal validates the block proposal
