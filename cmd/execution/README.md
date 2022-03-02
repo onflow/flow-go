@@ -79,7 +79,7 @@ incoming blocks are processed as if they were received during normal mode of ope
 
 ## Operation
 
-In order to execute block, all collections must be requested. To validate a collection it must be signed by a proper, staked
+In order to execute block, all collections must be requested. To validate a collection it must be signed by a proper, authorized
 collection node. Protocol state can be altered by executing transactions, hence parent block must be executed to provide
 up-to-date copy of protocol state. This allows to validate collection nodes identities and in turn, validity of collection itself.
 Having all collections retrieved and Execution State of a parent known - a block execution can commence.

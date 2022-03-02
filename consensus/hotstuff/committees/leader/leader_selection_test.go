@@ -34,15 +34,15 @@ func TestSingleConsensusNode(t *testing.T) {
 
 // compare this binary search method with sort.Search()
 func TestBsearchVSsortSearch(t *testing.T) {
-	stakes := []uint64{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
-	stakes2 := []int{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
+	weights := []uint64{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
+	weights2 := []int{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
 	var sum uint64
 	var sum2 int
 	sums := make([]uint64, 0)
 	sums2 := make([]int, 0)
-	for i := 0; i < len(stakes); i++ {
-		sum += stakes[i]
-		sum2 += stakes2[i]
+	for i := 0; i < len(weights); i++ {
+		sum += weights[i]
+		sum2 += weights2[i]
 		sums = append(sums, sum)
 		sums2 = append(sums2, sum2)
 	}
@@ -63,11 +63,11 @@ func TestBsearchVSsortSearch(t *testing.T) {
 
 // Test binary search implementation
 func TestBsearch(t *testing.T) {
-	stakes := []uint64{1, 2, 3, 4}
+	weights := []uint64{1, 2, 3, 4}
 	var sum uint64
 	sums := make([]uint64, 0)
-	for i := 0; i < len(stakes); i++ {
-		sum += stakes[i]
+	for i := 0; i < len(weights); i++ {
+		sum += weights[i]
 		sums = append(sums, sum)
 	}
 	sel := make([]int, 0, 10)
@@ -327,18 +327,18 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, identities)
 		require.NoError(t, err)
 
-		selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, weightful)
+		selectionFromWeightful, err := ComputeLeaderSelectionFromSeed(0, someSeed, N_VIEWS, weightful)
 		require.NoError(t, err)
 
 		for i := 0; i < N_VIEWS; i++ {
 			nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
-			nodeIDFromStakeful, err := selectionFromStakeful.LeaderForView(uint64(i))
+			nodeIDFromWeightful, err := selectionFromWeightful.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
 			// the selection should be the same
-			require.Equal(t, nodeIDFromAll, nodeIDFromStakeful)
+			require.Equal(t, nodeIDFromAll, nodeIDFromWeightful)
 		}
 	})
 
@@ -347,7 +347,7 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 100; i++ {
-			// create 1002 nodes with all 0 stake
+			// create 1002 nodes with all 0 weight
 			identities := unittest.IdentityListFixture(1002, unittest.WithWeight(0))
 
 			// create 2 nodes with 1 weight, and place them in between
@@ -358,24 +358,24 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 			identities[m].Weight = 1
 
 			// the following code check the zero weight node should not be selected
-			stakeful := identities.Filter(filter.HasWeight(true))
+			weightful := identities.Filter(filter.HasWeight(true))
 
 			count := 1000
 			selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
 			require.NoError(t, err)
 
-			selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, stakeful)
+			selectionFromWeightful, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, weightful)
 			require.NoError(t, err)
 
 			for i := 0; i < count; i++ {
 				nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
 				require.NoError(t, err)
 
-				nodeIDFromStakeful, err := selectionFromStakeful.LeaderForView(uint64(i))
+				nodeIDFromWeightful, err := selectionFromWeightful.LeaderForView(uint64(i))
 				require.NoError(t, err)
 
 				// the selection should be the same
-				require.Equal(t, nodeIDFromStakeful, nodeIDFromAll)
+				require.Equal(t, nodeIDFromWeightful, nodeIDFromAll)
 			}
 		}
 
@@ -387,9 +387,9 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 				identities := unittest.IdentityListFixture(1000, unittest.WithWeight(0))
 
 				n := rng.UintN(1000)
-				stake := n + 1
-				identities[n].Weight = stake
-				onlyStaked := identities[n]
+				weight := n + 1
+				identities[n].Weight = weight
+				onlyNodeWithWeight := identities[n]
 
 				selections, err := ComputeLeaderSelectionFromSeed(0, someSeed, 1000, identities)
 				require.NoError(t, err)
@@ -397,7 +397,7 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 				for i := 0; i < 1000; i++ {
 					nodeID, err := selections.LeaderForView(uint64(i))
 					require.NoError(t, err)
-					require.Equal(t, onlyStaked.NodeID, nodeID)
+					require.Equal(t, onlyNodeWithWeight.NodeID, nodeID)
 				}
 			}
 		})

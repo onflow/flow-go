@@ -21,7 +21,7 @@ type VoteProcessorTestSuiteBase struct {
 	onQCCreatedState   mock.Mock
 
 	stakingAggregator *mockhotstuff.WeightedSignatureAggregator
-	minRequiredStake  uint64
+	minRequiredWeight uint64
 	proposal          *model.Proposal
 }
 
@@ -31,7 +31,7 @@ func (s *VoteProcessorTestSuiteBase) SetupTest() {
 
 	// let's assume we have 19 nodes each with stake 100
 	s.sigWeight = 100
-	s.minRequiredStake = 1300 // we require at least 13 sigs to collect min weight
+	s.minRequiredWeight = 1300 // we require at least 13 sigs to collect min weight
 	s.stakingTotalWeight = 0
 
 	// setup staking signature aggregator

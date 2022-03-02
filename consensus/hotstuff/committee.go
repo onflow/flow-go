@@ -55,13 +55,13 @@ type DKG interface {
 	protocol.DKG
 }
 
-// ComputeStakeThresholdForBuildingQC returns the stake that is minimally required for building a QC
-func ComputeStakeThresholdForBuildingQC(totalStake uint64) uint64 {
-	// Given totalStake, we need the smallest integer t such that 2 * totalStake / 3 < t
-	// Formally, the minimally required stake is: 2 * Floor(totalStake/3) + max(1, totalStake mod 3)
-	floorOneThird := totalStake / 3 // integer division, includes floor
+// ComputeWeightThresholdForBuildingQC returns the weight that is minimally required for building a QC
+func ComputeWeightThresholdForBuildingQC(totalWeight uint64) uint64 {
+	// Given totalWeight, we need the smallest integer t such that 2 * totalWeight / 3 < t
+	// Formally, the minimally required stake is: 2 * Floor(totalWeight/3) + max(1, totalWeight mod 3)
+	floorOneThird := totalWeight / 3 // integer division, includes floor
 	res := 2 * floorOneThird
-	divRemainder := totalStake % 3
+	divRemainder := totalWeight % 3
 	if divRemainder <= 1 {
 		res = res + 1
 	} else {

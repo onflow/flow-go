@@ -463,8 +463,8 @@ func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 }
 
 // TestQCSignersError tests that a qc fails validation if:
-// QC signer's have insufficient stake (but are all valid consensus participants otherwise)
-func (qs *QCSuite) TestQCInsufficientStake() {
+// QC signer's have insufficient weight (but are all valid consensus participants otherwise)
+func (qs *QCSuite) TestQCInsufficientWeight() {
 	// signers only have stake 6 out of 10 total (NOT have a supermajority)
 	qs.signers = qs.participants[:6]
 	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
