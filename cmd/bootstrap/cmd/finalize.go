@@ -437,7 +437,7 @@ func internalStakesByAddress() map[string]uint64 {
 	stakes := make(map[string]uint64)
 	for _, config := range configs {
 		if _, ok := stakes[config.Address]; !ok {
-			stakes[config.Address] = config.Stake
+			stakes[config.Address] = config.Weight
 		} else {
 			log.Error().Msgf("duplicate internal node address %s", config.Address)
 		}

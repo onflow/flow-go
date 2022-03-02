@@ -69,6 +69,6 @@ func createConf(r flow.Role, i int) model.NodeConfig {
 	return model.NodeConfig{
 		Role:    r,
 		Address: fmt.Sprintf(flagAddressFormat, r.String(), i+1),
-		Stake:   flagStake,
+		Weight:  flagStake,
 	}
 }

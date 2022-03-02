@@ -107,8 +107,8 @@ type NodeConfig struct {
 	// machine account.
 	Address string
 
-	// Stake is the stake of the node
-	Stake uint64
+	// Weight is the weight of the node
+	Weight uint64
 }
 
 // Defines the canonical structure for encoding private node info.
@@ -125,7 +125,7 @@ type NodeInfoPub struct {
 	Role          flow.Role
 	Address       string
 	NodeID        flow.Identifier
-	Stake         uint64
+	Weight        uint64
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
 }
@@ -157,8 +157,8 @@ type NodeInfo struct {
 	// machine account.
 	Address string
 
-	// Stake is the stake of the node
-	Stake uint64
+	// Stake is the weight of the node
+	Weight uint64
 
 	// key information is private
 	networkPubKey  crypto.PublicKey
@@ -171,7 +171,7 @@ func NewPublicNodeInfo(
 	nodeID flow.Identifier,
 	role flow.Role,
 	addr string,
-	stake uint64,
+	weight uint64,
 	networkKey crypto.PublicKey,
 	stakingKey crypto.PublicKey,
 ) NodeInfo {
@@ -179,7 +179,7 @@ func NewPublicNodeInfo(
 		NodeID:        nodeID,
 		Role:          role,
 		Address:       addr,
-		Stake:         stake,
+		Weight:        weight,
 		networkPubKey: networkKey,
 		stakingPubKey: stakingKey,
 	}
@@ -189,7 +189,7 @@ func NewPrivateNodeInfo(
 	nodeID flow.Identifier,
 	role flow.Role,
 	addr string,
-	stake uint64,
+	weight uint64,
 	networkKey crypto.PrivateKey,
 	stakingKey crypto.PrivateKey,
 ) NodeInfo {
@@ -197,7 +197,7 @@ func NewPrivateNodeInfo(
 		NodeID:         nodeID,
 		Role:           role,
 		Address:        addr,
-		Stake:          stake,
+		Weight:         weight,
 		networkPrivKey: networkKey,
 		stakingPrivKey: stakingKey,
 		networkPubKey:  networkKey.PublicKey(),
@@ -261,7 +261,7 @@ func (node NodeInfo) Public() NodeInfoPub {
 		Role:          node.Role,
 		Address:       node.Address,
 		NodeID:        node.NodeID,
-		Stake:         node.Stake,
+		Weight:        node.Weight,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: node.NetworkPubKey()},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: node.StakingPubKey()},
 	}
@@ -284,7 +284,7 @@ func (node NodeInfo) Identity() *flow.Identity {
 		NodeID:        node.NodeID,
 		Address:       node.Address,
 		Role:          node.Role,
-		Weight:        node.Stake,
+		Weight:        node.Weight,
 		StakingPubKey: node.StakingPubKey(),
 		NetworkPubKey: node.NetworkPubKey(),
 	}

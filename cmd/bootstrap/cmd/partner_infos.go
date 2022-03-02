@@ -178,7 +178,7 @@ func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
 		Role:          flow.Role(fields[roleField].(cadence.UInt8)),
 		Address:       string(fields[networkingAddressField].(cadence.String)),
 		NodeID:        nodeID,
-		Stake:         defaultPartnerStake,
+		Weight:        defaultPartnerStake,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: networkPubKey},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: stakingPubKey},
 	}, nil

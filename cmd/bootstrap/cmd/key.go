@@ -76,7 +76,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	conf := model.NodeConfig{
 		Role:    role,
 		Address: flagAddress,
-		Stake:   0,
+		Weight:  0,
 	}
 	nodeInfo := assembleNodeInfo(conf, networkKey, stakingKey)
 

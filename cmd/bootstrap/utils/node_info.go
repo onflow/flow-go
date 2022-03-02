@@ -21,7 +21,7 @@ func WritePartnerFiles(nodeInfos []model.NodeInfo, bootDir string) (string, stri
 	stakes := make(map[flow.Identifier]uint64)
 	for i, node := range nodeInfos {
 		nodePubInfos[i] = node.Public()
-		stakes[node.NodeID] = node.Stake
+		stakes[node.NodeID] = node.Weight
 	}
 
 	// write node public infos to partner dir
@@ -78,7 +78,7 @@ func WriteInternalFiles(nodeInfos []model.NodeInfo, bootDir string) (string, str
 		configs[i] = model.NodeConfig{
 			Role:    node.Role,
 			Address: node.Address,
-			Stake:   node.Stake,
+			Weight:  node.Weight,
 		}
 	}
 
