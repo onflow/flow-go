@@ -72,7 +72,7 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	_, exists := identities.ByNodeID(factory.me.NodeID())
 	if !exists {
-		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrUnstakedForEpoch, factory.me.NodeID(), counter)
+		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrNotAuthorizedForEpoch, factory.me.NodeID(), counter)
 		return
 	}
 
