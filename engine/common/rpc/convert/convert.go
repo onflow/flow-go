@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/crypto"
@@ -124,10 +124,7 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 
 	t := timestamppb.New(h.Timestamp)
 
-	parentVoterIds := make([][]byte, len(h.ParentVoterIDs))
-	for i, parentVoterId := range h.ParentVoterIDs {
-		parentVoterIds[i] = parentVoterId[:]
-	}
+	parentVoterIds := IdentifiersToMessages(h.ParentVoterIDs)
 
 	return &entities.BlockHeader{
 		Id:                 id[:],
@@ -140,6 +137,22 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerId:         h.ProposerID[:],
 		ProposerSigData:    h.ProposerSigData,
+	}, nil
+}
+
+func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
+	parentVoterIds := MessagesToIdentifiers(m.ParentVoterIds)
+
+	return &flow.Header{
+		ParentID:           MessageToIdentifier(m.ParentId),
+		Height:             m.Height,
+		PayloadHash:        MessageToIdentifier(m.PayloadHash),
+		Timestamp:          m.Timestamp.AsTime(),
+		View:               m.View,
+		ParentVoterIDs:     parentVoterIds,
+		ParentVoterSigData: m.ParentVoterSigData,
+		ProposerID:         MessageToIdentifier(m.ProposerId),
+		ProposerSigData:    m.ProposerSigData,
 	}, nil
 }
 
@@ -160,16 +173,25 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	}
 
 	bh := entities.Block{
-		Id:                   id[:],
-		Height:               h.Header.Height,
-		ParentId:             parentID[:],
-		Timestamp:            t,
+		Id:        id[:],
+		Height:    h.Header.Height,
+		ParentId:  parentID[:],
+		Timestamp: t,
+
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
 		Signatures:           [][]byte{h.Header.ParentVoterSigData},
 	}
 
 	return &bh, nil
+}
+
+func MessageToBlock(m *entitiesproto.Block) *flow.Block {
+
+}
+
+func MessagesToExecutionResultMetaList() {
+
 }
 
 func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
@@ -181,6 +203,10 @@ func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 	}
 }
 
+func MessageToCollectionGuarantee(m *entitiesproto.CollectionGuarantee) *flow.CollectionGuarantee {
+
+}
+
 func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 	id := s.BlockID
 	result := s.ResultID
@@ -189,6 +215,10 @@ func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 		ExecutionReceiptId:         result[:],
 		ExecutionReceiptSignatures: [][]byte{}, // filling seals signature with zero
 	}
+}
+
+func MessageToBlockSeal(m *entitiesproto.BlockSeal) *flow.Seal {
+
 }
 
 func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
