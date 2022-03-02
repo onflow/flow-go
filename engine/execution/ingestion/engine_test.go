@@ -145,7 +145,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	require.NoError(t, err)
 
 	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return stateProtocol.IsNodeStakedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
+		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
 	engine, err = New(
@@ -1153,7 +1153,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	require.NoError(t, err)
 
 	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return stateProtocol.IsNodeStakedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
+		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
 	engine, err = New(

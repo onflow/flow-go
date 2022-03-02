@@ -445,7 +445,7 @@ func (e Engine) validateNonSystemChunkCollection(chunkDataPack *flow.ChunkDataPa
 // execution node at the given block ID.
 func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) bool {
 	snapshot := e.state.AtBlockID(blockID)
-	valid, err := protocol.IsNodeStakedWithRoleAt(snapshot, senderID, flow.RoleExecution)
+	valid, err := protocol.IsNodeAuthorizedWithRoleAt(snapshot, senderID, flow.RoleExecution)
 
 	if err != nil {
 		e.log.Fatal().

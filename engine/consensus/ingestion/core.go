@@ -192,7 +192,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 //       to be invalid, in which case we might want to slash the origin.
 func (e *Core) validateOrigin(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	refState := e.state.AtBlockID(guarantee.ReferenceBlockID)
-	valid, err := protocol.IsNodeStakedWithRoleAt(refState, originID, flow.RoleCollection)
+	valid, err := protocol.IsNodeAuthorizedWithRoleAt(refState, originID, flow.RoleCollection)
 	if err != nil {
 		// collection with an unknown reference block is unverifiable
 		if errors.Is(err, storage.ErrNotFound) {
