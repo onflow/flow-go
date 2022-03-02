@@ -27,7 +27,7 @@ func TestResolver_HappyPath(t *testing.T) {
 	resolver := NewResolver(DefaultCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
-		unittest.NoopHeroCacheMetricsRegistrationFunc,
+		metrics.NewNoopCollector(),
 		WithBasicResolver(&basicResolver))
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
@@ -59,7 +59,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 		DefaultCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
-		unittest.NoopHeroCacheMetricsRegistrationFunc,
+		metrics.NewNoopCollector(),
 		WithBasicResolver(&basicResolver),
 		WithTTL(1*time.Second)) // cache timeout set to 1 seconds for this test
 
@@ -97,7 +97,7 @@ func TestResolver_Error(t *testing.T) {
 		DefaultCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
-		unittest.NoopHeroCacheMetricsRegistrationFunc,
+		metrics.NewNoopCollector(),
 		WithBasicResolver(&basicResolver))
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
@@ -136,7 +136,7 @@ func TestResolver_Expired_Invalidated(t *testing.T) {
 		DefaultCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
-		unittest.NoopHeroCacheMetricsRegistrationFunc,
+		metrics.NewNoopCollector(),
 		WithBasicResolver(&basicResolver),
 		WithTTL(1*time.Second)) // 1 second TTL for test
 

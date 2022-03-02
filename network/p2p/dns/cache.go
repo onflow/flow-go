@@ -6,9 +6,9 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/herocache"
-	"github.com/onflow/flow-go/module/metrics"
 )
 
 // DefaultTimeToLive is the default duration a dns result is cached.
@@ -26,10 +26,10 @@ type cache struct {
 	dCache mempool.DNSCache
 }
 
-func newCache(sizeLimit uint32, logger zerolog.Logger, metricsFactory metrics.HeroCacheMetricsRegistrationFunc) *cache {
+func newCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *cache {
 	return &cache{
 		ttl:    DefaultTimeToLive,
-		dCache: herocache.NewDNSCache(sizeLimit, logger.With().Str("mempool", "dns-cache").Logger(), metricsFactory),
+		dCache: herocache.NewDNSCache(sizeLimit, logger.With().Str("mempool", "dns-cache").Logger(), collector),
 	}
 }
 
