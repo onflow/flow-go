@@ -185,7 +185,7 @@ func main() {
 				return herocache.NewTransactions(
 					uint32(txLimit),
 					node.Logger,
-					metrics.CollectionNodeTransactionsCacheMetricsFactory(node.MetricsRegisterer))
+					metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegisterer))
 			}
 
 			pools = epochpool.NewTransactionPools(create)

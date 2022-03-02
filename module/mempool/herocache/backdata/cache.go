@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -18,7 +17,7 @@ import (
 func runtimeNano() int64
 
 const (
-	slotsPerBucket = uint64(16)
+	SlotsPerBucket = uint64(16)
 
 	// slotAgeUnallocated defines an unallocated slot with zero age.
 	slotAgeUnallocated = uint64(0)
@@ -27,7 +26,7 @@ const (
 	// this back data prior to printing any log. This is done as a slow-down mechanism
 	// to avoid spamming logs upon read/write heavy operations. An interaction can be
 	// a read or write.
-	telemetryCounterInterval = uint64(1000)
+	telemetryCounterInterval = uint64(10_000)
 
 	// telemetryDurationInterval is the required elapsed duration interval
 	// prior to printing any log. This is done as a slow-down mechanism
@@ -55,13 +54,13 @@ type slot struct {
 
 // slotBucket represents a bucket of slots.
 type slotBucket struct {
-	slots [slotsPerBucket]slot
+	slots [SlotsPerBucket]slot
 }
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
 type Cache struct {
-	logger  zerolog.Logger
-	metrics module.HeroCacheMetrics
+	logger    zerolog.Logger
+	collector module.HeroCacheMetrics
 	// NOTE: as a BackData implementation, Cache must be non-blocking.
 	// Concurrency management is done by overlay Backend.
 	sizeLimit    uint32
@@ -110,25 +109,25 @@ func NewCache(sizeLimit uint32,
 	oversizeFactor uint32,
 	ejectionMode heropool.EjectionMode,
 	logger zerolog.Logger,
-	metricsFactory metrics.HeroCacheMetricsRegistrationFunc) *Cache {
+	collector module.HeroCacheMetrics) *Cache {
 
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
-	bucketNum := capacity / slotsPerBucket
-	if capacity%slotsPerBucket != 0 {
+	bucketNum := capacity / SlotsPerBucket
+	if capacity%SlotsPerBucket != 0 {
 		// accounting for remainder.
 		bucketNum++
 	}
 
 	bd := &Cache{
 		logger:                 logger,
-		metrics:                metricsFactory(bucketNum),
+		collector:              collector,
 		bucketNum:              bucketNum,
 		sizeLimit:              sizeLimit,
 		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
 		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode),
-		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
+		availableSlotHistogram: make([]uint64, SlotsPerBucket+1), // +1 is to account for empty buckets as well.
 	}
 
 	return bd
@@ -245,7 +244,7 @@ func (c *Cache) Clear() {
 
 	c.buckets = make([]slotBucket, c.bucketNum)
 	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
-	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
+	c.availableSlotHistogram = make([]uint64, SlotsPerBucket+1)
 	c.interactionCounter = 0
 	c.lastTelemetryDump = 0
 	c.slotCount = 0
@@ -266,7 +265,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	slotToUse, unique := c.slotIndexInBucket(b, entityId32of256, entityId)
 	if !unique {
 		// entityId already exists
-		c.metrics.OnAddingDuplicateEntityAttempt()
+		c.collector.OnAddingDuplicateEntityAttempt()
 		return false
 	}
 
@@ -274,18 +273,18 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 		// bucket is full, and we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
 		c.invalidateEntity(b, slotToUse)
-		c.metrics.OnBucketFull()
+		c.collector.OnBucketFull()
 		c.logger.Warn().
 			Hex("replaced_entity_id", logging.ID(linkedId)).
 			Hex("added_entity_id", logging.ID(entityId)).
-			Msg("adding entity to cache resulted in replacing a valid key, potential collision")
+			Msg("emergency ejection, adding entity to cache resulted in replacing a valid key, potential collision")
 	}
 
 	c.slotCount++
 	entityIndex, ejection := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
 	if ejection {
 		// cache is at its full size and ejection happened to make room for this new entity.
-		c.metrics.OnEntityEjectedAtFullCapacity()
+		c.collector.OnEntityEjectedAtFullCapacity()
 	}
 
 	c.buckets[b].slots[slotToUse].slotAge = c.slotCount
@@ -298,7 +297,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 // The boolean return value determines whether an entity with given id exists in the BackData.
 func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotIndex, bool) {
 	entityId32of256, b := c.entityId32of256AndBucketIndex(entityID)
-	for s := slotIndex(0); s < slotIndex(slotsPerBucket); s++ {
+	for s := slotIndex(0); s < slotIndex(SlotsPerBucket); s++ {
 		if c.buckets[b].slots[s].entityId32of256 != entityId32of256 {
 			continue
 		}
@@ -352,7 +351,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 
 	oldestSlotInBucket := c.slotCount + 1 // initializes the oldest slot to current max.
 
-	for s := slotIndex(0); s < slotIndex(slotsPerBucket); s++ {
+	for s := slotIndex(0); s < slotIndex(SlotsPerBucket); s++ {
 		if c.buckets[b].slots[s].slotAge < oldestSlotInBucket {
 			// record slot s as oldest slot
 			oldestSlotInBucket = c.buckets[b].slots[s].slotAge
@@ -390,7 +389,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 	}
 
 	c.availableSlotHistogram[availableSlotCount]++
-	c.metrics.BucketAvailableSlotsCount(availableSlotCount)
+	c.collector.BucketAvailableSlotsCount(availableSlotCount)
 	return slotToUse, true
 }
 
@@ -398,7 +397,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 // This scalar index is used to represent this (bucketIndex, slotIndex) pair in the underlying
 // entities list.
 func (c Cache) ownerIndexOf(b bucketIndex, s slotIndex) uint64 {
-	return (uint64(b) * slotsPerBucket) + uint64(s)
+	return (uint64(b) * SlotsPerBucket) + uint64(s)
 }
 
 // linkedEntityOf returns the entity linked to this (bucketIndex, slotIndex) pair from the underlying entities list.
@@ -446,7 +445,7 @@ func (c *Cache) logTelemetry() {
 			Logger()
 	}
 
-	lg.Debug().Msg("logging telemetry")
+	lg.Info().Msg("logging telemetry")
 	c.interactionCounter = 0
 	c.lastTelemetryDump = runtimeNano()
 }

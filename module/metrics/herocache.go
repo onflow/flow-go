@@ -4,41 +4,40 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 )
 
 const subsystemHeroCache = "hero_cache"
 
 type HeroCacheCollector struct {
-	bucketSlotAvailableHistogram     prometheus.Histogram
-	newEntitiesWriteCountTotal       prometheus.Counter
+	bucketSlotAvailableHistogram prometheus.Histogram
+
+	// TODO: successful and unsuccessful reads counters.
+
+	newEntitiesWriteCountTotal prometheus.Counter
+	duplicateWriteQueriesTotal prometheus.Counter
+
 	entityEjectedAtFullCapacityTotal prometheus.Counter
 	fullBucketsFoundTimes            prometheus.Counter
-	duplicateWriteQueriesTotal       prometheus.Counter
 }
 
 type HeroCacheMetricsRegistrationFunc func(uint64) module.HeroCacheMetrics
 
-func NetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) HeroCacheMetricsRegistrationFunc {
-	return func(totalBuckets uint64) module.HeroCacheMetrics {
-		return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingReceiveCache, totalBuckets, registrar)
-	}
+func NetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingReceiveCache, registrar)
 }
 
-func NetworkDnsCacheMetricsFactory(registrar prometheus.Registerer) HeroCacheMetricsRegistrationFunc {
-	return func(totalBuckets uint64) module.HeroCacheMetrics {
-		return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsCache, totalBuckets, registrar)
-	}
+func NetworkDnsCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsCache, registrar)
 }
 
-func CollectionNodeTransactionsCacheMetricsFactory(registrar prometheus.Registerer) HeroCacheMetricsRegistrationFunc {
-	return func(totalBuckets uint64) module.HeroCacheMetrics {
-		return NewHeroCacheCollector(namespaceCollection, ResourceTransaction, totalBuckets, registrar)
-	}
+func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceCollection, ResourceTransaction, registrar)
 }
 
-func NewHeroCacheCollector(nameSpace string, cacheName string, totalBuckets uint64, registrar prometheus.Registerer) *HeroCacheCollector {
+func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometheus.Registerer) *HeroCacheCollector {
 
-	hundredPercent := float64(totalBuckets)
+	hundredPercent := float64(herocache.SlotsPerBucket)
 	tenPercent := 0.1 * hundredPercent
 	twentyPercent := 0.25 * hundredPercent
 	fiftyPercent := 0.5 * hundredPercent
@@ -47,7 +46,7 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, totalBuckets uint
 	bucketSlotAvailableHistogram := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
-		Buckets:   []float64{1, 2, tenPercent, twentyPercent, fiftyPercent, seventyFivePercent, hundredPercent},
+		Buckets:   []float64{0, 1, 2, tenPercent, twentyPercent, fiftyPercent, seventyFivePercent, hundredPercent},
 		Name:      cacheName + "_" + "bucket_available_slot_count",
 		Help:      "histogram of number of available slots in buckets of cache",
 	})

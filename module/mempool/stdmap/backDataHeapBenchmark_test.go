@@ -16,6 +16,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,7 +55,7 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 			8,
 			heropool.LRUEjection,
 			unittest.Logger(),
-			unittest.NoopHeroCacheMetricsRegistrationFunc),
+			metrics.NewNoopCollector()),
 		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000_000))

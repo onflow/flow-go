@@ -4,10 +4,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/module/metrics"
 )
 
 // ReceiveCache implements an LRU cache of the received eventIDs that delivered to their engines
@@ -29,13 +29,13 @@ func (r receiveCacheEntry) Checksum() flow.Identifier {
 }
 
 // NewReceiveCache creates and returns a new ReceiveCache
-func NewReceiveCache(sizeLimit uint32, logger zerolog.Logger, metricsFactory metrics.HeroCacheMetricsRegistrationFunc) *ReceiveCache {
+func NewReceiveCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *ReceiveCache {
 	return &ReceiveCache{
 		c: stdmap.NewBackendWithBackData(herocache.NewCache(sizeLimit,
 			herocache.DefaultOversizeFactor,
 			heropool.LRUEjection, // receive cache must be LRU.
 			logger.With().Str("mempool", "receive-cache").Logger(),
-			metricsFactory)),
+			collector)),
 	}
 }
 

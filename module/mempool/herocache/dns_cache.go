@@ -6,10 +6,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/module/metrics"
 )
 
 type DNSCache struct {
@@ -17,20 +17,21 @@ type DNSCache struct {
 	txtCache *stdmap.Backend
 }
 
-func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, metricsFactory metrics.HeroCacheMetricsRegistrationFunc) *DNSCache {
+func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *DNSCache {
 	return &DNSCache{
 		txtCache: stdmap.NewBackendWithBackData(
 			herocache.NewCache(
 				sizeLimit,
 				8,
 				heropool.LRUEjection,
-				logger, metricsFactory)),
+				logger,
+				collector)),
 		ipCache: stdmap.NewBackendWithBackData(
 			herocache.NewCache(sizeLimit,
 				8,
 				heropool.LRUEjection,
 				logger,
-				metricsFactory)),
+				collector)),
 	}
 }
 
