@@ -467,7 +467,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
 		fnb.BaseConfig.profilerDuration,
-		!fnb.BaseConfig.profilerEnabled,
+		fnb.BaseConfig.profilerEnabled,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
