@@ -169,6 +169,14 @@ func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType,
 	return types, nil
 }
 
+// encodeSignerIndicesAndSigType encodes the given stakingSigners and beaconSigners into signer indices and sig types
+// the given fullMembers provides the canonical order of signer index for each signer.
+// for instance, assuming fullMembers are [A,B,C,D,E,F], stakingSigners are [D,E], beaconSigners are [A,B], then
+// the signerIndices will be [byte([1,1,0,1,1,0,0,0])],
+// 			bit 1 indicates the node at that index signed, bit 0 indicates the node at that index didn't sign
+// the sigType will be [byte([1,1,0,0,0,0,0,0])],
+// 			bit 1 indicates the signer at the same index in signerIndices signed random beacon sig
+// 			bit 0 indicates the signer at the same index in signerIndices signed staking sig
 func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners []flow.Identifier, beaconSigners []flow.Identifier) ([]byte, []byte, error) {
 	stakingSignersLookup := buildLookup(stakingSigners)
 	beaconSignersLookup := buildLookup(beaconSigners)
@@ -220,6 +228,8 @@ func buildLookup(identities []flow.Identifier) map[flow.Identifier]struct{} {
 	return lookup
 }
 
+// decodeSignerIndicesAndSigType decodes sigType and use it to split the given signerIDs into two groups: staking sigers and random beacon signers.
+// it returns model.ErrInvalidFormat if decode failed or the decoded data doesn't match with the given signer IDs.
 func decodeSignerIndicesAndSigType(signerIDs []flow.Identifier, sigType []byte) ([]flow.Identifier, []flow.Identifier, error) {
 	// deserialize the compact sig types
 	sigTypes, err := deserializeFromBitVector(sigType, len(signerIDs))
@@ -228,8 +238,8 @@ func decodeSignerIndicesAndSigType(signerIDs []flow.Identifier, sigType []byte) 
 	}
 
 	if len(signerIDs) != len(sigTypes) {
-		return nil, nil, fmt.Errorf("mismatching sigerIDs and sigTypes, %v signerIDs and %v sigTypes",
-			len(signerIDs), len(sigTypes))
+		return nil, nil, fmt.Errorf("mismatching sigerIDs and sigTypes, %v signerIDs and %v sigTypes: %w",
+			len(signerIDs), len(sigTypes), model.ErrInvalidFormat)
 	}
 
 	// read each signer's signerID and sig type from two different slices
