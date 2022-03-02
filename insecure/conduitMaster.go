@@ -5,6 +5,9 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
+// CorruptedFactoryPort defines the port on which attacker dials a corruptible conduit factory.
+const CorruptedFactoryPort = 5000
+
 // ConduitMaster defines part of the behavior of a corruptible conduit factory that controls the conduits it creates.
 type ConduitMaster interface {
 	// HandleIncomingEvent sends an incoming event to the conduit master to process.

@@ -12,15 +12,15 @@ import (
 
 // Attacker implements the adversarial domain that is orchestrating an attack through corrupted nodes.
 type Attacker struct {
-	corruptedIds  flow.IdentityList
-	attackVectors []insecure.AttackVector
-	network       insecure.AttackNetwork
+	corruptedIds flow.IdentityList
+	network      insecure.AttackNetwork
+	orchestrator insecure.AttackOrchestrator
 }
 
-func NewAttacker(address string, corruptedIds flow.IdentityList, attackVectors []insecure.AttackVector) (*Attacker, error) {
+func NewAttacker(address string, corruptedIds flow.IdentityList, orchestrator insecure.AttackOrchestrator) (*Attacker, error) {
 	attacker := &Attacker{
-		corruptedIds:  corruptedIds,
-		attackVectors: attackVectors,
+		corruptedIds: corruptedIds,
+		orchestrator: orchestrator,
 	}
 
 	s := grpc.NewServer()
@@ -32,6 +32,11 @@ func NewAttacker(address string, corruptedIds flow.IdentityList, attackVectors [
 	if err := s.Serve(ln); err != nil {
 		return nil, fmt.Errorf("could not bind attacker to the tcp listener: %w", err)
 	}
+
+}
+
+func (a Attacker) Start() {
+	a.orchestrator.Start()
 }
 
 func (a Attacker) Observe(server insecure.Attacker_ObserveServer) error {

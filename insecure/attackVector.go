@@ -11,3 +11,8 @@ type AttackVector interface {
 	// rest of the network.
 	Handle(interface{}, flow.IdentityList, AttackNetwork) error
 }
+
+type AttackOrchestrator interface {
+	RegisterAttackVector(vector AttackVector) error
+	Start()
+}
