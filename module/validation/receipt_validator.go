@@ -360,7 +360,7 @@ func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, b
 
 	err = ensureNodeHasWeightAndRole(identity, flow.RoleExecution)
 	if err != nil {
-		return fmt.Errorf("staked node invalid: %w", err)
+		return fmt.Errorf("node is not authorized execution node: %w", err)
 	}
 
 	err = v.verifySignature(receipt, identity)

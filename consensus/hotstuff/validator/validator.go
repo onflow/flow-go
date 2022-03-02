@@ -58,7 +58,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	// determine whether signers reach minimally required weight threshold for consensus
 	threshold := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight()) // compute required weight threshold
 	if signers.TotalWeight() < threshold {
-		return newInvalidBlockError(block, fmt.Errorf("qc signers have insufficient stake of %d (required=%d)", signers.TotalWeight(), threshold))
+		return newInvalidBlockError(block, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state

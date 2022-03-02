@@ -91,7 +91,7 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	// zero weight in the protocol state.
 	for _, participant := range setup.Participants {
 		if participant.Weight == 0 {
-			return fmt.Errorf("node with zero stake (%x)", participant.NodeID)
+			return fmt.Errorf("node with zero weight (%x)", participant.NodeID)
 		}
 	}
 

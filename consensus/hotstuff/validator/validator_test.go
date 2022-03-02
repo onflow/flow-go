@@ -471,10 +471,10 @@ func (qs *QCSuite) TestQCInsufficientWeight() {
 
 	// the QC should not be validated anymore
 	err := qs.validator.ValidateQC(qs.qc, qs.block)
-	assert.Error(qs.T(), err, "a QC should be rejected if it has insufficient voted stake")
+	assert.Error(qs.T(), err, "a QC should be rejected if it has insufficient voted weight")
 
 	// we should get a threshold error to bubble up for extra info
-	assert.True(qs.T(), model.IsInvalidBlockError(err), "if there is insufficient voted stake, an invalid block error should be raised")
+	assert.True(qs.T(), model.IsInvalidBlockError(err), "if there is insufficient voted weight, an invalid block error should be raised")
 }
 
 // TestQCSignatureError tests that validation errors if:

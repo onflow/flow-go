@@ -131,7 +131,7 @@ func TestAssignerEngine(t *testing.T) {
 	t.Run("new block happy path", func(t *testing.T) {
 		newBlockHappyPath(t)
 	})
-	t.Run("new block unstaked", func(t *testing.T) {
+	t.Run("new block zero-weight", func(t *testing.T) {
 		newBlockZeroWeight(t)
 	})
 	t.Run("new block zero chunk", func(t *testing.T) {

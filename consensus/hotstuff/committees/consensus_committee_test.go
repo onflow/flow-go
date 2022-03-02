@@ -61,7 +61,7 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 	})
 
 	t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
-		t.Run("unstaked consensus node", func(t *testing.T) {
+		t.Run("zero-weight consensus node", func(t *testing.T) {
 			_, err := com.Identity(blockID, zeroWeightConsensusIdentity.NodeID)
 			require.True(t, model.IsInvalidSignerError(err))
 		})

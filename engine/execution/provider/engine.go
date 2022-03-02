@@ -186,7 +186,7 @@ func (e *Engine) onChunkDataRequest(
 	if err != nil {
 		lg.Error().
 			Err(err).
-			Msg("could not verify staked identity of chunk data pack request, dropping it")
+			Msg("could not verify authorization of identity of chunk data pack request, dropping it")
 		return
 	}
 
