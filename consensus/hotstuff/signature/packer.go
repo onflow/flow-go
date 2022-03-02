@@ -19,6 +19,7 @@ type ConsensusSigDataPacker struct {
 
 var _ hotstuff.Packer = &ConsensusSigDataPacker{}
 
+// NewConsensusSigDataPacker creates a new ConsensusSigDataPacker instance
 func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataPacker {
 	return &ConsensusSigDataPacker{
 		committees: committees,
