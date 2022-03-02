@@ -2,10 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -37,12 +35,12 @@ func TestGenerateLevel2Summary(t *testing.T) {
 			TestRuns:         testdata.GetTestData_Level2_MultipleL1SummariesNoResults(),
 		},
 
-		// "many level 1 summaries, many failures, many passes": {
-		// 	Directory:        "test4-multi-failures",
-		// 	HasFailures:      true,
-		// 	HasNoResultTests: false,
-		// 	TestRuns:         testdata.GetTestData_Level2MultipleL1SummariesFailuresPasses(),
-		// },
+		"many level 1 summaries, many failures, many passes": {
+			Directory:        "test4-multi-failures",
+			HasFailures:      true,
+			HasNoResultTests: false,
+			TestRuns:         testdata.GetTestData_Level2MultipleL1SummariesFailuresPasses(),
+		},
 		// "many level 1 summaries, many failures, many passes, many no-result tests": {"test5-multi-failures-multi-no-result-tests", true, true},
 	}
 
@@ -111,7 +109,7 @@ func runGenerateLevel2Summary(t *testing.T, testData testdata.Level2TestData) {
 		expectedLevel2TestResult := expectedLevel2Summary.TestResultsMap[expectedLevel2TestResultKey]
 		actualLevel2TestResults, isFoundActual := actualLevel2Summary.TestResultsMap[expectedLevel2TestResultKey]
 
-		require.True(t, isFoundActual, printLevel2TestResult(expectedLevel2TestResult, "expected not in actual"))
+		require.True(t, isFoundActual, common.PrintLevel2TestResult(expectedLevel2TestResult, "expected not in actual"))
 
 		common.AssertLevel2TestResults(t, *expectedLevel2TestResult, *actualLevel2TestResults)
 	}
@@ -121,35 +119,13 @@ func runGenerateLevel2Summary(t *testing.T, testData testdata.Level2TestData) {
 		actualLevel2TestResult := actualLevel2Summary.TestResultsMap[actualLevel2TestResultKey]
 		exptectedLevel2TestResult, isFoundExpected := expectedLevel2Summary.TestResultsMap[actualLevel2TestResultKey]
 
-		require.True(t, isFoundExpected, printLevel2TestResult(actualLevel2TestResult, "actual not in expected"))
+		require.True(t, isFoundExpected, common.PrintLevel2TestResult(actualLevel2TestResult, "actual not in expected"))
 
 		common.AssertLevel2TestResults(t, *exptectedLevel2TestResult, *actualLevel2TestResult)
 	}
 
-	// make sure calculated summary level 2 is what we expected
-	require.Equal(t, expectedLevel2Summary, actualLevel2Summary)
-
 	checkFailureMessages(t, testData.HasFailures, expectedFailureMessagesPath)
 	checkNoResultMessages(t, testData.HasNoResultTests, expectedNoResultMessagesPath)
-}
-
-func printLevel2TestResult(level2TestResult *common.Level2TestResult, message string) string {
-	builder := strings.Builder{}
-	builder.WriteString("*** Test Runs Level 2 Summary (not found) " + message + "***")
-	builder.WriteString("\nTest: " + level2TestResult.Test)
-	builder.WriteString("\nPackage: " + level2TestResult.Package)
-	builder.WriteString("\nRuns: " + fmt.Sprintf("%d", level2TestResult.Runs))
-	builder.WriteString("\nPassed: " + fmt.Sprintf("%d", level2TestResult.Passed))
-	builder.WriteString("\nFailed: " + fmt.Sprintf("%d", level2TestResult.Failed))
-	builder.WriteString("\nNo Result: " + fmt.Sprintf("%d", level2TestResult.NoResult))
-	builder.WriteString("\nSkipped: " + fmt.Sprintf("%d", level2TestResult.Skipped))
-	builder.WriteString("\nAvg Duration: " + fmt.Sprintf("%f", level2TestResult.AverageDuration))
-
-	for i, duration := range level2TestResult.Durations {
-		builder.WriteString("\nDurations[" + fmt.Sprintf("%d", i) + "]" + fmt.Sprintf("%f", duration))
-	}
-
-	return builder.String()
 }
 
 // check failure messages created

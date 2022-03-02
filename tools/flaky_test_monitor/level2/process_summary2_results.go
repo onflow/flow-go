@@ -75,7 +75,7 @@ func generateLevel2SummaryFromStructs(level1Summaries []common.Level1Summary) co
 		}
 	}
 	// calculate averages and other calculations that can only be completed after all test runs have been read
-	postProcessTestSummary2(level2Summary)
+	postProcessLevel2Summary(level2Summary)
 	return level2Summary
 }
 
@@ -157,7 +157,7 @@ func generateLevel2Summary(level1Directory string) common.Level2Summary {
 	}
 
 	// calculate averages and other calculations that can only be completed after all test runs have been read
-	postProcessTestSummary2(level2Summary)
+	postProcessLevel2Summary(level2Summary)
 	return level2Summary
 }
 
@@ -210,17 +210,17 @@ func saveMessageHelper(testResult common.Level1TestResult, expectedResult string
 	}
 }
 
-func postProcessTestSummary2(testSummary2 common.Level2Summary) {
-	for _, testResultSummary := range testSummary2.TestResultsMap {
+func postProcessLevel2Summary(testSummary2 common.Level2Summary) {
+	for _, level2TestResult := range testSummary2.TestResultsMap {
 		// calculate average duration for each test summary
 		var durationSum float32 = 0
-		for _, duration := range testResultSummary.Durations {
+		for _, duration := range level2TestResult.Durations {
 			durationSum += duration
 		}
-		testResultSummary.AverageDuration = common.ConvertToNDecimalPlaces2(2, durationSum, testResultSummary.Runs)
+		level2TestResult.AverageDuration = common.ConvertToNDecimalPlaces2(2, durationSum, level2TestResult.Runs)
 
 		// calculate failure rate for each test summary
-		testResultSummary.FailureRate = common.ConvertToNDecimalPlaces(2, testResultSummary.Failed, testResultSummary.Runs)
+		level2TestResult.FailureRate = common.ConvertToNDecimalPlaces(2, level2TestResult.Failed, level2TestResult.Runs)
 	}
 
 	// check if there are no failures so can delete failures sub-directory
