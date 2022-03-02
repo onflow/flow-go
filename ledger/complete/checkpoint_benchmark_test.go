@@ -251,7 +251,6 @@ func benchmarkNewCheckpointRandomData(b *testing.B, segmentCount int) {
 	rand.Seed(int64(seed))
 
 	dir, err := os.MkdirTemp("", "test-mtrie-")
-	fmt.Printf("dir %s\n", dir)
 	defer os.RemoveAll(dir)
 	if err != nil {
 		b.Fatal(err)
@@ -339,12 +338,6 @@ func benchmarkNewCheckpointRandomData(b *testing.B, segmentCount int) {
 
 	b.ReportMetric(float64(elapsed/time.Millisecond), "newcheckpoint_rand_time_(ms)")
 	b.ReportAllocs()
-
-	files, _ := os.ReadDir(dir)
-	for _, fn := range files {
-		info, _ := fn.Info()
-		fmt.Printf("%s, %d\n", fn.Name(), info.Size())
-	}
 }
 
 type randKeyValueOptions struct {
