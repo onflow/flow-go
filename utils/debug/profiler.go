@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 )
@@ -18,6 +19,8 @@ var profilerEnabled bool
 // SetProfilerEnabled enable or disable generating profiler data
 func SetProfilerEnabled(enabled bool) {
 	profilerEnabled = enabled
+
+	log.Info().Msgf("changed profilerEnabled to %v", enabled)
 }
 
 type AutoProfiler struct {
