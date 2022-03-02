@@ -49,6 +49,13 @@ func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, dur
 func (p *AutoProfiler) Ready() <-chan struct{} {
 	delay := time.Duration(float64(p.interval) * rand.Float64())
 	p.unit.LaunchPeriodically(p.start, p.interval, delay)
+
+	if profilerEnabled {
+		p.log.Info().Msgf("AutoProfiler has started, the first profiler will be genereated at: %v", time.Now().Add(p.interval))
+	} else {
+		p.log.Info().Msg("AutoProfiler has started, profiler is disabled")
+	}
+
 	return p.unit.Ready()
 }
 

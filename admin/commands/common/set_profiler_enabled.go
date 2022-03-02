@@ -23,14 +23,14 @@ func (s *SetProfilerEnabledCommand) Handler(ctx context.Context, req *admin.Comm
 func (s *SetProfilerEnabledCommand) Validator(req *admin.CommandRequest) error {
 	enabled, ok := req.Data.(string)
 	if !ok {
-		return errors.New("the input must be true or false")
+		return errors.New("the input must be a string, either \"true\" or \"false\"")
 	}
 	if enabled == "true" {
 		req.ValidatorData = true
 	} else if enabled == "false" {
 		req.ValidatorData = false
 	} else {
-		return fmt.Errorf("unknown value, the input must be true or false")
+		return fmt.Errorf("unknown value, the input must be a string, either \"true\" or \"false\"")
 	}
 
 	return nil

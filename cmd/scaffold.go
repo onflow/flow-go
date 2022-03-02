@@ -462,10 +462,6 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
 	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
 
-	if !fnb.BaseConfig.profilerEnabled {
-		return
-	}
-
 	profiler, err := debug.NewAutoProfiler(
 		fnb.Logger,
 		fnb.BaseConfig.profilerDir,
