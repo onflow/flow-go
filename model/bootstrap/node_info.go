@@ -157,7 +157,7 @@ type NodeInfo struct {
 	// machine account.
 	Address string
 
-	// Stake is the weight of the node
+	// Weight is the weight of the node
 	Weight uint64
 
 	// key information is private

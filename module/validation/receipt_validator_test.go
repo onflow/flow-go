@@ -73,8 +73,8 @@ func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
-// TestReceiptInvalidStake tests that we reject receipt with invalid stake
-func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
+// TestReceiptFromZeroWeightNode tests that we reject receipt from node with zero weight
+func (s *ReceiptValidationSuite) TestReceiptFromZeroWeightNode() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))

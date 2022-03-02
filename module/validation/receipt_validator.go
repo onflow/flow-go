@@ -358,7 +358,7 @@ func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, b
 			err)
 	}
 
-	err = ensureStakedNodeWithRole(identity, flow.RoleExecution)
+	err = ensureNodeHasWeightAndRole(identity, flow.RoleExecution)
 	if err != nil {
 		return fmt.Errorf("staked node invalid: %w", err)
 	}
