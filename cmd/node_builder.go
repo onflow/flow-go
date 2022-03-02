@@ -136,7 +136,7 @@ type BaseConfig struct {
 	profilerDuration                time.Duration
 	tracerEnabled                   bool
 	tracerSensitivity               uint
-	metricsEnabled                  bool
+	MetricsEnabled                  bool
 	guaranteesCacheSize             uint
 	receiptsCacheSize               uint
 	db                              *badger.DB
@@ -216,7 +216,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerDuration:                10 * time.Second,
 		tracerEnabled:                   false,
 		tracerSensitivity:               4,
-		metricsEnabled:                  true,
+		MetricsEnabled:                  true,
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
