@@ -7,14 +7,12 @@ import (
 )
 
 func DecodeSignerIndices(indices []byte, count int) ([]int, error) {
-	if bytesCount(count) != count {
+	if bytesCount(count) != len(indices) {
 		return nil, fmt.Errorf("signer indices has wrong count, expect count %v, but actually got %v",
-			count, bytesCount(count))
+			bytesCount(count), len(indices))
 	}
 
 	signerIndices := make([]int, 0, count)
-
-	const initialMask = byte(1 << 7)
 
 	var byt byte
 	var offset int
@@ -22,7 +20,7 @@ func DecodeSignerIndices(indices []byte, count int) ([]int, error) {
 	for index := 0; index < count; index++ {
 		byt = indices[index>>3]
 		offset = 7 - (index & 7)
-		mask := initialMask >> offset
+		mask := byte(1 << offset)
 		if byt&mask > 0 {
 			signerIndices = append(signerIndices, index)
 		}
@@ -38,9 +36,11 @@ func DecodeSignerIndices(indices []byte, count int) ([]int, error) {
 	return signerIndices, nil
 }
 
+// EncodeSignerIndices encodes indices into bytes, it assumes the indices is in the increasing order,
+// otherwise, decoding the signer indices will not recover to the original indices.
 func EncodeSignerIndices(indices []int, count int) []byte {
 	totalBytes := bytesCount(count)
-	bytes := make([]byte, 0, totalBytes)
+	bytes := make([]byte, totalBytes)
 	for _, index := range indices {
 		byt := index >> 3
 		offset := 7 - (index & 7)
