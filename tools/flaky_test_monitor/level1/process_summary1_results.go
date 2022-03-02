@@ -34,7 +34,7 @@ func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
 }
 
-func processSummary1TestRun(resultReader ResultReader) common.TestRun {
+func processSummary1TestRun(resultReader ResultReader) common.Level1TestRun {
 	reader := resultReader.getReader()
 	scanner := bufio.NewScanner(reader)
 
@@ -57,9 +57,9 @@ func processSummary1TestRun(resultReader ResultReader) common.TestRun {
 // 3. pause (zero or once) - for tests using t.Parallel()
 // 4. cont (zero or once) - for tests using t.Parallel()
 // 5. pass OR fail OR skip (once)
-func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.TestResult {
+func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level1TestResult {
 	// test map holds all the tests
-	testResultMap := make(map[string][]*common.TestResult)
+	testResultMap := make(map[string][]*common.Level1TestResult)
 
 	for scanner.Scan() {
 		var rawTestStep common.RawTestStep
@@ -76,7 +76,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.TestR
 
 			// "run" is the very first test step and it needs special treatment - to create all the data structures that will be used by subsequent test steps for the same test
 			if rawTestStep.Action == "run" {
-				var newTestResult common.TestResult
+				var newTestResult common.Level1TestResult
 				newTestResult.Test = rawTestStep.Test
 				newTestResult.Package = rawTestStep.Package
 
@@ -145,8 +145,8 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.TestR
 	return testResultMap
 }
 
-func finalizeTestRun(testResultMap map[string][]*common.TestResult) common.TestRun {
-	var testRun common.TestRun
+func finalizeTestRun(testResultMap map[string][]*common.Level1TestResult) common.Level1TestRun {
+	var testRun common.Level1TestRun
 
 	for _, testResults := range testResultMap {
 		for _, testResult := range testResults {
@@ -165,7 +165,7 @@ func finalizeTestRun(testResultMap map[string][]*common.TestResult) common.TestR
 
 			// only include passed or failed tests - don't include skipped tests
 			// this is needed to have accurate Grafana metrics for average pass rate
-			testRun.Rows = append(testRun.Rows, common.TestResultRow{TestResult: *testResult})
+			testRun.Rows = append(testRun.Rows, common.Level1TestResultRow{TestResult: *testResult})
 		}
 	}
 

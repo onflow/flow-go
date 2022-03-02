@@ -20,7 +20,7 @@ func TestProcessSummary1TestRun_Struct(t *testing.T) {
 	const rawJsonFilePath = "../testdata/summary1/raw"
 
 	// data driven table test
-	testDataMap := map[string]testdata.TestDataLevel1{
+	testDataMap := map[string]testdata.Level1TestData{
 		"1 count all pass": {
 			ExpectedTestRun:    testdata.GetTestData_Level1_1CountPass(),
 			RawJSONTestRunFile: "test-result-crypto-hash-1-count-pass.json",
@@ -144,7 +144,7 @@ func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 	const expectedJsonFilePath = "../testdata/summary1/expected"
 	const rawJsonFilePath = "../testdata/summary1/raw"
 
-	var expectedTestRun common.TestRun
+	var expectedTestRun common.Level1TestRun
 	// read in expected JSON from file
 	expectedJsonBytes, err := os.ReadFile(filepath.Join(expectedJsonFilePath, jsonExpectedActualFile))
 	require.Nil(t, err)
@@ -170,7 +170,7 @@ func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 	checkTestRuns(t, expectedTestRun, actualTestRun)
 }
 
-func checkTestRuns(t *testing.T, expectedTestRun common.TestRun, actualTestRun common.TestRun) {
+func checkTestRuns(t *testing.T, expectedTestRun common.Level1TestRun, actualTestRun common.Level1TestRun) {
 	// number of TestResults should be the same between expected and actual
 	require.Equal(t, len(expectedTestRun.Rows), len(actualTestRun.Rows))
 
@@ -214,7 +214,7 @@ func (fileResultReader FileResultReader) getResultsFileName() string {
 	return "test-run-" + strings.ReplaceAll(t.Format("2006-01-02-15-04-05.0000"), ".", "-") + ".json"
 }
 
-func printTestResult(testResult common.TestResult, message string) string {
+func printTestResult(testResult common.Level1TestResult, message string) string {
 	builder := strings.Builder{}
 	builder.WriteString("*** Test Result (not found) " + message + "***")
 	builder.WriteString("\nTest: " + testResult.Test)

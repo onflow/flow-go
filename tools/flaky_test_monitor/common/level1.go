@@ -14,18 +14,18 @@ type RawTestStep struct {
 	Elapsed float32   `json:"Elapsed"`
 }
 
-// TestRun models full level 1 summary of a test run from "go test -json".
-type TestRun struct {
-	TestMap map[string][]TestResult `json:"-"`
-	Rows    []TestResultRow         `json:"rows"`
+// Level1TestRun models full level 1 summary of a test run from "go test -json".
+type Level1TestRun struct {
+	TestMap map[string][]Level1TestResult `json:"-"`
+	Rows    []Level1TestResultRow         `json:"rows"`
 }
 
-type TestResultRow struct {
-	TestResult TestResult `json:"json"`
+type Level1TestResultRow struct {
+	TestResult Level1TestResult `json:"json"`
 }
 
-// TestResult models result of a single test
-type TestResult struct {
+// Level1TestResult models result of a single test
+type Level1TestResult struct {
 	// data that spans multiple tests - it's added at the test level because it will be used
 	// by BigQuery tables and will need to be flattened
 	CommitSha  string    `json:"commit_sha"`

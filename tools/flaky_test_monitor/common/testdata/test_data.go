@@ -6,18 +6,18 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-// TestDataLevel1 is used by tests to store what the expected test result should be and what the raw
+// Level1TestData is used by tests to store what the expected test result should be and what the raw
 // JSON input file is
-type TestDataLevel1 struct {
-	ExpectedTestRun    common.TestRun
+type Level1TestData struct {
+	ExpectedTestRun    common.Level1TestRun
 	RawJSONTestRunFile string
 }
 
-type TestDataLevel2 struct {
+type Level2TestData struct {
 	Directory        string
 	HasFailures      bool
 	HasNoResultTests bool
-	TestRuns         []common.TestRun
+	TestRuns         []common.Level1TestRun
 }
 
 // ************** Helper Functions *****************
@@ -43,13 +43,13 @@ func getCryptoHashPackage() string {
 	return "github.com/onflow/flow-go/crypto/hash"
 }
 
-func getPassedTest(name string) common.TestResultRow {
+func getPassedTest(name string) common.Level1TestResultRow {
 	return getPassedTestPackage(name, getCryptoHashPackage())
 }
 
-func getPassedTestPackage(name string, packageName string) common.TestResultRow {
-	row := common.TestResultRow{
-		TestResult: common.TestResult{
+func getPassedTestPackage(name string, packageName string) common.Level1TestResultRow {
+	row := common.Level1TestResultRow{
+		TestResult: common.Level1TestResult{
 			CommitSha:  getCommitSha(),
 			CommitDate: getCommitDate(),
 			JobRunDate: getJobRunDate(),
@@ -68,9 +68,9 @@ func getPassedTestPackage(name string, packageName string) common.TestResultRow 
 	return row
 }
 
-func getPassedTestElapsed(name string, elapsed float32, elapsedStr string) common.TestResultRow {
-	row := common.TestResultRow{
-		TestResult: common.TestResult{
+func getPassedTestElapsed(name string, elapsed float32, elapsedStr string) common.Level1TestResultRow {
+	row := common.Level1TestResultRow{
+		TestResult: common.Level1TestResult{
 			CommitSha:  getCommitSha(),
 			CommitDate: getCommitDate(),
 			JobRunDate: getJobRunDate(),
@@ -89,15 +89,15 @@ func getPassedTestElapsed(name string, elapsed float32, elapsedStr string) commo
 	return row
 }
 
-func getPassedTestPackageElapsedOutput(name string, packageName string, elapsed float32, elapsedStr string, output string) common.TestResultRow {
+func getPassedTestPackageElapsedOutput(name string, packageName string, elapsed float32, elapsedStr string, output string) common.Level1TestResultRow {
 	row := getPassedTestElapsedOutput(name, elapsed, elapsedStr, output)
 	row.TestResult.Package = packageName
 	return row
 }
 
-func getPassedTestElapsedOutput(name string, elapsed float32, elapsedStr string, output string) common.TestResultRow {
-	row := common.TestResultRow{
-		TestResult: common.TestResult{
+func getPassedTestElapsedOutput(name string, elapsed float32, elapsedStr string, output string) common.Level1TestResultRow {
+	row := common.Level1TestResultRow{
+		TestResult: common.Level1TestResult{
 			CommitSha:  getCommitSha(),
 			CommitDate: getCommitDate(),
 			JobRunDate: getJobRunDate(),
@@ -117,9 +117,9 @@ func getPassedTestElapsedOutput(name string, elapsed float32, elapsedStr string,
 	return row
 }
 
-func getFailedTest_TestSanitySha2_256() common.TestResultRow {
-	row := common.TestResultRow{
-		TestResult: common.TestResult{
+func getFailedTest_TestSanitySha2_256() common.Level1TestResultRow {
+	row := common.Level1TestResultRow{
+		TestResult: common.Level1TestResult{
 			CommitSha:  getCommitSha(),
 			CommitDate: getCommitDate(),
 			JobRunDate: getJobRunDate(),
@@ -152,9 +152,9 @@ func getFailedTest_TestSanitySha2_256() common.TestResultRow {
 	return row
 }
 
-func getFailedTest_TestSanitySha3_256() common.TestResultRow {
-	row := common.TestResultRow{
-		TestResult: common.TestResult{
+func getFailedTest_TestSanitySha3_256() common.Level1TestResultRow {
+	row := common.Level1TestResultRow{
+		TestResult: common.Level1TestResult{
 			CommitSha:  getCommitSha(),
 			CommitDate: getCommitDate(),
 			JobRunDate: getJobRunDate(),
@@ -187,9 +187,9 @@ func getFailedTest_TestSanitySha3_256() common.TestResultRow {
 	return row
 }
 
-func getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.TestResultRow {
-	row := common.TestResultRow{
-		TestResult: common.TestResult{
+func getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.Level1TestResultRow {
+	row := common.Level1TestResultRow{
+		TestResult: common.Level1TestResult{
 			CommitSha:  getCommitSha(),
 			CommitDate: getCommitDate(),
 			JobRunDate: getJobRunDate(),
@@ -211,18 +211,18 @@ func getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.TestResultRow {
 // ************** Level 1 - Expected Test Run Functions *****************
 // following functions are used by unit tests for constructing expected TestRun data
 
-func GetTestData_Level1_1CountSingleNilTest() common.TestRun {
+func GetTestData_Level1_1CountSingleNilTest() common.Level1TestRun {
 	row1 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
 
-	testRun := common.TestRun{
-		Rows: []common.TestResultRow{
+	testRun := common.Level1TestRun{
+		Rows: []common.Level1TestResultRow{
 			row1,
 		},
 	}
 	return testRun
 }
 
-func GetTestData_Level1_1CountPass() common.TestRun {
+func GetTestData_Level1_1CountPass() common.Level1TestRun {
 	row1 := getPassedTest("TestSanitySha3_256")
 	row2 := getPassedTest("TestSanitySha2_256")
 	row3 := getPassedTest("TestSanitySha3_384")
@@ -233,8 +233,8 @@ func GetTestData_Level1_1CountPass() common.TestRun {
 	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
 	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
-	testRun := common.TestRun{
-		Rows: []common.TestResultRow{
+	testRun := common.Level1TestRun{
+		Rows: []common.Level1TestResultRow{
 			row1,
 			row2,
 			row3,
@@ -249,7 +249,7 @@ func GetTestData_Level1_1CountPass() common.TestRun {
 	return testRun
 }
 
-func GetTestData_Level1_1Count1FailRestPass() common.TestRun {
+func GetTestData_Level1_1Count1FailRestPass() common.Level1TestRun {
 	row1 := getFailedTest_TestSanitySha3_256()
 	row2 := getPassedTest("TestSanitySha3_384")
 	row3 := getPassedTest("TestSanitySha2_256")
@@ -260,8 +260,8 @@ func GetTestData_Level1_1Count1FailRestPass() common.TestRun {
 	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
 	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
-	testRun := common.TestRun{
-		Rows: []common.TestResultRow{
+	testRun := common.Level1TestRun{
+		Rows: []common.Level1TestResultRow{
 			row1,
 			row2,
 			row3,
@@ -276,7 +276,7 @@ func GetTestData_Level1_1Count1FailRestPass() common.TestRun {
 	return testRun
 }
 
-func GetTestData_Level1_1Count2SkippedRestPass() common.TestRun {
+func GetTestData_Level1_1Count2SkippedRestPass() common.Level1TestRun {
 	row1 := getPassedTest("TestSanitySha3_256")
 	row2 := getPassedTest("TestSanitySha3_384")
 	row3 := getPassedTest("TestSanitySha2_384")
@@ -285,8 +285,8 @@ func GetTestData_Level1_1Count2SkippedRestPass() common.TestRun {
 	row6 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
 	row7 := getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13")
 
-	testRun := common.TestRun{
-		Rows: []common.TestResultRow{
+	testRun := common.Level1TestRun{
+		Rows: []common.Level1TestResultRow{
 			row1,
 			row2,
 			row3,
@@ -299,7 +299,7 @@ func GetTestData_Level1_1Count2SkippedRestPass() common.TestRun {
 	return testRun
 }
 
-func GetTestData_Level1_2CountPass() common.TestRun {
+func GetTestData_Level1_2CountPass() common.Level1TestRun {
 	row1 := getPassedTest("TestSanitySha3_256")
 	row2 := getPassedTest("TestSanitySha2_256")
 	row3 := getPassedTest("TestSanitySha3_384")
@@ -313,8 +313,8 @@ func GetTestData_Level1_2CountPass() common.TestRun {
 	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
 	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
-	testRun := common.TestRun{
-		Rows: []common.TestResultRow{
+	testRun := common.Level1TestRun{
+		Rows: []common.Level1TestResultRow{
 			row1,
 			row2,
 			row3,
@@ -339,7 +339,7 @@ func GetTestData_Level1_2CountPass() common.TestRun {
 	return testRun
 }
 
-func GetTestData_Level1_10CountPass() common.TestRun {
+func GetTestData_Level1_10CountPass() common.Level1TestRun {
 	row1 := getPassedTest("TestSanitySha3_256")
 	row2 := getPassedTest("TestSanitySha2_256")
 	row3 := getPassedTest("TestSanitySha3_384")
@@ -390,7 +390,7 @@ func GetTestData_Level1_10CountPass() common.TestRun {
 	row9i := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 	row9j := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
-	var testResultRows []common.TestResultRow
+	var testResultRows []common.Level1TestResultRow
 
 	for i := 0; i < 10; i++ {
 		testResultRows = append(testResultRows, row1)
@@ -444,13 +444,13 @@ func GetTestData_Level1_10CountPass() common.TestRun {
 	testResultRows = append(testResultRows, row9i)
 	testResultRows = append(testResultRows, row9j)
 
-	testRun := common.TestRun{
+	testRun := common.Level1TestRun{
 		Rows: testResultRows,
 	}
 	return testRun
 }
 
-func GetTestData_Level1_10CountSomeFailures() common.TestRun {
+func GetTestData_Level1_10CountSomeFailures() common.Level1TestRun {
 	row1 := getPassedTest("TestSanitySha3_256")
 	row2 := getFailedTest_TestSanitySha2_256()
 	row3 := getPassedTest("TestSanitySha3_384")
@@ -492,7 +492,7 @@ func GetTestData_Level1_10CountSomeFailures() common.TestRun {
 
 	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
-	var testResultRows []common.TestResultRow
+	var testResultRows []common.Level1TestResultRow
 
 	for i := 0; i < 10; i++ {
 		testResultRows = append(testResultRows, row1)
@@ -536,28 +536,28 @@ func GetTestData_Level1_10CountSomeFailures() common.TestRun {
 	testResultRows = append(testResultRows, row8i)
 	testResultRows = append(testResultRows, row8j)
 
-	testRun := common.TestRun{
+	testRun := common.Level1TestRun{
 		Rows: testResultRows,
 	}
 	return testRun
 }
 
-func GetTestData_Level1_5CountSingleNilTest() common.TestRun {
-	var testResultRows []common.TestResultRow
+func GetTestData_Level1_5CountSingleNilTest() common.Level1TestRun {
+	var testResultRows []common.Level1TestResultRow
 	row1 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
 
 	for i := 0; i < 5; i++ {
 		testResultRows = append(testResultRows, row1)
 	}
 
-	testRun := common.TestRun{
+	testRun := common.Level1TestRun{
 		Rows: testResultRows,
 	}
 	return testRun
 }
 
-func GetTestData_Level1_5CountMultipleNilTests() common.TestRun {
-	var testResultRows []common.TestResultRow
+func GetTestData_Level1_5CountMultipleNilTests() common.Level1TestRun {
+	var testResultRows []common.Level1TestResultRow
 	row1 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
 	row2 := getPassedTestPackageElapsedOutput("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable", 0, "0.00", "    keys_test.go:245: bytes: 194\n")
 
@@ -566,14 +566,14 @@ func GetTestData_Level1_5CountMultipleNilTests() common.TestRun {
 	}
 	testResultRows = append(testResultRows, row2)
 
-	testRun := common.TestRun{
+	testRun := common.Level1TestRun{
 		Rows: testResultRows,
 	}
 	return testRun
 }
 
-func GetTestData_Leve1_3CountNilWithNormalTests() common.TestRun {
-	var testResultRows []common.TestResultRow
+func GetTestData_Leve1_3CountNilWithNormalTests() common.Level1TestRun {
+	var testResultRows []common.Level1TestResultRow
 	row1 := getPassedTestPackage("TestEncodableNetworkPrivKey", "github.com/onflow/flow-go/model/encodable")
 	row2 := getPassedTestPackage("TestEncodableNetworkPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
 	row3 := getPassedTestPackage("TestEncodableNetworkPubKey", "github.com/onflow/flow-go/model/encodable")
@@ -607,7 +607,7 @@ func GetTestData_Leve1_3CountNilWithNormalTests() common.TestRun {
 		testResultRows = append(testResultRows, row14)
 	}
 
-	testRun := common.TestRun{
+	testRun := common.Level1TestRun{
 		Rows: testResultRows,
 	}
 	return testRun
@@ -616,7 +616,7 @@ func GetTestData_Leve1_3CountNilWithNormalTests() common.TestRun {
 // ************** Level 2 - Expected Test Runs Functions *****************
 // following functions are used by unit tests for constructing expected TestRuns data
 
-func GetTestData_Level2_1FailureRestPass() []common.TestRun {
+func GetTestData_Level2_1FailureRestPass() []common.Level1TestRun {
 	row1_1 := getFailedTest_TestSanitySha3_256()
 	row2_1 := getPassedTest("TestSanitySha3_384")
 	row3_1 := getPassedTest("TestSanitySha2_256")
@@ -627,7 +627,7 @@ func GetTestData_Level2_1FailureRestPass() []common.TestRun {
 	row8_1 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
 	row9_1 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
 
-	var testResult1Rows []common.TestResultRow
+	var testResult1Rows []common.Level1TestResultRow
 	testResult1Rows = append(testResult1Rows, row1_1)
 	testResult1Rows = append(testResult1Rows, row2_1)
 	testResult1Rows = append(testResult1Rows, row3_1)
@@ -638,32 +638,32 @@ func GetTestData_Level2_1FailureRestPass() []common.TestRun {
 	testResult1Rows = append(testResult1Rows, row8_1)
 	testResult1Rows = append(testResult1Rows, row9_1)
 
-	testRun1 := common.TestRun{
+	testRun1 := common.Level1TestRun{
 		Rows: testResult1Rows,
 	}
 
-	var testRuns []common.TestRun
+	var testRuns []common.Level1TestRun
 	testRuns = append(testRuns, testRun1)
 	return testRuns
 }
 
-func GetTestsData_Level2_1NoResultNoOtherTests() []common.TestRun {
+func GetTestsData_Level2_1NoResultNoOtherTests() []common.Level1TestRun {
 	row1_1 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
 
-	var testResult1Rows []common.TestResultRow
+	var testResult1Rows []common.Level1TestResultRow
 	testResult1Rows = append(testResult1Rows, row1_1)
 
-	testRun1 := common.TestRun{
+	testRun1 := common.Level1TestRun{
 		Rows: testResult1Rows,
 	}
 
-	var testRuns []common.TestRun
+	var testRuns []common.Level1TestRun
 	testRuns = append(testRuns, testRun1)
 	return testRuns
 }
 
-func GetTestData_Level2_ManyNoResults() []common.TestRun {
-	var testResult1Rows []common.TestResultRow
+func GetTestData_Level2_MultipleL1SummariesNoResults() []common.Level1TestRun {
+	var testResult1Rows []common.Level1TestResultRow
 	row1_1 := getPassedTestPackage("TestEncodableNetworkPrivKey", "github.com/onflow/flow-go/model/encodable")
 	row2_1 := getPassedTestPackage("TestEncodableNetworkPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
 	row3_1 := getPassedTestPackage("TestEncodableNetworkPubKey", "github.com/onflow/flow-go/model/encodable")
@@ -696,46 +696,71 @@ func GetTestData_Level2_ManyNoResults() []common.TestRun {
 		testResult1Rows = append(testResult1Rows, row14_1)
 	}
 
-	testRun1 := common.TestRun{
+	testRun1 := common.Level1TestRun{
 		Rows: testResult1Rows,
 	}
 
 	row1_2 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
 
-	var testResult2Rows []common.TestResultRow
+	var testResult2Rows []common.Level1TestResultRow
 	testResult2Rows = append(testResult2Rows, row1_2)
-	testRun2 := common.TestRun{
+	testRun2 := common.Level1TestRun{
 		Rows: testResult2Rows,
 	}
 
 	row1_3 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
 	row2_3 := getPassedTestPackageElapsedOutput("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable", 0, "0.00", "    keys_test.go:245: bytes: 194\n")
 
-	var testResult3Rows []common.TestResultRow
+	var testResult3Rows []common.Level1TestResultRow
 	for i := 0; i < 4; i++ {
 		testResult3Rows = append(testResult3Rows, row1_3)
 	}
 	testResult3Rows = append(testResult3Rows, row2_3)
 
-	testRun3 := common.TestRun{
+	testRun3 := common.Level1TestRun{
 		Rows: testResult3Rows,
 	}
 
-	var testResult4Rows []common.TestResultRow
+	var testResult4Rows []common.Level1TestResultRow
 	row1_4 := getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack()
 
 	for i := 0; i < 5; i++ {
 		testResult4Rows = append(testResult4Rows, row1_4)
 	}
 
-	testRun4 := common.TestRun{
+	testRun4 := common.Level1TestRun{
 		Rows: testResult4Rows,
 	}
 
-	var testRuns []common.TestRun
+	var testRuns []common.Level1TestRun
 	testRuns = append(testRuns, testRun1)
 	testRuns = append(testRuns, testRun2)
 	testRuns = append(testRuns, testRun3)
 	testRuns = append(testRuns, testRun4)
 	return testRuns
 }
+
+// func GetTestData_Level2MultipleL1SummariesFailuresPasses() []common.TestRunLevel1 {
+// 	var testResult1Rows []common.TestResultRowLevel1
+// 	var testResult2Rows []common.TestResultRowLevel1
+// 	var testResult3Rows []common.TestResultRowLevel1
+// 	var testResult4Rows []common.TestResultRowLevel1
+// 	var testResult5Rows []common.TestResultRowLevel1
+// 	var testResult6Rows []common.TestResultRowLevel1
+// 	var testResult7Rows []common.TestResultRowLevel1
+
+// 	testRun1 := common.TestRunLevel1{
+// 		Rows: testResult1Rows,
+// 	}
+
+// 	var testRuns []common.TestRunLevel1
+// 	testRuns = append(testRuns, testRun1)
+// 	testRuns = append(testRuns, testRun2)
+// 	testRuns = append(testRuns, testRun3)
+// 	testRuns = append(testRuns, testRun4)
+// 	testRuns = append(testRuns, testRun5)
+// 	testRuns = append(testRuns, testRun6)
+// 	testRuns = append(testRuns, testRun7)
+// 	return testRuns
+
+// }

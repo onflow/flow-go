@@ -13,7 +13,7 @@ import (
 const failuresDir = "./failures/"
 const noResultsDir = "./no-results/"
 
-func processSummary2TestRunFromStructs(testRuns []common.TestRun) common.TestsLevel2Summary {
+func processSummary2TestRunFromStructs(level1TestRuns []common.Level1TestRun) common.TestsLevel2Summary {
 	// create directory to store failure messages
 	err := os.Mkdir(failuresDir, 0755)
 	common.AssertNoError(err, "error creating failures directory")
@@ -26,8 +26,8 @@ func processSummary2TestRunFromStructs(testRuns []common.TestRun) common.TestsLe
 	testSummary2.TestResultsMap = make(map[string]*common.TestRunsLevel2Summary)
 
 	// go through all level 1 test runs create level 2 summary
-	for i := 0; i < len(testRuns); i++ {
-		for _, testResultRow := range testRuns[i].Rows {
+	for i := 0; i < len(level1TestRuns); i++ {
+		for _, testResultRow := range level1TestRuns[i].Rows {
 			// check if already started collecting summary for this test
 			mapKey := testResultRow.TestResult.Package + "/" + testResultRow.TestResult.Test
 			testResultSummary, testResultSummaryExists := testSummary2.TestResultsMap[mapKey]
@@ -98,7 +98,7 @@ func processSummary2TestRun(level1Directory string) common.TestsLevel2Summary {
 	// go through all level 1 summaries in a folder to create level 2 summary
 	for i := 0; i < len(dirEntries); i++ {
 		// read in each level 1 summary
-		var level1TestRun common.TestRun
+		var level1TestRun common.Level1TestRun
 
 		level1JsonBytes, err := os.ReadFile(filepath.Join(level1Directory, dirEntries[i].Name()))
 		common.AssertNoError(err, "error reading level 1 json")
@@ -161,11 +161,11 @@ func processSummary2TestRun(level1Directory string) common.TestsLevel2Summary {
 	return testSummary2
 }
 
-func saveFailureMessage(testResult common.TestResult) {
+func saveFailureMessage(testResult common.Level1TestResult) {
 	saveMessageHelper(testResult, "0", failuresDir, "failure")
 }
 
-func saveNoResultMessage(testResult common.TestResult) {
+func saveNoResultMessage(testResult common.Level1TestResult) {
 	saveMessageHelper(testResult, "-100", noResultsDir, "no-result")
 }
 
@@ -176,7 +176,7 @@ func saveNoResultMessage(testResult common.TestResult) {
 // from test TestSanitySha3_256 from the "github.com/onflow/flow-go/crypto/hash" package
 // failure and no-result messages are saved in a similar way so this helper function
 // handles saving both types of messages
-func saveMessageHelper(testResult common.TestResult, expectedResult string, messagesDir string, messageFileStem string) {
+func saveMessageHelper(testResult common.Level1TestResult, expectedResult string, messagesDir string, messageFileStem string) {
 	if testResult.Result != expectedResult {
 		panic(fmt.Sprintf("unexpected test result: " + testResult.Result))
 	}

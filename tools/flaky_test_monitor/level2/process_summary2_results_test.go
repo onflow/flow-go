@@ -15,7 +15,7 @@ import (
 )
 
 func TestProcessSummary2TestRun(t *testing.T) {
-	testDataMap := map[string]testdata.TestDataLevel2{
+	testDataMap := map[string]testdata.Level2TestData{
 		"1 level 1 summary, 1 failure the rest pass": {
 			Directory:        "test1-1package-1failure",
 			HasFailures:      true,
@@ -34,10 +34,15 @@ func TestProcessSummary2TestRun(t *testing.T) {
 			Directory:        "test3-multi-no-result-tests",
 			HasFailures:      false,
 			HasNoResultTests: true,
-			TestRuns:         testdata.GetTestData_Level2_ManyNoResults(),
+			TestRuns:         testdata.GetTestData_Level2_MultipleL1SummariesNoResults(),
 		},
 
-		// "many level 1 summaries, many failures, many passes":                       {"test4-multi-failures", true, false},
+		// "many level 1 summaries, many failures, many passes": {
+		// 	Directory:        "test4-multi-failures",
+		// 	HasFailures:      true,
+		// 	HasNoResultTests: false,
+		// 	TestRuns:         testdata.GetTestData_Level2MultipleL1SummariesFailuresPasses(),
+		// },
 		// "many level 1 summaries, many failures, many passes, many no-result tests": {"test5-multi-failures-multi-no-result-tests", true, true},
 	}
 
@@ -73,7 +78,7 @@ func deleteMessagesDir(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func runProcessSummary2TestRun(t *testing.T, testData testdata.TestDataLevel2) {
+func runProcessSummary2TestRun(t *testing.T, testData testdata.Level2TestData) {
 
 	inputTestDataPath := filepath.Join("../testdata/summary2", testData.Directory, "input")
 
