@@ -19,6 +19,9 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
+// DefaultInitialWeight is the default initial weight for a node identity.
+const DefaultInitialWeight = 1000
+
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 

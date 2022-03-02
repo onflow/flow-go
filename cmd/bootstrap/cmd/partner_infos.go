@@ -29,8 +29,7 @@ const (
 )
 
 const (
-	flowNodeAddrPart    = "nodes.onflow.org"
-	defaultPartnerStake = 100
+	flowNodeAddrPart = "nodes.onflow.org"
 )
 
 var (
@@ -39,15 +38,12 @@ var (
 	flagNetworkEnv   string
 )
 
-// partnerStakesInfo mapping of NodeID => weight of staking key
-type partnerStakesInfo map[flow.Identifier]uint64
-
 // populatePartnerInfos represents the `populate-partner-infos` command which will read the proposed node
 // table from the staking contract and for each identity in the proposed table generate a node-info-pub
-// json file. It will also generate the partner-stakes json file.
+// json file. It will also generate the partner-weights json file.
 var populatePartnerInfosCMD = &cobra.Command{
 	Use:   "populate-partner-infos",
-	Short: "Generates a node-info-pub-*.json for all proposed identities in staking contract and corresponding partner-stakes.json file.",
+	Short: "Generates a node-info-pub-*.json for all proposed identities in staking contract and corresponding partner-weights.json file.",
 	Run:   populatePartnerInfosRun,
 }
 
@@ -61,14 +57,14 @@ func init() {
 	cmd.MarkFlagRequired(populatePartnerInfosCMD, "access-address")
 }
 
-// populatePartnerInfosRun generate node-pub-info file for each node in the proposed table and the partner stakes file, and prints the
+// populatePartnerInfosRun generate node-pub-info file for each node in the proposed table and the partner weights file, and prints the
 // address and node ID of any flow nodes that were skipped.
 func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 	ctx := context.Background()
 
 	flowClient := getFlowClient()
 
-	partnerStakes := make(partnerStakesInfo)
+	partnerWeights := make(PartnerWeights)
 	skippedNodes := 0
 	numOfPartnerNodesByRole := map[flow.Role]int{
 		flow.RoleCollection:   0,
@@ -96,12 +92,12 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 		}
 
 		writeNodePubInfoFile(nodePubInfo)
-		partnerStakes[nodePubInfo.NodeID] = defaultPartnerStake
+		partnerWeights[nodePubInfo.NodeID] = flow.DefaultInitialWeight
 		numOfPartnerNodesByRole[nodePubInfo.Role]++
 		totalNumOfPartnerNodes++
 	}
 
-	writePartnerStakesFile(partnerStakes)
+	writePartnerWeightsFile(partnerWeights)
 
 	printNodeCounts(numOfPartnerNodesByRole, totalNumOfPartnerNodes, skippedNodes)
 }
@@ -178,7 +174,7 @@ func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
 		Role:          flow.Role(fields[roleField].(cadence.UInt8)),
 		Address:       string(fields[networkingAddressField].(cadence.String)),
 		NodeID:        nodeID,
-		Weight:        defaultPartnerStake,
+		Weight:        flow.DefaultInitialWeight,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: networkPubKey},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: stakingPubKey},
 	}, nil
@@ -210,9 +206,9 @@ func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
 	writeJSON(fileOutputPath, info)
 }
 
-// writePartnerStakesFile writes the partner stakes file
-func writePartnerStakesFile(partnerStakes partnerStakesInfo) {
-	writeJSON(bootstrap.FileNamePartnerStakes, partnerStakes)
+// writePartnerWeightsFile writes the partner weights file
+func writePartnerWeightsFile(partnerWeights PartnerWeights) {
+	writeJSON(bootstrap.FileNamePartnerWeights, partnerWeights)
 }
 
 func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes, skippedNodes int) {

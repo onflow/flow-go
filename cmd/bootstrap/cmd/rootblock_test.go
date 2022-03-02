@@ -19,11 +19,11 @@ import (
 const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 	"collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
-	`read \d+ stakes for partner nodes` +
+	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
 	`read \d+ internal private node-info files` +
 	`read internal node configurations` +
-	`read \d+ stakes for internal nodes` +
+	`read \d+ weights for internal nodes` +
 	`checking constraints on consensus nodes` +
 	`assembling network and staking keys` +
 	`wrote file \S+/node-infos.pub.json` +
@@ -46,13 +46,13 @@ func TestRootBlock_HappyPath(t *testing.T) {
 	chainName := "main"
 	rootHeight := uint64(12332)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
@@ -83,13 +83,13 @@ func TestRootBlock_Deterministic(t *testing.T) {
 	chainName := "main"
 	rootHeight := uint64(1000)
 
-	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerWeights, internalPrivDir, configPath string) {
 
 		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
+		flagPartnerWeights = partnerWeights
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
