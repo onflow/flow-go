@@ -6,13 +6,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestsLevel2Summary models full level 2 summary of multiple tests from 1 or more level 1 test runs
-type TestsLevel2Summary struct {
-	TestResultsMap map[string]*TestRunsLevel2Summary `json:"tests"`
+// Level2Summary models full level 2 summary of multiple tests from 1 or more level 1 test runs
+type Level2Summary struct {
+	TestResultsMap map[string]*Level2TestResult `json:"tests"`
 }
 
-// TestRunsLevel2Summary models all results from a specific test over many (level 1) test runs
-type TestRunsLevel2Summary struct {
+// Level2TestResult models all results from a specific test over many (level 1) test runs
+type Level2TestResult struct {
 	Test            string    `json:"test"`
 	Package         string    `json:"package"`
 	Runs            int       `json:"runs"`
@@ -25,24 +25,24 @@ type TestRunsLevel2Summary struct {
 	Durations       []float32 `json:"durations"`
 }
 
-// AssertTestSummariesEqual checks that 2 TestResultSummary structs are equal, doing a deep comparison.
+// AssertLevel2TestResults checks that 2 Level2TestResult structs are equal, doing a deep comparison.
 // This is needed for multiple test files (level 2 and 3) so it's extracted as a helper function here.
-func AssertTestSummariesEqual(t *testing.T, expectedTestRunsLevel2Summary, actualTestRunsLevel2Summary TestRunsLevel2Summary) {
-	require.Equal(t, expectedTestRunsLevel2Summary.Package, actualTestRunsLevel2Summary.Package)
-	require.Equal(t, expectedTestRunsLevel2Summary.Test, actualTestRunsLevel2Summary.Test)
+func AssertLevel2TestResults(t *testing.T, expectedLevel2TestResult, actualLevel2TestResult Level2TestResult) {
+	require.Equal(t, expectedLevel2TestResult.Package, actualLevel2TestResult.Package)
+	require.Equal(t, expectedLevel2TestResult.Test, actualLevel2TestResult.Test)
 
-	require.Equal(t, expectedTestRunsLevel2Summary.Runs, actualTestRunsLevel2Summary.Runs, "test: "+expectedTestRunsLevel2Summary.Test)
-	require.Equal(t, expectedTestRunsLevel2Summary.Passed, actualTestRunsLevel2Summary.Passed)
-	require.Equal(t, expectedTestRunsLevel2Summary.Failed, actualTestRunsLevel2Summary.Failed)
-	require.Equal(t, expectedTestRunsLevel2Summary.Skipped, actualTestRunsLevel2Summary.Skipped)
-	require.Equal(t, expectedTestRunsLevel2Summary.NoResult, actualTestRunsLevel2Summary.NoResult)
+	require.Equal(t, expectedLevel2TestResult.Runs, actualLevel2TestResult.Runs, "test: "+expectedLevel2TestResult.Test)
+	require.Equal(t, expectedLevel2TestResult.Passed, actualLevel2TestResult.Passed)
+	require.Equal(t, expectedLevel2TestResult.Failed, actualLevel2TestResult.Failed)
+	require.Equal(t, expectedLevel2TestResult.Skipped, actualLevel2TestResult.Skipped)
+	require.Equal(t, expectedLevel2TestResult.NoResult, actualLevel2TestResult.NoResult)
 
-	require.Equal(t, expectedTestRunsLevel2Summary.FailureRate, actualTestRunsLevel2Summary.FailureRate)
+	require.Equal(t, expectedLevel2TestResult.FailureRate, actualLevel2TestResult.FailureRate)
 
 	// check all durations
-	require.Equal(t, len(expectedTestRunsLevel2Summary.Durations), len(actualTestRunsLevel2Summary.Durations))
-	for i := range expectedTestRunsLevel2Summary.Durations {
-		require.Equal(t, expectedTestRunsLevel2Summary.Durations[i], actualTestRunsLevel2Summary.Durations[i])
+	require.Equal(t, len(expectedLevel2TestResult.Durations), len(actualLevel2TestResult.Durations))
+	for i := range expectedLevel2TestResult.Durations {
+		require.Equal(t, expectedLevel2TestResult.Durations[i], actualLevel2TestResult.Durations[i])
 	}
-	require.Equal(t, expectedTestRunsLevel2Summary.AverageDuration, actualTestRunsLevel2Summary.AverageDuration)
+	require.Equal(t, expectedLevel2TestResult.AverageDuration, actualLevel2TestResult.AverageDuration)
 }

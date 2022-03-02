@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common/testdata"
 )
 
-func TestProcessSummary1TestRun_Struct(t *testing.T) {
+func TestGenerateLevel1Summary_Struct(t *testing.T) {
 	const rawJsonFilePath = "../testdata/summary1/raw"
 
 	// data driven table test
@@ -95,13 +95,15 @@ func TestProcessSummary1TestRun_Struct(t *testing.T) {
 			resultReader := FileResultReader{
 				rawJsonFile: filepath.Join(rawJsonFilePath, testData.RawJSONTestRunFile),
 			}
-			actualTestRun := processSummary1TestRun(&resultReader)
-			checkTestRuns(t, testData.ExpectedTestRun, actualTestRun)
+			// *****************************************************
+			actualTestRun := generateLevel1Summary(&resultReader)
+			// *****************************************************
+			checkLevel1Summaries(t, testData.ExpectedTestRun, actualTestRun)
 		})
 	}
 }
 
-func TestProcessSummary1TestRun_JSON(t *testing.T) {
+func TestGenerateLevel1Summary_JSON(t *testing.T) {
 	testDataMap := map[string]string{
 		"1 count all pass":                "test-result-crypto-hash-1-count-pass.json",
 		"1 count 1 fail the rest pass":    "test-result-crypto-hash-1-count-fail.json",
@@ -133,26 +135,26 @@ func TestProcessSummary1TestRun_JSON(t *testing.T) {
 
 	for k, testJsonData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
-			runProcessSummary1TestRun(t, testJsonData)
+			runGenerateLevel1Summary(t, testJsonData)
 		})
 	}
 }
 
 // HELPERS - UTILITIES
 
-func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
+func runGenerateLevel1Summary(t *testing.T, jsonExpectedActualFile string) {
 	const expectedJsonFilePath = "../testdata/summary1/expected"
 	const rawJsonFilePath = "../testdata/summary1/raw"
 
-	var expectedTestRun common.Level1TestRun
+	var expectedLevel1Summary common.Level1Summary
 	// read in expected JSON from file
 	expectedJsonBytes, err := os.ReadFile(filepath.Join(expectedJsonFilePath, jsonExpectedActualFile))
 	require.Nil(t, err)
 	require.NotEmpty(t, expectedJsonBytes)
 
-	err = json.Unmarshal(expectedJsonBytes, &expectedTestRun)
+	err = json.Unmarshal(expectedJsonBytes, &expectedLevel1Summary)
 	require.Nil(t, err)
-	require.NotEmpty(t, expectedTestRun.Rows)
+	require.NotEmpty(t, expectedLevel1Summary.Rows)
 
 	// these hard coded values simulate a real test run that would obtain these environment variables dynamically
 	// we are simulating this scenario by setting the environment variables explicitly in the test before calling the main processing script which will look for them
@@ -165,23 +167,25 @@ func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 	resultReader := FileResultReader{
 		rawJsonFile: filepath.Join(rawJsonFilePath, jsonExpectedActualFile),
 	}
-	actualTestRun := processSummary1TestRun(&resultReader)
+	// *****************************************************
+	actualLevel1Summary := generateLevel1Summary(&resultReader)
+	// *****************************************************
 
-	checkTestRuns(t, expectedTestRun, actualTestRun)
+	checkLevel1Summaries(t, expectedLevel1Summary, actualLevel1Summary)
 }
 
-func checkTestRuns(t *testing.T, expectedTestRun common.Level1TestRun, actualTestRun common.Level1TestRun) {
-	// number of TestResults should be the same between expected and actual
-	require.Equal(t, len(expectedTestRun.Rows), len(actualTestRun.Rows))
+func checkLevel1Summaries(t *testing.T, expectedLevel1Summary common.Level1Summary, actualLevel1Summary common.Level1Summary) {
+	// number of results should be the same between expected and actual
+	require.Equal(t, len(expectedLevel1Summary.Rows), len(actualLevel1Summary.Rows))
 
-	// check that all expected TestResults are in actual TestResults
-	for actualRowIndex := range actualTestRun.Rows {
-		require.Contains(t, actualTestRun.Rows, expectedTestRun.Rows[actualRowIndex], printTestResult(expectedTestRun.Rows[actualRowIndex].TestResult, "expected not in actual"))
+	// check that all expected results are in actual results
+	for actualRowIndex := range actualLevel1Summary.Rows {
+		require.Contains(t, actualLevel1Summary.Rows, expectedLevel1Summary.Rows[actualRowIndex], printLevel1TestResult(expectedLevel1Summary.Rows[actualRowIndex].TestResult, "expected not in actual"))
 	}
 
-	// check that all actual TestResults are in expected TestResults
-	for exptedRowIndex := range expectedTestRun.Rows {
-		require.Contains(t, expectedTestRun.Rows, actualTestRun.Rows[exptedRowIndex], printTestResult(actualTestRun.Rows[exptedRowIndex].TestResult, "actual not in expected"))
+	// check that all actual results are in expected results
+	for exptedRowIndex := range expectedLevel1Summary.Rows {
+		require.Contains(t, expectedLevel1Summary.Rows, actualLevel1Summary.Rows[exptedRowIndex], printLevel1TestResult(actualLevel1Summary.Rows[exptedRowIndex].TestResult, "actual not in expected"))
 	}
 }
 
@@ -214,17 +218,17 @@ func (fileResultReader FileResultReader) getResultsFileName() string {
 	return "test-run-" + strings.ReplaceAll(t.Format("2006-01-02-15-04-05.0000"), ".", "-") + ".json"
 }
 
-func printTestResult(testResult common.Level1TestResult, message string) string {
+func printLevel1TestResult(level1TestResult common.Level1TestResult, message string) string {
 	builder := strings.Builder{}
 	builder.WriteString("*** Test Result (not found) " + message + "***")
-	builder.WriteString("\nTest: " + testResult.Test)
-	builder.WriteString("\nCommit SHA: " + testResult.CommitSha)
-	builder.WriteString("\nPackage: " + testResult.Package)
-	builder.WriteString("\nCommit Date: " + testResult.CommitDate.String())
-	builder.WriteString("\nJob Run Date: " + testResult.JobRunDate.String())
-	builder.WriteString("\nElapsed: " + fmt.Sprintf("%f", testResult.Elapsed))
-	builder.WriteString("\nResult: " + testResult.Result)
-	for i, output := range testResult.Output {
+	builder.WriteString("\nTest: " + level1TestResult.Test)
+	builder.WriteString("\nCommit SHA: " + level1TestResult.CommitSha)
+	builder.WriteString("\nPackage: " + level1TestResult.Package)
+	builder.WriteString("\nCommit Date: " + level1TestResult.CommitDate.String())
+	builder.WriteString("\nJob Run Date: " + level1TestResult.JobRunDate.String())
+	builder.WriteString("\nElapsed: " + fmt.Sprintf("%f", level1TestResult.Elapsed))
+	builder.WriteString("\nResult: " + level1TestResult.Result)
+	for i, output := range level1TestResult.Output {
 		builder.WriteString("\nOutput[" + fmt.Sprintf("%d", i) + "]" + output.Item)
 	}
 	return builder.String()

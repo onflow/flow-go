@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common/testdata"
 )
 
-func TestProcessSummary2TestRun(t *testing.T) {
+func TestGenerateLevel2Summary(t *testing.T) {
 	testDataMap := map[string]testdata.Level2TestData{
 		"1 level 1 summary, 1 failure the rest pass": {
 			Directory:        "test1-1package-1failure",
@@ -49,7 +49,7 @@ func TestProcessSummary2TestRun(t *testing.T) {
 	for k, testData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
 			setUp(t)
-			runProcessSummary2TestRun(t, testData)
+			runGenerateLevel2Summary(t, testData)
 			tearDown(t)
 		})
 	}
@@ -78,7 +78,7 @@ func deleteMessagesDir(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func runProcessSummary2TestRun(t *testing.T, testData testdata.Level2TestData) {
+func runGenerateLevel2Summary(t *testing.T, testData testdata.Level2TestData) {
 
 	inputTestDataPath := filepath.Join("../testdata/summary2", testData.Directory, "input")
 
@@ -88,64 +88,64 @@ func runProcessSummary2TestRun(t *testing.T, testData testdata.Level2TestData) {
 
 	// **************************************************************
 	// can run the test from list of level 1 TestRun structs or from generated level 1 JSON files
-	var actualTestsLevel2Summary common.TestsLevel2Summary
+	var actualLevel2Summary common.Level2Summary
 	if len(testData.TestRuns) > 0 {
-		actualTestsLevel2Summary = processSummary2TestRunFromStructs(testData.TestRuns)
+		actualLevel2Summary = generateLevel2SummaryFromStructs(testData.TestRuns)
 	} else {
-		actualTestsLevel2Summary = processSummary2TestRun(inputTestDataPath)
+		actualLevel2Summary = generateLevel2Summary(inputTestDataPath)
 	}
 	// **************************************************************
 
 	// read in expected summary level 2
-	var expectedTestsLevel2Summary common.TestsLevel2Summary
-	expectedTestSummary2JsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
+	var expectedLevel2Summary common.Level2Summary
+	expectedLevel2SummaryJsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
 	require.Nil(t, err)
-	require.NotEmpty(t, expectedTestSummary2JsonBytes)
-	err = json.Unmarshal(expectedTestSummary2JsonBytes, &expectedTestsLevel2Summary)
+	require.NotEmpty(t, expectedLevel2SummaryJsonBytes)
+	err = json.Unmarshal(expectedLevel2SummaryJsonBytes, &expectedLevel2Summary)
 	require.Nil(t, err)
 
-	require.Equal(t, len(expectedTestsLevel2Summary.TestResultsMap), len(actualTestsLevel2Summary.TestResultsMap))
+	require.Equal(t, len(expectedLevel2Summary.TestResultsMap), len(actualLevel2Summary.TestResultsMap))
 
 	// check every expected test runs level 2 summary exists in map of actual test runs level 2 summaries
-	for expectedTestResultSummaryKey := range expectedTestsLevel2Summary.TestResultsMap {
-		expectedTestRunsLevel2Summary := expectedTestsLevel2Summary.TestResultsMap[expectedTestResultSummaryKey]
-		actualTestRunsLevel2Summary, isFoundActual := actualTestsLevel2Summary.TestResultsMap[expectedTestResultSummaryKey]
+	for expectedLevel2TestResultKey := range expectedLevel2Summary.TestResultsMap {
+		expectedLevel2TestResult := expectedLevel2Summary.TestResultsMap[expectedLevel2TestResultKey]
+		actualLevel2TestResults, isFoundActual := actualLevel2Summary.TestResultsMap[expectedLevel2TestResultKey]
 
-		require.True(t, isFoundActual, printTestRunsLevel2Summary(expectedTestRunsLevel2Summary, "expected not in actual"))
+		require.True(t, isFoundActual, printLevel2TestResult(expectedLevel2TestResult, "expected not in actual"))
 
-		common.AssertTestSummariesEqual(t, *expectedTestRunsLevel2Summary, *actualTestRunsLevel2Summary)
+		common.AssertLevel2TestResults(t, *expectedLevel2TestResult, *actualLevel2TestResults)
 	}
 
 	// check every actual test runs level 2 summary exists in map of expected test runs level 2 summaries
-	for actualTestResultSummaryKey := range actualTestsLevel2Summary.TestResultsMap {
-		actualTestRunsLevel2Summary := actualTestsLevel2Summary.TestResultsMap[actualTestResultSummaryKey]
-		exptectedTestRunsLevel2Summary, isFoundExpected := expectedTestsLevel2Summary.TestResultsMap[actualTestResultSummaryKey]
+	for actualLevel2TestResultKey := range actualLevel2Summary.TestResultsMap {
+		actualLevel2TestResult := actualLevel2Summary.TestResultsMap[actualLevel2TestResultKey]
+		exptectedLevel2TestResult, isFoundExpected := expectedLevel2Summary.TestResultsMap[actualLevel2TestResultKey]
 
-		require.True(t, isFoundExpected, printTestRunsLevel2Summary(actualTestRunsLevel2Summary, "actual not in expected"))
+		require.True(t, isFoundExpected, printLevel2TestResult(actualLevel2TestResult, "actual not in expected"))
 
-		common.AssertTestSummariesEqual(t, *exptectedTestRunsLevel2Summary, *actualTestRunsLevel2Summary)
+		common.AssertLevel2TestResults(t, *exptectedLevel2TestResult, *actualLevel2TestResult)
 	}
 
 	// make sure calculated summary level 2 is what we expected
-	require.Equal(t, expectedTestsLevel2Summary, actualTestsLevel2Summary)
+	require.Equal(t, expectedLevel2Summary, actualLevel2Summary)
 
 	checkFailureMessages(t, testData.HasFailures, expectedFailureMessagesPath)
 	checkNoResultMessages(t, testData.HasNoResultTests, expectedNoResultMessagesPath)
 }
 
-func printTestRunsLevel2Summary(testRunsLevel2Summary *common.TestRunsLevel2Summary, message string) string {
+func printLevel2TestResult(level2TestResult *common.Level2TestResult, message string) string {
 	builder := strings.Builder{}
 	builder.WriteString("*** Test Runs Level 2 Summary (not found) " + message + "***")
-	builder.WriteString("\nTest: " + testRunsLevel2Summary.Test)
-	builder.WriteString("\nPackage: " + testRunsLevel2Summary.Package)
-	builder.WriteString("\nRuns: " + fmt.Sprintf("%d", testRunsLevel2Summary.Runs))
-	builder.WriteString("\nPassed: " + fmt.Sprintf("%d", testRunsLevel2Summary.Passed))
-	builder.WriteString("\nFailed: " + fmt.Sprintf("%d", testRunsLevel2Summary.Failed))
-	builder.WriteString("\nNo Result: " + fmt.Sprintf("%d", testRunsLevel2Summary.NoResult))
-	builder.WriteString("\nSkipped: " + fmt.Sprintf("%d", testRunsLevel2Summary.Skipped))
-	builder.WriteString("\nAvg Duration: " + fmt.Sprintf("%f", testRunsLevel2Summary.AverageDuration))
+	builder.WriteString("\nTest: " + level2TestResult.Test)
+	builder.WriteString("\nPackage: " + level2TestResult.Package)
+	builder.WriteString("\nRuns: " + fmt.Sprintf("%d", level2TestResult.Runs))
+	builder.WriteString("\nPassed: " + fmt.Sprintf("%d", level2TestResult.Passed))
+	builder.WriteString("\nFailed: " + fmt.Sprintf("%d", level2TestResult.Failed))
+	builder.WriteString("\nNo Result: " + fmt.Sprintf("%d", level2TestResult.NoResult))
+	builder.WriteString("\nSkipped: " + fmt.Sprintf("%d", level2TestResult.Skipped))
+	builder.WriteString("\nAvg Duration: " + fmt.Sprintf("%f", level2TestResult.AverageDuration))
 
-	for i, duration := range testRunsLevel2Summary.Durations {
+	for i, duration := range level2TestResult.Durations {
 		builder.WriteString("\nDurations[" + fmt.Sprintf("%d", i) + "]" + fmt.Sprintf("%f", duration))
 	}
 

@@ -14,8 +14,8 @@ type RawTestStep struct {
 	Elapsed float32   `json:"Elapsed"`
 }
 
-// Level1TestRun models full level 1 summary of a test run from "go test -json".
-type Level1TestRun struct {
+// Level1Summary models full level 1 summary of a test run from "go test -json".
+type Level1Summary struct {
 	TestMap map[string][]Level1TestResult `json:"-"`
 	Rows    []Level1TestResultRow         `json:"rows"`
 }

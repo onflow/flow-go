@@ -34,7 +34,7 @@ func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
 }
 
-func processSummary1TestRun(resultReader ResultReader) common.Level1TestRun {
+func generateLevel1Summary(resultReader ResultReader) common.Level1Summary {
 	reader := resultReader.getReader()
 	scanner := bufio.NewScanner(reader)
 
@@ -45,7 +45,7 @@ func processSummary1TestRun(resultReader ResultReader) common.Level1TestRun {
 	err := scanner.Err()
 	common.AssertNoError(err, "error returning EOF for scanner")
 
-	testRun := finalizeTestRun(testResultMap)
+	testRun := finalizeLevel1Summary(testResultMap)
 
 	return testRun
 }
@@ -145,8 +145,8 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 	return testResultMap
 }
 
-func finalizeTestRun(testResultMap map[string][]*common.Level1TestResult) common.Level1TestRun {
-	var testRun common.Level1TestRun
+func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) common.Level1Summary {
+	var level1Summary common.Level1Summary
 
 	for _, testResults := range testResultMap {
 		for _, testResult := range testResults {
@@ -165,11 +165,11 @@ func finalizeTestRun(testResultMap map[string][]*common.Level1TestResult) common
 
 			// only include passed or failed tests - don't include skipped tests
 			// this is needed to have accurate Grafana metrics for average pass rate
-			testRun.Rows = append(testRun.Rows, common.Level1TestResultRow{TestResult: *testResult})
+			level1Summary.Rows = append(level1Summary.Rows, common.Level1TestResultRow{TestResult: *testResult})
 		}
 	}
 
-	return testRun
+	return level1Summary
 }
 
 // level 1 flaky test summary processor
@@ -178,7 +178,7 @@ func finalizeTestRun(testResultMap map[string][]*common.Level1TestResult) common
 func main() {
 	resultReader := StdinResultReader{}
 
-	testRun := processSummary1TestRun(resultReader)
+	testRun := generateLevel1Summary(resultReader)
 
 	common.SaveToFile(resultReader.getResultsFileName(), testRun)
 }
