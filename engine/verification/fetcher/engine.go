@@ -367,10 +367,10 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 			expectedChunkID, chunkDataPack.ChunkID)
 	}
 
-	// 2. sender must be a staked execution node at that block
+	// 2. sender must be a authorized execution node at that block
 	blockID := chunk.BlockID
-	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
-	if !staked {
+	authorized := e.validateAuthorizedExecutionNodeAtBlockID(senderID, blockID)
+	if !authorized {
 		return fmt.Errorf("unstaked execution node sender at block ID: %x, resultID: %x, chunk ID: %x",
 			blockID,
 			result.ID(),
@@ -441,9 +441,9 @@ func (e Engine) validateNonSystemChunkCollection(chunkDataPack *flow.ChunkDataPa
 	return nil
 }
 
-// validateStakedExecutionNodeAtBlockID validates sender ID of a chunk data pack response as an staked
+// validateAuthorizedExecutionNodeAtBlockID validates sender ID of a chunk data pack response as an staked
 // execution node at the given block ID.
-func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) bool {
+func (e Engine) validateAuthorizedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) bool {
 	snapshot := e.state.AtBlockID(blockID)
 	valid, err := protocol.IsNodeAuthorizedWithRoleAt(snapshot, senderID, flow.RoleExecution)
 

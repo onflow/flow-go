@@ -86,7 +86,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 	e.metrics.OnExecutionResultReceivedAtAssignerEngine()
 
 	// verification node should be staked at the reference block id.
-	ok, err := stakedAsVerification(e.state, result.BlockID, e.me.NodeID())
+	ok, err := authorizedAsVerification(e.state, result.BlockID, e.me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not verify stake of verification node for result at reference block id: %w", err)
 	}
@@ -242,10 +242,10 @@ func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionRes
 	return mine, nil
 }
 
-// stakedAsVerification checks whether this instance of verification node has staked at specified block ID.
+// authorizedAsVerification checks whether this instance of verification node has staked at specified block ID.
 // It returns true and nil if verification node is staked at referenced block ID, and returns false and nil otherwise.
 // It returns false and error if it could not extract the stake of node as a verification node at the specified block.
-func stakedAsVerification(state protocol.State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
+func authorizedAsVerification(state protocol.State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
 	// TODO define specific error for handling cases
 	identity, err := state.AtBlockID(blockID).Identity(identifier)
 	if err != nil {
