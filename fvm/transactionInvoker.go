@@ -261,16 +261,11 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 	}()
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	_, err = deductTxFees(proc.Transaction.Payer)
+	// hardcoded inclusion and execution effort for now.
+	_, err = deductTxFees(proc.Transaction.Payer, 1_0000, 0)
 
 	if err != nil {
-		// TODO: Fee value is currently a constant. this should be changed when it is not
-		fees, ok := DefaultTransactionFees.ToGoValue().(uint64)
-		if !ok {
-			err = fmt.Errorf("could not get transaction fees during formatting of TransactionFeeDeductionFailedError: %w", err)
-		}
-
-		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, fees, err)
+		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
 	}
 	return nil
 }

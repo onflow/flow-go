@@ -64,11 +64,10 @@ type TransactionFeeDeductionFailedError struct {
 }
 
 // NewTransactionFeeDeductionFailedError constructs a new TransactionFeeDeductionFailedError
-func NewTransactionFeeDeductionFailedError(payer flow.Address, txFees uint64, err error) *TransactionFeeDeductionFailedError {
+func NewTransactionFeeDeductionFailedError(payer flow.Address, err error) *TransactionFeeDeductionFailedError {
 	return &TransactionFeeDeductionFailedError{
-		Payer:  payer,
-		TxFees: txFees,
-		err:    err,
+		Payer: payer,
+		err:   err,
 	}
 }
 
