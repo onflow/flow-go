@@ -127,10 +127,9 @@ type Packer interface {
 	Pack(blockID flow.Identifier, sig *BlockSignatureData) (signerIndices []byte, sigData []byte, err error)
 
 	// Unpack de-serializes the provided signature data.
-	// blockID is the block that the aggregated sig is signed for
 	// sig is the aggregated signature data
 	// It returns:
 	//  - (sigData, nil) if successfully unpacked the signature data
 	//  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
-	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
+	Unpack(signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
 }

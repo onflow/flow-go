@@ -62,12 +62,11 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 }
 
 // Unpack de-serializes the provided signature data.
-// blockID is the block that the aggregated sig is signed for
 // sig is the aggregated signature data
 // It returns:
 //  - (sigData, nil) if successfully unpacked the signature data
 //  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
-func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	data, err := p.Decode(sigData)
 	if err != nil {

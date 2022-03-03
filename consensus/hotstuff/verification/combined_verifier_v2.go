@@ -112,6 +112,7 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 //  - model.ErrInvalidSignature if a signature is invalid
 //  - error if running into any unexpected exception (i.e. fatal error)
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
+	// TODO: remove this check, because we've checked the total stake have passed threshold
 	if len(signers) == 0 {
 		return fmt.Errorf("empty list of signers: %w", model.ErrInvalidFormat)
 	}
@@ -121,7 +122,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	}
 
 	// unpack sig data using packer
-	blockSigData, err := c.packer.Unpack(block.BlockID, signers.NodeIDs(), sigData)
+	blockSigData, err := c.packer.Unpack(signers.NodeIDs(), sigData)
 	if err != nil {
 		return fmt.Errorf("could not split signature: %w", err)
 	}

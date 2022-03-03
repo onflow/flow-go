@@ -354,14 +354,6 @@ func (il IdentityList) Lookup() map[Identifier]*Identity {
 	return lookup
 }
 
-func (il IdentityList) IndexLookup() map[Identifier]int {
-	lookup := make(map[Identifier]int, len(il))
-	for i, identity := range il {
-		lookup[identity.NodeID] = i
-	}
-	return lookup
-}
-
 // Sort will sort the list using the given ordering.  This is
 // not recommended for performance.  Expand the 'less' function
 // in place for best performance, and don't use this function.
