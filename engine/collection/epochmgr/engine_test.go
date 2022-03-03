@@ -259,7 +259,10 @@ func (suite *Suite) TestRespondToPhaseChange() {
 			called = true
 		}).Once()
 
-	suite.engine.EpochSetupPhaseStarted(0, nil)
+	first := unittest.BlockHeaderFixture()
+	suite.state.On("AtBlockID", first.ID()).Return(suite.snap)
+
+	suite.engine.EpochSetupPhaseStarted(0, &first)
 	suite.Assert().Eventually(func() bool {
 		return called
 	}, time.Second, time.Millisecond)
@@ -276,6 +279,7 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
 
 	first := unittest.BlockHeaderFixture()
+	suite.state.On("AtBlockID", first.ID()).Return(suite.snap)
 
 	// should set up callback for height at which previous epoch expires
 	var expiryCallback func()

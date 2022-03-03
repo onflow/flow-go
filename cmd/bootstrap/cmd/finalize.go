@@ -212,6 +212,12 @@ func finalize(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("the generated root snapshot is invalid")
 	}
 
+	// validate the generated root snapshot QCs
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
+	}
+
 	// write snapshot to disk
 	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
@@ -245,6 +251,13 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("saved snapshot is invalid")
 	}
+
+	// validate the generated root snapshot QCs
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
+	}
+
 	log.Info().Msgf("saved root snapshot is valid")
 
 	// copy files only if the directories differ
@@ -285,9 +298,10 @@ func readRootBlockVotes() []*hotstuff.Vote {
 		}
 
 		// read file and append to partners
-		var p hotstuff.Vote
-		readJSON(f, &p)
-		votes = append(votes, &p)
+		var vote hotstuff.Vote
+		readJSON(f, &vote)
+		votes = append(votes, &vote)
+		log.Info().Msgf("read vote %v for block %v from signerID %v", vote.ID(), vote.BlockID, vote.SignerID)
 	}
 	return votes
 }

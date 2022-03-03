@@ -478,6 +478,7 @@ func executionResultToMessages(er *flow.ExecutionResult) (*access.ExecutionResul
 			BlockId:          convert.IdentifierToMessage(er.BlockID),
 			Chunks:           chunks,
 			ServiceEvents:    serviceEvents,
+			ExecutionDataId:  convert.IdentifierToMessage(er.ExecutionDataID),
 		},
 	}, nil
 }

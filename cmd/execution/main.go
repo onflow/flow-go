@@ -17,6 +17,8 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	"github.com/onflow/flow-go/admin/commands"
+	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -170,6 +172,9 @@ func main() {
 	}
 
 	nodeBuilder.
+		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewReadExecutionDataCommand(executionDataService)
+		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory

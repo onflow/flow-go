@@ -53,18 +53,18 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 	t.Run("verify should fail on incorrect combinations", func(t *testing.T) {
 		correctCombinations := map[runtime.SignatureAlgorithm]map[runtime.HashAlgorithm]struct{}{
 
-			runtime.SignatureAlgorithmBLS_BLS12_381: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmKMAC128_BLS_BLS12_381: struct{}{},
+			runtime.SignatureAlgorithmBLS_BLS12_381: {
+				runtime.HashAlgorithmKMAC128_BLS_BLS12_381: {},
 			},
-			runtime.SignatureAlgorithmECDSA_P256: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256:   struct{}{},
-				runtime.HashAlgorithmSHA3_256:   struct{}{},
-				runtime.HashAlgorithmKECCAK_256: struct{}{},
+			runtime.SignatureAlgorithmECDSA_P256: {
+				runtime.HashAlgorithmSHA2_256:   {},
+				runtime.HashAlgorithmSHA3_256:   {},
+				runtime.HashAlgorithmKECCAK_256: {},
 			},
-			runtime.SignatureAlgorithmECDSA_secp256k1: map[runtime.HashAlgorithm]struct{}{
-				runtime.HashAlgorithmSHA2_256:   struct{}{},
-				runtime.HashAlgorithmSHA3_256:   struct{}{},
-				runtime.HashAlgorithmKECCAK_256: struct{}{},
+			runtime.SignatureAlgorithmECDSA_secp256k1: {
+				runtime.HashAlgorithmSHA2_256:   {},
+				runtime.HashAlgorithmSHA3_256:   {},
+				runtime.HashAlgorithmKECCAK_256: {},
 			},
 		}
 
@@ -171,11 +171,19 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			require   func(t *testing.T, sigOk bool, err error)
 		}{
 			{
+				signTag:   "",
+				verifyTag: "",
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.True(t, sigOk)
+				},
+			},
+			{
 				signTag:   "user",
 				verifyTag: "user",
 				require: func(t *testing.T, sigOk bool, err error) {
-					require.Error(t, err)
-					require.False(t, sigOk)
+					require.NoError(t, err)
+					require.True(t, sigOk)
 				},
 			}, {
 				signTag:   string(flow.UserDomainTag[:]),
@@ -195,7 +203,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				signTag:   string(flow.UserDomainTag[:]),
 				verifyTag: "user",
 				require: func(t *testing.T, sigOk bool, err error) {
-					require.Error(t, err)
+					require.NoError(t, err)
 					require.False(t, sigOk)
 				},
 			}, {
@@ -209,7 +217,15 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				signTag:   "random_tag",
 				verifyTag: "random_tag",
 				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.True(t, sigOk)
+				},
+			}, {
+				signTag:   "valid_tag",
+				verifyTag: "a very large tag with more than thirty two bytes",
+				require: func(t *testing.T, sigOk bool, err error) {
 					require.Error(t, err)
+					require.Equal(t, err.Error(), "[Error Code: 1051] invalid value (a very large tag with more than thirty two bytes): tag length (48) is larger than max length allowed (32 bytes).")
 					require.False(t, sigOk)
 				},
 			},
