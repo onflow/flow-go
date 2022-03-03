@@ -95,18 +95,6 @@ func NewScriptEnvironment(
 	return env
 }
 
-func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (bool, error) {
-	return crypto.BLSVerifyPOP(pk, s)
-}
-
-func (e *ScriptEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
-	return crypto.AggregateBLSSignatures(sigs)
-}
-
-func (e *ScriptEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
-	return crypto.AggregateBLSPublicKeys(keys)
-}
-
 func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
 }
 
@@ -705,4 +693,16 @@ func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, erro
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
+}
+
+func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
+	return crypto.VerifyPOP(pk, sig)
+}
+
+func (e *ScriptEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+	return crypto.AggregateSignatures(sigs)
+}
+
+func (e *ScriptEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	return crypto.AggregatePublicKeys(keys)
 }

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/fork"

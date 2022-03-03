@@ -54,18 +54,6 @@ type TransactionEnv struct {
 	authorizers        []runtime.Address
 }
 
-func (e *TransactionEnv) BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (bool, error) {
-	return crypto.BLSVerifyPOP(pk, s)
-}
-
-func (e *TransactionEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
-	return crypto.AggregateBLSSignatures(sigs)
-}
-
-func (e *TransactionEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
-	return crypto.AggregateBLSPublicKeys(keys)
-}
-
 func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
 }
 
@@ -976,4 +964,16 @@ func (e *TransactionEnv) Commit() ([]programs.ContractUpdateKey, error) {
 		return nil, err
 	}
 	return e.contracts.Commit()
+}
+
+func (e *TransactionEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
+	return crypto.VerifyPOP(pk, sig)
+}
+
+func (e *TransactionEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+	return crypto.AggregateSignatures(sigs)
+}
+
+func (e *TransactionEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	return crypto.AggregatePublicKeys(keys)
 }

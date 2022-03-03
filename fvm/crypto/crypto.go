@@ -23,7 +23,7 @@ func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byt
 			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
-		hasher = NewBLSKMAC(tag)
+		hasher = crypto.NewBLSKMAC(tag)
 	default:
 		err := errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
@@ -108,68 +108,11 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bo
 
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			return false, nil
+			return false, err
 		}
-		return false, fmt.Errorf("validate public key failed: %w", err)
+		panic(fmt.Errorf("validate public key failed with unexpected error %w", err))
 	}
 	return true, nil
-}
-
-// BLSVerifyPOP verifies a proof of possession (PoP) for the receiver public key.
-//
-// This function calls BLSVerifyPOP from the crypto package. If invalid inputs are provided, it returns false.
-func BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (valid bool, err error) {
-	sigAlgo := RuntimeToCryptoSigningAlgorithm(pk.SignAlgo)
-
-	cpk, err := crypto.DecodePublicKey(sigAlgo, pk.PublicKey)
-	if err != nil {
-		if crypto.IsInvalidInputsError(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("BLSVerifyPOP failed: %w", err)
-	}
-
-	return crypto.BLSVerifyPOP(cpk, s)
-}
-
-// AggregateBLSSignatures aggregate multiple BLS signatures into one.
-//
-// This function calls AggregateBLSSignatures from the crypto package.
-func AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
-
-	cryptoSigs := make([]crypto.Signature, len(sigs))
-	for i, sig := range sigs {
-		cryptoSigs[i] = sig
-	}
-
-	return crypto.AggregateBLSSignatures(cryptoSigs)
-}
-
-// AggregateBLSPublicKeys aggregate multiple BLS signatures into one.
-//
-// This function calls AggregateBLSPublicKeys from the crypto package.
-func AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
-	cryptoKeys := make([]crypto.PublicKey, len(keys))
-	for i, key := range keys {
-		sigAlgo := RuntimeToCryptoSigningAlgorithm(key.SignAlgo)
-		cpk, err := crypto.DecodePublicKey(sigAlgo, key.PublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("AggregateBLSPublicKeys failed: %w", err)
-		}
-		cryptoKeys[i] = cpk
-	}
-
-	aggregatedKey, err := crypto.AggregateBLSPublicKeys(cryptoKeys)
-	if err != nil {
-		return nil, fmt.Errorf("AggregateBLSPublicKeys failed: %w", err)
-	}
-
-	return &runtime.PublicKey{
-		PublicKey: aggregatedKey.Encode(),
-		SignAlgo:  0,
-		IsValid:   true, // <- TODO: check if this is correct
-		Validated: true,
-	}, nil
 }
 
 // VerifySignatureFromRuntime is an adapter that performs signature verification using
@@ -289,15 +232,86 @@ func (DefaultSignatureVerifier) Verify(
 			return false, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
-		hasher = NewBLSKMAC(tag)
+		hasher = crypto.NewBLSKMAC(tag)
 	default:
 		return false, errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 	}
 
 	valid, err := publicKey.Verify(signature, message, hasher)
 	if err != nil {
-		return false, fmt.Errorf("failed to verify signature: %w", err)
+		// All inputs are guaranteed to be valid at this stage.
+		// The check for crypto.InvalidInputs is only a sanity check
+		if crypto.IsInvalidInputsError(err) {
+			return false, err
+		}
+		panic(fmt.Errorf("verify signature failed with unexpected error %w", err))
 	}
 
 	return valid, nil
+}
+
+// VerifyPOP verifies a proof of possession (PoP) for the receiver public key; currently only works for BLS
+func VerifyPOP(pk *runtime.PublicKey, s crypto.Signature) (bool, error) {
+
+	key, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pk.PublicKey)
+	if err != nil {
+		// at this stage, the runtime public key is valid and there are no possible user value errors
+		panic(fmt.Errorf("verify PoP failed: runtime BLS public key should be valid %x", pk.PublicKey))
+	}
+
+	valid, err := crypto.BLSVerifyPOP(key, s)
+	if err != nil {
+		// no user errors possible at this stage
+		panic(fmt.Errorf("verify PoP failed with unexpected error %w", err))
+	}
+	return valid, nil
+}
+
+// AggregateSignatures aggregate multiple signatures into one; currently only works for BLS
+func AggregateSignatures(sigs [][]byte) (crypto.Signature, error) {
+	s := make([]crypto.Signature, 0, len(sigs))
+	for _, sig := range sigs {
+		s = append(s, sig)
+	}
+
+	aggregatedSignature, err := crypto.AggregateBLSSignatures(s)
+	if err != nil {
+		// check for a user error
+		if crypto.IsInvalidInputsError(err) {
+			return nil, err
+		}
+		panic(fmt.Errorf("aggregate BLS signatures failed with unexpected error %w", err))
+	}
+	return aggregatedSignature, nil
+}
+
+// AggregatePublicKeys aggregate multiple public keys into one; currently only works for BLS
+func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	pks := make([]crypto.PublicKey, 0, len(keys))
+	for _, key := range keys {
+		// TODO: avoid validating the public keys again since Cadence makes sure runtime keys have been validated.
+		// This requires exporting an unsafe function in the crypto package.
+		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, key.PublicKey)
+		if err != nil {
+			// at this stage, the runtime public key is valid and there are no possible user value errors
+			panic(fmt.Errorf("aggregate BLS public keys failed: runtime public key should be valid %x", key.PublicKey))
+		}
+		pks = append(pks, pk)
+	}
+
+	pk, err := crypto.AggregateBLSPublicKeys(pks)
+	if err != nil {
+		// check for a user error
+		if crypto.IsInvalidInputsError(err) {
+			return nil, err
+		}
+		panic(fmt.Errorf("aggregate BLS public keys failed with unexpected error %w", err))
+	}
+
+	return &runtime.PublicKey{
+		PublicKey: pk.Encode(),
+		SignAlgo:  CryptoToRuntimeSigningAlgorithm(crypto.BLSBLS12381),
+		IsValid:   true,
+		Validated: true,
+	}, nil
 }

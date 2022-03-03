@@ -60,7 +60,7 @@ const (
 )
 
 type state struct {
-	a [25]uint64 // main state of the hash
+	a [stateSize]uint64 // main state of the hash
 }
 
 // xor a buffer into the state at a given index.

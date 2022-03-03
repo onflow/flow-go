@@ -274,7 +274,7 @@ func TestValidatePublicKey(t *testing.T) {
 
 	t.Run("Unknown algorithm should return false", func(t *testing.T) {
 		valid, err := crypto.ValidatePublicKey(runtime.SignatureAlgorithmUnknown, validPublicKey(t, runtime.SignatureAlgorithmECDSA_P256))
-		require.NoError(t, err)
+		require.Error(t, err)
 		require.False(t, valid)
 	})
 
@@ -305,7 +305,7 @@ func TestValidatePublicKey(t *testing.T) {
 				key[0] ^= 1 // alter one bit of the valid key
 
 				valid, err := crypto.ValidatePublicKey(s, key)
-				require.NoError(t, err)
+				require.Error(t, err)
 				require.False(t, valid)
 			})
 		}
