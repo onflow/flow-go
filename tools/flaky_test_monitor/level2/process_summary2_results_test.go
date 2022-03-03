@@ -12,48 +12,75 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common/testdata"
 )
 
-func TestGenerateLevel2Summary(t *testing.T) {
+func TestGenerateLevel2Summary_Struct(t *testing.T) {
 	testDataMap := map[string]testdata.Level2TestData{
 		"1 level 1 summary, 1 failure the rest pass": {
 			Directory:        "test1-1package-1failure",
 			HasFailures:      true,
 			HasNoResultTests: false,
-			TestRuns:         testdata.GetTestData_Level2_1FailureRestPass(),
+			Level1Summaries:  testdata.GetTestData_Level2_1FailureRestPass(),
 		},
 
 		"1 level 1 summary, 1 no-result test, no other tests": {
 			Directory:        "test2-1-no-result-test",
 			HasFailures:      false,
 			HasNoResultTests: true,
-			TestRuns:         testdata.GetTestsData_Level2_1NoResultNoOtherTests(),
+			Level1Summaries:  testdata.GetTestsData_Level2_1NoResultNoOtherTests(),
 		},
 
 		"many level 1 summaries, many no-result tests": {
 			Directory:        "test3-multi-no-result-tests",
 			HasFailures:      false,
 			HasNoResultTests: true,
-			TestRuns:         testdata.GetTestData_Level2_MultipleL1SummariesNoResults(),
+			Level1Summaries:  testdata.GetTestData_Level2_MultipleL1SummariesNoResults(),
 		},
 
 		"many level 1 summaries, many failures, many passes": {
 			Directory:        "test4-multi-failures",
 			HasFailures:      true,
 			HasNoResultTests: false,
-			TestRuns:         testdata.GetTestData_Level2MultipleL1SummariesFailuresPasses(),
+			Level1Summaries:  testdata.GetTestData_Level2MultipleL1SummariesFailuresPasses(),
 		},
 
 		"many level 1 summaries, many failures, many passes, many no-result tests": {
 			Directory:        "test5-multi-failures-multi-no-result-tests",
 			HasFailures:      true,
 			HasNoResultTests: true,
-			TestRuns:         testdata.GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults(),
+			Level1Summaries:  testdata.GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults(),
 		},
 	}
 
 	for k, testData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
 			setUp(t)
-			runGenerateLevel2Summary(t, testData)
+			// ************************
+			actualLevel2Summary := generateLevel2SummaryFromStructs(testData.Level1Summaries)
+			// ************************
+			checkLevel2Summary(t, actualLevel2Summary, testData)
+			tearDown(t)
+		})
+	}
+}
+
+// TestGenerateLevel2Summary_JSON uses real level 1 JSON files as input
+// Don't want to use too many tests since they are more brittle to changes to JSON data structure.
+// That's why have very few of these. For new tests, it's best to add level 1 data as structs.
+func TestGenerateLevel2Summary_JSON(t *testing.T) {
+	testDataMap := map[string]testdata.Level2TestData{
+		"1 level 1 summary, 1 failure the rest pass": {
+			Directory:        "test1-1package-1failure",
+			Level1DataPath:   filepath.Join("../testdata/summary2", "test1-1package-1failure", "input"),
+			HasFailures:      true,
+			HasNoResultTests: false,
+		},
+	}
+	for k, testData := range testDataMap {
+		t.Run(k, func(t *testing.T) {
+			setUp(t)
+			// ************************
+			actualLevel2Summary := generateLevel2Summary(testData.Level1DataPath)
+			// ************************
+			checkLevel2Summary(t, actualLevel2Summary, testData)
 			tearDown(t)
 		})
 	}
@@ -82,23 +109,10 @@ func deleteMessagesDir(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func runGenerateLevel2Summary(t *testing.T, testData testdata.Level2TestData) {
-
-	inputTestDataPath := filepath.Join("../testdata/summary2", testData.Directory, "input")
-
+func checkLevel2Summary(t *testing.T, actualLevel2Summary common.Level2Summary, testData testdata.Level2TestData) {
 	expectedOutputTestDataPath := filepath.Join("../testdata/summary2", testData.Directory, "expected-output", testData.Directory+".json")
 	expectedFailureMessagesPath := filepath.Join("../testdata/summary2", testData.Directory, "expected-output/failures")
 	expectedNoResultMessagesPath := filepath.Join("../testdata/summary2", testData.Directory, "expected-output/no-results")
-
-	// **************************************************************
-	// can run the test from list of level 1 TestRun structs or from generated level 1 JSON files
-	var actualLevel2Summary common.Level2Summary
-	if len(testData.TestRuns) > 0 {
-		actualLevel2Summary = generateLevel2SummaryFromStructs(testData.TestRuns)
-	} else {
-		actualLevel2Summary = generateLevel2Summary(inputTestDataPath)
-	}
-	// **************************************************************
 
 	// read in expected summary level 2
 	var expectedLevel2Summary common.Level2Summary

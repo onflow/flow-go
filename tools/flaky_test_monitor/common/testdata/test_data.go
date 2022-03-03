@@ -9,15 +9,16 @@ import (
 // Level1TestData is used by tests to store what the expected test result should be and what the raw
 // JSON input file is
 type Level1TestData struct {
-	ExpectedTestRun    common.Level1Summary
-	RawJSONTestRunFile string
+	ExpectedLevel1Summary common.Level1Summary
+	RawJSONTestRunFile    string
 }
 
 type Level2TestData struct {
 	Directory        string
+	Level1DataPath   string
 	HasFailures      bool
 	HasNoResultTests bool
-	TestRuns         []common.Level1Summary
+	Level1Summaries  []common.Level1Summary
 }
 
 // ************** Helper Functions *****************
