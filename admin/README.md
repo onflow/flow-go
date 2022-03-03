@@ -15,7 +15,7 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 
 ### To turn on profiler
 ```
-curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-log-level", "data": "debug"}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-profiler-enabled", "data": "true"}'
 ```
 
 ### To get the latest finalized block
