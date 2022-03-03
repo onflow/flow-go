@@ -57,8 +57,8 @@ require (
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
-	github.com/onflow/atree v0.1.2-0.20211216135231-f8f0a14c7272
-	github.com/onflow/cadence v0.21.1-0.20220204220236-45455c565deb
+	github.com/onflow/atree v0.2.0
+	github.com/onflow/cadence v0.23.0
 	github.com/onflow/flow v0.2.3-0.20220131193101-d4e2ca43a621
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.2-0.20220211010218-ef36227fc493
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1
@@ -71,6 +71,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
+	github.com/rivo/uniseg v0.2.1-0.20211004051800-57c86be7915a // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/rs/cors v1.8.0
 	github.com/rs/zerolog v1.19.0
@@ -100,7 +101,6 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.27.1
 	gotest.tools v2.2.0+incompatible
-	lukechampine.com/blake3 v1.1.7 // indirect
 	pgregory.net/rapid v0.4.7
 )
 
