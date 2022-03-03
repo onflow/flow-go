@@ -5,7 +5,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
@@ -94,9 +93,6 @@ func (r *BalanceReporter) balanceReporterWorker(
 	accounts := state.NewAccounts(sth)
 	storage := cadenceRuntime.NewStorage(
 		&migrations.AccountsAtreeLedger{Accounts: accounts},
-		func(f func(), _ func(metrics cadenceRuntime.Metrics, duration time.Duration)) {
-			f()
-		},
 	)
 
 	for payload := range jobs {
@@ -165,7 +161,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 	}
 
 	if id.Key == "contract\u001fFlowToken" {
-		tokenSupply := uint64(cValue.(*interpreter.CompositeValue).GetField(nil, nil, "totalSupply").(interpreter.UFix64Value))
+		tokenSupply := uint64(cValue.(*interpreter.CompositeValue).GetField("totalSupply").(interpreter.UFix64Value))
 		r.Log.Info().Uint64("tokenSupply", tokenSupply).Msg("total token supply")
 	}
 
@@ -179,7 +175,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 			}
 
 			if string(value.TypeID()) == r.vaultTypeID {
-				b := uint64(value.GetField(nil, nil, "balance").(interpreter.UFix64Value))
+				b := uint64(value.GetField("balance").(interpreter.UFix64Value))
 				if b == 0 {
 					// ignore 0 balance results
 					return false

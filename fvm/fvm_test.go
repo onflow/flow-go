@@ -611,7 +611,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		tx := fvm.Transaction(txBody, 0)
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
-		assert.NoError(t, tx.Err)
+		require.NoError(t, tx.Err)
 	})
 
 	t.Run("account update with set code succeeds when there is a matching audit voucher", func(t *testing.T) {
@@ -2079,9 +2079,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						)
 
 						err = vm.Run(ctx, script, view, programs)
-						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
-						assert.Equal(t, cadence.NewBool(false), script.Value)
+						assert.Error(t, err)
 					})
 				}
 			},
@@ -2185,7 +2183,7 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					err = vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
+					assert.Error(t, script.Err)
 					assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
 				})
 
@@ -2205,7 +2203,7 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					err = vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
+					assert.Error(t, script.Err)
 					assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
 				})
 			},
@@ -2239,7 +2237,7 @@ func TestBLSMultiSignature(t *testing.T) {
 											signatureAlgorithm: SignatureAlgorithm.%s
 										))
 									}
-									return AggregateBLSPublicKeys(pks)?.publicKey
+									return AggregateBLSPublicKeys(pks).publicKey
 								}
 								`,
 							signatureAlgorithm.name,
@@ -2309,9 +2307,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						)
 
 						err := vm.Run(ctx, script, view, programs)
-						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
-						assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
+						assert.Error(t, err)
 					})
 				}
 
@@ -2331,7 +2327,7 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					err := vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
+					assert.Error(t, script.Err)
 					assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
 				})
 			},

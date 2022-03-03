@@ -54,6 +54,9 @@ type TransactionEnv struct {
 	authorizers        []runtime.Address
 }
 
+func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+}
+
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -172,7 +175,7 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
 	}
-	addresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+	addresses, ok := utils.CadenceValueToAddressSlice(value)
 	if !ok {
 		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts

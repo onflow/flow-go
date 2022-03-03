@@ -95,6 +95,9 @@ func NewScriptEnvironment(
 	return env
 }
 
+func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+}
+
 func (e *ScriptEnv) seedRNG(header *flow.Header) {
 	// Seed the random number generator with entropy created from the block header ID. The random number generator will
 	// be used by the UnsafeRandom function.
