@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -18,9 +19,9 @@ import (
 func newPacker(identities flow.IdentityList) *ConsensusSigDataPacker {
 	// mock consensus committee
 	committee := &mocks.Committee{}
-	committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
-			return identities.Filter(selector)
+	committee.On("Identities", mock.Anything).Return(
+		func(blockID flow.Identifier) flow.IdentityList {
+			return identities
 		},
 		nil,
 	)
@@ -45,6 +46,22 @@ func makeBlockSigData(committee []flow.Identifier) *hotstuff.BlockSignatureData 
 	return blockSigData
 }
 
+func signerIDsFromSignerIndices(signerIndices []byte, committee []flow.Identifier) ([]flow.Identifier, error) {
+	signerIndex, err := packer.DecodeSignerIndices(signerIndices, len(committee))
+	if err != nil {
+		return nil, err
+	}
+
+	signerIDs := make([]flow.Identifier, 0, len(committee))
+	for _, index := range signerIndex {
+		if index >= len(committee) {
+			return nil, fmt.Errorf("index %v out of range %v", index, len(committee)-1)
+		}
+		signerIDs = append(signerIDs, committee[index])
+	}
+	return signerIDs, nil
+}
+
 // test that a packed data can be unpacked
 // given the consensus committee [A, B, C, D, E, F]
 // [B,D,F] are random beacon nodes
@@ -63,10 +80,13 @@ func TestPackUnpack(t *testing.T) {
 	packer := newPacker(identities)
 
 	// pack & unpack
-	signerIDs, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	unpacked, err := packer.Unpack(blockID, signerIDs, sig)
+	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
+	require.NoError(t, err)
+
+	unpacked, err := packer.Unpack(signerIDs, sig)
 	require.NoError(t, err)
 
 	// check that the unpack data match with the original data
@@ -107,10 +127,13 @@ func TestPackUnpackManyNodes(t *testing.T) {
 	packer := newPacker(identities)
 
 	// pack & unpack
-	signerIDs, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	unpacked, err := packer.Unpack(blockID, signerIDs, sig)
+	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
+	require.NoError(t, err)
+
+	unpacked, err := packer.Unpack(signerIDs, sig)
 	require.NoError(t, err)
 
 	// check that the unpack data match with the original data
@@ -139,13 +162,16 @@ func TestFailToDecode(t *testing.T) {
 	// create packer with the committee
 	packer := newPacker(identities)
 
-	signerIDs, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
+	require.NoError(t, err)
+
+	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
 	require.NoError(t, err)
 
 	// prepare invalid data by modifying the valid data
 	invalidSigData := sig[1:]
 
-	_, err = packer.Unpack(blockID, signerIDs, invalidSigData)
+	_, err = packer.Unpack(signerIDs, invalidSigData)
 
 	require.Error(t, err)
 	require.True(t, errors.Is(err, model.ErrInvalidFormat))
@@ -153,32 +179,36 @@ func TestFailToDecode(t *testing.T) {
 
 // if the signer IDs doesn't match, return InvalidFormatError
 func TestMismatchSignerIDs(t *testing.T) {
-	identities := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
+	identities := unittest.IdentityListFixture(9, unittest.WithRole(flow.RoleConsensus))
 	committee := identities.NodeIDs()
 
 	// prepare data for testing
 	blockID := unittest.IdentifierFixture()
-	blockSigData := makeBlockSigData(committee)
+	blockSigData := makeBlockSigData(committee[:6])
 
 	// create packer with the committee
 	packer := newPacker(identities)
 
-	signerIDs, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
+	require.NoError(t, err)
+
+	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
 	require.NoError(t, err)
 
 	// prepare invalid signerIDs by modifying the valid signerIDs
 	// remove the first signer
 	invalidSignerIDs := signerIDs[1:]
 
-	_, err = packer.Unpack(blockID, invalidSignerIDs, sig)
+	_, err = packer.Unpack(invalidSignerIDs, sig)
 
 	require.Error(t, err)
 	require.True(t, errors.Is(err, model.ErrInvalidFormat))
 
-	// prepare invalid signerIDs by modifying the valid signerIDs
-	// adding one more signer
-	invalidSignerIDs = append(signerIDs, unittest.IdentifierFixture())
-	misPacked, err := packer.Unpack(blockID, invalidSignerIDs, sig)
+	// with additional signer
+	// 9 nodes committee would require two bytes for sig type, the additional byte
+	// would cause the sig type and signer IDs to be mismatch
+	invalidSignerIDs = committee
+	misPacked, err := packer.Unpack(committee, sig)
 
 	require.Error(t, err, fmt.Sprintf("packed signers: %v", misPacked))
 	require.True(t, errors.Is(err, model.ErrInvalidFormat))
@@ -196,7 +226,10 @@ func TestInvalidSigType(t *testing.T) {
 	// create packer with the committee
 	packer := newPacker(identities)
 
-	signerIDs, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
+	require.NoError(t, err)
+
+	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
 	require.NoError(t, err)
 
 	data, err := packer.Decode(sig)
@@ -207,7 +240,7 @@ func TestInvalidSigType(t *testing.T) {
 	encoded, err := packer.Encode(data)
 	require.NoError(t, err)
 
-	_, err = packer.Unpack(blockID, signerIDs, encoded)
+	_, err = packer.Unpack(signerIDs, encoded)
 
 	require.True(t, errors.Is(err, model.ErrInvalidFormat))
 }
@@ -445,10 +478,13 @@ func TestPackUnpackWithoutRBAggregatedSig(t *testing.T) {
 	packer := newPacker(identities)
 
 	// pack & unpack
-	signerIDs, sig, err := packer.Pack(blockID, blockSigData)
+	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	unpacked, err := packer.Unpack(blockID, signerIDs, sig)
+	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
+	require.NoError(t, err)
+
+	unpacked, err := packer.Unpack(signerIDs, sig)
 	require.NoError(t, err)
 
 	// check that the unpack data match with the original data
