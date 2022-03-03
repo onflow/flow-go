@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -196,7 +197,7 @@ func Sample(size uint, ids ...Identifier) []Identifier {
 	return dup[:size]
 }
 
-func CidToFlowID(c cid.Cid) (Identifier, error) {
+func CidToId(c cid.Cid) (Identifier, error) {
 	decoded, err := mh.Decode(c.Hash())
 
 	if err != nil {
@@ -214,7 +215,44 @@ func CidToFlowID(c cid.Cid) (Identifier, error) {
 	return HashToID(decoded.Digest), nil
 }
 
-func FlowIDToCid(f Identifier) cid.Cid {
+func IdToCid(f Identifier) cid.Cid {
 	hash, _ := mh.Encode(f[:], mh.SHA2_256)
 	return cid.NewCidV0(hash)
+}
+
+func ByteSliceToId(b []byte) (Identifier, error) {
+	var id Identifier
+	if len(b) != IdentifierLen {
+		return id, fmt.Errorf("illegal length for a flow identifier %x: got: %d, expected: %d", b, len(b), IdentifierLen)
+	}
+
+	copy(id[:], b[:])
+
+	return id, nil
+}
+
+func ByteSlicesToIds(b [][]byte) (IdentifierList, error) {
+	total := len(b)
+	ids := make(IdentifierList, total)
+
+	for i := 0; i < total; i++ {
+		id, err := ByteSliceToId(b[i])
+		if err != nil {
+			return nil, err
+		}
+
+		ids[i] = id
+	}
+
+	return ids, nil
+}
+
+func IdsToBytes(identifiers []Identifier) [][]byte {
+	var byteIds [][]byte
+	for _, id := range identifiers {
+		tempID := id // avoid capturing loop variable
+		byteIds = append(byteIds, tempID[:])
+	}
+
+	return byteIds
 }

@@ -743,6 +743,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          IdentifierFixture(),
 		Chunks:           ChunkListFixture(2, blockID),
+		ExecutionDataID:  IdentifierFixture(),
 	}
 
 	for _, apply := range opts {
