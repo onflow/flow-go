@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
@@ -55,7 +54,7 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 	log.Info().Msg("generated network key")
 
 	// hex encode and write to file
-	output := make([]byte, hex.EncodedLen(crypto.PrKeyLenECDSASecp256k1))
+	output := make([]byte, hex.EncodedLen(networkKey.Size()))
 	hex.Encode(output, networkKey.Encode())
 
 	writeText(model.FilenameObserverNetworkKey, output)
