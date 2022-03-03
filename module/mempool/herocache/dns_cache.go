@@ -17,21 +17,23 @@ type DNSCache struct {
 	txtCache *stdmap.Backend
 }
 
-func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *DNSCache {
+func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.HeroCacheMetrics, txtCollector module.HeroCacheMetrics) *DNSCache {
 	return &DNSCache{
-		txtCache: stdmap.NewBackendWithBackData(
-			herocache.NewCache(
-				sizeLimit,
-				8,
-				heropool.LRUEjection,
-				logger,
-				collector)),
-		ipCache: stdmap.NewBackendWithBackData(
-			herocache.NewCache(sizeLimit,
-				8,
-				heropool.LRUEjection,
-				logger,
-				collector)),
+		txtCache: stdmap.NewBackend(
+			stdmap.WithBackData(
+				herocache.NewCache(
+					sizeLimit,
+					herocache.DefaultOversizeFactor,
+					heropool.LRUEjection,
+					logger,
+					txtCollector))),
+		ipCache: stdmap.NewBackend(
+			stdmap.WithBackData(
+				herocache.NewCache(sizeLimit,
+					herocache.DefaultOversizeFactor,
+					heropool.LRUEjection,
+					logger,
+					ipCollector))),
 	}
 }
 

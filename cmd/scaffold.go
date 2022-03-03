@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
@@ -198,11 +199,19 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 
 func (fnb *FlowNodeBuilder) EnqueueResolver() {
 	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		resolver := dns.NewResolver(dns.DefaultCacheSize,
+		cache := herocache.NewDNSCache(
+			dns.DefaultCacheSize,
+			node.Logger,
+			metrics.NetworkDnsIpCacheMetricsFactory(fnb.MetricsRegisterer),
+			metrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegisterer),
+		)
+
+		resolver := dns.NewResolver(
 			node.Logger,
 			fnb.Metrics.Network,
-			metrics.NetworkDnsCacheMetricsFactory(fnb.MetricsRegisterer),
+			cache,
 			dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+
 		fnb.Resolver = resolver
 		return resolver, nil
 	})
