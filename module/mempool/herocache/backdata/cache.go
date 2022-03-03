@@ -290,6 +290,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	c.buckets[b].slots[slotToUse].slotAge = c.slotCount
 	c.buckets[b].slots[slotToUse].entityIndex = entityIndex
 	c.buckets[b].slots[slotToUse].entityId32of256 = entityId32of256
+	c.collector.OnSuccessfulWrite()
 	return true
 }
 
@@ -305,6 +306,7 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotInd
 		id, entity, linked := c.linkedEntityOf(b, s)
 		if !linked {
 			// no linked entity for this (bucketIndex, slotIndex) pair.
+			c.collector.OnUnsuccessfulRead()
 			return nil, 0, 0, false
 		}
 
@@ -313,9 +315,11 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotInd
 			continue
 		}
 
+		c.collector.OnSuccessfulRead()
 		return entity, b, s, true
 	}
 
+	c.collector.OnUnsuccessfulRead()
 	return nil, 0, 0, false
 }
 
