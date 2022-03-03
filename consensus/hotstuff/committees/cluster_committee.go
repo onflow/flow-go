@@ -87,27 +87,6 @@ func (c *Cluster) Identities(blockID flow.Identifier) (flow.IdentityList, error)
 	return identities, err
 }
 
-func (c *Cluster) IdentitiesByIndices(blockID flow.Identifier, indices []int) (flow.IdentityList, error) {
-	nodeIDs := make([]flow.Identifier, 0, len(indices))
-	for _, index := range indices {
-		if index < 0 || index >= len(initial) {
-			return nil, model.NewInvalidSignerErrorf("signer index %v is out of range in a %v members committee", index, len(initial))
-		}
-
-		id := initial[index]
-		nodeIDs = append(nodeIDs, id.NodeID)
-	}
-
-	identitiesFilter := filter.HasNodeID(nodeIDs...)
-
-	identities, err := c.Identities(blockID)
-	if err != nil {
-		return nil, err
-	}
-
-	return identities.Filter(identitiesFilter), nil
-}
-
 func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 
 	// first retrieve the cluster block payload
