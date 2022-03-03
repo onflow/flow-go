@@ -33,8 +33,6 @@ type Committee interface {
 	//  * model.InvalidSignerError if participantID does NOT correspond to a _staked_ HotStuff participant at the specified block.
 	Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 
-	IdentitiesByIndices(blockID flow.Identifier, indices []int) (flow.IdentityList, error)
-
 	// LeaderForView returns the identity of the leader for a given view.
 	// CAUTION: per liveness requirement of HotStuff, the leader must be fork-independent.
 	//          Therefore, a node retains its proposer view slots even if it is slashed.

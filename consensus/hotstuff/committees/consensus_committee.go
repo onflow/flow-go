@@ -73,10 +73,6 @@ func (c *Consensus) Identities(blockID flow.Identifier) (flow.IdentityList, erro
 	return il, err
 }
 
-func (c *Consensus) IdentitiesByIndices(blockID flow.Identifier, indices []int) (flow.IdentityList, error) {
-	panic("to be implemented")
-}
-
 func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
 	if err != nil {

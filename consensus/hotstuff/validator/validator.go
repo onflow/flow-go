@@ -62,9 +62,9 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		return newInvalidBlockError(block, fmt.Errorf("qc.SignerIndices is invalid: %w", err))
 	}
 
-	signers, err := v.committee.IdentitiesByIndices(block.BlockID, signerIndices)
+	signers, err := filterByIndices(allParticipants, signerIndices)
 	if err != nil {
-		return fmt.Errorf("could not get signers by indices: %w", err)
+		return newInvalidBlockError(block, fmt.Errorf("could not find signers by indices: %w", err))
 	}
 
 	// determine whether signers reach minimally required stake threshold for consensus
@@ -92,6 +92,10 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	return nil
+}
+
+func filterByIndices(identities flow.IdentityList, indices []int) (flow.IdentityList, error) {
+	panic("To be implemented")
 }
 
 // ValidateProposal validates the block proposal
