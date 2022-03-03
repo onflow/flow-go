@@ -880,7 +880,8 @@ func registerNodeTransaction(
 		},
 	)
 
-	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", id.Weight))
+	// for simplicity, stake all nodes with enough stake for all node roles
+	cdcAmount, err := cadence.NewUFix64("1250000.0")
 	if err != nil {
 		panic(err)
 	}
