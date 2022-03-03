@@ -5,10 +5,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ExecutionData represents the execution data of a block
+// ExecutionData represents the execution data of a Chunk
 type ExecutionData struct {
-	BlockID     flow.Identifier
-	Collections []*flow.Collection
-	Events      []flow.EventsList
-	TrieUpdates []*ledger.TrieUpdate
+	Collection *flow.Collection
+	Events     flow.EventsList
+	TrieUpdate *ledger.TrieUpdate
 }

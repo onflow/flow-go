@@ -1,13 +1,18 @@
 package execution
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/state_synchronization"
 )
 
 func GenerateExecutionResultAndChunkDataPacks(
+	ctx context.Context,
+	eds state_synchronization.ExecutionDataService,
+	edCache state_synchronization.ExecutionDataCIDCache,
 	prevResultId flow.Identifier,
 	startState flow.StateCommitment,
 	result *ComputationResult) (
@@ -33,22 +38,35 @@ func GenerateExecutionResultAndChunkDataPacks(
 
 		endState = result.StateCommitments[i]
 		var chunk *flow.Chunk
+
+		var collection *flow.Collection
+		numTransactions := 1
+
 		// account for system chunk being last
 		if i < len(result.StateCommitments)-1 {
 			// non-system chunks
 			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
-			collection := completeCollection.Collection()
-			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(len(completeCollection.Transactions)))
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
-		} else {
-			// system chunk
-			// note that system chunk does not have a collection.
-			// also, number of transactions is one for system chunk.
-			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1)
-			// system chunk has a nil collection.
-			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i])
+			c := completeCollection.Collection()
+			collection = &c
+			numTransactions = len(completeCollection.Transactions)
 		}
+
+		ed := &state_synchronization.ExecutionData{
+			Collection: collection,
+			Events:     result.Events[i],
+			TrieUpdate: result.TrieUpdates[i],
+		}
+
+		executionDataID, blobTree, err := eds.Add(ctx, ed)
+		if err != nil {
+			return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not add Execution Data: %w", err)
+		}
+
+		edCache.Insert(blockID, block.Header.Height, i, blobTree)
+
+		chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(numTransactions), executionDataID)
+		chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, collection, result.Proofs[i])
 
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
@@ -88,7 +106,6 @@ func GenerateExecutionResultForBlock(
 		BlockID:          block.ID(),
 		Chunks:           chunks,
 		ServiceEvents:    convertedServiceEvents,
-		ExecutionDataID:  executionDataID,
 	}
 
 	return er, nil
@@ -97,7 +114,9 @@ func GenerateExecutionResultForBlock(
 // GenerateChunk creates a chunk from the provided computation data.
 func GenerateChunk(colIndex int,
 	startState, endState flow.StateCommitment,
-	blockID, eventsCollection flow.Identifier, txNumber uint64) *flow.Chunk {
+	blockID, eventsCollection flow.Identifier,
+	txNumber uint64, executionDataID flow.Identifier,
+) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(colIndex),
@@ -108,8 +127,9 @@ func GenerateChunk(colIndex int,
 			TotalComputationUsed: 0,
 			NumberOfTransactions: txNumber,
 		},
-		Index:    uint64(colIndex),
-		EndState: endState,
+		Index:           uint64(colIndex),
+		EndState:        endState,
+		ExecutionDataID: executionDataID,
 	}
 }
 

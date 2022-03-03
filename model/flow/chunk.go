@@ -19,6 +19,8 @@ type Chunk struct {
 	Index uint64 // chunk index inside the ER (starts from zero)
 	// EndState inferred from next chunk or from the ER
 	EndState StateCommitment
+
+	ExecutionDataID Identifier
 }
 
 // ID returns a unique id for this entity

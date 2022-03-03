@@ -11,10 +11,12 @@ import (
 
 type ExecutionDataCIDCache interface {
 	Get(c cid.Cid) (BlobRecord, error)
-	Insert(header *flow.Header, blobTree BlobTree)
+	Insert(blockID flow.Identifier, blockHeight uint64, chunkIndex int, blobTree BlobTree)
 	BlobTreeRecords() uint
 	BlobRecords() uint
 }
+
+var _ ExecutionDataCIDCache = (*ExecutionDataCIDCacheImpl)(nil)
 
 type ExecutionDataCIDCacheImpl struct {
 	mu            sync.RWMutex
