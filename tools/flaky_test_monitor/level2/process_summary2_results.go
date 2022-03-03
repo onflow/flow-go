@@ -81,21 +81,18 @@ func generateLevel2SummaryFromStructs(level1Summaries []common.Level1Summary) co
 
 // process level 1 summary files in a single directory and output level 2 summary
 func generateLevel2Summary(level1Directory string) common.Level2Summary {
+	level1Summaries := buildLevel1SummariesFromJSON(level1Directory)
+	level2Summary := generateLevel2SummaryFromStructs(level1Summaries)
+	return level2Summary
+}
+
+// buildLevel1SummariesFromJSON creates level 1 summaries so the same function can be used to process level 1
+// summaries whether they were created from JSON files (used in production) or from pre-constructed level 1 summary structs (used by testing)
+func buildLevel1SummariesFromJSON(level1Directory string) []common.Level1Summary {
+	var level1Summaries []common.Level1Summary
 	dirEntries, err := os.ReadDir(filepath.Join(level1Directory))
 	common.AssertNoError(err, "error reading level 1 directory")
 
-	// create directory to store failure messages
-	err = os.Mkdir(failuresDir, 0755)
-	common.AssertNoError(err, "error creating failures directory")
-
-	// create directory to store no-results messages
-	err = os.Mkdir(noResultsDir, 0755)
-	common.AssertNoError(err, "error creating no-results directory")
-
-	level2Summary := common.Level2Summary{}
-	level2Summary.TestResultsMap = make(map[string]*common.Level2TestResult)
-
-	// go through all level 1 summaries in a folder to create level 2 summary
 	for i := 0; i < len(dirEntries); i++ {
 		// read in each level 1 summary
 		var level1Summary common.Level1Summary
@@ -106,59 +103,9 @@ func generateLevel2Summary(level1Directory string) common.Level2Summary {
 		err = json.Unmarshal(level1JsonBytes, &level1Summary)
 		common.AssertNoError(err, "error unmarshalling level 1 test run: "+dirEntries[i].Name())
 
-		// go through each level 1 summary and update level 2 summary
-		for _, level1TestResultRow := range level1Summary.Rows {
-			// check if already started collecting summary for this test
-			mapKey := level1TestResultRow.TestResult.Package + "/" + level1TestResultRow.TestResult.Test
-			level2TestResult, level2TestResultExists := level2Summary.TestResultsMap[mapKey]
-
-			// this test doesn't have a summary so create it
-			// no need to specify other fields explicitly - default values will suffice
-			if !level2TestResultExists {
-				level2TestResult = &common.Level2TestResult{
-					Test:    level1TestResultRow.TestResult.Test,
-					Package: level1TestResultRow.TestResult.Package,
-				}
-			}
-
-			// keep track of each duration so can later calculate average duration
-			level2TestResult.Durations = append(level2TestResult.Durations, level1TestResultRow.TestResult.Elapsed)
-
-			// increment # of passes, fails, skips or no-results for this test
-			level2TestResult.Runs++
-			switch level1TestResultRow.TestResult.Result {
-			case "1":
-				level2TestResult.Passed++
-			case "0":
-				level2TestResult.Failed++
-				saveFailureMessage(level1TestResultRow.TestResult)
-			case "skip":
-				level2TestResult.Skipped++
-
-				// don't count skip as a run
-				level2TestResult.Runs--
-
-				// truncate last duration - don't count durations of skips
-				level2TestResult.Durations = level2TestResult.Durations[:len(level2TestResult.Durations)-1]
-			case "":
-				level2TestResult.NoResult++
-				// don't count no result as a run
-				level2TestResult.Runs--
-
-				// truncate last duration - don't count durations of no-results
-				level2TestResult.Durations = level2TestResult.Durations[:len(level2TestResult.Durations)-1]
-				saveNoResultMessage(level1TestResultRow.TestResult)
-			default:
-				panic(fmt.Sprintf("unexpected test result: %s", level1TestResultRow.TestResult.Result))
-			}
-
-			level2Summary.TestResultsMap[mapKey] = level2TestResult
-		}
+		level1Summaries = append(level1Summaries, level1Summary)
 	}
-
-	// calculate averages and other calculations that can only be completed after all test runs have been read
-	postProcessLevel2Summary(level2Summary)
-	return level2Summary
+	return level1Summaries
 }
 
 func saveFailureMessage(testResult common.Level1TestResult) {
@@ -210,6 +157,7 @@ func saveMessageHelper(testResult common.Level1TestResult, expectedResult string
 	}
 }
 
+// postProcessLevel2Summary calculates average duration and failure rate for each test over multiple level 1 summaries
 func postProcessLevel2Summary(testSummary2 common.Level2Summary) {
 	for _, level2TestResult := range testSummary2.TestResultsMap {
 		// calculate average duration for each test summary
