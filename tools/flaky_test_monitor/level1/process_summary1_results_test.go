@@ -105,35 +105,10 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 
 // TestGenerateLevel1Summary_JSON uses real level 1 JSON files as expected output.
 // Don't want to use too many tests since they are more brittle to changes to JSON data structure.
-// That's why have very few of these. For new tests, it's best to add level 1 data as structs.
+// That's why have very few of these. For new tests, it's best to add level 1 expected data as structs.
 func TestGenerateLevel1Summary_JSON(t *testing.T) {
 	testDataMap := map[string]string{
-		"1 count all pass":                "test-result-crypto-hash-1-count-pass.json",
-		"1 count 1 fail the rest pass":    "test-result-crypto-hash-1-count-fail.json",
-		"1 count 2 skipped the rest pass": "test-result-crypto-hash-1-count-skip-pass.json",
-
-		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
-		"2 count all pass":       "test-result-crypto-hash-2-count-pass.json",
-		"10 count all pass":      "test-result-crypto-hash-10-count-pass.json",
-		"10 count some failures": "test-result-crypto-hash-10-count-fail.json",
-
-		// nil tests - tests below don't generate pass/fail result due to `go test` bug
-		// with using `fmt.printf("log message")` without newline `\n`
-
-		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
-		// this is a single unit test that produces a nil test result
-		"1 count single nil test": "test-result-nil-test-single-1-count-pass.json",
-
-		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
-		//multiple nil tests in a row
-		"5 nil tests in a row": "test-result-nil-test-single-5-count-pass.json",
-
-		//normal test at the end of a test run with multiple nil tests in front of it
-		"4 nil tests in a row, 1 normal test": "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
-
-		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
-		// group of unit tests with a single nil test result
-		"3 count nil test with normal tests": "test-result-nil-test-others-normal-3-count-pass.json",
+		"1 count all pass": "test-result-crypto-hash-1-count-pass.json",
 	}
 
 	for k, testJsonData := range testDataMap {
