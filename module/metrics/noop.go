@@ -160,3 +160,5 @@ func (nc *NoopCollector) OnSuccessfulWrite()                                    
 func (nc *NoopCollector) OnEntityEjectedAtFullCapacity()                                        {}
 func (nc *NoopCollector) OnEmergencyKeyEjection()                                               {}
 func (nc *NoopCollector) OnUnsuccessfulWrite()                                                  {}
+func (nc *NoopCollector) OnSuccessfulRead()                                                     {}
+func (nc *NoopCollector) OnUnsuccessfulRead()                                                   {}

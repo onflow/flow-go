@@ -8,8 +8,6 @@ import (
 
 const subsystemHeroCache = "hero_cache"
 
-var count = 0
-
 type HeroCacheCollector struct {
 	normalizedBucketSlotAvailableHistogram prometheus.Histogram
 
@@ -38,10 +36,6 @@ func NetworkDnsIpCacheMetricsFactory(registrar prometheus.Registerer) *HeroCache
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
-	if count > 0 {
-		panic("duplicate attempt on transaction cache metrics")
-	}
-	count++
 	return NewHeroCacheCollector(namespaceCollection, ResourceTransaction, registrar)
 }
 

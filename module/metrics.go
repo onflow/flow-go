@@ -429,19 +429,24 @@ type HeroCacheMetrics interface {
 	// BucketAvailableSlots keeps track of number of available slots in buckets of cache.
 	BucketAvailableSlots(uint64, uint64)
 
-	// OnNewEntityAdded is called whenever a new entity is successfully added to the cache.
+	// OnSuccessfulWrite is called whenever a new entity is successfully added to the cache.
 	OnSuccessfulWrite()
 
 	// OnEntityEjectedAtFullCapacity is called whenever adding a new entity to the cache results in ejection of another entity.
 	// This normally happens when the cache is full.
 	OnEntityEjectedAtFullCapacity()
 
-	// OnBucketFull is called whenever a bucket is found full and all of its keys are valid.
+	// OnEmergencyKeyEjection is called whenever a bucket is found full and all of its keys are valid.
 	// Hence, adding a new entity to that bucket will replace the oldest valid key inside that bucket.
 	OnEmergencyKeyEjection()
 
-	// OnAddingDuplicateEntityAttempt is tracking the total number of attempts on adding a duplicate entity to the cache.
-	// A duplicate entity is dropped by the cache when it is written to the cache,
-	// and this metric is tracking the total number of those queries.
+	// OnUnsuccessfulWrite is tracking the total number of unsuccessful writes caused by adding a duplicate entity to the cache.
+	// A duplicate entity is dropped by the cache when it is written to the cache.
 	OnUnsuccessfulWrite()
+
+	// OnSuccessfulRead tracks total number of successful read queries. A read query is successful if its entity is available in the cache.
+	OnSuccessfulRead()
+
+	// OnUnsuccessfulRead tracks total number of unsuccessful read queries. A read query is unsuccessful if its entity is not available in the cache.
+	OnUnsuccessfulRead()
 }
