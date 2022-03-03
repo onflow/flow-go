@@ -69,7 +69,7 @@ func TestGenerateLevel2Summary_JSON(t *testing.T) {
 	testDataMap := map[string]testdata.Level2TestData{
 		"1 level 1 summary, 1 failure the rest pass": {
 			Directory:        "test1-1package-1failure",
-			Level1DataPath:   filepath.Join("../testdata/summary2", "test1-1package-1failure", "input"),
+			Level1DataPath:   "../testdata/summary2/test1-1package-1failure/input",
 			HasFailures:      true,
 			HasNoResultTests: false,
 		},
