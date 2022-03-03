@@ -263,7 +263,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 		topologyCache := topology.NewCache(fnb.Logger, top)
 
-		receiveCache := netcache.NewReceiveCache(fnb.NetworkReceivedMessageCacheSize,
+		receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
 			fnb.Logger,
 			metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer))
 
