@@ -632,8 +632,12 @@ func (e *TransactionEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
-	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
+func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
+	valid, err := crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
+	if !valid {
+		return fmt.Errorf("invalid public key: %w", err)
+	}
+	return nil
 }
 
 // Block Environment Functions
@@ -970,10 +974,10 @@ func (e *TransactionEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, 
 	return crypto.VerifyPOP(pk, sig)
 }
 
-func (e *TransactionEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+func (e *TransactionEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 	return crypto.AggregateSignatures(sigs)
 }
 
-func (e *TransactionEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+func (e *TransactionEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
 }

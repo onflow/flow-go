@@ -501,8 +501,12 @@ func (e *ScriptEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
-	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
+func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
+	valid, err := crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
+	if !valid {
+		return fmt.Errorf("invalid public key: %w", err)
+	}
+	return nil
 }
 
 // Block Environment Functions
@@ -699,10 +703,10 @@ func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error
 	return crypto.VerifyPOP(pk, sig)
 }
 
-func (e *ScriptEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 	return crypto.AggregateSignatures(sigs)
 }
 
-func (e *ScriptEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
 }
