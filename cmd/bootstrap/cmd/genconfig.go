@@ -27,7 +27,11 @@ func genconfigCmdRun(_ *cobra.Command, _ []string) {
 	// maintain backward compatibility with old flag name
 	if deprecatedFlagStake != 0 {
 		log.Warn().Msg("using deprecated flag --stake (use --weight instead)")
-		flagWeight = deprecatedFlagStake
+		if flagWeight == 0 {
+			flagWeight = deprecatedFlagStake
+		} else {
+			log.Fatal().Msg("cannot use both --stake and --weight flags (use only --weight)")
+		}
 	}
 
 	configs := make([]model.NodeConfig, 0)
