@@ -265,7 +265,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	slotToUse, unique := c.slotIndexInBucket(b, entityId32of256, entityId)
 	if !unique {
 		// entityId already exists
-		c.collector.OnAddingDuplicateEntityAttempt()
+		c.collector.OnUnsuccessfulWrite()
 		return false
 	}
 
@@ -273,7 +273,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 		// bucket is full, and we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
 		c.invalidateEntity(b, slotToUse)
-		c.collector.OnBucketFull()
+		c.collector.OnEmergencyKeyEjection()
 		c.logger.Warn().
 			Hex("replaced_entity_id", logging.ID(linkedId)).
 			Hex("added_entity_id", logging.ID(entityId)).
@@ -389,7 +389,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 	}
 
 	c.availableSlotHistogram[availableSlotCount]++
-	c.collector.BucketAvailableSlotsCount(availableSlotCount, slotsPerBucket)
+	c.collector.BucketAvailableSlots(availableSlotCount, slotsPerBucket)
 	return slotToUse, true
 }
 

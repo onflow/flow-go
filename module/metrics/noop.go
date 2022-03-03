@@ -155,8 +155,8 @@ func (nc *NoopCollector) ExecutionDataAddStarted()                              
 func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)                  {}
 func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
 func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)                  {}
-func (nc *NoopCollector) BucketAvailableSlotsCount(uint64, uint64)                              {}
-func (nc *NoopCollector) OnNewEntityAdded()                                                     {}
+func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
+func (nc *NoopCollector) OnSuccessfulWrite()                                                    {}
 func (nc *NoopCollector) OnEntityEjectedAtFullCapacity()                                        {}
-func (nc *NoopCollector) OnBucketFull()                                                         {}
-func (nc *NoopCollector) OnAddingDuplicateEntityAttempt()                                       {}
+func (nc *NoopCollector) OnEmergencyKeyEjection()                                               {}
+func (nc *NoopCollector) OnUnsuccessfulWrite()                                                  {}

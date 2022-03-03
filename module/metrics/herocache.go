@@ -8,16 +8,19 @@ import (
 
 const subsystemHeroCache = "hero_cache"
 
+var count = 0
+
 type HeroCacheCollector struct {
-	bucketSlotAvailableHistogram prometheus.Histogram
+	normalizedBucketSlotAvailableHistogram prometheus.Histogram
 
-	// TODO: successful and unsuccessful reads counters.
+	successfulReadCount   prometheus.Counter
+	unsuccessfulReadCount prometheus.Counter
 
-	newEntitiesWriteCountTotal prometheus.Counter
-	duplicateWriteQueriesTotal prometheus.Counter
+	successfulWriteCount   prometheus.Counter
+	unsuccessfulWriteCount prometheus.Counter
 
-	entityEjectedAtFullCapacityTotal prometheus.Counter
-	fullBucketsFoundTimes            prometheus.Counter
+	fullCapacityEntityEjectionCount prometheus.Counter
+	emergencyKeyEjectionCount       prometheus.Counter
 }
 
 type HeroCacheMetricsRegistrationFunc func(uint64) module.HeroCacheMetrics
@@ -35,89 +38,130 @@ func NetworkDnsIpCacheMetricsFactory(registrar prometheus.Registerer) *HeroCache
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
+	if count > 0 {
+		panic("duplicate attempt on transaction cache metrics")
+	}
+	count++
 	return NewHeroCacheCollector(namespaceCollection, ResourceTransaction, registrar)
 }
 
 func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometheus.Registerer) *HeroCacheCollector {
 
-	bucketSlotAvailableHistogram := prometheus.NewHistogram(prometheus.HistogramOpts{
+	normalizedBucketSlotAvailableHistogram := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
 		Buckets:   []float64{0, 0.05, 0.1, 0.25, 0.5, 0.75, 1},
-		Name:      cacheName + "_" + "bucket_available_slot_percent_count",
-		Help:      "histogram of buckets vs normalized capacity of available slots (between 0 and 1)",
+		Name:      cacheName + "_" + "normalized_bucket_available_slot_count",
+		Help:      "normalized histogram of available slots across all buckets",
 	})
 
-	newEntitiesWriteCountTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	successfulReadCount := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
-		Name:      cacheName + "_" + "new_entity_write_count_total",
-		Help:      "total number of writes to the hero cache that carry a new unique entity (non-duplicate)",
+		Name:      cacheName + "_" + "successful_read_count_total",
+		Help:      "total number of successful read queries",
 	})
 
-	entityEjectedAtFullCapacityTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	unsuccessfulReadCount := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
-		Name:      cacheName + "_" + "entities_ejected_at_full_capacity_total",
-		Help:      "total number of entities ejected when writing new entities at full capacity",
+		Name:      cacheName + "_" + "unsuccessful_read_count_total",
+		Help:      "total number of unsuccessful read queries",
 	})
 
-	fullBucketFoundTimes := prometheus.NewCounter(prometheus.CounterOpts{
+	successfulWriteCount := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
-		Name:      cacheName + "_" + "full_bucket_found_times_total",
-		Help:      "total times adding a new entity faces a full bucket",
+		Name:      cacheName + "_" + "successful_write_count_total",
+		Help:      "total number successful write queries",
 	})
 
-	duplicateWriteQueriesTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	unsuccessfulWriteCount := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
-		Name:      cacheName + "_" + "duplicate_write_queries_total",
+		Name:      cacheName + "_" + "unsuccessful_write_count_total",
 		Help:      "total number of queries writing an already existing (duplicate) entity to the cache",
 	})
 
+	fullCapacityEntityEjectionCount := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: nameSpace,
+		Subsystem: subsystemHeroCache,
+		Name:      cacheName + "_" + "full_capacity_entity_ejection_total",
+		Help:      "total number of entities ejected when writing new entities at full capacity",
+	})
+
+	emergencyKeyEjectionCount := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: nameSpace,
+		Subsystem: subsystemHeroCache,
+		Name:      cacheName + "_" + "emergency_key_ejection_total",
+		Help:      "total number of emergency key ejections at bucket level",
+	})
+
 	registrar.MustRegister(
-		bucketSlotAvailableHistogram,
-		newEntitiesWriteCountTotal,
-		entityEjectedAtFullCapacityTotal,
-		fullBucketFoundTimes,
-		duplicateWriteQueriesTotal)
+		// available slot distribution
+		normalizedBucketSlotAvailableHistogram,
+
+		// read
+		successfulReadCount,
+		unsuccessfulReadCount,
+
+		// write
+		successfulWriteCount,
+		unsuccessfulWriteCount,
+
+		// ejection
+		fullCapacityEntityEjectionCount,
+		emergencyKeyEjectionCount)
 
 	return &HeroCacheCollector{
-		bucketSlotAvailableHistogram:     bucketSlotAvailableHistogram,
-		newEntitiesWriteCountTotal:       newEntitiesWriteCountTotal,
-		entityEjectedAtFullCapacityTotal: entityEjectedAtFullCapacityTotal,
-		fullBucketsFoundTimes:            fullBucketFoundTimes,
-		duplicateWriteQueriesTotal:       duplicateWriteQueriesTotal,
+		normalizedBucketSlotAvailableHistogram: normalizedBucketSlotAvailableHistogram,
+
+		successfulReadCount:   unsuccessfulReadCount,
+		unsuccessfulReadCount: unsuccessfulReadCount,
+
+		successfulWriteCount:   successfulWriteCount,
+		unsuccessfulWriteCount: unsuccessfulWriteCount,
+
+		fullCapacityEntityEjectionCount: fullCapacityEntityEjectionCount,
+		emergencyKeyEjectionCount:       emergencyKeyEjectionCount,
 	}
 }
 
-// BucketAvailableSlotsCount keeps track of number of available slots in buckets of cache.
-func (h *HeroCacheCollector) BucketAvailableSlotsCount(availableSlots uint64, totalSlots uint64) {
+// BucketAvailableSlots keeps track of number of available slots in buckets of cache.
+func (h *HeroCacheCollector) BucketAvailableSlots(availableSlots uint64, totalSlots uint64) {
 	normalizedAvailableSlots := float64(availableSlots) / float64(totalSlots)
-	h.bucketSlotAvailableHistogram.Observe(normalizedAvailableSlots)
+	h.normalizedBucketSlotAvailableHistogram.Observe(normalizedAvailableSlots)
 }
 
-// OnNewEntityAdded is called whenever a new entity is successfully added to the cache.
-func (h *HeroCacheCollector) OnNewEntityAdded() {
-	h.newEntitiesWriteCountTotal.Inc()
+// OnSuccessfulWrite is called whenever a new entity is successfully added to the cache.
+func (h *HeroCacheCollector) OnSuccessfulWrite() {
+	h.successfulWriteCount.Inc()
+}
+
+// OnUnsuccessfulWrite is tracking the total number of unsuccessful writes caused by adding a duplicate entity to the cache.
+// A duplicate entity is dropped by the cache when it is written to the cache.
+func (h *HeroCacheCollector) OnUnsuccessfulWrite() {
+	h.unsuccessfulWriteCount.Inc()
 }
 
 // OnEntityEjectedAtFullCapacity is called whenever adding a new entity to the cache results in ejection of another entity.
 // This normally happens when the cache is full.
 func (h *HeroCacheCollector) OnEntityEjectedAtFullCapacity() {
-	h.entityEjectedAtFullCapacityTotal.Inc()
+	h.fullCapacityEntityEjectionCount.Inc()
 }
 
-// OnBucketFull is called whenever a bucket is found full and all of its keys are valid.
+// OnEmergencyKeyEjection is called whenever a bucket is found full and all of its keys are valid.
 // Hence, adding a new entity to that bucket will replace the oldest valid key inside that bucket.
-func (h *HeroCacheCollector) OnBucketFull() {
-	h.fullBucketsFoundTimes.Inc()
+func (h *HeroCacheCollector) OnEmergencyKeyEjection() {
+	h.emergencyKeyEjectionCount.Inc()
 }
 
-// OnAddingDuplicateEntityAttempt is tracking the total number of attempts on adding a duplicate entity to the cache.
-// A duplicate entity is dropped by the cache when it is written to the cache,
-// and this metric is tracking the total number of those queries.
-func (h *HeroCacheCollector) OnAddingDuplicateEntityAttempt() {
-	h.duplicateWriteQueriesTotal.Inc()
+// OnSuccessfulRead tracks total number of successful read queries. A read query is successful if its entity is available in the cache.
+func (h *HeroCacheCollector) OnSuccessfulRead() {
+	h.successfulReadCount.Inc()
+}
+
+// OnUnsuccessfulRead tracks total number of unsuccessful read queries. A read query is unsuccessful if its entity is not available in the cache.
+func (h *HeroCacheCollector) OnUnsuccessfulRead() {
+	h.unsuccessfulReadCount.Inc()
 }
