@@ -106,17 +106,7 @@ func (iy Identity) Checksum() Identifier {
 
 type encodableIdentity struct {
 	NodeID        Identifier
-	Address       string
-	Role          Role
-	Weight        uint64
-	StakingPubKey []byte
-	NetworkPubKey []byte
-}
-
-// stealthIdentity represents a node identity without an address
-type stealthIdentity struct {
-	NodeID        Identifier
-	Address       string `json:"-"`
+	Address       string `json:",omitempty"`
 	Role          Role
 	Weight        uint64
 	StakingPubKey []byte
@@ -135,20 +125,12 @@ func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 }
 
 func (iy Identity) MarshalJSON() ([]byte, error) {
-	var identity interface{}
 	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
 	}
 
-	// if the address is empty, suppress the Address field in the output json
-	if encodable.Address == "" {
-		identity = stealthIdentity(encodable)
-	} else {
-		identity = encodable
-	}
-
-	data, err := json.Marshal(identity)
+	data, err := json.Marshal(encodable)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode json: %w", err)
 	}

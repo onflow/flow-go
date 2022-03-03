@@ -1,12 +1,15 @@
 package flow_test
 
 import (
+	"encoding/json"
 	"math/rand"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
@@ -48,15 +51,30 @@ func TestHexStringToIdentifier(t *testing.T) {
 	}
 }
 
-/*
 func TestIdentityEncodingJSON(t *testing.T) {
-	identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
-	enc, err := json.Marshal(identity)
-	require.NoError(t, err)
-	var dec flow.Identity
-	err = json.Unmarshal(enc, &dec)
-	require.NoError(t, err)
-	require.Equal(t, identity, &dec)
+
+	t.Run("normal identity", func(t *testing.T) {
+		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+		enc, err := json.Marshal(identity)
+		require.NoError(t, err)
+		var dec flow.Identity
+		err = json.Unmarshal(enc, &dec)
+		require.NoError(t, err)
+		require.Equal(t, identity, &dec)
+	})
+
+	t.Run("empty address should be omitted", func(t *testing.T) {
+		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+		identity.Address = ""
+		enc, err := json.Marshal(identity)
+		require.NoError(t, err)
+		// should have no address field in output
+		assert.False(t, strings.Contains(string(enc), "Address"))
+		var dec flow.Identity
+		err = json.Unmarshal(enc, &dec)
+		require.NoError(t, err)
+		require.Equal(t, identity, &dec)
+	})
 }
 
 func TestIdentityEncodingMsgpack(t *testing.T) {
@@ -68,7 +86,6 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, identity, &dec)
 }
-*/
 
 func TestIdentityList_Exists(t *testing.T) {
 	t.Run("should find a given element", func(t *testing.T) {
