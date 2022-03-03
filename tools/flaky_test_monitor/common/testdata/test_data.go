@@ -238,27 +238,17 @@ func GetTestData_Level1_1CountPass() common.Level1Summary {
 }
 
 func GetTestData_Level1_1Count1FailRestPass() common.Level1Summary {
-	row1 := getFailedTest_TestSanitySha3_256()
-	row2 := getPassedTest("TestSanitySha3_384")
-	row3 := getPassedTest("TestSanitySha2_256")
-	row4 := getPassedTest("TestSanitySha2_384")
-	row5 := getPassedTest("TestSanityKmac128")
-	row6 := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632498687765218000\n")
-	row7 := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632498687765661000\n")
-	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
-	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-
 	testRun := common.Level1Summary{
 		Rows: []common.Level1TestResultRow{
-			row1,
-			row2,
-			row3,
-			row4,
-			row5,
-			row6,
-			row7,
-			row8,
-			row9,
+			getFailedTest_TestSanitySha3_256(),
+			getPassedTest("TestSanitySha3_384"),
+			getPassedTest("TestSanitySha2_256"),
+			getPassedTest("TestSanitySha2_384"),
+			getPassedTest("TestSanityKmac128"),
+			getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632498687765218000\n"),
+			getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632498687765661000\n"),
+			getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11"),
+			getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"),
 		},
 	}
 	return testRun
@@ -280,149 +270,70 @@ func GetTestData_Level1_1Count2SkippedRestPass() common.Level1Summary {
 }
 
 func GetTestData_Level1_2CountPass() common.Level1Summary {
-	row1 := getPassedTest("TestSanitySha3_256")
-	row2 := getPassedTest("TestSanitySha2_256")
-	row3 := getPassedTest("TestSanitySha3_384")
-	row4 := getPassedTest("TestSanitySha2_384")
-	row5 := getPassedTest("TestSanityKmac128")
-	row6a := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1633358050203144000\n")
-	row6b := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1633358050430256000\n")
-	row7a := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1633358050203374000\n")
-	row7b := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1633358050430467000\n")
-
-	row8 := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-
 	testRun := common.Level1Summary{
 		Rows: []common.Level1TestResultRow{
-			row1,
-			row2,
-			row3,
-			row4,
-			row5,
-			row6a,
-			row7a,
-			row8,
-			row9,
-
-			row1,
-			row2,
-			row3,
-			row4,
-			row5,
-			row6b,
-			row7b,
-			row8,
-			row9,
+			getPassedTest("TestSanitySha3_256"),
+			getPassedTest("TestSanitySha3_256"),
+			getPassedTest("TestSanitySha2_256"),
+			getPassedTest("TestSanitySha2_256"),
+			getPassedTest("TestSanitySha3_384"),
+			getPassedTest("TestSanitySha3_384"),
+			getPassedTest("TestSanitySha2_384"),
+			getPassedTest("TestSanitySha2_384"),
+			getPassedTest("TestSanityKmac128"),
+			getPassedTest("TestSanityKmac128"),
+			getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1633358050203144000\n"),
+			getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1633358050430256000\n"),
+			getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1633358050203374000\n"),
+			getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1633358050430467000\n"),
+			getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"),
+			getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"),
+			getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"),
+			getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"),
 		},
 	}
 	return testRun
 }
 
 func GetTestData_Level1_10CountPass() common.Level1Summary {
-	row1 := getPassedTest("TestSanitySha3_256")
-	row2 := getPassedTest("TestSanitySha2_256")
-	row3 := getPassedTest("TestSanitySha3_384")
-	row4 := getPassedTest("TestSanitySha2_384")
-	row5 := getPassedTest("TestSanityKmac128")
-
-	row6a := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739552470379000\n")
-	row6b := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739552696815000\n")
-	row6c := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739552917474000\n")
-	row6d := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553140451000\n")
-	row6e := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553362249000\n")
-	row6f := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553605325000\n")
-	row6g := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553826502000\n")
-	row6h := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739554054239000\n")
-	row6i := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739554280043000\n")
-	row6j := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739554500707000\n")
-
-	row7a := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739552470723000\n")
-	row7b := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739552697024000\n")
-	row7c := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739552917708000\n")
-	row7d := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739553140702000\n")
-	row7e := getPassedTestElapsedOutput("TestSha3", 0.24, "0.24", "    hash_test.go:158: math rand seed is 1632739553362497000\n")
-	row7f := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739553605582000\n")
-	row7g := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739553826733000\n")
-	row7h := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739554054464000\n")
-	row7i := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739554280256000\n")
-	row7j := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739554500935000\n")
-
-	row8a := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8b := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8c := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8d := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8e := getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12")
-	row8f := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8g := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8h := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8i := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8j := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-
-	row9a := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-	row9b := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-	row9c := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-	row9d := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-	row9e := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-	row9f := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-	row9g := getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13")
-	row9h := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-	row9i := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-	row9j := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-
 	var testResultRows []common.Level1TestResultRow
 
 	for i := 0; i < 10; i++ {
-		testResultRows = append(testResultRows, row1)
-		testResultRows = append(testResultRows, row2)
-		testResultRows = append(testResultRows, row3)
-		testResultRows = append(testResultRows, row4)
-		testResultRows = append(testResultRows, row5)
+		testResultRows = append(testResultRows, getPassedTest("TestSanitySha3_256"))
+		testResultRows = append(testResultRows, getPassedTest("TestSanitySha2_256"))
+		testResultRows = append(testResultRows, getPassedTest("TestSanitySha3_384"))
+		testResultRows = append(testResultRows, getPassedTest("TestSanitySha2_384"))
+		testResultRows = append(testResultRows, getPassedTest("TestSanityKmac128"))
 	}
 
-	testResultRows = append(testResultRows, row6a)
-	testResultRows = append(testResultRows, row6b)
-	testResultRows = append(testResultRows, row6c)
-	testResultRows = append(testResultRows, row6d)
-	testResultRows = append(testResultRows, row6e)
-	testResultRows = append(testResultRows, row6f)
-	testResultRows = append(testResultRows, row6g)
-	testResultRows = append(testResultRows, row6h)
-	testResultRows = append(testResultRows, row6i)
-	testResultRows = append(testResultRows, row6j)
+	for i := 0; i < 9; i++ {
+		testResultRows = append(testResultRows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
+		testResultRows = append(testResultRows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
+	}
+	testResultRows = append(testResultRows, getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13"))
+	testResultRows = append(testResultRows, getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12"))
 
-	testResultRows = append(testResultRows, row7a)
-	testResultRows = append(testResultRows, row7b)
-	testResultRows = append(testResultRows, row7c)
-	testResultRows = append(testResultRows, row7d)
-	testResultRows = append(testResultRows, row7e)
-	testResultRows = append(testResultRows, row7f)
-	testResultRows = append(testResultRows, row7g)
-	testResultRows = append(testResultRows, row7h)
-	testResultRows = append(testResultRows, row7i)
-	testResultRows = append(testResultRows, row7j)
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739552470379000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739552696815000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739552917474000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553140451000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553362249000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553605325000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739553826502000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739554054239000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739554280043000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739554500707000\n"))
 
-	testResultRows = append(testResultRows, row8a)
-	testResultRows = append(testResultRows, row8b)
-	testResultRows = append(testResultRows, row8c)
-	testResultRows = append(testResultRows, row8d)
-	testResultRows = append(testResultRows, row8e)
-	testResultRows = append(testResultRows, row8f)
-	testResultRows = append(testResultRows, row8g)
-	testResultRows = append(testResultRows, row8h)
-	testResultRows = append(testResultRows, row8i)
-	testResultRows = append(testResultRows, row8j)
-
-	testResultRows = append(testResultRows, row9a)
-	testResultRows = append(testResultRows, row9b)
-	testResultRows = append(testResultRows, row9c)
-	testResultRows = append(testResultRows, row9d)
-	testResultRows = append(testResultRows, row9e)
-	testResultRows = append(testResultRows, row9f)
-	testResultRows = append(testResultRows, row9g)
-	testResultRows = append(testResultRows, row9h)
-	testResultRows = append(testResultRows, row9i)
-	testResultRows = append(testResultRows, row9j)
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739552470723000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739552697024000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739552917708000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739553140702000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.24, "0.24", "    hash_test.go:158: math rand seed is 1632739553362497000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739553605582000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739553826733000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739554054464000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739554280256000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739554500935000\n"))
 
 	testRun := common.Level1Summary{
 		Rows: testResultRows,
@@ -431,90 +342,45 @@ func GetTestData_Level1_10CountPass() common.Level1Summary {
 }
 
 func GetTestData_Level1_10CountSomeFailures() common.Level1Summary {
-	row1 := getPassedTest("TestSanitySha3_256")
-	row2 := getFailedTest_TestSanitySha2_256()
-	row3 := getPassedTest("TestSanitySha3_384")
-	row4 := getPassedTest("TestSanitySha2_384")
-	row5 := getPassedTest("TestSanityKmac128")
-
-	row6a := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739682184421000\n")
-	row6b := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739682415309000\n")
-	row6c := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739682637108000\n")
-	row6d := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739682857435000\n")
-	row6e := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683077064000\n")
-	row6f := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683297507000\n")
-	row6g := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683518492000\n")
-	row6h := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683740724000\n")
-	row6i := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683980033000\n")
-	row6j := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739684200452000\n")
-
-	row7a := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739682184858000\n")
-	row7b := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739682415616000\n")
-	row7c := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739682637311000\n")
-	row7d := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739682857668000\n")
-	row7e := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739683077268000\n")
-	row7f := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739683297711000\n")
-	row7g := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739683518781000\n")
-	row7h := getPassedTestElapsedOutput("TestSha3", 0.24, "0.24", "    hash_test.go:158: math rand seed is 1632739683740970000\n")
-	row7i := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739683980266000\n")
-	row7j := getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739684200658000\n")
-
-	row8a := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
-	row8b := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8c := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8d := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8e := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8f := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8g := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8h := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-	row8i := getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12")
-	row8j := getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10")
-
-	row9 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-
 	var testResultRows []common.Level1TestResultRow
 
 	for i := 0; i < 10; i++ {
-		testResultRows = append(testResultRows, row1)
-		testResultRows = append(testResultRows, row2)
-		testResultRows = append(testResultRows, row3)
-		testResultRows = append(testResultRows, row4)
-		testResultRows = append(testResultRows, row5)
-		testResultRows = append(testResultRows, row9)
+		testResultRows = append(testResultRows, getPassedTest("TestSanitySha3_256"))
+		testResultRows = append(testResultRows, getFailedTest_TestSanitySha2_256())
+		testResultRows = append(testResultRows, getPassedTest("TestSanitySha3_384"))
+		testResultRows = append(testResultRows, getPassedTest("TestSanitySha2_384"))
+		testResultRows = append(testResultRows, getPassedTest("TestSanityKmac128"))
+		testResultRows = append(testResultRows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
 	}
 
-	testResultRows = append(testResultRows, row6a)
-	testResultRows = append(testResultRows, row6b)
-	testResultRows = append(testResultRows, row6c)
-	testResultRows = append(testResultRows, row6d)
-	testResultRows = append(testResultRows, row6e)
-	testResultRows = append(testResultRows, row6f)
-	testResultRows = append(testResultRows, row6g)
-	testResultRows = append(testResultRows, row6h)
-	testResultRows = append(testResultRows, row6i)
-	testResultRows = append(testResultRows, row6j)
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739682184421000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739682415309000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739682637108000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739682857435000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683077064000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683297507000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683518492000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683740724000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739683980033000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632739684200452000\n"))
 
-	testResultRows = append(testResultRows, row7a)
-	testResultRows = append(testResultRows, row7b)
-	testResultRows = append(testResultRows, row7c)
-	testResultRows = append(testResultRows, row7d)
-	testResultRows = append(testResultRows, row7e)
-	testResultRows = append(testResultRows, row7f)
-	testResultRows = append(testResultRows, row7g)
-	testResultRows = append(testResultRows, row7h)
-	testResultRows = append(testResultRows, row7i)
-	testResultRows = append(testResultRows, row7j)
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632739682184858000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739682415616000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739682637311000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739682857668000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739683077268000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739683297711000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739683518781000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.24, "0.24", "    hash_test.go:158: math rand seed is 1632739683740970000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739683980266000\n"))
+	testResultRows = append(testResultRows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1632739684200658000\n"))
 
-	testResultRows = append(testResultRows, row8a)
-	testResultRows = append(testResultRows, row8b)
-	testResultRows = append(testResultRows, row8c)
-	testResultRows = append(testResultRows, row8d)
-	testResultRows = append(testResultRows, row8e)
-	testResultRows = append(testResultRows, row8f)
-	testResultRows = append(testResultRows, row8g)
-	testResultRows = append(testResultRows, row8h)
-	testResultRows = append(testResultRows, row8i)
-	testResultRows = append(testResultRows, row8j)
+	for i := 0; i < 8; i++ {
+		testResultRows = append(testResultRows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
+	}
+
+	testResultRows = append(testResultRows, getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11"))
+	testResultRows = append(testResultRows, getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12"))
 
 	testRun := common.Level1Summary{
 		Rows: testResultRows,
