@@ -36,7 +36,7 @@ func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, dur
 
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("could not create profile dir: %w", err)
+		return nil, fmt.Errorf("could not create profile dir %v: %w", dir, err)
 	}
 
 	p := &AutoProfiler{
