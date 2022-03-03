@@ -13,9 +13,8 @@ import (
 // The customizer is used to generate a task-specific PRG (customizer in this implementation
 // is up to 12-bytes long).
 //
-// The function extracts first the source of randomness from sigData and then hashes
-// it to obtain a seed. Hashing is required to uniformize the entropy over the output,
-// since the source of randmoness is a cryptographic signature.
++// The function hashes the input random source to obtain the PRG seed.
++// Hashing is required to uniformize the entropy over the output.
 func PRGFromRandomSource(randomSource []byte, customizer []byte) (random.Rand, error) {
 	// hash the source of randomness (signature) to uniformize the entropy
 	var seed [hash.HashLenSHA3_256]byte
