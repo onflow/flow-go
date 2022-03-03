@@ -288,7 +288,5 @@ func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) 
 	return &runtime.PublicKey{
 		PublicKey: pk.Encode(),
 		SignAlgo:  CryptoToRuntimeSigningAlgorithm(crypto.BLSBLS12381),
-		IsValid:   true,
-		Validated: true,
 	}, nil
 }
