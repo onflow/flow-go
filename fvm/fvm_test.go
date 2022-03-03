@@ -2104,7 +2104,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							pub fun main(
 							signatures: [[UInt8]],
 							): [UInt8]? {
-								return AggregateBLSSignatures(signatures)
+								return BLS.aggregateSignatures(signatures)!
 							}
 						`,
 				)
@@ -2184,7 +2184,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					err = vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
 					assert.Error(t, script.Err)
-					assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
+					assert.Equal(t, nil, script.Value)
 				})
 
 				t.Run("empty signature list", func(t *testing.T) {
@@ -2204,7 +2204,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					err = vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
 					assert.Error(t, script.Err)
-					assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
+					assert.Equal(t, nil, script.Value)
 				})
 			},
 		))
@@ -2237,7 +2237,7 @@ func TestBLSMultiSignature(t *testing.T) {
 											signatureAlgorithm: SignatureAlgorithm.%s
 										))
 									}
-									return AggregateBLSPublicKeys(pks).publicKey
+									return BLS.aggregatePublicKeys(pks)!.publicKey
 								}
 								`,
 							signatureAlgorithm.name,
@@ -2328,7 +2328,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					err := vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
 					assert.Error(t, script.Err)
-					assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
+					assert.Equal(t, nil, script.Value)
 				})
 			},
 		))
@@ -2364,8 +2364,8 @@ func TestBLSMultiSignature(t *testing.T) {
 										signatureAlgorithm: SignatureAlgorithm.BLS_BLS12_381
 									))
 								}
-								let aggPk = AggregateBLSPublicKeys(pks)!
-								let aggSignature = AggregateBLSSignatures(signatures)!
+								let aggPk = BLS.aggregatePublicKeys(pks)!
+								let aggSignature = BLS.aggregateSignatures(signatures)!
 								let boo = aggPk.verify(
 									signature: aggSignature, 
 									signedData: message, 
