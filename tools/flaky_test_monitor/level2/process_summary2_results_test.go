@@ -41,7 +41,13 @@ func TestGenerateLevel2Summary(t *testing.T) {
 			HasNoResultTests: false,
 			TestRuns:         testdata.GetTestData_Level2MultipleL1SummariesFailuresPasses(),
 		},
-		// "many level 1 summaries, many failures, many passes, many no-result tests": {"test5-multi-failures-multi-no-result-tests", true, true},
+
+		"many level 1 summaries, many failures, many passes, many no-result tests": {
+			Directory:        "test5-multi-failures-multi-no-result-tests",
+			HasFailures:      true,
+			HasNoResultTests: true,
+			TestRuns:         testdata.GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults(),
+		},
 	}
 
 	for k, testData := range testDataMap {

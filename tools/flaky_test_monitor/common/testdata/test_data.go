@@ -593,26 +593,16 @@ func GetTestData_Leve1_3CountNilWithNormalTests() common.Level1Summary {
 // following functions are used by unit tests for constructing expected TestRuns data
 
 func GetTestData_Level2_1FailureRestPass() []common.Level1Summary {
-	row1_1 := getFailedTest_TestSanitySha3_256()
-	row2_1 := getPassedTest("TestSanitySha3_384")
-	row3_1 := getPassedTest("TestSanitySha2_256")
-	row4_1 := getPassedTest("TestSanitySha2_384")
-	row5_1 := getPassedTest("TestSanityKmac128")
-	row6_1 := getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632498687765218000\n")
-	row7_1 := getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632498687765661000\n")
-	row8_1 := getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11")
-	row9_1 := getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12")
-
 	var testResult1Rows []common.Level1TestResultRow
-	testResult1Rows = append(testResult1Rows, row1_1)
-	testResult1Rows = append(testResult1Rows, row2_1)
-	testResult1Rows = append(testResult1Rows, row3_1)
-	testResult1Rows = append(testResult1Rows, row4_1)
-	testResult1Rows = append(testResult1Rows, row5_1)
-	testResult1Rows = append(testResult1Rows, row6_1)
-	testResult1Rows = append(testResult1Rows, row7_1)
-	testResult1Rows = append(testResult1Rows, row8_1)
-	testResult1Rows = append(testResult1Rows, row9_1)
+	testResult1Rows = append(testResult1Rows, getFailedTest_TestSanitySha3_256())
+	testResult1Rows = append(testResult1Rows, getPassedTest("TestSanitySha3_384"))
+	testResult1Rows = append(testResult1Rows, getPassedTest("TestSanitySha2_256"))
+	testResult1Rows = append(testResult1Rows, getPassedTest("TestSanitySha2_384"))
+	testResult1Rows = append(testResult1Rows, getPassedTest("TestSanityKmac128"))
+	testResult1Rows = append(testResult1Rows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632498687765218000\n"))
+	testResult1Rows = append(testResult1Rows, getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632498687765661000\n"))
+	testResult1Rows = append(testResult1Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11"))
+	testResult1Rows = append(testResult1Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
 
 	testRun1 := common.Level1Summary{
 		Rows: testResult1Rows,
@@ -843,5 +833,189 @@ func GetTestData_Level2MultipleL1SummariesFailuresPasses() []common.Level1Summar
 	level1Summaries = append(level1Summaries, level1Summary4)
 	level1Summaries = append(level1Summaries, level1Summary5)
 	level1Summaries = append(level1Summaries, level1Summary6)
+	return level1Summaries
+}
+
+func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Level1Summary {
+	var level1TestResult1Rows []common.Level1TestResultRow
+	level1TestResult1Rows = append(level1TestResult1Rows, getFailedTest_TestSanitySha3_256())
+	level1TestResult1Rows = append(level1TestResult1Rows, getPassedTest("TestSanitySha3_384"))
+	level1TestResult1Rows = append(level1TestResult1Rows, getPassedTest("TestSanitySha2_256"))
+	level1TestResult1Rows = append(level1TestResult1Rows, getPassedTest("TestSanitySha2_384"))
+	level1TestResult1Rows = append(level1TestResult1Rows, getPassedTest("TestSanityKmac128"))
+	level1TestResult1Rows = append(level1TestResult1Rows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1632498687765218000\n"))
+	level1TestResult1Rows = append(level1TestResult1Rows, getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1632498687765661000\n"))
+	level1TestResult1Rows = append(level1TestResult1Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11"))
+	level1TestResult1Rows = append(level1TestResult1Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
+
+	var level1TestResult2Rows []common.Level1TestResultRow
+	level1TestResult2Rows = append(level1TestResult2Rows, getPassedTest("TestSanitySha3_256"))
+	level1TestResult2Rows = append(level1TestResult2Rows, getPassedTest("TestSanitySha2_256"))
+	level1TestResult2Rows = append(level1TestResult2Rows, getPassedTest("TestSanitySha3_384"))
+	level1TestResult2Rows = append(level1TestResult2Rows, getPassedTest("TestSanitySha2_384"))
+	level1TestResult2Rows = append(level1TestResult2Rows, getPassedTest("TestSanityKmac128"))
+	level1TestResult2Rows = append(level1TestResult2Rows, getPassedTest("TestHashersAPI"))
+	level1TestResult2Rows = append(level1TestResult2Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
+	level1TestResult2Rows = append(level1TestResult2Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
+	level1TestResult2Rows = append(level1TestResult2Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
+
+	var level1TestResult3Rows []common.Level1TestResultRow
+	level1TestResult3Rows = append(level1TestResult3Rows, getPassedTest("TestSanitySha3_256"))
+	level1TestResult3Rows = append(level1TestResult3Rows, getPassedTest("TestSanitySha3_384"))
+	level1TestResult3Rows = append(level1TestResult3Rows, getPassedTest("TestSanitySha2_384"))
+	level1TestResult3Rows = append(level1TestResult3Rows, getPassedTest("TestSanityKmac128"))
+	level1TestResult3Rows = append(level1TestResult3Rows, getPassedTestElapsed("TestSha3", 0.24, "0.24"))
+	level1TestResult3Rows = append(level1TestResult3Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11"))
+	level1TestResult3Rows = append(level1TestResult3Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13"))
+
+	var level1TestResult4Rows []common.Level1TestResultRow
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanitySha3_256"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanitySha3_256"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanitySha2_256"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanitySha2_256"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanitySha3_384"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanitySha3_384"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanitySha2_384"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanitySha2_384"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanityKmac128"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestSanityKmac128"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestHashersAPI"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTest("TestHashersAPI"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsed("TestSha3", 0.22, "0.22"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
+	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
+
+	var level1TestResult5Rows []common.Level1TestResultRow
+
+	for i := 0; i < 10; i++ {
+		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTest("TestSanitySha3_256"))
+		level1TestResult5Rows = append(level1TestResult5Rows, getFailedTest_TestSanitySha2_256())
+		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTest("TestSanitySha3_384"))
+		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTest("TestSanitySha2_384"))
+		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTest("TestSanityKmac128"))
+		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTest("TestHashersAPI"))
+		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
+	}
+
+	for i := 0; i < 8; i++ {
+		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3", 0.22, "0.22"))
+		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
+	}
+	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3", 0.24, "0.24"))
+	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
+	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12"))
+	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11"))
+
+	var level1TestResult6Rows []common.Level1TestResultRow
+	for i := 0; i < 10; i++ {
+		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTest("TestSanitySha3_256"))
+		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTest("TestSanitySha2_256"))
+		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTest("TestSanitySha3_384"))
+		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTest("TestSanitySha2_384"))
+		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTest("TestSanityKmac128"))
+		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTest("TestHashersAPI"))
+	}
+
+	for i := 0; i < 9; i++ {
+		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
+		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
+	}
+	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12"))
+	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13"))
+
+	for i := 0; i < 6; i++ {
+		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.22, "0.22"))
+	}
+	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.24, "0.24"))
+	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
+	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
+	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
+
+	var level1TestResult7Rows []common.Level1TestResultRow
+	for i := 0; i < 3; i++ {
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableNetworkPrivKey", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableNetworkPrivKeyNil", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableNetworkPubKey", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableNetworkPubKeyNil", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableRandomBeaconPrivKey", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableRandomBeaconPrivKeyNil", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableRandomBeaconPubKey", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableRandomBeaconPubKeyNil", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableStakingPrivKey", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableStakingPrivKeyNil", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableStakingPubKey", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableStakingPubKeyNil", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestIsHexString", "github.com/onflow/flow-go/model/encodable"))
+		level1TestResult7Rows = append(level1TestResult7Rows, getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+	}
+
+	var level1TestResult8Rows []common.Level1TestResultRow
+	level1TestResult8Rows = append(level1TestResult8Rows, getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+
+	var level1TestResult9Rows []common.Level1TestResultRow
+	for i := 0; i < 4; i++ {
+		level1TestResult9Rows = append(level1TestResult9Rows, getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+	}
+	level1TestResult9Rows = append(level1TestResult9Rows, getPassedTestPackage("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable"))
+
+	var level1TestResult10Rows []common.Level1TestResultRow
+	for i := 0; i < 5; i++ {
+		level1TestResult10Rows = append(level1TestResult10Rows, getNilTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+	}
+
+	level1Summary1 := common.Level1Summary{
+		Rows: level1TestResult1Rows,
+	}
+
+	level1Summary2 := common.Level1Summary{
+		Rows: level1TestResult2Rows,
+	}
+
+	level1Summary3 := common.Level1Summary{
+		Rows: level1TestResult3Rows,
+	}
+
+	level1Summary4 := common.Level1Summary{
+		Rows: level1TestResult4Rows,
+	}
+
+	level1Summary5 := common.Level1Summary{
+		Rows: level1TestResult5Rows,
+	}
+
+	level1Summary6 := common.Level1Summary{
+		Rows: level1TestResult6Rows,
+	}
+
+	level1Summary7 := common.Level1Summary{
+		Rows: level1TestResult7Rows,
+	}
+
+	level1Summary8 := common.Level1Summary{
+		Rows: level1TestResult8Rows,
+	}
+
+	level1Summary9 := common.Level1Summary{
+		Rows: level1TestResult9Rows,
+	}
+
+	level1Summary10 := common.Level1Summary{
+		Rows: level1TestResult10Rows,
+	}
+
+	var level1Summaries []common.Level1Summary
+	level1Summaries = append(level1Summaries, level1Summary1)
+	level1Summaries = append(level1Summaries, level1Summary2)
+	level1Summaries = append(level1Summaries, level1Summary3)
+	level1Summaries = append(level1Summaries, level1Summary4)
+	level1Summaries = append(level1Summaries, level1Summary5)
+	level1Summaries = append(level1Summaries, level1Summary6)
+	level1Summaries = append(level1Summaries, level1Summary7)
+	level1Summaries = append(level1Summaries, level1Summary8)
+	level1Summaries = append(level1Summaries, level1Summary9)
+	level1Summaries = append(level1Summaries, level1Summary10)
 	return level1Summaries
 }
