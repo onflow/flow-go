@@ -61,6 +61,8 @@ func NewClusterCommittee(
 	return com, nil
 }
 
+// Identities returns the identities of all the collection nodes members within the same cluster at the given block.
+// The order of the identity is the canonical order
 func (c *Cluster) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
 	// blockID is a collection block not a block produced by consensus,
 	// to query the identities from protocol state, we need to use the reference block id from the payload
