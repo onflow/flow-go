@@ -8,7 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
-	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -53,44 +53,43 @@ func messageSigningID(m *pubsub.Message) (peer.ID, error) {
 
 // MessageValidator validates the given message with original sender `from`.
 // Note: contrarily to pubsub.ValidatorEx, the peerID parameter does not represent the bearer of the message, but its source.
-type MessageValidator func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult
+type MessageValidator func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult
 
 type ValidatorData struct {
-	Message *message.Message
+	Message interface{}
 	From    peer.ID
 }
 
-func TopicValidator(validators ...MessageValidator) pubsub.ValidatorEx {
-	return func(ctx context.Context, receivedFrom peer.ID, rawMsg *pubsub.Message) pubsub.ValidationResult {
-		var msg message.Message
-		// convert the incoming raw message payload to Message type
-		//bs := binstat.EnterTimeVal(binstat.BinNet+":wire>1protobuf2message", int64(len(rawMsg.Data)))
-		err := msg.Unmarshal(rawMsg.Data)
-		//binstat.Leave(bs)
-		if err != nil {
-			return pubsub.ValidationReject
-		}
+func TopicValidatorFactory(codec network.Codec) func(...MessageValidator) pubsub.ValidatorEx {
+	return func(validators ...MessageValidator) pubsub.ValidatorEx {
+		return func(ctx context.Context, receivedFrom peer.ID, rawMsg *pubsub.Message) pubsub.ValidationResult {
+			decodedMessage, err := codec.Decode(rawMsg.Data)
 
-		from, err := messageSigningID(rawMsg)
-		if err != nil {
-			return pubsub.ValidationReject
-		}
-
-		rawMsg.ValidatorData = ValidatorData{
-			Message: &msg,
-			From:    from,
-		}
-
-		result := pubsub.ValidationAccept
-		for _, validator := range validators {
-			switch res := validator(ctx, from, &msg); res {
-			case pubsub.ValidationReject:
-				return res
-			case pubsub.ValidationIgnore:
-				result = res
+			if err != nil {
+				return pubsub.ValidationReject
 			}
-		}
 
-		return result
+			from, err := messageSigningID(rawMsg)
+			if err != nil {
+				return pubsub.ValidationReject
+			}
+
+			rawMsg.ValidatorData = ValidatorData{
+				Message: decodedMessage,
+				From:    from,
+			}
+
+			result := pubsub.ValidationAccept
+			for _, validator := range validators {
+				switch res := validator(ctx, from, decodedMessage); res {
+				case pubsub.ValidationReject:
+					return res
+				case pubsub.ValidationIgnore:
+					result = res
+				}
+			}
+
+			return result
+		}
 	}
 }

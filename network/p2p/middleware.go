@@ -3,11 +3,12 @@
 package p2p
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -84,8 +85,9 @@ type Middleware struct {
 	peerManager                *PeerManager
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
-	directMessageConfigs       map[network.Topic]DirectMessageConfig
+	directMessageConfigs       map[network.Channel]DirectMessageConfig
 	directMessageConfigsLock   sync.RWMutex
+	codec                      network.Codec
 	component.Component
 }
 
@@ -121,6 +123,7 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 func NewMiddleware(
 	log zerolog.Logger,
 	libP2PNodeFactory LibP2PFactoryFunc,
+	codec network.Codec,
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
 	sporkID flow.Identifier,
@@ -139,7 +142,8 @@ func NewMiddleware(
 		validators:           DefaultValidators(log, flowID),
 		peerManagerFactory:   nil,
 		idTranslator:         idTranslator,
-		directMessageConfigs: make(map[network.Topic]DirectMessageConfig),
+		directMessageConfigs: make(map[network.Channel]DirectMessageConfig),
+		codec:                codec,
 	}
 
 	for _, opt := range opts {
@@ -259,10 +263,6 @@ func (m *Middleware) start(ctx context.Context) error {
 	}
 
 	m.libP2PNode = libP2PNode
-	err = m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
-	if err != nil {
-		return fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err)
-	}
 
 	m.UpdateNodeAddresses()
 
@@ -312,25 +312,33 @@ func (m *Middleware) stop() {
 //
 // Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 // a more efficient candidate.
-func (m *Middleware) SendDirect(channel network.Channel, msg *message.Message, targetID flow.Identifier) (err error) {
+func (m *Middleware) SendDirect(channel network.Channel, event interface{}, targetID flow.Identifier) (err error) {
 	// translates identifier to peer id
 	peerID, err := m.idTranslator.GetPeerID(targetID)
 	if err != nil {
 		return fmt.Errorf("could not find peer id for target id: %w", err)
 	}
 
-	topic := engine.TopicFromChannel(channel, m.sporkID)
-	config := m.getDirectMessageConfig(topic)
+	// encode the payload using the configured codec
+	payload, err := m.codec.Encode(event)
+	if err != nil {
+		return fmt.Errorf("could not encode event: %w", err)
+	}
 
-	if msg.Size() > config.MaxMsgSize {
+	config := m.getDirectMessageConfig(channel)
+
+	msgSize := len(payload)
+	if msgSize > config.MaxMsgSize {
 		// message size goes beyond maximum size that the serializer can handle.
 		// proceeding with this message results in closing the connection by the target side, and
 		// delivery failure.
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), config.MaxMsgSize)
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, config.MaxMsgSize)
 	}
 
 	m.metrics.DirectMessageStarted(channel.String())
 	defer m.metrics.DirectMessageFinished(channel.String())
+
+	msgType := m.msgType(event)
 
 	// pass in a context with timeout to make the unicast call fail fast
 	ctx, cancel := context.WithTimeout(m.ctx, config.MaxMsgTimeout)
@@ -338,7 +346,9 @@ func (m *Middleware) SendDirect(channel network.Channel, msg *message.Message, t
 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
-	tag := fmt.Sprintf("%v:%v", channel, msg.Type)
+	randID := make([]byte, 8)
+	rand.Read(randID)
+	tag := fmt.Sprintf("%v:%v:%v", channel, msgType, string(randID))
 	m.libP2PNode.host.ConnManager().Protect(peerID, tag)
 	defer m.libP2PNode.host.ConnManager().Unprotect(peerID, tag)
 
@@ -362,7 +372,7 @@ func (m *Middleware) SendDirect(channel network.Channel, msg *message.Message, t
 			}
 
 			// OneToOne communication metrics are reported with topic OneToOne
-			m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+			m.metrics.NetworkMessageSent(msgSize, metrics.ChannelOneToOne, msgType)
 		} else {
 			resetErr := stream.Reset()
 			if resetErr != nil {
@@ -377,19 +387,10 @@ func (m *Middleware) SendDirect(channel network.Channel, msg *message.Message, t
 		return fmt.Errorf("failed to set write deadline for stream: %w", err)
 	}
 
-	// create a gogo protobuf writer
-	bufw := bufio.NewWriter(stream)
-	writer := ggio.NewDelimitedWriter(bufw)
+	_, err = stream.Write(payload)
 
-	err = writer.WriteMsg(msg)
 	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", targetID, err)
-	}
-
-	// flush the stream
-	err = bufw.Flush()
-	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID, err)
+		return fmt.Errorf("failed to write message to stream: %w", err)
 	}
 
 	success = true
@@ -397,9 +398,13 @@ func (m *Middleware) SendDirect(channel network.Channel, msg *message.Message, t
 	return nil
 }
 
-func (m *Middleware) getDirectMessageConfig(topic network.Topic) DirectMessageConfig {
+func (m *Middleware) msgType(event interface{}) string {
+	return strings.TrimLeft(fmt.Sprintf("%T", event), "*")
+}
+
+func (m *Middleware) getDirectMessageConfig(channel network.Channel) DirectMessageConfig {
 	m.directMessageConfigsLock.RLock()
-	config, ok := m.directMessageConfigs[topic]
+	config, ok := m.directMessageConfigs[channel]
 	m.directMessageConfigsLock.RUnlock()
 
 	if ok {
@@ -435,17 +440,34 @@ func (m *Middleware) streamHandler(channel network.Channel, handler network.Dire
 			}
 		}()
 
-		config := m.getDirectMessageConfig(network.Topic(stream.Protocol()))
+		peerID := stream.Conn().RemotePeer()
+		flowID, err := m.idTranslator.GetFlowID(peerID)
+		if err != nil {
+			m.log.Warn().Err(err).Msgf("received message from unknown peer %v, and was dropped", peerID.String())
+			return
+		}
+
+		config := m.getDirectMessageConfig(channel)
 
 		ctx, cancel := context.WithTimeout(m.ctx, config.MaxMsgTimeout)
 		defer cancel()
 
 		deadline, _ := ctx.Deadline()
 
-		err := stream.SetReadDeadline(deadline)
+		err = stream.SetReadDeadline(deadline)
 		if err != nil {
 			log.Err(err).Msg("failed to set read deadline for stream")
 			return
+		}
+
+		for {
+
+		}
+
+		_, err = stream.Read()
+
+		if err != nil {
+			return fmt.Errorf("failed to write message to stream: %w", err)
 		}
 
 		// create the reader
@@ -470,15 +492,16 @@ func (m *Middleware) streamHandler(channel network.Channel, handler network.Dire
 				return
 			}
 
-			m.wg.Add(1)
-			go func(msg *message.Message) {
-				defer m.wg.Done()
+			decodedMessage, err := m.codec.Decode(msg.Payload)
+			if err != nil {
+				m.log.Err(err).Msg("could not decode msg")
+				return
+			}
 
-				// log metrics with the channel name as OneToOne
-				m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-				handler(channel)
-				m.processAuthenticatedMessage(msg, stream.Conn().RemotePeer())
-			}(&msg)
+			// log metrics with the channel name as OneToOne
+			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, m.msgType(decodedMessage))
+
+			handler(channel, msg, flowID)
 		}
 
 		success = true
@@ -494,13 +517,13 @@ func (m *Middleware) SetDirectMessageConfig(channel network.Channel, config Dire
 	m.directMessageConfigsLock.Lock()
 	defer m.directMessageConfigsLock.Unlock()
 
-	m.directMessageConfigs[engine.TopicFromChannel(channel, m.sporkID)] = config
+	m.directMessageConfigs[channel] = config
 }
 
 func (m *Middleware) SetDirectMessageHandler(channel network.Channel, handler network.DirectMessageHandler) {
 	m.libP2PNode.Host().SetStreamHandler(
 		protocol.ID(engine.TopicFromChannel(channel, m.sporkID)),
-		m.streamHandler(handler),
+		m.streamHandler(channel, handler),
 	)
 }
 
@@ -521,7 +544,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(m.ctx, s, m.processAuthenticatedMessage, m.log, m.metrics)
+	rs := newReadSubscription(m.ctx, s, m.pubSubMessageHandler(channel), m.log)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
@@ -547,62 +570,52 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	return nil
 }
 
-// processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
-// In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
-// The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
-// this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID) {
-	flowID, err := m.idTranslator.GetFlowID(peerID)
-	if err != nil {
-		m.log.Warn().Err(err).Msgf("received message from unknown peer %v, and was dropped", peerID.String())
-		return
-	}
+func (m *Middleware) pubSubMessageHandler(channel network.Channel) func(interface{}, int, peer.ID) {
+	return func(msg interface{}, rawLength int, peerID peer.ID) {
+		// log metrics
+		m.metrics.NetworkMessageReceived(rawLength, channel.String(), m.msgType(msg))
 
-	msg.OriginID = flowID[:]
-
-	m.processMessage(msg)
-}
-
-// processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(msg *message.Message) {
-	originID := flow.HashToID(msg.OriginID)
-
-	m.log.Debug().
-		Str("channel", msg.ChannelID).
-		Str("type", msg.Type).
-		Str("origin_id", originID.String()).
-		Msg("processing new message")
-
-	// run through all the message validators
-	for _, v := range m.validators {
-		// if any one fails, stop message propagation
-		if !v.Validate(*msg) {
+		flowID, err := m.idTranslator.GetFlowID(peerID)
+		if err != nil {
+			m.log.Warn().Err(err).Msgf("received message from unknown peer %v, and was dropped", peerID.String())
 			return
 		}
-	}
 
-	// if validation passed, send the message to the overlay
-	err := m.ov.Receive(originID, msg)
-	if err != nil {
-		m.log.Error().Err(err).Msg("could not deliver payload")
+		m.log.Debug().
+			Str("channel", channel.String()).
+			Str("type", m.msgType(msg)).
+			Str("origin_id", flowID.String()).
+			Msg("processing new message")
+
+		// run through all the message validators
+		for _, v := range m.validators {
+			// if any one fails, stop message propagation
+			if !v.Validate(msg) {
+				return
+			}
+		}
+
+		// if validation passed, send the message to the overlay
+		err = m.ov.Receive(flowID, msg)
+		if err != nil {
+			m.log.Error().Err(err).Msg("could not deliver payload")
+		}
 	}
 }
 
 // Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 // a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 // effort.
-func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
-	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
+func (m *Middleware) Publish(event interface{}, channel network.Channel) error {
+	m.log.Debug().Str("channel", channel.String()).Interface("msg", event).Msg("publishing new message")
 
-	// convert the message to bytes to be put on the wire.
-	//bs := binstat.EnterTime(binstat.BinNet + ":wire<4message2protobuf")
-	data, err := msg.Marshal()
-	//binstat.LeaveVal(bs, int64(len(data)))
+	// encode the payload using the configured codec
+	payload, err := m.codec.Encode(event)
 	if err != nil {
-		return fmt.Errorf("failed to marshal the message: %w", err)
+		return fmt.Errorf("could not encode event: %w", err)
 	}
 
-	msgSize := len(data)
+	msgSize := len(payload)
 	if msgSize > DefaultMaxPubSubMsgSize {
 		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
 		// hence return an error as this message is undeliverable
@@ -612,12 +625,12 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 	topic := engine.TopicFromChannel(channel, m.sporkID)
 
 	// publish the bytes on the topic
-	err = m.libP2PNode.Publish(m.ctx, topic, data)
+	err = m.libP2PNode.Publish(m.ctx, topic, payload)
 	if err != nil {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
-	m.metrics.NetworkMessageSent(len(data), string(channel), msg.Type)
+	m.metrics.NetworkMessageSent(msgSize, string(channel), m.msgType(event))
 
 	return nil
 }
