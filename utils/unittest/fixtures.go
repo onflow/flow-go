@@ -886,6 +886,15 @@ func RandomBytes(n int) []byte {
 	return b
 }
 
+func NodeConfigFixture(opts ...func(*flow.Identity)) bootstrap.NodeConfig {
+	identity := IdentityFixture(opts...)
+	return bootstrap.NodeConfig{
+		Role:    identity.Role,
+		Address: identity.Address,
+		Weight:  identity.Weight,
+	}
+}
+
 func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
 	opts = append(opts, WithKeys)
 	return bootstrap.NodeInfoFromIdentity(IdentityFixture(opts...))

@@ -2,6 +2,7 @@
 package bootstrap
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -111,7 +112,36 @@ type NodeConfig struct {
 	Weight uint64
 }
 
-// Defines the canonical structure for encoding private node info.
+// decodableNodeConfig provides backward-compatible decoding of old models
+// which use the Stake field in place of Weight.
+type decodableNodeConfig struct {
+	Role    flow.Role
+	Address string
+	Weight  uint64
+	// Stake previously was used in place of the Weight field.
+	Stake uint64
+}
+
+func (conf *NodeConfig) UnmarshalJSON(b []byte) error {
+	var decodable decodableNodeConfig
+	err := json.Unmarshal(b, &decodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	// compat: translate Stake fields to Weight
+	if decodable.Stake != 0 {
+		if decodable.Weight != 0 {
+			return fmt.Errorf("invalid NodeConfig with both Stake and Weight fields")
+		}
+		decodable.Weight = decodable.Stake
+	}
+	conf.Role = decodable.Role
+	conf.Address = decodable.Address
+	conf.Weight = decodable.Weight
+	return nil
+}
+
+// NodeInfoPriv defines the canonical structure for encoding private node info.
 type NodeInfoPriv struct {
 	Role           flow.Role
 	Address        string
@@ -120,7 +150,7 @@ type NodeInfoPriv struct {
 	StakingPrivKey encodable.StakingPrivKey
 }
 
-// Defines the canonical structure for encoding public node info.
+// NodeInfoPub defines the canonical structure for encoding public node info.
 type NodeInfoPub struct {
 	Role          flow.Role
 	Address       string
@@ -128,6 +158,42 @@ type NodeInfoPub struct {
 	Weight        uint64
 	NetworkPubKey encodable.NetworkPubKey
 	StakingPubKey encodable.StakingPubKey
+}
+
+// decodableNodeInfoPub provides backward-compatible decoding of old models
+// which use the Stake field in place of Weight.
+type decodableNodeInfoPub struct {
+	Role          flow.Role
+	Address       string
+	NodeID        flow.Identifier
+	Weight        uint64
+	NetworkPubKey encodable.NetworkPubKey
+	StakingPubKey encodable.StakingPubKey
+	// Stake previously was used in place of the Weight field.
+	// Deprecated: supported in decoding for backward-compatibility
+	Stake uint64
+}
+
+func (info *NodeInfoPub) UnmarshalJSON(b []byte) error {
+	var decodable decodableNodeInfoPub
+	err := json.Unmarshal(b, &decodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	// compat: translate Stake fields to Weight
+	if decodable.Stake != 0 {
+		if decodable.Weight != 0 {
+			return fmt.Errorf("invalid NodeInfoPub with both Stake and Weight fields")
+		}
+		decodable.Weight = decodable.Stake
+	}
+	info.Role = decodable.Role
+	info.Address = decodable.Address
+	info.NodeID = decodable.NodeID
+	info.Weight = decodable.Weight
+	info.NetworkPubKey = decodable.NetworkPubKey
+	info.StakingPubKey = decodable.StakingPubKey
+	return nil
 }
 
 // NodePrivateKeys is a wrapper for the private keys for a node, comprising all

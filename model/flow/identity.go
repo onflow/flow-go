@@ -113,6 +113,15 @@ type encodableIdentity struct {
 	NetworkPubKey []byte
 }
 
+// decodableIdentity provides backward-compatible decoding of old models
+// which use the Stake field in place of Weight.
+type decodableIdentity struct {
+	encodableIdentity
+	// Stake previously was used in place of the Weight field.
+	// Deprecated: supported in decoding for backward-compatibility
+	Stake uint64
+}
+
 func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Weight, nil, nil}
 	if iy.StakingPubKey != nil {
@@ -193,12 +202,19 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 }
 
 func (iy *Identity) UnmarshalJSON(b []byte) error {
-	var encodable encodableIdentity
-	err := json.Unmarshal(b, &encodable)
+	var decodable decodableIdentity
+	err := json.Unmarshal(b, &decodable)
 	if err != nil {
 		return fmt.Errorf("could not decode json: %w", err)
 	}
-	err = identityFromEncodable(encodable, iy)
+	// compat: translate Stake fields to Weight
+	if decodable.Stake != 0 {
+		if decodable.Weight != 0 {
+			return fmt.Errorf("invalid identity with both Stake and Weight fields")
+		}
+		decodable.Weight = decodable.Stake
+	}
+	err = identityFromEncodable(decodable.encodableIdentity, iy)
 	if err != nil {
 		return fmt.Errorf("could not convert from encodable json: %w", err)
 	}

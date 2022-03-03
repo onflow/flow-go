@@ -75,6 +75,18 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, identity, &dec)
 	})
+
+	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
+		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+		enc, err := json.Marshal(identity)
+		require.NoError(t, err)
+		// emulate the old encoding by replacing the new field with old field name
+		enc = []byte(strings.Replace(string(enc), "Weight", "Stake", 1))
+		var dec flow.Identity
+		err = json.Unmarshal(enc, &dec)
+		require.NoError(t, err)
+		require.Equal(t, identity, &dec)
+	})
 }
 
 func TestIdentityEncodingMsgpack(t *testing.T) {
