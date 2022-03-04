@@ -8,10 +8,10 @@ import (
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestDatastore() datastore.Batching {
