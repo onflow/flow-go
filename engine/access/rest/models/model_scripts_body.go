@@ -11,6 +11,6 @@ package models
 type ScriptsBody struct {
 	// Base64 encoded content of the Cadence script.
 	Script string `json:"script,omitempty"`
-	// Array of Base64 encoded arguments with in [JSON-Cadence interchange format](https://docs.onflow.org/cadence/json-cadence-spec/).
+	// An array containing arguments each encoded as Base64 passed in the [JSON-Cadence interchange format](https://docs.onflow.org/cadence/json-cadence-spec/).
 	Arguments []string `json:"arguments,omitempty"`
 }
