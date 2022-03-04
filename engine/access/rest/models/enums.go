@@ -11,7 +11,7 @@ const (
 )
 
 const (
-	PENDING_RESULT = PENDING_TransactionResultStatus
-	SUCCESS_RESULT = SUCCESS_TransactionResultStatus
-	FAILURE_RESULT = FAILURE_TransactionResultStatus
+	PENDING_RESULT = PENDING_TransactionExecution
+	SUCCESS_RESULT = SUCCESS_TransactionExecution
+	FAILURE_RESULT = FAILURE_TransactionExecution
 )
