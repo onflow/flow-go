@@ -5,7 +5,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
@@ -94,9 +93,6 @@ func (r *BalanceReporter) balanceReporterWorker(
 	accounts := state.NewAccounts(sth)
 	storage := cadenceRuntime.NewStorage(
 		&migrations.AccountsAtreeLedger{Accounts: accounts},
-		func(f func(), _ func(metrics cadenceRuntime.Metrics, duration time.Duration)) {
-			f()
-		},
 	)
 
 	for payload := range jobs {
