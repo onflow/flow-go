@@ -26,9 +26,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -44,6 +46,7 @@ func DefaultLibP2PNodeFactory(
 	idProvider id.IdentityProvider,
 	metrics module.NetworkMetrics,
 	resolver madns.BasicResolver,
+	codec network.Codec,
 	role string,
 ) LibP2PFactoryFunc {
 
@@ -55,7 +58,7 @@ func DefaultLibP2PNodeFactory(
 			return found
 		})
 
-		builder := NewNodeBuilder(log, address, flowKey, sporkId).
+		builder := NewNodeBuilder(log, address, flowKey, sporkId, validator.TopicValidatorFactory(codec)).
 			SetBasicResolver(resolver).
 			SetConnectionManager(connManager).
 			SetConnectionGater(connGater).
@@ -91,16 +94,17 @@ type NodeBuilder interface {
 }
 
 type LibP2PNodeBuilder struct {
-	sporkID            flow.Identifier
-	addr               string
-	networkKey         fcrypto.PrivateKey
-	logger             zerolog.Logger
-	basicResolver      madns.BasicResolver
-	subscriptionFilter pubsub.SubscriptionFilter
-	connManager        connmgr.ConnManager
-	connGater          connmgr.ConnectionGater
-	routingFactory     func(context.Context, host.Host) (routing.Routing, error)
-	pubsubFactory      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
+	sporkID               flow.Identifier
+	addr                  string
+	networkKey            fcrypto.PrivateKey
+	logger                zerolog.Logger
+	basicResolver         madns.BasicResolver
+	subscriptionFilter    pubsub.SubscriptionFilter
+	connManager           connmgr.ConnManager
+	connGater             connmgr.ConnectionGater
+	routingFactory        func(context.Context, host.Host) (routing.Routing, error)
+	pubsubFactory         func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
+	topicValidatorFactory func(...validator.MessageValidator) pubsub.ValidatorEx
 }
 
 func NewNodeBuilder(
@@ -108,12 +112,14 @@ func NewNodeBuilder(
 	addr string,
 	networkKey fcrypto.PrivateKey,
 	sporkID flow.Identifier,
+	topicValidatorFactory func(...validator.MessageValidator) pubsub.ValidatorEx,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
-		logger:     logger,
-		sporkID:    sporkID,
-		addr:       addr,
-		networkKey: networkKey,
+		logger:                logger,
+		sporkID:               sporkID,
+		addr:                  addr,
+		networkKey:            networkKey,
+		topicValidatorFactory: topicValidatorFactory,
 	}
 }
 

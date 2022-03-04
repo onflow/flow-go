@@ -33,14 +33,15 @@ const (
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
-	unicastManager *unicast.Manager
-	host           host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	pubSub         *pubsub.PubSub                         // reference to the libp2p PubSub component
-	logger         zerolog.Logger                         // used to provide logging
-	topics         map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs           map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
-	routing        routing.Routing
-	pCache         *protocolPeerCache
+	unicastManager        *unicast.Manager
+	host                  host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	pubSub                *pubsub.PubSub                         // reference to the libp2p PubSub component
+	logger                zerolog.Logger                         // used to provide logging
+	topics                map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
+	subs                  map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
+	routing               routing.Routing
+	pCache                *protocolPeerCache
+	topicValidatorFactory func(...validator.MessageValidator) pubsub.ValidatorEx
 }
 
 // Stop terminates the libp2p node.
@@ -171,7 +172,7 @@ func (n *Node) Subscribe(topic flownet.Topic, validators ...validator.MessageVal
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		topicValidator := validator.TopicValidator(validators...)
+		topicValidator := n.topicValidatorFactory(validators...)
 		if err := n.pubSub.RegisterTopicValidator(
 			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
 		); err != nil {
