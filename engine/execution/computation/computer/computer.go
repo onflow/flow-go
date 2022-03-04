@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -52,6 +53,8 @@ type blockComputer struct {
 	log            zerolog.Logger
 	systemChunkCtx fvm.Context
 	committer      ViewCommitter
+	eds            state_synchronization.ExecutionDataService
+	edCache        state_synchronization.ExecutionDataCIDCache
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -74,6 +77,8 @@ func NewBlockComputer(
 	tracer module.Tracer,
 	logger zerolog.Logger,
 	committer ViewCommitter,
+	eds state_synchronization.ExecutionDataService,
+	edCache state_synchronization.ExecutionDataCIDCache,
 ) (BlockComputer, error) {
 	return &blockComputer{
 		vm:             vm,
@@ -83,6 +88,8 @@ func NewBlockComputer(
 		log:            logger,
 		systemChunkCtx: SystemChunkContext(vmCtx, logger),
 		committer:      committer,
+		eds:            eds,
+		edCache:        edCache,
 	}, nil
 }
 
@@ -140,11 +147,12 @@ func (e *blockComputer) executeBlock(
 	var txIndex uint32
 	var err error
 	var wg sync.WaitGroup
-	wg.Add(2) // block commiter and event hasher
+	wg.Add(3) // block commiter, event hasher, and execution data storer
 
 	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
 	proofs := make([][]byte, 0, len(collections)+1)
 	trieUpdates := make([]*ledger.TrieUpdate, 0, len(collections)+1)
+	executionDataChan := make(chan *state_synchronization.ExecutionData, len(collections)+1)
 
 	bc := blockCommitter{
 		committer: e.committer,
@@ -152,9 +160,19 @@ func (e *blockComputer) executeBlock(
 		tracer:    e.tracer,
 		state:     *block.StartState,
 		views:     make(chan state.View, len(collections)+1),
-		callBack: func(state flow.StateCommitment, proof []byte, trieUpdate *ledger.TrieUpdate, err error) {
+		callBack: func(idx int, state flow.StateCommitment, proof []byte, trieUpdate *ledger.TrieUpdate, err error) {
 			if err != nil {
 				panic(err)
+			}
+			var collection *flow.Collection
+			if idx < len(collections) {
+				c := collections[idx].Collection()
+				collection = &c
+			}
+			executionDataChan <- &state_synchronization.ExecutionData{
+				Collection: collection,
+				Events:     res.Events[idx],
+				TrieUpdate: trieUpdate,
 			}
 			stateCommitments = append(stateCommitments, state)
 			proofs = append(proofs, proof)
@@ -173,6 +191,23 @@ func (e *blockComputer) executeBlock(
 			res.EventsHashes = append(res.EventsHashes, hash)
 		},
 	}
+
+	eds := executionDataStorer{
+		executionDataService: e.eds,
+		data:                 executionDataChan,
+		callBack: func(idx int, id flow.Identifier, blobTree state_synchronization.BlobTree, err error) {
+			if err != nil {
+				panic(fmt.Errorf("failed to store execution data: %w", err))
+			}
+			res.ExecutionDataIDs = append(res.ExecutionDataIDs, id)
+			e.edCache.Insert(block.ID(), block.Height(), idx, blobTree)
+		},
+	}
+
+	go func() {
+		eds.Run()
+		wg.Done()
+	}()
 
 	go func() {
 		bc.Run()
@@ -218,6 +253,7 @@ func (e *blockComputer) executeBlock(
 	// close the views and wait for all views to be committed
 	close(bc.views)
 	close(eh.data)
+	close(eds.data)
 	wg.Wait()
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	res.StateCommitments = stateCommitments
@@ -422,19 +458,21 @@ func (e *blockComputer) executeTransaction(
 type blockCommitter struct {
 	tracer    module.Tracer
 	committer ViewCommitter
-	callBack  func(state flow.StateCommitment, proof []byte, update *ledger.TrieUpdate, err error)
+	callBack  func(idx int, state flow.StateCommitment, proof []byte, update *ledger.TrieUpdate, err error)
 	state     flow.StateCommitment
 	views     chan state.View
 	blockSpan opentracing.Span
 }
 
 func (bc *blockCommitter) Run() {
+	i := 0
 	for view := range bc.views {
 		span := bc.tracer.StartSpanFromParent(bc.blockSpan, trace.EXECommitDelta)
 		stateCommit, proof, trieUpdate, err := bc.committer.CommitView(view, bc.state)
-		bc.callBack(stateCommit, proof, trieUpdate, err)
+		bc.callBack(i, stateCommit, proof, trieUpdate, err)
 		bc.state = stateCommit
 		span.Finish()
+		i++
 	}
 }
 
@@ -460,4 +498,23 @@ func (eh *eventHasher) Run() {
 
 func (eh *eventHasher) Hash(events flow.EventsList) {
 	eh.data <- events
+}
+
+type executionDataStorer struct {
+	executionDataService state_synchronization.ExecutionDataService
+	callBack             func(int, flow.Identifier, state_synchronization.BlobTree, error)
+	data                 chan *state_synchronization.ExecutionData
+}
+
+func (eds *executionDataStorer) Run() {
+	i := 0
+	for data := range eds.data {
+		id, blobTree, err := eds.executionDataService.Add(context.TODO(), data)
+		eds.callBack(i, id, blobTree, err)
+		i++
+	}
+}
+
+func (eds *executionDataStorer) Store(executionData *state_synchronization.ExecutionData) {
+	eds.data <- executionData
 }

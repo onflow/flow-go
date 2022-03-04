@@ -28,7 +28,7 @@ type ComputationResult struct {
 	ComputationUsed    uint64
 	StateReads         uint64
 	TrieUpdates        []*ledger.TrieUpdate
-	ExecutionDataID    flow.Identifier
+	ExecutionDataIDs   []flow.Identifier
 }
 
 func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {
