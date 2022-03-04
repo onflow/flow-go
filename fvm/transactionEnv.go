@@ -633,11 +633,7 @@ func (e *TransactionEnv) VerifySignature(
 }
 
 func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
-	valid, err := crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
-	if !valid {
-		return fmt.Errorf("invalid public key: %w", err)
-	}
-	return nil
+	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
 // Block Environment Functions

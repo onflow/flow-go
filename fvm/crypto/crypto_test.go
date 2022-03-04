@@ -289,9 +289,8 @@ func TestValidatePublicKey(t *testing.T) {
 	}
 
 	t.Run("Unknown algorithm should return false", func(t *testing.T) {
-		valid, err := crypto.ValidatePublicKey(runtime.SignatureAlgorithmUnknown, validPublicKey(t, runtime.SignatureAlgorithmECDSA_P256))
+		err := crypto.ValidatePublicKey(runtime.SignatureAlgorithmUnknown, validPublicKey(t, runtime.SignatureAlgorithmECDSA_P256))
 		require.Error(t, err)
-		require.False(t, valid)
 	})
 
 	t.Run("valid public key should return true", func(t *testing.T) {
@@ -302,9 +301,8 @@ func TestValidatePublicKey(t *testing.T) {
 		}
 		for i, s := range signatureAlgos {
 			t.Run(fmt.Sprintf("case %v: %v", i, s), func(t *testing.T) {
-				valid, err := crypto.ValidatePublicKey(s, validPublicKey(t, s))
+				err := crypto.ValidatePublicKey(s, validPublicKey(t, s))
 				require.NoError(t, err)
-				require.True(t, valid)
 			})
 		}
 	})
@@ -320,9 +318,8 @@ func TestValidatePublicKey(t *testing.T) {
 				key := validPublicKey(t, s)
 				key[0] ^= 1 // alter one bit of the valid key
 
-				valid, err := crypto.ValidatePublicKey(s, key)
+				err := crypto.ValidatePublicKey(s, key)
 				require.Error(t, err)
-				require.False(t, valid)
 			})
 		}
 	})

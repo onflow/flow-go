@@ -502,11 +502,7 @@ func (e *ScriptEnv) VerifySignature(
 }
 
 func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
-	valid, err := crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
-	if !valid {
-		return fmt.Errorf("invalid public key: %w", err)
-	}
-	return nil
+	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
 // Block Environment Functions

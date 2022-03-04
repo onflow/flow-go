@@ -99,19 +99,22 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 	}
 }
 
-// ValidatePublicKey returns true if public key is valid
-func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bool, err error) {
+// ValidatePublicKey returns :
+// - nil if key is valid and no exception occurred.
+// - crypto.invalidInputsError if key is invalid and no exception occurred.
+// - panics if an exception occurred.
+func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) error {
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signAlgo)
 
-	_, err = crypto.DecodePublicKey(sigAlgo, pk)
+	_, err := crypto.DecodePublicKey(sigAlgo, pk)
 
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			return false, err
+			return err
 		}
 		panic(fmt.Errorf("validate public key failed with unexpected error %w", err))
 	}
-	return true, nil
+	return nil
 }
 
 // VerifySignatureFromRuntime is an adapter that performs signature verification using
