@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/crypto"
@@ -137,6 +136,7 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerId:         h.ProposerID[:],
 		ProposerSigData:    h.ProposerSigData,
+		ChainId:            h.ChainID.String(),
 	}, nil
 }
 
@@ -153,6 +153,7 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		ParentVoterSigData: m.ParentVoterSigData,
 		ProposerID:         MessageToIdentifier(m.ProposerId),
 		ProposerSigData:    m.ProposerSigData,
+		ChainID:            flow.ChainID(m.ChainId),
 	}, nil
 }
 
@@ -173,11 +174,10 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	}
 
 	bh := entities.Block{
-		Id:        id[:],
-		Height:    h.Header.Height,
-		ParentId:  parentID[:],
-		Timestamp: t,
-
+		Id:                   id[:],
+		Height:               h.Header.Height,
+		ParentId:             parentID[:],
+		Timestamp:            t,
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
 		Signatures:           [][]byte{h.Header.ParentVoterSigData},
@@ -186,11 +186,36 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	return &bh, nil
 }
 
-func MessageToBlock(m *entitiesproto.Block) *flow.Block {
+func MessageToBlock(m *entities.Block) *flow.Block {
 
 }
 
-func MessagesToExecutionResultMetaList() {
+func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.ExecutionReceiptMetaList {
+	execMetaList := make([]*flow.ExecutionReceiptMeta, len(m))
+	for i, message := range m {
+		execMetaList[i] = &flow.ExecutionReceiptMeta{
+			ExecutorID:        MessageToIdentifier(message.ExecutorId),
+			ResultID:          MessageToIdentifier(message.ResultId),
+			Spocks:            MessagesToSignatures(message.Spocks),
+			ExecutorSignature: MessageToSignature(message.ExecutorSignature),
+		}
+	}
+	return execMetaList[:]
+}
+
+func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptMetaList) []*entities.ExecutionReceiptMeta {
+	messageList := make([]*entities.ExecutionReceiptMeta, len(e))
+	for i, execMeta := range e {
+		messageList[i] = &entities.ExecutionReceiptMeta{
+			ExecutorId:        IdentifierToMessage(execMeta.ExecutorID),
+			ResultId:          IdentifierToMessage(execMeta.ResultID),
+			Spocks:            SignaturesToMessages(execMeta.Spocks),
+			ExecutorSignature: MessageToSignature(execMeta.ExecutorSignature),
+		}
+	}
+}
+
+func PayloadFromMessage(m *entities.Block) *flow.Payload {
 
 }
 
@@ -198,13 +223,67 @@ func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.Collect
 	id := g.ID()
 
 	return &entities.CollectionGuarantee{
-		CollectionId: id[:],
-		Signatures:   [][]byte{g.Signature},
+		CollectionId:     id[:],
+		Signatures:       [][]byte{g.Signature},
+		ReferenceBlockId: IdentifierToMessage(g.ReferenceBlockID),
+		Signature:        g.Signature,
+		SignerIds:        IdentifiersToMessages(g.SignerIDs),
 	}
 }
 
-func MessageToCollectionGuarantee(m *entitiesproto.CollectionGuarantee) *flow.CollectionGuarantee {
+func MessageToCollectionGuarantee(m *entities.CollectionGuarantee) flow.CollectionGuarantee {
+	return flow.CollectionGuarantee{
+		CollectionID:     MessageToIdentifier(m.CollectionId),
+		ReferenceBlockID: MessageToIdentifier(m.ReferenceBlockId),
+		SignerIDs:        MessagesToIdentifiers(m.SignerIds),
+		Signature:        MessageToSignature(m.Signature),
+	}
+}
 
+func MessagesToAggregatedSignatures(m []*entities.AggregatedSignature) []flow.AggregatedSignature {
+	parsedSignatures := make([]flow.AggregatedSignature, len(m))
+	for i, message := range m {
+		parsedSignatures[i] = flow.AggregatedSignature{
+			SignerIDs:          MessagesToIdentifiers(message.SignerIds),
+			VerifierSignatures: MessagesToSignatures(message.VerifierSignatures),
+		}
+	}
+	return parsedSignatures
+}
+
+func AggregatedSignaturesToMessages(a []flow.AggregatedSignature) []*entities.AggregatedSignature {
+	parsedMessages := make([]*entities.AggregatedSignature, len(a))
+	for i, sig := range a {
+		parsedMessages[i] = &entities.AggregatedSignature{
+			SignerIds:          IdentifiersToMessages(sig.SignerIDs),
+			VerifierSignatures: SignaturesToMessages(sig.VerifierSignatures),
+		}
+	}
+	return parsedMessages
+}
+
+func MessagesToSignatures(m [][]byte) []crypto.Signature {
+	signatures := make([]crypto.Signature, len(m))
+	for i, message := range m {
+		signatures[i] = MessageToSignature(message)
+	}
+	return signatures
+}
+
+func MessageToSignature(m []byte) crypto.Signature {
+	return m[:]
+}
+
+func SignaturesToMessages(s []crypto.Signature) [][]byte {
+	messages := make([][]byte, len(s))
+	for i, sig := range s {
+		messages[i] = SignatureToMessage(sig)
+	}
+	return messages
+}
+
+func SignatureToMessage(s crypto.Signature) []byte {
+	return s[:]
 }
 
 func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
@@ -214,11 +293,23 @@ func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 		BlockId:                    id[:],
 		ExecutionReceiptId:         result[:],
 		ExecutionReceiptSignatures: [][]byte{}, // filling seals signature with zero
+		FinalState:                 StateCommitmentToMessage(s.FinalState),
+		AggregatedApprovalSigs:     AggregatedSignaturesToMessages(s.AggregatedApprovalSigs),
+		ResultId:                   IdentifierToMessage(s.ResultID),
 	}
 }
 
-func MessageToBlockSeal(m *entitiesproto.BlockSeal) *flow.Seal {
-
+func MessageToBlockSeal(m *entities.BlockSeal) (*flow.Seal, error) {
+	finalState, err := MessageToStateCommitment(m.FinalState)
+	if err != nil {
+		return nil, err
+	}
+	return &flow.Seal{
+		BlockID:                MessageToIdentifier(m.BlockId),
+		ResultID:               MessageToIdentifier(m.ResultId),
+		FinalState:             finalState,
+		AggregatedApprovalSigs: MessagesToAggregatedSignatures(m.AggregatedApprovalSigs),
+	}, nil
 }
 
 func CollectionToMessage(c *flow.Collection) (*entities.Collection, error) {
@@ -435,10 +526,9 @@ func BytesToInmemSnapshot(bytes []byte) (*inmem.Snapshot, error) {
 	return inmem.SnapshotFromEncodable(encodable), nil
 }
 
-func ProtoToExecutionResult(proto *entities.ExecutionResult) (*flow.ExecutionResult, error) {
-	// convert Chunks
-	parsedChunks := make(flow.ChunkList, len(proto.Chunks))
-	for i, chunk := range proto.Chunks {
+func MessagesToChunkList(m []*entities.Chunk) (flow.ChunkList, error) {
+	parsedChunks := make(flow.ChunkList, len(m))
+	for i, chunk := range m {
 		startState, err := flow.ToStateCommitment(chunk.StartState)
 		if err != nil {
 			return nil, err
@@ -461,9 +551,12 @@ func ProtoToExecutionResult(proto *entities.ExecutionResult) (*flow.ExecutionRes
 			EndState:  endState,
 		}
 	}
-	// convert ServiceEvents
-	parsedServiceEvents := make(flow.ServiceEventList, len(proto.ServiceEvents))
-	for i, serviceEvent := range proto.ServiceEvents {
+	return parsedChunks, nil
+}
+
+func MessagesToServiceEventList(m []*entities.ServiceEvent) (flow.ServiceEventList, error) {
+	parsedServiceEvents := make(flow.ServiceEventList, len(m))
+	for i, serviceEvent := range m {
 		var event interface{}
 		rawEvent := serviceEvent.Payload
 		// map keys correctly
@@ -490,12 +583,25 @@ func ProtoToExecutionResult(proto *entities.ExecutionResult) (*flow.ExecutionRes
 			Event: event,
 		}
 	}
+	return parsedServiceEvents, nil
+}
 
+func MessageToExecutionResult(m *entities.ExecutionResult) (*flow.ExecutionResult, error) {
+	// convert Chunks
+	parsedChunks, err := MessagesToChunkList(m.Chunks)
+	if err != nil {
+		return nil, err
+	}
+	// convert ServiceEvents
+	parsedServiceEvents, err := MessagesToServiceEventList(m.ServiceEvents)
+	if err != nil {
+		return nil, err
+	}
 	return &flow.ExecutionResult{
-		PreviousResultID: MessageToIdentifier(proto.PreviousResultId),
-		BlockID:          MessageToIdentifier(proto.BlockId),
+		PreviousResultID: MessageToIdentifier(m.PreviousResultId),
+		BlockID:          MessageToIdentifier(m.BlockId),
 		Chunks:           parsedChunks,
 		ServiceEvents:    parsedServiceEvents,
-		ExecutionDataID:  MessageToIdentifier(proto.ExecutionDataId),
+		ExecutionDataID:  MessageToIdentifier(m.ExecutionDataId),
 	}, nil
 }
