@@ -18,6 +18,9 @@ import (
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
+	"github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/network/compressor"
+	"github.com/onflow/flow-go/network/mocknetwork"
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -31,12 +34,24 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
+	state_synchronization "github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var scriptLogThreshold = 1 * time.Second
+
+func mockExecutionDataService() state_synchronization.ExecutionDataService {
+	bs := new(mocknetwork.BlobService)
+	bs.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(nil)
+	return state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		bs,
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
+}
 
 func TestComputeBlockWithStorage(t *testing.T) {
 	rt := fvm.NewInterpreterRuntime()
@@ -107,24 +122,28 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	eds := mockExecutionDataService()
+	eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		eds,
+		eCache,
+	)
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
 	require.NoError(t, err)
 
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-
-	eCache := new(state_synchronization.ExecutionDataCIDCache)
-	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
-
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
-		eds:           eds,
-		edCache:       eCache,
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -163,19 +182,11 @@ func TestComputeBlock_Uploader(t *testing.T) {
 
 	fakeUploader := &FakeUploader{}
 
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
-
-	eCache := new(state_synchronization.ExecutionDataCIDCache)
-	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
-
 	manager := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
 		uploaders:     []uploader.Uploader{fakeUploader},
-		eds:           eds,
-		edCache:       eCache,
 	}
 
 	view := delta.NewView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
@@ -218,10 +229,10 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	eds := new(state_synchronization.ExecutionDataService)
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	eds := mockExecutionDataService()
+	eCache := state_synchronization.NewExecutionDataCIDCache(500)
 
-	engine, err := New(logger, metrics.NewNoopCollector(), nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds, edCache)
+	engine, err := New(logger, metrics.NewNoopCollector(), nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds, eCache)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -243,8 +254,8 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	eds := new(state_synchronization.ExecutionDataService)
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	eds := mockExecutionDataService()
+	edCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds, edCache)
 	require.NoError(t, err)
@@ -270,8 +281,8 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	eds := new(state_synchronization.ExecutionDataService)
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	eds := mockExecutionDataService()
+	edCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond, nil, eds, edCache)
 	require.NoError(t, err)
@@ -297,8 +308,8 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	eds := new(state_synchronization.ExecutionDataService)
-	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	eds := mockExecutionDataService()
+	edCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second, nil, eds, edCache)
 	require.NoError(t, err)
