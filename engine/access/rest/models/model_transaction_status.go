@@ -8,6 +8,7 @@
  */
 package models
 
+// TransactionStatus : This value indicates the state of the transaction execution. Only sealed and expired are final and immutable states.
 type TransactionStatus string
 
 // List of TransactionStatus
