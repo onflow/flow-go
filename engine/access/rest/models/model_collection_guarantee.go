@@ -9,9 +9,7 @@
 package models
 
 type CollectionGuarantee struct {
-	CollectionId string `json:"collection_id"`
-
-	SignerIds []string `json:"signer_ids"`
-
-	Signature string `json:"signature"`
+	CollectionId string   `json:"collection_id"`
+	SignerIds    []string `json:"signer_ids"`
+	Signature    string   `json:"signature"`
 }
