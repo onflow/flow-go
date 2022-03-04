@@ -122,7 +122,7 @@ func main() {
 		blockdataUploaderRetryTimeout        = 1 * time.Second
 		executionDataService          state_synchronization.ExecutionDataService
 		executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
-		executionDataCIDCacheSize     uint = 100
+		executionDataCIDCacheSize     uint = 500
 		edsDatastoreTTL               time.Duration
 	)
 

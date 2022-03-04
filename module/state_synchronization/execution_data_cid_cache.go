@@ -39,6 +39,7 @@ var ErrCacheMiss = errors.New("CID not found in cache")
 type BlobTreeRecord struct {
 	BlockID     flow.Identifier
 	BlockHeight uint64
+	ChunkIndex  int
 	BlobTree    BlobTree
 }
 
@@ -77,10 +78,11 @@ func (e *ExecutionDataCIDCacheImpl) BlobRecords() uint {
 	return uint(len(e.blobs))
 }
 
-func (e *ExecutionDataCIDCacheImpl) insertBlobTree(header *flow.Header, blobTree BlobTree) *BlobTreeRecord {
+func (e *ExecutionDataCIDCacheImpl) insertBlobTree(blockID flow.Identifier, blockHeight uint64, chunkIndex int, blobTree BlobTree) *BlobTreeRecord {
 	blobTreeRecord := &BlobTreeRecord{
-		BlockID:     header.ID(),
-		BlockHeight: header.Height,
+		BlockID:     blockID,
+		BlockHeight: blockHeight,
+		ChunkIndex:  chunkIndex,
 		BlobTree:    blobTree,
 	}
 
@@ -107,11 +109,11 @@ func (e *ExecutionDataCIDCacheImpl) insertBlobTree(header *flow.Header, blobTree
 	return blobTreeRecord
 }
 
-func (e *ExecutionDataCIDCacheImpl) Insert(header *flow.Header, blobTree BlobTree) {
+func (e *ExecutionDataCIDCacheImpl) Insert(blockID flow.Identifier, blockHeight uint64, chunkIndex int, blobTree BlobTree) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	blobTreeRecord := e.insertBlobTree(header, blobTree)
+	blobTreeRecord := e.insertBlobTree(blockID, blockHeight, chunkIndex, blobTree)
 
 	for height, cids := range blobTree {
 		for index, cid := range cids {
