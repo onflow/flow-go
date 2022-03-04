@@ -25,7 +25,7 @@ func (err InvalidViewError) Error() string {
 	)
 }
 
-// IsInvalidViwError returns whether or not the input error is an invalid view error.
+// IsInvalidViewError returns whether or not the input error is an invalid view error.
 func IsInvalidViewError(err error) bool {
 	return errors.As(err, &InvalidViewError{})
 }
