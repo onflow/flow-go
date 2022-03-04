@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
+// corruptedNodeConnection represents a named type for a gRPC streaming client to a corrupted conduit factory.
 type corruptedNodeConnection insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient
 
 // AttackNetwork represents the networking interface that is available to the attacker for sending messages "through" corrupted nodes
