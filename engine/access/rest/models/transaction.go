@@ -88,8 +88,8 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	var status TransactionStatus
 	status.Build(txr.Status)
 
-	var result TransactionResultStatus
-	result.Build(txr)
+	var execution TransactionExecution
+	execution.Build(txr)
 
 	var events Events
 	events.Build(txr.Events)
@@ -99,7 +99,7 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	}
 
 	t.Status = &status
-	t.Result = &result
+	t.Execution = &execution
 	t.StatusCode = int32(txr.StatusCode)
 	t.ErrorMessage = txr.ErrorMessage
 	t.ComputationUsed = util.FromUint64(0) // todo: define this
@@ -126,7 +126,7 @@ func (t *TransactionStatus) Build(status flow.TransactionStatus) {
 	}
 }
 
-func (t *TransactionResultStatus) Build(result *access.TransactionResult) {
+func (t *TransactionExecution) Build(result *access.TransactionResult) {
 	*t = PENDING_RESULT
 
 	if result.Status == flow.TransactionStatusSealed && result.ErrorMessage == "" {

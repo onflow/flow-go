@@ -164,6 +164,7 @@ func TestGetTransactions(t *testing.T) {
 			   ],
 				"result": {
 					"block_id": "%s",
+					"execution": "Success",
 					"status": "Sealed",
 					"status_code": 1,
 					"error_message": "",
@@ -173,7 +174,8 @@ func TestGetTransactions(t *testing.T) {
 							"type": "flow.AccountCreated",
 							"transaction_id": "%s",
 							"transaction_index": "0",
-							"event_index": "0"
+							"event_index": "0",
+							"payload": ""
 						}
 					],
 					"_links": {
