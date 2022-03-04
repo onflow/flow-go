@@ -80,7 +80,7 @@ func NewChacha20PRG(seed []byte, customizer []byte) (*chachaPRG, error) {
 
 	// check the nonce size
 	if len(customizer) > Chacha20CustomizerMaxLen {
-		return nil, fmt.Errorf("new Rand streamID should be %d bytes", Chacha20CustomizerMaxLen)
+		return nil, fmt.Errorf("chacha20 streamID should be less than %d bytes", Chacha20CustomizerMaxLen)
 	}
 
 	// init the state core

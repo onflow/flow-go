@@ -54,10 +54,6 @@ func (u *Epoch) RandomSource() ([]byte, error) {
 	return nil, u.err
 }
 
-func (u *Epoch) Seed(...uint32) ([]byte, error) {
-	return nil, u.err
-}
-
 func NewEpoch(err error) *Epoch {
 	return &Epoch{err: err}
 }
