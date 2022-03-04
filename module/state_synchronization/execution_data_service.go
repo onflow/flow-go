@@ -101,7 +101,7 @@ func (s *executionDataServiceImpl) receiveBatch(ctx context.Context, br *blobs.B
 }
 
 // storeBlobs receives blobs from the given BlobReceiver, and stores them to the blobservice
-func (s *executionDataServiceImpl) storeBlobs(parent context.Context, br *blobs.BlobReceiver, logger zerolog.Logger) ([]cid.Cid, error) {
+func (s *executionDataServiceImpl) storeBlobs(parent context.Context, br *blobs.BlobReceiver) ([]cid.Cid, error) {
 	defer br.Close()
 
 	ctx, cancel := context.WithCancel(parent)
@@ -128,7 +128,7 @@ func (s *executionDataServiceImpl) storeBlobs(parent context.Context, br *blobs.
 			batchCids.Str(blob.Cid().String())
 		}
 
-		batchLogger := logger.With().Array("cids", batchCids).Logger()
+		batchLogger := s.logger.With().Array("cids", batchCids).Logger()
 
 		if err := s.blobService.AddBlobs(ctx, batch); err != nil {
 			batchLogger.Debug().Err(err).Msg("failed to add batch to blobservice")
@@ -146,7 +146,7 @@ func (s *executionDataServiceImpl) storeBlobs(parent context.Context, br *blobs.
 //
 // blobs are added in a batched streaming fashion, using a separate goroutine to serialize the object and send the
 // blobs of serialized data over a blob channel to the main routine, which adds them in batches to the blobservice.
-func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, uint64, error) {
+func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, uint64, error) {
 	bcw, br := blobs.IncomingBlobChannel(s.maxBlobSize)
 
 	done := make(chan struct{})
@@ -158,7 +158,7 @@ func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, 
 		defer bcw.Close()
 
 		if serializeErr = s.serializer.Serialize(bcw, v); serializeErr != nil {
-			logger.Debug().Err(serializeErr).Msg("failed to serialize execution data")
+			s.logger.Debug().Err(serializeErr).Msg("failed to serialize execution data")
 
 			return
 		}
@@ -166,11 +166,11 @@ func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, 
 		serializeErr = bcw.Flush()
 
 		if serializeErr != nil {
-			logger.Debug().Err(serializeErr).Msg("flushed execution data")
+			s.logger.Debug().Err(serializeErr).Msg("flushed execution data")
 		}
 	}()
 
-	cids, storeErr := s.storeBlobs(ctx, br, logger)
+	cids, storeErr := s.storeBlobs(ctx, br)
 
 	<-done
 
@@ -189,13 +189,12 @@ func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, 
 
 // Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
 func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, BlobTree, error) {
-	logger := s.logger.With().Str("block_id", sd.BlockID.String()).Logger()
-	logger.Debug().Msg("adding execution data")
+	s.logger.Debug().Msg("adding execution data")
 
 	s.metrics.ExecutionDataAddStarted()
 
 	start := time.Now()
-	cids, totalBytes, err := s.addBlobs(ctx, sd, logger)
+	cids, totalBytes, err := s.addBlobs(ctx, sd)
 
 	if err != nil {
 		s.metrics.ExecutionDataAddFinished(time.Since(start), false, 0)
@@ -213,7 +212,7 @@ func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (
 			cidArr.Str(cid.String())
 		}
 
-		logger.Debug().Array("cids", cidArr).Msg("added blobs")
+		s.logger.Debug().Array("cids", cidArr).Msg("added blobs")
 
 		blobTree = append(blobTree, cids)
 		blobTreeSize += totalBytes
@@ -225,7 +224,7 @@ func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (
 			return root, blobTree, err
 		}
 
-		if cids, totalBytes, err = s.addBlobs(ctx, cids, logger); err != nil {
+		if cids, totalBytes, err = s.addBlobs(ctx, cids); err != nil {
 			s.metrics.ExecutionDataAddFinished(time.Since(start), false, blobTreeSize)
 
 			return flow.ZeroID, nil, fmt.Errorf("failed to add cid blobs: %w", err)

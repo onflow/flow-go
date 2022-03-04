@@ -456,6 +456,5 @@ func ProtoToExecutionResult(proto *entities.ExecutionResult) (*flow.ExecutionRes
 		BlockID:          MessageToIdentifier(proto.BlockId),
 		Chunks:           parsedChunks,
 		ServiceEvents:    parsedServiceEvents,
-		ExecutionDataID:  MessageToIdentifier(proto.ExecutionDataId),
 	}, nil
 }

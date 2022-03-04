@@ -743,7 +743,6 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          IdentifierFixture(),
 		Chunks:           ChunkListFixture(2, blockID),
-		ExecutionDataID:  IdentifierFixture(),
 	}
 
 	for _, apply := range opts {
@@ -1036,8 +1035,9 @@ func ChunkFixture(blockID flow.Identifier, collectionIndex uint) *flow.Chunk {
 			NumberOfTransactions: 42,
 			BlockID:              blockID,
 		},
-		Index:    0,
-		EndState: StateCommitmentFixture(),
+		Index:           0,
+		EndState:        StateCommitmentFixture(),
+		ExecutionDataID: IdentifierFixture(),
 	}
 }
 
