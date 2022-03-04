@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
@@ -63,6 +64,7 @@ func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *mode
 		onQCCreated:      f.onQCCreated,
 		minRequiredStake: minRequiredStake,
 		done:             *atomic.NewBool(false),
+		allParticipants:  allParticipants,
 	}, nil
 }
 
@@ -79,6 +81,7 @@ type StakingVoteProcessor struct {
 	onQCCreated      hotstuff.OnQCCreated
 	minRequiredStake uint64
 	done             atomic.Bool
+	allParticipants  flow.IdentityList
 }
 
 // Block returns block that is part of proposal that we are processing votes for.
@@ -162,8 +165,10 @@ func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
 	}
 
-	// TODO: maybe Aggregate could return signer indices directly?
-	signerIndices := p.signerIndicesFromIdentities(stakingSigners)
+	signerIndices, err := p.signerIndicesFromIdentities(stakingSigners)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode signer indices: %w", err)
+	}
 
 	return &flow.QuorumCertificate{
 		View:          p.block.View,
@@ -173,6 +178,29 @@ func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 	}, nil
 }
 
-func (p *StakingVoteProcessor) signerIndicesFromIdentities(signerIDs []flow.Identifier) []byte {
-	panic("to be implemented")
+func (p *StakingVoteProcessor) signerIndicesFromIdentities(signerIDs []flow.Identifier) ([]byte, error) {
+	signersLookup := buildLookup(signerIDs)
+
+	indices := make([]int, 0, len(p.allParticipants))
+	for i, member := range p.allParticipants.NodeIDs() {
+		if _, ok := signersLookup[member]; ok {
+			indices = append(indices, i)
+			delete(signersLookup, member)
+		}
+	}
+
+	if len(signersLookup) > 0 {
+		return nil, fmt.Errorf("unknown signers %v", signersLookup)
+	}
+
+	signerIndices := packer.EncodeSignerIndices(indices, len(p.allParticipants))
+	return signerIndices, nil
+}
+
+func buildLookup(identities []flow.Identifier) map[flow.Identifier]struct{} {
+	lookup := make(map[flow.Identifier]struct{})
+	for _, id := range identities {
+		lookup[id] = struct{}{}
+	}
+	return lookup
 }
