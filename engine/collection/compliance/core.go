@@ -320,14 +320,12 @@ func (c *Core) prunePendingCache() {
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 }
 
-// ProcessFinalizedBlock performs pruning of stale data based on finalization event
-// removes pending blocks below the finalized height and prunes vote aggregator
-func (c *Core) ProcessFinalizedBlock(final *flow.Header) {
-	// remove all pending blocks at or below the finalized height
-	c.pending.PruneByHeight(final.Height)
+// ProcessFinalizedView performs pruning of stale data based on finalization event
+// removes pending blocks below the finalized view
+func (c *Core) ProcessFinalizedView(finalizedView uint64) {
+	// remove all pending blocks at or below the finalized view
+	c.pending.PruneByHeight(finalizedView)
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
-
-	c.voteAggregator.PruneUpToView(final.View)
 }

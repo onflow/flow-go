@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -47,6 +48,7 @@ type Engine struct {
 	pendingBlocks              engine.MessageStore
 	pendingVotes               engine.MessageStore
 	messageHandler             *engine.MessageHandler
+	finalizedView              counters.StrictMonotonousCounter
 	finalizationEventsNotifier engine.Notifier
 	con                        network.Conduit
 	stopHotstuff               context.CancelFunc
@@ -425,8 +427,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 //  (1) Informs sealing.Core about finalization of respective block.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(*model.Block) {
-	e.finalizationEventsNotifier.Notify()
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	if e.finalizedView.Set(block.View) {
+		e.finalizationEventsNotifier.Notify()
+	}
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
@@ -437,11 +441,7 @@ func (e *Engine) finalizationProcessingLoop() {
 		case <-e.unit.Quit():
 			return
 		case <-finalizationNotifier:
-			finalized, err := e.core.state.Final().Head()
-			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not retrieve last finalized block")
-			}
-			e.core.ProcessFinalizedBlock(finalized)
+			e.core.ProcessFinalizedView(e.finalizedView.Value())
 		}
 	}
 }
