@@ -22,12 +22,22 @@ func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dk
 	return static, nil
 }
 
+// NewStaticCommitteeWithDKG returns a new committee with a static participant set.
+func NewStaticCommitteeWithDKG(participants flow.IdentityList, myID flow.Identifier, dkg protocol.DKG) (*Static, error) {
+	static := &Static{
+		participants: participants,
+		myID:         myID,
+		dkg:          dkg,
+	}
+	return static, nil
+}
+
 // Static represents a committee with a static participant set. It is used for
 // bootstrapping purposes.
 type Static struct {
 	participants flow.IdentityList
 	myID         flow.Identifier
-	dkg          staticDKG
+	dkg          protocol.DKG
 }
 
 func (s Static) Identities(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
