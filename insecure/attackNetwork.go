@@ -17,5 +17,5 @@ type AttackNetwork interface {
 	RpcPublishOnChannel(flow.Identifier, network.Channel, interface{}, ...flow.Identifier) error
 
 	// RpcMulticastOnChannel enforces a multicast-dissemination on the specified channel through a corrupted node.
-	RpcMulticastOnChannel(flow.Identifier, network.Channel, interface{}, uint, ...flow.Identifier) error
+	RpcMulticastOnChannel(flow.Identifier, network.Channel, interface{}, uint32, ...flow.Identifier) error
 }
