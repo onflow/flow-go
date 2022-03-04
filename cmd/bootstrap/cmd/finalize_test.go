@@ -14,6 +14,7 @@ import (
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -52,7 +53,7 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 var finalizeHappyPathRegex = regexp.MustCompile(finalizeHappyPathLogs)
 
 func TestFinalize_HappyPath(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
@@ -99,7 +100,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 }
 
 func TestFinalize_Deterministic(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
@@ -174,7 +175,7 @@ func TestFinalize_Deterministic(t *testing.T) {
 }
 
 func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
@@ -268,7 +269,8 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		randomSource2, err := currentEpoch2.RandomSource()
 		require.NoError(t, err)
 		assert.Equal(t, randomSource1, randomSource2)
-		assert.Equal(t, randomSource1, getRandomSource(deterministicSeed))
+		assert.Equal(t, randomSource1, deterministicSeed)
+		assert.Equal(t, flow.EpochSetupRandomSourceLength, len(randomSource1))
 	})
 }
 
