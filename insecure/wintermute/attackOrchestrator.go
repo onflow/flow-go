@@ -1,29 +1,32 @@
 package wintermute
 
 import (
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/insecure/adversary"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
 )
 
 type Orchestrator struct {
 	component.Component
+	logger       zerolog.Logger
 	network      insecure.AttackNetwork
 	corruptedIds flow.IdentityList
-}
-
-func (o Orchestrator) Handle(i interface{}) error {
-	panic("implement me")
+	allIds       flow.IdentityList // identity of all nodes in the network (including non-corrupted ones)
 }
 
 var _ insecure.AttackOrchestrator = &Orchestrator{}
 
-func NewOrchestrator(corruptedIds flow.IdentityList) *Orchestrator {
+func NewOrchestrator(allIds flow.IdentityList, corruptedIds flow.IdentityList, logger zerolog.Logger) *Orchestrator {
 	o := &Orchestrator{
-		network:      adversary.NewAttackNetwork(corruptedIds),
+		logger:       logger,
+		network:      adversary.NewAttackNetwork(corruptedIds, logger),
 		corruptedIds: corruptedIds,
+		allIds:       allIds,
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -42,4 +45,18 @@ func NewOrchestrator(corruptedIds flow.IdentityList) *Orchestrator {
 
 func (o *Orchestrator) start(ctx irrecoverable.SignalerContext) {
 	o.network.Start(ctx)
+}
+
+// HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
+//
+// In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
+// the attacker instead of dispatching them to the network.
+func (o *Orchestrator) HandleEventFromCorruptedNode(corruptedId flow.Identifier,
+	channel network.Channel,
+	event interface{},
+	protocol insecure.Protocol,
+	num uint32,
+	targetIds ...flow.Identifier) error {
+
+	panic("implement me")
 }
