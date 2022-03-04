@@ -23,7 +23,8 @@ var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 // We test that leader selection works for a committee of size one
 func TestSingleConsensusNode(t *testing.T) {
 	identity := unittest.IdentityFixture(unittest.WithStake(8))
-	selection, err := ComputeLeaderSelectionFromSeed(0, someSeed, 10, []*flow.Identity{identity})
+	rng := prg(t, someSeed)
+	selection, err := ComputeLeaderSelection(0, rng, 10, []*flow.Identity{identity})
 	require.NoError(t, err)
 	for i := uint64(0); i < 10; i++ {
 		leaderID, err := selection.LeaderForView(i)
