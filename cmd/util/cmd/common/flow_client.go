@@ -45,12 +45,12 @@ func NewFlowClientConfig(accessAddress, accessApiNodePubKey string, insecure boo
 }
 
 // FlowClient will return a secure or insecure flow client depending on *FlowClientConfig.Insecure
-func FlowClient(opt *FlowClientConfig) (*client.Client, error) {
-	if opt.Insecure {
-		return insecureFlowClient(opt.AccessAddress)
+func FlowClient(conf *FlowClientConfig) (*client.Client, error) {
+	if conf.Insecure {
+		return insecureFlowClient(conf.AccessAddress)
 	}
 
-	return secureFlowClient(opt.AccessAddress, opt.AccessNodePubKey)
+	return secureFlowClient(conf.AccessAddress, conf.AccessNodePubKey)
 }
 
 // secureFlowClient creates a flow client with secured GRPC connection

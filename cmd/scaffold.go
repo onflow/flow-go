@@ -712,6 +712,10 @@ func (fnb *FlowNodeBuilder) initState() {
 func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) {
 	var err error
 
+	// validate the root snapshot QCs
+	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
+	fnb.MustNot(err).Msg("failed to validate root snapshot QCs")
+
 	fnb.RootSnapshot = rootSnapshot
 	// cache properties of the root snapshot, for convenience
 	fnb.RootResult, fnb.RootSeal, err = fnb.RootSnapshot.SealedResult()

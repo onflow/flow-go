@@ -94,7 +94,7 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
-	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
+	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(flow.EpochSetupRandomSourceLength), "The seed used to for DKG, Clustering and Cluster QC generation")
 	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
@@ -119,9 +119,8 @@ func addFinalizeCmdFlags() {
 
 func finalize(cmd *cobra.Command, args []string) {
 
-	actualSeedLength := len(flagBootstrapRandomSeed)
-	if actualSeedLength != randomSeedBytes {
-		log.Error().Int("expected", randomSeedBytes).Int("actual", actualSeedLength).Msg("random seed provided length is not valid")
+	if len(flagBootstrapRandomSeed) != flow.EpochSetupRandomSourceLength {
+		log.Error().Int("expected", flow.EpochSetupRandomSourceLength).Int("actual", len(flagBootstrapRandomSeed)).Msg("random seed provided length is not valid")
 		return
 	}
 
@@ -186,7 +185,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		generateEmptyExecutionState(
 			block.Header.ChainID,
-			getRandomSource(flagBootstrapRandomSeed),
+			flagBootstrapRandomSeed,
 			assignments,
 			clusterQCs,
 			dkgData,
@@ -210,6 +209,12 @@ func finalize(cmd *cobra.Command, args []string) {
 	err = badger.IsValidRootSnapshot(snapshot, verifyResultID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("the generated root snapshot is invalid")
+	}
+
+	// validate the generated root snapshot QCs
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
 	}
 
 	// write snapshot to disk
@@ -245,6 +250,13 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("saved snapshot is invalid")
 	}
+
+	// validate the generated root snapshot QCs
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
+	}
+
 	log.Info().Msgf("saved root snapshot is valid")
 
 	// copy files only if the directories differ

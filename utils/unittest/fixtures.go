@@ -743,6 +743,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          IdentifierFixture(),
 		Chunks:           ChunkListFixture(2, blockID),
+		ExecutionDataID:  IdentifierFixture(),
 	}
 
 	for _, apply := range opts {
@@ -1120,7 +1121,7 @@ func QCSigDataFixture() []byte {
 }
 
 func SignatureFixture() crypto.Signature {
-	sig := make([]byte, 48)
+	sig := make([]byte, crypto.SignatureLenBLSBLS12381)
 	_, _ = crand.Read(sig)
 	return sig
 }
