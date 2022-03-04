@@ -10,14 +10,19 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
 )
 
 // Attacker implements the adversarial domain that is orchestrating an attack through corrupted nodes.
 type Attacker struct {
-	*component.ComponentManager
+	component.Component
 	logger       zerolog.Logger
 	orchestrator insecure.AttackOrchestrator
+	codec        network.Codec
+	cm           *component.ComponentManager
 }
 
 func NewAttacker(address string, orchestrator insecure.AttackOrchestrator) (*Attacker, error) {
@@ -35,12 +40,29 @@ func NewAttacker(address string, orchestrator insecure.AttackOrchestrator) (*Att
 		return nil, fmt.Errorf("could not bind attacker to the tcp listener: %w", err)
 	}
 
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			attacker.start(ctx)
+
+			ready()
+
+			<-ctx.Done()
+		}).Build()
+
+	attacker.Component = cm
+	attacker.cm = cm
+
+	return attacker, nil
 }
 
-func (a Attacker) Observe(stream insecure.Attacker_ObserveServer) error {
+func (a *Attacker) start(ctx irrecoverable.SignalerContext) {
+	a.orchestrator.Start(ctx)
+}
+
+func (a *Attacker) Observe(stream insecure.Attacker_ObserveServer) error {
 	for {
 		select {
-		case <-a.ComponentManager.ShutdownSignal():
+		case <-a.cm.ShutdownSignal():
 			// TODO:
 			return nil
 		default:
@@ -50,13 +72,38 @@ func (a Attacker) Observe(stream insecure.Attacker_ObserveServer) error {
 				return stream.SendAndClose(&empty.Empty{})
 			}
 			if err != nil {
-				a.logger.Fatal().Err(err).Msg("could not read attacker's stream")
+				a.logger.Fatal().Err(err).Msg("could not read stream of corrupted node")
 				return stream.SendAndClose(&empty.Empty{})
 			}
-			if err = a.orchestrator.Handle(msg); err != nil {
-				a.logger.Fatal().Err(err).Msg("could not process attacker's message")
+
+			if err = a.processObservedMsg(msg); err != nil {
+				a.logger.Fatal().Err(err).Msg("could not process message of corrupted node")
 				return stream.SendAndClose(&empty.Empty{})
 			}
 		}
 	}
+}
+
+func (a *Attacker) processObservedMsg(message *insecure.Message) error {
+	event, err := a.codec.Decode(message.Payload)
+	if err != nil {
+		return fmt.Errorf("could not decode observed payload: %w", err)
+	}
+
+	sender, err := flow.ByteSliceToId(message.OriginID)
+	if err != nil {
+		return fmt.Errorf("could not convert origin id to flow identifier: %w", err)
+	}
+
+	targetIds, err := flow.ByteSlicesToIds(message.TargetIDs)
+	if err != nil {
+		return fmt.Errorf("could not convert target ids to flow identifiers: %w", err)
+	}
+
+	channel := network.Channel(message.ChannelID)
+	if err = a.orchestrator.HandleEventFromCorruptedNode(sender, channel, event, message.Protocol, message.Targets, targetIds...); err != nil {
+		return fmt.Errorf("could not handle event by orchestrator: %w", err)
+	}
+
+	return nil
 }
