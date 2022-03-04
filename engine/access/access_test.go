@@ -371,7 +371,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expectedMessage, actual)
 			expectedBlock, err := convert.MessageToBlock(resp.Block)
 			require.NoError(suite.T(), err)
-			require.Equal(suite.T(), expectedBlock, block)
+			require.Equal(suite.T(), expectedBlock.ID(), block.ID())
 		}
 
 		suite.Run("get header 1 by ID", func() {
