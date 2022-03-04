@@ -23,16 +23,10 @@ func AddressSliceToCadenceValue(addresses []common.Address) cadence.Value {
 	return cadence.NewArray(adds)
 }
 
-func OptionalCadenceValueToAddressSlice(value cadence.Value) (addresses []common.Address, ok bool) {
-
-	// cast to optional
-	optV, ok := value.(cadence.Optional)
-	if !ok {
-		return nil, false
-	}
+func CadenceValueToAddressSlice(value cadence.Value) (addresses []common.Address, ok bool) {
 
 	// cast to array
-	v, ok := optV.Value.(cadence.Array)
+	v, ok := value.(cadence.Array)
 	if !ok {
 		return nil, false
 	}
