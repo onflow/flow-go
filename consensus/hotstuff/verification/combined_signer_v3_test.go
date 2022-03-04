@@ -187,7 +187,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	// first, we check that our testing setup works for a correct QC
 	t.Run("valid QC", func(t *testing.T) {
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&unpackedSigData, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&unpackedSigData, nil)
 
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
@@ -205,7 +205,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.AggregatedStakingSig = []byte{}
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
 		require.NoError(t, err)
@@ -220,7 +220,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.StakingSigners = []flow.Identifier{}
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
 		require.ErrorIs(t, err, model.ErrInvalidFormat)
@@ -233,7 +233,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.RandomBeaconSigners = []flow.Identifier{}
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
 		require.ErrorIs(t, err, model.ErrInvalidFormat)
@@ -249,7 +249,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.AggregatedRandomBeaconSig = aggregatedSignature(t, privRbKeyShares[:5], msg, encoding.RandomBeaconTag)
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
 		require.ErrorIs(t, err, model.ErrInvalidFormat)

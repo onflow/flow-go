@@ -46,7 +46,7 @@ func makeBlockSigData(committee []flow.Identifier) *hotstuff.BlockSignatureData 
 	return blockSigData
 }
 
-func signerIDsFromSignerIndices(signerIndices []byte, committee []flow.Identifier) ([]flow.Identifier, error) {
+func SignerIDsFromSignerIndices(signerIndices []byte, committee []flow.Identifier) ([]flow.Identifier, error) {
 	signerIndex, err := packer.DecodeSignerIndices(signerIndices, len(committee))
 	if err != nil {
 		return nil, err
