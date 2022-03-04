@@ -717,7 +717,7 @@ transaction(clusterWeights: [{String: UInt64}]) {
 		collectorClusters: clusters,
         // NOTE: clusterQCs and dkgPubKeys are empty because these initial values are not used
 		clusterQCs: [],
-		dkgPubKeys: [],
+		dkgKeys: [],
 	)
   }
 }
