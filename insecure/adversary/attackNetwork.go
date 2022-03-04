@@ -15,21 +15,21 @@ import (
 
 type AttackNetwork struct {
 	component.Component
-	corruptedIds   flow.IdentityList
-	corruptedNodes map[flow.Identifier]insecure.CorruptibleConduitFactoryClient
+	corruptedIds     flow.IdentityList
+	corruptedClients map[flow.Identifier]insecure.CorruptibleConduitFactoryClient
 }
 
 func NewAttackNetwork(corruptedIds flow.IdentityList) *AttackNetwork {
 	attackNetwork := &AttackNetwork{
-		corruptedIds:   corruptedIds,
-		corruptedNodes: make(map[flow.Identifier]insecure.CorruptibleConduitFactoryClient),
+		corruptedIds:     corruptedIds,
+		corruptedClients: make(map[flow.Identifier]insecure.CorruptibleConduitFactoryClient),
 	}
 
 	return attackNetwork
 }
 
 func (a AttackNetwork) RpcUnicastOnChannel(corruptedId flow.Identifier, channel network.Channel, event interface{}, targetId flow.Identifier) error {
-	a.corruptedNodes[corruptedId].ProcessAttackerMessage()
+	a.corruptedClients[corruptedId].ProcessAttackerMessage()
 }
 
 func (a AttackNetwork) RpcPublishOnChannel(corruptedId flow.Identifier, channel network.Channel, event interface{}, targetIds ...flow.Identifier) error {
@@ -42,8 +42,11 @@ func (a AttackNetwork) RpcMulticastOnChannel(corruptedId flow.Identifier, channe
 
 func (a *AttackNetwork) start() error {
 	for _, corruptedId := range a.corruptedIds {
-
-		a.corruptedNodes[corruptedId.NodeID] = corruptedNodeClient
+		corruptibleClient, err := a.corruptibleConduitFactoryClient(corruptedId.Address)
+		if err != nil {
+			return fmt.Errorf("could not establish corruptible client to node %x: %w", corruptedId.NodeID, err)
+		}
+		a.corruptedClients[corruptedId.NodeID] = corruptibleClient
 	}
 
 	return nil
@@ -60,15 +63,15 @@ func corruptedConduitFactoryAddress(address string) (string, error) {
 }
 
 // corruptibleConduitFactoryClient creates a gRPC client for the corruptible conduit factory of the given corrupted identity. It then
-// connects the client to the remote corruptible conduit factory and returns it.
-func (a *AttackNetwork) corruptibleConduitFactoryClient(id *flow.Identity) (insecure.CorruptibleConduitFactoryClient, error) {
-	address, err := corruptedConduitFactoryAddress(id.Address)
+// connects the client to the remote corruptible conduit factory and returns it.+
+func (a *AttackNetwork) corruptibleConduitFactoryClient(address string) (insecure.CorruptibleConduitFactoryClient, error) {
+	corruptedAddress, err := corruptedConduitFactoryAddress(address)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate corruptible conduit factory address for %x: %w", id.NodeID, err)
+		return nil, fmt.Errorf("could not generate corruptible conduit factory address for: %w", err)
 	}
-	gRpcClient, err := grpc.Dial(address)
+	gRpcClient, err := grpc.Dial(corruptedAddress)
 	if err != nil {
-		return nil, fmt.Errorf("could not dial corruptible conduit factory %s of node %x: %w", address, id, err)
+		return nil, fmt.Errorf("could not dial corruptible conduit factory %s: %w", corruptedAddress, err)
 	}
 
 	return insecure.NewCorruptibleConduitFactoryClient(gRpcClient), nil
