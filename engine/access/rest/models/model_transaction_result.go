@@ -9,9 +9,10 @@
 package models
 
 type TransactionResult struct {
-	BlockId    string             `json:"block_id"`
-	Status     *TransactionStatus `json:"status"`
-	StatusCode int32              `json:"status_code"`
+	BlockId    string                   `json:"block_id"`
+	Result     *TransactionResultStatus `json:"result,omitempty"`
+	Status     *TransactionStatus       `json:"status"`
+	StatusCode int32                    `json:"status_code"`
 	// Provided transaction error in case the transaction wasn't successful.
 	ErrorMessage    string  `json:"error_message"`
 	ComputationUsed string  `json:"computation_used"`
