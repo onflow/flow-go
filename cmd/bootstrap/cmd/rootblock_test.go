@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,7 +42,7 @@ const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 var rootBlockHappyPathRegex = regexp.MustCompile(rootBlockHappyPathLogs)
 
 func TestRootBlock_HappyPath(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(12332)
@@ -78,7 +79,7 @@ func TestRootBlock_HappyPath(t *testing.T) {
 }
 
 func TestRootBlock_Deterministic(t *testing.T) {
-	deterministicSeed := GenerateRandomSeed()
+	deterministicSeed := GenerateRandomSeed(flow.EpochSetupRandomSourceLength)
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(1000)

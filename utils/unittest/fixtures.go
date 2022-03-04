@@ -1131,7 +1131,7 @@ func QCSigDataFixture() []byte {
 }
 
 func SignatureFixture() crypto.Signature {
-	sig := make([]byte, 48)
+	sig := make([]byte, crypto.SignatureLenBLSBLS12381)
 	_, _ = crand.Read(sig)
 	return sig
 }
