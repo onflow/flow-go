@@ -440,7 +440,6 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 			assert.Equal(suite.T(), executionResult.BlockID, convert.MessageToIdentifier(er.BlockId))
 			assert.Equal(suite.T(), executionResult.PreviousResultID, convert.MessageToIdentifier(er.PreviousResultId))
-			assert.Equal(suite.T(), executionResult.ExecutionDataID, convert.MessageToIdentifier(er.ExecutionDataId))
 
 			for i, chunk := range executionResult.Chunks {
 				assert.Equal(suite.T(), chunk.BlockID[:], er.Chunks[i].BlockId)

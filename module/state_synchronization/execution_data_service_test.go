@@ -6,7 +6,6 @@ import (
 	"math"
 	"math/rand"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -23,7 +22,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -32,64 +31,12 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func mockBlobService(bs blockstore.Blockstore) network.BlobService {
-	bex := new(mocknetwork.BlobService)
-
-	bex.On("GetBlobs", mock.Anything, mock.AnythingOfType("[]cid.Cid")).
-		Return(func(ctx context.Context, cids []cid.Cid) <-chan blobs.Blob {
-			ch := make(chan blobs.Blob)
-
-			var wg sync.WaitGroup
-			wg.Add(len(cids))
-
-			for _, c := range cids {
-				c := c
-				go func() {
-					defer wg.Done()
-
-					blob, err := bs.Get(ctx, c)
-
-					if err != nil {
-						// In the real implementation, Bitswap would keep trying to get the blob from
-						// the network indefinitely, sending requests to more and more peers until it
-						// eventually finds the blob, or the context is canceled. Here, we know that
-						// if the blob is not already in the blobstore, then we will never appear, so
-						// we just wait for the context to be canceled.
-						<-ctx.Done()
-
-						return
-					}
-
-					ch <- blob
-				}()
-			}
-
-			go func() {
-				wg.Wait()
-				close(ch)
-			}()
-
-			return ch
-		})
-
-	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(bs.PutMany)
-
-	return bex
-}
-
-func testBlobstore() blockstore.Blockstore {
-	return blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore()))
-}
-
 func executionData(t *testing.T, s *serializer, minSerializedSize uint64) (*ExecutionData, []byte) {
-	ed := &ExecutionData{
-		BlockID: unittest.IdentifierFixture(),
-	}
+	ed := &ExecutionData{}
 
 	size := 1
 
@@ -102,15 +49,8 @@ func executionData(t *testing.T, s *serializer, minSerializedSize uint64) (*Exec
 			return ed, buf.Bytes()
 		}
 
-		if len(ed.TrieUpdates) == 0 {
-			ed.TrieUpdates = append(ed.TrieUpdates, &ledger.TrieUpdate{
-				Payloads: []*ledger.Payload{{}},
-			})
-		}
+		ed.TrieUpdate = utils.TrieUpdateFixture(1, size, size+1)
 
-		v := make([]byte, size)
-		rand.Read(v)
-		ed.TrieUpdates[0].Payloads[0].Value = v
 		size *= 2
 	}
 }
@@ -220,7 +160,7 @@ func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Block
 func TestHappyPath(t *testing.T) {
 	t.Parallel()
 
-	eds := executionDataService(mockBlobService(testBlobstore()))
+	eds := executionDataService(unittest.TestBlobService(unittest.TestDatastore()))
 
 	test := func(minSerializedSize uint64) {
 		expected, _ := executionData(t, eds.serializer, minSerializedSize)
@@ -238,8 +178,9 @@ func TestHappyPath(t *testing.T) {
 func TestMalformedData(t *testing.T) {
 	t.Parallel()
 
-	bs := testBlobstore()
-	eds := executionDataService(mockBlobService(bs))
+	ds := unittest.TestDatastore()
+	bs := blockstore.NewBlockstore(ds)
+	eds := executionDataService(unittest.TestBlobService(ds))
 
 	test := func(data []byte) {
 		rootID := writeBlobTree(t, eds.serializer, data, bs, time.Second)
@@ -262,8 +203,9 @@ func TestMalformedData(t *testing.T) {
 func TestOversizedBlob(t *testing.T) {
 	t.Parallel()
 
-	bs := testBlobstore()
-	eds := executionDataService(mockBlobService(bs))
+	ds := unittest.TestDatastore()
+	bs := blockstore.NewBlockstore(ds)
+	eds := executionDataService(unittest.TestBlobService(ds))
 
 	test := func(data []byte) {
 		cid, err := putBlob(bs, data, time.Second)
@@ -321,8 +263,9 @@ func TestOversizedBlob(t *testing.T) {
 func TestGetContextCanceled(t *testing.T) {
 	t.Parallel()
 
-	bs := testBlobstore()
-	eds := executionDataService(mockBlobService(bs))
+	ds := unittest.TestDatastore()
+	bs := blockstore.NewBlockstore(ds)
+	eds := executionDataService(unittest.TestBlobService(ds))
 
 	ed, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
 	rootCid, err := addExecutionData(eds, ed, time.Second)
@@ -340,9 +283,10 @@ func TestGetContextCanceled(t *testing.T) {
 func TestAddContextCanceled(t *testing.T) {
 	t.Parallel()
 
-	bs := testBlobstore()
-	bex := mockBlobService(bs).(*mocknetwork.BlobService)
-	eds := executionDataService(bex)
+	ds := unittest.TestDatastore()
+	bs := blockstore.NewBlockstore(ds)
+	bex := unittest.TestBlobService(ds)
+	eds := executionDataService(unittest.TestBlobService(ds))
 
 	ed, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
 	_, err := addExecutionData(eds, ed, time.Second)
@@ -373,9 +317,10 @@ func TestAddContextCanceled(t *testing.T) {
 func TestGetIncompleteData(t *testing.T) {
 	t.Parallel()
 
-	bs := testBlobstore()
-	bex := mockBlobService(bs).(*mocknetwork.BlobService)
-	eds := executionDataService(bex)
+	ds := unittest.TestDatastore()
+	bs := blockstore.NewBlockstore(ds)
+	bex := unittest.TestBlobService(ds)
+	eds := executionDataService(unittest.TestBlobService(ds))
 
 	ed, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
 	rootCid, err := addExecutionData(eds, ed, time.Second)
@@ -491,8 +436,8 @@ func TestReprovider(t *testing.T) {
 
 	ctx, errChan := irrecoverable.WithSignaler(parent)
 
-	ds := dssync.MutexWrap(datastore.NewMapDatastore())
-	mockBs := mockBlobService(blockstore.NewBlockstore(ds))
+	ds := unittest.TestDatastore()
+	mockBs := unittest.TestBlobService(ds)
 	mockEds := executionDataService(mockBs)
 	expected, _ := executionData(t, mockEds.serializer, 10*defaultMaxBlobSize)
 	rootCid, err := addExecutionData(mockEds, expected, time.Second)

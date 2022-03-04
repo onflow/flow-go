@@ -69,7 +69,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
@@ -463,18 +462,6 @@ type CheckerMock struct {
 	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
 }
 
-func mockExecutionDataService() state_synchronization.ExecutionDataService {
-	bs := new(mocknetwork.BlobService)
-	bs.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(nil)
-	return state_synchronization.NewExecutionDataService(
-		&cbor.Codec{},
-		compressor.NewLz4Compressor(),
-		bs,
-		metrics.NewNoopCollector(),
-		zerolog.Nop(),
-	)
-}
-
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
@@ -556,7 +543,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
 
-	eds := mockExecutionDataService()
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics,
+		zerolog.Nop(),
+	)
 	edCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	computationEngine, err := computation.New(

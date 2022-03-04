@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -18,9 +17,7 @@ import (
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/mocknetwork"
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -30,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -40,18 +38,6 @@ import (
 )
 
 var scriptLogThreshold = 1 * time.Second
-
-func mockExecutionDataService() state_synchronization.ExecutionDataService {
-	bs := new(mocknetwork.BlobService)
-	bs.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(nil)
-	return state_synchronization.NewExecutionDataService(
-		&cbor.Codec{},
-		compressor.NewLz4Compressor(),
-		bs,
-		metrics.NewNoopCollector(),
-		zerolog.Nop(),
-	)
-}
 
 func TestComputeBlockWithStorage(t *testing.T) {
 	rt := fvm.NewInterpreterRuntime()
@@ -122,7 +108,13 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	eds := mockExecutionDataService()
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
 	eCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	blockComputer, err := computer.NewBlockComputer(
@@ -229,7 +221,13 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	eds := mockExecutionDataService()
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
 	eCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	engine, err := New(logger, metrics.NewNoopCollector(), nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds, eCache)
@@ -254,7 +252,13 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	eds := mockExecutionDataService()
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
 	edCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds, edCache)
@@ -281,7 +285,13 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	eds := mockExecutionDataService()
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
 	edCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond, nil, eds, edCache)
@@ -308,7 +318,13 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	eds := mockExecutionDataService()
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
 	edCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second, nil, eds, edCache)

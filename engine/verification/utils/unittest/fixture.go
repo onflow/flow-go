@@ -300,6 +300,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 		for i := range computationResult.StateCommitments {
 			endState := computationResult.StateCommitments[i]
+			executionDataID := computationResult.ExecutionDataIDs[i]
 
 			// generates chunk and chunk data pack
 			var chunkDataPack *flow.ChunkDataPack
@@ -313,14 +314,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
-				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(len(completeCollection.Transactions)))
+				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(len(completeCollection.Transactions)), executionDataID)
 				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
 			} else {
 				// generates chunk data pack fixture for system chunk
 				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
 				require.NoError(t, err)
 
-				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(1))
+				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(1), executionDataID)
 				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, nil, computationResult.Proofs[i])
 			}
 

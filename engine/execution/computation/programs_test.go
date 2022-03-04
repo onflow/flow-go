@@ -18,12 +18,14 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -100,7 +102,13 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	eds := mockExecutionDataService()
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
 	eCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	blockComputer, err := computer.NewBlockComputer(
@@ -181,7 +189,13 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	eds := mockExecutionDataService()
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
 	edCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	blockComputer, err := computer.NewBlockComputer(

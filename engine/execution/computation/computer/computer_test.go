@@ -29,12 +29,15 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -62,16 +65,25 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		metrics := new(modulemock.ExecutionMetrics)
-		metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+		exeMetrics := new(modulemock.ExecutionMetrics)
+		exeMetrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
-		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		exeMetrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer)
+		eds := state_synchronization.NewExecutionDataService(
+			&cbor.Codec{},
+			compressor.NewLz4Compressor(),
+			unittest.TestBlobService(unittest.TestDatastore()),
+			metrics.NewNoopCollector(),
+			zerolog.Nop(),
+		)
+		eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, exeMetrics, trace.NewNoopTracer(), zerolog.Nop(), committer, eds, eCache)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -100,7 +112,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
+		eds := state_synchronization.NewExecutionDataService(
+			&cbor.Codec{},
+			compressor.NewLz4Compressor(),
+			unittest.TestBlobService(unittest.TestDatastore()),
+			metrics.NewNoopCollector(),
+			zerolog.Nop(),
+		)
+		eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, eds, eCache)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -172,7 +193,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		comm := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm)
+		eds := state_synchronization.NewExecutionDataService(
+			&cbor.Codec{},
+			compressor.NewLz4Compressor(),
+			unittest.TestBlobService(unittest.TestDatastore()),
+			metrics.NewNoopCollector(),
+			zerolog.Nop(),
+		)
+		eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm, eds, eCache)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -197,7 +227,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
+		eds := state_synchronization.NewExecutionDataService(
+			&cbor.Codec{},
+			compressor.NewLz4Compressor(),
+			unittest.TestBlobService(unittest.TestDatastore()),
+			metrics.NewNoopCollector(),
+			zerolog.Nop(),
+		)
+		eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, eds, eCache)
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -340,7 +379,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(emittingRuntime)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		eds := state_synchronization.NewExecutionDataService(
+			&cbor.Codec{},
+			compressor.NewLz4Compressor(),
+			unittest.TestBlobService(unittest.TestDatastore()),
+			metrics.NewNoopCollector(),
+			zerolog.Nop(),
+		)
+		eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), eds, eCache)
 		require.NoError(t, err)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
@@ -390,7 +438,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		eds := state_synchronization.NewExecutionDataService(
+			&cbor.Codec{},
+			compressor.NewLz4Compressor(),
+			unittest.TestBlobService(unittest.TestDatastore()),
+			metrics.NewNoopCollector(),
+			zerolog.Nop(),
+		)
+		eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), eds, eCache)
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -459,7 +516,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		eds := state_synchronization.NewExecutionDataService(
+			&cbor.Codec{},
+			compressor.NewLz4Compressor(),
+			unittest.TestBlobService(unittest.TestDatastore()),
+			metrics.NewNoopCollector(),
+			zerolog.Nop(),
+		)
+		eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), eds, eCache)
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -602,7 +668,16 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
+	eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), eds, eCache)
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
@@ -646,16 +721,25 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil, nil, nil, nil).
 		Times(1) // only system chunk
 
-	metrics := new(modulemock.ExecutionMetrics)
-	metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+	exeMetrics := new(modulemock.ExecutionMetrics)
+	exeMetrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
 		Times(1) // system collection
 
-	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	exeMetrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
 		Times(1) // system chunk tx
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer)
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		unittest.TestBlobService(unittest.TestDatastore()),
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
+	eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, exeMetrics, trace.NewNoopTracer(), zerolog.Nop(), committer, eds, eCache)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing

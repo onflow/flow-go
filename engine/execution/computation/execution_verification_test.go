@@ -22,11 +22,14 @@ import (
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/rs/zerolog"
@@ -645,7 +648,18 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 
 	ledgerCommiter := committer.NewLedgerViewCommitter(ledger, tracer)
 
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommiter)
+	ds := unittest.TestDatastore()
+	bs := unittest.TestBlobService(ds)
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		bs,
+		metrics.NewNoopCollector(),
+		zerolog.Nop(),
+	)
+	eCache := state_synchronization.NewExecutionDataCIDCache(500)
+
+	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommiter, eds, eCache)
 	require.NoError(t, err)
 
 	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
