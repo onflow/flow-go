@@ -87,7 +87,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 	finalizedBlockID := finalizedBlock.ID()
 
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
-	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
+	s.core.On("ProcessFinalizedView", finalizedBlockID).Return(nil).Once()
 	s.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
