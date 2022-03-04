@@ -1,18 +1,13 @@
 package execution
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization"
 )
 
 func GenerateExecutionResultAndChunkDataPacks(
-	ctx context.Context,
-	eds state_synchronization.ExecutionDataService,
-	edCache state_synchronization.ExecutionDataCIDCache,
 	prevResultId flow.Identifier,
 	startState flow.StateCommitment,
 	result *ComputationResult) (
@@ -33,10 +28,10 @@ func GenerateExecutionResultAndChunkDataPacks(
 	// TODO: check current state root == startState
 	endState = startState
 
-	for i := range result.StateCommitments {
+	for i, endState := range result.StateCommitments {
 		// TODO: deltas should be applied to a particular state
 
-		endState = result.StateCommitments[i]
+		executionDataID := result.ExecutionDataIDs[i]
 		var chunk *flow.Chunk
 
 		var collection *flow.Collection
@@ -52,19 +47,6 @@ func GenerateExecutionResultAndChunkDataPacks(
 			numTransactions = len(completeCollection.Transactions)
 		}
 
-		ed := &state_synchronization.ExecutionData{
-			Collection: collection,
-			Events:     result.Events[i],
-			TrieUpdate: result.TrieUpdates[i],
-		}
-
-		executionDataID, blobTree, err := eds.Add(ctx, ed)
-		if err != nil {
-			return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not add Execution Data: %w", err)
-		}
-
-		edCache.Insert(blockID, block.Header.Height, i, blobTree)
-
 		chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(numTransactions), executionDataID)
 		chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, collection, result.Proofs[i])
 
@@ -73,7 +55,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 		startState = endState
 	}
 
-	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents, result.ExecutionDataID)
+	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -88,7 +70,6 @@ func GenerateExecutionResultForBlock(
 	block *flow.Block,
 	chunks []*flow.Chunk,
 	serviceEvents []flow.Event,
-	executionDataID flow.Identifier,
 ) (*flow.ExecutionResult, error) {
 
 	// convert Cadence service event representation to flow-go representation
