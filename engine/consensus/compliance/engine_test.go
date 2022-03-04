@@ -222,7 +222,7 @@ func (cs *ComplianceSuite) TestOnFinalizedBlock() {
 	cs.voteAggregator.On("PruneUpToView", finalizedBlock.View).Run(func(mock.Arguments) {
 		done.Toggle()
 	}).Return(nil).Once()
-	cs.engine.OnFinalizedBlock(finalizedBlock.ID())
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)

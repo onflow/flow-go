@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/events"
@@ -407,7 +408,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 //  (1) Informs sealing.Core about finalization of respective block.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(flow.Identifier) {
+func (e *Engine) OnFinalizedBlock(*model.Block) {
 	e.finalizationEventsNotifier.Notify()
 }
 
