@@ -8,8 +8,6 @@ import (
 
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
-	message "github.com/onflow/flow-go/network/message"
-
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/onflow/flow-go/network"
@@ -99,11 +97,11 @@ func (_m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.
 }
 
 // Publish provides a mock function with given fields: msg, channel
-func (_m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
+func (_m *Middleware) Publish(msg interface{}, channel network.Channel) error {
 	ret := _m.Called(msg, channel)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.Message, network.Channel) error); ok {
+	if rf, ok := ret.Get(0).(func(interface{}, network.Channel) error); ok {
 		r0 = rf(msg, channel)
 	} else {
 		r0 = ret.Error(0)
@@ -128,18 +126,23 @@ func (_m *Middleware) Ready() <-chan struct{} {
 	return r0
 }
 
-// SendDirect provides a mock function with given fields: msg, targetID
-func (_m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
-	ret := _m.Called(msg, targetID)
+// SendDirect provides a mock function with given fields: channel, msg, targetID
+func (_m *Middleware) SendDirect(channel network.Channel, msg interface{}, targetID flow.Identifier) error {
+	ret := _m.Called(channel, msg, targetID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.Message, flow.Identifier) error); ok {
-		r0 = rf(msg, targetID)
+	if rf, ok := ret.Get(0).(func(network.Channel, interface{}, flow.Identifier) error); ok {
+		r0 = rf(channel, msg, targetID)
 	} else {
 		r0 = ret.Error(0)
 	}
 
 	return r0
+}
+
+// SetDirectMessageHandler provides a mock function with given fields: channel, handler
+func (_m *Middleware) SetDirectMessageHandler(channel network.Channel, handler network.DirectMessageHandler) {
+	_m.Called(channel, handler)
 }
 
 // SetOverlay provides a mock function with given fields: _a0

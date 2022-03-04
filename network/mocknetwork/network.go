@@ -4,7 +4,10 @@ package mocknetwork
 
 import (
 	datastore "github.com/ipfs/go-datastore"
+	flow "github.com/onflow/flow-go/model/flow"
+
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/onflow/flow-go/network"
@@ -102,6 +105,20 @@ func (_m *Network) RegisterBlobService(channel network.Channel, store datastore.
 	return r0, r1
 }
 
+// RegisterDirectMessageHandler provides a mock function with given fields: channel, handler
+func (_m *Network) RegisterDirectMessageHandler(channel network.Channel, handler network.DirectMessageHandler) error {
+	ret := _m.Called(channel, handler)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(network.Channel, network.DirectMessageHandler) error); ok {
+		r0 = rf(channel, handler)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // RegisterPingService provides a mock function with given fields: pingProtocolID, pingInfoProvider
 func (_m *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider network.PingInfoProvider) (network.PingService, error) {
 	ret := _m.Called(pingProtocolID, pingInfoProvider)
@@ -123,6 +140,20 @@ func (_m *Network) RegisterPingService(pingProtocolID protocol.ID, pingInfoProvi
 	}
 
 	return r0, r1
+}
+
+// SendDirectMessage provides a mock function with given fields: channel, message, targetID
+func (_m *Network) SendDirectMessage(channel network.Channel, message interface{}, targetID flow.Identifier) error {
+	ret := _m.Called(channel, message, targetID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(network.Channel, interface{}, flow.Identifier) error); ok {
+		r0 = rf(channel, message, targetID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Start provides a mock function with given fields: _a0

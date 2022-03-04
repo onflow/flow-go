@@ -14,27 +14,6 @@ type Adapter struct {
 	mock.Mock
 }
 
-// MulticastOnChannel provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *Adapter) MulticastOnChannel(_a0 network.Channel, _a1 interface{}, _a2 uint, _a3 ...flow.Identifier) error {
-	_va := make([]interface{}, len(_a3))
-	for _i := range _a3 {
-		_va[_i] = _a3[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _a0, _a1, _a2)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(network.Channel, interface{}, uint, ...flow.Identifier) error); ok {
-		r0 = rf(_a0, _a1, _a2, _a3...)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // PublishOnChannel provides a mock function with given fields: _a0, _a1, _a2
 func (_m *Adapter) PublishOnChannel(_a0 network.Channel, _a1 interface{}, _a2 ...flow.Identifier) error {
 	_va := make([]interface{}, len(_a2))
@@ -63,20 +42,6 @@ func (_m *Adapter) UnRegisterChannel(channel network.Channel) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(network.Channel) error); ok {
 		r0 = rf(channel)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// UnicastOnChannel provides a mock function with given fields: _a0, _a1, _a2
-func (_m *Adapter) UnicastOnChannel(_a0 network.Channel, _a1 interface{}, _a2 flow.Identifier) error {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(network.Channel, interface{}, flow.Identifier) error); ok {
-		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Error(0)
 	}

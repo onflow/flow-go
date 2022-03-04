@@ -38,6 +38,7 @@ type Engine struct {
 	execState           state.ReadOnlyExecutionState
 	me                  module.Local
 	chunksConduit       network.Conduit
+	net                 network.Network
 	metrics             module.ExecutionMetrics
 	checkStakedAtBlock  func(blockID flow.Identifier) (bool, error)
 	chdpQueryTimeout    time.Duration
@@ -70,6 +71,7 @@ func New(
 		checkStakedAtBlock:  checkStakedAtBlock,
 		chdpQueryTimeout:    time.Duration(chdpQueryTimeout) * time.Second,
 		chdpDeliveryTimeout: time.Duration(chdpDeliveryTimeout) * time.Second,
+		net:                 net,
 	}
 
 	var err error
@@ -208,7 +210,7 @@ func (e *Engine) onChunkDataRequest(
 	e.unit.Launch(func() {
 		deliveryStart := time.Now()
 
-		err := e.chunksConduit.Unicast(response, originID)
+		err := e.net.SendDirectMessage(engine.ProvideChunks, response, originID)
 
 		sinceDeliver := time.Since(deliveryStart)
 		lg = lg.With().Dur("since_deliver", sinceDeliver).Logger()

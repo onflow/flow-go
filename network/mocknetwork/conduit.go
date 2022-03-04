@@ -26,27 +26,6 @@ func (_m *Conduit) Close() error {
 	return r0
 }
 
-// Multicast provides a mock function with given fields: event, num, targetIDs
-func (_m *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
-	_va := make([]interface{}, len(targetIDs))
-	for _i := range targetIDs {
-		_va[_i] = targetIDs[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, event, num)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(interface{}, uint, ...flow.Identifier) error); ok {
-		r0 = rf(event, num, targetIDs...)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Publish provides a mock function with given fields: event, targetIDs
 func (_m *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
 	_va := make([]interface{}, len(targetIDs))
@@ -61,20 +40,6 @@ func (_m *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) erro
 	var r0 error
 	if rf, ok := ret.Get(0).(func(interface{}, ...flow.Identifier) error); ok {
 		r0 = rf(event, targetIDs...)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Unicast provides a mock function with given fields: event, targetID
-func (_m *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
-	ret := _m.Called(event, targetID)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(interface{}, flow.Identifier) error); ok {
-		r0 = rf(event, targetID)
 	} else {
 		r0 = ret.Error(0)
 	}
