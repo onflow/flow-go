@@ -25,10 +25,13 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/compressor"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -128,11 +131,17 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain) *BasicBlockExecutor 
 	)
 	require.NoError(tb, err)
 
-	eds := new(state_synchronization.ExecutionDataService)
-	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+	bs := new(mocknetwork.BlobService)
+	bs.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(nil)
 
-	eCache := new(state_synchronization.ExecutionDataCIDCache)
-	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
+	eds := state_synchronization.NewExecutionDataService(
+		&cbor.Codec{},
+		compressor.NewLz4Compressor(),
+		bs,
+		metrics.NewNoopCollector(),
+		logger,
+	)
+	eCache := state_synchronization.NewExecutionDataCIDCache(500)
 
 	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
 	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter, eds, eCache)
