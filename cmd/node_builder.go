@@ -136,7 +136,7 @@ type BaseConfig struct {
 	profilerInterval                time.Duration
 	profilerDuration                time.Duration
 	profilerMemProfileRate          int
-	tracerEnabled                   bool
+	TracerEnabled                   bool
 	tracerSensitivity               uint
 	metricsEnabled                  bool
 	guaranteesCacheSize             uint
@@ -217,7 +217,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerInterval:                15 * time.Minute,
 		profilerDuration:                10 * time.Second,
 		profilerMemProfileRate:          runtime.MemProfileRate,
-		tracerEnabled:                   false,
+		TracerEnabled:                   false,
 		tracerSensitivity:               4,
 		metricsEnabled:                  true,
 		receiptsCacheSize:               bstorage.DefaultCacheSize,

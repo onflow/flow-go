@@ -15,6 +15,7 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/admin/commands"
@@ -418,7 +419,11 @@ func main() {
 
 			extralog.ExtraLogDumpPath = extraLogPath
 
-			rt := fvm.NewInterpreterRuntime()
+			options := []runtime.Option{}
+			if node.BaseConfig.TracerEnabled {
+				options = append(options, runtime.WithTracingEnabled(true))
+			}
+			rt := fvm.NewInterpreterRuntime(options...)
 
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
