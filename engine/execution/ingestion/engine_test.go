@@ -364,7 +364,9 @@ func TestChunkIndexIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		unittest.IdentifierFixture(),
 		unittest.IdentifierFixture(),
-		21)
+		21,
+		unittest.IdentifierFixture(),
+	)
 
 	assert.Equal(t, i, int(chunk.Index))
 	assert.Equal(t, i, int(chunk.CollectionIndex))
@@ -378,7 +380,9 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		unittest.IdentifierFixture(),
 		unittest.IdentifierFixture(),
-		i)
+		i,
+		unittest.IdentifierFixture(),
+	)
 
 	assert.Equal(t, i, chunk.NumberOfTransactions)
 }

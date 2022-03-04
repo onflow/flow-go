@@ -20,8 +20,11 @@ import (
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/convert"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/network/compressor"
 
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -249,7 +252,15 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		programs := programs.NewEmptyPrograms()
 
 		// create BlockComputer
-		bc, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), log, committer)
+		eds := state_synchronization.NewExecutionDataService(
+			&cbor.Codec{},
+			compressor.NewLz4Compressor(),
+			unittest.TestBlobService(unittest.TestDatastore()),
+			metrics.NewNoopCollector(),
+			zerolog.Nop(),
+		)
+		edCache := state_synchronization.NewExecutionDataCIDCache(500)
+		bc, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), log, committer, eds, edCache)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
