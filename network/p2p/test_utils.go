@@ -12,7 +12,9 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 type nodeOpt func(NodeBuilder)
@@ -30,7 +32,13 @@ func createNode(
 	sporkID flow.Identifier,
 	opts ...nodeOpt,
 ) *Node {
-	builder := NewNodeBuilder(zerolog.Nop(), "0.0.0.0:0", networkKey, sporkID).
+	builder := NewNodeBuilder(
+		zerolog.Nop(),
+		"0.0.0.0:0",
+		networkKey,
+		sporkID,
+		validator.TopicValidatorFactory(cbor.NewCodec()),
+	).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID))
 		}).

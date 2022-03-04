@@ -8,6 +8,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	go_datastore "github.com/ipfs/go-datastore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
+	flow "github.com/onflow/flow-go/model/flow"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	network "github.com/onflow/flow-go/network"
 	reflect "reflect"
@@ -99,6 +100,20 @@ func (mr *MockNetworkMockRecorder) RegisterBlobService(arg0, arg1 interface{}, a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterBlobService", reflect.TypeOf((*MockNetwork)(nil).RegisterBlobService), varargs...)
 }
 
+// RegisterDirectMessageHandler mocks base method
+func (m *MockNetwork) RegisterDirectMessageHandler(arg0 network.Channel, arg1 network.DirectMessageHandler) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RegisterDirectMessageHandler", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RegisterDirectMessageHandler indicates an expected call of RegisterDirectMessageHandler
+func (mr *MockNetworkMockRecorder) RegisterDirectMessageHandler(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterDirectMessageHandler", reflect.TypeOf((*MockNetwork)(nil).RegisterDirectMessageHandler), arg0, arg1)
+}
+
 // RegisterPingService mocks base method
 func (m *MockNetwork) RegisterPingService(arg0 protocol.ID, arg1 network.PingInfoProvider) (network.PingService, error) {
 	m.ctrl.T.Helper()
@@ -112,6 +127,20 @@ func (m *MockNetwork) RegisterPingService(arg0 protocol.ID, arg1 network.PingInf
 func (mr *MockNetworkMockRecorder) RegisterPingService(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterPingService", reflect.TypeOf((*MockNetwork)(nil).RegisterPingService), arg0, arg1)
+}
+
+// SendDirectMessage mocks base method
+func (m *MockNetwork) SendDirectMessage(arg0 network.Channel, arg1 interface{}, arg2 flow.Identifier) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendDirectMessage", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendDirectMessage indicates an expected call of SendDirectMessage
+func (mr *MockNetworkMockRecorder) SendDirectMessage(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendDirectMessage", reflect.TypeOf((*MockNetwork)(nil).SendDirectMessage), arg0, arg1, arg2)
 }
 
 // Start mocks base method
