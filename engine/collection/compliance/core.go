@@ -314,7 +314,7 @@ func (c *Core) prunePendingCache() {
 	}
 
 	// remove all pending blocks at or below the finalized height
-	c.pending.PruneByHeight(final.Height)
+	c.pending.PruneByView(final.Height)
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
@@ -324,7 +324,7 @@ func (c *Core) prunePendingCache() {
 // removes pending blocks below the finalized view
 func (c *Core) ProcessFinalizedView(finalizedView uint64) {
 	// remove all pending blocks at or below the finalized view
-	c.pending.PruneByHeight(finalizedView)
+	c.pending.PruneByView(finalizedView)
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())

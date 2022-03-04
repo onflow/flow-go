@@ -19,7 +19,7 @@ type PendingBlockBuffer interface {
 
 	DropForParent(parentID flow.Identifier)
 
-	PruneByHeight(height uint64)
+	PruneByView(view uint64)
 
 	Size() uint
 }
@@ -35,7 +35,7 @@ type PendingClusterBlockBuffer interface {
 
 	DropForParent(parentID flow.Identifier)
 
-	PruneByHeight(height uint64)
+	PruneByView(view uint64)
 
 	Size() uint
 }

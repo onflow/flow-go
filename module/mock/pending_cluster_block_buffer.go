@@ -82,7 +82,7 @@ func (_m *PendingClusterBlockBuffer) DropForParent(parentID flow.Identifier) {
 }
 
 // PruneByHeight provides a mock function with given fields: height
-func (_m *PendingClusterBlockBuffer) PruneByHeight(height uint64) {
+func (_m *PendingClusterBlockBuffer) PruneByView(height uint64) {
 	_m.Called(height)
 }
 

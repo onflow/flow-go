@@ -358,7 +358,7 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 // removes pending blocks below the finalized view
 func (c *Core) ProcessFinalizedView(finalizedView uint64) {
 	// remove all pending blocks at or below the finalized view
-	c.pending.PruneByHeight(finalizedView)
+	c.pending.PruneByView(finalizedView)
 
 	// always record the metric
 	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())

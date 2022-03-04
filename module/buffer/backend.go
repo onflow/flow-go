@@ -108,15 +108,15 @@ func (b *backend) dropForParent(parentID flow.Identifier) {
 	delete(b.blocksByParent, parentID)
 }
 
-// pruneByHeight prunes any items in the cache that have height less than or
-// equal to the given height. The pruning height should be the finalized height.
-func (b *backend) pruneByHeight(height uint64) {
+// pruneByView prunes any items in the cache that have view less than or
+// equal to the given view. The pruning view should be the finalized view.
+func (b *backend) pruneByView(view uint64) {
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	for id, item := range b.blocksByID {
-		if item.header.Height <= height {
+		if item.header.View <= view {
 			delete(b.blocksByID, id)
 			delete(b.blocksByParent, item.header.ParentID)
 		}

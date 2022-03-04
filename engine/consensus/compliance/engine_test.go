@@ -1,6 +1,7 @@
 package compliance
 
 import (
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"math/rand"
 	"sync"
 	"testing"
@@ -219,15 +220,14 @@ func (cs *ComplianceSuite) TestOnFinalizedBlock() {
 	cs.head = &finalizedBlock
 
 	done := atomic.NewBool(false)
-	cs.voteAggregator.On("PruneUpToView", finalizedBlock.View).Run(func(mock.Arguments) {
+	*cs.pending = modulemock.PendingBlockBuffer{}
+	cs.pending.On("PruneByView", finalizedBlock.View).Run(func(mock.Arguments) {
 		done.Toggle()
 	}).Return(nil).Once()
+	cs.pending.On("Size").Return(uint(0)).Once()
 	cs.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
-
-	// matching engine has at least 100ms ticks for processing events
-	time.Sleep(1 * time.Second)
 
 	require.Eventually(cs.T(), done.Load, time.Second, time.Millisecond*20)
 
-	cs.voteAggregator.AssertExpectations(cs.T())
+	cs.pending.AssertExpectations(cs.T())
 }
