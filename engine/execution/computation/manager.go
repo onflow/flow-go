@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
@@ -59,8 +58,6 @@ type Manager struct {
 	programsCache      *ProgramsCache
 	scriptLogThreshold time.Duration
 	uploaders          []uploader.Uploader
-	eds                state_synchronization.ExecutionDataService
-	edCache            state_synchronization.ExecutionDataCIDCache
 }
 
 func New(
@@ -87,6 +84,8 @@ func New(
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
 		committer,
+		eds,
+		edCache,
 	)
 
 	if err != nil {
@@ -109,8 +108,6 @@ func New(
 		programsCache:      programsCache,
 		scriptLogThreshold: scriptLogThreshold,
 		uploaders:          uploaders,
-		eds:                eds,
-		edCache:            edCache,
 	}
 
 	return &e, nil
@@ -246,30 +243,7 @@ func (e *Manager) ComputeBlock(
 
 	e.programsCache.Set(block.ID(), toInsert)
 
-	group, uploadCtx := errgroup.WithContext(ctx)
-	var rootID flow.Identifier
-	var blobTree [][]cid.Cid
-
-	group.Go(func() error {
-		var collections []*flow.Collection
-		for _, collection := range result.ExecutableBlock.Collections() {
-			collections = append(collections, &flow.Collection{
-				Transactions: collection.Transactions,
-			})
-		}
-
-		ed := &state_synchronization.ExecutionData{
-			BlockID:     block.ID(),
-			Collections: collections,
-			Events:      result.Events,
-			TrieUpdates: result.TrieUpdates,
-		}
-
-		var err error
-		rootID, blobTree, err = e.eds.Add(uploadCtx, ed)
-
-		return err
-	})
+	group := new(errgroup.Group)
 
 	for _, uploader := range e.uploaders {
 		uploader := uploader
@@ -288,9 +262,6 @@ func (e *Manager) ComputeBlock(
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
-
-	e.edCache.Insert(block.Block.Header, blobTree)
-	result.ExecutionDataID = rootID
 
 	return result, nil
 }
