@@ -102,7 +102,7 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	t.Result = &result
 	t.StatusCode = int32(txr.StatusCode)
 	t.ErrorMessage = txr.ErrorMessage
-	t.ComputationUsed = util.FromUint64(0)
+	t.ComputationUsed = util.FromUint64(0) // todo: define this
 	t.Events = events
 
 	self, _ := SelfLink(txID, link.TransactionResultLink)
