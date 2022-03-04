@@ -88,6 +88,9 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	var status TransactionStatus
 	status.Build(txr.Status)
 
+	var result TransactionResultStatus
+	result.Build(txr)
+
 	var events Events
 	events.Build(txr.Events)
 
@@ -96,6 +99,7 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	}
 
 	t.Status = &status
+	t.Result = &result
 	t.StatusCode = int32(txr.StatusCode)
 	t.ErrorMessage = txr.ErrorMessage
 	t.ComputationUsed = util.FromUint64(0)
@@ -119,6 +123,20 @@ func (t *TransactionStatus) Build(status flow.TransactionStatus) {
 		*t = PENDING
 	default:
 		*t = ""
+	}
+}
+
+func (t *TransactionResultStatus) Build(result *access.TransactionResult) {
+	*t = PENDING_RESULT
+
+	if result.Status == flow.TransactionStatusSealed && result.ErrorMessage == "" {
+		*t = SUCCESS_RESULT
+	}
+	if result.ErrorMessage != "" {
+		*t = FAILURE_RESULT
+	}
+	if result.Status == flow.TransactionStatusExpired {
+		*t = FAILURE_RESULT
 	}
 }
 
