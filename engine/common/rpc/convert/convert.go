@@ -256,11 +256,11 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	payload, err := PayloadFromMessage(m)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to extract payload data from message: %w", err)
 	}
 	header, err := MessageToBlockHeader(m.BlockHeader)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to parse block header: %w", err)
 	}
 	return &flow.Block{
 		Header:  header,
@@ -623,27 +623,11 @@ func BytesToInmemSnapshot(bytes []byte) (*inmem.Snapshot, error) {
 func MessagesToChunkList(m []*entities.Chunk) (flow.ChunkList, error) {
 	parsedChunks := make(flow.ChunkList, len(m))
 	for i, chunk := range m {
-		startState, err := flow.ToStateCommitment(chunk.StartState)
+		parsedChunk, err := MessageToChunk(chunk)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse message to chunk: %w", err)
 		}
-		endState, err := flow.ToStateCommitment(chunk.EndState)
-		if err != nil {
-			return nil, err
-		}
-		chunkBody := flow.ChunkBody{
-			CollectionIndex:      uint(chunk.CollectionIndex),
-			StartState:           startState,
-			EventCollection:      MessageToIdentifier(chunk.EventCollection),
-			BlockID:              MessageToIdentifier(chunk.BlockId),
-			TotalComputationUsed: chunk.TotalComputationUsed,
-			NumberOfTransactions: uint64(chunk.NumberOfTransactions),
-		}
-		parsedChunks[i] = &flow.Chunk{
-			ChunkBody: chunkBody,
-			Index:     chunk.Index,
-			EndState:  endState,
-		}
+		parsedChunks[i] = parsedChunk
 	}
 	return parsedChunks, nil
 }
@@ -651,31 +635,11 @@ func MessagesToChunkList(m []*entities.Chunk) (flow.ChunkList, error) {
 func MessagesToServiceEventList(m []*entities.ServiceEvent) (flow.ServiceEventList, error) {
 	parsedServiceEvents := make(flow.ServiceEventList, len(m))
 	for i, serviceEvent := range m {
-		var event interface{}
-		rawEvent := serviceEvent.Payload
-		// map keys correctly
-		switch serviceEvent.Type {
-		case flow.ServiceEventSetup:
-			setup := new(flow.EpochSetup)
-			err := json.Unmarshal(rawEvent, setup)
-			if err != nil {
-				return nil, err
-			}
-			event = setup
-		case flow.ServiceEventCommit:
-			commit := new(flow.EpochCommit)
-			err := json.Unmarshal(rawEvent, commit)
-			if err != nil {
-				return nil, err
-			}
-			event = commit
-		default:
-			return nil, fmt.Errorf("invalid event type: %s", serviceEvent.Type)
+		parsedServiceEvent, err := MessageToServiceEvent(serviceEvent)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse service event from message: %w", err)
 		}
-		parsedServiceEvents[i] = flow.ServiceEvent{
-			Type:  serviceEvent.Type,
-			Event: event,
-		}
+		parsedServiceEvents[i] = *parsedServiceEvent
 	}
 	return parsedServiceEvents, nil
 }
@@ -739,6 +703,34 @@ func ServiceEventToMessage(event flow.ServiceEvent) (*entities.ServiceEvent, err
 	}, nil
 }
 
+func MessageToServiceEvent(m *entities.ServiceEvent) (*flow.ServiceEvent, error) {
+	var event interface{}
+	rawEvent := m.Payload
+	// map keys correctly
+	switch m.Type {
+	case flow.ServiceEventSetup:
+		setup := new(flow.EpochSetup)
+		err := json.Unmarshal(rawEvent, setup)
+		if err != nil {
+			return nil, err
+		}
+		event = setup
+	case flow.ServiceEventCommit:
+		commit := new(flow.EpochCommit)
+		err := json.Unmarshal(rawEvent, commit)
+		if err != nil {
+			return nil, err
+		}
+		event = commit
+	default:
+		return nil, fmt.Errorf("invalid event type: %s", m.Type)
+	}
+	return &flow.ServiceEvent{
+		Type:  m.Type,
+		Event: event,
+	}, nil
+}
+
 func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
 	return &entities.Chunk{
 		CollectionIndex:      uint32(chunk.CollectionIndex),
@@ -750,4 +742,28 @@ func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
 		Index:                chunk.Index,
 		EndState:             StateCommitmentToMessage(chunk.EndState),
 	}
+}
+
+func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
+	startState, err := flow.ToStateCommitment(m.StartState)
+	if err != nil {
+		return nil, err
+	}
+	endState, err := flow.ToStateCommitment(m.EndState)
+	if err != nil {
+		return nil, err
+	}
+	chunkBody := flow.ChunkBody{
+		CollectionIndex:      uint(m.CollectionIndex),
+		StartState:           startState,
+		EventCollection:      MessageToIdentifier(m.EventCollection),
+		BlockID:              MessageToIdentifier(m.BlockId),
+		TotalComputationUsed: m.TotalComputationUsed,
+		NumberOfTransactions: uint64(m.NumberOfTransactions),
+	}
+	return &flow.Chunk{
+		ChunkBody: chunkBody,
+		Index:     m.Index,
+		EndState:  endState,
+	}, nil
 }
