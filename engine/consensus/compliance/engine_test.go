@@ -1,7 +1,6 @@
 package compliance
 
 import (
-	modulemock "github.com/onflow/flow-go/module/mock"
 	"math/rand"
 	"sync"
 	"testing"
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
