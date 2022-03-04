@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -26,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -126,8 +128,14 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain) *BasicBlockExecutor 
 	)
 	require.NoError(tb, err)
 
+	eds := new(state_synchronization.ExecutionDataService)
+	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+
+	eCache := new(state_synchronization.ExecutionDataCIDCache)
+	eCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("state_synchronization.BlobTree"))
+
 	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter)
+	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter, eds, eCache)
 	require.NoError(tb, err)
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))

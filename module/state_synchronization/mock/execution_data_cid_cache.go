@@ -64,7 +64,7 @@ func (_m *ExecutionDataCIDCache) Get(c cid.Cid) (state_synchronization.BlobRecor
 	return r0, r1
 }
 
-// Insert provides a mock function with given fields: header, blobTree
-func (_m *ExecutionDataCIDCache) Insert(header *flow.Header, blobTree state_synchronization.BlobTree) {
-	_m.Called(header, blobTree)
+// Insert provides a mock function with given fields: blockID, blockHeight, chunkIndex, blobTree
+func (_m *ExecutionDataCIDCache) Insert(blockID flow.Identifier, blockHeight uint64, chunkIndex int, blobTree state_synchronization.BlobTree) {
+	_m.Called(blockID, blockHeight, chunkIndex, blobTree)
 }
