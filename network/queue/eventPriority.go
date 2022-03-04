@@ -2,7 +2,6 @@ package queue
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -19,7 +18,6 @@ const (
 // QMessage is the message that is enqueued for each incoming message
 type QMessage struct {
 	Payload  interface{}     // the decoded message
-	Size     int             // the size of the message in bytes
 	Target   network.Channel // the target channel to lookup the engine
 	SenderID flow.Identifier // senderID for logging
 }
@@ -32,8 +30,7 @@ func GetEventPriority(message interface{}) (Priority, error) {
 		return 0, fmt.Errorf("invalid message format: %T", message)
 	}
 	priorityByType := getPriorityByType(qm.Payload)
-	priorityBySize := getPriorityBySize(qm.Size)
-	return Priority(math.Ceil(float64(priorityByType+priorityBySize) / 2)), nil
+	return Priority(priorityByType), nil
 }
 
 // getPriorityByType maps a message type to its priority

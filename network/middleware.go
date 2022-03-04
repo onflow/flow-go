@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/network/message"
 )
 
 // Topic is the internal type of Libp2p which corresponds to the Channel in the network level.
@@ -35,14 +34,14 @@ type Middleware interface {
 	//
 	// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 	// a more efficient candidate.
-	SendDirect(msg *message.Message, targetID flow.Identifier) error
+	SendDirect(channel Channel, msg interface{}, targetID flow.Identifier) error
 
-	SetDirectMessageHandler(channel Channel, handler DirectMessageHandler) error
+	SetDirectMessageHandler(channel Channel, handler DirectMessageHandler)
 
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 	// effort.
-	Publish(msg *message.Message, channel Channel) error
+	Publish(msg interface{}, channel Channel) error
 
 	// Subscribe subscribes the middleware to a channel.
 	Subscribe(channel Channel) error
@@ -75,7 +74,7 @@ type Overlay interface {
 	// GetIdentity returns the Identity associated with the given peer ID, if it exists
 	Identity(peer.ID) (*flow.Identity, bool)
 
-	Receive(nodeID flow.Identifier, msg *message.Message) error
+	Receive(nodeID flow.Identifier, channel Channel, msg interface{}) error
 }
 
 // Connection represents an interface to read from & write to a connection.

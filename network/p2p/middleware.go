@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	ggio "github.com/gogo/protobuf/io"
 	"github.com/ipfs/go-datastore"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -27,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -172,8 +170,7 @@ func NewMiddleware(
 
 func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
-		validator.ValidateNotSender(flowID),   // validator to filter out messages sent by this node itself
-		validator.ValidateTarget(log, flowID), // validator to filter out messages not intended for this node
+		validator.ValidateNotSender(flowID), // validator to filter out messages sent by this node itself
 	}
 }
 
@@ -460,49 +457,22 @@ func (m *Middleware) streamHandler(channel network.Channel, handler network.Dire
 			return
 		}
 
-		for {
-
-		}
-
-		_, err = stream.Read()
-
+		data, err := io.ReadAll(stream)
 		if err != nil {
-			return fmt.Errorf("failed to write message to stream: %w", err)
+			m.log.Err(err).Msg("failed to read message from stream:")
+			return
 		}
 
-		// create the reader
-		r := ggio.NewDelimitedReader(stream, config.MaxMsgSize)
-
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-
-			var msg message.Message
-
-			// read the next message (blocking call)
-			err = r.ReadMsg(&msg)
-
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-
-				m.log.Err(err).Msg("failed to read message")
-				return
-			}
-
-			decodedMessage, err := m.codec.Decode(msg.Payload)
-			if err != nil {
-				m.log.Err(err).Msg("could not decode msg")
-				return
-			}
-
-			// log metrics with the channel name as OneToOne
-			m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, m.msgType(decodedMessage))
-
-			handler(channel, msg, flowID)
+		decodedMessage, err := m.codec.Decode(data)
+		if err != nil {
+			m.log.Err(err).Msg("could not decode msg")
+			return
 		}
+
+		// log metrics with the channel name as OneToOne
+		m.metrics.NetworkMessageReceived(len(data), metrics.ChannelOneToOne, m.msgType(decodedMessage))
+
+		handler(channel, decodedMessage, flowID)
 
 		success = true
 	}
@@ -590,13 +560,13 @@ func (m *Middleware) pubSubMessageHandler(channel network.Channel) func(interfac
 		// run through all the message validators
 		for _, v := range m.validators {
 			// if any one fails, stop message propagation
-			if !v.Validate(msg) {
+			if !v.Validate(flowID, msg) {
 				return
 			}
 		}
 
 		// if validation passed, send the message to the overlay
-		err = m.ov.Receive(flowID, msg)
+		err = m.ov.Receive(flowID, channel, msg)
 		if err != nil {
 			m.log.Error().Err(err).Msg("could not deliver payload")
 		}

@@ -3,7 +3,6 @@ package p2p
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,8 +21,6 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
-	netcache "github.com/onflow/flow-go/network/cache"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -58,12 +55,10 @@ type Network struct {
 	*component.ComponentManager
 	identityProvider            id.IdentityProvider
 	logger                      zerolog.Logger
-	codec                       network.Codec
 	me                          module.Local
 	mw                          network.Middleware
 	top                         network.Topology // used to determine fanout connections
 	metrics                     module.NetworkMetrics
-	rcache                      *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
 	subMngr                     network.SubscriptionManager // used to keep track of subscribed channels
 	conduitFactory              network.ConduitFactory
@@ -98,24 +93,17 @@ type registerBlobServiceResp struct {
 
 var ErrNetworkShutdown = errors.New("network has already shutdown")
 
-// NewNetwork creates a new naive overlay network, using the given middleware to
-// communicate to direct peers, using the given codec for serialization, and
-// using the given state & cache interfaces to track volatile information.
-// csize determines the size of the cache dedicated to keep track of received messages
+// NewNetwork creates a new naive overlay network, using the given middleware to communicate to direct peers.
 func NewNetwork(
 	log zerolog.Logger,
-	codec network.Codec,
 	me module.Local,
 	mwFactory func() (network.Middleware, error),
-	csize int,
 	top network.Topology,
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
 	identityProvider id.IdentityProvider,
 	options ...NetworkOptFunction,
 ) (*Network, error) {
-
-	rcache := netcache.NewReceiveCache(uint32(csize), log)
 	mw, err := mwFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
@@ -123,10 +111,8 @@ func NewNetwork(
 
 	n := &Network{
 		logger:                      log,
-		codec:                       codec,
 		me:                          me,
 		mw:                          mw,
-		rcache:                      rcache,
 		top:                         top,
 		metrics:                     metrics,
 		subMngr:                     sm,
@@ -287,12 +273,13 @@ func (n *Network) RegisterDirectMessageHandler(channel network.Channel, handler 
 	case <-n.ComponentManager.ShutdownSignal():
 		return ErrNetworkShutdown
 	default:
-		return
+		n.mw.SetDirectMessageHandler(channel, handler)
+		return nil
 	}
 }
 
 func (n *Network) SendDirectMessage(channel network.Channel, message interface{}, targetID flow.Identifier) error {
-
+	return n.mw.SendDirect(channel, message, targetID)
 }
 
 // RegisterBlobService registers a BlobService on the given channel.
@@ -351,95 +338,30 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	return top, nil
 }
 
-func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
-	err := n.processNetworkMessage(nodeID, msg)
+func (n *Network) Receive(nodeID flow.Identifier, channel network.Channel, msg interface{}) error {
+	err := n.processNetworkMessage(nodeID, channel, msg)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
 	return nil
 }
 
-func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
-	// checks the cache for deduplication and adds the message if not already present
-	if !n.rcache.Add(message.EventID) {
-		log := n.logger.With().
-			Hex("sender_id", senderID[:]).
-			Hex("event_id", message.EventID).
-			Logger()
-
-		// drops duplicate message
-		log.Debug().
-			Str("channel", message.ChannelID).
-			Msg("dropping message due to duplication")
-
-		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID, message.Type)
-
-		return nil
-	}
-
-	// Convert message payload to a known message type
-	decodedMessage, err := n.codec.Decode(message.Payload)
-	if err != nil {
-		return fmt.Errorf("could not decode event: %w", err)
-	}
+func (n *Network) processNetworkMessage(senderID flow.Identifier, channel network.Channel, message interface{}) error {
 
 	// create queue message
 	qm := queue.QMessage{
-		Payload:  decodedMessage,
-		Size:     message.Size(),
-		Target:   network.Channel(message.ChannelID),
+		Payload:  message,
+		Target:   channel,
 		SenderID: senderID,
 	}
 
 	// insert the message in the queue
-	err = n.queue.Insert(qm)
+	err := n.queue.Insert(qm)
 	if err != nil {
 		return fmt.Errorf("failed to insert message in queue: %w", err)
 	}
 
 	return nil
-}
-
-// genNetworkMessage uses the codec to encode an event into a NetworkMessage
-func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) (*message.Message, error) {
-	// encode the payload using the configured codec
-	payload, err := n.codec.Encode(event)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode event: %w", err)
-	}
-
-	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
-	//defer binstat.Leave(bs)
-
-	eventId, err := EventId(channel, payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate event id for message: %x", err)
-	}
-
-	var emTargets [][]byte
-	for _, targetID := range targetIDs {
-		tempID := targetID // avoid capturing loop variable
-		emTargets = append(emTargets, tempID[:])
-	}
-
-	// get origin ID
-	selfID := n.me.NodeID()
-	originID := selfID[:]
-
-	// get message type from event type and remove the asterisk prefix if present
-	msgType := strings.TrimLeft(fmt.Sprintf("%T", event), "*")
-
-	// cast event to a libp2p.Message
-	msg := &message.Message{
-		ChannelID: channel.String(),
-		EventID:   eventId,
-		OriginID:  originID,
-		TargetIDs: emTargets,
-		Payload:   payload,
-		Type:      msgType,
-	}
-
-	return msg, nil
 }
 
 // PublishOnChannel sends the message in an unreliable way to the given recipients.
@@ -477,15 +399,9 @@ func (n *Network) sendOnChannel(channel network.Channel, message interface{}, ta
 		Str("target_ids", fmt.Sprintf("%v", targetIDs)).
 		Msg("sending new message on channel")
 
-	// generate network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
-	if err != nil {
-		return fmt.Errorf("failed to generate network message for channel %s: %w", channel, err)
-	}
-
 	// publish the message through the channel, however, the message
 	// is only restricted to targetIDs (if they subscribed to channel).
-	err = n.mw.Publish(msg, channel)
+	err := n.mw.Publish(message, channel)
 	if err != nil {
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}

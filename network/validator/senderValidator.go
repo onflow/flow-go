@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/message"
 )
 
 var _ network.MessageValidator = &SenderValidator{}
@@ -23,8 +22,8 @@ func ValidateSender(sender flow.Identifier) network.MessageValidator {
 }
 
 // Validate returns true if the message origin id is the same as the sender ID.
-func (sv *SenderValidator) Validate(msg message.Message) bool {
-	return bytes.Equal(sv.sender, msg.OriginID)
+func (sv *SenderValidator) Validate(origin flow.Identifier, msg interface{}) bool {
+	return bytes.Equal(sv.sender, origin[:])
 }
 
 // ValidateNotSender creates and returns a validator which validates that the message origin id is different from
