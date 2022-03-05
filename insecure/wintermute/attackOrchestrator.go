@@ -21,7 +21,8 @@ type Orchestrator struct {
 
 var _ insecure.AttackOrchestrator = &Orchestrator{}
 
-func NewOrchestrator(allIds flow.IdentityList, corruptedIds flow.IdentityList, logger zerolog.Logger) *Orchestrator {
+// NewOrchestrator creates and returns a new Wintermute attack orchestrator.
+func NewOrchestrator(logger zerolog.Logger, allIds flow.IdentityList, corruptedIds flow.IdentityList) *Orchestrator {
 	o := &Orchestrator{
 		logger:       logger,
 		network:      adversary.NewAttackNetwork(corruptedIds, logger),
@@ -43,6 +44,7 @@ func NewOrchestrator(allIds flow.IdentityList, corruptedIds flow.IdentityList, l
 	return o
 }
 
+// start triggers the sub-modules of orchestrator.
 func (o *Orchestrator) start(ctx irrecoverable.SignalerContext) {
 	o.network.Start(ctx)
 }
