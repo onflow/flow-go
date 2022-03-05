@@ -367,14 +367,8 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, channel networ
 // In this context, unreliable means that the message is published over a libp2p pub-sub
 // channel and can be read by any node subscribed to that channel.
 // The selector could be used to optimize or restrict delivery.
-func (n *Network) PublishOnChannel(channel network.Channel, message interface{}, targetIDs ...flow.Identifier) error {
-	filteredIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter())
-
-	if len(filteredIDs) == 0 {
-		return network.EmptyTargetList
-	}
-
-	err := n.sendOnChannel(channel, message, filteredIDs)
+func (n *Network) PublishOnChannel(channel network.Channel, message interface{}) error {
+	err := n.sendOnChannel(channel, message)
 
 	if err != nil {
 		return fmt.Errorf("failed to publish on channel %s: %w", channel, err)
@@ -391,15 +385,13 @@ func (n *Network) removeSelfFilter() flow.IdentifierFilter {
 }
 
 // sendOnChannel sends the message on channel to targets.
-func (n *Network) sendOnChannel(channel network.Channel, message interface{}, targetIDs []flow.Identifier) error {
+func (n *Network) sendOnChannel(channel network.Channel, message interface{}) error {
 	n.logger.Debug().
 		Interface("message", message).
 		Str("channel", channel.String()).
-		Str("target_ids", fmt.Sprintf("%v", targetIDs)).
 		Msg("sending new message on channel")
 
-	// publish the message through the channel, however, the message
-	// is only restricted to targetIDs (if they subscribed to channel).
+	// publish the message through the channel
 	err := n.mw.Publish(message, channel)
 	if err != nil {
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)

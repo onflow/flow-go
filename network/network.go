@@ -39,8 +39,8 @@ type DirectMessageHandler func(channel Channel, originID flow.Identifier, messag
 // Adapter is meant to be utilized by the Conduit interface to send messages to the Network layer to be
 // delivered to the remote targets.
 type Adapter interface {
-	// PublishOnChannel sends the message in an unreliable way to all the given recipients.
-	PublishOnChannel(Channel, interface{}, ...flow.Identifier) error
+	// PublishOnChannel sends the message in an unreliable way to the channel.
+	PublishOnChannel(Channel, interface{}) error
 
 	// UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
 	// receive messages from that channel.

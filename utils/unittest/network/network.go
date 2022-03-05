@@ -11,7 +11,7 @@ import (
 )
 
 type EngineProcessFunc func(network.Channel, flow.Identifier, interface{}) error
-type NetworkPublishFunc func(network.Channel, interface{}, ...flow.Identifier) error
+type NetworkPublishFunc func(network.Channel, interface{}) error
 
 // Conduit represents a mock conduit.
 type Conduit struct {
@@ -22,9 +22,9 @@ type Conduit struct {
 
 // Publish sends a message on this mock network, invoking any callback that has
 // been specified. This will panic if no callback is found.
-func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+func (c *Conduit) Publish(event interface{}) error {
 	if c.net.publishFunc != nil {
-		return c.net.publishFunc(c.channel, event, targetIDs...)
+		return c.net.publishFunc(c.channel, event)
 	}
 	panic("Publish called but no callback function was found.")
 }

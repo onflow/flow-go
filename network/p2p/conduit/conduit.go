@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -63,11 +62,11 @@ type Conduit struct {
 // to subscribers of the given event on the network layer. It uses a
 // publish-subscribe layer and can thus not guarantee that the specified
 // recipients received the event.
-func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
+func (c *Conduit) Publish(event interface{}) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
-	return c.adapter.PublishOnChannel(c.channel, event, targetIDs...)
+	return c.adapter.PublishOnChannel(c.channel, event)
 }
 
 func (c *Conduit) Close() error {

@@ -107,13 +107,8 @@ func (n *Network) submit(channel network.Channel, event interface{}, targetIDs .
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) PublishOnChannel(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
-
-	if len(targetIDs) == 0 {
-		return fmt.Errorf("publish found empty target ID list for the message")
-	}
-
-	return n.submit(channel, event, targetIDs...)
+func (n *Network) PublishOnChannel(channel network.Channel, event interface{}) error {
+	return n.submit(channel, event)
 }
 
 // haveSeen returns true if the node attached to this Network instance has seen the event ID.
