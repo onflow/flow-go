@@ -25,9 +25,11 @@ type Attacker struct {
 	cm           *component.ComponentManager
 }
 
-func NewAttacker(address string, orchestrator insecure.AttackOrchestrator) (*Attacker, error) {
+func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orchestrator insecure.AttackOrchestrator) (*Attacker, error) {
 	attacker := &Attacker{
 		orchestrator: orchestrator,
+		logger:       logger,
+		codec:        codec,
 	}
 
 	s := grpc.NewServer()
@@ -40,6 +42,7 @@ func NewAttacker(address string, orchestrator insecure.AttackOrchestrator) (*Att
 		return nil, fmt.Errorf("could not bind attacker to the tcp listener: %w", err)
 	}
 
+	// setting lifecycle management module.
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			attacker.start(ctx)
@@ -55,6 +58,7 @@ func NewAttacker(address string, orchestrator insecure.AttackOrchestrator) (*Att
 	return attacker, nil
 }
 
+// start
 func (a *Attacker) start(ctx irrecoverable.SignalerContext) {
 	a.orchestrator.Start(ctx)
 }
