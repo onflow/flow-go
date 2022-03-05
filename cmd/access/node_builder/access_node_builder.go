@@ -39,7 +39,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
@@ -473,16 +472,11 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	middleware network.Middleware,
 	topology network.Topology,
 ) (*p2p.Network, error) {
-
-	codec := cborcodec.NewCodec()
-
 	// creates network instance
 	net, err := p2p.NewNetwork(
 		builder.Logger,
-		codec,
 		nodeID,
 		func() (network.Middleware, error) { return builder.Middleware, nil },
-		p2p.DefaultCacheSize,
 		topology,
 		p2p.NewChannelSubscriptionManager(middleware),
 		networkMetrics,
@@ -504,8 +498,6 @@ func unstakedNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProv
 			validator.NewOriginValidator(
 				id.NewIdentityFilterIdentifierProvider(filter.IsValidCurrentEpochParticipant, idProvider),
 			),
-			// or the message should be specifically targeted for this node
-			validator.ValidateTarget(log, selfID),
 		),
 	}
 }

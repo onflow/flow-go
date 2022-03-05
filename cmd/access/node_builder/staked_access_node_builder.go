@@ -30,10 +30,12 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	relaynet "github.com/onflow/flow-go/network/relay"
 	"github.com/onflow/flow-go/network/topology"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -260,19 +262,17 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	if builder.supportsUnstakedFollower {
 		builder.Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			syncRequestHandler, err := synceng.NewRequestHandlerEngine(
+			syncRequestHandler := synceng.NewRequestHandler(
 				node.Logger.With().Bool("unstaked", true).Logger(),
 				unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
 				builder.AccessNodeConfig.PublicNetworkConfig.Network,
+				engine.PublicSyncCommittee,
 				node.Me,
 				node.Storage.Blocks,
 				builder.SyncCore,
 				builder.FinalizedHeader,
+				false,
 			)
-
-			if err != nil {
-				return nil, fmt.Errorf("could not create unstaked sync request handler: %w", err)
-			}
 
 			return syncRequestHandler, nil
 		})
@@ -304,12 +304,13 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("unstaked"))
+		codec := cbor.NewCodec()
 
-		libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
+		libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey, codec)
 
 		msgValidators := unstakedNetworkMsgValidators(node.Logger.With().Bool("unstaked", true).Logger(), node.IdentityProvider, builder.NodeID)
 
-		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, msgValidators...)
+		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, codec, msgValidators...)
 
 		// topology returns empty list since peers are not known upfront
 		top := topology.EmptyListTopology{}
@@ -334,11 +335,17 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 // 		The passed in private key as the libp2p key
 //		No connection gater
 // 		Default Flow libp2p pubsub options
-func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
+func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, codec network.Codec) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
 		connManager := p2p.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
 
-		libp2pNode, err := p2p.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
+		libp2pNode, err := p2p.NewNodeBuilder(
+			builder.Logger,
+			builder.PublicNetworkConfig.BindAddress,
+			networkKey,
+			builder.SporkID,
+			validator.TopicValidatorFactory(codec),
+		).
 			SetBasicResolver(builder.Resolver).
 			SetSubscriptionFilter(
 				p2p.NewRoleBasedFilter(
@@ -367,7 +374,9 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Priv
 func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
-	validators ...network.MessageValidator) network.Middleware {
+	codec network.Codec,
+	validators ...network.MessageValidator,
+) network.Middleware {
 
 	// disable connection pruning for the staked AN which supports the unstaked AN
 	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(builder.PeerUpdateInterval)}, p2p.WithConnectionPruning(false))
@@ -375,10 +384,10 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger.With().Bool("staked", false).Logger(),
 		factoryFunc,
+		codec,
 		nodeID,
 		networkMetrics,
 		builder.SporkID,
-		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		p2p.WithMessageValidators(validators...),
 		p2p.WithPeerManager(peerManagerFactory),

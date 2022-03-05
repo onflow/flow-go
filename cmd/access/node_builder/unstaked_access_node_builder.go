@@ -21,10 +21,12 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -168,7 +170,7 @@ func (builder *UnstakedAccessNodeBuilder) validateParams() error {
 //		No connection gater
 // 		No connection manager
 // 		Default libp2p pubsub options
-func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
+func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey, codec network.Codec) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
 		var pis []peer.AddrInfo
 
@@ -182,7 +184,13 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Pr
 			pis = append(pis, pi)
 		}
 
-		node, err := p2p.NewNodeBuilder(builder.Logger, builder.BaseConfig.BindAddr, networkKey, builder.SporkID).
+		node, err := p2p.NewNodeBuilder(
+			builder.Logger,
+			builder.BaseConfig.BindAddr,
+			networkKey,
+			builder.SporkID,
+			validator.TopicValidatorFactory(codec),
+		).
 			SetSubscriptionFilter(
 				p2p.NewRoleBasedFilter(
 					p2p.UnstakedRole, builder.IdentityProvider,
@@ -235,6 +243,7 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(node *cmd.Nod
 func (builder *UnstakedAccessNodeBuilder) enqueueMiddleware() {
 	builder.
 		Module("network middleware", func(node *cmd.NodeConfig) error {
+			codec := cbor.NewCodec()
 
 			// NodeID for the unstaked node on the unstaked network
 			unstakedNodeID := node.NodeID
@@ -242,11 +251,11 @@ func (builder *UnstakedAccessNodeBuilder) enqueueMiddleware() {
 			// Networking key
 			unstakedNetworkKey := node.NetworkKey
 
-			libP2PFactory := builder.initLibP2PFactory(unstakedNetworkKey)
+			libP2PFactory := builder.initLibP2PFactory(unstakedNetworkKey, codec)
 
 			msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, unstakedNodeID)
 
-			builder.initMiddleware(unstakedNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
+			builder.initMiddleware(unstakedNodeID, node.Metrics.Network, libP2PFactory, codec, msgValidators...)
 
 			return nil
 		})
@@ -297,15 +306,17 @@ func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
 func (builder *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
-	validators ...network.MessageValidator) network.Middleware {
+	codec network.Codec,
+	validators ...network.MessageValidator,
+) network.Middleware {
 
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger,
 		factoryFunc,
+		codec,
 		nodeID,
 		networkMetrics,
 		builder.SporkID,
-		p2p.DefaultUnicastTimeout,
 		builder.IDTranslator,
 		p2p.WithMessageValidators(validators...),
 		// no peer manager

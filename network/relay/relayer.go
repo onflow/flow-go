@@ -43,7 +43,7 @@ func (r *Relayer) Process(channel network.Channel, originID flow.Identifier, eve
 
 	g.Go(func() error {
 		if err := r.messageProcessor.Process(channel, originID, event); err != nil {
-			return fmt.Errorf("failed to relay message to message processor: %w", err)
+			return fmt.Errorf("failed to forward message to message processor: %w", err)
 		}
 
 		return nil
@@ -51,7 +51,7 @@ func (r *Relayer) Process(channel network.Channel, originID flow.Identifier, eve
 
 	g.Go(func() error {
 		if err := r.destinationConduit.Publish(event, flow.ZeroID); err != nil {
-			return fmt.Errorf("failed to relay message to network: %w", err)
+			return fmt.Errorf("failed to relay message to destination network: %w", err)
 		}
 
 		return nil

@@ -7,6 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
@@ -33,6 +34,15 @@ func NewRelayNetwork(
 		logger:         logger.With().Str("component", "relay_network").Logger(),
 		channels:       channels,
 	}
+}
+
+func (r *RelayNetwork) RegisterDirectMessageHandler(channel network.Channel, handler network.DirectMessageHandler) error {
+	// TODO: for now, we have no usecase that requires relaying direct messages.
+	return r.originNet.RegisterDirectMessageHandler(channel, handler)
+}
+
+func (r *RelayNetwork) SendDirectMessage(channel network.Channel, message interface{}, target flow.Identifier) error {
+	return r.originNet.SendDirectMessage(channel, message, target)
 }
 
 func (r *RelayNetwork) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {

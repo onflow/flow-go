@@ -36,12 +36,13 @@ type Engine struct {
 	tracer      module.Tracer              // used for tracing
 	pushConduit network.Conduit            // used to push result approvals
 	pullConduit network.Conduit            // used to respond to requests for result approvals
-	me          module.Local               // used to access local node information
-	state       protocol.State             // used to access the protocol state
-	rah         hash.Hasher                // used as hasher to sign the result approvals
-	chVerif     module.ChunkVerifier       // used to verify chunks
-	spockHasher hash.Hasher                // used for generating spocks
-	approvals   storage.ResultApprovals    // used to store result approvals
+	net         network.Network
+	me          module.Local            // used to access local node information
+	state       protocol.State          // used to access the protocol state
+	rah         hash.Hasher             // used as hasher to sign the result approvals
+	chVerif     module.ChunkVerifier    // used to verify chunks
+	spockHasher hash.Hasher             // used for generating spocks
+	approvals   storage.ResultApprovals // used to store result approvals
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -63,6 +64,7 @@ func New(
 		tracer:      tracer,
 		state:       state,
 		me:          me,
+		net:         net,
 		chVerif:     chVerif,
 		rah:         utils.NewResultApprovalHasher(),
 		spockHasher: crypto.NewBLSKMAC(encoding.SPOCKTag),
@@ -376,7 +378,7 @@ func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.
 		Approval: *approval,
 	}
 
-	err = e.pullConduit.Unicast(response, originID)
+	err = e.net.SendDirectMessage(engine.ProvideApprovalsByChunk, response, originID)
 	if err != nil {
 		return fmt.Errorf("could not send requested approval to %s: %w",
 			originID,
