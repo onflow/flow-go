@@ -32,16 +32,6 @@ func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orc
 		codec:        codec,
 	}
 
-	s := grpc.NewServer()
-	insecure.RegisterAttackerServer(s, attacker)
-	ln, err := net.Listen("tcp", address)
-	if err != nil {
-		return nil, fmt.Errorf("could not listen on specified address: %w", err)
-	}
-	if err = s.Serve(ln); err != nil {
-		return nil, fmt.Errorf("could not bind attacker to the tcp listener: %w", err)
-	}
-
 	// setting lifecycle management module.
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -55,12 +45,31 @@ func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orc
 	attacker.Component = cm
 	attacker.cm = cm
 
+	if err := attacker.listenAndServe(address); err != nil {
+		return nil, fmt.Errorf("could not start up a gRPC server for attacker: %w", err)
+	}
+
 	return attacker, nil
 }
 
-// start
+// start triggers the sub-modules of attacker.
 func (a *Attacker) start(ctx irrecoverable.SignalerContext) {
 	a.orchestrator.Start(ctx)
+}
+
+// listenAndServe establishes an attacker gRPC server on the specified address.
+func (a *Attacker) listenAndServe(address string) error {
+	s := grpc.NewServer()
+	insecure.RegisterAttackerServer(s, a)
+	ln, err := net.Listen("tcp", address)
+	if err != nil {
+		return fmt.Errorf("could not listen on specified address: %w", err)
+	}
+	if err = s.Serve(ln); err != nil {
+		return fmt.Errorf("could not bind attacker to the tcp listener: %w", err)
+	}
+
+	return nil
 }
 
 func (a *Attacker) Observe(stream insecure.Attacker_ObserveServer) error {
