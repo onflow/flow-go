@@ -22,6 +22,7 @@ var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 
 // We test that leader selection works for a committee of size one
 func TestSingleConsensusNode(t *testing.T) {
+
 	identity := unittest.IdentityFixture(unittest.WithWeight(8))
 	rng := prg(t, someSeed)
 	selection, err := ComputeLeaderSelection(0, rng, 10, []*flow.Identity{identity})
@@ -409,8 +410,8 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 				identities := unittest.IdentityListFixture(1000, unittest.WithWeight(0))
 
 				n := toolRng.UintN(1000)
-				stake := n + 1
-				identities[n].Weight = stake
+				weight := n + 1
+				identities[n].Weight = weight
 				onlyNodeWithWeight := identities[n]
 
 				selections, err := ComputeLeaderSelection(0, rng, 1000, identities)
