@@ -131,7 +131,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_BuildQCError() {
 	stakingSigAggregator.AssertExpectations(s.T())
 }
 
-// TestProcess_NotEnoughStakingWeight tests a scenario where we first don't have enough staking weight,
+// TestProcess_NotEnoughStakingWeight tests a scenario where we first don't have enough weight,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created.
 func (s *StakingVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 	for i := s.sigWeight; i < s.minRequiredWeight; i += s.sigWeight {

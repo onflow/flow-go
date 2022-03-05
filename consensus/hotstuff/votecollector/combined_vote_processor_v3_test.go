@@ -339,7 +339,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
 	})
 }
 
-// TestProcess_EnoughWeightNotEnoughShares tests a scenario where we first don't have enough staking weight,
+// TestProcess_EnoughWeightNotEnoughShares tests a scenario where we first don't have enough weight,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created
 // in this scenario since there is not enough random beacon shares.
 func (s *CombinedVoteProcessorV3TestSuite) TestProcess_EnoughWeightNotEnoughShares() {
@@ -532,7 +532,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			require.Subset(t, aggregatedBeaconSigners, blockSigData.RandomBeaconSigners)
 
 			// 2. CHECK: supermajority
-			// All participants have equal staking weight in this test. Per configuration, collecting `honestParticipants`
+			// All participants have equal weights in this test. Per configuration, collecting `honestParticipants`
 			// number of votes is the minimally required supermajority.
 			require.GreaterOrEqual(t, uint64(len(blockSigData.StakingSigners)+len(blockSigData.RandomBeaconSigners)), honestParticipants)
 

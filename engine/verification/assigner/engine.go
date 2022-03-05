@@ -243,7 +243,7 @@ func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionRes
 }
 
 // authorizedAsVerification checks whether this instance of verification node is authorized at specified block ID.
-// It returns true and nil if verification node has weight at referenced block ID, and returns false and nil otherwise.
+// It returns true and nil if verification node has positive weight at referenced block ID, and returns false and nil otherwise.
 // It returns false and error if it could not extract the weight of node as a verification node at the specified block.
 func authorizedAsVerification(state protocol.State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
 	// TODO define specific error for handling cases

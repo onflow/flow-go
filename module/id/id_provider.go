@@ -13,7 +13,7 @@ type IdentifierProvider interface {
 }
 
 // IdentityProvider provides an interface to get a list of Identities representing
-// the set of un-ejected participants in the Flow protocol.
+// the set of non-ejected participants in the Flow protocol.
 type IdentityProvider interface {
 	Identities(flow.IdentityFilter) flow.IdentityList
 	ByNodeID(flow.Identifier) (*flow.Identity, bool)

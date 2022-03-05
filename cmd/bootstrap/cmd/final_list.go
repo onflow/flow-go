@@ -77,7 +77,7 @@ func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo
 			Msg("onchain node count does not match local internal+partner node count")
 	}
 
-	// check onchain and local nodes to make sure node ID are not missing
+	// check registered and local nodes to make sure node ID are not missing
 	validateNodeIDs(localNodes, registeredNodes)
 
 	// print mismatching nodes
@@ -98,8 +98,8 @@ func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo
 		// check node type and error if mismatch
 		if matchingNode.Role != registeredNode.Role {
 			log.Error().
-				Str("onchain node id", registeredNode.NodeID.String()).
-				Str("onchain node role", registeredNode.Role.String()).
+				Str("registered node id", registeredNode.NodeID.String()).
+				Str("registered node role", registeredNode.Role.String()).
 				Str("local node", matchingNode.NodeID.String()).
 				Str("local node role", matchingNode.Role.String()).
 				Msg("node role does not match")
@@ -107,8 +107,8 @@ func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo
 
 		if matchingNode.Address != registeredNode.Address {
 			log.Error().
-				Str("onchain node id", registeredNode.NodeID.String()).
-				Str("onchain node address", registeredNode.Address).
+				Str("registered node id", registeredNode.NodeID.String()).
+				Str("registered node address", registeredNode.Address).
 				Str("local node", matchingNode.NodeID.String()).
 				Str("local node address", matchingNode.Address).
 				Msg("node address does not match")
