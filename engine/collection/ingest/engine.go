@@ -3,10 +3,11 @@
 package ingest
 
 import (
-	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
@@ -32,6 +33,7 @@ type Engine struct {
 	state                protocol.State
 	pools                *epochs.TransactionPools
 	transactionValidator *access.TransactionValidator
+	net                  network.Network
 
 	config Config
 }
@@ -75,6 +77,7 @@ func New(
 		pools:                pools,
 		config:               config,
 		transactionValidator: transactionValidator,
+		net:                  net,
 	}
 
 	conduit, err := net.Register(engine.PushTransactions, e)
@@ -235,13 +238,29 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 		log.Debug().Msg("propagating transaction to cluster")
 
-		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
-		if err != nil && !errors.Is(err, network.EmptyTargetList) {
-			// if multicast to a target cluster with at least one node failed, return an error
-			return fmt.Errorf("could not route transaction to cluster: %w", err)
+		targets := flow.Sample(e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
+		g := new(errgroup.Group)
+		success := false
+		var succeedOnce sync.Once
+
+		for _, target := range targets {
+			target := target
+			g.Go(func() error {
+				err := e.net.SendDirectMessage(engine.PushTransactions, tx, target)
+				if err == nil {
+					succeedOnce.Do(func() {
+						success = true
+					})
+					e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
+				} else {
+					e.log.Debug().Err(err).Str("target_id", target.String()).Msg("failed to propagate transaction to target")
+				}
+				return err
+			})
 		}
-		if err == nil {
-			e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
+		_ = g.Wait()
+		if !success {
+			return fmt.Errorf("failed to propagate transaction to cluster: %w", err)
 		}
 	}
 

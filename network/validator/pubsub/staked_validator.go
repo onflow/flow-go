@@ -7,11 +7,10 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/message"
 )
 
 func StakedValidator(getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
-	return func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult {
+	return func(ctx context.Context, from peer.ID, msg interface{}) pubsub.ValidationResult {
 		if _, ok := getIdentity(from); ok {
 			return pubsub.ValidationAccept
 		}

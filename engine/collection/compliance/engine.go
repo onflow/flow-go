@@ -47,6 +47,8 @@ type Engine struct {
 	pendingVotes   engine.MessageStore
 	messageHandler *engine.MessageHandler
 	con            network.Conduit
+	net            network.Network
+	clusterChannel network.Channel
 	stopHotstuff   context.CancelFunc
 	cluster        flow.IdentityList // consensus participants in our cluster
 }
@@ -143,6 +145,11 @@ func NewEngine(
 		},
 	)
 
+	chainID, err := core.state.Params().ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get chain ID: %w", err)
+	}
+
 	eng := &Engine{
 		unit:           engine.NewUnit(),
 		lm:             lifecycle.NewLifecycleManager(),
@@ -157,16 +164,13 @@ func NewEngine(
 		pendingVotes:   pendingVotes,
 		messageHandler: handler,
 		con:            nil,
+		net:            net,
 		cluster:        currentCluster,
-	}
-
-	chainID, err := core.state.Params().ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain ID: %w", err)
+		clusterChannel: engine.ChannelConsensusCluster(chainID),
 	}
 
 	// register network conduit
-	conduit, err := net.Register(engine.ChannelConsensusCluster(chainID), eng)
+	conduit, err := net.Register(eng.clusterChannel, eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -320,7 +324,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
 	e.unit.Launch(func() {
 		// send the vote the desired recipient
-		err := e.con.Unicast(vote, recipientID)
+		err := e.net.SendDirectMessage(e.clusterChannel, vote, recipientID)
 		if err != nil {
 			log.Warn().Err(err).Msg("could not send vote")
 			return

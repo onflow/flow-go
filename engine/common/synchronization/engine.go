@@ -5,10 +5,11 @@ package synchronization
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -38,6 +39,7 @@ type Engine struct {
 	metrics module.EngineMetrics
 	me      module.Local
 	con     network.Conduit
+	net     network.Network
 	blocks  storage.Blocks
 	comp    network.Engine // compliance layer engine
 
@@ -91,6 +93,7 @@ func New(
 		scanInterval:         opt.ScanInterval,
 		finalizedHeader:      finalizedHeader,
 		participantsProvider: participantsProvider,
+		net:                  net,
 	}
 
 	err := e.setupResponseMessageHandler()
@@ -350,10 +353,40 @@ CheckLoop:
 	scan.Stop()
 }
 
+func (e *Engine) sendRequest(req interface{}, redundancy uint, requestType string) bool {
+	targets := flow.Sample(redundancy, e.participantsProvider.Identifiers()...)
+
+	g := new(errgroup.Group)
+	success := false
+	var succeedOnce sync.Once
+
+	for _, target := range targets {
+		target := target
+		g.Go(func() error {
+			err := e.net.SendDirectMessage(engine.SyncCommittee, req, target)
+			if err == nil {
+				succeedOnce.Do(func() {
+					success = true
+				})
+				e.metrics.MessageSent(metrics.EngineSynchronization, requestType)
+			} else {
+				e.log.Warn().
+					Err(err).
+					Str("target_id", target.String()).
+					Str("request_type", requestType).
+					Msg("failed to send request to target")
+			}
+			return err
+		})
+	}
+
+	_ = g.Wait()
+	return success
+}
+
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() {
 	head := e.finalizedHeader.Get()
-	participants := e.participantsProvider.Identifiers()
 
 	// send the request for synchronization
 	req := &messages.SyncRequest{
@@ -364,17 +397,14 @@ func (e *Engine) pollHeight() {
 		Uint64("height", req.Height).
 		Uint64("range_nonce", req.Nonce).
 		Msg("sending sync request")
-	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
-	if err != nil {
-		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
+	if !e.sendRequest(req, synccore.DefaultPollNodes, metrics.MessageSyncRequest) {
+		e.log.Warn().Msg("sending sync requests to poll heights failed")
 		return
 	}
-	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 }
 
 // sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
 func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Range, batches []flow.Batch) {
-	var errs *multierror.Error
 
 	for _, ran := range ranges {
 		req := &messages.RangeRequest{
@@ -382,18 +412,17 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Ra
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
-			continue
+
+		if e.sendRequest(req, synccore.DefaultPollNodes, metrics.MessageRangeRequest) {
+			e.log.Debug().
+				Uint64("range_from", req.FromHeight).
+				Uint64("range_to", req.ToHeight).
+				Uint64("range_nonce", req.Nonce).
+				Msg("range requested")
+			e.core.RangeRequested(ran)
+		} else {
+			e.log.Warn().Msg("sending range requests failed")
 		}
-		e.log.Info().
-			Uint64("range_from", req.FromHeight).
-			Uint64("range_to", req.ToHeight).
-			Uint64("range_nonce", req.Nonce).
-			Msg("range requested")
-		e.core.RangeRequested(ran)
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 	}
 
 	for _, batch := range batches {
@@ -401,20 +430,15 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Ra
 			Nonce:    rand.Uint64(),
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
-			continue
-		}
-		e.log.Debug().
-			Strs("block_ids", flow.IdentifierList(batch.BlockIDs).Strings()).
-			Uint64("range_nonce", req.Nonce).
-			Msg("batch requested")
-		e.core.BatchRequested(batch)
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
-	}
 
-	if err := errs.ErrorOrNil(); err != nil {
-		e.log.Warn().Err(err).Msg("sending range and batch requests failed")
+		if e.sendRequest(req, synccore.DefaultBlockRequestNodes, metrics.MessageBatchRequest) {
+			e.log.Debug().
+				Strs("block_ids", flow.IdentifierList(batch.BlockIDs).Strings()).
+				Uint64("range_nonce", req.Nonce).
+				Msg("batch requested")
+			e.core.BatchRequested(batch)
+		} else {
+			e.log.Warn().Msg("sending batch requests failed")
+		}
 	}
 }
