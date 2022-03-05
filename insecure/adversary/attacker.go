@@ -72,6 +72,9 @@ func (a *Attacker) listenAndServe(address string) error {
 	return nil
 }
 
+// Observe implements the gRPC interface of attacker that is exposed to the corrupted conduits.
+// Instead of dispatching their messages to the networking layer of Flow, the conduits of corrupted nodes
+// dispatch the outgoing messages to the attacker by calling the Observe method of it remotely.
 func (a *Attacker) Observe(stream insecure.Attacker_ObserveServer) error {
 	for {
 		select {
@@ -97,6 +100,8 @@ func (a *Attacker) Observe(stream insecure.Attacker_ObserveServer) error {
 	}
 }
 
+// processObserveMsg processes incoming messages arrived from corruptible conduits by passing them
+// to the orchestrator.
 func (a *Attacker) processObservedMsg(message *insecure.Message) error {
 	event, err := a.codec.Decode(message.Payload)
 	if err != nil {
