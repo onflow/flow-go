@@ -472,7 +472,7 @@ func (m *Middleware) streamHandler(channel network.Channel, handler network.Dire
 		// log metrics with the channel name as OneToOne
 		m.metrics.NetworkMessageReceived(len(data), metrics.ChannelOneToOne, m.msgType(decodedMessage))
 
-		handler(channel, decodedMessage, flowID)
+		handler(channel, flowID, decodedMessage)
 
 		success = true
 	}
