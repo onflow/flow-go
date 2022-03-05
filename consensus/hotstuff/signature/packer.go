@@ -176,9 +176,9 @@ func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType,
 // the sigType will be [byte([1,1,0,0,0,0,0,0])],
 // 			bit 1 indicates the signer at the same index in signerIndices signed random beacon sig
 // 			bit 0 indicates the signer at the same index in signerIndices signed staking sig
-func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners []flow.Identifier, beaconSigners []flow.Identifier) ([]byte, []byte, error) {
-	stakingSignersLookup := buildLookup(stakingSigners)
-	beaconSignersLookup := buildLookup(beaconSigners)
+func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners flow.IdentifierList, beaconSigners flow.IdentifierList) ([]byte, []byte, error) {
+	stakingSignersLookup := stakingSigners.Lookup()
+	beaconSignersLookup := beaconSigners.Lookup()
 
 	indices := make([]int, 0, len(fullMembers))
 	sigType := make([]hotstuff.SigType, 0, len(fullMembers))
@@ -217,14 +217,6 @@ func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners
 	}
 
 	return signerIndices, serialized, nil
-}
-
-func buildLookup(identities []flow.Identifier) map[flow.Identifier]struct{} {
-	lookup := make(map[flow.Identifier]struct{})
-	for _, id := range identities {
-		lookup[id] = struct{}{}
-	}
-	return lookup
 }
 
 // decodeSignerIndicesAndSigType decodes sigType and use it to split the given signerIDs into two groups: staking sigers and random beacon signers.

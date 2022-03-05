@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/packer"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -216,15 +217,22 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 	in.signer.On("CreateQC", mock.Anything).Return(
 		func(votes []*model.Vote) *flow.QuorumCertificate {
-			voterIDs := make([]flow.Identifier, 0, len(votes))
+			voterIDs := make(flow.IdentifierList, 0, len(votes))
 			for _, vote := range votes {
 				voterIDs = append(voterIDs, vote.SignerID)
 			}
+
+			signerIndices, err := packer.EncodeSignerIdentifiersToIndices(in.participants.NodeIDs(), voterIDs)
+			if err != nil {
+				panic(fmt.Errorf("could not encode signer indices: %w", err))
+			}
+
+			// voterIndices := packer.EncodeSignerIndices(
 			qc := &flow.QuorumCertificate{
-				View:    votes[0].View,
-				BlockID: votes[0].BlockID,
-				signer:  voterIDs,
-				SigData: nil,
+				View:          votes[0].View,
+				BlockID:       votes[0].BlockID,
+				SignerIndices: signerIndices,
+				SigData:       nil,
 			}
 			return qc
 		},
@@ -319,9 +327,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root, 0)
 	rootQC := &flow.QuorumCertificate{
-		View:      rootBlock.View,
-		BlockID:   rootBlock.BlockID,
-		SignerIDs: in.participants.NodeIDs(),
+		View:          rootBlock.View,
+		BlockID:       rootBlock.BlockID,
+		SignerIndices: []byte{},
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)

@@ -9,12 +9,12 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/packer"
 )
 
 /* ***************** Base-Factory for StakingVoteProcessor ****************** */
@@ -178,29 +178,10 @@ func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 	}, nil
 }
 
-func (p *StakingVoteProcessor) signerIndicesFromIdentities(signerIDs []flow.Identifier) ([]byte, error) {
-	signersLookup := buildLookup(signerIDs)
-
-	indices := make([]int, 0, len(p.allParticipants))
-	for i, member := range p.allParticipants.NodeIDs() {
-		if _, ok := signersLookup[member]; ok {
-			indices = append(indices, i)
-			delete(signersLookup, member)
-		}
+func (p *StakingVoteProcessor) signerIndicesFromIdentities(signerIDs flow.IdentifierList) ([]byte, error) {
+	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(p.allParticipants.NodeIDs(), signerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode signer identifiers to indices: %w", err)
 	}
-
-	if len(signersLookup) > 0 {
-		return nil, fmt.Errorf("unknown signers %v", signersLookup)
-	}
-
-	signerIndices := packer.EncodeSignerIndices(indices, len(p.allParticipants))
 	return signerIndices, nil
-}
-
-func buildLookup(identities []flow.Identifier) map[flow.Identifier]struct{} {
-	lookup := make(map[flow.Identifier]struct{})
-	for _, id := range identities {
-		lookup[id] = struct{}{}
-	}
-	return lookup
 }
