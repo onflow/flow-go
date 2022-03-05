@@ -10,7 +10,7 @@ import (
 // have a dedicated Committee state.
 // A Committee provides subset of the protocol.State, which is restricted to exactly those
 // nodes that participate in the current HotStuff instance: the state of all legitimate HotStuff
-// participants for the specified block. Legitimate HotStuff participants have NON-ZERO STAKE.
+// participants for the specified block. Legitimate HotStuff participants have NON-ZERO WEIGHT.
 //
 // The intended use case is to support collectors running HotStuff within Flow. Specifically,
 // the collectors produced their own blocks, independently of the Consensus Nodes (aka the main consensus).
@@ -20,16 +20,16 @@ type Committee interface {
 
 	// Identities returns a IdentityList with legitimate HotStuff participants for the specified block.
 	// The list of participants is filtered by the provided selector. The returned list of HotStuff participants
-	//   * contains nodes that are allowed to sign the specified block (legitimate participants with NON-ZERO STAKE)
+	//   * contains nodes that are allowed to sign the specified block (legitimate participants with NON-ZERO WEIGHT)
 	//   * is ordered in the canonical order
 	//   * contains no duplicates.
 	// The list of all legitimate HotStuff participants for the specified block can be obtained by using `filter.Any`
 	Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error)
 
 	// Identity returns the full Identity for specified HotStuff participant.
-	// The node must be a legitimate HotStuff participant with NON-ZERO STAKE at the specified block.
+	// The node must be a legitimate HotStuff participant with NON-ZERO WEIGHT at the specified block.
 	// ERROR conditions:
-	//  * model.InvalidSignerError if participantID does NOT correspond to a _staked_ HotStuff participant at the specified block.
+	//  * model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
 	Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 
 	// LeaderForView returns the identity of the leader for a given view.
@@ -55,13 +55,13 @@ type DKG interface {
 	protocol.DKG
 }
 
-// ComputeStakeThresholdForBuildingQC returns the stake that is minimally required for building a QC
-func ComputeStakeThresholdForBuildingQC(totalStake uint64) uint64 {
-	// Given totalStake, we need the smallest integer t such that 2 * totalStake / 3 < t
-	// Formally, the minimally required stake is: 2 * Floor(totalStake/3) + max(1, totalStake mod 3)
-	floorOneThird := totalStake / 3 // integer division, includes floor
+// ComputeWeightThresholdForBuildingQC returns the weight that is minimally required for building a QC
+func ComputeWeightThresholdForBuildingQC(totalWeight uint64) uint64 {
+	// Given totalWeight, we need the smallest integer t such that 2 * totalWeight / 3 < t
+	// Formally, the minimally required weight is: 2 * Floor(totalWeight/3) + max(1, totalWeight mod 3)
+	floorOneThird := totalWeight / 3 // integer division, includes floor
 	res := 2 * floorOneThird
-	divRemainder := totalStake % 3
+	divRemainder := totalWeight % 3
 	if divRemainder <= 1 {
 		res = res + 1
 	} else {

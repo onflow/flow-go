@@ -415,7 +415,7 @@ func MockLastSealedHeight(state *mockprotocol.State, height uint64) {
 }
 
 func NewVerificationHappyPathTest(t *testing.T,
-	staked bool,
+	authorized bool,
 	blockCount int,
 	eventRepetition int,
 	verCollector module.VerificationMetrics,
@@ -423,7 +423,7 @@ func NewVerificationHappyPathTest(t *testing.T,
 	retry int,
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
-	withConsumers(t, staked, blockCount, verCollector, mempoolCollector, RespondChunkDataPackRequestAfterNTrials(retry), func(
+	withConsumers(t, authorized, blockCount, verCollector, mempoolCollector, RespondChunkDataPackRequestAfterNTrials(retry), func(
 		blockConsumer *blockconsumer.BlockConsumer,
 		blocks []*flow.Block,
 		resultApprovalsWG *sync.WaitGroup,
@@ -450,7 +450,7 @@ func NewVerificationHappyPathTest(t *testing.T,
 // The block consumer operates on a block reader with a chain of specified number of finalized blocks
 // ready to read.
 func withConsumers(t *testing.T,
-	staked bool,
+	authorized bool,
 	blockCount int,
 	verCollector module.VerificationMetrics, // verification metrics collector
 	mempoolCollector module.MempoolMetrics, // memory pool metrics collector
@@ -461,7 +461,7 @@ func withConsumers(t *testing.T,
 	tracer := &trace.NoopTracer{}
 
 	// bootstraps system with one node of each role.
-	s, verID, participants := bootstrapSystem(t, tracer, staked)
+	s, verID, participants := bootstrapSystem(t, tracer, authorized)
 	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
 	ops = append(ops, WithExecutorIDs(
@@ -480,8 +480,8 @@ func withConsumers(t *testing.T,
 	// chunk assignment
 	chunkAssigner := &mock.ChunkAssigner{}
 	assignedChunkIDs := flow.IdentifierList{}
-	if staked {
-		// only staked verification node has some chunks assigned to it.
+	if authorized {
+		// only authorized verification node has some chunks assigned to it.
 		_, assignedChunkIDs = MockChunkAssignmentFixture(chunkAssigner,
 			flow.IdentityList{verID},
 			completeERs,
@@ -564,8 +564,8 @@ func withConsumers(t *testing.T,
 		conNode,
 		exeNode)
 
-	if !staked {
-		// in unstaked mode, no message should be received by consensus and execution node.
+	if !authorized {
+		// in unauthorized mode, no message should be received by consensus and execution node.
 		conEngine.AssertNotCalled(t, "Process")
 		exeEngine.AssertNotCalled(t, "Process")
 	}
@@ -578,11 +578,11 @@ func withConsumers(t *testing.T,
 }
 
 // bootstrapSystem is a test helper that bootstraps a flow system with node of each main roles (except execution nodes that are two).
-// If staked set to true, it bootstraps verification node as an staked one.
-// Otherwise, it bootstraps the verification node as unstaked in current epoch.
+// If authorized set to true, it bootstraps verification node as an authorized one.
+// Otherwise, it bootstraps the verification node as unauthorized in current epoch.
 //
 // As the return values, it returns the state, local module, and list of identities in system.
-func bootstrapSystem(t *testing.T, tracer module.Tracer, staked bool) (*enginemock.StateFixture, *flow.Identity,
+func bootstrapSystem(t *testing.T, tracer module.Tracer, authorized bool) (*enginemock.StateFixture, *flow.Identity,
 	flow.IdentityList) {
 	// creates identities to bootstrap system with
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -594,8 +594,8 @@ func bootstrapSystem(t *testing.T, tracer module.Tracer, staked bool) (*enginemo
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
 
-	if !staked {
-		// creates a new verification node identity that is unstaked for this epoch
+	if !authorized {
+		// creates a new verification node identity that is unauthorized for this epoch
 		verID = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 		identities = identities.Union(flow.IdentityList{verID})
 
