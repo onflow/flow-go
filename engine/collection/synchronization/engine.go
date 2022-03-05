@@ -5,10 +5,11 @@ package synchronization
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -34,14 +35,16 @@ const defaultBlockResponseQueueCapacity = 500
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
-	unit         *engine.Unit
-	lm           *lifecycle.LifecycleManager
-	log          zerolog.Logger
-	metrics      module.EngineMetrics
-	me           module.Local
-	participants flow.IdentityList
-	con          network.Conduit
-	comp         network.Engine // compliance layer engine
+	unit           *engine.Unit
+	lm             *lifecycle.LifecycleManager
+	log            zerolog.Logger
+	metrics        module.EngineMetrics
+	me             module.Local
+	participants   flow.IdentityList
+	con            network.Conduit
+	net            network.Network
+	clusterChannel network.Channel
+	comp           network.Engine // compliance layer engine
 
 	pollInterval time.Duration
 	scanInterval time.Duration
@@ -78,39 +81,41 @@ func New(
 		return nil, fmt.Errorf("must initialize synchronization engine with comp engine")
 	}
 
-	// initialize the propagation engine with its dependencies
-	e := &Engine{
-		unit:         engine.NewUnit(),
-		lm:           lifecycle.NewLifecycleManager(),
-		log:          log.With().Str("engine", "cluster_synchronization").Logger(),
-		metrics:      metrics,
-		me:           me,
-		participants: participants.Filter(filter.Not(filter.HasNodeID(me.NodeID()))),
-		comp:         comp,
-		core:         core,
-		pollInterval: opt.PollInterval,
-		scanInterval: opt.ScanInterval,
-		state:        state,
-	}
-
-	err := e.setupResponseMessageHandler()
-	if err != nil {
-		return nil, fmt.Errorf("could not setup message handler")
-	}
-
 	chainID, err := state.Params().ChainID()
 	if err != nil {
 		return nil, fmt.Errorf("could not get chain ID: %w", err)
 	}
 
+	// initialize the propagation engine with its dependencies
+	e := &Engine{
+		unit:           engine.NewUnit(),
+		lm:             lifecycle.NewLifecycleManager(),
+		log:            log.With().Str("engine", "cluster_synchronization").Logger(),
+		metrics:        metrics,
+		me:             me,
+		participants:   participants.Filter(filter.Not(filter.HasNodeID(me.NodeID()))),
+		comp:           comp,
+		core:           core,
+		pollInterval:   opt.PollInterval,
+		scanInterval:   opt.ScanInterval,
+		state:          state,
+		clusterChannel: engine.ChannelSyncCluster(chainID),
+		net:            net,
+	}
+
+	err = e.setupResponseMessageHandler()
+	if err != nil {
+		return nil, fmt.Errorf("could not setup message handler")
+	}
+
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ChannelSyncCluster(chainID), e)
+	con, err := net.Register(e.clusterChannel, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, state)
+	e.requestHandler = NewRequestHandlerEngine(log, metrics, net, e.clusterChannel, me, blocks, core, state)
 
 	return e, nil
 }
@@ -348,6 +353,37 @@ CheckLoop:
 	scan.Stop()
 }
 
+func (e *Engine) sendRequest(req interface{}, redundancy uint, requestType string) bool {
+	targets := flow.Sample(redundancy, e.participants.NodeIDs()...)
+
+	g := new(errgroup.Group)
+	success := false
+	var succeedOnce sync.Once
+
+	for _, target := range targets {
+		target := target
+		g.Go(func() error {
+			err := e.net.SendDirectMessage(e.clusterChannel, req, target)
+			if err == nil {
+				succeedOnce.Do(func() {
+					success = true
+				})
+				e.metrics.MessageSent(metrics.EngineClusterSynchronization, requestType)
+			} else {
+				e.log.Warn().
+					Err(err).
+					Str("target_id", target.String()).
+					Str("request_type", requestType).
+					Msg("failed to send request to target")
+			}
+			return err
+		})
+	}
+
+	_ = g.Wait()
+	return success
+}
+
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() {
 	head, err := e.state.Final().Head()
@@ -361,36 +397,29 @@ func (e *Engine) pollHeight() {
 		Nonce:  rand.Uint64(),
 		Height: head.Height,
 	}
-	err = e.con.Multicast(req, synccore.DefaultPollNodes, e.participants.NodeIDs()...)
-	if err != nil {
-		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
-		return
+	if !e.sendRequest(req, synccore.DefaultPollNodes, metrics.MessageSyncRequest) {
+		e.log.Warn().Err(err).Msg("sending sync requests to poll heights failed")
 	}
-	e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageSyncRequest)
 }
 
 // sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
 func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) {
-	var errs *multierror.Error
-
 	for _, ran := range ranges {
 		req := &messages.RangeRequest{
 			Nonce:      rand.Uint64(),
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, e.participants.NodeIDs()...)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
-			continue
+		if e.sendRequest(req, synccore.DefaultBlockRequestNodes, metrics.MessageRangeRequest) {
+			e.log.Debug().
+				Uint64("range_from", req.FromHeight).
+				Uint64("range_to", req.ToHeight).
+				Uint64("nonce", req.Nonce).
+				Msg("range requested")
+			e.core.RangeRequested(ran)
+		} else {
+			e.log.Warn().Msg("sending range requests failed")
 		}
-		e.log.Debug().
-			Uint64("range_from", req.FromHeight).
-			Uint64("range_to", req.ToHeight).
-			Uint64("range_nonce", req.Nonce).
-			Msg("range requested")
-		e.core.RangeRequested(ran)
-		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest)
 	}
 
 	for _, batch := range batches {
@@ -398,16 +427,14 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) {
 			Nonce:    rand.Uint64(),
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, e.participants.NodeIDs()...)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
-			continue
+		if e.sendRequest(req, synccore.DefaultBlockRequestNodes, metrics.MessageBatchRequest) {
+			e.log.Debug().
+				Strs("block_ids", flow.IdentifierList(batch.BlockIDs).Strings()).
+				Uint64("nonce", req.Nonce).
+				Msg("batch requested")
+			e.core.BatchRequested(batch)
+		} else {
+			e.log.Warn().Msg("sending batch requests failed")
 		}
-		e.core.BatchRequested(batch)
-		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest)
-	}
-
-	if err := errs.ErrorOrNil(); err != nil {
-		e.log.Warn().Err(err).Msg("sending range and batch requests failed")
 	}
 }

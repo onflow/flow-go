@@ -135,8 +135,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
-	fnb.flags.IntVar(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultCacheSize,
-		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 	fnb.flags.StringVar(&fnb.BaseConfig.topologyProtocolName, "topology", defaultConfig.topologyProtocolName, "networking overlay topology")
@@ -220,6 +218,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.IdentityProvider,
 			fnb.Metrics.Network,
 			fnb.Resolver,
+			codec,
 			fnb.BaseConfig.NodeRole,
 		)
 
@@ -238,10 +237,10 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger,
 			libP2PNodeFactory,
+			codec,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
 			fnb.SporkID,
-			fnb.BaseConfig.UnicastMessageTimeout,
 			fnb.IDTranslator,
 			mwOpts...,
 		)
@@ -259,11 +258,10 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		topologyCache := topology.NewCache(fnb.Logger, top)
 
 		// creates network instance
-		net, err := p2p.NewNetwork(fnb.Logger,
-			codec,
+		net, err := p2p.NewNetwork(
+			fnb.Logger,
 			fnb.Me,
 			func() (network.Middleware, error) { return fnb.Middleware, nil },
-			fnb.NetworkReceivedMessageCacheSize,
 			topologyCache,
 			subscriptionManager,
 			fnb.Metrics.Network,

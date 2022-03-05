@@ -108,7 +108,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandler(log, metrics, NewResponseSender(con), me, blocks, core, finalizedHeader, true)
+	e.requestHandler = NewRequestHandler(log, metrics, net, engine.SyncCommittee, me, blocks, core, finalizedHeader, true)
 
 	return e, nil
 }
@@ -417,7 +417,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Ra
 			e.log.Debug().
 				Uint64("range_from", req.FromHeight).
 				Uint64("range_to", req.ToHeight).
-				Uint64("range_nonce", req.Nonce).
+				Uint64("nonce", req.Nonce).
 				Msg("range requested")
 			e.core.RangeRequested(ran)
 		} else {
@@ -434,7 +434,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Ra
 		if e.sendRequest(req, synccore.DefaultBlockRequestNodes, metrics.MessageBatchRequest) {
 			e.log.Debug().
 				Strs("block_ids", flow.IdentifierList(batch.BlockIDs).Strings()).
-				Uint64("range_nonce", req.Nonce).
+				Uint64("nonce", req.Nonce).
 				Msg("batch requested")
 			e.core.BatchRequested(batch)
 		} else {

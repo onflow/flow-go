@@ -27,7 +27,6 @@ import (
 )
 
 const (
-	DefaultCacheSize = 10e4
 	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
 	eventIDPackingPrefix = "libp2ppacking"
 )

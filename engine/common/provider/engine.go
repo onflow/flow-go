@@ -35,6 +35,7 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
+	net      network.Network
 	channel  network.Channel
 	selector flow.IdentityFilter
 	retrieve RetrieveFunc
@@ -63,6 +64,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 		channel:  channel,
 		selector: selector,
 		retrieve: retrieve,
+		net:      net,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -195,7 +197,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 		EntityIDs: entityIDs,
 		Blobs:     blobs,
 	}
-	err = e.con.Unicast(res, originID)
+	err = e.net.SendDirectMessage(e.channel, res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send response: %w", err)
 	}

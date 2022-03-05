@@ -39,10 +39,11 @@ type RequestHandlerEngine struct {
 	log     zerolog.Logger
 	metrics module.EngineMetrics
 
-	blocks storage.ClusterBlocks
-	core   module.SyncCore
-	state  cluster.State
-	con    network.Conduit // used for sending responses to requesters
+	blocks  storage.ClusterBlocks
+	core    module.SyncCore
+	state   cluster.State
+	net     network.Network
+	channel network.Channel
 
 	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
 	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
@@ -53,7 +54,8 @@ type RequestHandlerEngine struct {
 func NewRequestHandlerEngine(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	con network.Conduit,
+	net network.Network,
+	channel network.Channel,
 	me module.Local,
 	blocks storage.ClusterBlocks,
 	core module.SyncCore,
@@ -68,7 +70,7 @@ func NewRequestHandlerEngine(
 		blocks:  blocks,
 		core:    core,
 		state:   state,
-		con:     con,
+		net:     net,
 	}
 
 	r.setupRequestMessageHandler()
@@ -188,7 +190,7 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *mess
 		Height: final.Height,
 		Nonce:  req.Nonce,
 	}
-	err = r.con.Unicast(res, originID)
+	err = r.net.SendDirectMessage(r.channel, res, originID)
 	if err != nil {
 		r.log.Warn().Err(err).Msg("sending sync response failed")
 		return nil
@@ -235,7 +237,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
-	err = r.con.Unicast(res, originID)
+	err = r.net.SendDirectMessage(r.channel, res, originID)
 	if err != nil {
 		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending range response failed")
 		return nil
@@ -283,7 +285,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
-	err := r.con.Unicast(res, originID)
+	err := r.net.SendDirectMessage(r.channel, res, originID)
 	if err != nil {
 		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending batch response failed")
 		return nil
