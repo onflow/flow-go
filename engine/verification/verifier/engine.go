@@ -14,7 +14,6 @@ import (
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
@@ -77,9 +76,10 @@ func New(
 		return nil, fmt.Errorf("could not register engine on approval push channel: %w", err)
 	}
 
-	e.pullConduit, err = net.Register(engine.ProvideApprovalsByChunk, e)
+	// register the engine with the network layer
+	err = net.RegisterDirectMessageHandler(engine.RequestApprovalsByChunk, e.Submit)
 	if err != nil {
-		return nil, fmt.Errorf("could not register engine on approval pull channel: %w", err)
+		return nil, fmt.Errorf("could not register handler for approval pull channel: %w", err)
 	}
 
 	return e, nil
@@ -245,17 +245,8 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		return fmt.Errorf("could not index approval: %w", err)
 	}
 
-	// Extracting consensus node ids
-	// TODO state extraction should be done based on block references
-	consensusNodes, err := e.state.Final().
-		Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		// TODO this error needs more advance handling after MVP
-		return fmt.Errorf("could not load consensus node IDs: %w", err)
-	}
-
 	// broadcast result approval to the consensus nodes
-	err = e.pushConduit.Publish(approval, consensusNodes.NodeIDs()...)
+	err = e.pushConduit.Publish(approval)
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
@@ -380,9 +371,7 @@ func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.
 
 	err = e.net.SendDirectMessage(engine.ProvideApprovalsByChunk, response, originID)
 	if err != nil {
-		return fmt.Errorf("could not send requested approval to %s: %w",
-			originID,
-			err)
+		return fmt.Errorf("could not send requested approval to %s: %w", originID, err)
 	}
 
 	log.Debug().Msg("succesfully replied to approval request")

@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
@@ -37,7 +36,6 @@ type Engine struct {
 	state               protocol.State
 	execState           state.ReadOnlyExecutionState
 	me                  module.Local
-	chunksConduit       network.Conduit
 	net                 network.Network
 	metrics             module.ExecutionMetrics
 	checkStakedAtBlock  func(blockID flow.Identifier) (bool, error)
@@ -81,11 +79,11 @@ func New(
 		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
 	}
 
-	chunksConduit, err := net.Register(engine.ProvideChunks, &eng)
+	// register the engine with the network layer
+	err = net.RegisterDirectMessageHandler(engine.RequestChunks, eng.Submit)
 	if err != nil {
-		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
+		return nil, fmt.Errorf("could not register direct message handler: %w", err)
 	}
-	eng.chunksConduit = chunksConduit
 
 	return &eng, nil
 }
@@ -222,6 +220,7 @@ func (e *Engine) onChunkDataRequest(
 		if err != nil {
 			lg.Warn().
 				Err(err).
+				Str("origin_id", originID.String()).
 				Msg("could not send requested chunk data pack to origin ID")
 			return
 		}
@@ -284,13 +283,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 		Hex("final_state", finalState[:]).
 		Msg("broadcasting execution receipt")
 
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,
-		flow.RoleVerification))
-	if err != nil {
-		return fmt.Errorf("could not get consensus and verification identities: %w", err)
-	}
-
-	err = e.receiptCon.Publish(receipt, identities.NodeIDs()...)
+	err = e.receiptCon.Publish(receipt)
 	if err != nil {
 		return fmt.Errorf("could not submit execution receipts: %w", err)
 	}

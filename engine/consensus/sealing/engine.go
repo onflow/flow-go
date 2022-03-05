@@ -128,14 +128,14 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
 	}
 
-	// register engine to the channel for requesting missing approvals
-	approvalConduit, err := net.Register(engine.RequestApprovalsByChunk, e)
+	// register the engine to the channel for requesting missing approvals
+	err = net.RegisterDirectMessageHandler(engine.ProvideApprovalsByChunk, e.Submit)
 	if err != nil {
-		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	signatureHasher := crypto.NewBLSKMAC(encoding.ResultApprovalTag)
-	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, approvalConduit, options)
+	core, err := NewCore(log, net, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, signatureHasher, sealsMempool, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}

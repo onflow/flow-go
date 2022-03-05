@@ -27,16 +27,18 @@ type AssignmentCollectorBase struct {
 	headers                              storage.Headers                 // used to query headers from storage
 	sigHasher                            hash.Hasher                     // used to verify result approval signatures
 	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
-	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
-	requestTracker                       *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
-	requiredApprovalsForSealConstruction uint                            // number of approvals that are required for each chunk to be sealed
+	net                                  network.Network
+	requestTracker                       *RequestTracker // used to keep track of number of approval requests, and blackout periods, by chunk
+	requiredApprovalsForSealConstruction uint            // number of approvals that are required for each chunk to be sealed
 
 	result        *flow.ExecutionResult // execution result
 	resultID      flow.Identifier       // ID of execution result
 	executedBlock *flow.Header          // header of the executed block
 }
 
-func NewAssignmentCollectorBase(logger zerolog.Logger,
+func NewAssignmentCollectorBase(
+	logger zerolog.Logger,
+	net network.Network,
 	workerPool *workerpool.WorkerPool,
 	result *flow.ExecutionResult,
 	state protocol.State,
@@ -44,7 +46,6 @@ func NewAssignmentCollectorBase(logger zerolog.Logger,
 	assigner module.ChunkAssigner,
 	seals mempool.IncorporatedResultSeals,
 	sigHasher hash.Hasher,
-	approvalConduit network.Conduit,
 	requestTracker *RequestTracker,
 	requiredApprovalsForSealConstruction uint,
 ) (AssignmentCollectorBase, error) {
@@ -61,12 +62,12 @@ func NewAssignmentCollectorBase(logger zerolog.Logger,
 		headers:                              headers,
 		sigHasher:                            sigHasher,
 		seals:                                seals,
-		approvalConduit:                      approvalConduit,
 		requestTracker:                       requestTracker,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		result:                               result,
 		resultID:                             result.ID(),
 		executedBlock:                        executedBlock,
+		net:                                  net,
 	}, nil
 }
 

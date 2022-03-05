@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
@@ -355,11 +356,23 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 			}
 
 			requestCount++
-			err = ac.approvalConduit.Publish(req, verifiers...)
-			if err != nil {
-				log.Error().Err(err).
-					Msgf("could not publish approval request for chunk %d", chunkIndex)
+
+			g := new(errgroup.Group)
+
+			for _, target := range verifiers {
+				target := target
+				g.Go(func() error {
+					err := ac.net.SendDirectMessage(engine.RequestApprovalsByChunk, req, target)
+					if err != nil {
+						log.Err(err).
+							Str("target", target.String()).
+							Msgf("could not send approval request for chunk %d", chunkIndex)
+					}
+					return err
+				})
 			}
+
+			_ = g.Wait()
 		}
 
 		observation.ApprovalsRequested(collector.IncorporatedResult(), requestCount)

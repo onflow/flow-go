@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -127,14 +126,9 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 
 // SubmitCollectionGuarantee submits the collection guarantee to all consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
-	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return fmt.Errorf("could not get consensus nodes: %w", err)
-	}
-
 	// NOTE: Consensus nodes do not broadcast guarantees among themselves, so it needs that
 	// at least one collection node make a publish to all of them.
-	err = e.conduit.Publish(guarantee, consensusNodes.NodeIDs()...)
+	err := e.conduit.Publish(guarantee)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}

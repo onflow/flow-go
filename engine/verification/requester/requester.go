@@ -3,10 +3,12 @@ package requester
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/rand"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
@@ -45,8 +47,8 @@ type Engine struct {
 	// common
 	log   zerolog.Logger
 	unit  *engine.Unit
-	state protocol.State  // used to check the last sealed height.
-	con   network.Conduit // used to send the chunk data request, and receive the response.
+	state protocol.State // used to check the last sealed height.
+	net   network.Network
 
 	// monitoring
 	tracer  module.Tracer
@@ -72,7 +74,8 @@ func New(log zerolog.Logger,
 	retryInterval time.Duration,
 	reqQualifierFunc RequestQualifierFunc,
 	reqUpdaterFunc mempool.ChunkRequestHistoryUpdaterFunc,
-	requestTargets uint64) (*Engine, error) {
+	requestTargets uint64,
+) (*Engine, error) {
 
 	e := &Engine{
 		log:              log.With().Str("engine", "requester").Logger(),
@@ -85,13 +88,14 @@ func New(log zerolog.Logger,
 		pendingRequests:  pendingRequests,
 		reqUpdaterFunc:   reqUpdaterFunc,
 		reqQualifierFunc: reqQualifierFunc,
+		net:              net,
 	}
 
-	con, err := net.Register(engine.RequestChunks, e)
+	// register the engine with the network layer
+	err := net.RegisterDirectMessageHandler(engine.ProvideChunks, e.Submit)
 	if err != nil {
-		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
-	e.con = con
 
 	return e, nil
 }
@@ -332,9 +336,33 @@ func (e *Engine) requestChunkDataPack(request *verification.ChunkDataPackRequest
 
 	// publishes the chunk data request to the network
 	targetIDs := request.SampleTargets(int(e.requestTargets))
-	err := e.con.Publish(req, targetIDs...)
-	if err != nil {
-		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", request.ChunkID, err)
+
+	g := new(errgroup.Group)
+	success := false
+	var succeedOnce sync.Once
+
+	for _, target := range targetIDs {
+		target := target
+		g.Go(func() error {
+			err := e.net.SendDirectMessage(engine.RequestChunks, req, target)
+			if err == nil {
+				succeedOnce.Do(func() {
+					success = true
+				})
+			} else {
+				e.log.Warn().
+					Err(err).
+					Str("target", target.String()).
+					Msg("could not send chunk data pack request to target")
+			}
+			return err
+		})
+	}
+
+	_ = g.Wait()
+
+	if !success {
+		return fmt.Errorf("failed to send chunk data pack request for chunk (id=%s)", request.ChunkID)
 	}
 
 	return nil

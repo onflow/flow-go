@@ -40,7 +40,6 @@ type Engine struct {
 	log     zerolog.Logger
 	metrics module.EngineMetrics
 	me      module.Local
-	con     network.Conduit
 	net     network.Network
 	blocks  storage.Blocks
 	comp    network.Engine // compliance layer engine
@@ -105,12 +104,11 @@ func New(
 		return nil, fmt.Errorf("could not setup message handler")
 	}
 
-	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.SyncCommittee, e)
+	// register the engine with the network layer
+	err = net.RegisterDirectMessageHandler(engine.SyncCommittee, e.Submit)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
-	e.con = con
 
 	return e, nil
 }

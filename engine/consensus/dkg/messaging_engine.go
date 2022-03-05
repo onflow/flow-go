@@ -32,12 +32,11 @@ const retryJitterPct = 25
 // MessagingEngine is a network engine that enables DKG nodes to exchange
 // private messages over the network.
 type MessagingEngine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	me      module.Local    // local object to identify the node
-	conduit network.Conduit // network conduit for sending and receiving private messages
-	net     network.Network
-	tunnel  *dkg.BrokerTunnel // tunnel for relaying private messages to and from controllers
+	unit   *engine.Unit
+	log    zerolog.Logger
+	me     module.Local // local object to identify the node
+	net    network.Network
+	tunnel *dkg.BrokerTunnel // tunnel for relaying private messages to and from controllers
 }
 
 // NewMessagingEngine returns a new engine.
@@ -57,10 +56,10 @@ func NewMessagingEngine(
 		tunnel: tunnel,
 	}
 
-	var err error
-	eng.conduit, err = net.Register(engine.DKGCommittee, &eng)
+	// register the engine with the network layer
+	err := net.RegisterDirectMessageHandler(engine.DKGCommittee, eng.Submit)
 	if err != nil {
-		return nil, fmt.Errorf("could not register dkg network engine: %w", err)
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	eng.unit.Launch(eng.forwardOutgoingMessages)
@@ -174,7 +173,7 @@ func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessage
 		err = retry.Do(e.unit.Ctx(), backoff, func(ctx context.Context) error {
 			err := e.net.SendDirectMessage(engine.DKGCommittee, &message.DKGMessage, message.DestID)
 			if err != nil {
-				e.log.Warn().Err(err).Msgf("error sending dkg message retrying (%d)", attempts)
+				e.log.Warn().Err(err).Str("destination", message.DestID.String()).Msgf("error sending dkg message retrying (%d)", attempts)
 			}
 
 			attempts++

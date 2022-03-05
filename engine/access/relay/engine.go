@@ -104,7 +104,7 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 	e.log.Trace().Interface("event", event).Str("channel", channel.String()).Str("originID", originID.String()).Msg("relaying message")
 
 	// We use a dummy target ID here so that events are broadcast to the entire network
-	if err := conduit.Publish(event, flow.ZeroID); err != nil {
+	if err := conduit.Publish(event); err != nil {
 		return fmt.Errorf("could not relay message: %w", err)
 	}
 

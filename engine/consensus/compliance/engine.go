@@ -149,6 +149,11 @@ func NewEngine(
 		messageHandler: handler,
 	}
 
+	err = net.RegisterDirectMessageHandler(engine.ConsensusCommittee, eng.Submit)
+	if err != nil {
+		return nil, fmt.Errorf("could not register direct message handler: %w", err)
+	}
+
 	// register the core with the network layer and store the conduit
 	eng.con, err = net.Register(engine.ConsensusCommittee, eng)
 	if err != nil {
@@ -302,7 +307,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		// send the vote the desired recipient
 		err := e.net.SendDirectMessage(engine.ConsensusCommittee, vote, recipientID)
 		if err != nil {
-			log.Warn().Err(err).Msg("could not send vote")
+			log.Warn().Err(err).Str("recipient", recipientID.String()).Msg("could not send vote")
 			return
 		}
 		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)

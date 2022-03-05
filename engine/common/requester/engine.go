@@ -40,7 +40,6 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	net      network.Network
-	con      network.Conduit
 	channel  network.Channel
 	selector flow.IdentityFilter
 	create   CreateFunc
@@ -114,12 +113,11 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 		requests: make(map[uint64]*messages.EntityRequest), // holds all sent requests
 	}
 
-	// register the engine with the network layer and store the conduit
-	con, err := net.Register(channel, e)
+	// register the engine with the network layer
+	err := net.RegisterDirectMessageHandler(channel, e.Submit)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
-	e.con = con
 
 	return e, nil
 }

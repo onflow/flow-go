@@ -213,7 +213,7 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 	}
 	err := r.net.SendDirectMessage(r.channel, res, originID)
 	if err != nil {
-		r.log.Warn().Err(err).Msg("sending sync response failed")
+		r.log.Warn().Err(err).Str("origin_id", originID.String()).Msg("sending sync response failed")
 		return nil
 	}
 	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)

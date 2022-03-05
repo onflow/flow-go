@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -331,7 +330,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		// send the vote the desired recipient
 		err := e.net.SendDirectMessage(e.clusterChannel, vote, recipientID)
 		if err != nil {
-			log.Warn().Err(err).Msg("could not send vote")
+			log.Warn().Err(err).Str("recipient", recipientID.String()).Msg("could not send vote")
 			return
 		}
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
@@ -377,15 +376,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	log = log.With().Int("collection_size", payload.Collection.Len()).Logger()
 
-	// retrieve all collection nodes in our cluster
-	recipients, err := e.state.Final().Identities(filter.And(
-		filter.In(e.cluster),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get cluster members: %w", err)
-	}
-
 	e.unit.LaunchAfter(delay, func() {
 
 		go e.core.hotstuff.SubmitProposal(header, parent.View)
@@ -396,7 +386,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Payload: payload,
 		}
 
-		err := e.con.Publish(msg, recipients.NodeIDs()...)
+		err := e.con.Publish(msg)
 		if errors.Is(err, network.EmptyTargetList) {
 			return
 		}
@@ -405,9 +395,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			return
 		}
 
-		log.Debug().
-			Str("recipients", fmt.Sprintf("%v", recipients.NodeIDs())).
-			Msg("broadcast proposal from hotstuff")
+		log.Debug().Msg("broadcast proposal from hotstuff")
 
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		block := &cluster.Block{

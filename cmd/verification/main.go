@@ -199,7 +199,8 @@ func main() {
 				requestInterval,
 				vereq.RetryAfterQualifier,
 				mempool.ExponentialUpdater(backoffMultiplier, backoffMaxInterval, backoffMinInterval),
-				requestTargets)
+				requestTargets,
+			)
 
 			fetcherEngine = fetcher.New(
 				node.Logger,
