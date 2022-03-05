@@ -79,7 +79,7 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(me.NodeID)
 
-	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions {
+	suite.pools = epochs.NewTransactionPools(func(_ uint64) mempool.Transactions {
 		return herocache.NewTransactions(1000, log, metrics)
 	})
 

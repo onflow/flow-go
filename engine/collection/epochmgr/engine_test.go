@@ -131,7 +131,7 @@ func (suite *Suite) SetupTest() {
 	suite.AddEpoch(suite.counter)
 	suite.AddEpoch(suite.counter + 1)
 
-	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions {
+	suite.pools = epochs.NewTransactionPools(func(_ uint64) mempool.Transactions {
 		return herocache.NewTransactions(1000, suite.log, metrics.NewNoopCollector())
 	})
 

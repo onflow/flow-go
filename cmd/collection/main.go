@@ -181,11 +181,11 @@ func main() {
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
-			create := func() mempool.Transactions {
+			create := func(epoch uint64) mempool.Transactions {
 				return herocache.NewTransactions(
 					uint32(txLimit),
 					node.Logger,
-					metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegisterer))
+					metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegisterer, epoch))
 			}
 
 			pools = epochpool.NewTransactionPools(create)
