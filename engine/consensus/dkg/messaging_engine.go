@@ -34,8 +34,9 @@ const retryJitterPct = 25
 type MessagingEngine struct {
 	unit    *engine.Unit
 	log     zerolog.Logger
-	me      module.Local      // local object to identify the node
-	conduit network.Conduit   // network conduit for sending and receiving private messages
+	me      module.Local    // local object to identify the node
+	conduit network.Conduit // network conduit for sending and receiving private messages
+	net     network.Network
 	tunnel  *dkg.BrokerTunnel // tunnel for relaying private messages to and from controllers
 }
 
@@ -52,6 +53,7 @@ func NewMessagingEngine(
 		unit:   engine.NewUnit(),
 		log:    log,
 		me:     me,
+		net:    net,
 		tunnel: tunnel,
 	}
 
@@ -170,7 +172,7 @@ func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessage
 
 		attempts := 1
 		err = retry.Do(e.unit.Ctx(), backoff, func(ctx context.Context) error {
-			err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
+			err := e.net.SendDirectMessage(engine.DKGCommittee, &message.DKGMessage, message.DestID)
 			if err != nil {
 				e.log.Warn().Err(err).Msgf("error sending dkg message retrying (%d)", attempts)
 			}

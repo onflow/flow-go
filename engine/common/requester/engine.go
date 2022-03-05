@@ -39,6 +39,7 @@ type Engine struct {
 	metrics  module.EngineMetrics
 	me       module.Local
 	state    protocol.State
+	net      network.Network
 	con      network.Conduit
 	channel  network.Channel
 	selector flow.IdentityFilter
@@ -104,6 +105,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 		metrics:  metrics,
 		me:       me,
 		state:    state,
+		net:      net,
 		channel:  channel,
 		selector: selector,
 		create:   create,
@@ -113,7 +115,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(network.Channel(channel), e)
+	con, err := net.Register(channel, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -361,7 +363,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 	}
-	err = e.con.Unicast(req, providerID)
+	err = e.net.SendDirectMessage(e.channel, req, providerID)
 	if err != nil {
 		return true, fmt.Errorf("could not send request: %w", err)
 	}

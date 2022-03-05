@@ -49,6 +49,7 @@ type Engine struct {
 	pendingVotes   engine.MessageStore
 	messageHandler *engine.MessageHandler
 	con            network.Conduit
+	net            network.Network
 	stopHotstuff   context.CancelFunc
 }
 
@@ -57,7 +58,8 @@ func NewEngine(
 	net network.Network,
 	me module.Local,
 	prov network.Engine,
-	core *Core) (*Engine, error) {
+	core *Core,
+) (*Engine, error) {
 
 	// FIFO queue for block proposals
 	blocksQueue, err := fifoqueue.NewFifoQueue(
@@ -141,6 +143,7 @@ func NewEngine(
 		pendingVotes:   pendingVotes,
 		state:          core.state,
 		tracer:         core.tracer,
+		net:            net,
 		prov:           prov,
 		core:           core,
 		messageHandler: handler,
@@ -297,7 +300,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
 	e.unit.Launch(func() {
 		// send the vote the desired recipient
-		err := e.con.Unicast(vote, recipientID)
+		err := e.net.SendDirectMessage(engine.ConsensusCommittee, vote, recipientID)
 		if err != nil {
 			log.Warn().Err(err).Msg("could not send vote")
 			return
