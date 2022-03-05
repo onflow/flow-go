@@ -140,9 +140,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.headers[cfg.Root.ID()] = cfg.Root
 
 	// program the hotstuff committee state
-	in.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
-			return in.participants.Filter(selector)
+	in.committee.On("Identities", mock.Anything).Return(
+		func(blockID flow.Identifier) flow.IdentityList {
+			return in.participants
 		},
 		nil,
 	)
@@ -352,8 +352,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
 	rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
+	indices, err := toIndices(in.participants.NodeIDs(), in.participants.NodeIDs())
+	require.NoError(t, err)
+
 	packer := &mocks.Packer{}
-	packer.On("Pack", mock.Anything, mock.Anything).Return(in.participants.NodeIDs(), unittest.RandomBytes(128), nil).Maybe()
+	packer.On("Pack", mock.Anything, mock.Anything).Return(indices, unittest.RandomBytes(128), nil).Maybe()
 
 	onQCCreated := func(qc *flow.QuorumCertificate) {
 		in.queue <- qc
@@ -387,6 +390,10 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	require.NoError(t, err)
 
 	return &in
+}
+
+func toIndices(all []flow.Identifier, signers []flow.Identifier) ([]byte, error) {
+	return packer.EncodeSignerIdentifiersToIndices(all, signers)
 }
 
 func (in *Instance) Run() error {
