@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -20,6 +21,10 @@ type Component interface {
 	module.Startable
 	module.ReadyDoneAware
 }
+
+// ErrComponentStopped should be returned for any external method calls to a component
+// that happen after the component has already been shut down.
+var ErrComponentStopped = errors.New("component has been shut down")
 
 type ComponentFactory func() (Component, error)
 

@@ -3,6 +3,7 @@
 package synchronization
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	identifier "github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
@@ -67,6 +69,7 @@ func New(
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
 	participantsProvider identifier.IdentifierProvider,
+	requestHandler *RequestHandler,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -94,6 +97,7 @@ func New(
 		finalizedHeader:      finalizedHeader,
 		participantsProvider: participantsProvider,
 		net:                  net,
+		requestHandler:       requestHandler,
 	}
 
 	err := e.setupResponseMessageHandler()
@@ -107,8 +111,6 @@ func New(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
-
-	e.requestHandler = NewRequestHandler(log, metrics, net, engine.SyncCommittee, me, blocks, core, finalizedHeader, true)
 
 	return e, nil
 }
@@ -190,15 +192,6 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.lm.Stopped()
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.process(e.me.NodeID(), event)
-	if err != nil {
-		// receiving an input of incompatible type from a trusted internal component is fatal
-		e.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
-
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
@@ -209,15 +202,10 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 	}
 }
 
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.process(e.me.NodeID(), event)
-}
-
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	err := e.process(originID, event)
+	err := e.process(channel, originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
 			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
@@ -232,14 +220,16 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 // Error returns:
 //  * IncompatibleInputTypeError if input has unexpected type
 //  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
-	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
-		return e.requestHandler.process(originID, event)
 	case *messages.SyncResponse, *messages.BlockResponse:
 		return e.responseMessageHandler.Process(originID, event)
 	default:
-		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
+		err := e.requestHandler.Process(channel, originID, event)
+		if errors.Is(err, component.ErrComponentStopped) {
+			return nil
+		}
+		return err
 	}
 }
 

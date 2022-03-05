@@ -28,7 +28,6 @@ type Engine struct {
 	log                  zerolog.Logger
 	engMetrics           module.EngineMetrics
 	colMetrics           module.CollectionMetrics
-	conduit              network.Conduit
 	me                   module.Local
 	state                protocol.State
 	pools                *epochs.TransactionPools
@@ -80,12 +79,10 @@ func New(
 		net:                  net,
 	}
 
-	conduit, err := net.Register(engine.PushTransactions, e)
+	err := net.RegisterDirectMessageHandler(engine.PushTransactions, e.Submit)
 	if err != nil {
-		return nil, fmt.Errorf("could not register engine: %w", err)
+		return nil, fmt.Errorf("could not register direct message handler: %w", err)
 	}
-
-	e.conduit = conduit
 
 	return e, nil
 }

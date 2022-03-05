@@ -176,6 +176,11 @@ func NewEngine(
 	}
 	eng.con = conduit
 
+	err = net.RegisterDirectMessageHandler(eng.clusterChannel, eng.Submit)
+	if err != nil {
+		return nil, fmt.Errorf("could not register direct message handler: %w", err)
+	}
+
 	return eng, nil
 }
 

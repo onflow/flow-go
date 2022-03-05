@@ -16,33 +16,25 @@ import (
 
 // Handler handles the GRPC calls from a client
 type Handler struct {
-	log        zerolog.Logger
-	conduitMap map[network.Channel]network.Conduit
-	msgChan    chan ghost.FlowMessage
-	codec      network.Codec
+	log     zerolog.Logger
+	net     network.Network
+	msgChan chan ghost.FlowMessage
+	codec   network.Codec
 }
 
 var _ ghost.GhostNodeAPIServer = Handler{}
 
-func NewHandler(log zerolog.Logger, conduitMap map[network.Channel]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
+func NewHandler(log zerolog.Logger, _ map[network.Channel]network.Conduit, net network.Network, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
 	return &Handler{
-		log:        log.With().Str("component", "ghost_engine_handler").Logger(),
-		conduitMap: conduitMap,
-		msgChan:    msgChan,
-		codec:      codec,
+		log:     log.With().Str("component", "ghost_engine_handler").Logger(),
+		net:     net,
+		msgChan: msgChan,
+		codec:   codec,
 	}
 }
 
 func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*empty.Empty, error) {
-
 	channelID := req.GetChannelId()
-
-	// find the conduit for the channel
-	conduit, found := h.conduitMap[network.Channel(channelID)]
-
-	if !found {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("conduit not found for given channel %v", channelID))
-	}
 
 	message := req.GetMessage()
 
@@ -76,7 +68,7 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	//
 
 	for _, flowID := range flowIDs {
-		err = conduit.Unicast(event, flowID)
+		err = h.net.SendDirectMessage(network.Channel(channelID), event, flowID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to submit message: %v", err)
 		}

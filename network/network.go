@@ -33,7 +33,7 @@ type Network interface {
 	RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error)
 }
 
-type DirectMessageHandler func(channel Channel, message interface{}, originID flow.Identifier)
+type DirectMessageHandler func(channel Channel, originID flow.Identifier, message interface{})
 
 // Adapter is a wrapper around the Network implementation. It only exposes message dissemination functionalities.
 // Adapter is meant to be utilized by the Conduit interface to send messages to the Network layer to be

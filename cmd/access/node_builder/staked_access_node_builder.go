@@ -262,17 +262,27 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	if builder.supportsUnstakedFollower {
 		builder.Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			channel := engine.PublicSyncCommittee
+
 			syncRequestHandler := synceng.NewRequestHandler(
 				node.Logger.With().Bool("unstaked", true).Logger(),
 				unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
 				builder.AccessNodeConfig.PublicNetworkConfig.Network,
-				engine.PublicSyncCommittee,
+				channel,
 				node.Me,
 				node.Storage.Blocks,
 				builder.SyncCore,
 				builder.FinalizedHeader,
 				false,
 			)
+
+			err := builder.AccessNodeConfig.PublicNetworkConfig.Network.RegisterDirectMessageHandler(
+				channel, syncRequestHandler.Submit,
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not register direct message handler: %w", err)
+			}
 
 			return syncRequestHandler, nil
 		})

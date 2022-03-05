@@ -9,7 +9,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -23,18 +24,15 @@ type FinalizedHeaderCache struct {
 	lastFinalizedHeader       *flow.Header
 	finalizationEventNotifier engine.Notifier // notifier for finalization events
 
-	lm      *lifecycle.LifecycleManager
-	stopped chan struct{}
+	component.Component
 }
 
 // NewFinalizedHeaderCache creates a new finalized header cache.
 func NewFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizationDistributor *pubsub.FinalizationDistributor) (*FinalizedHeaderCache, error) {
 	cache := &FinalizedHeaderCache{
 		state:                     state,
-		lm:                        lifecycle.NewLifecycleManager(),
 		log:                       log.With().Str("component", "finalized_snapshot_cache").Logger(),
 		finalizationEventNotifier: engine.NewNotifier(),
-		stopped:                   make(chan struct{}),
 	}
 
 	snapshot, err := cache.getHeader()
@@ -45,6 +43,15 @@ func NewFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizat
 	cache.lastFinalizedHeader = snapshot
 
 	finalizationDistributor.AddOnBlockFinalizedConsumer(cache.onFinalizedBlock)
+
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			cache.finalizationProcessingLoop(ctx)
+		}).
+		Build()
+
+	cache.Component = cm
 
 	return cache, nil
 }
@@ -91,20 +98,6 @@ func (f *FinalizedHeaderCache) updateHeader() error {
 	return nil
 }
 
-func (f *FinalizedHeaderCache) Ready() <-chan struct{} {
-	f.lm.OnStart(func() {
-		go f.finalizationProcessingLoop()
-	})
-	return f.lm.Started()
-}
-
-func (f *FinalizedHeaderCache) Done() <-chan struct{} {
-	f.lm.OnStop(func() {
-		<-f.stopped
-	})
-	return f.lm.Stopped()
-}
-
 // onFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 //  (1) Updates local state of last finalized snapshot.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
@@ -116,19 +109,17 @@ func (f *FinalizedHeaderCache) onFinalizedBlock(blockID flow.Identifier) {
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (f *FinalizedHeaderCache) finalizationProcessingLoop() {
-	defer close(f.stopped)
-
+func (f *FinalizedHeaderCache) finalizationProcessingLoop(ctx irrecoverable.SignalerContext) {
 	f.log.Debug().Msg("starting finalization processing loop")
 	notifier := f.finalizationEventNotifier.Channel()
 	for {
 		select {
-		case <-f.lm.ShutdownSignal():
+		case <-ctx.Done():
 			return
 		case <-notifier:
 			err := f.updateHeader()
 			if err != nil {
-				f.log.Fatal().Err(err).Msg("could not process latest finalized block")
+				ctx.Throw(fmt.Errorf("could not update finalized header: %w", err))
 			}
 		}
 	}

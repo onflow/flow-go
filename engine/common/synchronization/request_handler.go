@@ -10,7 +10,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
@@ -30,9 +31,6 @@ const defaultBatchRequestQueueCapacity = 500
 const defaultEngineRequestsWorkers = 8
 
 type RequestHandler struct {
-	lm   *lifecycle.LifecycleManager
-	unit *engine.Unit
-
 	me      module.Local
 	log     zerolog.Logger
 	metrics module.EngineMetrics
@@ -49,6 +47,9 @@ type RequestHandler struct {
 	requestMessageHandler *engine.MessageHandler // message handler responsible for request processing
 
 	queueMissingHeights bool // true if missing heights should be added to download queue
+
+	cm *component.ComponentManager
+	component.Component
 }
 
 func NewRequestHandler(
@@ -63,8 +64,6 @@ func NewRequestHandler(
 	queueMissingHeights bool,
 ) *RequestHandler {
 	r := &RequestHandler{
-		unit:                engine.NewUnit(),
-		lm:                  lifecycle.NewLifecycleManager(),
 		me:                  me,
 		log:                 log.With().Str("engine", "synchronization").Logger(),
 		metrics:             metrics,
@@ -78,12 +77,45 @@ func NewRequestHandler(
 
 	r.setupRequestMessageHandler()
 
+	builder := component.NewComponentManagerBuilder()
+
+	for i := 0; i < defaultEngineRequestsWorkers; i++ {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			<-r.finalizedHeader.Ready()
+			ready()
+
+			r.requestProcessingLoop(ctx)
+		})
+	}
+
+	cm := builder.Build()
+	r.cm = cm
+	r.Component = cm
+
 	return r
+}
+
+func (r *RequestHandler) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+	select {
+	case <-r.cm.ShutdownSignal():
+		return
+	default:
+	}
+	err := r.Process(channel, originID, event)
+	if err != nil {
+		r.log.Err(err).Msg("internal error processing event")
+	}
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (r *RequestHandler) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	select {
+	case <-r.cm.ShutdownSignal():
+		return component.ErrComponentStopped
+	default:
+	}
+
 	err := r.process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -100,7 +132,12 @@ func (r *RequestHandler) Process(channel network.Channel, originID flow.Identifi
 //  * IncompatibleInputTypeError if input has unexpected type
 //  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (r *RequestHandler) process(originID flow.Identifier, event interface{}) error {
-	return r.requestMessageHandler.Process(originID, event)
+	switch event.(type) {
+	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
+		return r.requestMessageHandler.Process(originID, event)
+	default:
+		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
+	}
 }
 
 // setupRequestMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED requests.
@@ -291,10 +328,10 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 }
 
 // processAvailableRequests is processor of pending events which drives events from networking layer to business logic.
-func (r *RequestHandler) processAvailableRequests() error {
+func (r *RequestHandler) processAvailableRequests(ctx irrecoverable.SignalerContext) error {
 	for {
 		select {
-		case <-r.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}
@@ -333,38 +370,17 @@ func (r *RequestHandler) processAvailableRequests() error {
 }
 
 // requestProcessingLoop is a separate goroutine that performs processing of queued requests
-func (r *RequestHandler) requestProcessingLoop() {
+func (r *RequestHandler) requestProcessingLoop(ctx irrecoverable.SignalerContext) {
 	notifier := r.requestMessageHandler.GetNotifier()
 	for {
 		select {
-		case <-r.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-notifier:
-			err := r.processAvailableRequests()
+			err := r.processAvailableRequests(ctx)
 			if err != nil {
-				r.log.Fatal().Err(err).Msg("internal error processing queued requests")
+				ctx.Throw(fmt.Errorf("internal error processing queued requests: %w", err))
 			}
 		}
 	}
-}
-
-// Ready returns a ready channel that is closed once the engine has fully started.
-func (r *RequestHandler) Ready() <-chan struct{} {
-	r.lm.OnStart(func() {
-		<-r.finalizedHeader.Ready()
-		for i := 0; i < defaultEngineRequestsWorkers; i++ {
-			r.unit.Launch(r.requestProcessingLoop)
-		}
-	})
-	return r.lm.Started()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-func (r *RequestHandler) Done() <-chan struct{} {
-	r.lm.OnStop(func() {
-		// wait for all request processing workers to exit
-		<-r.unit.Done()
-		<-r.finalizedHeader.Done()
-	})
-	return r.lm.Stopped()
 }

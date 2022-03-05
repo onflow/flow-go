@@ -41,7 +41,6 @@ type Engine struct {
 	metrics        module.EngineMetrics
 	me             module.Local
 	participants   flow.IdentityList
-	con            network.Conduit
 	net            network.Network
 	clusterChannel network.Channel
 	comp           network.Engine // compliance layer engine
@@ -108,12 +107,10 @@ func New(
 		return nil, fmt.Errorf("could not setup message handler")
 	}
 
-	// register the engine with the network layer and store the conduit
-	con, err := net.Register(e.clusterChannel, e)
+	err = net.RegisterDirectMessageHandler(e.clusterChannel, e.Submit)
 	if err != nil {
-		return nil, fmt.Errorf("could not register engine: %w", err)
+		return nil, fmt.Errorf("could not register direct message handler: %w", err)
 	}
-	e.con = con
 
 	e.requestHandler = NewRequestHandlerEngine(log, metrics, net, e.clusterChannel, me, blocks, core, state)
 

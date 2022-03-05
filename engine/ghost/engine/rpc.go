@@ -71,7 +71,7 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 		return nil, fmt.Errorf("failed to initialize RPC: %w", err)
 	}
 
-	handler := NewHandler(log, conduitMap, messages, codec)
+	handler := NewHandler(log, conduitMap, net, messages, codec)
 	eng.handler = handler
 
 	ghost.RegisterGhostNodeAPIServer(eng.server, eng.handler)
@@ -126,9 +126,13 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 	for _, e := range channels {
 		c, err := net.Register(e, eng)
 		if err != nil {
-			return nil, fmt.Errorf("could not register collection provider engine: %w", err)
+			return nil, fmt.Errorf("could not register engine: %w", err)
 		}
 		conduitMap[e] = c
+		err = net.RegisterDirectMessageHandler(e, eng.Submit)
+		if err != nil {
+			return nil, fmt.Errorf("could not register direct message handler: %w", err)
+		}
 	}
 
 	return conduitMap, nil
