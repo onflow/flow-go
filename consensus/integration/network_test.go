@@ -66,6 +66,11 @@ type Network struct {
 	mocknetwork.Network
 }
 
+func (n *Network) SetDirectMessageConfig(channel network.Channel, config network.DirectMessageConfig) error {
+	// TODO: this isn't needed for the tests
+	return nil
+}
+
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the
 // Conduit instance.
 func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
@@ -101,9 +106,9 @@ func (n *Network) unregister(channel network.Channel) error {
 // submit is called when the attached Engine to the channel is sending an event to an
 // Engine attached to the same channel on another node or nodes.
 // This implementation uses unicast under the hood.
-func (n *Network) submit(event interface{}, channel network.Channel, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(event interface{}, channel network.Channel) error {
 	var sendErrors *multierror.Error
-	for _, targetID := range targetIDs {
+	for targetID := range n.hub.networks {
 		if err := n.unicast(event, channel, targetID); err != nil {
 			sendErrors = multierror.Append(sendErrors, fmt.Errorf("could not unicast the event: %w", err))
 		}
@@ -149,16 +154,8 @@ func (n *Network) unicast(event interface{}, channel network.Channel, targetID f
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(event interface{}, channel network.Channel, targetIDs ...flow.Identifier) error {
-	return n.submit(event, channel, targetIDs...)
-}
-
-// multicast is called when an Engine attached to the channel is sending an event to a number of randomly chosen
-// Engines attached to the same channel on other nodes. The targeted nodes are selected based on the selector.
-// In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) multicast(event interface{}, channel network.Channel, num uint, targetIDs ...flow.Identifier) error {
-	targetIDs = flow.Sample(num, targetIDs...)
-	return n.submit(event, channel, targetIDs...)
+func (n *Network) publish(event interface{}, channel network.Channel) error {
+	return n.submit(event, channel)
 }
 
 type Conduit struct {
@@ -169,32 +166,11 @@ type Conduit struct {
 	queue   chan message
 }
 
-func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
+func (c *Conduit) Publish(event interface{}) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit closed")
 	}
-	return c.net.submit(event, c.channel, targetIDs...)
-}
-
-func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
-	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit closed")
-	}
-	return c.net.publish(event, c.channel, targetIDs...)
-}
-
-func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
-	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit closed")
-	}
-	return c.net.unicast(event, c.channel, targetID)
-}
-
-func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
-	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit closed")
-	}
-	return c.net.multicast(event, c.channel, num, targetIDs...)
+	return c.net.publish(event, c.channel)
 }
 
 func (c *Conduit) Close() error {

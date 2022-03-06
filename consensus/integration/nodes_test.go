@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -531,17 +532,28 @@ func createNode(
 	require.NoError(t, err)
 	idProvider := id.NewFixedIdentifierProvider(identities.NodeIDs())
 
+	reqHandler := synceng.NewRequestHandler(
+		log,
+		metrics,
+		net,
+		engine.SyncCommittee,
+		me,
+		blocksDB,
+		syncCore,
+		finalizedHeader,
+		true,
+	)
+
 	// initialize the synchronization engine
 	sync, err := synceng.New(
 		log,
 		metrics,
 		net,
-		me,
-		blocksDB,
 		comp,
 		syncCore,
 		finalizedHeader,
 		idProvider,
+		reqHandler,
 	)
 	require.NoError(t, err)
 

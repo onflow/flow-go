@@ -41,6 +41,10 @@ func (r *RelayNetwork) RegisterDirectMessageHandler(channel network.Channel, han
 	return r.originNet.RegisterDirectMessageHandler(channel, handler)
 }
 
+func (r *RelayNetwork) SetDirectMessageConfig(channel network.Channel, config network.DirectMessageConfig) error {
+	return r.originNet.SetDirectMessageConfig(channel, config)
+}
+
 func (r *RelayNetwork) SendDirectMessage(channel network.Channel, message interface{}, target flow.Identifier) error {
 	return r.originNet.SendDirectMessage(channel, message, target)
 }
