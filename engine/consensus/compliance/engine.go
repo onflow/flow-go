@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -360,15 +359,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
-	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get consensus recipients: %w", err)
-	}
-
 	e.unit.LaunchAfter(delay, func() {
 
 		go e.core.hotstuff.SubmitProposal(header, parent.View)
@@ -382,7 +372,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 
 		// broadcast the proposal to consensus nodes
-		err = e.con.Publish(proposal, recipients.NodeIDs()...)
+		err = e.con.Publish(proposal)
 		if errors.Is(err, network.EmptyTargetList) {
 			return
 		}

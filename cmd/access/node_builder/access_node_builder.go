@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -334,17 +335,32 @@ func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuil
 }
 
 func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
-	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	var reqHandler *synceng.RequestHandler
+
+	builder.Component("main chain sync request hangler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		reqHandler = synceng.NewRequestHandler(
+			node.Logger,
+			node.Metrics.Engine,
+			node.Network,
+			engine.SyncCommittee,
+			node.Me,
+			node.Storage.Blocks,
+			builder.SyncCore,
+			builder.FinalizedHeader,
+			true,
+		)
+
+		return reqHandler, nil
+	}).Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
 			node.Network,
-			node.Me,
-			node.Storage.Blocks,
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.FinalizedHeader,
 			builder.SyncEngineParticipantsProviderFactory(),
+			reqHandler,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)

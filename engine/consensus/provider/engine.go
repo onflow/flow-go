@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -144,17 +143,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return engine.NewInvalidInputErrorf("non-local block (nodeID: %x)", originID)
 	}
 
-	// determine the nodes we should send the block to
-	recipients, err := e.state.Final().Identities(filter.And(
-		filter.Not(filter.Ejected),
-		filter.Not(filter.HasRole(flow.RoleConsensus)),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get recipients: %w", err)
-	}
-
 	// submit the block to the targets
-	err = e.con.Publish(proposal, recipients.NodeIDs()...)
+	err := e.con.Publish(proposal)
 	if err != nil {
 		return fmt.Errorf("could not broadcast block: %w", err)
 	}

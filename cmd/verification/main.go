@@ -13,6 +13,7 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/verification/assigner"
@@ -70,6 +71,7 @@ func main() {
 		blockConsumer           *blockconsumer.BlockConsumer
 		finalizationDistributor *pubsub.FinalizationDistributor
 		finalizedHeader         *synceng.FinalizedHeaderCache
+		reqHandler              *synceng.RequestHandler
 
 		followerEng *followereng.Engine        // the follower engine
 		collector   module.VerificationMetrics // used to collect metrics of all engines
@@ -344,17 +346,31 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
+		Component("sync request hangler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			reqHandler = synceng.NewRequestHandler(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				engine.SyncCommittee,
+				node.Me,
+				node.Storage.Blocks,
+				syncCore,
+				finalizedHeader,
+				true,
+			)
+
+			return reqHandler, nil
+		}).
 		Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
-				node.Me,
-				node.Storage.Blocks,
 				followerEng,
 				syncCore,
 				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
+				reqHandler,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)

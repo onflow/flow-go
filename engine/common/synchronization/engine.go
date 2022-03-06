@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/storage"
 )
 
 // defaultSyncResponseQueueCapacity maximum capacity of sync responses queue
@@ -39,9 +38,7 @@ type Engine struct {
 	lm      *lifecycle.LifecycleManager
 	log     zerolog.Logger
 	metrics module.EngineMetrics
-	me      module.Local
 	net     network.Network
-	blocks  storage.Blocks
 	comp    network.Engine // compliance layer engine
 
 	pollInterval         time.Duration
@@ -62,8 +59,6 @@ func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
 	net network.Network,
-	me module.Local,
-	blocks storage.Blocks,
 	comp network.Engine,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
@@ -87,8 +82,6 @@ func New(
 		lm:                   lifecycle.NewLifecycleManager(),
 		log:                  log.With().Str("engine", "synchronization").Logger(),
 		metrics:              metrics,
-		me:                   me,
-		blocks:               blocks,
 		comp:                 comp,
 		core:                 core,
 		pollInterval:         opt.PollInterval,

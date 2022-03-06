@@ -76,6 +76,7 @@ func main() {
 		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
 		finalizationDistributor *pubsub.FinalizationDistributor
 		finalizedHeader         *consync.FinalizedHeaderCache
+		reqHandler              *consync.RequestHandler
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -311,19 +312,32 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
-		Component("main chain sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("main chain sync request hangler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			reqHandler = consync.NewRequestHandler(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				engine.SyncCommittee,
+				node.Me,
+				node.Storage.Blocks,
+				mainChainSyncCore,
+				finalizedHeader,
+				true,
+			)
 
+			return reqHandler, nil
+		}).
+		Component("main chain sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// create a block synchronization engine to handle follower getting out of sync
 			sync, err := consync.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
-				node.Me,
-				node.Storage.Blocks,
 				followerEng,
 				mainChainSyncCore,
 				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
+				reqHandler,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)

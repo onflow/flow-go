@@ -116,6 +116,7 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
+		reqHandler              *synceng.RequestHandler
 		hotstuffModules         *consensus.HotstuffModules
 		dkgState                *bstorage.DKGState
 		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
@@ -689,17 +690,31 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
+		Component("sync request hangler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			reqHandler = synceng.NewRequestHandler(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				engine.SyncCommittee,
+				node.Me,
+				node.Storage.Blocks,
+				syncCore,
+				finalizedHeader,
+				true,
+			)
+
+			return reqHandler, nil
+		}).
 		Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
-				node.Me,
-				node.Storage.Blocks,
 				comp,
 				syncCore,
 				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
+				reqHandler,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
