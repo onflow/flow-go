@@ -22,13 +22,13 @@ var deductTransactionFeesInvocationArgumentTypes = []sema.Type{
 func DeductTransactionFeesInvocation(
 	env Environment,
 	traceSpan opentracing.Span,
-) func(payer flow.Address, executionEffort uint64, inclusionEffort uint64) (cadence.Value, error) {
+) func(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
 	sc, err := systemcontracts.SystemContractsForChain(env.Context().Chain.ChainID())
 	if err != nil {
 		panic(err) // this should never happen, otherwise there is a bug in the system contracts addresses
 	}
 
-	return func(payer flow.Address, executionEffort uint64, inclusionEffort uint64) (cadence.Value, error) {
+	return func(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
 		invoker := NewTransactionContractFunctionInvoker(
 			common.AddressLocation{
 				Address: common.Address(sc.FlowFees.Address),
@@ -37,8 +37,8 @@ func DeductTransactionFeesInvocation(
 			systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
 			[]interpreter.Value{
 				interpreter.NewAddressValue(common.Address(payer)),
-				interpreter.UFix64Value(executionEffort),
 				interpreter.UFix64Value(inclusionEffort),
+				interpreter.UFix64Value(executionEffort),
 			},
 			deductTransactionFeesInvocationArgumentTypes,
 			env.Context().Logger,

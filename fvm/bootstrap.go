@@ -88,21 +88,27 @@ var DefaultStorageMBPerFLOW = func() cadence.UFix64 {
 	return value
 }()
 
-// DefaultTransactionFees are the default transaction fees if transaction fees are on.
+// DefaultTransactionFees are the default transaction fee parameters if transaction fees are on.
+// surge factor is 1.0, inclusion effort cost is 0.0001 (because the static inclusion effort is 1.0) and
+// execution effort cost is 0.0 because dynamic execution fees are off
 // If they are off (which is the default behaviour) that means the transaction fees are 0.0.
 var DefaultTransactionFees = func() BootstrapProcedureFeeParameters {
-	effortCost, err := cadence.NewUFix64("1.0")
-	if err != nil {
-		panic(fmt.Errorf("invalid default fee effort cost: %w", err))
-	}
 	surgeFactor, err := cadence.NewUFix64("1.0")
 	if err != nil {
 		panic(fmt.Errorf("invalid default fee surge factor: %w", err))
 	}
+	inclusionEffortCost, err := cadence.NewUFix64("0.0001")
+	if err != nil {
+		panic(fmt.Errorf("invalid default fee effort cost: %w", err))
+	}
+	executionEffortCost, err := cadence.NewUFix64("0.0")
+	if err != nil {
+		panic(fmt.Errorf("invalid default fee effort cost: %w", err))
+	}
 	return BootstrapProcedureFeeParameters{
 		SurgeFactor:         surgeFactor,
-		InclusionEffortCost: effortCost,
-		ExecutionEffortCost: effortCost,
+		InclusionEffortCost: inclusionEffortCost,
+		ExecutionEffortCost: executionEffortCost,
 	}
 }()
 
