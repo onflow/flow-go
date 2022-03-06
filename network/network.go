@@ -20,6 +20,8 @@ type Network interface {
 	// On a single node, only one engine can be subscribed to a channel at any given time.
 	Register(channel Channel, messageProcessor MessageProcessor) (Conduit, error)
 
+	SetDirectMessageConfig(channel Channel, config DirectMessageConfig) error
+
 	RegisterDirectMessageHandler(channel Channel, handler DirectMessageHandler) error
 
 	SendDirectMessage(channel Channel, message interface{}, targetID flow.Identifier) error

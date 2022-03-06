@@ -83,7 +83,7 @@ type Middleware struct {
 	peerManager                *PeerManager
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
-	directMessageConfigs       map[network.Channel]DirectMessageConfig
+	directMessageConfigs       map[network.Channel]network.DirectMessageConfig
 	directMessageConfigsLock   sync.RWMutex
 	codec                      network.Codec
 	component.Component
@@ -140,7 +140,7 @@ func NewMiddleware(
 		validators:           DefaultValidators(log, flowID),
 		peerManagerFactory:   nil,
 		idTranslator:         idTranslator,
-		directMessageConfigs: make(map[network.Channel]DirectMessageConfig),
+		directMessageConfigs: make(map[network.Channel]network.DirectMessageConfig),
 		codec:                codec,
 	}
 
@@ -399,7 +399,7 @@ func (m *Middleware) msgType(event interface{}) string {
 	return strings.TrimLeft(fmt.Sprintf("%T", event), "*")
 }
 
-func (m *Middleware) getDirectMessageConfig(channel network.Channel) DirectMessageConfig {
+func (m *Middleware) getDirectMessageConfig(channel network.Channel) network.DirectMessageConfig {
 	m.directMessageConfigsLock.RLock()
 	config, ok := m.directMessageConfigs[channel]
 	m.directMessageConfigsLock.RUnlock()
@@ -408,7 +408,7 @@ func (m *Middleware) getDirectMessageConfig(channel network.Channel) DirectMessa
 		return config
 	}
 
-	return DirectMessageConfig{
+	return network.DirectMessageConfig{
 		MaxMsgSize:    DefaultMaxUnicastMsgSize,
 		MaxMsgTimeout: DefaultUnicastTimeout,
 	}
@@ -478,12 +478,7 @@ func (m *Middleware) streamHandler(channel network.Channel, handler network.Dire
 	}
 }
 
-type DirectMessageConfig struct {
-	MaxMsgSize    int
-	MaxMsgTimeout time.Duration
-}
-
-func (m *Middleware) SetDirectMessageConfig(channel network.Channel, config DirectMessageConfig) {
+func (m *Middleware) SetDirectMessageConfig(channel network.Channel, config network.DirectMessageConfig) {
 	m.directMessageConfigsLock.Lock()
 	defer m.directMessageConfigsLock.Unlock()
 

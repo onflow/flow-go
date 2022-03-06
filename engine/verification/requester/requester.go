@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -91,8 +92,16 @@ func New(log zerolog.Logger,
 		net:              net,
 	}
 
+	err := net.SetDirectMessageConfig(engine.ProvideChunks, network.DirectMessageConfig{
+		MaxMsgSize:    p2p.LargeMsgMaxUnicastMsgSize,
+		MaxMsgTimeout: p2p.LargeMsgUnicastTimeout,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not set direct message config: %w", err)
+	}
+
 	// register the engine with the network layer
-	err := net.RegisterDirectMessageHandler(engine.ProvideChunks, e.Submit)
+	err = net.RegisterDirectMessageHandler(engine.ProvideChunks, e.Submit)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

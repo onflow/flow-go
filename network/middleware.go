@@ -3,6 +3,8 @@
 package network
 
 import (
+	"time"
+
 	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
@@ -17,6 +19,11 @@ type Topic string
 
 func (t Topic) String() string {
 	return string(t)
+}
+
+type DirectMessageConfig struct {
+	MaxMsgSize    int
+	MaxMsgTimeout time.Duration
 }
 
 // Middleware represents the middleware layer, which manages the connections to
@@ -35,6 +42,8 @@ type Middleware interface {
 	// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 	// a more efficient candidate.
 	SendDirect(channel Channel, msg interface{}, targetID flow.Identifier) error
+
+	SetDirectMessageConfig(channel Channel, config DirectMessageConfig)
 
 	SetDirectMessageHandler(channel Channel, handler DirectMessageHandler)
 

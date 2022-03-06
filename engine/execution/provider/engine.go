@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -77,6 +78,14 @@ func New(
 	eng.receiptCon, err = net.Register(engine.PushReceipts, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
+	}
+
+	err = net.SetDirectMessageConfig(engine.RequestChunks, network.DirectMessageConfig{
+		MaxMsgSize:    p2p.LargeMsgMaxUnicastMsgSize,
+		MaxMsgTimeout: p2p.LargeMsgUnicastTimeout,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not set direct message config: %w", err)
 	}
 
 	// register the engine with the network layer
