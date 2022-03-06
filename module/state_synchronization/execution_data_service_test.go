@@ -199,7 +199,7 @@ func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Block
 		require.NoError(t, bs.PutMany(ctx, batch))
 
 		if numBlobs <= 1 {
-			id, err := flow.CidToFlowID(batch[0].Cid())
+			id, err := flow.CidToId(batch[0].Cid())
 			require.NoError(t, err)
 
 			return id
@@ -268,7 +268,7 @@ func TestOversizedBlob(t *testing.T) {
 	test := func(data []byte) {
 		cid, err := putBlob(bs, data, time.Second)
 		require.NoError(t, err)
-		fid, err := flow.CidToFlowID(cid)
+		fid, err := flow.CidToId(cid)
 		require.NoError(t, err)
 		_, err = getExecutionData(eds, fid, time.Second)
 		var blobSizeLimitExceededError *BlobSizeLimitExceededError

@@ -88,11 +88,11 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 		filter.Not(filter.Ejected),
 	)
 
-	// make sure we don't send requests to unstaked nodes
+	// make sure we don't send requests to unauthorized nodes
 	if cfg.ValidateStaking {
 		selector = filter.And(
 			selector,
-			filter.HasStake(true),
+			filter.HasWeight(true),
 		)
 	}
 

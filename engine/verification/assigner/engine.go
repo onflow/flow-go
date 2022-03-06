@@ -71,7 +71,7 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // resultChunkAssignment receives an execution result that appears in a finalized incorporating block.
-// In case this verification node is staked at the reference block of this execution receipt's result,
+// In case this verification node is authorized at the reference block of this execution receipt's result,
 // chunk assignment is computed for the result, and the list of assigned chunks returned.
 func (e *Engine) resultChunkAssignment(ctx context.Context,
 	result *flow.ExecutionResult,
@@ -85,13 +85,13 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 		Logger()
 	e.metrics.OnExecutionResultReceivedAtAssignerEngine()
 
-	// verification node should be staked at the reference block id.
-	ok, err := stakedAsVerification(e.state, result.BlockID, e.me.NodeID())
+	// verification node should be authorized at the reference block id.
+	ok, err := authorizedAsVerification(e.state, result.BlockID, e.me.NodeID())
 	if err != nil {
-		return nil, fmt.Errorf("could not verify stake of verification node for result at reference block id: %w", err)
+		return nil, fmt.Errorf("could not verify weight of verification node for result at reference block id: %w", err)
 	}
 	if !ok {
-		log.Warn().Msg("node is not staked at reference block id, receipt is discarded")
+		log.Warn().Msg("node is not authorized at reference block id, receipt is discarded")
 		return nil, nil
 	}
 
@@ -242,10 +242,10 @@ func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionRes
 	return mine, nil
 }
 
-// stakedAsVerification checks whether this instance of verification node has staked at specified block ID.
-// It returns true and nil if verification node is staked at referenced block ID, and returns false and nil otherwise.
-// It returns false and error if it could not extract the stake of node as a verification node at the specified block.
-func stakedAsVerification(state protocol.State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
+// authorizedAsVerification checks whether this instance of verification node is authorized at specified block ID.
+// It returns true and nil if verification node has positive weight at referenced block ID, and returns false and nil otherwise.
+// It returns false and error if it could not extract the weight of node as a verification node at the specified block.
+func authorizedAsVerification(state protocol.State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
 	// TODO define specific error for handling cases
 	identity, err := state.AtBlockID(blockID).Identity(identifier)
 	if err != nil {
@@ -254,7 +254,7 @@ func stakedAsVerification(state protocol.State, blockID flow.Identifier, identif
 
 	// checks role of node is verification
 	if identity.Role != flow.RoleVerification {
-		return false, fmt.Errorf("node is staked for an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
+		return false, fmt.Errorf("node has an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
 	}
 
 	// checks identity has not been ejected
@@ -262,8 +262,8 @@ func stakedAsVerification(state protocol.State, blockID flow.Identifier, identif
 		return false, nil
 	}
 
-	// checks identity has stake
-	if identity.Stake == 0 {
+	// checks identity has weight
+	if identity.Weight == 0 {
 		return false, nil
 	}
 

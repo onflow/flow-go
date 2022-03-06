@@ -1,7 +1,6 @@
 package flattener_test
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -15,7 +14,7 @@ import (
 )
 
 func TestTrieStoreAndLoad(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-mtrie-")
+	dir, err := os.MkdirTemp("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 

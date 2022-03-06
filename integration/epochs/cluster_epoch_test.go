@@ -144,7 +144,7 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 			cdcNodeID, err := cadence.NewString(node.NodeID.String())
 			require.NoError(s.T(), err)
 			nodeIDs = append(nodeIDs, cdcNodeID)
-			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.Stake))
+			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.Weight))
 		}
 
 		clusterNodeIDs[index] = cadence.NewArray(nodeIDs)
