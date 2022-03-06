@@ -278,7 +278,22 @@ func (n *Network) RegisterDirectMessageHandler(channel network.Channel, handler 
 }
 
 func (n *Network) SendDirectMessage(channel network.Channel, message interface{}, targetID flow.Identifier) error {
-	return n.mw.SendDirect(channel, message, targetID)
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return ErrNetworkShutdown
+	default:
+		return n.mw.SendDirect(channel, message, targetID)
+	}
+}
+
+func (n *Network) SetDirectMessageConfig(channel network.Channel, config network.DirectMessageConfig) error {
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return ErrNetworkShutdown
+	default:
+		n.mw.SetDirectMessageConfig(channel, config)
+		return nil
+	}
 }
 
 // RegisterBlobService registers a BlobService on the given channel.
