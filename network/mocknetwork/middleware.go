@@ -140,6 +140,11 @@ func (_m *Middleware) SendDirect(channel network.Channel, msg interface{}, targe
 	return r0
 }
 
+// SetDirectMessageConfig provides a mock function with given fields: channel, config
+func (_m *Middleware) SetDirectMessageConfig(channel network.Channel, config network.DirectMessageConfig) {
+	_m.Called(channel, config)
+}
+
 // SetDirectMessageHandler provides a mock function with given fields: channel, handler
 func (_m *Middleware) SetDirectMessageHandler(channel network.Channel, handler network.DirectMessageHandler) {
 	_m.Called(channel, handler)

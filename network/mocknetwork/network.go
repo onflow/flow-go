@@ -156,6 +156,20 @@ func (_m *Network) SendDirectMessage(channel network.Channel, message interface{
 	return r0
 }
 
+// SetDirectMessageConfig provides a mock function with given fields: channel, config
+func (_m *Network) SetDirectMessageConfig(channel network.Channel, config network.DirectMessageConfig) error {
+	ret := _m.Called(channel, config)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(network.Channel, network.DirectMessageConfig) error); ok {
+		r0 = rf(channel, config)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Start provides a mock function with given fields: _a0
 func (_m *Network) Start(_a0 irrecoverable.SignalerContext) {
 	_m.Called(_a0)

@@ -143,6 +143,20 @@ func (mr *MockNetworkMockRecorder) SendDirectMessage(arg0, arg1, arg2 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendDirectMessage", reflect.TypeOf((*MockNetwork)(nil).SendDirectMessage), arg0, arg1, arg2)
 }
 
+// SetDirectMessageConfig mocks base method
+func (m *MockNetwork) SetDirectMessageConfig(arg0 network.Channel, arg1 network.DirectMessageConfig) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDirectMessageConfig", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetDirectMessageConfig indicates an expected call of SetDirectMessageConfig
+func (mr *MockNetworkMockRecorder) SetDirectMessageConfig(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDirectMessageConfig", reflect.TypeOf((*MockNetwork)(nil).SetDirectMessageConfig), arg0, arg1)
+}
+
 // Start mocks base method
 func (m *MockNetwork) Start(arg0 irrecoverable.SignalerContext) {
 	m.ctrl.T.Helper()
