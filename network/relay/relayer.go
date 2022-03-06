@@ -50,7 +50,7 @@ func (r *Relayer) Process(channel network.Channel, originID flow.Identifier, eve
 	})
 
 	g.Go(func() error {
-		if err := r.destinationConduit.Publish(event, flow.ZeroID); err != nil {
+		if err := r.destinationConduit.Publish(event); err != nil {
 			return fmt.Errorf("failed to relay message to destination network: %w", err)
 		}
 
