@@ -18,8 +18,10 @@ import (
 func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 	for _, n := range nodes {
 		go func(n *Node) {
+			n.finalizedHeader.Start(signalerCtx)
 			n.aggregator.Start(signalerCtx)
-			<-util.AllReady(n.aggregator, n.compliance, n.sync)
+			n.sync.Start(signalerCtx)
+			<-util.AllReady(n.aggregator, n.compliance, n.sync, n.finalizedHeader)
 		}(n)
 	}
 }
@@ -35,15 +37,16 @@ func stopNodes(t *testing.T, cancel context.CancelFunc, nodes []*Node) {
 
 // happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
-	stopper := NewStopper(5, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
-
-	hub.WithFilter(blockNothing)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	stopper := NewStopper(5, 0, cancel)
+
+	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+
+	hub.WithFilter(blockNothing)
 
 	runNodes(signalerCtx, nodes)
 
@@ -58,15 +61,18 @@ func Test3Nodes(t *testing.T) {
 
 // with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
-	// 4 nodes should be able finalize at least 3 blocks.
-	stopper := NewStopper(2, 1)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	// 4 nodes should be able finalize at least 3 blocks.
+	stopper := NewStopper(2, 1, cancel)
+
 	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNodes(nodes[0]))
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	runNodes(signalerCtx, nodes)
 

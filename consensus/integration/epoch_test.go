@@ -21,11 +21,6 @@ import (
 
 // should be able to reach consensus when identity table contains nodes with 0 weight.
 func TestUnweightedNode(t *testing.T) {
-	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
-	// epoch) identities, but don't cross an epoch boundary
-	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
-	// epoch) identities, but don't cross an epoch boundary
-	stopper := NewStopper(2, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	consensusParticipants := NewConsensusParticipants(participantsData)
@@ -41,12 +36,16 @@ func TestUnweightedNode(t *testing.T) {
 		10_000,
 	)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
+	// epoch) identities, but don't cross an epoch boundary
+	stopper := NewStopper(2, 0, cancel)
+
 	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	runNodes(signalerCtx, nodes)
 
@@ -61,8 +60,6 @@ func TestUnweightedNode(t *testing.T) {
 
 // test consensus across an epoch boundary, where both epochs have the same identity table.
 func TestStaticEpochTransition(t *testing.T) {
-	// must finalize 8 blocks, we specify the epoch transition after 4 views
-	stopper := NewStopper(8, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	consensusParticipants := NewConsensusParticipants(participantsData)
@@ -81,12 +78,15 @@ func TestStaticEpochTransition(t *testing.T) {
 		4,
 	)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	// must finalize 8 blocks, we specify the epoch transition after 4 views
+	stopper := NewStopper(8, 0, cancel)
+
 	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	runNodes(signalerCtx, nodes)
 
@@ -108,8 +108,6 @@ func TestStaticEpochTransition(t *testing.T) {
 // test consensus across an epoch boundary, where the identity table changes
 // but the new epoch overlaps with the previous epoch.
 func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
-	// must finalize 8 blocks, we specify the epoch transition after 4 views
-	stopper := NewStopper(8, 0)
 	privateNodeInfos := createPrivateNodeIdentities(4)
 	firstEpochConsensusParticipants := completeConsensusIdentities(t, privateNodeInfos[:3])
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
@@ -140,12 +138,15 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 		4,
 	)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	// must finalize 8 blocks, we specify the epoch transition after 4 views
+	stopper := NewStopper(8, 0, cancel)
+
 	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	runNodes(signalerCtx, nodes)
 
@@ -167,8 +168,6 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 // test consensus across an epoch boundary, where the identity table in the new
 // epoch is disjoint from the identity table in the first epoch.
 func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
-	// must finalize 8 blocks, we specify the epoch transition after 4 views
-	stopper := NewStopper(8, 0)
 	firstEpochConsensusParticipants := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
 	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
@@ -195,12 +194,15 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 		4,
 	)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	// must finalize 8 blocks, we specify the epoch transition after 4 views
+	stopper := NewStopper(8, 0, cancel)
+
 	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	runNodes(signalerCtx, nodes)
 

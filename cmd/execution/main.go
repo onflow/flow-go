@@ -88,7 +88,6 @@ func main() {
 		ingestionEng                  *ingestion.Engine
 		finalizationDistributor       *pubsub.FinalizationDistributor
 		finalizedHeader               *synchronization.FinalizedHeaderCache
-		reqHandler                    *synchronization.RequestHandler
 		rpcConf                       rpc.Config
 		err                           error
 		executionState                state.ExecutionState
@@ -683,8 +682,8 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
-		Component("sync request hangler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			reqHandler = synchronization.NewRequestHandler(
+		Component("synchronization engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			reqHandler := synchronization.NewRequestHandler(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -696,9 +695,6 @@ func main() {
 				true,
 			)
 
-			return reqHandler, nil
-		}).
-		Component("synchronization engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
 				node.Logger,

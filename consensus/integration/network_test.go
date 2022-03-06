@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -40,11 +38,13 @@ func (h *Hub) WithFilter(filter BlockOrDelayFunc) *Hub {
 // other networks to send events directly.
 func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 	net := &Network{
-		ctx:      context.Background(),
-		hub:      h,
-		originID: originID,
-		conduits: make(map[network.Channel]*Conduit),
-		node:     node,
+		ctx:                   context.Background(),
+		hub:                   h,
+		originID:              originID,
+		conduits:              make(map[network.Channel]*Conduit),
+		directMessageHandlers: make(map[network.Channel]network.DirectMessageHandler),
+		directMessageQueues:   make(map[network.Channel]chan message),
+		node:                  node,
 	}
 	h.networks[originID] = net
 	h.identities = append(h.identities, node.id)
@@ -58,16 +58,64 @@ func (h *Hub) AddNetwork(originID flow.Identifier, node *Node) *Network {
 // When an engine is attached on a Network instance, the mocked Network delivers
 // all engine's events to others using an in-memory delivery mechanism.
 type Network struct {
-	ctx      context.Context
-	hub      *Hub
-	node     *Node
-	originID flow.Identifier
-	conduits map[network.Channel]*Conduit
+	ctx                   context.Context
+	hub                   *Hub
+	node                  *Node
+	originID              flow.Identifier
+	conduits              map[network.Channel]*Conduit
+	directMessageHandlers map[network.Channel]network.DirectMessageHandler
+	directMessageQueues   map[network.Channel]chan message
 	mocknetwork.Network
 }
 
-func (n *Network) SetDirectMessageConfig(channel network.Channel, config network.DirectMessageConfig) error {
-	// TODO: this isn't needed for the tests
+func (n *Network) RegisterDirectMessageHandler(channel network.Channel, handler network.DirectMessageHandler) error {
+	queue := make(chan message, 256)
+
+	go func() {
+		for msg := range queue {
+			go func(m message) {
+				handler(channel, m.originID, m.event)
+			}(msg)
+		}
+	}()
+
+	n.directMessageHandlers[channel] = handler
+	n.directMessageQueues[channel] = queue
+
+	return nil
+}
+
+func (n *Network) SendDirectMessage(channel network.Channel, event interface{}, targetID flow.Identifier) error {
+	targetNet, ok := n.hub.networks[targetID]
+	if !ok {
+		return fmt.Errorf("target node %s not found", targetID)
+	}
+
+	queue, ok := targetNet.directMessageQueues[channel]
+	if !ok {
+		return fmt.Errorf("no direct message handler registered for channel %s", channel)
+	}
+
+	sender, receiver := n.node, targetNet.node
+	block, delay := n.hub.filter(channel, event, sender, receiver)
+	// block the message
+	if block {
+		return nil
+	}
+
+	// no delay, push to the receiver's message queue right away
+	if delay == 0 {
+		queue <- message{originID: n.originID, event: event}
+		return nil
+	}
+
+	// use a goroutine to wait and send
+	go func(delay time.Duration, senderID flow.Identifier, receiver chan<- message, event interface{}) {
+		// sleep in order to simulate the network delay
+		time.Sleep(delay)
+		queue <- message{originID: senderID, event: event}
+	}(delay, n.originID, queue, event)
+
 	return nil
 }
 
@@ -103,42 +151,25 @@ func (n *Network) unregister(channel network.Channel) error {
 	return nil
 }
 
-// submit is called when the attached Engine to the channel is sending an event to an
-// Engine attached to the same channel on another node or nodes.
-// This implementation uses unicast under the hood.
-func (n *Network) submit(event interface{}, channel network.Channel) error {
-	var sendErrors *multierror.Error
-	for targetID := range n.hub.networks {
-		if err := n.unicast(event, channel, targetID); err != nil {
-			sendErrors = multierror.Append(sendErrors, fmt.Errorf("could not unicast the event: %w", err))
-		}
-	}
-	return sendErrors.ErrorOrNil()
-}
-
-// unicast is called when the attached Engine to the channel is sending an event to a single target
+// trySend is called when the attached Engine to the channel is sending an event to a single target
 // Engine attached to the same channel on another node.
-func (n *Network) unicast(event interface{}, channel network.Channel, targetID flow.Identifier) error {
-	net, found := n.hub.networks[targetID]
-	if !found {
-		return fmt.Errorf("could not find target network on hub: %x", targetID)
-	}
+func (n *Network) trySend(event interface{}, channel network.Channel, net *Network) {
 	con, found := net.conduits[channel]
 	if !found {
-		return fmt.Errorf("invalid channel (%d) for target ID (%x)", targetID, channel)
+		return
 	}
 
 	sender, receiver := n.node, net.node
 	block, delay := n.hub.filter(channel, event, sender, receiver)
 	// block the message
 	if block {
-		return nil
+		return
 	}
 
 	// no delay, push to the receiver's message queue right away
 	if delay == 0 {
 		con.queue <- message{originID: n.originID, event: event}
-		return nil
+		return
 	}
 
 	// use a goroutine to wait and send
@@ -147,15 +178,16 @@ func (n *Network) unicast(event interface{}, channel network.Channel, targetID f
 		time.Sleep(delay)
 		con.queue <- message{originID: senderID, event: event}
 	}(delay, n.originID, con, event)
-
-	return nil
 }
 
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
 // same channel on other nodes based on selector.
-// In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(event interface{}, channel network.Channel) error {
-	return n.submit(event, channel)
+func (n *Network) publish(event interface{}, channel network.Channel) {
+	for targetID, net := range n.hub.networks {
+		if targetID != n.originID {
+			n.trySend(event, channel, net)
+		}
+	}
 }
 
 type Conduit struct {
@@ -170,7 +202,8 @@ func (c *Conduit) Publish(event interface{}) error {
 	if c.ctx.Err() != nil {
 		return fmt.Errorf("conduit closed")
 	}
-	return c.net.publish(event, c.channel)
+	c.net.publish(event, c.channel)
+	return nil
 }
 
 func (c *Conduit) Close() error {

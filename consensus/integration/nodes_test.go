@@ -45,6 +45,7 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
+	modutil "github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
@@ -130,23 +131,23 @@ func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.Participan
 }
 
 type Node struct {
-	db         *badger.DB
-	dbDir      string
-	index      int
-	log        zerolog.Logger
-	id         *flow.Identity
-	compliance *compliance.Engine
-	sync       *synceng.Engine
-	hot        module.HotStuff
-	aggregator hotstuff.VoteAggregator
-	state      *bprotocol.MutableState
-	headers    *storage.Headers
-	net        *Network
+	db              *badger.DB
+	dbDir           string
+	index           int
+	log             zerolog.Logger
+	id              *flow.Identity
+	compliance      *compliance.Engine
+	finalizedHeader *synceng.FinalizedHeaderCache
+	sync            *synceng.Engine
+	hot             module.HotStuff
+	aggregator      hotstuff.VoteAggregator
+	state           *bprotocol.MutableState
+	headers         *storage.Headers
+	net             *Network
 }
 
 func (n *Node) Shutdown() {
-	<-n.sync.Done()
-	<-n.compliance.Done()
+	<-modutil.AllDone(n.sync, n.compliance, n.finalizedHeader, n.aggregator)
 }
 
 // epochInfo is a helper structure for storing epoch information such as counter and final view
@@ -574,6 +575,7 @@ func createNode(
 
 	comp = comp.WithConsensus(hot)
 
+	node.finalizedHeader = finalizedHeader
 	node.compliance = comp
 	node.sync = sync
 	node.state = fullState

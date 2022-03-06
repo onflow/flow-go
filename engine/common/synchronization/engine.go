@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	identifier "github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
@@ -34,8 +34,6 @@ const defaultBlockResponseQueueCapacity = 500
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
-	unit    *engine.Unit
-	lm      *lifecycle.LifecycleManager
 	log     zerolog.Logger
 	metrics module.EngineMetrics
 	net     network.Network
@@ -52,6 +50,9 @@ type Engine struct {
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
 	responseMessageHandler *engine.MessageHandler // message handler responsible for response processing
+
+	cm *component.ComponentManager
+	component.Component
 }
 
 // New creates a new main chain synchronization engine.
@@ -78,8 +79,6 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:                 engine.NewUnit(),
-		lm:                   lifecycle.NewLifecycleManager(),
 		log:                  log.With().Str("engine", "synchronization").Logger(),
 		metrics:              metrics,
 		comp:                 comp,
@@ -102,6 +101,27 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
+
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			e.requestHandler.Start(ctx)
+			ready()
+			<-e.requestHandler.Done()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			<-e.finalizedHeader.Ready()
+			ready()
+			e.checkLoop(ctx)
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			<-e.finalizedHeader.Ready()
+			ready()
+			e.responseProcessingLoop(ctx)
+		}).
+		Build()
+
+	e.cm = cm
+	e.Component = cm
 
 	return e, nil
 }
@@ -157,45 +177,31 @@ func (e *Engine) setupResponseMessageHandler() error {
 	return nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully started.
-func (e *Engine) Ready() <-chan struct{} {
-	e.lm.OnStart(func() {
-		<-e.finalizedHeader.Ready()
-		e.unit.Launch(e.checkLoop)
-		e.unit.Launch(e.responseProcessingLoop)
-		// wait for request handler to startup
-		<-e.requestHandler.Ready()
-	})
-	return e.lm.Started()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-func (e *Engine) Done() <-chan struct{} {
-	e.lm.OnStop(func() {
-		// signal the request handler to shutdown
-		requestHandlerDone := e.requestHandler.Done()
-		// wait for request sending and response processing routines to exit
-		<-e.unit.Done()
-		// wait for request handler shutdown to complete
-		<-requestHandlerDone
-		<-e.finalizedHeader.Done()
-	})
-	return e.lm.Stopped()
-}
-
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+	select {
+	case <-e.cm.ShutdownSignal():
+		return
+	default:
+	}
+
 	err := e.Process(channel, originID, event)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("internal error processing event")
+		e.log.Err(err).Msg("internal error processing event")
 	}
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	select {
+	case <-e.cm.ShutdownSignal():
+		return component.ErrComponentStopped
+	default:
+	}
+
 	err := e.process(channel, originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
@@ -225,23 +231,23 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 }
 
 // responseProcessingLoop is a separate goroutine that performs processing of queued responses
-func (e *Engine) responseProcessingLoop() {
+func (e *Engine) responseProcessingLoop(ctx irrecoverable.SignalerContext) {
 	notifier := e.responseMessageHandler.GetNotifier()
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		case <-notifier:
-			e.processAvailableResponses()
+			e.processAvailableResponses(ctx)
 		}
 	}
 }
 
 // processAvailableResponses is processor of pending events which drives events from networking layer to business logic.
-func (e *Engine) processAvailableResponses() {
+func (e *Engine) processAvailableResponses(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			return
 		default:
 		}
@@ -299,7 +305,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 }
 
 // checkLoop will regularly scan for items that need requesting.
-func (e *Engine) checkLoop() {
+func (e *Engine) checkLoop(ctx irrecoverable.SignalerContext) {
 	pollChan := make(<-chan time.Time)
 	if e.pollInterval > 0 {
 		poll := time.NewTicker(e.pollInterval)
@@ -312,13 +318,13 @@ CheckLoop:
 	for {
 		// give the quit channel a priority to be selected
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			break CheckLoop
 		default:
 		}
 
 		select {
-		case <-e.unit.Quit():
+		case <-ctx.Done():
 			break CheckLoop
 		case <-pollChan:
 			e.pollHeight()

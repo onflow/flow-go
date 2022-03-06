@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -22,6 +23,7 @@ type Stopper struct {
 	finalizedCount uint
 	tolerate       int
 	stopped        chan struct{}
+	cancel         context.CancelFunc
 }
 
 // How to stop nodes?
@@ -32,7 +34,7 @@ type Stopper struct {
 // a better strategy is to wait until all nodes has entered a certain view,
 // then stop them all.
 //
-func NewStopper(finalizedCount uint, tolerate int) *Stopper {
+func NewStopper(finalizedCount uint, tolerate int, cancel context.CancelFunc) *Stopper {
 	return &Stopper{
 		running:        make(map[flow.Identifier]struct{}),
 		nodes:          make([]*Node, 0),
@@ -40,6 +42,7 @@ func NewStopper(finalizedCount uint, tolerate int) *Stopper {
 		finalizedCount: finalizedCount,
 		tolerate:       tolerate,
 		stopped:        make(chan struct{}),
+		cancel:         cancel,
 	}
 }
 
@@ -78,6 +81,8 @@ func (s *Stopper) stopAll() {
 	}
 
 	fmt.Println("stopping all nodes")
+
+	s.cancel()
 
 	// wait until all nodes has been shut down
 	var wg sync.WaitGroup

@@ -335,10 +335,8 @@ func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuil
 }
 
 func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
-	var reqHandler *synceng.RequestHandler
-
-	builder.Component("main chain sync request hangler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		reqHandler = synceng.NewRequestHandler(
+	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		reqHandler := synceng.NewRequestHandler(
 			node.Logger,
 			node.Metrics.Engine,
 			node.Network,
@@ -350,8 +348,6 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			true,
 		)
 
-		return reqHandler, nil
-	}).Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
