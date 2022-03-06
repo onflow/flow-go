@@ -330,9 +330,8 @@ CheckLoop:
 			e.pollHeight()
 		case <-scan.C:
 			head := e.finalizedHeader.Get()
-			participants := e.participantsProvider.Identifiers()
 			ranges, batches := e.core.ScanPending(head)
-			e.sendRequests(participants, ranges, batches)
+			e.sendRequests(ranges, batches)
 		}
 	}
 
@@ -391,7 +390,7 @@ func (e *Engine) pollHeight() {
 }
 
 // sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
-func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Range, batches []flow.Batch) {
+func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) {
 
 	for _, ran := range ranges {
 		req := &messages.RangeRequest{

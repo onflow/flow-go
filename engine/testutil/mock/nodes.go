@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
@@ -206,9 +207,18 @@ type ExecutionNode struct {
 	Collections         storage.Collections
 	Finalizer           *consensus.Finalizer
 	MyExecutionReceipts storage.MyExecutionReceipts
+	FinalizedHeader     *synchronization.FinalizedHeaderCache
+
+	cancel context.CancelFunc
 }
 
 func (en ExecutionNode) Ready() {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	en.SyncEngine.Start(signalerCtx)
+	en.cancel = cancel
+
 	<-util.AllReady(
 		en.Ledger,
 		en.ReceiptsEngine,
@@ -221,6 +231,8 @@ func (en ExecutionNode) Ready() {
 }
 
 func (en ExecutionNode) Done() {
+	en.cancel()
+
 	util.AllDone(
 		en.IngestionEngine,
 		en.IngestionEngine,

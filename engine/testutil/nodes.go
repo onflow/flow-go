@@ -618,14 +618,24 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
+	reqHandler := synchronization.NewRequestHandler(
+		node.Log,
+		node.Metrics,
+		node.Net,
+		engine.SyncCommittee,
+		node.Me,
+		node.Blocks,
+		syncCore,
+		finalizedHeader,
+		true,
+	)
+
 	idCache, err := p2p.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
 	require.NoError(t, err, "could not create finalized snapshot cache")
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,
 		node.Net,
-		node.Me,
-		node.Blocks,
 		followerEng,
 		syncCore,
 		finalizedHeader,
@@ -636,6 +646,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 			),
 			idCache,
 		),
+		reqHandler,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
@@ -658,6 +669,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Finalizer:           finalizer,
 		MyExecutionReceipts: myReceipts,
 		DiskWAL:             diskWal,
+		FinalizedHeader:     finalizedHeader,
 	}
 }
 
