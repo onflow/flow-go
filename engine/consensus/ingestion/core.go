@@ -181,7 +181,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 // validateOrigin validates that the message has a valid sender (origin). We
 // only accept guarantees from an origin that is part of the identity table
 // at the collection's reference block. Furthermore, the origin must be
-// a staked, non-ejected collector node.
+// an authorized (i.e. positive weight), non-ejected collector node.
 // Expected errors during normal operation:
 //  * engine.InvalidInputError if the origin violates any requirements
 //  * engine.UnverifiableInputError if the reference block of the collection is unknown
@@ -192,7 +192,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 //       to be invalid, in which case we might want to slash the origin.
 func (e *Core) validateOrigin(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	refState := e.state.AtBlockID(guarantee.ReferenceBlockID)
-	valid, err := protocol.IsNodeStakedWithRoleAt(refState, originID, flow.RoleCollection)
+	valid, err := protocol.IsNodeAuthorizedWithRoleAt(refState, originID, flow.RoleCollection)
 	if err != nil {
 		// collection with an unknown reference block is unverifiable
 		if errors.Is(err, storage.ErrNotFound) {
