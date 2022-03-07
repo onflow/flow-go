@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -57,7 +59,11 @@ func (ps *ProposalSuite) SetupTest() {
 		helper.WithParentBlock(ps.parent),
 		helper.WithParentSigners(ps.participants.NodeIDs()),
 	)
-	ps.voters = ps.participants.Filter(filter.HasNodeID(ps.block.QC.SignerIDs...))
+
+	voterIDs, err := packer.DecodeSignerIdentifiersFromIndices(ps.participants.NodeIDs(), ps.block.QC.SignerIndices)
+	require.NoError(ps.T(), err)
+
+	ps.voters = ps.participants.Filter(filter.HasNodeID(voterIDs...))
 	ps.proposal = &model.Proposal{Block: ps.block}
 	ps.vote = ps.proposal.ProposerVote()
 	ps.voter = ps.leader
