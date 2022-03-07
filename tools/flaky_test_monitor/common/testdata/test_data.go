@@ -6,6 +6,10 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
+const COMMIT_DATE = "2021-09-21T18:06:25-07:00"
+const COMMIT_SHA = "46baf6c6be29af9c040bc14195e195848598bbae"
+const JOB_STARTED = "2021-09-21T21:06:25-07:00"
+
 // Level1TestData is used by tests to store what the expected test result should be and what the raw
 // JSON input file is
 type Level1TestData struct {
