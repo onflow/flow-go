@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 	"net/url"
 	"strings"
@@ -194,8 +195,9 @@ func testBlockEventResponse(events []flow.BlockEvents) string {
 				"type": "%s",
 				"transaction_id": "%s",
 				"transaction_index": "%d",
-				"event_index": "%d"
-			}`, ev.Type, ev.TransactionID, ev.TransactionIndex, ev.EventIndex)
+				"event_index": "%d",
+				"payload": "%s"
+			}`, ev.Type, ev.TransactionID, ev.TransactionIndex, ev.EventIndex, util.ToBase64(ev.Payload))
 		}
 
 		res[i] = fmt.Sprintf(`{
