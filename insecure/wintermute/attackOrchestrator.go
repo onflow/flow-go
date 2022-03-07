@@ -4,7 +4,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/insecure/adversary"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -22,10 +21,10 @@ type Orchestrator struct {
 var _ insecure.AttackOrchestrator = &Orchestrator{}
 
 // NewOrchestrator creates and returns a new Wintermute attack orchestrator.
-func NewOrchestrator(logger zerolog.Logger, allIds flow.IdentityList, corruptedIds flow.IdentityList) *Orchestrator {
+func NewOrchestrator(logger zerolog.Logger, allIds flow.IdentityList, corruptedIds flow.IdentityList, attacker insecure.AttackNetwork) *Orchestrator {
 	o := &Orchestrator{
 		logger:       logger,
-		network:      adversary.NewAttackNetwork(corruptedIds, logger),
+		network:      attacker,
 		corruptedIds: corruptedIds,
 		allIds:       allIds,
 	}
@@ -44,7 +43,7 @@ func NewOrchestrator(logger zerolog.Logger, allIds flow.IdentityList, corruptedI
 	return o
 }
 
-// start triggers the sub-modules of orchestrator.
+// start triggers the sub-modules of orchestrator.0
 func (o *Orchestrator) start(ctx irrecoverable.SignalerContext) {
 	o.network.Start(ctx)
 }
