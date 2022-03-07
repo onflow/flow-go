@@ -54,6 +54,9 @@ type TransactionEnv struct {
 	authorizers        []runtime.Address
 }
 
+func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+}
+
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -160,7 +163,7 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
 	}
-	addresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+	addresses, ok := utils.CadenceValueToAddressSlice(value)
 	if !ok {
 		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
@@ -649,7 +652,7 @@ func (e *TransactionEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
+func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
 	e.computationHandler.AddUsed(1, "ValidatePublicKey")
 	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
@@ -1003,4 +1006,16 @@ func (e *TransactionEnv) Commit() ([]programs.ContractUpdateKey, error) {
 		return nil, err
 	}
 	return e.contracts.Commit()
+}
+
+func (e *TransactionEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
+	return crypto.VerifyPOP(pk, sig)
+}
+
+func (e *TransactionEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
+	return crypto.AggregateSignatures(sigs)
+}
+
+func (e *TransactionEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	return crypto.AggregatePublicKeys(keys)
 }

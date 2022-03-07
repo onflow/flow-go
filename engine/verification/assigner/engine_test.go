@@ -131,8 +131,8 @@ func TestAssignerEngine(t *testing.T) {
 	t.Run("new block happy path", func(t *testing.T) {
 		newBlockHappyPath(t)
 	})
-	t.Run("new block unstaked", func(t *testing.T) {
-		newBlockUnstaked(t)
+	t.Run("new block zero-weight", func(t *testing.T) {
+		newBlockZeroWeight(t)
 	})
 	t.Run("new block zero chunk", func(t *testing.T) {
 		newBlockNoChunk(t)
@@ -189,15 +189,16 @@ func newBlockHappyPath(t *testing.T) {
 		s.notifier)
 }
 
-// newBlockUnstaked evaluates that when verification node is unstaked at a reference block,
+// newBlockZeroWeight evaluates that when verification node has zero weight at a reference block,
 // it drops the corresponding execution receipts for that block without performing any chunk assignment.
 // It also evaluates that the chunks queue is never called on any chunks of that receipt's result.
-func newBlockUnstaked(t *testing.T) {
-	// creates an assigner engine for an unstaked verification node.
+func newBlockZeroWeight(t *testing.T) {
+
+	// creates an assigner engine for zero-weight verification node.
 	s := SetupTest(WithIdentity(
 		unittest.IdentityFixture(
 			unittest.WithRole(flow.RoleVerification),
-			unittest.WithStake(0))))
+			unittest.WithWeight(0))))
 	e := NewAssignerEngine(s)
 
 	// creates a container block, with a single receipt, that contains
@@ -218,7 +219,7 @@ func newBlockUnstaked(t *testing.T) {
 	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
-	// when the node is unstaked at reference block id, chunk assigner should not be called,
+	// when the node has zero-weight at reference block id, chunk assigner should not be called,
 	// and nothing should be passed to chunks queue, and
 	// job listener should not be notified.
 	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")

@@ -743,6 +743,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          IdentifierFixture(),
 		Chunks:           ChunkListFixture(2, blockID),
+		ExecutionDataID:  IdentifierFixture(),
 	}
 
 	for _, apply := range opts {
@@ -846,9 +847,10 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 	}
 }
 
-func WithStake(stake uint64) func(*flow.Identity) {
+// WithWeight sets the weight on an identity fixture.
+func WithWeight(weight uint64) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		identity.Stake = stake
+		identity.Weight = weight
 	}
 }
 
@@ -884,6 +886,15 @@ func RandomBytes(n int) []byte {
 	return b
 }
 
+func NodeConfigFixture(opts ...func(*flow.Identity)) bootstrap.NodeConfig {
+	identity := IdentityFixture(opts...)
+	return bootstrap.NodeConfig{
+		Role:    identity.Role,
+		Address: identity.Address,
+		Weight:  identity.Weight,
+	}
+}
+
 func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
 	opts = append(opts, WithKeys)
 	return bootstrap.NodeInfoFromIdentity(IdentityFixture(opts...))
@@ -917,7 +928,7 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 		NodeID:        nodeID,
 		Address:       fmt.Sprintf("address-%v", nodeID[0:7]),
 		Role:          flow.RoleConsensus,
-		Stake:         1000,
+		Weight:        1000,
 		StakingPubKey: stakingKey.PublicKey(),
 	}
 	for _, apply := range opts {
@@ -1120,7 +1131,7 @@ func QCSigDataFixture() []byte {
 }
 
 func SignatureFixture() crypto.Signature {
-	sig := make([]byte, 48)
+	sig := make([]byte, crypto.SignatureLenBLSBLS12381)
 	_, _ = crand.Read(sig)
 	return sig
 }

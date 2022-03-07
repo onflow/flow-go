@@ -32,6 +32,8 @@ const (
 	Localnet ChainID = "flow-localnet"
 	// Emulator is the chain ID for the emulated chain.
 	Emulator ChainID = "flow-emulator"
+	// BftTestnet is the chain ID for testing attack vector scenarios.
+	BftTestnet ChainID = "flow-bft-test-net"
 
 	// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
 	MonotonicEmulator ChainID = "flow-emulator-monotonic"

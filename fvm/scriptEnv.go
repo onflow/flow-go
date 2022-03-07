@@ -95,6 +95,9 @@ func NewScriptEnvironment(
 	return env
 }
 
+func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+}
+
 func (e *ScriptEnv) seedRNG(header *flow.Header) {
 	// Seed the random number generator with entropy created from the block header ID. The random number generator will
 	// be used by the UnsafeRandom function.
@@ -523,7 +526,7 @@ func (e *ScriptEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
+func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
 	e.computationHandler.AddUsed(1, "ValidatePublicKey")
 	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
@@ -725,4 +728,16 @@ func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, erro
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
+}
+
+func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
+	return crypto.VerifyPOP(pk, sig)
+}
+
+func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
+	return crypto.AggregateSignatures(sigs)
+}
+
+func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	return crypto.AggregatePublicKeys(keys)
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/crypto"
@@ -13,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
@@ -392,4 +393,69 @@ func BytesToInmemSnapshot(bytes []byte) (*inmem.Snapshot, error) {
 	}
 
 	return inmem.SnapshotFromEncodable(encodable), nil
+}
+
+func ProtoToExecutionResult(proto *entities.ExecutionResult) (*flow.ExecutionResult, error) {
+	// convert Chunks
+	parsedChunks := make(flow.ChunkList, len(proto.Chunks))
+	for i, chunk := range proto.Chunks {
+		startState, err := flow.ToStateCommitment(chunk.StartState)
+		if err != nil {
+			return nil, err
+		}
+		endState, err := flow.ToStateCommitment(chunk.EndState)
+		if err != nil {
+			return nil, err
+		}
+		chunkBody := flow.ChunkBody{
+			CollectionIndex:      uint(chunk.CollectionIndex),
+			StartState:           startState,
+			EventCollection:      MessageToIdentifier(chunk.EventCollection),
+			BlockID:              MessageToIdentifier(chunk.BlockId),
+			TotalComputationUsed: chunk.TotalComputationUsed,
+			NumberOfTransactions: uint64(chunk.NumberOfTransactions),
+		}
+		parsedChunks[i] = &flow.Chunk{
+			ChunkBody: chunkBody,
+			Index:     chunk.Index,
+			EndState:  endState,
+		}
+	}
+	// convert ServiceEvents
+	parsedServiceEvents := make(flow.ServiceEventList, len(proto.ServiceEvents))
+	for i, serviceEvent := range proto.ServiceEvents {
+		var event interface{}
+		rawEvent := serviceEvent.Payload
+		// map keys correctly
+		switch serviceEvent.Type {
+		case flow.ServiceEventSetup:
+			setup := new(flow.EpochSetup)
+			err := json.Unmarshal(rawEvent, setup)
+			if err != nil {
+				return nil, err
+			}
+			event = setup
+		case flow.ServiceEventCommit:
+			commit := new(flow.EpochCommit)
+			err := json.Unmarshal(rawEvent, commit)
+			if err != nil {
+				return nil, err
+			}
+			event = commit
+		default:
+			return nil, fmt.Errorf("invalid event type: %s", serviceEvent.Type)
+		}
+		parsedServiceEvents[i] = flow.ServiceEvent{
+			Type:  serviceEvent.Type,
+			Event: event,
+		}
+	}
+
+	return &flow.ExecutionResult{
+		PreviousResultID: MessageToIdentifier(proto.PreviousResultId),
+		BlockID:          MessageToIdentifier(proto.BlockId),
+		Chunks:           parsedChunks,
+		ServiceEvents:    parsedServiceEvents,
+		ExecutionDataID:  MessageToIdentifier(proto.ExecutionDataId),
+	}, nil
 }

@@ -86,12 +86,12 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 		}
 	}
 
-	// there should be no nodes with zero stake
+	// there should be no nodes with zero weight
 	// TODO: we might want to remove the following as we generally want to allow nodes with
 	// zero weight in the protocol state.
 	for _, participant := range setup.Participants {
-		if participant.Stake == 0 {
-			return fmt.Errorf("node with zero stake (%x)", participant.NodeID)
+		if participant.Weight == 0 {
+			return fmt.Errorf("node with zero weight (%x)", participant.NodeID)
 		}
 	}
 
@@ -103,7 +103,7 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	// STEP 3: sanity checks for individual roles
 	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake
 	// in communication but not in respective node functions
-	activeParticipants := setup.Participants.Filter(filter.HasStake(true))
+	activeParticipants := setup.Participants.Filter(filter.HasWeight(true))
 
 	// we need at least one node of each role
 	roles := make(map[flow.Role]uint)
