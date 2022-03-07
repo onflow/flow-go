@@ -74,6 +74,8 @@ type NodeIterator struct {
 // The Descendents-First-Relationship has the following important property:
 // When re-building the Trie from the sequence of nodes, one can build the trie on the fly,
 // as for each node, the children have been previously encountered.
+// NodeIterator created by NewNodeIterator is safe for concurrent use
+// because visitedNodes is always nil in this case.
 func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
 	// for a Trie with height H (measured by number of edges), the longest possible path contains H+1 vertices
 	stackSize := ledger.NodeMaxHeight + 1
