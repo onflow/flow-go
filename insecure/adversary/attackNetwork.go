@@ -24,17 +24,20 @@ type corruptedNodeConnection insecure.CorruptibleConduitFactory_ProcessAttackerM
 // "to" the rest of the network.
 type AttackNetwork struct {
 	component.Component
-	corruptedIds   flow.IdentityList
-	corruptedNodes map[flow.Identifier]corruptedNodeConnection
-	codec          network.Codec
-	logger         zerolog.Logger
+	corruptedIds    flow.IdentityList
+	corruptedNodes  map[flow.Identifier]corruptedNodeConnection
+	codec           network.Codec
+	logger          zerolog.Logger
+	attackerAddress string
 }
 
-func NewAttackNetwork(corruptedIds flow.IdentityList, logger zerolog.Logger) *AttackNetwork {
+func NewAttackNetwork(attackerAddress string, codec network.Codec, corruptedIds flow.IdentityList, logger zerolog.Logger) *AttackNetwork {
 	attackNetwork := &AttackNetwork{
-		corruptedIds:   corruptedIds,
-		corruptedNodes: make(map[flow.Identifier]corruptedNodeConnection),
-		logger:         logger,
+		corruptedIds:    corruptedIds,
+		corruptedNodes:  make(map[flow.Identifier]corruptedNodeConnection),
+		logger:          logger,
+		codec:           codec,
+		attackerAddress: attackerAddress,
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -169,6 +172,14 @@ func (a *AttackNetwork) corruptibleConduitFactoryClient(ctx context.Context, add
 	}
 
 	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
+
+	_, err = client.RegisterAttacker(ctx, &insecure.AttackerRegisterMessage{
+		Address: a.attackerAddress,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not register attacker: %w", err)
+	}
+
 	stream, err := client.ProcessAttackerMessage(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not establish a stream to corruptible conduit factory: %w", err)
