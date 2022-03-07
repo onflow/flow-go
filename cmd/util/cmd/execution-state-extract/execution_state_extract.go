@@ -95,11 +95,7 @@ func extractExecutionState(
 				Chain: chain,
 				RWF:   reportFileWriterFactory,
 			},
-			&reporters.BalanceReporter{
-				Log:   log,
-				Chain: chain,
-				RWF:   reportFileWriterFactory,
-			},
+			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
 		}
 	}
 
