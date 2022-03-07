@@ -120,7 +120,7 @@ func Test_Checkpointing(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -170,7 +170,7 @@ func Test_Checkpointing(t *testing.T) {
 		})
 
 		// create a new forest and replay WAL
-		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		t.Run("replay WAL and create checkpoint", func(t *testing.T) {
@@ -207,7 +207,7 @@ func Test_Checkpointing(t *testing.T) {
 			<-wal2.Done()
 		})
 
-		f3, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f3, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
@@ -287,7 +287,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "00000011")) //make sure we have extra segment
 		})
 
-		f5, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f5, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
@@ -338,7 +338,7 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("corrupted checkpoints are skipped", func(t *testing.T) {
 
-			f6, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+			f6, err := mtrie.NewForest(size*10, metricsCollector, nil)
 			require.NoError(t, err)
 
 			wal6, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)

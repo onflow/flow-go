@@ -178,9 +178,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("no segments to checkpoint to %d, latests not checkpointed segment: %d", to, notCheckpointedTo)
 	}
 
-	forest, err := mtrie.NewForest(c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
-		return nil
-	})
+	forest, err := mtrie.NewForest(c.forestCapacity, &metrics.NoopCollector{}, nil)
 	if err != nil {
 		return fmt.Errorf("cannot create Forest: %w", err)
 	}

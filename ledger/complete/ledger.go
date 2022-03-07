@@ -47,14 +47,17 @@ func NewLedger(
 	log zerolog.Logger,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) error {
-		return wal.RecordDelete(evictedTrie.RootHash())
+	logger := log.With().Str("ledger", "complete").Logger()
+
+	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) {
+		err := wal.RecordDelete(evictedTrie.RootHash())
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to save delete record in wal")
+		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
-
-	logger := log.With().Str("ledger", "complete").Logger()
 
 	storage := &Ledger{
 		forest:            forest,

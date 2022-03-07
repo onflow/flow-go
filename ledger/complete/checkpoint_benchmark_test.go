@@ -112,9 +112,7 @@ func BenchmarkLoadCheckpointAndWALs(b *testing.B) {
 		b.Fatalf("failed to find checkpoint in %s.  Use -dir to specify dir containing segments and checkpoint files.", *dir)
 	}
 
-	forest, err := mtrie.NewForest(500, metrics.NewNoopCollector(), func(evictedTrie *trie.MTrie) error {
-		return nil
-	})
+	forest, err := mtrie.NewForest(500, metrics.NewNoopCollector(), nil)
 	if err != nil {
 		b.Fatal(err)
 	}

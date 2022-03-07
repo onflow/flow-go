@@ -53,7 +53,7 @@ func Test_Compactor(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -157,7 +157,7 @@ func Test_Compactor(t *testing.T) {
 			}
 		})
 
-		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		time.Sleep(2 * time.Second)
@@ -233,7 +233,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
