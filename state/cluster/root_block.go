@@ -21,7 +21,7 @@ var rootBlockPayloadHash = rootBlockPayload.Hash()
 // cluster in the given epoch. It contains an empty collection referencing
 func CanonicalRootBlock(epoch uint64, participants flow.IdentityList) *cluster.Block {
 	chainID := CanonicalClusterID(epoch, participants)
-	
+
 	header := &flow.Header{
 		ChainID:            chainID,
 		ParentID:           flow.ZeroID,
