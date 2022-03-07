@@ -36,7 +36,7 @@ func TestOrderedMapMigration(t *testing.T) {
 	address1 := flow.HexToAddress("0x1")
 	cadenceAddress, _ := common.HexToAddress("0x1")
 
-	mig.initialize([]ledger.Payload{
+	_, _ = mig.initialize([]ledger.Payload{
 		{Key: createAccountPayloadKey(address1, state2.KeyExists), Value: []byte{1}},
 		{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
 	})
@@ -122,7 +122,7 @@ func TestMultipleAccounts(t *testing.T) {
 	address3 := flow.HexToAddress("0x3")
 	cadenceAddress3, _ := common.HexToAddress("0x3")
 
-	mig.initialize([]ledger.Payload{
+	_, _ = mig.initialize([]ledger.Payload{
 		{Key: createAccountPayloadKey(address1, state2.KeyExists), Value: []byte{1}},
 		{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
 		{Key: createAccountPayloadKey(address2, state2.KeyExists), Value: []byte{1}},
@@ -199,7 +199,7 @@ func TestContractValue(t *testing.T) {
 	address1 := flow.HexToAddress("0x1")
 	cadenceAddress, _ := common.HexToAddress("0x1")
 
-	mig.initialize([]ledger.Payload{
+	_, _ = mig.initialize([]ledger.Payload{
 		{Key: createAccountPayloadKey(address1, state2.KeyExists), Value: []byte{1}},
 		{Key: createAccountPayloadKey(address1, state2.KeyStorageUsed), Value: utils.Uint64ToBinary(1)},
 	})
