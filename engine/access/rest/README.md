@@ -4,15 +4,12 @@ This package and subpackages implement the HTTP API Server for
 the [Flow OpenAPI definition](https://github.com/onflow/flow/blob/master/openapi/access.yaml). The API documentation is
 available on our [docs site](https://docs.onflow.org/http-api/).
 
-## Packages:
+## Packages
 
-`rest`: The HTTP handlers for all the request, server generator and the select filter.
-
-`middleware`: The common [middlewares](https://github.com/gorilla/mux#middleware) that all request pass through.
-
-`models`: The generated models using openapi generators and implementation of model builders.
-
-`request`: Implementation of API requests that provide validation for input data and build request models.
+- `rest`: The HTTP handlers for all the request, server generator and the select filter.
+- `middleware`: The common [middlewares](https://github.com/gorilla/mux#middleware) that all request pass through.
+- `models`: The generated models using openapi generators and implementation of model builders.
+- `request`: Implementation of API requests that provide validation for input data and build request models.
 
 ## Request lifecycle
 
@@ -27,6 +24,16 @@ available on our [docs site](https://docs.onflow.org/http-api/).
    responses.
 
 ## Maintaining
+
+### Updating OpenAPI Schema
+
+Make sure the OpenAPI schema if first updated and merged into
+master [on the hosted repository](https://github.com/onflow/flow/tree/master/openapi). After you can use the make
+command to generated updated models:
+
+```makefile
+make generate-openapi
+```
 
 ### Adding New API Endpoints
 
