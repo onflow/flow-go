@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package corruptible;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "insecure";
+
+// to compile this file, run:
+// protoc insecure/attacker.proto --go_out=plugins=grpc:.
+
+// CorruptibleConduitFactory allows an attacker to register itself to the factory, and send messages on behalf of its conduits.
+service CorruptibleConduitFactory {
+  rpc RegisterAttacker(AttackerRegisterMessage) returns (google.protobuf.Empty) {}
+  rpc ProcessAttackerMessage(stream Message) returns (google.protobuf.Empty) {}
+}
+
+service Attacker {
+  rpc Observe(stream Message) returns (google.protobuf.Empty) {}
+}
+
+// Message is represents the message exchanged between the CorruptibleConduitFactory and Attacker services.
+message Message {
+  string ChannelID = 1;
+  bytes OriginID = 2;
+  uint32 Targets = 3;
+  repeated bytes TargetIDs = 4;
+  bytes Payload = 5;
+  Protocol protocol = 6;
+}
+
+enum Protocol {
+  UNKNOWN = 0;
+  UNICAST = 1;
+  MULTICAST = 2;
+  PUBLISH = 3;
+}
+
+// AttackerRegisterMessage is the message an attacker uses to register itself to the chosen CorruptibleConduitFactory,
+// and takes its control.
+message AttackerRegisterMessage {
+  string address = 1;
+}

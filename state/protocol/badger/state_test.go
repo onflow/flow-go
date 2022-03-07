@@ -253,9 +253,9 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		})
 	})
 
-	t.Run("zero stake", func(t *testing.T) {
-		zeroStakeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithStake(0))
-		participants := unittest.CompleteIdentitySet(zeroStakeIdentity)
+	t.Run("zero weight", func(t *testing.T) {
+		zeroWeightIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithWeight(0))
+		participants := unittest.CompleteIdentitySet(zeroWeightIdentity)
 		root := unittest.RootSnapshotFixture(participants)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)

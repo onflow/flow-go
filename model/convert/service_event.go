@@ -267,13 +267,11 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 		}
 		identity.Address = string(address)
 
-		// CAUTION: Identity.Stake refers to weight - this is an outdated name -
-		// see note in flow.Identity
-		stake, ok := cdcNodeInfoFields[13].(cadence.UInt64)
+		initialWeight, ok := cdcNodeInfoFields[13].(cadence.UInt64)
 		if !ok {
-			return nil, invalidCadenceTypeError("nodeInfo.stake", cdcNodeInfoFields[13], cadence.UInt64(0))
+			return nil, invalidCadenceTypeError("nodeInfo.initialWeight", cdcNodeInfoFields[13], cadence.UInt64(0))
 		}
-		identity.Stake = uint64(stake)
+		identity.Weight = uint64(initialWeight)
 
 		// convert nodeID string into identifier
 		nodeIDHex, ok := cdcNodeInfoFields[0].(cadence.String)
