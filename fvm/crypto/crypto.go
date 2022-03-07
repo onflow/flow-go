@@ -3,7 +3,6 @@ package crypto
 import (
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/cadence/runtime"
 
@@ -23,7 +22,7 @@ func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byt
 			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
-		hasher = NewBLSKMAC(tag)
+		hasher = crypto.NewBLSKMAC(tag)
 	default:
 		err := errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
@@ -100,19 +99,22 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 	}
 }
 
-// ValidatePublicKey returns true if public key is valid
-func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bool, err error) {
+// ValidatePublicKey returns :
+// - nil if key is valid and no exception occurred.
+// - crypto.invalidInputsError if key is invalid and no exception occurred.
+// - panics if an exception occurred.
+func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) error {
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signAlgo)
 
-	_, err = crypto.DecodePublicKey(sigAlgo, pk)
+	_, err := crypto.DecodePublicKey(sigAlgo, pk)
 
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			return false, nil
+			return err
 		}
-		return false, fmt.Errorf("validate public key failed: %w", err)
+		panic(fmt.Errorf("validate public key failed with unexpected error %w", err))
 	}
-	return true, nil
+	return nil
 }
 
 // VerifySignatureFromRuntime is an adapter that performs signature verification using
@@ -145,9 +147,9 @@ func VerifySignatureFromRuntime(
 				hashAlgo, sigAlgo)
 		}
 
-		// tag compatibility
-		if !tagECDSACheck(tag) {
-			return false, errors.NewValueErrorf(sigAlgo.String(), "tag %s is not supported", tag)
+		// tag length compatibility
+		if len(tag) > flow.DomainTagLength {
+			return false, errors.NewValueErrorf(tag, "tag length (%d) is larger than max length allowed (%d bytes).", len(tag), flow.DomainTagLength)
 		}
 
 		// check BLS compatibilites
@@ -175,28 +177,6 @@ func VerifySignatureFromRuntime(
 	}
 
 	return valid, nil
-}
-
-// check compatible tags with ECDSA
-//
-// Only tags with a prefix flow.UserTagString and zero paddings are accepted.
-func tagECDSACheck(tag string) bool {
-
-	if len(tag) > flow.DomainTagLength ||
-		!strings.HasPrefix(tag, flow.UserTagString) {
-
-		return false
-	}
-
-	// check the remaining bytes are zeros
-	remaining := tag[len(flow.UserTagString):]
-	for _, b := range []byte(remaining) {
-		if b != 0 {
-			return false
-		}
-	}
-
-	return true
 }
 
 type SignatureVerifier interface {
@@ -232,15 +212,84 @@ func (DefaultSignatureVerifier) Verify(
 			return false, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
-		hasher = NewBLSKMAC(tag)
+		hasher = crypto.NewBLSKMAC(tag)
 	default:
 		return false, errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 	}
 
 	valid, err := publicKey.Verify(signature, message, hasher)
 	if err != nil {
-		return false, fmt.Errorf("failed to verify signature: %w", err)
+		// All inputs are guaranteed to be valid at this stage.
+		// The check for crypto.InvalidInputs is only a sanity check
+		if crypto.IsInvalidInputsError(err) {
+			return false, err
+		}
+		panic(fmt.Errorf("verify signature failed with unexpected error %w", err))
 	}
 
 	return valid, nil
+}
+
+// VerifyPOP verifies a proof of possession (PoP) for the receiver public key; currently only works for BLS
+func VerifyPOP(pk *runtime.PublicKey, s crypto.Signature) (bool, error) {
+
+	key, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pk.PublicKey)
+	if err != nil {
+		// at this stage, the runtime public key is valid and there are no possible user value errors
+		panic(fmt.Errorf("verify PoP failed: runtime BLS public key should be valid %x", pk.PublicKey))
+	}
+
+	valid, err := crypto.BLSVerifyPOP(key, s)
+	if err != nil {
+		// no user errors possible at this stage
+		panic(fmt.Errorf("verify PoP failed with unexpected error %w", err))
+	}
+	return valid, nil
+}
+
+// AggregateSignatures aggregate multiple signatures into one; currently only works for BLS
+func AggregateSignatures(sigs [][]byte) (crypto.Signature, error) {
+	s := make([]crypto.Signature, 0, len(sigs))
+	for _, sig := range sigs {
+		s = append(s, sig)
+	}
+
+	aggregatedSignature, err := crypto.AggregateBLSSignatures(s)
+	if err != nil {
+		// check for a user error
+		if crypto.IsInvalidInputsError(err) {
+			return nil, err
+		}
+		panic(fmt.Errorf("aggregate BLS signatures failed with unexpected error %w", err))
+	}
+	return aggregatedSignature, nil
+}
+
+// AggregatePublicKeys aggregate multiple public keys into one; currently only works for BLS
+func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	pks := make([]crypto.PublicKey, 0, len(keys))
+	for _, key := range keys {
+		// TODO: avoid validating the public keys again since Cadence makes sure runtime keys have been validated.
+		// This requires exporting an unsafe function in the crypto package.
+		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, key.PublicKey)
+		if err != nil {
+			// at this stage, the runtime public key is valid and there are no possible user value errors
+			panic(fmt.Errorf("aggregate BLS public keys failed: runtime public key should be valid %x", key.PublicKey))
+		}
+		pks = append(pks, pk)
+	}
+
+	pk, err := crypto.AggregateBLSPublicKeys(pks)
+	if err != nil {
+		// check for a user error
+		if crypto.IsInvalidInputsError(err) {
+			return nil, err
+		}
+		panic(fmt.Errorf("aggregate BLS public keys failed with unexpected error %w", err))
+	}
+
+	return &runtime.PublicKey{
+		PublicKey: pk.Encode(),
+		SignAlgo:  CryptoToRuntimeSigningAlgorithm(crypto.BLSBLS12381),
+	}, nil
 }

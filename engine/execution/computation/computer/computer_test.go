@@ -494,6 +494,14 @@ type testRuntime struct {
 
 var _ runtime.Runtime = &testRuntime{}
 
+func (e *testRuntime) SetTracingEnabled(_ bool) {
+	panic("SetTracingEnabled not expected")
+}
+
+func (e *testRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
+	panic("SetResourceOwnerChangeHandlerEnabled not expected")
+}
+
 func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
 }

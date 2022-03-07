@@ -180,7 +180,7 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.Block
 	require.Eventually(t,
 		func() bool {
 			if bs.highestSealed != nil {
-				t.Log("waiting for sealed", bs.highestSealed.Header.Height, height)
+				t.Logf("waiting for sealed height (%d/%d)", bs.highestSealed.Header.Height, height)
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.Height >= height
 		},
@@ -199,11 +199,11 @@ func (bs *BlockState) HighestSealed() (*messages.BlockProposal, bool) {
 }
 
 func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *messages.BlockProposal {
-	timeout := 2 * blockStateTimeout
+	timeout := 3 * blockStateTimeout
 	require.Eventually(t,
 		func() bool {
 			if bs.highestSealed != nil {
-				t.Log("waiting for sealed", bs.highestSealed.Header.View, view)
+				t.Logf("waiting for sealed view (%d/%d)", bs.highestSealed.Header.View, view)
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.View >= view
 		},

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"sort"
@@ -76,16 +75,17 @@ func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 
 	list := make([]int, 0)
 
-	files, err := ioutil.ReadDir(c.dir)
+	files, err := os.ReadDir(c.dir)
 	if err != nil {
 		return nil, -1, fmt.Errorf("cannot list directory [%s] content: %w", c.dir, err)
 	}
 	last := -1
 	for _, fn := range files {
-		if !strings.HasPrefix(fn.Name(), checkpointFilenamePrefix) {
+		fname := fn.Name()
+		if !strings.HasPrefix(fname, checkpointFilenamePrefix) {
 			continue
 		}
-		justNumber := fn.Name()[len(checkpointFilenamePrefix):]
+		justNumber := fname[len(checkpointFilenamePrefix):]
 		k, err := strconv.Atoi(justNumber)
 		if err != nil {
 			continue
@@ -250,7 +250,7 @@ func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error)
 		return nil, fmt.Errorf("checkpoint file %s already exists", fullname)
 	}
 
-	tmpFile, err := ioutil.TempFile(dir, "writing-chkpnt-*")
+	tmpFile, err := os.CreateTemp(dir, "writing-chkpnt-*")
 	if err != nil {
 		return nil, fmt.Errorf("cannot create temporary file for checkpoint %v: %w", tmpFile, err)
 	}
