@@ -218,7 +218,6 @@ func main() {
 			return nil
 		}).
 		Component("GCP block data uploader", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			computation.SetUploaderEnabled(enableBlockDataUpload)
 			if enableBlockDataUpload && gcpBucketName != "" {
 				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
 				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
@@ -229,6 +228,8 @@ func main() {
 				if err != nil {
 					return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
 				}
+
+				computation.SetUploaderEnabled(true)
 
 				asyncUploader := uploader.NewAsyncUploader(
 					gcpBucketUploader,
@@ -257,6 +258,8 @@ func main() {
 				if err != nil {
 					return nil, fmt.Errorf("failed to load AWS configuration: %w", err)
 				}
+
+				computation.SetUploaderEnabled(true)
 
 				client := s3.NewFromConfig(config)
 				s3Uploader := uploader.NewS3Uploader(
