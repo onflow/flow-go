@@ -32,7 +32,7 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 		},
 
 		"1 count 2 skipped the rest pass": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_1Count2SkippedRestPass(),
+			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountAllPass(),
 			RawJSONTestRunFile:    "test-result-crypto-hash-1-count-skip-pass.json",
 		},
 
@@ -54,33 +54,33 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 			RawJSONTestRunFile:    "test-result-crypto-hash-10-count-fail.json",
 		},
 
-		// nil tests - tests below don't generate pass/fail result due to `go test` bug
+		// no result tests - tests below don't generate pass/fail result due to `go test` bug
 		// with using `fmt.printf("log message")` without newline `\n`
 
 		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
-		// this is a single unit test that produces a nil test result
-		"1 count single nil test": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountSingleNilTest(),
+		// this is a single unit test that produces a no result result
+		"1 count single no result test": {
+			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountSingleNoResultTest(),
 			RawJSONTestRunFile:    "test-result-nil-test-single-1-count-pass.json",
 		},
 
 		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
-		//multiple nil tests in a row
-		"5 nil tests in a row": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountSingleNilTest(),
+		//multiple no result tests in a row
+		"5 no result tests in a row": {
+			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountSingleNoResultTest(),
 			RawJSONTestRunFile:    "test-result-nil-test-single-5-count-pass.json",
 		},
 
-		//normal test at the end of a test run with multiple nil tests in front of it
-		"4 nil tests in a row, 1 normal test": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountMultipleNilTests(),
+		//normal test at the end of a test run with multiple no result tests in front of it
+		"4 no result tests in a row, 1 normal test": {
+			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountMultipleNoResultTests(),
 			RawJSONTestRunFile:    "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
 		},
 
 		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
-		// group of unit tests with a single nil test result
-		"3 count nil test with normal tests": {
-			ExpectedLevel1Summary: testdata.GetTestData_Leve1_3CountNilWithNormalTests(),
+		// group of unit tests with a single no result test
+		"3 count no result test with normal tests": {
+			ExpectedLevel1Summary: testdata.GetTestData_Leve1_3CountNoResultWithNormalTests(),
 			RawJSONTestRunFile:    "test-result-nil-test-others-normal-3-count-pass.json",
 		},
 	}
