@@ -214,10 +214,10 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, fmt.Errorf("invalid epoch phase: %s", phase)
 	}
 
-	// add the identities from next/last epoch, with stake set to 0
+	// add the identities from next/last epoch, with weight set to 0
 	identities = append(
 		identities,
-		otherEpochIdentities.Map(mapfunc.WithStake(0))...,
+		otherEpochIdentities.Map(mapfunc.WithWeight(0))...,
 	)
 
 	// apply the filter to the participants
@@ -408,10 +408,10 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	return descendantIDs, nil
 }
 
-// Seed returns the random seed at the given indices for the current block snapshot.
+// RandomSource returns the seed for the current block snapshot.
 // Expected error returns:
 // * state.NoValidChildBlockError if no valid child is known
-func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
+func (s *Snapshot) RandomSource() ([]byte, error) {
 
 	// CASE 1: for the root block, generate the seed from the root qc
 	root, err := s.state.Params().Root()
@@ -426,11 +426,10 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
 		}
 
-		seed, err := seed.FromParentSignature(indices, rootQC.SigData)
+		seed, err := seed.FromParentQCSignature(rootQC.SigData)
 		if err != nil {
 			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
 		}
-
 		return seed, nil
 	}
 
@@ -440,7 +439,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
 	}
 
-	seed, err := seed.FromParentSignature(indices, child.ParentVoterSigData)
+	seed, err := seed.FromParentQCSignature(child.ParentVoterSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
 	}

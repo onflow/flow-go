@@ -3,6 +3,12 @@ package badger
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
@@ -80,12 +86,12 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 		}
 	}
 
-	// there should be no nodes with zero stake
+	// there should be no nodes with zero weight
 	// TODO: we might want to remove the following as we generally want to allow nodes with
 	// zero weight in the protocol state.
 	for _, participant := range setup.Participants {
-		if participant.Stake == 0 {
-			return fmt.Errorf("node with zero stake (%x)", participant.NodeID)
+		if participant.Weight == 0 {
+			return fmt.Errorf("node with zero weight (%x)", participant.NodeID)
 		}
 	}
 
@@ -97,7 +103,7 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	// STEP 3: sanity checks for individual roles
 	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake
 	// in communication but not in respective node functions
-	activeParticipants := setup.Participants.Filter(filter.HasStake(true))
+	activeParticipants := setup.Participants.Filter(filter.HasWeight(true))
 
 	// we need at least one node of each role
 	roles := make(map[flow.Role]uint)
@@ -262,5 +268,90 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("final view of epoch less than first block view")
 	}
 
+	return nil
+}
+
+// IsValidRootSnapshotQCs checks internal consistency of QCs that are included in the root state snapshot
+// It verifies QCs for main consensus and for each collection cluster.
+func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
+	// validate main consensus QC
+	err := validateRootQC(snap)
+	if err != nil {
+		return fmt.Errorf("invalid root QC: %w", err)
+	}
+
+	// validate each collection cluster separately
+	curEpoch := snap.Epochs().Current()
+	clusters, err := curEpoch.Clustering()
+	if err != nil {
+		return fmt.Errorf("could not get clustering for root snapshot: %w", err)
+	}
+	for clusterIndex := range clusters {
+		cluster, err := curEpoch.Cluster(uint(clusterIndex))
+		if err != nil {
+			return fmt.Errorf("could not get cluster %d for root snapshot: %w", clusterIndex, err)
+		}
+		err = validateClusterQC(cluster)
+		if err != nil {
+			return fmt.Errorf("invalid cluster qc %d: %W", clusterIndex, err)
+		}
+	}
+	return nil
+}
+
+// validateRootQC performs validation of root QC
+// Returns nil on success
+func validateRootQC(snap protocol.Snapshot) error {
+	rootBlock, err := snap.Head()
+	if err != nil {
+		return fmt.Errorf("could not get root block: %w", err)
+	}
+
+	identities, err := snap.Identities(filter.IsVotingConsensusCommitteeMember)
+	if err != nil {
+		return fmt.Errorf("could not get root snapshot identities: %w", err)
+	}
+
+	rootQC, err := snap.QuorumCertificate()
+	if err != nil {
+		return fmt.Errorf("could not get root QC: %w", err)
+	}
+
+	dkg, err := snap.Epochs().Current().DKG()
+	if err != nil {
+		return fmt.Errorf("could not get DKG for root snapshot: %w", err)
+	}
+
+	hotstuffRootBlock := model.GenesisBlockFromFlow(rootBlock)
+	committee, err := committees.NewStaticCommitteeWithDKG(identities, flow.Identifier{}, dkg)
+	if err != nil {
+		return fmt.Errorf("could not create static committee: %w", err)
+	}
+	verifier := verification.NewCombinedVerifier(committee, signature.NewConsensusSigDataPacker(committee))
+	forks := &mocks.ForksReader{}
+	hotstuffValidator := validator.New(committee, forks, verifier)
+	err = hotstuffValidator.ValidateQC(rootQC, hotstuffRootBlock)
+	if err != nil {
+		return fmt.Errorf("could not validate root qc: %w", err)
+	}
+	return nil
+}
+
+// validateClusterQC performs QC validation of single collection cluster
+// Returns nil on success
+func validateClusterQC(cluster protocol.Cluster) error {
+	clusterRootBlock := model.GenesisBlockFromFlow(cluster.RootBlock().Header)
+
+	committee, err := committees.NewStaticCommittee(cluster.Members(), flow.Identifier{}, nil, nil)
+	if err != nil {
+		return fmt.Errorf("could not create static committee: %w", err)
+	}
+	verifier := verification.NewStakingVerifier()
+	forks := &mocks.ForksReader{}
+	hotstuffValidator := validator.New(committee, forks, verifier)
+	err = hotstuffValidator.ValidateQC(cluster.RootQC(), clusterRootBlock)
+	if err != nil {
+		return fmt.Errorf("could not validate root qc: %w", err)
+	}
 	return nil
 }

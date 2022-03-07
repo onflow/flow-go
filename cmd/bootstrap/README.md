@@ -29,7 +29,7 @@ The bootstrapping will generate the following information:
   - node role
   - public staking key
   - public networking key
-  - stake
+  - weight
 
 #### Root Block for main consensus
 * Root Block
@@ -92,8 +92,8 @@ Each input is a config file specified as a command line parameter:
 * parameter with state commitment for the initial execution state (`root-commit`)
 * `json` containing configuration for all Dapper-Controlled nodes (see `./example_files/node-config.json`)
 * folder containing the `<NodeID>.node-info.pub.json` files for _all_ partner nodes (see `.example_files/partner-node-infos`)
-* `json` containing the stake value for all partner nodes (see `./example_files/partner-stakes.json`).
-  Format: ```<NodeID>: <stake value>```
+* `json` containing the weight value for all partner nodes (see `./example_files/partner-weights.json`).
+  Format: ```<NodeID>: <weight value>```
 
 #### Example
 ```bash
@@ -105,7 +105,7 @@ go run -tags relic ./cmd/bootstrap finalize \
   --root-commit 4b8d01975cf0cd23e046b1fae36518e542f92a6e35bedd627c43da30f4ae761a \
   --config ./cmd/bootstrap/example_files/node-config.json \
   --partner-dir ./cmd/bootstrap/example_files/partner-node-infos \
-  --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json \
+  --partner-weights ./cmd/bootstrap/example_files/partner-weights.json \
   --epoch-counter 1 \
   -o ./bootstrap/root-infos
 ```

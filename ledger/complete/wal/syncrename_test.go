@@ -2,7 +2,6 @@ package wal
 
 import (
 	"bufio"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -48,7 +47,7 @@ func Test_RenameHappensAfterClosing(t *testing.T) {
 		require.NoFileExists(t, fullTmpName)
 		require.FileExists(t, fullFileName)
 
-		readBytes, err := ioutil.ReadFile(fullFileName)
+		readBytes, err := os.ReadFile(fullFileName)
 		require.NoError(t, err)
 
 		require.Equal(t, readBytes, sampleBytes)
