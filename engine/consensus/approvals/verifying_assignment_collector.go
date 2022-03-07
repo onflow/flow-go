@@ -379,7 +379,7 @@ func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (
 	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
 		filter.And(
 			filter.HasRole(flow.RoleVerification),
-			filter.HasStake(true),
+			filter.HasWeight(true),
 			filter.Not(filter.Ejected),
 		))
 	if err != nil {

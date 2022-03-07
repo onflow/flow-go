@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -134,9 +135,10 @@ type BaseConfig struct {
 	profilerDir                     string
 	profilerInterval                time.Duration
 	profilerDuration                time.Duration
+	profilerMemProfileRate          int
 	tracerEnabled                   bool
 	tracerSensitivity               uint
-	metricsEnabled                  bool
+	MetricsEnabled                  bool
 	guaranteesCacheSize             uint
 	receiptsCacheSize               uint
 	db                              *badger.DB
@@ -214,9 +216,10 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerDir:                     "profiler",
 		profilerInterval:                15 * time.Minute,
 		profilerDuration:                10 * time.Second,
+		profilerMemProfileRate:          runtime.MemProfileRate,
 		tracerEnabled:                   false,
 		tracerSensitivity:               4,
-		metricsEnabled:                  true,
+		MetricsEnabled:                  true,
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,

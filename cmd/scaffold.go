@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -120,6 +121,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultConfig.profilerDuration,
 		"the duration to run the auto-profile for")
+	fnb.flags.IntVar(&fnb.BaseConfig.profilerMemProfileRate, "profiler-mem-profile-rate", defaultConfig.profilerMemProfileRate,
+		"controls the fraction of memory allocations that are recorded and reported in the memory profile. 0 means turn off heap profiling entirely")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
 	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
@@ -294,6 +297,13 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 		}
 		fnb.RegisterDefaultAdminCommands()
 		fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			// set up all admin commands
+			for commandName, commandFunc := range fnb.adminCommands {
+				command := commandFunc(fnb.NodeConfig)
+				fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+				fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
+			}
+
 			var opts []admin.CommandRunnerOption
 
 			if node.AdminCert != NotSet {
@@ -425,7 +435,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Mempool:        metrics.NewNoopCollector(),
 		CleanCollector: metrics.NewNoopCollector(),
 	}
-	if fnb.BaseConfig.metricsEnabled {
+	if fnb.BaseConfig.MetricsEnabled {
 		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
@@ -449,6 +459,8 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
+	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
+	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
 	if !fnb.BaseConfig.profilerEnabled {
 		return
 	}
@@ -699,6 +711,10 @@ func (fnb *FlowNodeBuilder) initState() {
 // setRootSnapshot sets the root snapshot field and all related fields in the NodeConfig.
 func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) {
 	var err error
+
+	// validate the root snapshot QCs
+	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
+	fnb.MustNot(err).Msg("failed to validate root snapshot QCs")
 
 	fnb.RootSnapshot = rootSnapshot
 	// cache properties of the root snapshot, for convenience
@@ -971,7 +987,7 @@ func WithSecretsDBEnabled(enabled bool) Option {
 
 func WithMetricsEnabled(enabled bool) Option {
 	return func(config *BaseConfig) {
-		config.metricsEnabled = enabled
+		config.MetricsEnabled = enabled
 	}
 }
 
@@ -1028,14 +1044,12 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	fnb.EnqueuePingService()
 
-	if fnb.metricsEnabled {
+	if fnb.MetricsEnabled {
 		fnb.EnqueueMetricsServerInit()
 		if err := fnb.RegisterBadgerMetrics(); err != nil {
 			return err
 		}
 	}
-
-	fnb.EnqueueAdminServerInit()
 
 	fnb.EnqueueTracer()
 
@@ -1107,12 +1121,7 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		}
 	}
 
-	// set up all admin commands
-	for commandName, commandFunc := range fnb.adminCommands {
-		command := commandFunc(fnb.NodeConfig)
-		fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
-		fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
-	}
+	fnb.EnqueueAdminServerInit()
 
 	// run all modules
 	for _, f := range fnb.modules {

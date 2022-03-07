@@ -75,7 +75,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	cs.myID = cs.participants[0].NodeID
 	block := unittest.BlockFixture()
