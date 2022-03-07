@@ -29,7 +29,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-var uploadEnabled bool
+var uploadEnabled = true
 
 func SetUploaderEnabled(enabled bool) {
 	uploadEnabled = enabled

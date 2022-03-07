@@ -229,8 +229,6 @@ func main() {
 					return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
 				}
 
-				computation.SetUploaderEnabled(true)
-
 				asyncUploader := uploader.NewAsyncUploader(
 					gcpBucketUploader,
 					blockdataUploaderRetryTimeout,
@@ -258,8 +256,6 @@ func main() {
 				if err != nil {
 					return nil, fmt.Errorf("failed to load AWS configuration: %w", err)
 				}
-
-				computation.SetUploaderEnabled(true)
 
 				client := s3.NewFromConfig(config)
 				s3Uploader := uploader.NewS3Uploader(
