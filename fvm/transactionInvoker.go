@@ -182,6 +182,18 @@ func (i *TransactionInvoker) Process(
 		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
 	}
 
+	// Dump all intensities to the log before fee deduction. Fee deduction uses an unmerged sub-meter anyway.
+	if i.logger.GetLevel() >= zerolog.InfoLevel {
+		d := zerolog.Dict()
+		for s, u := range env.computationHandler.Intensities() {
+			d.Uint64(s, u)
+		}
+		i.logger.Info().
+			Str("txHash", txIDStr).
+			Dict("weights", d).
+			Msg("transaction computation parameters")
+	}
+
 	// it there was any transaction error clear changes and try to deduct fees again
 	if txError != nil {
 		sth.DisableLimitEnforcement()

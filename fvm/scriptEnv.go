@@ -41,7 +41,7 @@ type ScriptEnv struct {
 	programs           *handler.ProgramsHandler
 	accountKeys        *handler.AccountKeyHandler
 	metrics            *handler.MetricsHandler
-	computationHandler handler.ComputationMeteringHandler
+	computationHandler *handler.ComputationMeteringHandler
 	uuidGenerator      *state.UUIDGenerator
 	logs               []string
 	rng                *rand.Rand
@@ -436,7 +436,8 @@ func (e *ScriptEnv) GetComputationLimit() uint64 {
 }
 
 func (e *ScriptEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.AddUsed(used)
+	e.computationHandler.AddUsed(used, "function_or_loop_call")
+	return nil
 }
 
 func (e *ScriptEnv) GetComputationUsed() uint64 {

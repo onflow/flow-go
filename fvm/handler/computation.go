@@ -7,9 +7,11 @@ type ComputationMeter interface {
 	// Limit gets computation limit
 	Limit() uint64
 	// AddUsed adds more computation used to the current computation used
-	AddUsed(used uint64) error
+	AddUsed(intensity uint64, feature string)
 	// Used gets the current computation used
 	Used() uint64
+	// Intensities gets the intensities of features
+	Intensities() map[string]uint64
 }
 
 // SubComputationMeter meters computation usage. Currently, can only be discarded,
@@ -27,36 +29,38 @@ type SubComputationMeter interface {
 	// Commit()
 }
 
-// ComputationMeteringHandler handles computation metering on a transaction level
-type ComputationMeteringHandler interface {
-	ComputationMeter
-	StartSubMeter(limit uint64) SubComputationMeter
-}
-
 type computationMeter struct {
-	used  uint64
-	limit uint64
+	used        uint64
+	limit       uint64
+	intensities map[string]uint64
+	handler     *ComputationMeteringHandler
 }
 
 func (c *computationMeter) Limit() uint64 {
 	return c.limit
 }
 
-func (c *computationMeter) AddUsed(used uint64) error {
-	c.used += used
-	return nil
+func (c *computationMeter) AddUsed(intensity uint64, feature string) {
+	c.intensities[feature] += intensity
+	if feature != "function_or_loop_call" {
+		return
+	}
+	c.used += intensity
 }
 
 func (c *computationMeter) Used() uint64 {
 	return c.used
 }
 
+func (c *computationMeter) Intensities() map[string]uint64 {
+	return c.intensities
+}
+
 var _ ComputationMeter = &computationMeter{}
 
 type subComputationMeter struct {
 	computationMeter
-	parent  ComputationMeter
-	handler *computationMeteringHandler
+	parent ComputationMeter
 }
 
 func (s *subComputationMeter) Discard() error {
@@ -69,41 +73,48 @@ func (s *subComputationMeter) Discard() error {
 
 var _ SubComputationMeter = &subComputationMeter{}
 
-type computationMeteringHandler struct {
+type ComputationMeteringHandler struct {
 	computation ComputationMeter
 }
 
-func (c *computationMeteringHandler) StartSubMeter(limit uint64) SubComputationMeter {
+func (c *ComputationMeteringHandler) StartSubMeter(limit uint64) SubComputationMeter {
 	m := &subComputationMeter{
 		computationMeter: computationMeter{
-			limit: limit,
+			limit:   limit,
+			handler: c,
+			// sum-meters have separate intensities
+			intensities: map[string]uint64{},
 		},
-		parent:  c.computation,
-		handler: c,
+		parent: c.computation,
 	}
 
 	c.computation = m
 	return m
 }
 
-var _ ComputationMeteringHandler = &computationMeteringHandler{}
-
-func NewComputationMeteringHandler(computationLimit uint64) ComputationMeteringHandler {
-	return &computationMeteringHandler{
-		computation: &computationMeter{
-			limit: computationLimit,
-		},
+func NewComputationMeteringHandler(computationLimit uint64) *ComputationMeteringHandler {
+	h := &ComputationMeteringHandler{}
+	h.computation = &computationMeter{
+		limit:       computationLimit,
+		handler:     h,
+		intensities: map[string]uint64{},
 	}
+
+	return h
 }
 
-func (c *computationMeteringHandler) Limit() uint64 {
+func (c *ComputationMeteringHandler) Limit() uint64 {
 	return c.computation.Limit()
 }
 
-func (c *computationMeteringHandler) AddUsed(used uint64) error {
-	return c.computation.AddUsed(used)
+func (c *ComputationMeteringHandler) AddUsed(intensity uint64, feature string) {
+	c.computation.AddUsed(intensity, feature)
 }
 
-func (c *computationMeteringHandler) Used() uint64 {
+func (c *ComputationMeteringHandler) Used() uint64 {
 	return c.computation.Used()
+}
+
+func (c *ComputationMeteringHandler) Intensities() map[string]uint64 {
+	return c.computation.Intensities()
 }
