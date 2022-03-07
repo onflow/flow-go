@@ -440,7 +440,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				// capture new values for future query
 				for j, k := range keys {
 					encKey := encoding.EncodeKey(&k)
-					histStorage[string(newState[:])+string(encKey[:])] = values[j]
+					histStorage[string(newState[:])+string(encKey)] = values[j]
 					latestValue[string(encKey)] = values[j]
 				}
 
