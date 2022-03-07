@@ -307,6 +307,7 @@ func buildQCWithPackerAndSigData(
 	blockSigData *hotstuff.BlockSignatureData,
 ) (*flow.QuorumCertificate, error) {
 	signerIndices, sigData, err := packer.Pack(block.BlockID, blockSigData)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}

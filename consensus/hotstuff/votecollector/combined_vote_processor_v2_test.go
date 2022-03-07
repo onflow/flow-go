@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -285,7 +286,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 	reconstructor.On("EnoughShares").Return(true)
 	reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil)
 
-	packer.On("Pack", mock.Anything, mock.Anything).Return(identities, unittest.RandomBytes(128), nil)
+	packer.On("Pack", mock.Anything, mock.Anything).Return(unittest.RandomBytes(100), unittest.RandomBytes(128), nil)
 
 	// Helper factory function to create processors. We need new processor for every test case
 	// because QC creation is one time operation and is triggered as soon as we have collected enough weight and shares.
@@ -398,7 +399,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_ConcurrentCreatingQC() {
 	s.reconstructor.On("EnoughShares").Return(true)
 
 	// at this point sending any vote should result in creating QC.
-	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(stakingSigners, unittest.RandomBytes(128), nil)
+	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(unittest.RandomBytes(100), unittest.RandomBytes(128), nil)
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Return(nil).Once()
 
 	var startupWg, shutdownWg sync.WaitGroup
@@ -490,8 +491,8 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		// mock expected call to Packer
 		mergedSignerIDs := make([]flow.Identifier, 0)
 		packedSigData := unittest.RandomBytes(128)
-		packer := &mockhotstuff.Packer{}
-		packer.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
+		pcker := &mockhotstuff.Packer{}
+		pcker.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
 
 			// check that aggregated signers are part of all votes signers
@@ -516,7 +517,10 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			// fill merged signers with collected signers
 			mergedSignerIDs = append(expectedBlockSigData.StakingSigners, expectedBlockSigData.RandomBeaconSigners...)
 		}).Return(
-			func(flow.Identifier, *hotstuff.BlockSignatureData) []flow.Identifier { return mergedSignerIDs },
+			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte {
+				signerIndices, _ := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
+				return signerIndices
+			},
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
 			func(flow.Identifier, *hotstuff.BlockSignatureData) error { return nil }).Once()
 
@@ -530,12 +534,17 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 				t.Fatalf("QC created more than once")
 			}
 
+			signerIndices, err := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
+			if err != nil {
+				t.Fatalf("signer indices can not be created %v", err)
+			}
+
 			// ensure that QC contains correct field
 			expectedQC := &flow.QuorumCertificate{
-				View:      block.View,
-				BlockID:   block.BlockID,
-				SignerIDs: mergedSignerIDs,
-				SigData:   packedSigData,
+				View:          block.View,
+				BlockID:       block.BlockID,
+				SignerIndices: signerIndices,
+				SigData:       packedSigData,
 			}
 			require.Equalf(t, expectedQC, qc, "QC should be equal to what we expect")
 		}
@@ -546,7 +555,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			stakingSigAggtor: stakingAggregator,
 			rbRector:         reconstructor,
 			onQCCreated:      onQCCreated,
-			packer:           packer,
+			packer:           pcker,
 			minRequiredStake: minRequiredStake,
 			done:             *atomic.NewBool(false),
 		}
@@ -676,8 +685,11 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		// mock expected call to Packer
 		mergedSignerIDs := append(stakingSigners.NodeIDs(), beaconSigners.NodeIDs()...)
 		packedSigData := unittest.RandomBytes(128)
-		packer := &mockhotstuff.Packer{}
-		packer.On("Pack", block.BlockID, mock.Anything).Return(mergedSignerIDs, packedSigData, nil)
+		pcker := &mockhotstuff.Packer{}
+
+		signerIndices, err := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
+		require.NoError(t, err)
+		pcker.On("Pack", block.BlockID, mock.Anything).Return(signerIndices, packedSigData, nil)
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
@@ -696,7 +708,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 			stakingSigAggtor: stakingAggregator,
 			rbRector:         reconstructor,
 			onQCCreated:      onQCCreated,
-			packer:           packer,
+			packer:           pcker,
 			minRequiredStake: minRequiredStake,
 			done:             *atomic.NewBool(false),
 		}

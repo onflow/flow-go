@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,11 +33,13 @@ func TestStakingVoteProcessor(t *testing.T) {
 type StakingVoteProcessorTestSuite struct {
 	VoteProcessorTestSuiteBase
 
-	processor *StakingVoteProcessor
+	processor       *StakingVoteProcessor
+	allParticipants flow.IdentityList
 }
 
 func (s *StakingVoteProcessorTestSuite) SetupTest() {
 	s.VoteProcessorTestSuiteBase.SetupTest()
+	s.allParticipants = unittest.IdentityListFixture(14)
 	s.processor = &StakingVoteProcessor{
 		log:              unittest.Logger(),
 		block:            s.proposal.Block,
@@ -44,6 +47,7 @@ func (s *StakingVoteProcessorTestSuite) SetupTest() {
 		onQCCreated:      s.onQCCreated,
 		minRequiredStake: s.minRequiredStake,
 		done:             *atomic.NewBool(false),
+		allParticipants:  s.allParticipants,
 	}
 }
 
@@ -151,7 +155,9 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 // aggregator.
 func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	// prepare test setup: 13 votes with staking sigs
-	stakingSigners := unittest.IdentifierListFixture(14)
+	stakingSigners := s.allParticipants[:14].NodeIDs()
+	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(stakingSigners, stakingSigners)
+	require.NoError(s.T(), err)
 
 	// setup aggregator
 	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
@@ -163,10 +169,10 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 		qc := args.Get(0).(*flow.QuorumCertificate)
 		// ensure that QC contains correct field
 		expectedQC := &flow.QuorumCertificate{
-			View:      s.proposal.Block.View,
-			BlockID:   s.proposal.Block.BlockID,
-			SignerIDs: stakingSigners,
-			SigData:   expectedSigData,
+			View:          s.proposal.Block.View,
+			BlockID:       s.proposal.Block.BlockID,
+			SignerIndices: signerIndices,
+			SigData:       expectedSigData,
 		}
 		require.Equal(s.T(), expectedQC, qc)
 	}).Return(nil).Once()
@@ -190,7 +196,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 
 	// processing extra votes shouldn't result in creating new QCs
 	vote := unittest.VoteForBlockFixture(s.proposal.Block)
-	err := s.processor.Process(vote)
+	err = s.processor.Process(vote)
 	require.NoError(s.T(), err)
 
 	s.onQCCreatedState.AssertExpectations(s.T())
@@ -199,7 +205,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 // TestProcess_ConcurrentCreatingQC tests a scenario where multiple goroutines process vote at same time,
 // we expect only one QC created in this scenario.
 func (s *StakingVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
-	stakingSigners := unittest.IdentifierListFixture(10)
+	stakingSigners := s.allParticipants[:10].NodeIDs()
 	mockAggregator := func(aggregator *mockhotstuff.WeightedSignatureAggregator) {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
 		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)

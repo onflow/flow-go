@@ -27,5 +27,14 @@ func EncodeSignerIdentifiersToIndices(fullIdentities []flow.Identifier, signerID
 }
 
 func DecodeSignerIdentifiersFromIndices(fullIdentities []flow.Identifier, signerIndices []byte) ([]flow.Identifier, error) {
-	panic("to be implemented")
+	indices, err := DecodeSignerIndices(signerIndices, len(fullIdentities))
+	if err != nil {
+		return nil, err
+	}
+
+	signerIDs := make([]flow.Identifier, 0, len(fullIdentities))
+	for _, index := range indices {
+		signerIDs = append(signerIDs, fullIdentities[index])
+	}
+	return signerIDs, nil
 }

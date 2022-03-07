@@ -28,10 +28,9 @@ func WithQCBlock(block *model.Block) func(*flow.QuorumCertificate) {
 	}
 }
 
-func WithQCSigners(signerIDs []flow.Identifier) func(*flow.QuorumCertificate) {
+func WithQCSigners(signerIndices []byte) func(*flow.QuorumCertificate) {
 	return func(qc *flow.QuorumCertificate) {
-		// TODO: fix
-		qc.SignerIndices = nil
+		qc.SignerIndices = signerIndices
 	}
 }
 

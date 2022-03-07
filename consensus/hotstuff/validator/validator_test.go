@@ -53,11 +53,15 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.parent = helper.MakeBlock(
 		helper.WithBlockView(ps.finalized),
 	)
+
+	indices, err := packer.EncodeSignerIdentifiersToIndices(ps.participants.NodeIDs(), ps.participants.NodeIDs())
+	require.NoError(ps.T(), err)
+
 	ps.block = helper.MakeBlock(
 		helper.WithBlockView(ps.finalized+1),
 		helper.WithBlockProposer(ps.leader.NodeID),
 		helper.WithParentBlock(ps.parent),
-		helper.WithParentSigners(ps.participants.NodeIDs()),
+		helper.WithParentSigners(indices),
 	)
 
 	voterIDs, err := packer.DecodeSignerIdentifiersFromIndices(ps.participants.NodeIDs(), ps.block.QC.SignerIndices)
@@ -71,9 +75,9 @@ func (ps *ProposalSuite) SetupTest() {
 	// set up the mocked hotstuff Committee state
 	ps.committee = &mocks.Committee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.leader.NodeID, nil)
-	ps.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
-			return ps.participants.Filter(selector)
+	ps.committee.On("Identities", mock.Anything).Return(
+		func(blockID flow.Identifier) flow.IdentityList {
+			return ps.participants
 		},
 		nil,
 	)
@@ -421,13 +425,16 @@ func (qs *QCSuite) SetupTest() {
 
 	// create a block that has the signers in its QC
 	qs.block = helper.MakeBlock()
-	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
+	indices, err := packer.EncodeSignerIdentifiersToIndices(qs.participants.NodeIDs(), qs.signers.NodeIDs())
+	require.NoError(qs.T(), err)
+
+	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(indices))
 
 	// return the correct participants and identities from view state
 	qs.committee = &mocks.Committee{}
-	qs.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
-			return qs.participants.Filter(selector)
+	qs.committee.On("Identities", mock.Anything).Return(
+		func(blockID flow.Identifier) flow.IdentityList {
+			return qs.participants
 		},
 		nil,
 	)
@@ -450,9 +457,23 @@ func (qs *QCSuite) TestQCOK() {
 // TestQCInvalidSignersError tests that a qc fails validation if:
 // QC signer's Identities cannot all be retrieved (some are not valid consensus participants)
 func (qs *QCSuite) TestQCInvalidSignersError() {
-	qs.participants = qs.participants[1:]           // remove participant[0] from the list of valid consensus participant
+	qs.verifier = &mocks.Verifier{}
+	qs.verifier.On("VerifyQC", mock.Anything, qs.qc.SigData, qs.block).Return(
+		newInvalidBlockError(qs.block, fmt.Errorf("invalid signer index: %w", model.ErrInvalidFormat)))
+	qs.validator = New(qs.committee, nil, qs.verifier)
 	err := qs.validator.ValidateQC(qs.qc, qs.block) // the QC should not be validated anymore
-	assert.True(qs.T(), model.IsInvalidBlockError(err), "if some signers are invalid consensus participants, an ErrorInvalidBlock error should be raised")
+	require.Error(qs.T(), err)
+	assert.True(qs.T(), model.IsInvalidBlockError(err), err)
+}
+
+func (qs *QCSuite) TestQCInvalidQCSignatureError() {
+	qs.verifier = &mocks.Verifier{}
+	qs.verifier.On("VerifyQC", mock.Anything, qs.qc.SigData, qs.block).Return(
+		newInvalidBlockError(qs.block, fmt.Errorf("invalid signer sig: %w", model.ErrInvalidSignature)))
+	qs.validator = New(qs.committee, nil, qs.verifier)
+	err := qs.validator.ValidateQC(qs.qc, qs.block) // the QC should not be validated anymore
+	require.Error(qs.T(), err)
+	assert.True(qs.T(), model.IsInvalidBlockError(err), err)
 }
 
 // TestQCRetrievingParticipantsError tests that validation errors if:
@@ -473,10 +494,13 @@ func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 func (qs *QCSuite) TestQCInsufficientStake() {
 	// signers only have stake 6 out of 10 total (NOT have a supermajority)
 	qs.signers = qs.participants[:6]
-	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
+	indices, err := packer.EncodeSignerIdentifiersToIndices(qs.participants.NodeIDs(), qs.signers.NodeIDs())
+	require.NoError(qs.T(), err)
+
+	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(indices))
 
 	// the QC should not be validated anymore
-	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	err = qs.validator.ValidateQC(qs.qc, qs.block)
 	assert.Error(qs.T(), err, "a QC should be rejected if it has insufficient voted stake")
 
 	// we should get a threshold error to bubble up for extra info
