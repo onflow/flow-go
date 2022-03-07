@@ -218,6 +218,7 @@ func main() {
 			return nil
 		}).
 		Component("GCP block data uploader", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			computation.SetUploaderEnabled(enableBlockDataUpload)
 			if enableBlockDataUpload && gcpBucketName != "" {
 				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
 				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
