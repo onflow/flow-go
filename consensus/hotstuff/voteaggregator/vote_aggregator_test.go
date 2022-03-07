@@ -20,8 +20,9 @@ func TestVoteAggregator(t *testing.T) {
 	suite.Run(t, new(VoteAggregatorTestSuite))
 }
 
-// VoteCollectorsTestSuite is a test suite for isolated testing of VoteCollectors.
-// Contains helper methods and mocked state which is used to verify correct behavior of VoteCollectors.
+// VoteAggregatorTestSuite is a test suite for isolated testing of VoteAggregator.
+// Contains mocked state which is used to verify correct behavior of VoteAggregator.
+// Automatically starts and stops module.Startable in SetupTest and TearDownTest respectively.
 type VoteAggregatorTestSuite struct {
 	suite.Suite
 
@@ -67,6 +68,8 @@ func (s *VoteAggregatorTestSuite) TearDownTest() {
 	unittest.RequireCloseBefore(s.T(), s.aggregator.Done(), time.Second, "should close before timeout")
 }
 
+// TestOnFinalizedBlock tests if finalized block gets processed when send through `VoteAggregator`.
+// Tests the whole processing pipeline.
 func (s *VoteAggregatorTestSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture(unittest.HeaderWithView(100))
 	done := atomic.NewBool(false)
