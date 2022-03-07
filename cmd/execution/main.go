@@ -19,6 +19,7 @@ import (
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
+	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -174,6 +175,9 @@ func main() {
 	nodeBuilder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(executionDataService)
+		}).
+		AdminCommand("set-uploader-enabled", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return uploaderCommands.NewToggleUploaderCommand()
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
