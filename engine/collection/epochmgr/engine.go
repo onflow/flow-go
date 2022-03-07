@@ -26,10 +26,10 @@ import (
 // components before giving up.
 const DefaultStartupTimeout = 30 * time.Second
 
-// ErrUnstakedForEpoch is returned when we attempt to create epoch components
-// for an epoch in which we are not staked. This is the case for epochs during
-// which this node is joining or leaving the network.
-var ErrUnstakedForEpoch = fmt.Errorf("we are not a staked node in the epoch")
+// ErrNotAuthorizedForEpoch is returned when we attempt to create epoch components
+// for an epoch in which we are not an authorized network participant. This is the
+// case for epochs during which this node is joining or leaving the network.
+var ErrNotAuthorizedForEpoch = fmt.Errorf("we are not an authorized participant for the epoch")
 
 // EpochComponents represents all dependencies for running an epoch.
 type EpochComponents struct {
@@ -156,8 +156,8 @@ func New(
 	}
 
 	components, err := e.createEpochComponents(epoch)
-	// don't set up consensus components if we aren't staked in current epoch
-	if errors.Is(err, ErrUnstakedForEpoch) {
+	// don't set up consensus components if we aren't authorized in current epoch
+	if errors.Is(err, ErrNotAuthorizedForEpoch) {
 		return e, nil
 	}
 	if err != nil {
@@ -220,7 +220,7 @@ func (e *Engine) Done() <-chan struct{} {
 // createEpochComponents instantiates and returns epoch-scoped components for
 // the given epoch, using the configured factory.
 //
-// Returns ErrUnstakedForEpoch if this node is not staked in the epoch.
+// Returns ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
 
 	state, prop, sync, hot, aggregator, err := e.factory.Create(epoch)
@@ -283,8 +283,8 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 
 	// create components for new epoch
 	components, err := e.createEpochComponents(epoch)
-	// if we are not staked in this epoch, skip starting up cluster consensus
-	if errors.Is(err, ErrUnstakedForEpoch) {
+	// if we are not authorized in this epoch, skip starting up cluster consensus
+	if errors.Is(err, ErrNotAuthorizedForEpoch) {
 		e.prepareToStopEpochComponents(counter-1, lastEpochMaxHeight)
 		return nil
 	}

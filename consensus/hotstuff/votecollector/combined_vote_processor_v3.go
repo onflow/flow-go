@@ -86,18 +86,18 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 	}
 
 	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
-	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight())
 
 	return &CombinedVoteProcessorV3{
-		log:              log.With().Hex("block_id", block.BlockID[:]).Logger(),
-		block:            block,
-		stakingSigAggtor: stakingSigAggtor,
-		rbSigAggtor:      rbSigAggtor,
-		rbRector:         rbRector,
-		onQCCreated:      f.onQCCreated,
-		packer:           f.packer,
-		minRequiredStake: minRequiredStake,
-		done:             *atomic.NewBool(false),
+		log:               log.With().Hex("block_id", block.BlockID[:]).Logger(),
+		block:             block,
+		stakingSigAggtor:  stakingSigAggtor,
+		rbSigAggtor:       rbSigAggtor,
+		rbRector:          rbRector,
+		onQCCreated:       f.onQCCreated,
+		packer:            f.packer,
+		minRequiredWeight: minRequiredWeight,
+		done:              *atomic.NewBool(false),
 	}, nil
 }
 
@@ -110,15 +110,15 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 // progress; while in the latter case, the voter also contributes to running the
 // random beacon. Concurrency safe.
 type CombinedVoteProcessorV3 struct {
-	log              zerolog.Logger
-	block            *model.Block
-	stakingSigAggtor hotstuff.WeightedSignatureAggregator
-	rbSigAggtor      hotstuff.WeightedSignatureAggregator
-	rbRector         hotstuff.RandomBeaconReconstructor
-	onQCCreated      hotstuff.OnQCCreated
-	packer           hotstuff.Packer
-	minRequiredStake uint64
-	done             atomic.Bool
+	log               zerolog.Logger
+	block             *model.Block
+	stakingSigAggtor  hotstuff.WeightedSignatureAggregator
+	rbSigAggtor       hotstuff.WeightedSignatureAggregator
+	rbRector          hotstuff.RandomBeaconReconstructor
+	onQCCreated       hotstuff.OnQCCreated
+	packer            hotstuff.Packer
+	minRequiredWeight uint64
+	done              atomic.Bool
 }
 
 var _ hotstuff.VerifyingVoteProcessor = (*CombinedVoteProcessorV3)(nil)
@@ -231,7 +231,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	}
 
 	// checking of conditions for building QC are satisfied
-	if p.stakingSigAggtor.TotalWeight()+p.rbSigAggtor.TotalWeight() < p.minRequiredStake {
+	if p.stakingSigAggtor.TotalWeight()+p.rbSigAggtor.TotalWeight() < p.minRequiredWeight {
 		return nil
 	}
 	if !p.rbRector.EnoughShares() {

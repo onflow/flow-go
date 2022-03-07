@@ -75,10 +75,10 @@ func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter {
 	}
 }
 
-// HasStake returns a filter for nodes with non-zero stake.
-func HasStake(hasStake bool) flow.IdentityFilter {
+// HasWeight returns a filter for nodes with non-zero weight.
+func HasWeight(hasWeight bool) flow.IdentityFilter {
 	return func(identity *flow.Identity) bool {
-		return (identity.Stake > 0) == hasStake
+		return (identity.Weight > 0) == hasWeight
 	}
 }
 
@@ -102,7 +102,7 @@ func HasRole(roles ...flow.Role) flow.IdentityFilter {
 // IsValidCurrentEpochParticipant is an identity filter for members of the
 // current epoch in good standing.
 var IsValidCurrentEpochParticipant = And(
-	HasStake(true),
+	HasWeight(true),
 	Not(Ejected),
 )
 
