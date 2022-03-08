@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
@@ -17,6 +18,7 @@ func NewVoteAggregator(
 	lowestRetainedView uint64,
 	notifier hotstuff.Consumer,
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
+	distributor *pubsub.FinalizationDistributor,
 ) (hotstuff.VoteAggregator, error) {
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
@@ -27,6 +29,7 @@ func NewVoteAggregator(
 	if err != nil {
 		return nil, fmt.Errorf("could not create vote aggregator: %w", err)
 	}
+	distributor.AddOnBlockFinalizedConsumer(aggregator.OnFinalizedBlock)
 
 	return aggregator, nil
 }
