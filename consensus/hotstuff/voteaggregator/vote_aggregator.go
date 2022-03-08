@@ -34,7 +34,7 @@ type VoteAggregator struct {
 	collectors                 hotstuff.VoteCollectors
 	queuedVotesNotifier        engine.Notifier
 	finalizationEventsNotifier engine.Notifier
-	finalizedView              counters.StrictMonotonousCounter
+	finalizedView              counters.StrictMonotonousCounter // cache the last finalized view to queue up the pruning work, and unblock the caller who's delivering the finalization event.
 	queuedVotes                *fifoqueue.FifoQueue
 }
 

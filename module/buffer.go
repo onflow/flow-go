@@ -19,6 +19,7 @@ type PendingBlockBuffer interface {
 
 	DropForParent(parentID flow.Identifier)
 
+	// PruneByView prunes any pending blocks with views less or equal to the given view.
 	PruneByView(view uint64)
 
 	Size() uint
@@ -35,6 +36,7 @@ type PendingClusterBlockBuffer interface {
 
 	DropForParent(parentID flow.Identifier)
 
+	// PruneByView prunes any pending cluster blocks with views less or equal to the given view.
 	PruneByView(view uint64)
 
 	Size() uint

@@ -59,6 +59,7 @@ func (b *PendingBlocks) DropForParent(parentID flow.Identifier) {
 	b.backend.dropForParent(parentID)
 }
 
+// PruneByView prunes any pending blocks with views less or equal to the given view.
 func (b *PendingBlocks) PruneByView(view uint64) {
 	b.backend.pruneByView(view)
 }
