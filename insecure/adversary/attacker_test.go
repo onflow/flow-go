@@ -24,9 +24,16 @@ import (
 
 const attackerAddress = "localhost:8000"
 
-func TestAttackerStart(t *testing.T) {
-	count := 1
-	withScenario(t, count,
+func TestAttackerObserve_SingleMessage(t *testing.T) {
+	testAttackerObserve(t, 1)
+}
+
+func TestAttackerObserve_MultipleConcurrentMessages(t *testing.T) {
+	testAttackerObserve(t, 10)
+}
+
+func testAttackerObserve(t *testing.T, concurrencyDegree int) {
+	withScenario(t, concurrencyDegree,
 		func(t *testing.T,
 			orchestrator *mockinsecure.AttackOrchestrator,
 			client insecure.Attacker_ObserveClient,
@@ -34,7 +41,7 @@ func TestAttackerStart(t *testing.T) {
 			events []*insecure.CorruptedNodeEvent) {
 
 			orchestratorWG := sync.WaitGroup{}
-			orchestratorWG.Add(count)
+			orchestratorWG.Add(concurrencyDegree)
 
 			mu := sync.Mutex{}
 			seen := make(map[*insecure.CorruptedNodeEvent]struct{}) // keeps track of seen events by orchestrator
@@ -57,6 +64,8 @@ func TestAttackerStart(t *testing.T) {
 			}).Return(nil)
 
 			attackerSendWG := sync.WaitGroup{}
+			attackerSendWG.Add(concurrencyDegree)
+
 			for _, msg := range messages {
 				msg := msg
 
@@ -68,7 +77,7 @@ func TestAttackerStart(t *testing.T) {
 			}
 
 			unittest.RequireReturnsBefore(t, attackerSendWG.Wait, 1*time.Second, "could not send all messages to attacker on time")
-			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 10*time.Second, "could not receive message")
+			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 1*time.Second, "orchestrator could not receive messages on time")
 		})
 }
 
@@ -118,8 +127,8 @@ func messageFixtures(t *testing.T, codec network.Codec, count int) ([]*insecure.
 	for i := 0; i < count; i++ {
 		m, e := messageFixture(t, codec)
 
-		msgs = append(msgs, m)
-		events = append(events, e)
+		msgs[i] = m
+		events[i] = e
 	}
 
 	return msgs, events
