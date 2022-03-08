@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -58,11 +59,16 @@ func TestOnEntityRequestFull(t *testing.T) {
 	state := &protocol.State{}
 	state.On("Final").Return(final, nil)
 
-	con := &mocknetwork.Conduit{}
-	con.On("Unicast", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			response := args.Get(0).(*messages.EntityResponse)
-			nodeID := args.Get(1).(flow.Identifier)
+	channel := network.Channel("TEST")
+
+	net := &mocknetwork.Network{}
+	net.On("SendDirectMessage", mock.AnythingOfType("network.Channel"), mock.Anything, mock.AnythingOfType("flow.Identifier")).
+		Run(func(args mock.Arguments) {
+			ch := args.Get(0).(network.Channel)
+			response := args.Get(1).(*messages.EntityResponse)
+			nodeID := args.Get(2).(flow.Identifier)
+
+			assert.Equal(t, ch, channel)
 			assert.Equal(t, nodeID, originID)
 			var entities []flow.Entity
 			for _, blob := range response.Blobs {
@@ -71,13 +77,14 @@ func TestOnEntityRequestFull(t *testing.T) {
 				entities = append(entities, coll)
 			}
 			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll2, &coll3, &coll4, &coll5})
-		},
-	).Return(nil)
+		}).
+		Return(nil)
 
 	provide := Engine{
 		metrics:  metrics.NewNoopCollector(),
 		state:    state,
-		con:      con,
+		net:      net,
+		channel:  channel,
 		selector: selector,
 		retrieve: retrieve,
 	}
@@ -89,7 +96,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 	err := provide.onEntityRequest(originID, request)
 	assert.NoError(t, err, "should not error on full response")
 
-	con.AssertExpectations(t)
+	net.AssertExpectations(t)
 }
 
 func TestOnEntityRequestPartial(t *testing.T) {
@@ -131,11 +138,16 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	state := &protocol.State{}
 	state.On("Final").Return(final, nil)
 
-	con := &mocknetwork.Conduit{}
-	con.On("Unicast", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			response := args.Get(0).(*messages.EntityResponse)
-			nodeID := args.Get(1).(flow.Identifier)
+	channel := network.Channel("TEST")
+
+	net := &mocknetwork.Network{}
+	net.On("SendDirectMessage", mock.AnythingOfType("network.Channel"), mock.Anything, mock.AnythingOfType("flow.Identifier")).
+		Run(func(args mock.Arguments) {
+			ch := args.Get(0).(network.Channel)
+			response := args.Get(1).(*messages.EntityResponse)
+			nodeID := args.Get(2).(flow.Identifier)
+
+			assert.Equal(t, ch, channel)
 			assert.Equal(t, nodeID, originID)
 			var entities []flow.Entity
 			for _, blob := range response.Blobs {
@@ -144,13 +156,14 @@ func TestOnEntityRequestPartial(t *testing.T) {
 				entities = append(entities, coll)
 			}
 			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll3, &coll5})
-		},
-	).Return(nil)
+		}).
+		Return(nil)
 
 	provide := Engine{
 		metrics:  metrics.NewNoopCollector(),
 		state:    state,
-		con:      con,
+		net:      net,
+		channel:  channel,
 		selector: selector,
 		retrieve: retrieve,
 	}
@@ -162,7 +175,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	err := provide.onEntityRequest(originID, request)
 	assert.NoError(t, err, "should not error on partial response")
 
-	con.AssertExpectations(t)
+	net.AssertExpectations(t)
 }
 
 func TestOnEntityRequestEmpty(t *testing.T) {
@@ -204,20 +217,26 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	state := &protocol.State{}
 	state.On("Final").Return(final, nil)
 
-	con := &mocknetwork.Conduit{}
-	con.On("Unicast", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			response := args.Get(0).(*messages.EntityResponse)
-			nodeID := args.Get(1).(flow.Identifier)
+	channel := network.Channel("TEST")
+
+	net := &mocknetwork.Network{}
+	net.On("SendDirectMessage", mock.AnythingOfType("network.Channel"), mock.Anything, mock.AnythingOfType("flow.Identifier")).
+		Run(func(args mock.Arguments) {
+			ch := args.Get(0).(network.Channel)
+			response := args.Get(1).(*messages.EntityResponse)
+			nodeID := args.Get(2).(flow.Identifier)
+
+			assert.Equal(t, ch, channel)
 			assert.Equal(t, nodeID, originID)
 			assert.Empty(t, response.Blobs)
-		},
-	).Return(nil)
+		}).
+		Return(nil)
 
 	provide := Engine{
 		metrics:  metrics.NewNoopCollector(),
 		state:    state,
-		con:      con,
+		net:      net,
+		channel:  channel,
 		selector: selector,
 		retrieve: retrieve,
 	}
@@ -229,7 +248,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	err := provide.onEntityRequest(originID, request)
 	assert.NoError(t, err, "should not error on empty response")
 
-	con.AssertExpectations(t)
+	net.AssertExpectations(t)
 }
 
 func TestOnEntityRequestInvalidOrigin(t *testing.T) {
@@ -271,12 +290,32 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	state := &protocol.State{}
 	state.On("Final").Return(final, nil)
 
-	con := &mocknetwork.Conduit{}
+	channel := network.Channel("TEST")
+
+	net := &mocknetwork.Network{}
+	net.On("SendDirectMessage", mock.AnythingOfType("network.Channel"), mock.Anything, mock.AnythingOfType("flow.Identifier")).
+		Run(func(args mock.Arguments) {
+			ch := args.Get(0).(network.Channel)
+			response := args.Get(1).(*messages.EntityResponse)
+			nodeID := args.Get(2).(flow.Identifier)
+
+			assert.Equal(t, ch, channel)
+			assert.Equal(t, nodeID, originID)
+			var entities []flow.Entity
+			for _, blob := range response.Blobs {
+				coll := &flow.Collection{}
+				_ = msgpack.Unmarshal(blob, &coll)
+				entities = append(entities, coll)
+			}
+			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll2, &coll3, &coll4, &coll5})
+		}).
+		Return(nil)
 
 	provide := Engine{
 		metrics:  metrics.NewNoopCollector(),
 		state:    state,
-		con:      con,
+		net:      net,
+		channel:  channel,
 		selector: selector,
 		retrieve: retrieve,
 	}
@@ -289,5 +328,5 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	assert.Error(t, err, "should error on invalid origin")
 	assert.True(t, engine.IsInvalidInputError(err), "should return invalid input error")
 
-	con.AssertExpectations(t)
+	net.AssertExpectations(t)
 }
