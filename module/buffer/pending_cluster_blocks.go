@@ -63,5 +63,5 @@ func (b *PendingClusterBlocks) PruneByView(view uint64) {
 }
 
 func (b *PendingClusterBlocks) Size() uint {
-	return uint(len(b.backend.blocksByID))
+	return b.backend.size()
 }

@@ -65,5 +65,5 @@ func (b *PendingBlocks) PruneByView(view uint64) {
 }
 
 func (b *PendingBlocks) Size() uint {
-	return uint(len(b.backend.blocksByID))
+	return b.backend.size()
 }
