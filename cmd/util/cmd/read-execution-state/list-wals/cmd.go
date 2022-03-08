@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -52,7 +52,7 @@ func run(*cobra.Command, []string) {
 	}()
 
 	err = w.ReplayLogsOnly(
-		func(forestSequencing *flattener.FlattenedForest) error {
+		func(tries []*trie.MTrie) error {
 			fmt.Printf("forest sequencing \n")
 			return nil
 		},
