@@ -22,7 +22,7 @@ func NewVoteAggregator(
 ) (hotstuff.VoteAggregator, error) {
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
-	voteCollectors := voteaggregator.NewVoteCollectors(lowestRetainedView, workerpool.New(4), createCollectorFactoryMethod)
+	voteCollectors := voteaggregator.NewVoteCollectors(log, lowestRetainedView, workerpool.New(4), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
 	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, lowestRetainedView, voteCollectors)
