@@ -56,6 +56,10 @@ func (e *ScriptEnv) VM() *VirtualMachine {
 	return e.vm
 }
 
+func (e *ScriptEnv) ComputationHandler() *handler.ComputationMeteringHandler {
+	return e.computationHandler
+}
+
 func NewScriptEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -129,11 +133,14 @@ func (e *ScriptEnv) GetValue(owner, key []byte) ([]byte, error) {
 		string(key),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("getting value failed: %w", err)
+		return nil, fmt.Errorf("get value failed: %w", err)
 	}
 	valueByteSize = len(v)
 
-	e.computationHandler.AddUsed(uint64(valueByteSize), "GetValue")
+	err = e.computationHandler.AddUsed(handler.MeteredOperationGetValue, uint(valueByteSize))
+	if err != nil {
+		return nil, fmt.Errorf("get value failed: %w", err)
+	}
 	return v, nil
 }
 
@@ -147,15 +154,18 @@ func (e *ScriptEnv) SetValue(owner, key, value []byte) error {
 		)
 		defer sp.Finish()
 	}
-	e.computationHandler.AddUsed(uint64(len(value)), "SetValue")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationSetValue, uint(len(value)))
+	if err != nil {
+		return fmt.Errorf("set value failed: %w", err)
+	}
 
-	err := e.accounts.SetValue(
+	err = e.accounts.SetValue(
 		flow.BytesToAddress(owner),
 		string(key),
 		value,
 	)
 	if err != nil {
-		return fmt.Errorf("setting value failed: %w", err)
+		return fmt.Errorf("set value failed: %w", err)
 	}
 	return nil
 }
@@ -166,11 +176,14 @@ func (e *ScriptEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "ValueExists")
+	err = e.computationHandler.AddUsed(handler.MeteredOperationValueExists, 1)
+	if err != nil {
+		return false, fmt.Errorf("check value existence failed: %w", err)
+	}
 
 	v, err := e.GetValue(owner, key)
 	if err != nil {
-		return false, fmt.Errorf("checking value existence failed: %w", err)
+		return false, fmt.Errorf("check value existence failed: %w", err)
 	}
 
 	return len(v) > 0, nil
@@ -182,11 +195,14 @@ func (e *ScriptEnv) GetStorageUsed(address common.Address) (value uint64, err er
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetStorageUsed")
+	err = e.computationHandler.AddUsed(handler.MeteredOperationGetStorageUsed, 1)
+	if err != nil {
+		return value, fmt.Errorf("get storage used failed: %w", err)
+	}
 
 	value, err = e.accounts.GetStorageUsed(flow.Address(address))
 	if err != nil {
-		return value, fmt.Errorf("getting storage used failed: %w", err)
+		return value, fmt.Errorf("get storage used failed: %w", err)
 	}
 
 	return value, nil
@@ -198,7 +214,10 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetStorageCapacity")
+	err = e.computationHandler.AddUsed(handler.MeteredOperationGetStorageCapacity, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get storage capacity failed: %w", err)
+	}
 
 	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
 	result, invokeErr := accountStorageCapacity(address)
@@ -223,7 +242,10 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetAccountBalance")
+	err = e.computationHandler.AddUsed(handler.MeteredOperationGetAccountBalance, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get account balance failed: %w", err)
+	}
 
 	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountBalance(address)
@@ -241,7 +263,10 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetAccountAvailableBalance")
+	err = e.computationHandler.AddUsed(handler.MeteredOperationGetAccountAvailableBalance, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get account available balance failed: %w", err)
+	}
 
 	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountAvailableBalance(address)
@@ -264,7 +289,10 @@ func (e *ScriptEnv) ResolveLocation(
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "ResolveLocation")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationResolveLocation, 1)
+	if err != nil {
+		return nil, fmt.Errorf("resolve location failed: %w", err)
+	}
 
 	addressLocation, isAddress := location.(common.AddressLocation)
 
@@ -287,12 +315,12 @@ func (e *ScriptEnv) ResolveLocation(
 
 		err := e.accounts.CheckAccountNotFrozen(address)
 		if err != nil {
-			return nil, fmt.Errorf("resolving location failed: %w", err)
+			return nil, fmt.Errorf("resolve location failed: %w", err)
 		}
 
 		contractNames, err := e.contracts.GetContractNames(addressLocation.Address)
 		if err != nil {
-			return nil, fmt.Errorf("resolving location failed: %w", err)
+			return nil, fmt.Errorf("resolve location failed: %w", err)
 		}
 
 		// if there are no contractNames deployed,
@@ -333,13 +361,16 @@ func (e *ScriptEnv) GetAccountContractNames(address runtime.Address) ([]string, 
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetAccountContractNames")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationGetAccountContractNames, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get account contract names failed: %w", err)
+	}
 
 	a := flow.Address(address)
 
 	freezeError := e.accounts.CheckAccountNotFrozen(a)
 	if freezeError != nil {
-		return nil, fmt.Errorf("get account contract names: %w", freezeError)
+		return nil, fmt.Errorf("get account contract names failed: %w", freezeError)
 	}
 
 	return e.accounts.GetContractNames(a)
@@ -351,7 +382,10 @@ func (e *ScriptEnv) GetCode(location runtime.Location) ([]byte, error) {
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetCode")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationGetCode, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get code failed: %w", err)
+	}
 
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
@@ -360,7 +394,7 @@ func (e *ScriptEnv) GetCode(location runtime.Location) ([]byte, error) {
 
 	address := flow.Address(contractLocation.Address)
 
-	err := e.accounts.CheckAccountNotFrozen(address)
+	err = e.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
@@ -379,7 +413,10 @@ func (e *ScriptEnv) GetProgram(location common.Location) (*interpreter.Program, 
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetProgram")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationGetProgram, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get program failed: %w", err)
+	}
 
 	if addressLocation, ok := location.(common.AddressLocation); ok {
 		address := flow.Address(addressLocation.Address)
@@ -404,9 +441,12 @@ func (e *ScriptEnv) SetProgram(location common.Location, program *interpreter.Pr
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "SetProgram")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationSetProgram, 1)
+	if err != nil {
+		return fmt.Errorf("set program failed: %w", err)
+	}
 
-	err := e.programs.Set(location, program)
+	err = e.programs.Set(location, program)
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)
 	}
@@ -429,7 +469,7 @@ func (e *ScriptEnv) Logs() []string {
 	return e.logs
 }
 
-func (e *ScriptEnv) EmitEvent(event cadence.Event) error {
+func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
 	return errors.NewOperationNotSupportedError("EmitEvent")
 }
 
@@ -447,11 +487,14 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
 	}
 
-	e.computationHandler.AddUsed(1, "GenerateUUID")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationGenerateUUID, 1)
+	if err != nil {
+		return 0, fmt.Errorf("generate uuid failed: %w", err)
+	}
 
 	uuid, err := e.uuidGenerator.GenerateUUID()
 	if err != nil {
-		return 0, fmt.Errorf("generating uuid failed: %w", err)
+		return 0, fmt.Errorf("generate uuid failed: %w", err)
 	}
 	return uuid, err
 }
@@ -461,15 +504,14 @@ func (e *ScriptEnv) GetComputationLimit() uint64 {
 }
 
 func (e *ScriptEnv) SetComputationUsed(used uint64) error {
-	e.computationHandler.AddUsed(used, "function_or_loop_call")
-	return nil
+	return e.computationHandler.AddUsed(handler.MeteredOperationfunction_or_loop_call, uint(used))
 }
 
 func (e *ScriptEnv) GetComputationUsed() uint64 {
 	return e.computationHandler.Used()
 }
 
-func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
+func (e *ScriptEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvDecodeArgument)
 		defer sp.Finish()
@@ -490,7 +532,10 @@ func (e *ScriptEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgo
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "Hash")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationHash, 1)
+	if err != nil {
+		return nil, fmt.Errorf("hash failed: %w", err)
+	}
 
 	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	return crypto.HashWithTag(hashAlgo, tag, data)
@@ -509,6 +554,11 @@ func (e *ScriptEnv) VerifySignature(
 		defer sp.Finish()
 	}
 
+	err := e.computationHandler.AddUsed(handler.MeteredOperationVerifySignature, 1)
+	if err != nil {
+		return false, fmt.Errorf("verify signature failed: %w", err)
+	}
+
 	valid, err := crypto.VerifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
@@ -520,14 +570,18 @@ func (e *ScriptEnv) VerifySignature(
 	)
 
 	if err != nil {
-		return false, fmt.Errorf("verifying signature failed: %w", err)
+		return false, fmt.Errorf("verify signature failed: %w", err)
 	}
 
 	return valid, nil
 }
 
 func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
-	e.computationHandler.AddUsed(1, "ValidatePublicKey")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationValidatePublicKey, 1)
+	if err != nil {
+		return fmt.Errorf("validate public key failed: %w", err)
+	}
+
 	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
@@ -540,7 +594,10 @@ func (e *ScriptEnv) GetCurrentBlockHeight() (uint64, error) {
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetCurrentBlockHeight")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationGetCurrentBlockHeight, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get current block height failed: %w", err)
+	}
 
 	if e.ctx.BlockHeader == nil {
 		return 0, errors.NewOperationNotSupportedError("GetCurrentBlockHeight")
@@ -573,7 +630,10 @@ func (e *ScriptEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error)
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetBlockAtHeight")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationGetBlockAtHeight, 1)
+	if err != nil {
+		return runtime.Block{}, false, fmt.Errorf("get block at height failed: %w", err)
+	}
 
 	if e.ctx.Blocks == nil {
 		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
@@ -588,21 +648,21 @@ func (e *ScriptEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error)
 	if errors.Is(err, storage.ErrNotFound) {
 		return runtime.Block{}, false, nil
 	} else if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("getting block at height failed for height %v: %w", height, err)
+		return runtime.Block{}, false, fmt.Errorf("get block at height failed for height %v: %w", height, err)
 	}
 
 	return runtimeBlockFromHeader(header), true, nil
 }
 
-func (e *ScriptEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
 	return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
 }
 
-func (e *ScriptEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
+func (e *ScriptEnv) AddEncodedAccountKey(_ runtime.Address, _ []byte) error {
 	return errors.NewOperationNotSupportedError("AddEncodedAccountKey")
 }
 
-func (e *ScriptEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+func (e *ScriptEnv) RevokeEncodedAccountKey(_ runtime.Address, _ int) (publicKey []byte, err error) {
 	return nil, errors.NewOperationNotSupportedError("RevokeEncodedAccountKey")
 }
 
@@ -616,12 +676,15 @@ func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetAccountKey")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationGetAccountKey, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get account key failed: %w", err)
+	}
 
 	if e.accountKeys != nil {
 		accKey, err := e.accountKeys.GetAccountKey(address, index)
 		if err != nil {
-			return nil, fmt.Errorf("getting account key failed: %w", err)
+			return nil, fmt.Errorf("get account key failed: %w", err)
 		}
 		return accKey, err
 	}
@@ -629,11 +692,11 @@ func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.
 	return nil, errors.NewOperationNotSupportedError("GetAccountKey")
 }
 
-func (e *ScriptEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
+func (e *ScriptEnv) RevokeAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {
 	return nil, errors.NewOperationNotSupportedError("RevokeAccountKey")
 }
 
-func (e *ScriptEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
+func (e *ScriptEnv) UpdateAccountContractCode(_ runtime.Address, _ string, _ []byte) (err error) {
 	return errors.NewOperationNotSupportedError("UpdateAccountContractCode")
 }
 
@@ -643,20 +706,23 @@ func (e *ScriptEnv) GetAccountContractCode(address runtime.Address, name string)
 		defer sp.Finish()
 	}
 
-	e.computationHandler.AddUsed(1, "GetAccountContractCode")
+	err = e.computationHandler.AddUsed(handler.MeteredOperationGetAccountContractCode, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get account contract code failed: %w", err)
+	}
 
 	code, err = e.GetCode(common.AddressLocation{
 		Address: address,
 		Name:    name,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("getting account contract code failed: %w", err)
+		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}
 
 	return code, nil
 }
 
-func (e *ScriptEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+func (e *ScriptEnv) RemoveAccountContractCode(_ runtime.Address, _ string) (err error) {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
 
@@ -722,7 +788,11 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
 func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	e.computationHandler.AddUsed(1, "AllocateStorageIndex")
+	err := e.computationHandler.AddUsed(handler.MeteredOperationAllocateStorageIndex, 1)
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
+	}
+
 	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)

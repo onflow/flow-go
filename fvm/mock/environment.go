@@ -12,6 +12,8 @@ import (
 
 	fvm "github.com/onflow/flow-go/fvm"
 
+	handler "github.com/onflow/flow-go/fvm/handler"
+
 	interpreter "github.com/onflow/cadence/runtime/interpreter"
 
 	mock "github.com/stretchr/testify/mock"
@@ -155,6 +157,22 @@ func (_m *Environment) BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (bool, erro
 	}
 
 	return r0, r1
+}
+
+// ComputationHandler provides a mock function with given fields:
+func (_m *Environment) ComputationHandler() *handler.ComputationMeteringHandler {
+	ret := _m.Called()
+
+	var r0 *handler.ComputationMeteringHandler
+	if rf, ok := ret.Get(0).(func() *handler.ComputationMeteringHandler); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*handler.ComputationMeteringHandler)
+		}
+	}
+
+	return r0
 }
 
 // Context provides a mock function with given fields:

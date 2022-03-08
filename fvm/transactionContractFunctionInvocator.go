@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -44,8 +45,9 @@ func NewTransactionContractFunctionInvoker(
 func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentracing.Span) (cadence.Value, error) {
 	var span opentracing.Span
 
-	if tenv, ok := env.(*TransactionEnv); ok {
-		tenv.computationHandler.AddUsed(1, "ContractFunctionInvoke")
+	err := env.ComputationHandler().AddUsed(handler.MeteredOperationContractFunctionInvoke, 1)
+	if err != nil {
+		return nil, err
 	}
 
 	ctx := env.Context()

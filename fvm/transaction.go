@@ -62,7 +62,7 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 
 	proc.ComputationMeteringHandler = handler.NewComputationMeteringHandler(
 		handler.ComputationLimit(ctx.GasLimit, proc.Transaction.GasLimit, DefaultGasLimit),
-		handler.WithCoumputationWeightFactors(map[string]uint64{"function_or_loop_call": 1}))
+		handler.WithCoumputationWeightFactors(map[uint]uint{handler.MeteredOperationfunction_or_loop_call: 1}))
 
 	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
 		st.SetPayerIsServiceAccount()

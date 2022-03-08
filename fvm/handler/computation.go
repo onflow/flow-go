@@ -2,18 +2,58 @@ package handler
 
 import (
 	"fmt"
+
+	"github.com/onflow/cadence/runtime"
 )
 
-type ComputationCostLabel string
+type MetringOperationType uint
+
+const (
+	// 10_000 to 11_000 for FVM
+	_ = iota + 10_000
+	MeteredOperationHash
+	MeteredOperationfunction_or_loop_call
+	MeteredOperationVerifySignature
+	MeteredOperationContractFunctionInvoke
+	MeteredOperationAddAccountKey
+	MeteredOperationAddEncodedAccountKey
+	MeteredOperationAllocateStorageIndex
+	MeteredOperationCreateAccount
+	MeteredOperationEmitEvent
+	MeteredOperationGenerateUUID
+	MeteredOperationGetAccountAvailableBalance
+	MeteredOperationGetAccountBalance
+	MeteredOperationGetAccountContractCode
+	MeteredOperationGetAccountContractNames
+	MeteredOperationGetAccountKey
+	MeteredOperationGetBlockAtHeight
+	MeteredOperationGetCode
+	MeteredOperationGetCurrentBlockHeight
+	MeteredOperationGetProgram
+	MeteredOperationGetStorageCapacity
+	MeteredOperationGetStorageUsed
+	MeteredOperationGetValue
+	MeteredOperationRemoveAccountContractCode
+	MeteredOperationResolveLocation
+	MeteredOperationRevokeAccountKey
+	MeteredOperationRevokeEncodedAccountKey
+	MeteredOperationSetProgram
+	MeteredOperationSetValue
+	MeteredOperationUpdateAccountContractCode
+	MeteredOperationValidatePublicKey
+	MeteredOperationValueExists
+)
 
 // ComputationMeter meters computation usage
 type ComputationMeter interface {
 	// Limit gets computation limit
 	Limit() uint64
-	// AddUsed adds more computation used to the current computation used
-	AddUsed(amount uint64, label ComputationCostLabel)
+	// AddUsed adds more computation used to the current computation using the type specified
+	AddUsed(feature uint, intensity uint) error
 	// Used gets the current computation used
 	Used() uint64
+	// Intensities are the aggregated intensities of all the feature calls so far. Used for logging.
+	Intensities() map[uint]uint
 }
 
 // SubComputationMeter meters computation usage. Currently, can only be discarded,
@@ -32,27 +72,43 @@ type SubComputationMeter interface {
 }
 
 type computationMeter struct {
-	used    uint64
-	limit   uint64
-	handler *ComputationMeteringHandler
+	used        uint64
+	limit       uint64
+	intensities map[uint]uint
+	handler     *ComputationMeteringHandler
 }
 
 func (c *computationMeter) Limit() uint64 {
 	return c.limit
 }
 
-func (c *computationMeter) AddUsed(amount uint64, label ComputationCostLabel) {
-	c.handler.weights[string(label)] += amount
-	costFactor, ok := c.handler.factors[string(label)]
+func (c *computationMeter) AddUsed(feature uint, intensity uint) error {
+	// take note of the intensity even if the weight of the feature is 0
+	c.intensities[feature] += intensity
+	weight, ok := c.handler.weights[feature]
 	if !ok {
-		return
+		return nil
 	}
 
-	c.used += costFactor * amount
+	c.used += uint64(weight * intensity)
+	return c.errorIfOverLimit()
+}
+
+func (c *computationMeter) errorIfOverLimit() error {
+	if c.used > c.limit {
+		return runtime.ComputationLimitExceededError{
+			Limit: c.limit,
+		}
+	}
+	return nil
 }
 
 func (c *computationMeter) Used() uint64 {
 	return c.used
+}
+
+func (c *computationMeter) Intensities() map[uint]uint {
+	return c.intensities
 }
 
 var _ ComputationMeter = &computationMeter{}
@@ -74,15 +130,15 @@ var _ SubComputationMeter = &subComputationMeter{}
 
 type ComputationMeteringHandler struct {
 	computation ComputationMeter
-	factors     map[string]uint64
-	weights     map[string]uint64
+	weights     map[uint]uint
 }
 
 func (c *ComputationMeteringHandler) StartSubMeter(limit uint64) SubComputationMeter {
 	m := &subComputationMeter{
 		computationMeter: computationMeter{
-			limit:   limit,
-			handler: c,
+			limit:       limit,
+			intensities: map[uint]uint{},
+			handler:     c,
 		},
 		parent: c.computation,
 	}
@@ -108,12 +164,11 @@ func ComputationLimit(ctxGasLimit, txGasLimit, defaultGasLimit uint64) uint64 {
 }
 
 func NewComputationMeteringHandler(computationLimit uint64, options ...ComputationMeteringOption) *ComputationMeteringHandler {
-	h := &ComputationMeteringHandler{
-		weights: map[string]uint64{},
-	}
+	h := &ComputationMeteringHandler{}
 	h.computation = &computationMeter{
-		limit:   computationLimit,
-		handler: h,
+		limit:       computationLimit,
+		intensities: map[uint]uint{},
+		handler:     h,
 	}
 
 	for _, o := range options {
@@ -122,9 +177,9 @@ func NewComputationMeteringHandler(computationLimit uint64, options ...Computati
 	return h
 }
 
-func WithCoumputationWeightFactors(weightFactors map[string]uint64) ComputationMeteringOption {
+func WithCoumputationWeightFactors(weights map[uint]uint) ComputationMeteringOption {
 	return func(handler *ComputationMeteringHandler) {
-		handler.factors = weightFactors
+		handler.weights = weights
 	}
 }
 
@@ -132,14 +187,14 @@ func (c *ComputationMeteringHandler) Limit() uint64 {
 	return c.computation.Limit()
 }
 
-func (c *ComputationMeteringHandler) AddUsed(amount uint64, label ComputationCostLabel) {
-	c.computation.AddUsed(amount, label)
+func (c *ComputationMeteringHandler) AddUsed(feature uint, intensity uint) error {
+	return c.computation.AddUsed(feature, intensity)
 }
 
 func (c *ComputationMeteringHandler) Used() uint64 {
 	return c.computation.Used()
 }
 
-func (c *ComputationMeteringHandler) Weights() map[string]uint64 {
-	return c.weights
+func (c *ComputationMeteringHandler) Intensities() map[uint]uint {
+	return c.computation.Intensities()
 }

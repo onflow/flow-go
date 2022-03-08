@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -418,12 +419,12 @@ func (e *blockComputer) executeTransaction(
 
 	if e.log.GetLevel() >= zerolog.InfoLevel {
 		d := zerolog.Dict()
-		for s, u := range tx.ComputationMeteringHandler.Weights() {
-			d.Uint64(s, u)
+		for s, u := range tx.ComputationMeteringHandler.Intensities() {
+			d.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		e.log.Info().
 			Str("txHash", tx.ID.String()).
-			Dict("weights", d).
+			Dict("intensities", d).
 			Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 			Msg("transaction computation parameters")
 	}
