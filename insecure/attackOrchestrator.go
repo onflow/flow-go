@@ -14,5 +14,14 @@ type AttackOrchestrator interface {
 	//
 	// In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 	// the attacker instead of dispatching them to the network.
-	HandleEventFromCorruptedNode(flow.Identifier, network.Channel, interface{}, Protocol, uint32, ...flow.Identifier) error
+	HandleEventFromCorruptedNode(*CorruptedNodeEvent) error
+}
+
+type CorruptedNodeEvent struct {
+	CorruptedId flow.Identifier
+	Channel     network.Channel
+	Event       interface{}
+	Protocol    Protocol
+	TargetNum   uint32
+	TargetIds   flow.IdentifierList
 }

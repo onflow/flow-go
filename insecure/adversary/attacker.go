@@ -65,7 +65,7 @@ func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orc
 			ready()
 
 			<-ctx.Done()
-			attacker.stop()
+			attacker.Stop()
 		}).Build()
 
 	attacker.Component = cm
@@ -79,15 +79,9 @@ func (a *Attacker) start(ctx irrecoverable.SignalerContext) {
 	a.orchestrator.Start(ctx)
 }
 
-// start stops the sub-modules of attacker.
-func (a *Attacker) stop() {
+// Stop stops the sub-modules of attacker.
+func (a *Attacker) Stop() {
 	a.server.Stop()
-}
-
-// listenAndServe establishes an attacker gRPC server on the specified address.
-func (a *Attacker) listenAndServe() error {
-
-	return nil
 }
 
 // Observe implements the gRPC interface of attacker that is exposed to the corrupted conduits.
@@ -137,7 +131,15 @@ func (a *Attacker) processObservedMsg(message *insecure.Message) error {
 	}
 
 	channel := network.Channel(message.ChannelID)
-	if err = a.orchestrator.HandleEventFromCorruptedNode(sender, channel, event, message.Protocol, message.Targets, targetIds...); err != nil {
+	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.CorruptedNodeEvent{
+		CorruptedId: sender,
+		Channel:     channel,
+		Event:       event,
+		Protocol:    message.Protocol,
+		TargetNum:   message.Targets,
+		TargetIds:   targetIds,
+	})
+	if err != nil {
 		return fmt.Errorf("could not handle event by orchestrator: %w", err)
 	}
 

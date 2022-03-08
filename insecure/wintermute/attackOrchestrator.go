@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network"
 )
 
 type Orchestrator struct {
@@ -52,12 +51,7 @@ func (o *Orchestrator) start(ctx irrecoverable.SignalerContext) {
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
-func (o *Orchestrator) HandleEventFromCorruptedNode(corruptedId flow.Identifier,
-	channel network.Channel,
-	event interface{},
-	protocol insecure.Protocol,
-	num uint32,
-	targetIds ...flow.Identifier) error {
+func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.CorruptedNodeEvent) error {
 
 	panic("implement me")
 }
