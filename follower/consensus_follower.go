@@ -39,6 +39,7 @@ type Config struct {
 	dataDir        string              // directory to store the protocol state (if the badger storage is not provided)
 	bootstrapDir   string              // path to the bootstrap directory
 	logLevel       string              // log level
+	exposeMetrics  bool                // whether to expose metrics
 }
 
 type Option func(c *Config)
@@ -71,6 +72,12 @@ func WithDB(db *badger.DB) Option {
 	return func(cf *Config) {
 		cf.db = db
 		cf.dataDir = ""
+	}
+}
+
+func WithExposeMetrics(expose bool) Option {
+	return func(c *Config) {
+		c.exposeMetrics = expose
 	}
 }
 
@@ -123,6 +130,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	if config.db != nil {
 		options = append(options, cmd.WithDB(config.db))
 	}
+	if config.exposeMetrics {
+		options = append(options, cmd.WithMetricsEnabled(config.exposeMetrics))
+	}
 
 	return options
 }
@@ -158,6 +168,7 @@ func NewConsensusFollower(
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
 		logLevel:       "info",
+		exposeMetrics:  false,
 	}
 
 	for _, opt := range opts {

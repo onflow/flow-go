@@ -22,7 +22,8 @@ var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 
 // We test that leader selection works for a committee of size one
 func TestSingleConsensusNode(t *testing.T) {
-	identity := unittest.IdentityFixture(unittest.WithStake(8))
+
+	identity := unittest.IdentityFixture(unittest.WithWeight(8))
 	rng := prg(t, someSeed)
 	selection, err := ComputeLeaderSelection(0, rng, 10, []*flow.Identity{identity})
 	require.NoError(t, err)
@@ -35,15 +36,15 @@ func TestSingleConsensusNode(t *testing.T) {
 
 // compare this binary search method with sort.Search()
 func TestBsearchVSsortSearch(t *testing.T) {
-	stakes := []uint64{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
-	stakes2 := []int{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
+	weights := []uint64{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
+	weights2 := []int{1, 2, 3, 4, 5, 6, 7, 9, 12, 21, 32}
 	var sum uint64
 	var sum2 int
 	sums := make([]uint64, 0)
 	sums2 := make([]int, 0)
-	for i := 0; i < len(stakes); i++ {
-		sum += stakes[i]
-		sum2 += stakes2[i]
+	for i := 0; i < len(weights); i++ {
+		sum += weights[i]
+		sum2 += weights2[i]
 		sums = append(sums, sum)
 		sums2 = append(sums2, sum2)
 	}
@@ -64,11 +65,11 @@ func TestBsearchVSsortSearch(t *testing.T) {
 
 // Test binary search implementation
 func TestBsearch(t *testing.T) {
-	stakes := []uint64{1, 2, 3, 4}
+	weights := []uint64{1, 2, 3, 4}
 	var sum uint64
 	sums := make([]uint64, 0)
-	for i := 0; i < len(stakes); i++ {
-		sum += stakes[i]
+	for i := 0; i < len(weights); i++ {
+		sum += weights[i]
 		sums = append(sums, sum)
 	}
 	sel := make([]int, 0, 10)
@@ -127,7 +128,7 @@ func TestDeterministic(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(N_NODES)
 	for i, identity := range identities {
-		identity.Stake = uint64(i + 1)
+		identity.Weight = uint64(i + 1)
 	}
 	rng := prg(t, someSeed)
 
@@ -226,7 +227,7 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(N_NODES)
 	for i, identity := range identities {
-		identity.Stake = uint64(i)
+		identity.Weight = uint64(i)
 	}
 
 	rng1 := prg(t, someSeed)
@@ -268,7 +269,7 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(N_NODES)
 	for i, identity := range identities {
-		identity.Stake = uint64(i + 1)
+		identity.Weight = uint64(i + 1)
 	}
 
 	leaders, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
@@ -286,7 +287,7 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 	for nodeID, selectedCount := range selected {
 		identity, ok := identities.ByNodeID(nodeID)
 		require.True(t, ok)
-		target := uint64(N_VIEWS) * identity.Stake / 10
+		target := uint64(N_VIEWS) * identity.Weight / 10
 
 		var diff uint64
 		if selectedCount > target {
@@ -308,7 +309,7 @@ func BenchmarkLeaderSelection(b *testing.B) {
 
 	identities := make([]*flow.Identity, 0, N_NODES)
 	for i := 0; i < N_NODES; i++ {
-		identities = append(identities, unittest.IdentityFixture(unittest.WithStake(uint64(i))))
+		identities = append(identities, unittest.IdentityFixture(unittest.WithWeight(uint64(i))))
 	}
 	rng := prg(b, someSeed)
 
@@ -321,45 +322,45 @@ func BenchmarkLeaderSelection(b *testing.B) {
 
 func TestInvalidTotalWeight(t *testing.T) {
 	rng := prg(t, someSeed)
-	identities := unittest.IdentityListFixture(4, unittest.WithStake(0))
+	identities := unittest.IdentityListFixture(4, unittest.WithWeight(0))
 	_, err := ComputeLeaderSelection(0, rng, 10, identities)
 	require.Error(t, err)
 }
 
-func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
+func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 
 	// create 2 RNGs from the same seed
 	rng := prg(t, someSeed)
 	rng_copy := prg(t, someSeed)
 
-	// check that if there is some zero staked node, the selections for each view should be the same as
-	// with no zero staked nodes.
+	// check that if there is some node with 0 weight, the selections for each view should be the same as
+	// with no zero-weight nodes.
 	t.Run("small dataset", func(t *testing.T) {
 		const N_VIEWS = 100
 
-		stakeless := unittest.IdentityListFixture(5, unittest.WithStake(0))
-		stakeful := unittest.IdentityListFixture(5)
-		for i, identity := range stakeful {
-			identity.Stake = uint64(i + 1)
+		weightless := unittest.IdentityListFixture(5, unittest.WithWeight(0))
+		weightful := unittest.IdentityListFixture(5)
+		for i, identity := range weightful {
+			identity.Weight = uint64(i + 1)
 		}
 
-		identities := append(stakeless, stakeful...)
+		identities := append(weightless, weightful...)
 
 		selectionFromAll, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
 		require.NoError(t, err)
 
-		selectionFromStakeful, err := ComputeLeaderSelection(0, rng_copy, N_VIEWS, stakeful)
+		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, N_VIEWS, weightful)
 		require.NoError(t, err)
 
 		for i := 0; i < N_VIEWS; i++ {
 			nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
-			nodeIDFromStakeful, err := selectionFromStakeful.LeaderForView(uint64(i))
+			nodeIDFromWeightful, err := selectionFromWeightful.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
 			// the selection should be the same
-			require.Equal(t, nodeIDFromAll, nodeIDFromStakeful)
+			require.Equal(t, nodeIDFromAll, nodeIDFromWeightful)
 		}
 	})
 
@@ -368,50 +369,50 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 
 		// TODO: randomize the test at each iteration
 		for i := 0; i < 1; i++ {
-			// create 1002 nodes with all 0 stake
-			identities := unittest.IdentityListFixture(1002, unittest.WithStake(0))
+			// create 1002 nodes with all 0 weight
+			identities := unittest.IdentityListFixture(1002, unittest.WithWeight(0))
 
-			// create 2 nodes with 1 stake, and place them in between
+			// create 2 nodes with 1 weight, and place them in between
 			// index 233-777
 			n := toolRng.UintN(777-233) + 233
 			m := toolRng.UintN(777-233) + 233
-			identities[n].Stake = 1
-			identities[m].Stake = 1
+			identities[n].Weight = 1
+			identities[m].Weight = 1
 
-			// the following code check the zero staker should not be selected
-			stakeful := identities.Filter(filter.HasStake(true))
+			// the following code check the zero weight node should not be selected
+			weightful := identities.Filter(filter.HasWeight(true))
 
 			count := 1000
 
 			selectionFromAll, err := ComputeLeaderSelection(0, rng, count, identities)
 			require.NoError(t, err)
 
-			selectionFromStakeful, err := ComputeLeaderSelection(0, rng_copy, count, stakeful)
+			selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, weightful)
 			require.NoError(t, err)
 
 			for j := 0; j < count; j++ {
 				nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(j))
 				require.NoError(t, err)
 
-				nodeIDFromStakeful, err := selectionFromStakeful.LeaderForView(uint64(j))
+				nodeIDFromWeightful, err := selectionFromWeightful.LeaderForView(uint64(j))
 				require.NoError(t, err)
 
 				// the selection should be the same
-				require.Equal(t, nodeIDFromStakeful, nodeIDFromAll)
+				require.Equal(t, nodeIDFromWeightful, nodeIDFromAll)
 			}
 		}
 
-		t.Run("if there is only 1 node has stake, then it will be always be the leader and the only leader", func(t *testing.T) {
+		t.Run("if there is only 1 node has weight, then it will be always be the leader and the only leader", func(t *testing.T) {
 			toolRng := prg(t, someSeed)
 
 			// TODO: randomize the test at each iteration
 			for i := 0; i < 1; i++ {
-				identities := unittest.IdentityListFixture(1000, unittest.WithStake(0))
+				identities := unittest.IdentityListFixture(1000, unittest.WithWeight(0))
 
 				n := toolRng.UintN(1000)
-				stake := n + 1
-				identities[n].Stake = stake
-				onlyStaked := identities[n]
+				weight := n + 1
+				identities[n].Weight = weight
+				onlyNodeWithWeight := identities[n]
 
 				selections, err := ComputeLeaderSelection(0, rng, 1000, identities)
 				require.NoError(t, err)
@@ -419,7 +420,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 				for j := 0; j < 1000; j++ {
 					nodeID, err := selections.LeaderForView(uint64(j))
 					require.NoError(t, err)
-					require.Equal(t, onlyStaked.NodeID, nodeID)
+					require.Equal(t, onlyNodeWithWeight.NodeID, nodeID)
 				}
 			}
 		})
