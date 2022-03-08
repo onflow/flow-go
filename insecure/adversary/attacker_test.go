@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
@@ -32,24 +33,24 @@ func TestAttackerObserve_MultipleConcurrentMessages(t *testing.T) {
 	testAttackerObserve(t, 10)
 }
 
+// testAttackerObserve evaluates that upon receiving concurrent messages from corruptible conduits, the attacker
+// decodes the messages into events and relays them to its registered orchestrator.
 func testAttackerObserve(t *testing.T, concurrencyDegree int) {
-	withScenario(t, concurrencyDegree,
-		func(t *testing.T,
-			orchestrator *mockinsecure.AttackOrchestrator,
-			client insecure.Attacker_ObserveClient,
-			messages []*insecure.Message,
-			events []*insecure.CorruptedNodeEvent) {
+	withAttacker(
+		t,
+		concurrencyDegree,
+		func(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, client insecure.Attacker_ObserveClient, messages []*insecure.Message, events []*insecure.Event) {
 
 			orchestratorWG := sync.WaitGroup{}
-			orchestratorWG.Add(concurrencyDegree)
+			orchestratorWG.Add(concurrencyDegree) // keeps track of total events that orchestrator receives
 
 			mu := sync.Mutex{}
-			seen := make(map[*insecure.CorruptedNodeEvent]struct{}) // keeps track of seen events by orchestrator
+			seen := make(map[*insecure.Event]struct{}) // keeps track of unique events received by orchestrator
 			orchestrator.On("HandleEventFromCorruptedNode", mock.Anything).Run(func(args mock.Arguments) {
 				mu.Lock()
 				defer mu.Unlock()
 
-				e, ok := args[0].(*insecure.CorruptedNodeEvent)
+				e, ok := args[0].(*insecure.Event)
 				require.True(t, ok)
 
 				// event should not be seen before.
@@ -63,6 +64,8 @@ func testAttackerObserve(t *testing.T, concurrencyDegree int) {
 
 			}).Return(nil)
 
+			// sends all messages concurrently to the attacker (imitating corruptible conduits sending
+			// messages conccurently to attacker).
 			attackerSendWG := sync.WaitGroup{}
 			attackerSendWG.Add(concurrencyDegree)
 
@@ -76,24 +79,29 @@ func testAttackerObserve(t *testing.T, concurrencyDegree int) {
 				}()
 			}
 
+			// all messages should be sent to attacker in a timely fashion.
 			unittest.RequireReturnsBefore(t, attackerSendWG.Wait, 1*time.Second, "could not send all messages to attacker on time")
+			// all events should be relayed to the orchestrator by the attacker in a timely fashion.
 			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 1*time.Second, "orchestrator could not receive messages on time")
 		})
 }
 
-func messageFixture(t *testing.T, codec network.Codec) (*insecure.Message, *insecure.CorruptedNodeEvent) {
+// messageFixture creates and returns a randomly generated gRPC message that is sent between a corruptible conduit and the attacker.
+// It also generates and returns the corresponding application-layer event of that message, which is sent between the attacker and the
+// orchestrator.
+func messageFixture(t *testing.T, codec network.Codec) (*insecure.Message, *insecure.Event) {
 	// fixture for content of message
 	originId := unittest.IdentifierFixture()
 	targetIds := unittest.IdentifierListFixture(10)
 	targets := uint32(3)
 	protocol := insecure.Protocol_MULTICAST
 	channel := network.Channel("test-channel")
-	event := &message.TestMessage{
+	content := &message.TestMessage{
 		Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
 	}
 
 	// encodes event to create payload
-	payload, err := codec.Encode(event)
+	payload, err := codec.Encode(content)
 	require.NoError(t, err)
 
 	// creates message that goes over gRPC.
@@ -108,10 +116,10 @@ func messageFixture(t *testing.T, codec network.Codec) (*insecure.Message, *inse
 
 	// creates corresponding event of that message that
 	// is sent by attacker to orchestrator.
-	e := &insecure.CorruptedNodeEvent{
+	e := &insecure.Event{
 		CorruptedId: originId,
 		Channel:     channel,
-		Event:       event,
+		Content:     content,
 		Protocol:    protocol,
 		TargetNum:   targets,
 		TargetIds:   targetIds,
@@ -120,9 +128,12 @@ func messageFixture(t *testing.T, codec network.Codec) (*insecure.Message, *inse
 	return m, e
 }
 
-func messageFixtures(t *testing.T, codec network.Codec, count int) ([]*insecure.Message, []*insecure.CorruptedNodeEvent) {
+// messageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
+// The messages are sent between a corruptible conduit and the attacker.
+// The events are the corresponding protocol-level representation of messages.
+func messageFixtures(t *testing.T, codec network.Codec, count int) ([]*insecure.Message, []*insecure.Event) {
 	msgs := make([]*insecure.Message, count)
-	events := make([]*insecure.CorruptedNodeEvent, count)
+	events := make([]*insecure.Event, count)
 
 	for i := 0; i < count; i++ {
 		m, e := messageFixture(t, codec)
@@ -134,9 +145,13 @@ func messageFixtures(t *testing.T, codec network.Codec, count int) ([]*insecure.
 	return msgs, events
 }
 
-func withScenario(t *testing.T, eventCount int, scenario func(*testing.T, *mockinsecure.AttackOrchestrator, insecure.Attacker_ObserveClient,
-	[]*insecure.Message,
-	[]*insecure.CorruptedNodeEvent)) {
+// withAttacker is a test helper that creates and starts an attacker server, prepares a set of message fixtures and runs the given scenario
+// against the attacker and generated messages.
+func withAttacker(
+	t *testing.T,
+	messageCount int, // number of messages received by attacker from corruptible conduits while playing scenario.
+	scenario func(*testing.T, *mockinsecure.AttackOrchestrator, insecure.Attacker_ObserveClient, []*insecure.Message, []*insecure.Event)) {
+
 	codec := cbor.NewCodec()
 	orchestrator := &mockinsecure.AttackOrchestrator{}
 	// mocks start up of orchestrator
@@ -162,7 +177,7 @@ func withScenario(t *testing.T, eventCount int, scenario func(*testing.T, *mocki
 	attacker.Start(attackCtx)
 	unittest.RequireCloseBefore(t, attacker.Ready(), 1*time.Second, "could not start attacker on time")
 
-	gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithInsecure())
+	gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	require.NoError(t, err)
 
 	client := insecure.NewAttackerClient(gRpcClient)
@@ -170,7 +185,7 @@ func withScenario(t *testing.T, eventCount int, scenario func(*testing.T, *mocki
 	require.NoError(t, err)
 
 	// creates fixtures and runs the scenario
-	msgs, events := messageFixtures(t, codec, eventCount)
+	msgs, events := messageFixtures(t, codec, messageCount)
 	scenario(t, orchestrator, clientStream, msgs, events)
 
 	// terminates resources

@@ -17,6 +17,8 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
+const networkingProtocolTCP = "tcp"
+
 // Attacker implements the adversarial domain that is orchestrating an attack through corrupted nodes.
 type Attacker struct {
 	component.Component
@@ -39,9 +41,10 @@ func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orc
 	// setting lifecycle management module.
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// starts up gRPC server of attacker at given address.
 			s := grpc.NewServer()
 			insecure.RegisterAttackerServer(s, attacker)
-			ln, err := net.Listen("tcp", attacker.address)
+			ln, err := net.Listen(networkingProtocolTCP, attacker.address)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
 			}
@@ -51,11 +54,12 @@ func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orc
 			wg.Add(1)
 			go func() {
 				wg.Done()
-				if err = s.Serve(ln); err != nil {
+				if err = s.Serve(ln); err != nil { // blocking call
 					ctx.Throw(fmt.Errorf("could not bind attacker to the tcp listener: %w", err))
 				}
 			}()
 
+			// waits till gRPC server starts serving.
 			wg.Wait()
 			ready()
 		}).
@@ -91,7 +95,6 @@ func (a *Attacker) Observe(stream insecure.Attacker_ObserveServer) error {
 	for {
 		select {
 		case <-a.cm.ShutdownSignal():
-			// TODO:
 			return nil
 		default:
 			msg, err := stream.Recv()
@@ -130,11 +133,10 @@ func (a *Attacker) processObservedMsg(message *insecure.Message) error {
 		return fmt.Errorf("could not convert target ids to flow identifiers: %w", err)
 	}
 
-	channel := network.Channel(message.ChannelID)
-	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.CorruptedNodeEvent{
+	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.Event{
 		CorruptedId: sender,
-		Channel:     channel,
-		Event:       event,
+		Channel:     network.Channel(message.ChannelID),
+		Content:     event,
 		Protocol:    message.Protocol,
 		TargetNum:   message.Targets,
 		TargetIds:   targetIds,

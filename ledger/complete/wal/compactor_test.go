@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -54,7 +53,7 @@ func Test_Compactor(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -158,7 +157,7 @@ func Test_Compactor(t *testing.T) {
 			}
 		})
 
-		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		time.Sleep(2 * time.Second)
@@ -168,8 +167,8 @@ func Test_Compactor(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(forestSequencing *flattener.FlattenedForest) error {
-					return loadIntoForest(f2, forestSequencing)
+				func(tries []*trie.MTrie) error {
+					return f2.AddTries(tries)
 				},
 				func(update *ledger.TrieUpdate) error {
 					_, err := f2.Update(update)
@@ -234,7 +233,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -329,18 +328,4 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			require.NoError(t, err)
 		})
 	})
-}
-
-func loadIntoForest(forest *mtrie.Forest, forestSequencing *flattener.FlattenedForest) error {
-	tries, err := flattener.RebuildTries(forestSequencing)
-	if err != nil {
-		return err
-	}
-	for _, t := range tries {
-		err := forest.AddTrie(t)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

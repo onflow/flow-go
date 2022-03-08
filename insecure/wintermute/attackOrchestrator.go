@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
+// Orchestrator encapsulates a stateful implementation of wintermute attack orchestrator logic.
 type Orchestrator struct {
 	component.Component
 	logger       zerolog.Logger
@@ -19,11 +20,10 @@ type Orchestrator struct {
 
 var _ insecure.AttackOrchestrator = &Orchestrator{}
 
-// NewOrchestrator creates and returns a new Wintermute attack orchestrator.
-func NewOrchestrator(logger zerolog.Logger, allIds flow.IdentityList, corruptedIds flow.IdentityList, attacker insecure.AttackNetwork) *Orchestrator {
+func NewOrchestrator(allIds flow.IdentityList, corruptedIds flow.IdentityList, attackNetwork insecure.AttackNetwork, logger zerolog.Logger) *Orchestrator {
 	o := &Orchestrator{
 		logger:       logger,
-		network:      attacker,
+		network:      attackNetwork,
 		corruptedIds: corruptedIds,
 		allIds:       allIds,
 	}
@@ -42,7 +42,7 @@ func NewOrchestrator(logger zerolog.Logger, allIds flow.IdentityList, corruptedI
 	return o
 }
 
-// start triggers the sub-modules of orchestrator.0
+// start performs the startup of orchestrator components.
 func (o *Orchestrator) start(ctx irrecoverable.SignalerContext) {
 	o.network.Start(ctx)
 }
@@ -51,7 +51,8 @@ func (o *Orchestrator) start(ctx irrecoverable.SignalerContext) {
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
-func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.CorruptedNodeEvent) error {
+func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
 
+	// TODO: implement wintermute attack logic.
 	panic("implement me")
 }

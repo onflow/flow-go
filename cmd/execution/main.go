@@ -19,6 +19,7 @@ import (
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
+	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -109,7 +110,7 @@ func main() {
 		syncThreshold                 int
 		extensiveLog                  bool
 		pauseExecution                bool
-		checkStakedAtBlock            func(blockID flow.Identifier) (bool, error)
+		checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
 		diskWAL                       *wal.DiskWAL
 		scriptLogThreshold            time.Duration
 		chdpQueryTimeout              uint
@@ -174,6 +175,9 @@ func main() {
 	nodeBuilder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(executionDataService)
+		}).
+		AdminCommand("set-uploader-enabled", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return uploaderCommands.NewToggleUploaderCommand()
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -281,9 +285,9 @@ func main() {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
 			return err
 		}).
-		Module("stake checking function", func(node *cmd.NodeConfig) error {
-			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
-				return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
+		Module("authorization checking function", func(node *cmd.NodeConfig) error {
+			checkAuthorizedAtBlock = func(blockID flow.Identifier) (bool, error) {
+				return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 			}
 			return nil
 		}).
@@ -477,7 +481,7 @@ func main() {
 				node.Me,
 				executionState,
 				collector,
-				checkStakedAtBlock,
+				checkAuthorizedAtBlock,
 				chdpQueryTimeout,
 				chdpDeliveryTimeout,
 			)
@@ -585,7 +589,7 @@ func main() {
 				deltas,
 				syncThreshold,
 				syncFast,
-				checkStakedAtBlock,
+				checkAuthorizedAtBlock,
 				pauseExecution,
 			)
 
