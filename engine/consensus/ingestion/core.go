@@ -9,11 +9,13 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -68,7 +70,7 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("collection_id", guaranteeID[:]).
-		Int("signers", len(guarantee.SignerIDs)).
+		// Int("signers", len(guarantee.SignerIDs)).
 		Logger()
 	log.Info().Msg("collection guarantee received")
 
@@ -147,32 +149,36 @@ func (e *Core) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 //	     nodes independently decide when a collection is finalized and we only check
 //	     that the guarantors are all from the same cluster. This implementation is NOT BFT.
 func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
-	guarantors := guarantee.SignerIDs
-	if len(guarantors) == 0 {
-		return engine.NewInvalidInputError("invalid collection guarantee with no guarantors")
-	}
-
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
 	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
-	clusters, err := snapshot.Epochs().Current().Clustering()
+	cluster, err := snapshot.Epochs().Current().ClusterByChainID(guarantee.ChainID)
 	if errors.Is(err, storage.ErrNotFound) {
-		return engine.NewUnverifiableInputError("could not get clusters for unknown reference block (id=%x): %w", guarantee.ReferenceBlockID, err)
+		return engine.NewUnverifiableInputError(
+			"could not get clusters with chainID %v for unknown reference block (id=%x): %w", guarantee.ChainID, guarantee.ReferenceBlockID, err)
 	}
+
+	// TODO: use sentinal error
+	if err != nil {
+		return engine.NewInvalidInputErrorf("invalid chain ID %v", guarantee.ChainID)
+	}
+
 	if err != nil {
 		return fmt.Errorf("internal error retrieving collector clusters: %w", err)
 	}
-	cluster, _, ok := clusters.ByNodeID(guarantors[0])
-	if !ok {
-		return engine.NewInvalidInputErrorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
-	}
 
 	// ensure the guarantors are from the same cluster
-	clusterLookup := cluster.Lookup()
-	for _, guarantorID := range guarantors {
-		_, exists := clusterLookup[guarantorID]
-		if !exists {
-			return engine.NewInvalidInputError("inconsistent guarantors from different clusters")
-		}
+	clusterMembers := cluster.Members()
+
+	var guarantors flow.IdentityList
+	guarantors, err = packer.DecodeSignerIdentifiersFromIndices(clusterMembers, guarantee.SignerIndices)
+	if err != nil {
+		return engine.NewInvalidInputErrorf("could not decode signer identifiers from indices: %v", err)
+	}
+
+	// determine whether signers reach minimally required stake threshold
+	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(clusterMembers.TotalStake()) // compute required stake threshold
+	if guarantors.TotalStake() < threshold {
+		return engine.NewInvalidInputErrorf("qc signers have insufficient stake of %d (required=%d)", signers.TotalStake(), threshold)
 	}
 
 	return nil

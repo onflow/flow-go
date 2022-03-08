@@ -488,9 +488,9 @@ func WithCollection(collection *flow.Collection) func(guarantee *flow.Collection
 
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID: IdentifierFixture(),
-		SignerIDs:    IdentifierListFixture(16),
-		Signature:    SignatureFixture(),
+		CollectionID:  IdentifierFixture(),
+		SignerIndices: RandomBytes(16),
+		Signature:     SignatureFixture(),
 	}
 	for _, option := range options {
 		option(guarantee)
@@ -579,9 +579,8 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	block := BlockWithParentFixture(parent)
 	block.Payload.Guarantees = nil
 
-	for _, signerIDs := range collectionsSignerIDs {
+	for range collectionsSignerIDs {
 		completeCollection := CompleteCollectionFixture()
-		completeCollection.Guarantee.SignerIDs = signerIDs
 		block.Payload.Guarantees = append(block.Payload.Guarantees, completeCollection.Guarantee)
 		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
 	}

@@ -151,6 +151,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     payload.Collection.ID(),
 					ReferenceBlockID: payload.ReferenceBlockID,
+					ChainID:          header.ChainID,
 					SignerIndices:    step.ParentVoterIndices,
 					Signature:        step.ParentVoterSigData,
 				},
