@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
@@ -176,7 +177,7 @@ func withAttacker(
 	attacker.Start(attackCtx)
 	unittest.RequireCloseBefore(t, attacker.Ready(), 1*time.Second, "could not start attacker on time")
 
-	gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithInsecure())
+	gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	require.NoError(t, err)
 
 	client := insecure.NewAttackerClient(gRpcClient)
