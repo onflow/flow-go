@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -21,17 +20,12 @@ func (s *SetProfilerEnabledCommand) Handler(ctx context.Context, req *admin.Comm
 }
 
 func (s *SetProfilerEnabledCommand) Validator(req *admin.CommandRequest) error {
-	enabled, ok := req.Data.(string)
+	enabled, ok := req.Data.(bool)
 	if !ok {
-		return errors.New("the input must be a string, either \"true\" or \"false\"")
+		return errors.New("the data field must be a bool, either true or false")
 	}
-	if enabled == "true" {
-		req.ValidatorData = true
-	} else if enabled == "false" {
-		req.ValidatorData = false
-	} else {
-		return fmt.Errorf("unknown value, the input must be a string, either \"true\" or \"false\"")
-	}
+
+	req.ValidatorData = enabled
 
 	return nil
 }
