@@ -263,9 +263,10 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 	}()
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	// Hardcoded inclusion effort (of 1.0). Eventually this will be dynamic.
+	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
 	// Execution effort will be connected to computation used.
-	_, err = deductTxFees(proc.Transaction.Payer, 1_0000_0000, computationUsed)
+	inclusionEffort := uint64(100_000_000)
+	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, computationUsed)
 
 	if err != nil {
 		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
