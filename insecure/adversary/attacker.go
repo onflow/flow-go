@@ -19,6 +19,8 @@ import (
 // Attacker implements the adversarial domain that is orchestrating an attack through corrupted nodes.
 type Attacker struct {
 	component.Component
+	address      string
+	server       *grpc.Server
 	logger       zerolog.Logger
 	orchestrator insecure.AttackOrchestrator
 	codec        network.Codec
@@ -30,24 +32,30 @@ func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orc
 		orchestrator: orchestrator,
 		logger:       logger,
 		codec:        codec,
+		address:      address,
 	}
 
 	// setting lifecycle management module.
 	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+
+			err := attacker.listenAndServe()
+			if err != nil {
+				ctx.Throw(err)
+			}
+		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			attacker.start(ctx)
 
 			ready()
 
 			<-ctx.Done()
+			attacker.stop()
 		}).Build()
 
 	attacker.Component = cm
 	attacker.cm = cm
-
-	if err := attacker.listenAndServe(address); err != nil {
-		return nil, fmt.Errorf("could not start up a gRPC server for attacker: %w", err)
-	}
 
 	return attacker, nil
 }
@@ -57,11 +65,16 @@ func (a *Attacker) start(ctx irrecoverable.SignalerContext) {
 	a.orchestrator.Start(ctx)
 }
 
+// start stops the sub-modules of attacker.
+func (a *Attacker) stop() {
+	a.server.Stop()
+}
+
 // listenAndServe establishes an attacker gRPC server on the specified address.
-func (a *Attacker) listenAndServe(address string) error {
+func (a *Attacker) listenAndServe() error {
 	s := grpc.NewServer()
 	insecure.RegisterAttackerServer(s, a)
-	ln, err := net.Listen("tcp", address)
+	ln, err := net.Listen("tcp", a.address)
 	if err != nil {
 		return fmt.Errorf("could not listen on specified address: %w", err)
 	}
