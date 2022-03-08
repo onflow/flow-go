@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -105,12 +105,8 @@ func (w *DiskWAL) RecordDelete(rootHash ledger.RootHash) error {
 
 func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 	return w.Replay(
-		func(forestSequencing *flattener.FlattenedForest) error {
-			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
-			if err != nil {
-				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
-			}
-			err = forest.AddTries(rebuiltTries)
+		func(tries []*trie.MTrie) error {
+			err := forest.AddTries(tries)
 			if err != nil {
 				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
 			}
@@ -132,7 +128,7 @@ func (w *DiskWAL) Segments() (first, last int, err error) {
 }
 
 func (w *DiskWAL) Replay(
-	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+	checkpointFn func(tries []*trie.MTrie) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(ledger.RootHash) error,
 ) error {
@@ -144,7 +140,7 @@ func (w *DiskWAL) Replay(
 }
 
 func (w *DiskWAL) ReplayLogsOnly(
-	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+	checkpointFn func(tries []*trie.MTrie) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 ) error {
@@ -157,7 +153,7 @@ func (w *DiskWAL) ReplayLogsOnly(
 
 func (w *DiskWAL) replay(
 	from, to int,
-	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+	checkpointFn func(tries []*trie.MTrie) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 	useCheckpoints bool,
@@ -343,12 +339,12 @@ type LedgerWAL interface {
 	ReplayOnForest(forest *mtrie.Forest) error
 	Segments() (first, last int, err error)
 	Replay(
-		checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+		checkpointFn func(tries []*trie.MTrie) error,
 		updateFn func(update *ledger.TrieUpdate) error,
 		deleteFn func(ledger.RootHash) error,
 	) error
 	ReplayLogsOnly(
-		checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+		checkpointFn func(tries []*trie.MTrie) error,
 		updateFn func(update *ledger.TrieUpdate) error,
 		deleteFn func(rootHash ledger.RootHash) error,
 	) error
