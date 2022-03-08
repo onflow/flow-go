@@ -122,7 +122,7 @@ const (
 	SyncExecution     = network.Channel("sync-execution")
 
 	// Channels for dkg communication
-	DKGCommittee = "dkg-committee"
+	DKGCommittee = network.Channel("dkg-committee")
 
 	// Channels for actively pushing entities to subscribers
 	PushTransactions = network.Channel("push-transactions")

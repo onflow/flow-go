@@ -18,11 +18,9 @@ import (
 
 // Helper function to initialise an engine.
 func createTestEngine(t *testing.T) *MessagingEngine {
-	// setup mock conduit
-	conduit := &mocknetwork.Conduit{}
 	network := new(mocknetwork.Network)
-	network.On("Register", mock.Anything, mock.Anything).
-		Return(conduit, nil).
+	network.On("RegisterDirectMessageHandler", engine.DKGCommittee, mock.Anything).
+		Return(nil).
 		Once()
 
 	// setup local with nodeID
@@ -45,7 +43,7 @@ func createTestEngine(t *testing.T) *MessagingEngine {
 // outgoing messages from the tunnel's Out channel to the network conduit.
 func TestForwardOutgoingMessages(t *testing.T) {
 	// sender engine
-	engine := createTestEngine(t)
+	eng := createTestEngine(t)
 
 	// expected DKGMessage
 	destinationID := unittest.IdentifierFixture()
@@ -55,22 +53,22 @@ func TestForwardOutgoingMessages(t *testing.T) {
 		"dkg-123",
 	)
 
-	// override the conduit to check that the Unicast call matches the expected
-	// message and destination ID
-	conduit := &mocknetwork.Conduit{}
-	conduit.On("Unicast", &expectedMsg, destinationID).
-		Return(nil).
-		Once()
-	engine.conduit = conduit
+	net := eng.net.(*mocknetwork.Network)
+	net.On(
+		"SendDirectMessage",
+		engine.DKGCommittee,
+		&expectedMsg,
+		destinationID,
+	).Return(nil).Once()
 
-	engine.tunnel.SendOut(msg.PrivDKGMessageOut{
+	eng.tunnel.SendOut(msg.PrivDKGMessageOut{
 		DKGMessage: expectedMsg,
 		DestID:     destinationID,
 	})
 
 	time.Sleep(5 * time.Millisecond)
 
-	conduit.AssertExpectations(t)
+	net.AssertExpectations(t)
 }
 
 // TestForwardIncomingMessages checks that the engine correclty forwards
