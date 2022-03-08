@@ -36,13 +36,15 @@ CC_VAL=${CC_VAL:-"$(which cc)"}
 CC_VERSION_STR="$($CC_VAL --version)"
 
 # we use uname to record which arch we are running on
-ARCH=$(uname -m 2>/dev/null ||true)
+ARCH=$(uname -m 2>/dev/null || true)
 
-if [[ "$ARCH" =~ ^(arm64|armv7|armv7s)$ && "${CC_VERSION_STR[0]}" =~ (clang)  ]]; then
-    #  the "-march=native" option is not supported with clang on ARM
-    MARCH=""
-else
+# Compile x86_64 as westmere by default.
+# See https://github.com/onflow/flow-go/pull/1993#issuecomment-1056048192
+if [[ "$ARCH" = "x86_64" ]]; then
     MARCH="-march=westmere"
+else
+    # Use defaults for ARM
+    MARCH=""
 fi
 
 # Set RELIC config for Flow
