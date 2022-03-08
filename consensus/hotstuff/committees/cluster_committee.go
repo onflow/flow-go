@@ -54,7 +54,7 @@ func NewClusterCommittee(
 		clusterMemberFilter: filter.And(
 			cluster.Members().Selector(),
 			filter.Not(filter.Ejected),
-			filter.HasStake(true),
+			filter.HasWeight(true),
 		),
 		initialClusterMembers: cluster.Members(),
 	}

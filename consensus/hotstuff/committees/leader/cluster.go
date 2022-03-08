@@ -3,8 +3,8 @@ package leader
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 // SelectionForCluster pre-computes and returns leaders for the given cluster
@@ -21,16 +21,24 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*Leade
 	}
 
 	identities := cluster.Members()
-	seed, err := epoch.Seed(indices.ProtocolCollectorClusterLeaderSelection(cluster.Index())...)
+	// get the random source of the current epoch
+	randomSeed, err := epoch.RandomSource()
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection seed for cluster (index: %v) at epoch: %v: %w", cluster.Index(), counter, err)
 	}
+	// create random number generator from the seed and customizer
+	rng, err := seed.PRGFromRandomSource(randomSeed, seed.ProtocolCollectorClusterLeaderSelection(cluster.Index()))
+	if err != nil {
+		return nil, fmt.Errorf("could not create rng: %w", err)
+	}
+
 	firstView := cluster.RootBlock().Header.View
 	// TODO what is a good value here?
 	finalView := firstView + EstimatedSixMonthOfViews
-	leaders, err := ComputeLeaderSelectionFromSeed(
+
+	leaders, err := ComputeLeaderSelection(
 		firstView,
-		seed,
+		rng,
 		int(finalView-firstView+1),
 		identities,
 	)

@@ -117,8 +117,8 @@ func (e InvalidVoteError) Unwrap() error {
 
 // ByzantineThresholdExceededError is raised if HotStuff detects malicious conditions which
 // prove a Byzantine threshold of consensus replicas has been exceeded.
-// Per definition, the byzantine threshold is exceeded is there are byzantine consensus
-// replicas with _at least_ 1/3 stake.
+// Per definition, the byzantine threshold is exceeded if there are byzantine consensus
+// replicas with _at least_ 1/3 weight.
 type ByzantineThresholdExceededError struct {
 	Evidence string
 }

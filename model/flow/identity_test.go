@@ -1,12 +1,15 @@
 package flow_test
 
 import (
+	"encoding/json"
 	"math/rand"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
@@ -48,15 +51,42 @@ func TestHexStringToIdentifier(t *testing.T) {
 	}
 }
 
-/*
 func TestIdentityEncodingJSON(t *testing.T) {
-	identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
-	enc, err := json.Marshal(identity)
-	require.NoError(t, err)
-	var dec flow.Identity
-	err = json.Unmarshal(enc, &dec)
-	require.NoError(t, err)
-	require.Equal(t, identity, &dec)
+
+	t.Run("normal identity", func(t *testing.T) {
+		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+		enc, err := json.Marshal(identity)
+		require.NoError(t, err)
+		var dec flow.Identity
+		err = json.Unmarshal(enc, &dec)
+		require.NoError(t, err)
+		require.Equal(t, identity, &dec)
+	})
+
+	t.Run("empty address should be omitted", func(t *testing.T) {
+		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+		identity.Address = ""
+		enc, err := json.Marshal(identity)
+		require.NoError(t, err)
+		// should have no address field in output
+		assert.False(t, strings.Contains(string(enc), "Address"))
+		var dec flow.Identity
+		err = json.Unmarshal(enc, &dec)
+		require.NoError(t, err)
+		require.Equal(t, identity, &dec)
+	})
+
+	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
+		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+		enc, err := json.Marshal(identity)
+		require.NoError(t, err)
+		// emulate the old encoding by replacing the new field with old field name
+		enc = []byte(strings.Replace(string(enc), "Weight", "Stake", 1))
+		var dec flow.Identity
+		err = json.Unmarshal(enc, &dec)
+		require.NoError(t, err)
+		require.Equal(t, identity, &dec)
+	})
 }
 
 func TestIdentityEncodingMsgpack(t *testing.T) {
@@ -68,7 +98,6 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, identity, &dec)
 }
-*/
 
 func TestIdentityList_Exists(t *testing.T) {
 	t.Run("should find a given element", func(t *testing.T) {
@@ -252,9 +281,9 @@ func TestIdentity_EqualTo(t *testing.T) {
 		require.False(t, b.EqualTo(a))
 	})
 
-	t.Run("Stake diff", func(t *testing.T) {
-		a := &flow.Identity{Stake: 1}
-		b := &flow.Identity{Stake: 2}
+	t.Run("Weight diff", func(t *testing.T) {
+		a := &flow.Identity{Weight: 1}
+		b := &flow.Identity{Weight: 2}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -289,7 +318,7 @@ func TestIdentity_EqualTo(t *testing.T) {
 			NodeID:        flow.Identifier{1, 2, 3},
 			Address:       "address",
 			Role:          flow.RoleCollection,
-			Stake:         23,
+			Weight:        23,
 			Ejected:       false,
 			StakingPubKey: pks[0],
 			NetworkPubKey: pks[1],
@@ -298,7 +327,7 @@ func TestIdentity_EqualTo(t *testing.T) {
 			NodeID:        flow.Identifier{1, 2, 3},
 			Address:       "address",
 			Role:          flow.RoleCollection,
-			Stake:         23,
+			Weight:        23,
 			Ejected:       false,
 			StakingPubKey: pks[0],
 			NetworkPubKey: pks[1],
