@@ -23,6 +23,7 @@ func TestAttackerStart(t *testing.T) {
 	orchestrator.On("Start", mock.AnythingOfType("*irrecoverable.signalerCtx")).Return().Once()
 
 	attacker, err := NewAttacker(unittest.Logger(), attackerAddress, codec, orchestrator)
+
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -39,4 +40,5 @@ func TestAttackerStart(t *testing.T) {
 
 	attacker.Start(attackCtx)
 	<-attacker.Ready()
+
 }

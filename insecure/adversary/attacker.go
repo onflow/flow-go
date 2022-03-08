@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/rs/zerolog"
@@ -38,12 +39,25 @@ func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orc
 	// setting lifecycle management module.
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-
-			err := attacker.listenAndServe()
+			s := grpc.NewServer()
+			insecure.RegisterAttackerServer(s, attacker)
+			ln, err := net.Listen("tcp", attacker.address)
 			if err != nil {
-				ctx.Throw(err)
+				ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
 			}
+			attacker.server = s
+
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				wg.Done()
+				if err = s.Serve(ln); err != nil {
+					ctx.Throw(fmt.Errorf("could not bind attacker to the tcp listener: %w", err))
+				}
+			}()
+
+			wg.Wait()
+			ready()
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			attacker.start(ctx)
@@ -72,15 +86,6 @@ func (a *Attacker) stop() {
 
 // listenAndServe establishes an attacker gRPC server on the specified address.
 func (a *Attacker) listenAndServe() error {
-	s := grpc.NewServer()
-	insecure.RegisterAttackerServer(s, a)
-	ln, err := net.Listen("tcp", a.address)
-	if err != nil {
-		return fmt.Errorf("could not listen on specified address: %w", err)
-	}
-	if err = s.Serve(ln); err != nil {
-		return fmt.Errorf("could not bind attacker to the tcp listener: %w", err)
-	}
 
 	return nil
 }
