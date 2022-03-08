@@ -6,17 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestComplianceEngine(t *testing.T) {
@@ -219,15 +217,13 @@ func (cs *ComplianceSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	cs.head = &finalizedBlock
 
-	done := atomic.NewBool(false)
 	*cs.pending = modulemock.PendingBlockBuffer{}
-	cs.pending.On("PruneByView", finalizedBlock.View).Run(func(mock.Arguments) {
-		done.Toggle()
-	}).Return(nil).Once()
+	cs.pending.On("PruneByView", finalizedBlock.View).Return(nil).Once()
 	cs.pending.On("Size").Return(uint(0)).Once()
 	cs.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
 
-	require.Eventually(cs.T(), done.Load, time.Second, time.Millisecond*20)
-
-	cs.pending.AssertExpectations(cs.T())
+	require.Eventually(cs.T(),
+		func() bool {
+			return cs.pending.AssertCalled(cs.T(), "PruneByView", finalizedBlock.View)
+		}, time.Second, time.Millisecond*20)
 }
