@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/model/flow"
+	pcker "github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -46,22 +46,6 @@ func makeBlockSigData(committee []flow.Identifier) *hotstuff.BlockSignatureData 
 	return blockSigData
 }
 
-func SignerIDsFromSignerIndices(signerIndices []byte, committee []flow.Identifier) ([]flow.Identifier, error) {
-	signerIndex, err := packer.DecodeSignerIndices(signerIndices, len(committee))
-	if err != nil {
-		return nil, err
-	}
-
-	signerIDs := make([]flow.Identifier, 0, len(committee))
-	for _, index := range signerIndex {
-		if index >= len(committee) {
-			return nil, fmt.Errorf("index %v out of range %v", index, len(committee)-1)
-		}
-		signerIDs = append(signerIDs, committee[index])
-	}
-	return signerIDs, nil
-}
-
 // test that a packed data can be unpacked
 // given the consensus committee [A, B, C, D, E, F]
 // [B,D,F] are random beacon nodes
@@ -83,7 +67,7 @@ func TestPackUnpack(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
+	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
 	require.NoError(t, err)
 
 	unpacked, err := packer.Unpack(signerIDs, sig)
@@ -130,7 +114,7 @@ func TestPackUnpackManyNodes(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
+	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
 	require.NoError(t, err)
 
 	unpacked, err := packer.Unpack(signerIDs, sig)
@@ -165,7 +149,7 @@ func TestFailToDecode(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
+	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
 	require.NoError(t, err)
 
 	// prepare invalid data by modifying the valid data
@@ -192,7 +176,7 @@ func TestMismatchSignerIDs(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
+	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
 	require.NoError(t, err)
 
 	// prepare invalid signerIDs by modifying the valid signerIDs
@@ -229,7 +213,7 @@ func TestInvalidSigType(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
+	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
 	require.NoError(t, err)
 
 	data, err := packer.Decode(sig)
@@ -481,7 +465,7 @@ func TestPackUnpackWithoutRBAggregatedSig(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := signerIDsFromSignerIndices(signerIndices, committee)
+	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
 	require.NoError(t, err)
 
 	unpacked, err := packer.Unpack(signerIDs, sig)

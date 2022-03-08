@@ -182,7 +182,7 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block.Payload.Collection.ID(),
-					SignerIDs:    block.Header.ParentVoterIDs,
+					SignerIDs:    []flow.Identifier{}, // block.Header.ParentVoterIndices,
 					Signature:    block.Header.ParentVoterSigData,
 				},
 			})
@@ -233,14 +233,14 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.Header.ParentVoterIDs,
+					SignerIDs:    []flow.Identifier{}, // block1.Header.ParentVoterIndices,
 					Signature:    block1.Header.ParentVoterSigData,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block2.Payload.Collection.ID(),
-					SignerIDs:    block2.Header.ParentVoterIDs,
+					SignerIDs:    []flow.Identifier{}, //  block2.Header.ParentVoterIndices,
 					Signature:    block2.Header.ParentVoterSigData,
 				},
 			})
@@ -290,7 +290,7 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.Header.ParentVoterIDs,
+					SignerIDs:    []flow.Identifier{}, // block1.Header.ParentVoterIndices,
 					Signature:    block1.Header.ParentVoterSigData,
 				},
 			})
@@ -342,7 +342,7 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.Header.ParentVoterIDs,
+					SignerIDs:    []flow.Identifier{}, // block1.Header.ParentVoterIndices,
 					Signature:    block1.Header.ParentVoterSigData,
 				},
 			})

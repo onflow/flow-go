@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
@@ -124,12 +125,8 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 
 		// replace cluster QCs, with real data
 		for i, clusterQC := range commit.ClusterQCs {
-			clusterParticipants := flow.IdentifierList(clusterQC.VoterIDs).Lookup()
-			signers := make([]model.NodeInfo, 0, len(clusterParticipants))
-			for _, signerID := range clusterQC.VoterIDs {
-				signer := nodeInfoLookup[signerID]
-				signers = append(signers, signer)
-			}
+			signers, err := packer.DecodeSignerIdentifiersFromIndices(nodeInfos, clusterQC.VoterIndices)
+			require.NoError(t, err)
 			// generate root cluster block
 			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers))
 			// generate cluster root qc

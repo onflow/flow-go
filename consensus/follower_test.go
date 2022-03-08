@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/packer"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -105,10 +106,13 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 		Height:    21053,
 		View:      52078,
 	}
+
+	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(identities.NodeIDs(), identities.NodeIDs()[:3])
+	require.NoError(s.T(), err)
 	s.rootQC = &flow.QuorumCertificate{
-		View:      s.rootHeader.View,
-		BlockID:   s.rootHeader.ID(),
-		SignerIDs: identities.NodeIDs()[:3],
+		View:          s.rootHeader.View,
+		BlockID:       s.rootHeader.ID(),
+		SignerIndices: signerIndices,
 	}
 
 	// we start with the latest finalized block being the root block
@@ -335,6 +339,7 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 	nextBlock := unittest.BlockHeaderWithParentFixture(parent)
 	nextBlock.View = blockView
 	nextBlock.ProposerID = mc.identities[int(blockView)%len(mc.identities)].NodeID
-	nextBlock.ParentVoterIDs = mc.identities.NodeIDs()
+	signerIndices, _ := packer.EncodeSignerIdentifiersToIndices(mc.identities.NodeIDs(), mc.identities.NodeIDs())
+	nextBlock.ParentVoterIndices = signerIndices
 	return &nextBlock
 }
