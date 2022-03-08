@@ -12,6 +12,7 @@ import (
 	"github.com/vmihailenco/msgpack"
 
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -114,23 +115,28 @@ func TestDispatchRequestVarious(t *testing.T) {
 
 	var nonce uint64
 
-	con := &mocknetwork.Conduit{}
-	con.On("Unicast", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			request := args.Get(0).(*messages.EntityRequest)
-			originID := args.Get(1).(flow.Identifier)
+	channel := network.Channel("TEST")
+
+	net := &mocknetwork.Network{}
+	net.On("SendDirectMessage", mock.AnythingOfType("network.Channel"), mock.Anything, mock.AnythingOfType("flow.Identifier")).
+		Run(func(args mock.Arguments) {
+			ch := args.Get(0).(network.Channel)
+			request := args.Get(1).(*messages.EntityResponse)
+			nodeID := args.Get(2).(flow.Identifier)
 			nonce = request.Nonce
-			assert.Equal(t, originID, targetID)
+			assert.Equal(t, ch, channel)
+			assert.Equal(t, nodeID, targetID)
 			assert.ElementsMatch(t, request.EntityIDs, []flow.Identifier{justAdded.EntityID, triedAnciently.EntityID})
-		},
-	).Return(nil)
+		}).
+		Return(nil)
 
 	request := Engine{
 		unit:     engine.NewUnit(),
 		metrics:  metrics.NewNoopCollector(),
 		cfg:      cfg,
 		state:    state,
-		con:      con,
+		net:      net,
+		channel:  channel,
 		items:    items,
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.HasNodeID(targetID),
@@ -139,7 +145,7 @@ func TestDispatchRequestVarious(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, dispatched)
 
-	con.AssertExpectations(t)
+	net.AssertExpectations(t)
 
 	assert.Contains(t, request.requests, nonce)
 
@@ -188,20 +194,25 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 		items[item.EntityID] = item
 	}
 
-	con := &mocknetwork.Conduit{}
-	con.On("Unicast", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			request := args.Get(0).(*messages.EntityRequest)
+	channel := network.Channel("TEST")
+
+	net := &mocknetwork.Network{}
+	net.On("SendDirectMessage", mock.AnythingOfType("network.Channel"), mock.Anything, mock.AnythingOfType("flow.Identifier")).
+		Run(func(args mock.Arguments) {
+			ch := args.Get(0).(network.Channel)
+			request := args.Get(1).(*messages.EntityResponse)
+			assert.Equal(t, ch, channel)
 			assert.Len(t, request.EntityIDs, int(batchLimit))
-		},
-	).Return(nil)
+		}).
+		Return(nil)
 
 	request := Engine{
 		unit:     engine.NewUnit(),
 		metrics:  metrics.NewNoopCollector(),
 		cfg:      cfg,
 		state:    state,
-		con:      con,
+		net:      net,
+		channel:  channel,
 		items:    items,
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.Any,
@@ -210,7 +221,7 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, dispatched)
 
-	con.AssertExpectations(t)
+	net.AssertExpectations(t)
 }
 
 func TestOnEntityResponseValid(t *testing.T) {
