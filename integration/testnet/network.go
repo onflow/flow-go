@@ -426,7 +426,7 @@ func (n *NetworkConfig) Swap(i, j int) {
 // to network creation.
 type NodeConfig struct {
 	Role                  flow.Role
-	Stake                 uint64
+	Weight                uint64
 	Identifier            flow.Identifier
 	LogLevel              zerolog.Level
 	Ghost                 bool
@@ -438,7 +438,7 @@ type NodeConfig struct {
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 	c := NodeConfig{
 		Role:       role,
-		Stake:      1_250_000,                    // sufficient to exceed minimum for all roles https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowIDTableStaking.cdc#L1161
+		Weight:     flow.DefaultInitialWeight,
 		Identifier: unittest.IdentifierFixture(), // default random ID
 		LogLevel:   zerolog.DebugLevel,           // log at debug by default
 	}
@@ -969,7 +969,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 			conf.NodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
-			0,               // no stake
+			0,               // no weight
 			conf.NetworkingPrivKey,
 			dummyStakingKey,
 		)
@@ -999,7 +999,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
-	// generate the follower node keys (follow nodes do not run as docker containers)
+	// generate the follower node keys (follower nodes do not run as docker containers)
 	followerInfos, err := followerNodeInfos(networkConf.ConsensusFollowers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
@@ -1194,7 +1194,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			conf.Identifier,
 			conf.Role,
 			addr,
-			conf.Stake,
+			conf.Weight,
 			networkKeys[i],
 			stakingKeys[i],
 		)
