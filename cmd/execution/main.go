@@ -200,6 +200,14 @@ func main() {
 			)
 			return err
 		}).
+		Module("hardware specs", func(node *cmd.NodeConfig) error {
+			hwLogger := node.Logger.With().Str("system", "hardware").Logger()
+			err = logHardware(hwLogger)
+			if err != nil {
+				hwLogger.Error().Err(err)
+			}
+			return nil
+		}).
 		Module("execution metrics", func(node *cmd.NodeConfig) error {
 			collector = metrics.NewExecutionCollector(node.Tracer)
 			return nil
@@ -332,12 +340,6 @@ func main() {
 						"bootstap has statecommitment: %x",
 						commit, node.RootSeal.FinalState)
 				}
-			}
-
-			hwLogger := node.Logger.With().Str("system", "hardware").Logger()
-			err = logHardware(hwLogger)
-			if err != nil {
-				hwLogger.Error().Err(err)
 			}
 
 			ledgerStorage, err = ledger.NewLedger(diskWAL, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), ledger.DefaultPathFinderVersion)
