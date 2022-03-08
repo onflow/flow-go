@@ -117,6 +117,7 @@ func (f *HotStuffFactory) CreateModules(
 		finalizedBlock.View+1,
 		notifier,
 		voteProcessorFactory,
+		finalizationDistributor,
 	)
 	if err != nil {
 		return nil, nil, err

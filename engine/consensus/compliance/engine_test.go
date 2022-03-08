@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -218,16 +218,13 @@ func (cs *ComplianceSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	cs.head = &finalizedBlock
 
-	done := atomic.NewBool(false)
-	cs.voteAggregator.On("PruneUpToView", finalizedBlock.View).Run(func(mock.Arguments) {
-		done.Toggle()
-	}).Return(nil).Once()
-	cs.engine.OnFinalizedBlock(finalizedBlock.ID())
+	*cs.pending = modulemock.PendingBlockBuffer{}
+	cs.pending.On("PruneByView", finalizedBlock.View).Return(nil).Once()
+	cs.pending.On("Size").Return(uint(0)).Once()
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
 
-	// matching engine has at least 100ms ticks for processing events
-	time.Sleep(1 * time.Second)
-
-	require.Eventually(cs.T(), done.Load, time.Second, time.Millisecond*20)
-
-	cs.voteAggregator.AssertExpectations(cs.T())
+	require.Eventually(cs.T(),
+		func() bool {
+			return cs.pending.AssertCalled(cs.T(), "PruneByView", finalizedBlock.View)
+		}, time.Second, time.Millisecond*20)
 }
