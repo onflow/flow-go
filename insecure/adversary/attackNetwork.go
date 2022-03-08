@@ -3,12 +3,9 @@ package adversary
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,24 +14,22 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// corruptedNodeConnection represents a named type for a gRPC streaming client to a corrupted conduit factory.
-type corruptedNodeConnection insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient
-
 // AttackNetwork represents the networking interface that is available to the attacker for sending messages "through" corrupted nodes
 // "to" the rest of the network.
 type AttackNetwork struct {
 	component.Component
-	corruptedIds    flow.IdentityList
-	corruptedNodes  map[flow.Identifier]corruptedNodeConnection
-	codec           network.Codec
-	logger          zerolog.Logger
-	attackerAddress string
+	corruptedIds       flow.IdentityList
+	corruptedNodes     map[flow.Identifier]insecure.CorruptedNodeConnection
+	corruptedConnector insecure.CorruptedNodeConnector
+	codec              network.Codec
+	logger             zerolog.Logger
+	attackerAddress    string
 }
 
 func NewAttackNetwork(attackerAddress string, codec network.Codec, corruptedIds flow.IdentityList, logger zerolog.Logger) *AttackNetwork {
 	attackNetwork := &AttackNetwork{
 		corruptedIds:    corruptedIds,
-		corruptedNodes:  make(map[flow.Identifier]corruptedNodeConnection),
+		corruptedNodes:  make(map[flow.Identifier]insecure.CorruptedNodeConnection),
 		logger:          logger,
 		codec:           codec,
 		attackerAddress: attackerAddress,
@@ -72,7 +67,7 @@ func (a *AttackNetwork) RpcUnicastOnChannel(corruptedId flow.Identifier, channel
 		return fmt.Errorf("could not convert event to unicast message: %w", err)
 	}
 
-	err = connection.Send(msg)
+	err = connection.SendMessage(msg)
 	if err != nil {
 		return fmt.Errorf("could not sent unicast event to corrupted node: %w", err)
 	}
@@ -93,7 +88,7 @@ func (a *AttackNetwork) RpcPublishOnChannel(corruptedId flow.Identifier, channel
 		return fmt.Errorf("could not convert event to publish message: %w", err)
 	}
 
-	err = connection.Send(msg)
+	err = connection.SendMessage(msg)
 	if err != nil {
 		return fmt.Errorf("could not sent publish event to corrupted node: %w", err)
 	}
@@ -114,7 +109,7 @@ func (a *AttackNetwork) RpcMulticastOnChannel(corruptedId flow.Identifier, chann
 		return fmt.Errorf("could not convert event to multicast message: %w", err)
 	}
 
-	err = connection.Send(msg)
+	err = connection.SendMessage(msg)
 	if err != nil {
 		return fmt.Errorf("could not sent multicast event to corrupted node: %w", err)
 	}
@@ -125,7 +120,7 @@ func (a *AttackNetwork) RpcMulticastOnChannel(corruptedId flow.Identifier, chann
 // start establishes a connection to individual corrupted conduit factories.
 func (a *AttackNetwork) start(ctx context.Context) error {
 	for _, corruptedId := range a.corruptedIds {
-		corruptibleClient, err := a.corruptibleConduitFactoryClient(ctx, corruptedId.Address)
+		corruptibleClient, err := a.corruptedConnector.Connect(ctx, corruptedId.Address)
 		if err != nil {
 			return fmt.Errorf("could not establish corruptible client to node %x: %w", corruptedId.NodeID, err)
 		}
@@ -139,7 +134,7 @@ func (a *AttackNetwork) start(ctx context.Context) error {
 func (a *AttackNetwork) stop() error {
 	var errors *multierror.Error
 	for _, connection := range a.corruptedNodes {
-		err := connection.CloseSend()
+		err := connection.CloseConnection()
 
 		if err != nil {
 			errors = multierror.Append(errors, err)
@@ -147,45 +142,6 @@ func (a *AttackNetwork) stop() error {
 	}
 
 	return errors.ErrorOrNil()
-}
-
-// corruptedConduitFactoryAddress generates and returns the gRPC interface address of corruptible conduit factory for given identity.
-func corruptedConduitFactoryAddress(address string) (string, error) {
-	corruptedAddress, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return "", fmt.Errorf("could not extract address of corruptible conduit factory %s: %w", address, err)
-	}
-
-	return net.JoinHostPort(corruptedAddress, strconv.Itoa(insecure.CorruptedFactoryPort)), nil
-}
-
-// corruptibleConduitFactoryClient creates a gRPC client for the corruptible conduit factory of the given corrupted identity. It then
-// connects the client to the remote corruptible conduit factory and returns it.+
-func (a *AttackNetwork) corruptibleConduitFactoryClient(ctx context.Context, address string) (corruptedNodeConnection, error) {
-	corruptedAddress, err := corruptedConduitFactoryAddress(address)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate corruptible conduit factory address for: %w", err)
-	}
-	gRpcClient, err := grpc.Dial(corruptedAddress)
-	if err != nil {
-		return nil, fmt.Errorf("could not dial corruptible conduit factory %s: %w", corruptedAddress, err)
-	}
-
-	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
-
-	_, err = client.RegisterAttacker(ctx, &insecure.AttackerRegisterMessage{
-		Address: a.attackerAddress,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not register attacker: %w", err)
-	}
-
-	stream, err := client.ProcessAttackerMessage(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("could not establish a stream to corruptible conduit factory: %w", err)
-	}
-
-	return stream, nil
 }
 
 // eventToMessage converts the given application layer event to a protobuf message that is meant to be sent to the corrupted node.
