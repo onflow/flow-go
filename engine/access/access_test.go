@@ -438,8 +438,9 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			require.Len(suite.T(), er.Chunks, len(executionResult.Chunks))
 			require.Len(suite.T(), er.ServiceEvents, len(executionResult.ServiceEvents))
 
-			assert.Equal(suite.T(), executionResult.BlockID[:], er.BlockId)
-			assert.Equal(suite.T(), executionResult.PreviousResultID[:], er.PreviousResultId)
+			assert.Equal(suite.T(), executionResult.BlockID, convert.MessageToIdentifier(er.BlockId))
+			assert.Equal(suite.T(), executionResult.PreviousResultID, convert.MessageToIdentifier(er.PreviousResultId))
+			assert.Equal(suite.T(), executionResult.ExecutionDataID, convert.MessageToIdentifier(er.ExecutionDataId))
 
 			for i, chunk := range executionResult.Chunks {
 				assert.Equal(suite.T(), chunk.BlockID[:], er.Chunks[i].BlockId)
@@ -461,6 +462,10 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
 			}
+			parsedExecResult, err := convert.ProtoToExecutionResult(resp.ExecutionResult)
+			require.NoError(suite.T(), err)
+			assert.Equal(suite.T(), parsedExecResult, executionResult)
+			assert.Equal(suite.T(), parsedExecResult.ID(), executionResult.ID())
 		}
 
 		suite.Run("nonexisting block", func() {

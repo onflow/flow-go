@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/fork"
@@ -358,9 +358,9 @@ func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, b
 			err)
 	}
 
-	err = ensureStakedNodeWithRole(identity, flow.RoleExecution)
+	err = ensureNodeHasWeightAndRole(identity, flow.RoleExecution)
 	if err != nil {
-		return fmt.Errorf("staked node invalid: %w", err)
+		return fmt.Errorf("node is not authorized execution node: %w", err)
 	}
 
 	err = v.verifySignature(receipt, identity)

@@ -20,14 +20,7 @@ import (
 
 // GenerateClusterRootQC creates votes and generates a QC based on participant data
 func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flow.IdentityList, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
-	clusterRootBlock := &model.Block{
-		BlockID:     clusterBlock.ID(),
-		View:        clusterBlock.Header.View,
-		ProposerID:  clusterBlock.Header.ProposerID,
-		QC:          nil,
-		PayloadHash: clusterBlock.Header.PayloadHash,
-		Timestamp:   clusterBlock.Header.Timestamp,
-	}
+	clusterRootBlock := model.GenesisBlockFromFlow(clusterBlock.Header)
 
 	// STEP 1: create votes for cluster root block
 	votes, err := createRootBlockVotes(signers, clusterRootBlock)
