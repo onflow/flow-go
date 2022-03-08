@@ -35,10 +35,11 @@ type BootstrapProcedure struct {
 	addressGenerator        flow.AddressGenerator
 
 	accountCreationFee               cadence.UFix64
-	transactionFee                   cadence.UFix64
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
+
+	transactionFees BootstrapProcedureFeeParameters
 
 	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
@@ -46,6 +47,12 @@ type BootstrapProcedure struct {
 	// list of initial network participants for whom we will create/stake flow
 	// accounts and retrieve epoch-related resources
 	identities flow.IdentityList
+}
+
+type BootstrapProcedureFeeParameters struct {
+	SurgeFactor         cadence.UFix64
+	InclusionEffortCost cadence.UFix64
+	ExecutionEffortCost cadence.UFix64
 }
 
 type BootstrapProcedureOption func(*BootstrapProcedure) *BootstrapProcedure
@@ -81,14 +88,28 @@ var DefaultStorageMBPerFLOW = func() cadence.UFix64 {
 	return value
 }()
 
-// DefaultTransactionFees are the default transaction fees if transaction fees are on.
+// DefaultTransactionFees are the default transaction fee parameters if transaction fees are on.
+// surge factor is 1.0, inclusion effort cost is 0.0001 (because the static inclusion effort is 1.0) and
+// execution effort cost is 0.0 because dynamic execution fees are off
 // If they are off (which is the default behaviour) that means the transaction fees are 0.0.
-var DefaultTransactionFees = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("0.0001")
+var DefaultTransactionFees = func() BootstrapProcedureFeeParameters {
+	surgeFactor, err := cadence.NewUFix64("1.0")
 	if err != nil {
-		panic(fmt.Errorf("invalid default transaction fees: %w", err))
+		panic(fmt.Errorf("invalid default fee surge factor: %w", err))
 	}
-	return value
+	inclusionEffortCost, err := cadence.NewUFix64("0.0001")
+	if err != nil {
+		panic(fmt.Errorf("invalid default fee effort cost: %w", err))
+	}
+	executionEffortCost, err := cadence.NewUFix64("0.0")
+	if err != nil {
+		panic(fmt.Errorf("invalid default fee effort cost: %w", err))
+	}
+	return BootstrapProcedureFeeParameters{
+		SurgeFactor:         surgeFactor,
+		InclusionEffortCost: inclusionEffortCost,
+		ExecutionEffortCost: executionEffortCost,
+	}
 }()
 
 func WithAccountCreationFee(fee cadence.UFix64) BootstrapProcedureOption {
@@ -98,9 +119,9 @@ func WithAccountCreationFee(fee cadence.UFix64) BootstrapProcedureOption {
 	}
 }
 
-func WithTransactionFee(fee cadence.UFix64) BootstrapProcedureOption {
+func WithTransactionFee(fees BootstrapProcedureFeeParameters) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.transactionFee = fee
+		bp.transactionFees = fees
 		return bp
 	}
 }
@@ -155,7 +176,7 @@ func Bootstrap(
 ) *BootstrapProcedure {
 	bootstrapProcedure := &BootstrapProcedure{
 		serviceAccountPublicKey: serviceAccountPublicKey,
-		transactionFee:          0,
+		transactionFees:         BootstrapProcedureFeeParameters{0, 0, 0},
 		epochConfig:             epochs.DefaultEpochConfig(),
 	}
 
@@ -195,11 +216,18 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.setupParameters(
 		service,
-		b.transactionFee,
 		b.accountCreationFee,
 		b.minimumStorageReservation,
 		b.storagePerFlow,
 		b.restrictedAccountCreationEnabled,
+	)
+
+	b.setupFees(
+		service,
+		feeContract,
+		b.transactionFees.SurgeFactor,
+		b.transactionFees.InclusionEffortCost,
+		b.transactionFees.ExecutionEffortCost,
 	)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
@@ -473,7 +501,6 @@ func (b *BootstrapProcedure) mintInitialTokens(
 
 func (b *BootstrapProcedure) setupParameters(
 	service flow.Address,
-	transactionFee,
 	addressCreationFee,
 	minimumStorageReservation,
 	storagePerFlow cadence.UFix64,
@@ -482,13 +509,30 @@ func (b *BootstrapProcedure) setupParameters(
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.SetupFeesTransaction(
+			blueprints.SetupParametersTransaction(
 				service,
-				transactionFee,
 				addressCreationFee,
 				minimumStorageReservation,
 				storagePerFlow,
 				restrictedAccountCreationEnabled,
+			),
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to setup parameters: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setupFees(service, flowFees flow.Address, surgeFactor, inclusionEffortCost, executionEffortCost cadence.UFix64) {
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.SetupFeesTransaction(
+				service,
+				flowFees,
+				surgeFactor,
+				inclusionEffortCost,
+				executionEffortCost,
 			),
 			0),
 		b.sth,

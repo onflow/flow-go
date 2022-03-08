@@ -242,6 +242,8 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 		return nil
 	}
 
+	computationUsed := env.computationHandler.Used()
+
 	// start a new computation meter for deducting transaction fees.
 	subMeter := env.computationHandler.StartSubMeter(DefaultGasLimit)
 	defer func() {
@@ -260,16 +262,13 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 	}()
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	_, err = deductTxFees(proc.Transaction.Payer)
+	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
+	// Execution effort will be connected to computation used.
+	inclusionEffort := uint64(100_000_000)
+	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, computationUsed)
 
 	if err != nil {
-		// TODO: Fee value is currently a constant. this should be changed when it is not
-		fees, ok := DefaultTransactionFees.ToGoValue().(uint64)
-		if !ok {
-			err = fmt.Errorf("could not get transaction fees during formatting of TransactionFeeDeductionFailedError: %w", err)
-		}
-
-		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, fees, err)
+		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
 	}
 	return nil
 }

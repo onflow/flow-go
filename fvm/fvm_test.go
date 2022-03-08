@@ -3085,8 +3085,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		checkResult   func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure)
 	}
 
-	txFees := fvm.DefaultTransactionFees.ToGoValue().(uint64)
-	fundingAmount := uint64(1_0000_0000)
+	txFees := uint64(10_000)             // 0.0001
+	fundingAmount := uint64(100_000_000) // 1.0
 	transferAmount := uint64(123_456)
 	minimumStorageReservation := fvm.DefaultMinimumStorageReservation.ToGoValue().(uint64)
 
