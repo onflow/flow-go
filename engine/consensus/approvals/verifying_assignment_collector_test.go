@@ -47,12 +47,23 @@ func newVerifyingAssignmentCollector(logger zerolog.Logger,
 	assigner realmodule.ChunkAssigner,
 	seals realmempool.IncorporatedResultSeals,
 	sigHasher hash.Hasher,
-	approvalConduit network.Conduit,
+	net network.Network,
 	requestTracker *RequestTracker,
 	requiredApprovalsForSealConstruction uint,
 ) (*VerifyingAssignmentCollector, error) {
-	b, err := NewAssignmentCollectorBase(logger, workerPool, result, state, headers, assigner, seals, sigHasher,
-		approvalConduit, requestTracker, requiredApprovalsForSealConstruction)
+	b, err := NewAssignmentCollectorBase(
+		logger,
+		net,
+		workerPool,
+		result,
+		state,
+		headers,
+		assigner,
+		seals,
+		sigHasher,
+		requestTracker,
+		requiredApprovalsForSealConstruction,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +79,19 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.BaseAssignmentCollectorTestSuite.SetupTest()
 
 	var err error
-	s.collector, err = newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
-		s.Assigner, s.SealsPL, s.SigHasher, s.Conduit, s.RequestTracker, uint(len(s.AuthorizedVerifiers)))
+	s.collector, err = newVerifyingAssignmentCollector(
+		unittest.Logger(),
+		s.WorkerPool,
+		s.IncorporatedResult.Result,
+		s.State,
+		s.Headers,
+		s.Assigner,
+		s.SealsPL,
+		s.SigHasher,
+		s.Network,
+		s.RequestTracker,
+		uint(len(s.AuthorizedVerifiers)),
+	)
 	require.NoError(s.T(), err)
 }
 
@@ -206,8 +228,19 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner := &module.ChunkAssigner{}
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
-			assigner, s.SealsPL, s.SigHasher, s.Conduit, s.RequestTracker, 1)
+		collector, err := newVerifyingAssignmentCollector(
+			unittest.Logger(),
+			s.WorkerPool,
+			s.IncorporatedResult.Result,
+			s.State,
+			s.Headers,
+			assigner,
+			s.SealsPL,
+			s.SigHasher,
+			s.Network,
+			s.RequestTracker,
+			1,
+		)
 		require.NoError(s.T(), err)
 
 		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
@@ -218,8 +251,20 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		// delete identities for Result.BlockID
 		delete(s.IdentitiesCache, s.IncorporatedResult.Result.BlockID)
 		s.Snapshots[s.IncorporatedResult.Result.BlockID] = unittest.StateSnapshotForKnownBlock(&s.Block, nil)
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
-			s.Assigner, s.SealsPL, s.SigHasher, s.Conduit, s.RequestTracker, 1)
+		collector, err := newVerifyingAssignmentCollector(
+			unittest.Logger(),
+			s.WorkerPool,
+			s.IncorporatedResult.Result,
+			s.State,
+			s.Headers,
+
+			s.Assigner,
+			s.SealsPL,
+			s.SigHasher,
+			s.Network,
+			s.RequestTracker,
+			1,
+		)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
 	})
@@ -243,8 +288,19 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
-			s.SigHasher, s.Conduit, s.RequestTracker, 1)
+		collector, err := newVerifyingAssignmentCollector(
+			unittest.Logger(),
+			s.WorkerPool,
+			s.IncorporatedResult.Result,
+			state,
+			s.Headers,
+			s.Assigner,
+			s.SealsPL,
+			s.SigHasher,
+			s.Network,
+			s.RequestTracker,
+			1,
+		)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
 	})
@@ -263,8 +319,19 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
-			s.SigHasher, s.Conduit, s.RequestTracker, 1)
+		collector, err := newVerifyingAssignmentCollector(
+			unittest.Logger(),
+			s.WorkerPool,
+			s.IncorporatedResult.Result,
+			state,
+			s.Headers,
+			s.Assigner,
+			s.SealsPL,
+			s.SigHasher,
+			s.Network,
+			s.RequestTracker,
+			1,
+		)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
 	})
@@ -282,8 +349,19 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
-			s.SigHasher, s.Conduit, s.RequestTracker, 1)
+		collector, err := newVerifyingAssignmentCollector(
+			unittest.Logger(),
+			s.WorkerPool,
+			s.IncorporatedResult.Result,
+			state,
+			s.Headers,
+			s.Assigner,
+			s.SealsPL,
+			s.SigHasher,
+			s.Network,
+			s.RequestTracker,
+			1,
+		)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
 	})
@@ -293,9 +371,11 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 // is discovered, without execution result we are missing information for verification. Calling `ProcessApproval` before `ProcessApproval`
 // should result in error
 func (s *AssignmentCollectorTestSuite) TestProcessApproval_BeforeIncorporatedResult() {
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
+	approval := unittest.ResultApprovalFixture(
+		unittest.WithChunk(s.Chunks[0].Index),
 		unittest.WithApproverID(s.VerID),
-		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()),
+	)
 	err := s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err))
@@ -307,10 +387,11 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_BeforeIncorporatedRes
 // rate limiting is respected.
 func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	// build new assignment with 2 verifiers
+	numVerifiers := 2
 	assignment := chunks.NewAssignment()
 	for _, chunk := range s.Chunks {
 		verifiers := s.ChunksAssignment.Verifiers(chunk)
-		assignment.Add(chunk, verifiers[:2])
+		assignment.Add(chunk, verifiers[:numVerifiers])
 	}
 	// replace old one
 	s.ChunksAssignment = assignment
@@ -318,7 +399,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	incorporatedBlocks := make([]*flow.Header, 0)
 
 	lastHeight := uint64(rand.Uint32())
-	for i := 0; i < 2; i++ {
+	for i := 0; i < numVerifiers; i++ {
 		incorporatedBlock := unittest.BlockHeaderFixture()
 		incorporatedBlock.Height = lastHeight
 		lastHeight++
@@ -331,7 +412,8 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	for _, block := range incorporatedBlocks {
 		incorporatedResult := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),
-			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()))
+			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+		)
 		incorporatedResults = append(incorporatedResults, incorporatedResult)
 
 		err := s.collector.ProcessIncorporatedResult(incorporatedResult)
@@ -339,12 +421,17 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	}
 
 	requests := make([]*messages.ApprovalRequest, 0)
-	// mock the Publish method when requests are sent to 2 verifiers
-	s.Conduit.On("Publish", mock.Anything, mock.Anything, mock.Anything).
+	// mock the SendDirectMessage method when requests are sent to 2 verifiers
+	s.Network.On(
+		"SendDirectMessage",
+		engine.RequestApprovalsByChunk,
+		mock.AnythingOfType("*messages.ApprovalRequest"),
+		mock.AnythingOfType("flow.Identifier"),
+	).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			// collect the request
-			ar, ok := args[0].(*messages.ApprovalRequest)
+			ar, ok := args[1].(*messages.ApprovalRequest)
 			s.Assert().True(ok)
 			requests = append(requests, ar)
 		})
@@ -370,7 +457,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	s.Require().NoError(err)
 
 	require.Equal(s.T(), int(requestCount), s.Chunks.Len()*len(s.collector.collectors))
-	require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors))
+	require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors)*numVerifiers)
 
 	result := s.IncorporatedResult.Result
 	for _, chunk := range s.Chunks {

@@ -87,7 +87,7 @@ type BaseAssignmentCollectorTestSuite struct {
 	Headers           *storage.Headers
 	Assigner          *module.ChunkAssigner
 	SealsPL           *mempool.IncorporatedResultSeals
-	Conduit           *mocknetwork.Conduit
+	Network           *mocknetwork.Network
 	FinalizedAtHeight map[uint64]*flow.Header
 	IdentitiesCache   map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
 	RequestTracker    *RequestTracker
@@ -100,7 +100,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.SealsPL = &mempool.IncorporatedResultSeals{}
 	s.State = &protocol.State{}
 	s.Assigner = &module.ChunkAssigner{}
-	s.Conduit = &mocknetwork.Conduit{}
+	s.Network = &mocknetwork.Network{}
 	s.Headers = &storage.Headers{}
 
 	s.RequestTracker = NewRequestTracker(s.Headers, 1, 3)

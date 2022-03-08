@@ -36,7 +36,7 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 		headers:                              s.Headers,
 		sigHasher:                            s.SigHasher,
 		seals:                                s.SealsPL,
-		approvalConduit:                      s.Conduit,
+		net:                                  s.Network,
 		requestTracker:                       s.RequestTracker,
 		requiredApprovalsForSealConstruction: 5,
 		executedBlock:                        &s.Block,
