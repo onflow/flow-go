@@ -240,7 +240,7 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block2.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, //  block2.Header.ParentVoterIndices,
+					SignerIDs:    block2.Header.ParentVoterIndices,
 					Signature:    block2.Header.ParentVoterSigData,
 				},
 			})

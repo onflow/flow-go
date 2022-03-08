@@ -146,14 +146,13 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// collection.
 
 			// TODO add real signatures here (2711)
+			// TODO use signer indices for collection guarantee signer IDs
 			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     payload.Collection.ID(),
 					ReferenceBlockID: payload.ReferenceBlockID,
-					// TODO use signer indices for collection guarantee signer IDs
-					// add cluster ID/chain ID
-					SignerIDs: nil, // step.ParentVoterIndices,
-					Signature: step.ParentVoterSigData,
+					SignerIndices:    step.ParentVoterIndices,
+					Signature:        step.ParentVoterSigData,
 				},
 			})
 		}
