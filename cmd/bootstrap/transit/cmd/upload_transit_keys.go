@@ -14,29 +14,29 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// pushTransitKeysCmd represents a command to upload public keys to the transit server
-var pushTransitKeysCmd = &cobra.Command{
-	Use:   "push-transit-keys",
-	Short: "Upload transit keys for a consensus node",
-	Long:  `Upload transit keys for a consensus node`,
-	Run:   pushTransitKeys,
+// pushTransitKeyCmd represents a command to upload public keys to the transit server
+var pushTransitKeyCmd = &cobra.Command{
+	Use:   "push-transit-key",
+	Short: "Upload transit key for a consensus node",
+	Long:  `Upload transit key for a consensus node`,
+	Run:   pushTransitKey,
 }
 
 func init() {
-	rootCmd.AddCommand(pushTransitKeysCmd)
+	rootCmd.AddCommand(pushTransitKeyCmd)
 	addUploadTransitKeysCmdFlags()
 }
 
 func addUploadTransitKeysCmdFlags() {
-	pushTransitKeysCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team")
-	err := pushTransitKeysCmd.MarkFlagRequired("token")
+	pushTransitKeyCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team")
+	err := pushTransitKeyCmd.MarkFlagRequired("token")
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize")
 	}
 }
 
-// pushTransitKeys uploads transit keys to the Flow server
-func pushTransitKeys(_ *cobra.Command, _ []string) {
+// pushTransitKey uploads transit keys to the Flow server
+func pushTransitKey(_ *cobra.Command, _ []string) {
 
 	nodeIDString, err := readNodeID()
 	if err != nil {
