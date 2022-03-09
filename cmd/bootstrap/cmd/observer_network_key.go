@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 )
 
@@ -27,6 +28,8 @@ func init() {
 	rootCmd.AddCommand(observerNetworkKeyCmd)
 
 	observerNetworkKeyCmd.Flags().StringVarP(&flagOutputFile, "output-file", "f", "", "output file path")
+	cmd.MarkFlagRequired(observerNetworkKeyCmd, "output-file")
+
 	observerNetworkKeyCmd.Flags().BytesHexVar(&flagNetworkSeed, "seed", []byte{}, fmt.Sprintf("hex encoded network key seed (min %d bytes)", minSeedBytes))
 }
 
