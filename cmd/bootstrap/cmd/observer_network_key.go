@@ -3,12 +3,15 @@ package cmd
 import (
 	"encoding/hex"
 	"fmt"
-	"path"
+	"io/ioutil"
 
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	model "github.com/onflow/flow-go/model/bootstrap"
+)
+
+var (
+	flagOutputFile string
 )
 
 // observerNetworkKeyCmd represents the `observer-network-key` command which generates required network key
@@ -23,6 +26,7 @@ var observerNetworkKeyCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(observerNetworkKeyCmd)
 
+	observerNetworkKeyCmd.Flags().StringVarP(&flagOutputFile, "output-file", "f", "", "output file path")
 	observerNetworkKeyCmd.Flags().BytesHexVar(&flagNetworkSeed, "seed", []byte{}, fmt.Sprintf("hex encoded network key seed (min %d bytes)", minSeedBytes))
 }
 
@@ -35,13 +39,13 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 	}
 
 	// if the file already exists, exit
-	keyExists, err := pathExists(path.Join(flagOutdir, model.FilenameObserverNetworkKey))
+	keyExists, err := pathExists(flagOutputFile)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not check if network-key exists")
+		log.Fatal().Err(err).Msgf("could not check if %s exists", flagOutputFile)
 	}
 
 	if keyExists {
-		log.Warn().Msg("network key already exists, exiting...")
+		log.Warn().Msgf("%s already exists, exiting...", flagOutputFile)
 		return
 	}
 
@@ -57,5 +61,11 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 	output := make([]byte, hex.EncodedLen(networkKey.Size()))
 	hex.Encode(output, networkKey.Encode())
 
-	writeText(model.FilenameObserverNetworkKey, output)
+	// write to file
+	err = ioutil.WriteFile(flagOutputFile, output, 0600)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not write file")
+	}
+
+	log.Info().Msgf("wrote file %v", flagOutputFile)
 }

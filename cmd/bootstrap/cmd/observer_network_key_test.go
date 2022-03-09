@@ -12,16 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestObserverNetworkKeyFileExists(t *testing.T) {
 	unittest.RunWithTempDir(t, func(bootDir string) {
-		var keyFileExistsRegex = regexp.MustCompile(`^network key already exists`)
-
 		// command flags
-		flagOutdir = bootDir
+		flagOutputFile = filepath.Join(bootDir, "test-network-key")
+
+		keyFileExistsRegex := regexp.MustCompile(fmt.Sprintf(`^%s already exists`, flagOutputFile))
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -30,14 +30,12 @@ func TestObserverNetworkKeyFileExists(t *testing.T) {
 		observerNetworkKeyRun(nil, nil)
 		hook.logs.Reset()
 
-		require.DirExists(t, flagOutdir)
-
 		// make sure file exists
-		networkKeyFilePath := filepath.Join(flagOutdir, model.FilenameObserverNetworkKey)
-		require.FileExists(t, networkKeyFilePath)
+		require.FileExists(t, flagOutputFile)
 
 		// read file priv key file before command
-		keyDataBefore := readText(networkKeyFilePath)
+		keyDataBefore, err := io.ReadFile(flagOutputFile)
+		require.NoError(t, err)
 
 		// run command with flags
 		observerNetworkKeyRun(nil, nil)
@@ -46,7 +44,8 @@ func TestObserverNetworkKeyFileExists(t *testing.T) {
 		require.Regexp(t, keyFileExistsRegex, hook.logs.String())
 
 		// read network key file again
-		keyDataAfter := readText(networkKeyFilePath)
+		keyDataAfter, err := io.ReadFile(flagOutputFile)
+		require.NoError(t, err)
 
 		// check if key was modified
 		assert.Equal(t, keyDataBefore, keyDataAfter)
@@ -55,17 +54,15 @@ func TestObserverNetworkKeyFileExists(t *testing.T) {
 
 func TestObserverNetworkKeyFileCreated(t *testing.T) {
 	unittest.RunWithTempDir(t, func(bootDir string) {
-		var keyFileCreatedRegex = `^generated network key` +
-			`wrote file %s/network-key`
-		regex := regexp.MustCompile(fmt.Sprintf(keyFileCreatedRegex, bootDir))
-
 		// command flags
-		flagOutdir = bootDir
+		flagOutputFile = filepath.Join(bootDir, "test-network-key")
+
+		keyFileCreatedRegex := `^generated network key` +
+			`wrote file %s`
+		regex := regexp.MustCompile(fmt.Sprintf(keyFileCreatedRegex, flagOutputFile))
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
-
-		networkKeyFilePath := filepath.Join(flagOutdir, model.FilenameObserverNetworkKey)
 
 		// run command with flags
 		observerNetworkKeyRun(nil, nil)
@@ -74,10 +71,12 @@ func TestObserverNetworkKeyFileCreated(t *testing.T) {
 		assert.Regexp(t, regex, hook.logs.String())
 
 		// make sure file exists (regex checks this too)
-		require.FileExists(t, networkKeyFilePath)
+		require.FileExists(t, flagOutputFile)
 
 		// make sure key is valid and the correct type
-		keyData := readText(networkKeyFilePath)
+		keyData, err := io.ReadFile(flagOutputFile)
+		require.NoError(t, err)
+
 		validateNetworkKey(t, keyData)
 	})
 }

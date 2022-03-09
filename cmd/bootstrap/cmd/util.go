@@ -50,15 +50,6 @@ func writeJSON(path string, data interface{}) {
 	writeText(path, bz)
 }
 
-func readText(path string) []byte {
-	dat, err := io.ReadFile(path)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot read data")
-	}
-
-	return dat
-}
-
 func writeText(path string, data []byte) {
 	path = filepath.Join(flagOutdir, path)
 

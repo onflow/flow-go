@@ -153,9 +153,7 @@ go run -tags relic ./cmd/bootstrap finalize \
 This generates the networking key used by observers to connect to the public libp2p network. It is a different key format than staked nodes and should only be used for Observers.
 
 ```bash
-go run -tags relic ./cmd/bootstrap observer-network-key  -o ./path/
+go run -tags relic ./cmd/bootstrap observer-network-key  -f ./path/network-key
 ```
-
-In this example, the following file will be generated: `./path/network-key`
 
 This key must be kept secret as it's used to encrypt and sign network requests sent by the observers.
