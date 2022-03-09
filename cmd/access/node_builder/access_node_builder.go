@@ -71,11 +71,10 @@ type AccessNodeBuilder interface {
 	IsStaked() bool
 }
 
-// AccessNodeConfig defines all the user defined parameters required to bootstrap an access node
+// ObserverNodeConfig defines all the user defined parameters required to bootstrap an observer node
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
-type AccessNodeConfig struct {
-	staked                       bool
+type ObserverNodeConfig struct {
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
 	observerNetworkingKeyPath    string
@@ -101,6 +100,14 @@ type AccessNodeConfig struct {
 	PublicNetworkConfig PublicNetworkConfig
 }
 
+// AccessNodeConfig defines all the user defined parameters required to bootstrap an access node
+// For a node running as a standalone process, the config fields will be populated from the command line params,
+// while for a node running as a library, the config fields are expected to be initialized by the caller.
+type AccessNodeConfig struct {
+	ObserverNodeConfig
+	staked bool
+}
+
 type PublicNetworkConfig struct {
 	// NetworkKey crypto.PublicKey // TODO: do we need a different key for the public network?
 	BindAddress string
@@ -108,9 +115,9 @@ type PublicNetworkConfig struct {
 	Metrics     module.NetworkMetrics
 }
 
-// DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
-func DefaultAccessNodeConfig() *AccessNodeConfig {
-	return &AccessNodeConfig{
+// DefaultObserverNodeConfig defines all the default values for the AccessNodeConfig
+func DefaultObserverNodeConfig() *ObserverNodeConfig {
+	return &ObserverNodeConfig{
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
@@ -136,7 +143,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		nodeInfoFile:                 "",
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
-		staked:                       true,
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
 		supportsUnstakedFollower:     false,
@@ -145,6 +151,34 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			Metrics:     metrics.NewNoopCollector(),
 		},
 		observerNetworkingKeyPath: cmd.NotSet,
+	}
+}
+
+// CustomAccessNodeConfig defines custom values of an unstaged access node based on observer parameters
+func NewObserverNodeConfig(config *ObserverNodeConfig, opts ...Option) *AccessNodeConfig {
+	accessConfig := &AccessNodeConfig{
+		ObserverNodeConfig: *config,
+		staked:             false,
+	}
+	for _, opt := range opts {
+		opt(accessConfig)
+	}
+	return accessConfig
+}
+
+func NewObserverNodeBuilder(accessConfig *AccessNodeConfig, config *ObserverNodeConfig) *FlowAccessNodeBuilder {
+	return &FlowAccessNodeBuilder{
+		AccessNodeConfig:        accessConfig,
+		FlowNodeBuilder:         cmd.FlowNode(flow.RoleObserver.String(), config.baseOptions...),
+		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
+	}
+}
+
+// DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
+func DefaultAccessNodeConfig() *AccessNodeConfig {
+	return &AccessNodeConfig{
+		ObserverNodeConfig: *DefaultObserverNodeConfig(),
+		staked:             true,
 	}
 }
 

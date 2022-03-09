@@ -19,6 +19,7 @@ const (
 	RoleExecution    Role = 3
 	RoleVerification Role = 4
 	RoleAccess       Role = 5
+	RoleObserver     Role = 6
 )
 
 func (r Role) Valid() bool {
@@ -38,6 +39,8 @@ func (r Role) String() string {
 		return "verification"
 	case RoleAccess:
 		return "access"
+	case RoleObserver:
+		return "observer"
 	default:
 		panic(fmt.Sprintf("invalid role (%d)", r))
 	}
@@ -56,6 +59,8 @@ func ParseRole(role string) (Role, error) {
 		return RoleVerification, nil
 	case "access":
 		return RoleAccess, nil
+	case "observer":
+		return RoleObserver, nil
 	default:
 		return 0, errors.Errorf("invalid role string (%s)", role)
 	}
@@ -72,7 +77,7 @@ func (r *Role) UnmarshalText(text []byte) error {
 }
 
 func Roles() RoleList {
-	return []Role{RoleCollection, RoleConsensus, RoleExecution, RoleVerification, RoleAccess}
+	return []Role{RoleCollection, RoleConsensus, RoleExecution, RoleVerification, RoleAccess, RoleObserver}
 }
 
 // RoleList defines a slice of roles in flow system.

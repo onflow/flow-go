@@ -12,13 +12,15 @@ func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
 	// ensure all nodes of the same role have equal weight
 	for _, role := range flow.Roles() {
 		withRole := allNodes.Filter(filter.HasRole(role))
-		expectedWeight := withRole[0].Weight
-		for _, node := range withRole {
-			if node.Weight != expectedWeight {
-				log.Fatal().Msgf(
-					"will not bootstrap configuration with non-equal weights\n"+
-						"found nodes with role %s and weight1=%d, weight2=%d",
-					role, expectedWeight, node.Weight)
+		if len(withRole) > 0 {
+	                expectedWeight := withRole[0].Weight
+			for _, node := range withRole {
+				if node.Weight != expectedWeight {
+					log.Fatal().Msgf(
+						"will not bootstrap configuration with non-equal weights\n"+
+							"found nodes with role %s and weight1=%d, weight2=%d",
+						role, expectedWeight, node.Weight)
+				}
 			}
 		}
 	}
