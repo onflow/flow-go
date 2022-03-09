@@ -69,7 +69,7 @@ jobs:
         max_attempts: 2
         command: make ci
     - name: Upload coverage report
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v2
       if: ${{ matrix.go-version == '1.17' }}
       with:
         file: ./coverage.txt
