@@ -26,7 +26,6 @@ func TestInsert(t *testing.T) {
 }
 
 func TestRemoveAll(t *testing.T) {
-
 	removeCount := uint64(100000)
 
 	t.Run("remove random order", func(t *testing.T) {

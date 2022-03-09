@@ -117,24 +117,24 @@ func remove(heights []uint64, h uint64) []uint64 {
 		return heights
 	}
 
-	// find the remove position given a descending order slice
-	pos := sort.Search(len(heights), func(i int) bool { return heights[i] <= h })
+	// most of the time, we'll be removing the highest or lowest height
+	if h == heights[len(heights)-1] {
+		// remove from the end
+		return heights[:len(heights)-1]
+	}
 
-	switch {
-	case pos >= len(heights) || heights[pos] != h:
-		// not in the list
-		return heights
-
-	case pos == 0:
+	if h == heights[0] {
 		// remove from the front
 		return heights[1:]
-
-	case pos == len(heights)-1:
-		// remove from the end
-		return heights[:pos]
-
-	default:
-		// remove from the middle
-		return append(heights[:pos], heights[pos+1:]...)
 	}
+
+	// find the remove position given a descending order slice
+	pos := sort.Search(len(heights), func(i int) bool { return heights[i] <= h })
+	if pos >= len(heights) || heights[pos] != h {
+		// not in the list
+		return heights
+	}
+
+	// remove from the middle
+	return append(heights[:pos], heights[pos+1:]...)
 }
