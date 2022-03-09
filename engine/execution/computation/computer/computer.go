@@ -3,7 +3,6 @@ package computer
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -376,7 +375,7 @@ func (e *blockComputer) executeTransaction(
 
 	txResult := flow.TransactionResult{
 		TransactionID:   tx.ID,
-		ComputationUsed: tx.ComputationMeteringHandler.Used(),
+		ComputationUsed: tx.ComputationUsed,
 	}
 
 	if tx.Err != nil {
@@ -397,7 +396,7 @@ func (e *blockComputer) executeTransaction(
 	res.AddEvents(collectionIndex, tx.Events)
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
-	res.AddComputationUsed(tx.ComputationMeteringHandler.Used())
+	res.AddComputationUsed(tx.ComputationUsed)
 
 	lg := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).
@@ -405,7 +404,7 @@ func (e *blockComputer) executeTransaction(
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
-		Uint64("computationUsed", tx.ComputationMeteringHandler.Used()).
+		Uint64("computationUsed", tx.ComputationUsed).
 		Logger()
 
 	if tx.Err != nil {
@@ -417,19 +416,7 @@ func (e *blockComputer) executeTransaction(
 		lg.Info().Msg("transaction executed successfully")
 	}
 
-	if e.log.GetLevel() >= zerolog.InfoLevel {
-		d := zerolog.Dict()
-		for s, u := range tx.ComputationMeteringHandler.Intensities() {
-			d.Uint(strconv.FormatUint(uint64(s), 10), u)
-		}
-		e.log.Info().
-			Str("txHash", tx.ID.String()).
-			Dict("intensities", d).
-			Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
-			Msg("transaction computation parameters")
-	}
-
-	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationMeteringHandler.Used(), len(tx.Events), tx.Err != nil)
+	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
 	return nil
 }
 

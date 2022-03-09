@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/onflow/cadence/runtime"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -61,9 +63,13 @@ func (i *TransactionInvoker) Process(
 	retry := false
 	numberOfRetries := 0
 
+	computationHandler := handler.NewComputationMeteringHandler(
+		handler.ComputationLimit(ctx.GasLimit, proc.Transaction.GasLimit, DefaultGasLimit),
+		handler.WithCoumputationWeightFactors(map[uint]uint{handler.MeteredOperationfunction_or_loop_call: 1}))
+
 	parentState := sth.State()
 	childState := sth.NewChild()
-	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, proc.ComputationMeteringHandler)
+	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, computationHandler)
 	predeclaredValues := valueDeclarations(ctx, env)
 
 	defer func() {
@@ -107,7 +113,7 @@ func (i *TransactionInvoker) Process(
 
 			// reset error part of proc
 			// Warning right now the tx requires retry logic doesn't change
-			// anything on state but we might want to revert the state changes (or not committing)
+			// anything on state, but we might want to revert the state changes (or not committing)
 			// if we decided to expand it further.
 			proc.Err = nil
 			proc.Logs = make([]string, 0)
@@ -115,7 +121,7 @@ func (i *TransactionInvoker) Process(
 			proc.ServiceEvents = make([]flow.Event, 0)
 
 			// reset env
-			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, proc.ComputationMeteringHandler)
+			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, computationHandler)
 		}
 
 		location := common.TransactionLocation(proc.ID[:])
@@ -197,7 +203,7 @@ func (i *TransactionInvoker) Process(
 			Msg("transaction executed with error")
 
 		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, proc.ComputationMeteringHandler)
+		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, computationHandler)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc)
@@ -218,12 +224,14 @@ func (i *TransactionInvoker) Process(
 				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 				Msg("transaction fee deduction executed with error")
 
+			i.logExecutionIntensities(computationHandler, txIDStr)
 			return feesError
 		}
 	}
 
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
+	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -234,6 +242,7 @@ func (i *TransactionInvoker) Process(
 	proc.Events = append(proc.Events, env.Events()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
+	i.logExecutionIntensities(computationHandler, txIDStr)
 	return txError
 }
 
@@ -423,4 +432,18 @@ func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedu
 		Str("codes", string(codesJSON)).
 		Str("programs", string(programsJSON)).
 		Msg("checking failed")
+}
+
+// logExecutionIntensities logs execution intensities of the transaction
+func (i *TransactionInvoker) logExecutionIntensities(cmh *handler.ComputationMeteringHandler, txHash string) {
+	if i.logger.GetLevel() >= zerolog.DebugLevel {
+		d := zerolog.Dict()
+		for s, u := range cmh.Intensities() {
+			d.Uint(strconv.FormatUint(uint64(s), 10), u)
+		}
+		i.logger.Info().
+			Str("txHash", txHash).
+			Dict("intensities", d).
+			Msg("transaction execution intensities")
+	}
 }

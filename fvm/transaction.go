@@ -5,8 +5,6 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/onflow/flow-go/fvm/handler"
-
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -17,10 +15,9 @@ import (
 
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:                         tx.ID(),
-		Transaction:                tx,
-		TxIndex:                    txIndex,
-		ComputationMeteringHandler: handler.NewComputationMeteringHandler(DefaultGasLimit),
+		ID:          tx.ID(),
+		Transaction: tx,
+		TxIndex:     txIndex,
 	}
 }
 
@@ -29,16 +26,16 @@ type TransactionProcessor interface {
 }
 
 type TransactionProcedure struct {
-	ID                         flow.Identifier
-	Transaction                *flow.TransactionBody
-	TxIndex                    uint32
-	Logs                       []string
-	Events                     []flow.Event
-	ServiceEvents              []flow.Event
-	ComputationMeteringHandler *handler.ComputationMeteringHandler
-	Err                        errors.Error
-	Retried                    int
-	TraceSpan                  opentracing.Span
+	ID              flow.Identifier
+	Transaction     *flow.TransactionBody
+	TxIndex         uint32
+	Logs            []string
+	Events          []flow.Event
+	ServiceEvents   []flow.Event
+	ComputationUsed uint64
+	Err             errors.Error
+	Retried         int
+	TraceSpan       opentracing.Span
 }
 
 func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
@@ -49,7 +46,6 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 
 	defer func() {
 		if r := recover(); r != nil {
-
 			if strings.Contains(fmt.Sprintf("%v", r), "[Error Code: 1106]") {
 				ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("VM LedgerIntractionLimitExceeded panic")
 				proc.Err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
@@ -59,10 +55,6 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 			panic(r)
 		}
 	}()
-
-	proc.ComputationMeteringHandler = handler.NewComputationMeteringHandler(
-		handler.ComputationLimit(ctx.GasLimit, proc.Transaction.GasLimit, DefaultGasLimit),
-		handler.WithCoumputationWeightFactors(map[uint]uint{handler.MeteredOperationfunction_or_loop_call: 1}))
 
 	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
 		st.SetPayerIsServiceAccount()
