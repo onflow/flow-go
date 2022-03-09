@@ -328,6 +328,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			"BINSTAT_LEN_WHAT",
 			"BINSTAT_DMP_NAME",
 			"BINSTAT_DMP_PATH",
+			"GODEBUG=asyncpreemptoff=1",
 		},
 	}
 
