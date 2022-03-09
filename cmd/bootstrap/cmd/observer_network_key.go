@@ -12,7 +12,7 @@ import (
 )
 
 // observerNetworkKeyCmd represents the `observer-network-key` command which generates required network key
-// for an observer,  and writes it to the default path within the provided directory. Used by new observer
+// for an Observer,  and writes it to the default path within the provided directory. Used by new Observer
 // operators to create the networking key only
 var observerNetworkKeyCmd = &cobra.Command{
 	Use:   "observer-network-key",
