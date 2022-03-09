@@ -16,12 +16,12 @@ import (
 )
 
 type blockSummary struct {
-	BlockHeight   uint64 `json:"block_height"`
-	BlockID       string `json:"block_id"`
-	ParentBlockID string `json:"parent_block_id"`
-	// ParentVoterIndices []byte `json:"parent_voter_ids"`
-	// ParentVoterSigData []string  `json:"parent_voter_sig"`
-	ProposerID string `json:"proposer_id"`
+	BlockHeight        uint64 `json:"block_height"`
+	BlockID            string `json:"block_id"`
+	ParentBlockID      string `json:"parent_block_id"`
+	ParentVoterIndices string `json:"parent_voter_indices"`
+	ParentVoterSigData string `json:"parent_voter_sig"`
+	ProposerID         string `json:"proposer_id"`
 	// ProposerSigData    string  `json:"proposer_sig"`
 	Timestamp         time.Time `json:"timestamp"`
 	CollectionIDs     []string  `json:"collection_ids"`
@@ -88,15 +88,17 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 		}
 
 		b := blockSummary{
-			BlockID:           hex.EncodeToString(activeBlockID[:]),
-			BlockHeight:       header.Height,
-			ParentBlockID:     hex.EncodeToString(header.ParentID[:]),
-			ProposerID:        hex.EncodeToString(header.ProposerID[:]),
-			Timestamp:         header.Timestamp,
-			CollectionIDs:     cols,
-			SealedBlocks:      seals,
-			SealedResults:     sealsResults,
-			SealedFinalStates: sealsStates,
+			BlockID:            hex.EncodeToString(activeBlockID[:]),
+			BlockHeight:        header.Height,
+			ParentBlockID:      hex.EncodeToString(header.ParentID[:]),
+			ParentVoterIndices: hex.EncodeToString(header.ParentVoterIndices),
+			ParentVoterSigData: hex.EncodeToString(header.ParentVoterSigData),
+			ProposerID:         hex.EncodeToString(header.ProposerID[:]),
+			Timestamp:          header.Timestamp,
+			CollectionIDs:      cols,
+			SealedBlocks:       seals,
+			SealedResults:      sealsResults,
+			SealedFinalStates:  sealsStates,
 		}
 
 		jsonData, err := json.Marshal(b)
