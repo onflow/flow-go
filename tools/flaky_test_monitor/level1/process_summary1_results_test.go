@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -58,7 +57,7 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 		// with using `fmt.printf("log message")` without newline `\n`
 
 		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
-		// this is a single unit test that produces a no result result
+		// this is a single unit test that produces a no result
 		"1 count single no result test": {
 			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountSingleNoResultTest(),
 			RawJSONTestRunFile:    "test-result-nil-test-single-1-count-pass.json",
@@ -98,7 +97,7 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 			// *****************************************************
 			actualLevel1Summary := generateLevel1Summary(&resultReader)
 			// *****************************************************
-			checkLevel1Summaries(t, testData.ExpectedLevel1Summary, actualLevel1Summary)
+			require.ElementsMatch(t, testData.ExpectedLevel1Summary.Rows, actualLevel1Summary.Rows)
 		})
 	}
 }
@@ -117,7 +116,7 @@ func TestGenerateLevel1Summary_JSON(t *testing.T) {
 			actualLevel1Summary := runGenerateLevel1Summary(t, testJsonData)
 			// *****************************************************
 			expectedLevel1Summary := getExpectedLevel1SummaryFromJSON(t, testJsonData)
-			checkLevel1Summaries(t, expectedLevel1Summary, actualLevel1Summary)
+			require.ElementsMatch(t, expectedLevel1Summary.Rows, actualLevel1Summary.Rows)
 		})
 	}
 }
@@ -160,21 +159,6 @@ func runGenerateLevel1Summary(t *testing.T, jsonExpectedActualFile string) commo
 	return actualLevel1Summary
 }
 
-func checkLevel1Summaries(t *testing.T, expectedLevel1Summary common.Level1Summary, actualLevel1Summary common.Level1Summary) {
-	// number of results should be the same between expected and actual
-	require.Equal(t, len(expectedLevel1Summary.Rows), len(actualLevel1Summary.Rows))
-
-	// check that all expected results are in actual results
-	for actualRowIndex := range actualLevel1Summary.Rows {
-		require.Contains(t, actualLevel1Summary.Rows, expectedLevel1Summary.Rows[actualRowIndex], printLevel1TestResult(expectedLevel1Summary.Rows[actualRowIndex].TestResult, "expected not in actual"))
-	}
-
-	// check that all actual results are in expected results
-	for exptedRowIndex := range expectedLevel1Summary.Rows {
-		require.Contains(t, expectedLevel1Summary.Rows, actualLevel1Summary.Rows[exptedRowIndex], printLevel1TestResult(actualLevel1Summary.Rows[exptedRowIndex].TestResult, "actual not in expected"))
-	}
-}
-
 // read raw results from local json file - for testing
 type FileResultReader struct {
 	rawJsonFile string
@@ -202,20 +186,4 @@ func (fileResultReader *FileResultReader) close() {
 func (fileResultReader FileResultReader) getResultsFileName() string {
 	t := time.Now()
 	return "test-run-" + strings.ReplaceAll(t.Format("2006-01-02-15-04-05.0000"), ".", "-") + ".json"
-}
-
-func printLevel1TestResult(level1TestResult common.Level1TestResult, message string) string {
-	builder := strings.Builder{}
-	builder.WriteString("*** Test Result (not found) " + message + "***")
-	builder.WriteString("\nTest: " + level1TestResult.Test)
-	builder.WriteString("\nCommit SHA: " + level1TestResult.CommitSha)
-	builder.WriteString("\nPackage: " + level1TestResult.Package)
-	builder.WriteString("\nCommit Date: " + level1TestResult.CommitDate.String())
-	builder.WriteString("\nJob Run Date: " + level1TestResult.JobRunDate.String())
-	builder.WriteString("\nElapsed: " + fmt.Sprintf("%f", level1TestResult.Elapsed))
-	builder.WriteString("\nResult: " + level1TestResult.Result)
-	for i, output := range level1TestResult.Output {
-		builder.WriteString("\nOutput[" + fmt.Sprintf("%d", i) + "]" + output.Item)
-	}
-	return builder.String()
 }

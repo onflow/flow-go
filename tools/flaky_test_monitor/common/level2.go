@@ -43,7 +43,7 @@ func AssertLevel2TestResults(t *testing.T, expectedLevel2TestResult, actualLevel
 	require.Equal(t, expectedLevel2TestResult.AverageDuration, actualLevel2TestResult.AverageDuration, "avg duration not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, len(expectedLevel2TestResult.Durations), len(actualLevel2TestResult.Durations), PrintLevel2TestResult(&actualLevel2TestResult, "duration list sizes don't match"))
 	// skip checking all individual durations because
-	// a. require.Contains() seems to have bug for checking float values in a list
+	// a. require.Contains() seems to have a bug for checking float values in a list
 	// b. durations might be removed from level 2 in the future since they're not necessary
 	// c. the main metrics involving duration is average duration and test runs which are both checked
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-// this interface gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for unit testing)
+// ResultReader gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for unit testing)
 type ResultReader interface {
 	getReader() *os.File
 	close()
@@ -66,12 +66,12 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 		err := json.Unmarshal(scanner.Bytes(), &rawTestStep)
 		common.AssertNoError(err, "error unmarshalling raw test step")
 
-		// each test name needs to be unique so we add package name in case there are
+		// each test name needs to be unique, so we add package name in case there are
 		// tests with the same name across different packages
 		testResultMapKey := rawTestStep.Package + "/" + rawTestStep.Test
 
-		// most raw test steps will have Test value - only package specific steps won't
-		// which we're not storing at all
+		// most raw test steps will have Test value - only package specific steps won't have a Test value
+		// we're not storing package specific data
 		if rawTestStep.Test != "" {
 
 			// "run" is the very first test step and it needs special treatment - to create all the data structures that will be used by subsequent test steps for the same test
@@ -156,7 +156,7 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 			}
 
 			// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
-			// we want to highlight these tests so they show up at the top in Granfa
+			// we want to highlight these tests so they show up at the top in Grafana
 			// we do this by simulating a really low fail rate so that the average success rate
 			// will be very low compared to other tests so it will show up on the "flakiest test" panel
 			if testResult.Result == "" {

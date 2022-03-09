@@ -32,7 +32,7 @@ func generateLevel2SummaryFromStructs(level1Summaries []common.Level1Summary) co
 			level2TestResultsMapKey := level1TestResultRow.TestResult.Package + "/" + level1TestResultRow.TestResult.Test
 			level2TestResult, level2TestResultExists := level2Summary.TestResultsMap[level2TestResultsMapKey]
 
-			// this test doesn't have a summary so create it
+			// this test doesn't have a summary so create one
 			// no need to specify other fields explicitly - default values will suffice
 			if !level2TestResultExists {
 				level2TestResult = &common.Level2TestResult{
@@ -61,9 +61,9 @@ func generateLevel2SummaryFromStructs(level1Summaries []common.Level1Summary) co
 				level2TestResult.Durations = level2TestResult.Durations[:len(level2TestResult.Durations)-1]
 
 			// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
-			// we want to highlight these tests so they show up at the top in Granfa
+			// we want to highlight these tests, so they show up at the top in Grafana
 			// we do this by simulating a really low fail rate so that the average success rate
-			// will be very low compared to other tests so it will show up on the "flakiest test" panel
+			// will be very low compared to other tests, so it will show up on the "flakiest test" panel
 			case "-100":
 				level2TestResult.NoResult++
 				// don't count no result as a run
