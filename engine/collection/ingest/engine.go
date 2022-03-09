@@ -132,7 +132,8 @@ func New(
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	select {
 	case <-e.ComponentManager.ShutdownSignal():
-		return component.ErrComponentShutdown
+		e.log.Warn().Msgf("received message from %x after shut down", originID)
+		return nil
 	default:
 	}
 
@@ -151,6 +152,13 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 // local component. The transaction is validated and ingested synchronously.
 // This is used by the GRPC API, for transactions from Access nodes.
 func (e *Engine) ProcessTransaction(tx *flow.TransactionBody) error {
+	// do not process transactions after the engine has shut down
+	select {
+	case <-e.ComponentManager.ShutdownSignal():
+		return component.ErrComponentShutdown
+	default:
+	}
+
 	return e.onTransaction(e.me.NodeID(), tx)
 }
 
@@ -209,6 +217,12 @@ func (e *Engine) processAvailableMessages(ctx context.Context) error {
 
 // onTransaction handles receipt of a new transaction. This can be submitted
 // from outside the system or routed from another collection node.
+//
+// Returns:
+// * engine.UnverifiableInputError if the reference block is unknown or if the
+//   node is not a member of any cluster in the reference epoch.
+// * engine.InvalidInputError if the transaction is invalid.
+// * other error for any other unexpected error condition.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
 
 	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)

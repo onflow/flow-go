@@ -1,9 +1,11 @@
 package ingest
 
 import (
+	"context"
 	"errors"
 	"io/ioutil"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -12,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -179,7 +183,7 @@ func (suite *Suite) TestInvalidTransaction() {
 		sig2.Address = signer
 		sig2.SignerIndex = 1
 
-		suite.Run("invalid format of an enveloppe signature", func() {
+		suite.Run("invalid format of an envelope signature", func() {
 			invalidSig := unittest.InvalidFormatSignature()
 			tx := unittest.TransactionBodyFixture()
 			tx.ReferenceBlockID = suite.root.ID()
@@ -275,6 +279,24 @@ func (suite *Suite) TestInvalidTransaction() {
 		suite.Assert().Error(err)
 		suite.Assert().True(errors.As(err, &access.ExpiredTransactionError{}))
 	})
+
+}
+
+// should return an error if the engine is shutdown and not processing transactions
+func (suite *Suite) TestComponentShutdown() {
+	tx := unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+
+	// start then shut down the engine
+	parentCtx, cancel := context.WithCancel(context.Background())
+	ctx, _ := irrecoverable.WithSignaler(parentCtx)
+	suite.engine.Start(ctx)
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), 10*time.Millisecond)
+	cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Done(), 10*time.Millisecond)
+
+	err := suite.engine.ProcessTransaction(&tx)
+	suite.Assert().ErrorIs(err, component.ErrComponentShutdown)
 }
 
 // should store transactions for local cluster and propagate to other cluster members
