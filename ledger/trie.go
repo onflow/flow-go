@@ -224,7 +224,11 @@ func (p *Payload) String() string {
 }
 
 // Equals compares this payload to another payload
+// A nil payload is equivalent to an empty payload.
 func (p *Payload) Equals(other *Payload) bool {
+	if p == nil || (len(p.Key.KeyParts) == 0 && len(p.Value) == 0) {
+		return other == nil || (len(other.Key.KeyParts) == 0 && len(other.Value) == 0)
+	}
 	if other == nil {
 		return false
 	}

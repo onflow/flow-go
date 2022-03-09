@@ -274,13 +274,16 @@ type LedgerMetrics interface {
 	LatestTrieRegCount(number uint64)
 
 	// LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
-	LatestTrieRegCountDiff(number uint64)
+	LatestTrieRegCountDiff(number int64)
 
-	// LatestTrieMaxDepth records the maximum depth of the last created trie
-	LatestTrieMaxDepth(number uint64)
+	// LatestTrieRegSize records the size of unique register allocated (the latest created trie)
+	LatestTrieRegSize(size uint64)
 
-	// LatestTrieMaxDepthDiff records the difference between the max depth of the latest created trie and parent trie
-	LatestTrieMaxDepthDiff(number uint64)
+	// LatestTrieRegSizeDiff records the difference between the size of unique register allocated of the latest created trie and parent trie
+	LatestTrieRegSizeDiff(size int64)
+
+	// LatestTrieMaxDepthTouched records the maximum depth touched of the lastest created trie
+	LatestTrieMaxDepthTouched(maxDepth uint16)
 
 	// UpdateCount increase a counter of performed updates
 	UpdateCount()

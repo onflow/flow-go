@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
 func TestLeafNodeEncodingDecoding(t *testing.T) {
@@ -23,26 +24,24 @@ func TestLeafNodeEncodingDecoding(t *testing.T) {
 	path1 := utils.PathByUint8(0)
 	payload1 := (*ledger.Payload)(nil)
 	hashValue1 := hash.Hash([32]byte{1, 1, 1})
-	leafNodeNilPayload := node.NewNode(255, nil, nil, ledger.Path(path1), payload1, hashValue1, 0, 1)
+	leafNodeNilPayload := node.NewNode(255, nil, nil, ledger.Path(path1), payload1, hashValue1)
 
 	// Leaf node with empty payload (not nil)
 	// EmptyPayload() not used because decoded playload's value is empty slice (not nil)
 	path2 := utils.PathByUint8(1)
 	payload2 := &ledger.Payload{Value: []byte{}}
 	hashValue2 := hash.Hash([32]byte{2, 2, 2})
-	leafNodeEmptyPayload := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2, 0, 1)
+	leafNodeEmptyPayload := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2)
 
 	// Leaf node with payload
 	path3 := utils.PathByUint8(2)
 	payload3 := utils.LightPayload8('A', 'a')
 	hashValue3 := hash.Hash([32]byte{3, 3, 3})
-	leafNodePayload := node.NewNode(255, nil, nil, ledger.Path(path3), payload3, hashValue3, 0, 1)
+	leafNodePayload := node.NewNode(255, nil, nil, ledger.Path(path3), payload3, hashValue3)
 
 	encodedLeafNodeNilPayload := []byte{
 		0x00,       // node type
 		0x00, 0xff, // height
-		0x00, 0x00, // max depth
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // reg count
 		0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -57,8 +56,6 @@ func TestLeafNodeEncodingDecoding(t *testing.T) {
 	encodedLeafNodeEmptyPayload := []byte{
 		0x00,       // node type
 		0x00, 0xff, // height
-		0x00, 0x00, // max depth
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // reg count
 		0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -75,8 +72,6 @@ func TestLeafNodeEncodingDecoding(t *testing.T) {
 	encodedLeafNodePayload := []byte{
 		0x00,       // node type
 		0x00, 0xff, // height
-		0x00, 0x00, // max depth
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // reg count
 		0x03, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -167,7 +162,7 @@ func TestRandomLeafNodeEncodingDecoding(t *testing.T) {
 		var hashValue hash.Hash
 		rand.Read(hashValue[:])
 
-		n := node.NewNode(height, nil, nil, paths[i], payloads[i], hashValue, 0, 1)
+		n := node.NewNode(height, nil, nil, paths[i], payloads[i], hashValue)
 
 		encodedNode := flattener.EncodeNode(n, 0, 0, writeScratch)
 
@@ -198,23 +193,21 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 	path1 := utils.PathByUint8(0)
 	payload1 := utils.LightPayload8('A', 'a')
 	hashValue1 := hash.Hash([32]byte{1, 1, 1})
-	leafNode1 := node.NewNode(255, nil, nil, ledger.Path(path1), payload1, hashValue1, 0, 1)
+	leafNode1 := node.NewNode(255, nil, nil, ledger.Path(path1), payload1, hashValue1)
 
 	// Child node
 	path2 := utils.PathByUint8(1)
 	payload2 := utils.LightPayload8('B', 'b')
 	hashValue2 := hash.Hash([32]byte{2, 2, 2})
-	leafNode2 := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2, 0, 1)
+	leafNode2 := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2)
 
 	// Interim node
 	hashValue3 := hash.Hash([32]byte{3, 3, 3})
-	interimNode := node.NewNode(256, leafNode1, leafNode2, ledger.DummyPath, nil, hashValue3, 1, 2)
+	interimNode := node.NewNode(256, leafNode1, leafNode2, ledger.DummyPath, nil, hashValue3)
 
 	encodedInterimNode := []byte{
 		0x01,       // node type
 		0x01, 0x00, // height
-		0x00, 0x01, // max depth
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, // reg count
 		0x03, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -277,25 +270,29 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 }
 
 func TestTrieEncodingDecoding(t *testing.T) {
-	// Nil root node
-	rootNodeNil := (*node.Node)(nil)
 	rootNodeNilIndex := uint64(20)
 
-	// Not nil root node
 	hashValue := hash.Hash([32]byte{2, 2, 2})
-	rootNode := node.NewNode(256, nil, nil, ledger.DummyPath, nil, hashValue, 7, 5000)
+	rootNode := node.NewNode(256, nil, nil, ledger.DummyPath, nil, hashValue)
 	rootNodeIndex := uint64(21)
 
+	mtrie, err := trie.NewMTrie(rootNode, 7, 1234)
+	require.NoError(t, err)
+
 	encodedNilTrie := []byte{
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, // RootIndex
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, // root index
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // reg count
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // reg size
 		0x56, 0x8f, 0x4e, 0xc7, 0x40, 0xfe, 0x3b, 0x5d,
 		0xe8, 0x80, 0x34, 0xcb, 0x7b, 0x1f, 0xbd, 0xdb,
 		0x41, 0x54, 0x8b, 0x06, 0x8f, 0x31, 0xae, 0xbc,
-		0x8a, 0xe9, 0x18, 0x9e, 0x42, 0x9c, 0x57, 0x49, // RootHash data
+		0x8a, 0xe9, 0x18, 0x9e, 0x42, 0x9c, 0x57, 0x49, // hash data
 	}
 
 	encodedTrie := []byte{
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x15, // RootIndex
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x15, // root index
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, // reg count
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0xd2, // reg size
 		0x02, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -304,12 +301,12 @@ func TestTrieEncodingDecoding(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		rootNode      *node.Node
+		trie          *trie.MTrie
 		rootNodeIndex uint64
 		encodedTrie   []byte
 	}{
-		{"nil trie", rootNodeNil, rootNodeNilIndex, encodedNilTrie},
-		{"trie", rootNode, rootNodeIndex, encodedTrie},
+		{"empty trie", trie.NewEmptyMTrie(), rootNodeNilIndex, encodedNilTrie},
+		{"trie", mtrie, rootNodeIndex, encodedTrie},
 	}
 
 	for _, tc := range testCases {
@@ -323,7 +320,7 @@ func TestTrieEncodingDecoding(t *testing.T) {
 			}
 
 			for _, scratch := range scratchBuffers {
-				encodedTrie := flattener.EncodeTrie(tc.rootNode, tc.rootNodeIndex, scratch)
+				encodedTrie := flattener.EncodeTrie(tc.trie, tc.rootNodeIndex, scratch)
 				assert.Equal(t, tc.encodedTrie, encodedTrie)
 
 				if len(scratch) > 0 {
@@ -352,10 +349,12 @@ func TestTrieEncodingDecoding(t *testing.T) {
 					if nodeIndex != tc.rootNodeIndex {
 						return nil, fmt.Errorf("unexpected root node index %d ", nodeIndex)
 					}
-					return tc.rootNode, nil
+					return tc.trie.RootNode(), nil
 				})
 				require.NoError(t, err)
-				assert.Equal(t, tc.rootNode, trie.RootNode())
+				assert.Equal(t, tc.trie, trie)
+				assert.Equal(t, tc.trie.AllocatedRegCount(), trie.AllocatedRegCount())
+				assert.Equal(t, tc.trie.AllocatedRegSize(), trie.AllocatedRegSize())
 				assert.Equal(t, 0, reader.Len())
 			}
 		})

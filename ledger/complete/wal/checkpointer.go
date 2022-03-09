@@ -304,11 +304,9 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	allNodes := make(map[*node.Node]uint64)
 	allNodes[nil] = 0
 
-	allRootNodes := make([]*node.Node, len(tries))
-
 	// Serialize all unique nodes
 	nodeCounter := uint64(1) // start from 1, as 0 marks nil node
-	for i, t := range tries {
+	for _, t := range tries {
 
 		// Traverse all unique nodes for trie t.
 		for itr := flattener.NewUniqueNodeIterator(t, allNodes); itr.Next(); {
@@ -342,26 +340,20 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 				return fmt.Errorf("cannot serialize node: %w", err)
 			}
 		}
-
-		// Save trie root for serialization later.
-		allRootNodes[i] = t.RootNode()
 	}
 
 	// Serialize trie root nodes
-	for _, rootNode := range allRootNodes {
+	for _, t := range tries {
+		rootNode := t.RootNode()
+
 		// Get root node index
 		rootIndex, found := allNodes[rootNode]
 		if !found {
-			var rootHash ledger.RootHash
-			if rootNode == nil {
-				rootHash = trie.EmptyTrieRootHash()
-			} else {
-				rootHash = ledger.RootHash(rootNode.Hash())
-			}
+			rootHash := t.RootHash()
 			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
 		}
 
-		encTrie := flattener.EncodeTrie(rootNode, rootIndex, scratch)
+		encTrie := flattener.EncodeTrie(t, rootIndex, scratch)
 		_, err = crc32Writer.Write(encTrie)
 		if err != nil {
 			return fmt.Errorf("cannot serialize trie: %w", err)
@@ -371,7 +363,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	// Write footer with nodes count and tries count
 	footer := scratch[:encNodeCountSize+encTrieCountSize]
 	binary.BigEndian.PutUint64(footer, uint64(len(allNodes)-1)) // -1 to account for 0 node meaning nil
-	binary.BigEndian.PutUint16(footer[encNodeCountSize:], uint16(len(allRootNodes)))
+	binary.BigEndian.PutUint16(footer[encNodeCountSize:], uint16(len(tries)))
 
 	_, err = crc32Writer.Write(footer)
 	if err != nil {
@@ -464,6 +456,12 @@ func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
 // This function is for backwards compatibility, not optimized.
 func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, error) {
 
+	type nodeWithRegMetrics struct {
+		n        *node.Node
+		regCount uint64
+		regSize  uint64
+	}
+
 	var bufReader io.Reader = bufio.NewReaderSize(f, defaultBufioReadSize)
 	crcReader := NewCRC32Reader(bufReader)
 
@@ -489,28 +487,32 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 	nodesCount := binary.BigEndian.Uint64(header[headerSize:])
 	triesCount := binary.BigEndian.Uint16(header[headerSize+encNodeCountSize:])
 
-	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
+	nodes := make([]nodeWithRegMetrics, nodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		n, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, error) {
+		n, regCount, regSize, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(i) {
-				return nil, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
 			}
-			return nodes[nodeIndex], nil
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
 		}
-		nodes[i] = n
+		nodes[i].n = n
+		nodes[i].regCount = regCount
+		nodes[i].regSize = regSize
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
-		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, error) {
+		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(len(nodes)) {
-				return nil, fmt.Errorf("sequence of stored nodes doesn't contain node")
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes doesn't contain node")
 			}
-			return nodes[nodeIndex], nil
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot read trie %d: %w", i, err)
