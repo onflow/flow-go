@@ -734,6 +734,11 @@ func runRequesterTest(t *testing.T, ctx context.Context, edr ExecutionDataReques
 
 	fetchedExecutionData := make(map[flow.Identifier]*state_synchronization.ExecutionData, cfg.sealedCount)
 	edr.AddOnExecutionDataFetchedConsumer(func(ed *state_synchronization.ExecutionData) {
+		if _, has := fetchedExecutionData[ed.BlockID]; has {
+			t.Errorf("duplicate execution data for block %s", ed.BlockID)
+			return
+		}
+
 		fetchedExecutionData[ed.BlockID] = ed
 		outstandingBlocks.Done()
 		t.Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Header.Height, len(fetchedExecutionData), cfg.sealedCount)
@@ -887,7 +892,7 @@ func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan 
 	case <-ctx.Done():
 		return
 	case err := <-errChan:
-		t.Errorf("unexpected irrecoverable error: %v", err)
+		t.Fatalf("unexpected irrecoverable error: %v", err)
 	}
 }
 
