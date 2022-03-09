@@ -8,7 +8,7 @@ import (
 
 func TestComputationMeteringHandler(t *testing.T) {
 	const limit = uint64(100)
-	const used = uint(7)
+	const used = uint64(7)
 
 	t.Run("Get Limit", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit,
@@ -27,7 +27,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 				0: 1,
 			}))
 
-		err := h.AddUsed(0, used)
+		err := h.AddUsed(0, uint(used))
 		require.NoError(t, err)
 
 		u := h.Used()
@@ -41,10 +41,10 @@ func TestComputationMeteringHandler(t *testing.T) {
 				0: 1,
 			}))
 
-		err := h.AddUsed(0, used)
+		err := h.AddUsed(0, uint(used))
 		require.NoError(t, err)
 
-		err = h.AddUsed(0, used)
+		err = h.AddUsed(0, uint(used))
 		require.NoError(t, err)
 
 		u := h.Used()
@@ -58,15 +58,15 @@ func TestComputationMeteringHandler(t *testing.T) {
 				0: 1,
 			}))
 
-		err := h.AddUsed(0, used)
+		err := h.AddUsed(0, uint(used))
 		require.NoError(t, err)
 
-		err = h.AddUsed(0, used)
+		err = h.AddUsed(0, uint(used))
 		require.NoError(t, err)
 
 		i := h.Intensities()
 
-		require.Equal(t, 2*used, i[0])
+		require.Equal(t, uint(2*used), i[0])
 	})
 
 	t.Run("Add used adds to intensity to sub-meter but not on meter", func(t *testing.T) {
@@ -77,18 +77,18 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 		subMeter := h.StartSubMeter(2 * limit)
 
-		err := h.AddUsed(0, used)
+		err := h.AddUsed(0, uint(used))
 		require.NoError(t, err)
 
 		err = subMeter.Discard()
 		require.NoError(t, err)
 
-		err = h.AddUsed(0, used)
+		err = h.AddUsed(0, uint(used))
 		require.NoError(t, err)
 
 		i := h.Intensities()
 
-		require.Equal(t, used, i[0])
+		require.Equal(t, uint(used), i[0])
 	})
 
 	t.Run("Sub Meter", func(t *testing.T) {
@@ -102,7 +102,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 		l := h.Limit()
 		require.Equal(t, 2*limit, l)
 
-		err := h.AddUsed(0, used)
+		err := h.AddUsed(0, uint(used))
 		require.NoError(t, err)
 
 		u := h.Used()
@@ -126,7 +126,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 		subMeter := h.StartSubMeter(2 * limit)
 
-		err := h.AddUsed(0, used)
+		err := h.AddUsed(0, uint(used))
 		require.NoError(t, err)
 
 		subSubMeter := h.StartSubMeter(3 * limit)
@@ -134,7 +134,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 		l := h.Limit()
 		require.Equal(t, 3*limit, l)
 
-		err = h.AddUsed(0, 2*used)
+		err = h.AddUsed(0, 2*uint(used))
 		require.NoError(t, err)
 
 		u := h.Used()
