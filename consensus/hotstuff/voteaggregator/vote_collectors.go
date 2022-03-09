@@ -142,7 +142,9 @@ func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 	v.lock.Unlock()
 
 	v.log.Debug().
-		Uint64("from", from).
-		Uint64("to", lowestRetainedView).
-		Msgf("pruned vote collectors, before: %d, after: %d", sizeBefore, sizeAfter)
+		Uint64("prior_lowest_retained_view", from).
+		Uint64("lowest_retained_view", lowestRetainedView).
+		Int("prior_size", sizeBefore).
+		Int("size", sizeAfter).
+		Msgf("pruned vote collectors")
 }
