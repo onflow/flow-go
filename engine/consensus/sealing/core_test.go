@@ -72,7 +72,22 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options)
+	s.core, err = NewCore(
+		unittest.Logger(),
+		s.Network,
+		s.WorkerPool,
+		tracer,
+		metrics,
+		&tracker.NoopSealingTracker{},
+		engine.NewUnit(),
+		s.Headers,
+		s.State,
+		s.sealsDB,
+		s.Assigner,
+		s.SigHasher,
+		s.SealsPL,
+		options,
+	)
 	require.NoError(s.T(), err)
 }
 
@@ -621,8 +636,14 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	time.Sleep(3 * time.Second)
 
 	// our setup is for 5 verification nodes
-	s.Conduit.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil).Times(chunkCount)
+	for _, v := range verifiers {
+		s.Network.On(
+			"SendDirectMessage",
+			mock.AnythingOfType("network.Channel"),
+			mock.Anything,
+			v,
+		).Return(nil).Times(chunkCount)
+	}
 
 	// process next block
 	finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
@@ -633,7 +654,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// now 2 results should be pending
 	require.ElementsMatch(s.T(), s.core.requestTracker.GetAllIds(), resultIDs[:2])
 
-	s.Conduit.AssertExpectations(s.T())
+	s.Network.AssertExpectations(s.T())
 }
 
 // TestRepopulateAssignmentCollectorTree tests that the
@@ -726,8 +747,22 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	finalSnapShot.On("ValidDescendants").Return(blockChildren, nil)
 	s.State.On("Final").Return(finalSnapShot)
 
-	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
+	core, err := NewCore(
+		unittest.Logger(),
+		s.Network,
+		s.WorkerPool,
+		tracer,
+		metrics,
+		&tracker.NoopSealingTracker{},
+		engine.NewUnit(),
+		s.Headers,
+		s.State,
+		s.sealsDB,
+		assigner,
+		s.SigHasher,
+		s.SealsPL,
+		s.core.config,
+	)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)
@@ -806,8 +841,22 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 		}, nil)
 	s.State.On("Final").Return(finalSnapShot)
 
-	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
+	core, err := NewCore(
+		unittest.Logger(),
+		s.Network,
+		s.WorkerPool,
+		tracer,
+		metrics,
+		&tracker.NoopSealingTracker{},
+		engine.NewUnit(),
+		s.Headers,
+		s.State,
+		s.sealsDB,
+		assigner,
+		s.SigHasher,
+		s.SealsPL,
+		s.core.config,
+	)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)
