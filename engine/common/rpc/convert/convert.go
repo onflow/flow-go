@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -15,6 +16,16 @@ import (
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
+var ValidChainIds = map[string]bool{
+	flow.Mainnet.String():           true,
+	flow.Testnet.String():           true,
+	flow.Canary.String():            true,
+	flow.Benchnet.String():          true,
+	flow.Localnet.String():          true,
+	flow.Emulator.String():          true,
+	flow.BftTestnet.String():        true,
+	flow.MonotonicEmulator.String(): true,
+}
 
 func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
 	if m == nil {
@@ -142,7 +153,10 @@ func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 
 func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	parentVoterIds := MessagesToIdentifiers(m.ParentVoterIds)
-
+	chainId, err := MessageToChainId(m.ChainId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert ChainId: %w", err)
+	}
 	return &flow.Header{
 		ParentID:           MessageToIdentifier(m.ParentId),
 		Height:             m.Height,
@@ -153,14 +167,23 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 		ParentVoterSigData: m.ParentVoterSigData,
 		ProposerID:         MessageToIdentifier(m.ProposerId),
 		ProposerSigData:    m.ProposerSigData,
-		ChainID:            flow.ChainID(m.ChainId),
+		ChainID:            *chainId,
 	}, nil
+}
+
+// MessageToChainId checks chainId from enumeration to prevent a panic on Chain() being called
+func MessageToChainId(m string) (*flow.ChainID, error) {
+	if !ValidChainIds[m] {
+		return nil, fmt.Errorf("invalid chainId %s: ", m)
+	}
+	chainId := flow.ChainID(m)
+	return &chainId, nil
 }
 
 func CollectionGuaranteesToMessages(c []*flow.CollectionGuarantee) []*entities.CollectionGuarantee {
 	cg := make([]*entities.CollectionGuarantee, len(c))
 	for i, g := range c {
-		cg[i] = collectionGuaranteeToMessage(g)
+		cg[i] = CollectionGuaranteeToMessage(g)
 	}
 	return cg
 }
@@ -176,7 +199,7 @@ func MessagesToCollectionGuarantees(m []*entities.CollectionGuarantee) []*flow.C
 func BlockSealsToMessages(b []*flow.Seal) []*entities.BlockSeal {
 	seals := make([]*entities.BlockSeal, len(b))
 	for i, s := range b {
-		seals[i] = blockSealToMessage(s)
+		seals[i] = BlockSealToMessage(s)
 	}
 	return seals
 }
@@ -210,7 +233,7 @@ func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.Executio
 	for i, e := range m {
 		parsedExecResult, err := MessageToExecutionResult(e)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to convert message at index %d to execution result: %w", i, err)
 		}
 		execResults[i] = parsedExecResult
 	}
@@ -256,11 +279,11 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	payload, err := PayloadFromMessage(m)
 	if err != nil {
-		return nil, fmt.Errorf("unable to extract payload data from message: %w", err)
+		return nil, fmt.Errorf("failed to extract payload data from message: %w", err)
 	}
 	header, err := MessageToBlockHeader(m.BlockHeader)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse block header: %w", err)
+		return nil, fmt.Errorf("failed to convert block header: %w", err)
 	}
 	return &flow.Block{
 		Header:  header,
@@ -313,7 +336,7 @@ func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
 	}, nil
 }
 
-func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
+func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
 	id := g.ID()
 
 	return &entities.CollectionGuarantee{
@@ -380,7 +403,7 @@ func SignatureToMessage(s crypto.Signature) []byte {
 	return s[:]
 }
 
-func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
+func BlockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 	id := s.BlockID
 	result := s.ResultID
 	return &entities.BlockSeal{
@@ -396,7 +419,7 @@ func blockSealToMessage(s *flow.Seal) *entities.BlockSeal {
 func MessageToBlockSeal(m *entities.BlockSeal) (*flow.Seal, error) {
 	finalState, err := MessageToStateCommitment(m.FinalState)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert message to block seal: %w", err)
 	}
 	return &flow.Seal{
 		BlockID:                MessageToIdentifier(m.BlockId),
@@ -625,7 +648,7 @@ func MessagesToChunkList(m []*entities.Chunk) (flow.ChunkList, error) {
 	for i, chunk := range m {
 		parsedChunk, err := MessageToChunk(chunk)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse message to chunk: %w", err)
+			return nil, fmt.Errorf("failed to parse message at index %d to chunk: %w", i, err)
 		}
 		parsedChunks[i] = parsedChunk
 	}
@@ -637,7 +660,7 @@ func MessagesToServiceEventList(m []*entities.ServiceEvent) (flow.ServiceEventLi
 	for i, serviceEvent := range m {
 		parsedServiceEvent, err := MessageToServiceEvent(serviceEvent)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse service event from message: %w", err)
+			return nil, fmt.Errorf("failed to parse service event at index %d from message: %w", i, err)
 		}
 		parsedServiceEvents[i] = *parsedServiceEvent
 	}
@@ -648,7 +671,7 @@ func MessageToExecutionResult(m *entities.ExecutionResult) (*flow.ExecutionResul
 	// convert Chunks
 	parsedChunks, err := MessagesToChunkList(m.Chunks)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse messages to ChunkList: %w", err)
 	}
 	// convert ServiceEvents
 	parsedServiceEvents, err := MessagesToServiceEventList(m.ServiceEvents)
@@ -712,14 +735,14 @@ func MessageToServiceEvent(m *entities.ServiceEvent) (*flow.ServiceEvent, error)
 		setup := new(flow.EpochSetup)
 		err := json.Unmarshal(rawEvent, setup)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal to EpochSetup event: %w", err)
 		}
 		event = setup
 	case flow.ServiceEventCommit:
 		commit := new(flow.EpochCommit)
 		err := json.Unmarshal(rawEvent, commit)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal to EpochCommit event: %w", err)
 		}
 		event = commit
 	default:
@@ -747,11 +770,11 @@ func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
 func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 	startState, err := flow.ToStateCommitment(m.StartState)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse Message start state to Chunk: %w", err)
 	}
 	endState, err := flow.ToStateCommitment(m.EndState)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse Message end state to Chunk: %w", err)
 	}
 	chunkBody := flow.ChunkBody{
 		CollectionIndex:      uint(m.CollectionIndex),
