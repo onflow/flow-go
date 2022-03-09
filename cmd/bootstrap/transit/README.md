@@ -72,11 +72,11 @@ After the root block and random beacon key have been fetched, running `transit g
 
 Once a vote has been generated, running `transit push-root-block-vote` will upload the vote file to the server.
 
-### Push Transit Keys
+### Push Transit Key
 
-Transit keys are used to encrypt the random beacon keys generated for the consensus nodes.
+Transit key is used to encrypt the random beacon key generated for the consensus nodes.
 
-Running `transit push-transit-keys` will perform the following actions:
+Running `transit push-transit-key` will perform the following actions:
 
 1. Create a Transit Keypair and write it to
    - `transit-key.pub.<id>`
