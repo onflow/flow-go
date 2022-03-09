@@ -190,6 +190,5 @@ func withAttacker(
 
 	// terminates resources
 	cancel()
-	attacker.Stop()
 	unittest.RequireCloseBefore(t, attacker.Done(), 1*time.Second, "could not stop attacker on time")
 }
