@@ -43,6 +43,10 @@ func (cr *ComputationResult) AddTransactionResult(inp *flow.TransactionResult) {
 	cr.TransactionResults = append(cr.TransactionResults, *inp)
 }
 
+func (cr *ComputationResult) AddIndexedTransactionResult(inp *flow.TransactionResult, index int) {
+	cr.TransactionResults[index] = *inp
+}
+
 func (cr *ComputationResult) AddComputationUsed(inp uint64) {
 	cr.ComputationUsed += inp
 }
