@@ -9,13 +9,14 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type CorruptedConnector struct {
 	attackerAddress string
 }
 
-func (c *CorruptedConnector) Connect(ctx context.Context, address string) (insecure.CorruptedNodeConnection, error) {
+func (c *CorruptedConnector) Connect(ctx context.Context, address flow.Identifier) (insecure.CorruptedNodeConnection, error) {
 	corruptedAddress, err := corruptedConduitFactoryAddress(address)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate corruptible conduit factory address for: %w", err)

@@ -39,7 +39,8 @@ func NewAttacker(
 	address string,
 	codec network.Codec,
 	orchestrator insecure.AttackOrchestrator,
-	connector insecure.CorruptedNodeConnector) (*Attacker, error) {
+	connector insecure.CorruptedNodeConnector,
+	corruptedIds flow.IdentityList) (*Attacker, error) {
 
 	attacker := &Attacker{
 		orchestrator:       orchestrator,
@@ -47,6 +48,7 @@ func NewAttacker(
 		codec:              codec,
 		address:            address,
 		corruptedConnector: connector,
+		corruptedIds:       corruptedIds,
 		corruptedNodes:     make(map[flow.Identifier]insecure.CorruptedNodeConnection),
 	}
 
@@ -100,7 +102,7 @@ func NewAttacker(
 // start triggers the sub-modules of attacker.
 func (a *Attacker) start(ctx irrecoverable.SignalerContext) error {
 	for _, corruptedId := range a.corruptedIds {
-		corruptibleClient, err := a.corruptedConnector.Connect(ctx, corruptedId.Address)
+		corruptibleClient, err := a.corruptedConnector.Connect(ctx, corruptedId.NodeID)
 		if err != nil {
 			return fmt.Errorf("could not establish corruptible client to node %x: %w", corruptedId.NodeID, err)
 		}

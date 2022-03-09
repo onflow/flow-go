@@ -6,6 +6,8 @@ import (
 	context "context"
 
 	insecure "github.com/onflow/flow-go/insecure"
+	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -15,11 +17,11 @@ type CorruptedNodeConnector struct {
 }
 
 // Connect provides a mock function with given fields: _a0, _a1
-func (_m *CorruptedNodeConnector) Connect(_a0 context.Context, _a1 string) (insecure.CorruptedNodeConnection, error) {
+func (_m *CorruptedNodeConnector) Connect(_a0 context.Context, _a1 flow.Identifier) (insecure.CorruptedNodeConnection, error) {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 insecure.CorruptedNodeConnection
-	if rf, ok := ret.Get(0).(func(context.Context, string) insecure.CorruptedNodeConnection); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) insecure.CorruptedNodeConnection); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
@@ -28,7 +30,7 @@ func (_m *CorruptedNodeConnector) Connect(_a0 context.Context, _a1 string) (inse
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
