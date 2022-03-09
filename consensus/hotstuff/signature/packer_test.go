@@ -192,7 +192,7 @@ func TestMismatchSignerIDs(t *testing.T) {
 	// 9 nodes committee would require two bytes for sig type, the additional byte
 	// would cause the sig type and signer IDs to be mismatch
 	invalidSignerIDs = committee
-	misPacked, err := packer.Unpack(committee, sig)
+	misPacked, err := packer.Unpack(invalidSignerIDs, sig)
 
 	require.Error(t, err, fmt.Sprintf("packed signers: %v", misPacked))
 	require.True(t, errors.Is(err, model.ErrInvalidFormat))

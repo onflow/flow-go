@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -155,6 +156,7 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 		return nil, fmt.Errorf("failed to generate clustering: %w", err)
 	}
 
+	// TODO: double check ByIndex returns canonical order
 	members, ok := clustering.ByIndex(index)
 	if !ok {
 		return nil, fmt.Errorf("failed to get members of cluster %d: %w", index, err)
@@ -166,11 +168,16 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 	rootQCVoteData := qcs[index]
 
+	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(members.NodeIDs(), rootQCVoteData.VoterIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode signer indices for rootQCVoteData.VoterIDs: %w", err)
+	}
+
 	rootBlock := cluster.CanonicalRootBlock(epochCounter, members)
 	rootQC := &flow.QuorumCertificate{
 		View:          rootBlock.Header.View,
 		BlockID:       rootBlock.ID(),
-		SignerIndices: rootQCVoteData.VoterIndices,
+		SignerIndices: signerIndices,
 		SigData:       rootQCVoteData.SigData,
 	}
 

@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/module/packer"
 )
 
 func constructRootResultAndSeal(
@@ -43,9 +44,24 @@ func constructRootResultAndSeal(
 		RandomSource:       getRandomSource(flagBootstrapRandomSeed),
 	}
 
+	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
+	for i, clusterQC := range clusterQCs {
+		members := assignments[i]
+		signerIDs, err := packer.DecodeSignerIdentifiersFromIndices(members, clusterQC.SignerIndices)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("could not decode signer IDs from clusterQC at index %v", i)
+		}
+		qcsWithSignerIDs = append(qcsWithSignerIDs, &flow.QuorumCertificateWithSignerIDs{
+			View:      clusterQC.View,
+			BlockID:   clusterQC.BlockID,
+			SignerIDs: signerIDs,
+			SigData:   clusterQC.SigData,
+		})
+	}
+
 	epochCommit := &flow.EpochCommit{
 		Counter:            flagEpochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkgData.PubGroupKey,
 		DKGParticipantKeys: dkgData.PubKeyShares,
 	}

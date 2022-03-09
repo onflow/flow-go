@@ -1110,7 +1110,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		// expect a commit event with wrong cluster QCs to trigger EECC without error
 		t.Run("inconsistent cluster QCs (EECC)", func(t *testing.T) {
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
-				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateFixture()))
+				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateWithSignerIDsFixture()))
 			})
 
 			sealingBlock := unittest.SealBlock(t, state, block3, receipt, seal)

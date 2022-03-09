@@ -1538,6 +1538,27 @@ func PublicKeysFixture(n int, algo crypto.SigningAlgorithm) []crypto.PublicKey {
 	return pks
 }
 
+func QuorumCertificateWithSignerIDsFixture(opts ...func(*flow.QuorumCertificateWithSignerIDs)) *flow.QuorumCertificateWithSignerIDs {
+	qc := flow.QuorumCertificateWithSignerIDs{
+		View:      uint64(rand.Uint32()),
+		BlockID:   IdentifierFixture(),
+		SignerIDs: IdentifierListFixture(3),
+		SigData:   QCSigDataFixture(),
+	}
+	for _, apply := range opts {
+		apply(&qc)
+	}
+	return &qc
+}
+
+func QuorumCertificatesWithSignerIDsFixtures(n uint, opts ...func(*flow.QuorumCertificateWithSignerIDs)) []*flow.QuorumCertificateWithSignerIDs {
+	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, n)
+	for i := 0; i < int(n); i++ {
+		qcs = append(qcs, QuorumCertificateWithSignerIDsFixture(opts...))
+	}
+	return qcs
+}
+
 func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
 	qc := flow.QuorumCertificate{
 		View:          uint64(rand.Uint32()),
@@ -1709,10 +1730,9 @@ func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCom
 }
 
 func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.EpochCommit) {
-	qcs := make([]*flow.QuorumCertificate, 0, len(assignments))
+	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(assignments))
 	for range assignments {
-		// TODO: fix
-		qcs = append(qcs, QuorumCertificateFixture(QCWithSignerIndices([]byte{})))
+		qcs = append(qcs, QuorumCertificateWithSignerIDsFixture())
 	}
 	return func(commit *flow.EpochCommit) {
 		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)
@@ -1739,7 +1759,7 @@ func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
 func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	commit := &flow.EpochCommit{
 		Counter:            uint64(rand.Uint32()),
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(QuorumCertificatesFixtures(1)),
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(QuorumCertificatesWithSignerIDsFixtures(1)),
 		DKGGroupKey:        KeyFixture(crypto.BLSBLS12381).PublicKey(),
 		DKGParticipantKeys: PublicKeysFixture(2, crypto.BLSBLS12381),
 	}

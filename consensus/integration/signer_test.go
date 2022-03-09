@@ -26,15 +26,12 @@ func (s *Signer) CreateVote(block *model.Block) (*model.Vote, error) {
 	return vote, nil
 }
 func (*Signer) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
-	voterIDs := make([]flow.Identifier, 0, len(votes))
-	for _, vote := range votes {
-		voterIDs = append(voterIDs, vote.SignerID)
-	}
 	qc := &flow.QuorumCertificate{
-		View:      votes[0].View,
-		BlockID:   votes[0].BlockID,
-		SignerIDs: voterIDs,
-		SigData:   nil,
+		View:    votes[0].View,
+		BlockID: votes[0].BlockID,
+		// TODO: fix
+		SignerIndices: nil,
+		SigData:       nil,
 	}
 	return qc, nil
 }

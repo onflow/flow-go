@@ -25,3 +25,10 @@ type QuorumCertificate struct {
 	// from all signers.
 	SigData []byte
 }
+
+type QuorumCertificateWithSignerIDs struct {
+	View      uint64
+	BlockID   Identifier
+	SignerIDs []Identifier
+	SigData   []byte
+}

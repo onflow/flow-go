@@ -3,7 +3,6 @@ package flow_test
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -26,12 +25,12 @@ func TestClusterQCVoteData_Equality(t *testing.T) {
 
 	t.Run("sig data triggers", func(t *testing.T) {
 		a := &flow.ClusterQCVoteData{
-			SigData:      []byte{1, 2},
-			VoterIndices: nil,
+			SigData:  []byte{1, 2},
+			VoterIDs: nil,
 		}
 		b := &flow.ClusterQCVoteData{
-			SigData:      []byte{1, 3},
-			VoterIndices: nil,
+			SigData:  []byte{1, 3},
+			VoterIDs: nil,
 		}
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -39,12 +38,12 @@ func TestClusterQCVoteData_Equality(t *testing.T) {
 
 	t.Run("VoterID len difference triggers", func(t *testing.T) {
 		a := &flow.ClusterQCVoteData{
-			SigData:      nil,
-			VoterIndices: packer.EncodeSignerIndices([]int{1}, 10),
+			SigData:  nil,
+			VoterIDs: []flow.Identifier{flow.HashToID([]byte{1, 2, 3})},
 		}
 		b := &flow.ClusterQCVoteData{
-			SigData:      nil,
-			VoterIndices: packer.EncodeSignerIndices([]int{}, 10),
+			SigData:  nil,
+			VoterIDs: []flow.Identifier{},
 		}
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -52,12 +51,12 @@ func TestClusterQCVoteData_Equality(t *testing.T) {
 
 	t.Run("VoterID len values triggers", func(t *testing.T) {
 		a := &flow.ClusterQCVoteData{
-			SigData:      nil,
-			VoterIndices: packer.EncodeSignerIndices([]int{1, 2, 3}, 10),
+			SigData:  nil,
+			VoterIDs: []flow.Identifier{flow.HashToID([]byte{1, 2, 3})},
 		}
 		b := &flow.ClusterQCVoteData{
-			SigData:      nil,
-			VoterIndices: packer.EncodeSignerIndices([]int{1, 2, 6}, 10),
+			SigData:  nil,
+			VoterIDs: []flow.Identifier{flow.HashToID([]byte{3, 2, 1})},
 		}
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -65,12 +64,12 @@ func TestClusterQCVoteData_Equality(t *testing.T) {
 
 	t.Run("filled structures match with same data", func(t *testing.T) {
 		a := &flow.ClusterQCVoteData{
-			SigData:      []byte{3, 3, 3},
-			VoterIndices: packer.EncodeSignerIndices([]int{1, 2, 3}, 10),
+			SigData:  []byte{3, 3, 3},
+			VoterIDs: []flow.Identifier{flow.HashToID([]byte{1, 2, 3}), flow.HashToID([]byte{3, 2, 1})},
 		}
 		b := &flow.ClusterQCVoteData{
-			SigData:      []byte{3, 3, 3},
-			VoterIndices: packer.EncodeSignerIndices([]int{1, 2, 3}, 10),
+			SigData:  []byte{3, 3, 3},
+			VoterIDs: []flow.Identifier{flow.HashToID([]byte{1, 2, 3}), flow.HashToID([]byte{3, 2, 1})},
 		}
 		require.True(t, a.EqualTo(b))
 		require.True(t, b.EqualTo(a))
@@ -80,13 +79,13 @@ func TestClusterQCVoteData_Equality(t *testing.T) {
 func TestEpochCommit_EqualTo(t *testing.T) {
 
 	qcA := flow.ClusterQCVoteData{
-		SigData:      []byte{3, 3, 3},
-		VoterIndices: packer.EncodeSignerIndices([]int{1, 2, 3}, 10),
+		SigData:  []byte{3, 3, 3},
+		VoterIDs: []flow.Identifier{flow.HashToID([]byte{1, 2, 3}), flow.HashToID([]byte{3, 2, 1})},
 	}
 
 	qcB := flow.ClusterQCVoteData{
-		SigData:      []byte{1, 1, 1},
-		VoterIndices: packer.EncodeSignerIndices([]int{1, 2, 3}, 10),
+		SigData:  []byte{1, 1, 1},
+		VoterIDs: []flow.Identifier{flow.HashToID([]byte{1, 2, 3}), flow.HashToID([]byte{3, 2, 1})},
 	}
 
 	pks := unittest.PublicKeysFixture(2, crypto.BLSBLS12381)
