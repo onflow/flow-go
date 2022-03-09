@@ -61,7 +61,7 @@ func TestNextNotification(t *testing.T) {
 		nextBlockID := unittest.IdentifierFixture()
 		status := &status{
 			lastNotified: 5,
-			lastReceived: 7,
+			LastReceived: 7,
 			outstandingNotifications: map[uint64]flow.Identifier{
 				6: nextBlockID,
 			},
@@ -77,7 +77,7 @@ func TestNextNotification(t *testing.T) {
 	t.Run("none ready", func(t *testing.T) {
 		status := &status{
 			lastNotified:   5,
-			lastReceived:   5,
+			LastReceived:   5,
 			missingHeights: map[uint64]bool{},
 		}
 
@@ -90,7 +90,7 @@ func TestNextNotification(t *testing.T) {
 	t.Run("next missing", func(t *testing.T) {
 		status := &status{
 			lastNotified: 5,
-			lastReceived: 7,
+			LastReceived: 7,
 			missingHeights: map[uint64]bool{
 				6: true,
 			},
@@ -141,27 +141,20 @@ func TestNextNotification(t *testing.T) {
 	})
 }
 
-func TestSeals(t *testing.T) {
-	status := &status{}
-	assert.Equal(t, uint64(0), status.lastSealed)
-
-	status.Sealed(10)
-	assert.Equal(t, uint64(10), status.lastSealed)
-}
-
 func TestFetched(t *testing.T) {
+	ctx := context.Background()
 	t.Run("fetched next", func(t *testing.T) {
 		height := uint64(6)
 		blockID := unittest.IdentifierFixture()
 		status := &status{
-			lastReceived:             5,
+			LastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
 			missingHeights:           map[uint64]bool{},
 		}
 
-		status.Fetched(height, blockID)
+		status.Fetched(ctx, height, blockID)
 
-		assert.Equal(t, height, status.lastReceived)
+		assert.Equal(t, height, status.LastReceived)
 		assert.Len(t, status.outstandingNotifications, 1)
 		assert.Equal(t, blockID, status.outstandingNotifications[height])
 	})
@@ -170,16 +163,16 @@ func TestFetched(t *testing.T) {
 		height := uint64(4)
 		blockID := unittest.IdentifierFixture()
 		status := &status{
-			lastReceived:             5,
+			LastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
 			missingHeights: map[uint64]bool{
 				height: true,
 			},
 		}
 
-		status.Fetched(height, blockID)
+		status.Fetched(ctx, height, blockID)
 
-		assert.Equal(t, uint64(5), status.lastReceived)
+		assert.Equal(t, uint64(5), status.LastReceived)
 		assert.Len(t, status.outstandingNotifications, 1)
 		assert.Equal(t, blockID, status.outstandingNotifications[height])
 		assert.Len(t, status.missingHeights, 0)
@@ -189,14 +182,14 @@ func TestFetched(t *testing.T) {
 		height := uint64(8)
 		blockID := unittest.IdentifierFixture()
 		status := &status{
-			lastReceived:             5,
+			LastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
 			missingHeights:           map[uint64]bool{},
 		}
 
-		status.Fetched(height, blockID)
+		status.Fetched(ctx, height, blockID)
 
-		assert.Equal(t, height, status.lastReceived)
+		assert.Equal(t, height, status.LastReceived)
 		assert.Len(t, status.outstandingNotifications, 1)
 		assert.Equal(t, blockID, status.outstandingNotifications[height])
 		assert.Equal(t, []uint64{6, 7}, status.MissingHeights())
@@ -206,14 +199,14 @@ func TestFetched(t *testing.T) {
 		height := uint64(5)
 		blockID := unittest.IdentifierFixture()
 		status := &status{
-			lastReceived:             5,
+			LastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
 			missingHeights:           map[uint64]bool{},
 		}
 
-		status.Fetched(height, blockID)
+		status.Fetched(ctx, height, blockID)
 
-		assert.Equal(t, height, status.lastReceived)
+		assert.Equal(t, height, status.LastReceived)
 		assert.Len(t, status.outstandingNotifications, 0)
 	})
 
@@ -222,14 +215,14 @@ func TestFetched(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		status := &status{
 			lastNotified:             5,
-			lastReceived:             5,
+			LastReceived:             5,
 			outstandingNotifications: map[uint64]flow.Identifier{},
 			missingHeights:           map[uint64]bool{},
 		}
 
-		status.Fetched(height, blockID)
+		status.Fetched(ctx, height, blockID)
 
-		assert.Equal(t, uint64(5), status.lastReceived)
+		assert.Equal(t, uint64(5), status.LastReceived)
 		assert.Len(t, status.outstandingNotifications, 0)
 	})
 
@@ -238,14 +231,14 @@ func TestFetched(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		status := &status{
 			lastNotified:             5,
-			lastReceived:             8,
+			LastReceived:             8,
 			outstandingNotifications: map[uint64]flow.Identifier{},
 			missingHeights:           map[uint64]bool{},
 		}
 
-		status.Fetched(height, blockID)
+		status.Fetched(ctx, height, blockID)
 
-		assert.Equal(t, uint64(8), status.lastReceived)
+		assert.Equal(t, uint64(8), status.LastReceived)
 		assert.Len(t, status.outstandingNotifications, 0)
 	})
 
@@ -257,9 +250,9 @@ func TestFetched(t *testing.T) {
 			missingHeights:           map[uint64]bool{},
 		}
 
-		status.Fetched(height, blockID)
+		status.Fetched(ctx, height, blockID)
 
-		assert.Equal(t, uint64(0), status.lastReceived)
+		assert.Equal(t, uint64(0), status.LastReceived)
 		assert.Len(t, status.outstandingNotifications, 1)
 		assert.Equal(t, blockID, status.outstandingNotifications[height])
 		assert.Len(t, status.missingHeights, 0)
@@ -274,9 +267,9 @@ func TestFetched(t *testing.T) {
 			missingHeights:           map[uint64]bool{},
 		}
 
-		status.Fetched(height, blockID)
+		status.Fetched(ctx, height, blockID)
 
-		assert.Equal(t, uint64(0), status.lastReceived)
+		assert.Equal(t, uint64(0), status.LastReceived)
 		assert.Len(t, status.outstandingNotifications, 0)
 		assert.Len(t, status.missingHeights, 0)
 	})
@@ -319,7 +312,7 @@ func TestNotified(t *testing.T) {
 		height := uint64(7)
 		status := &status{
 			lastNotified: 5,
-			lastReceived: 6,
+			LastReceived: 6,
 			outstandingNotifications: map[uint64]flow.Identifier{
 				height: unittest.IdentifierFixture(),
 			},
@@ -336,7 +329,7 @@ func TestNotified(t *testing.T) {
 		height := uint64(7)
 		status := &status{
 			lastNotified: 5,
-			lastReceived: 8,
+			LastReceived: 8,
 			outstandingNotifications: map[uint64]flow.Identifier{
 				height: unittest.IdentifierFixture(),
 			},
@@ -438,7 +431,7 @@ func TestNotificationTransitions(t *testing.T) {
 
 			heights = append(heights[:index], heights[index+1:]...)
 
-			status.Fetched(height, unittest.IdentifierFixture())
+			status.Fetched(ctx, height, unittest.IdentifierFixture())
 			notifications.Notify()
 		}
 

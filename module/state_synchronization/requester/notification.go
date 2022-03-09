@@ -1,12 +1,18 @@
 package requester
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 
+	"github.com/ipfs/go-datastore"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const statusDBKey = "execution_requester_status"
 
 var (
 	ErrDuplicateNotification = errors.New("notification already sent for height")
@@ -15,35 +21,76 @@ var (
 )
 
 type status struct {
-	startHeight              uint64
-	lastNotified             uint64
-	lastSealed               uint64
-	lastReceived             uint64
-	lastProcessed            uint64
-	missingHeights           map[uint64]bool
-	outstandingNotifications map[uint64]flow.Identifier
-	halted                   bool
+	// The highest block height whose ExecutionData has been fetched. Included in stored state.
+	LastReceived uint64
 
+	// The highest block height that's been inspected for newly sealed results
+	lastProcessed uint64
+
+	// The highest block height for which notifications have been sent
+	lastNotified uint64
+
+	// Whether or not the requester has been halted. Included in stored state.
+	// Persisted to the db so the condition can be detected without inspecting
+	// the entire datastore.
+	Halted bool
+
+	// List of heights below lastProcessed that have not been received
+	missingHeights map[uint64]bool
+
+	// List of heights that have been received, but notifications have not been sent
+	outstandingNotifications map[uint64]flow.Identifier
+
+	// Whether or not the first notification has been sent since startup. This is used to handle
+	// the case where the block height is 0 since the's no way to distinguish between an unset
+	// uint64 and 0
 	firstNotificationSent bool
 
-	mu sync.Mutex
+	mu sync.RWMutex
+	db datastore.Batching
 }
 
-func (m *status) Load() error {
+func (m *status) Load(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// load the status data from the db
-
 	m.missingHeights = make(map[uint64]bool)
 	m.outstandingNotifications = make(map[uint64]flow.Identifier)
+
+	data, err := m.db.Get(ctx, datastore.NewKey(statusDBKey))
+	if err == datastore.ErrNotFound {
+		return nil
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to load status: %w", err)
+	}
+
+	err = json.Unmarshal(data, m)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal status: %w", err)
+	}
+
+	return nil
+}
+
+func (m *status) save(ctx context.Context) error {
+	data, err := json.Marshal(m)
+	if err != nil {
+		return fmt.Errorf("failed to marshal status: %w", err)
+	}
+
+	err = m.db.Put(ctx, datastore.NewKey(statusDBKey), data)
+	if err != nil {
+		return fmt.Errorf("failed to save status: %w", err)
+	}
 
 	return nil
 }
 
 func (m *status) MissingHeights() []uint64 {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	heights := make([]uint64, len(m.missingHeights))
 
@@ -62,8 +109,8 @@ func (m *status) MissingHeights() []uint64 {
 }
 
 func (m *status) NextNotification() (uint64, flow.Identifier, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	// special case for block height 0
 	if m.lastNotified == 0 && !m.firstNotificationSent {
@@ -88,41 +135,28 @@ func (m *status) NextNotification() (uint64, flow.Identifier, bool) {
 	return next, flow.ZeroID, false
 }
 
-func (m *status) Sealed(height uint64) {
+func (m *status) Fetched(ctx context.Context, height uint64, blockID flow.Identifier) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	m.lastSealed = height
-}
-
-func (m *status) LastSealed() uint64 {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	return m.lastSealed
-}
-
-func (m *status) Fetched(height uint64, blockID flow.Identifier) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	defer m.save(ctx)
 
 	// this is the next height we're expecting
 	// this also includes special handling for block 0.
 
-	if m.lastReceived == 0 && !m.firstNotificationSent {
+	if m.LastReceived == 0 && !m.firstNotificationSent {
 		if height == 0 {
-			m.lastReceived = height
+			m.LastReceived = height
 			m.outstandingNotifications[height] = blockID
 			return
 		}
-	} else if height == m.lastReceived+1 {
-		m.lastReceived = height
+	} else if height == m.LastReceived+1 {
+		m.LastReceived = height
 		m.outstandingNotifications[height] = blockID
 		return
 	}
 
 	// check if it's missing
-	if height <= m.lastReceived {
+	if height <= m.LastReceived {
 		if m.missingHeights[height] {
 			delete(m.missingHeights, height)
 			m.outstandingNotifications[height] = blockID
@@ -133,15 +167,15 @@ func (m *status) Fetched(height uint64, blockID flow.Identifier) {
 	}
 
 	// if there's a gap, record all missing heights
-	start := m.lastReceived + 1
-	if m.lastReceived == 0 && !m.firstNotificationSent {
+	start := m.LastReceived + 1
+	if m.LastReceived == 0 && !m.firstNotificationSent {
 		start = 0
 	}
 	for h := start; h < height; h++ {
 		m.missingHeights[h] = true
 	}
 
-	m.lastReceived = height
+	m.LastReceived = height
 	m.outstandingNotifications[height] = blockID
 }
 
@@ -171,10 +205,19 @@ func (m *status) Notified(height uint64) error {
 	}
 
 	// we haven't seen this height yet
-	if height > m.lastReceived {
+	if height > m.LastReceived {
 		return ErrUnavailableHeight
 	}
 
 	// there's a problem with the state
 	return ErrNonconsecutiveHeight
+}
+
+func (m *status) Halt(ctx context.Context) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.Halted = true
+
+	m.save(ctx)
 }

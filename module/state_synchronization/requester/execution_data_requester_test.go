@@ -732,24 +732,11 @@ func runRequesterTest(t *testing.T, ctx context.Context, edr ExecutionDataReques
 	outstandingBlocks := sync.WaitGroup{}
 	outstandingBlocks.Add(cfg.sealedCount)
 
-	sendLast := make(chan struct{}, 1)
 	fetchedExecutionData := make(map[flow.Identifier]*state_synchronization.ExecutionData, cfg.sealedCount)
 	edr.AddOnExecutionDataFetchedConsumer(func(ed *state_synchronization.ExecutionData) {
-		// t.Logf("fetched execution data: %#v", ed)
 		fetchedExecutionData[ed.BlockID] = ed
 		outstandingBlocks.Done()
-
 		t.Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Header.Height, len(fetchedExecutionData), cfg.sealedCount)
-
-		// signal that we're near the end of the expected notifications. this is used to ensure
-		// that the last finalized block is successfully enqueued, and the finalization processor
-		// can backfill any blocks missed due to queue overflow.
-		if cfg.sealedCount-len(fetchedExecutionData) < finalizationQueueLength-1 {
-			select {
-			case sendLast <- struct{}{}:
-			default:
-			}
-		}
 	})
 
 	edr.Start(signalerCtx)
@@ -771,10 +758,14 @@ func runRequesterTest(t *testing.T, ctx context.Context, edr ExecutionDataReques
 		// needs a slight delay otherwise it will fill the queue immediately.
 		time.Sleep(5 * time.Millisecond)
 
-		// the requester can catch up after receiving a finalization block, so on the last
-		// block, pause until the queue is no longer full and add it
+		// the requester can catch up after receiving a finalization block, so on the last block,
+		// put the block directly into the finalized block channel to ensure it's accepted
 		if i == cfg.endHeight {
-			<-sendLast
+			select {
+			case <-ctx.Done():
+				t.Error("timed out before sending last block")
+			case edr.(*executionDataRequesterImpl).finalizedBlocks <- block.BlockID:
+			}
 		}
 	}
 
