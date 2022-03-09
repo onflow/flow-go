@@ -221,6 +221,8 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 
 	err = StoreCheckpoint(writer, tries...)
 
+	c.wal.log.Info().Msgf("created checkpoint %d with %d tries", to, len(tries))
+
 	return err
 }
 
