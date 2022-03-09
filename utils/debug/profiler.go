@@ -9,9 +9,19 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 )
+
+var profilerEnabled bool
+
+// SetProfilerEnabled enable or disable generating profiler data
+func SetProfilerEnabled(enabled bool) {
+	profilerEnabled = enabled
+
+	log.Info().Msgf("changed profilerEnabled to %v", enabled)
+}
 
 type AutoProfiler struct {
 	unit     *engine.Unit
@@ -21,11 +31,12 @@ type AutoProfiler struct {
 	duration time.Duration
 }
 
-func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration) (*AutoProfiler, error) {
+func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration, enabled bool) (*AutoProfiler, error) {
+	SetProfilerEnabled(enabled)
 
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("could not create profile dir: %w", err)
+		return nil, fmt.Errorf("could not create profile dir %v: %w", dir, err)
 	}
 
 	p := &AutoProfiler{
@@ -41,6 +52,13 @@ func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, dur
 func (p *AutoProfiler) Ready() <-chan struct{} {
 	delay := time.Duration(float64(p.interval) * rand.Float64())
 	p.unit.LaunchPeriodically(p.start, p.interval, delay)
+
+	if profilerEnabled {
+		p.log.Info().Msgf("AutoProfiler has started, the first profiler will be genereated at: %v", time.Now().Add(p.interval))
+	} else {
+		p.log.Info().Msg("AutoProfiler has started, profiler is disabled")
+	}
+
 	return p.unit.Ready()
 }
 
@@ -49,6 +67,10 @@ func (p *AutoProfiler) Done() <-chan struct{} {
 }
 
 func (p *AutoProfiler) start() {
+	if !profilerEnabled {
+		return
+	}
+
 	p.log.Info().Msg("starting profile trace")
 	// write pprof trace files
 	p.pprof("heap")
