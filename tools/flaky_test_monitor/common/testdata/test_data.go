@@ -546,6 +546,8 @@ func GetTestData_Level2_MultipleL1SummariesNoResults() []common.Level1Summary {
 	for i := 0; i < 4; i++ {
 		testResult3Rows = append(testResult3Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
+
+	// the remaining 1 test runs (out of 5) has to be added manually since it wasn't a no-result test
 	testResult3Rows = append(testResult3Rows, getPassedTestPackageElapsedOutput("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable", 0, "0.00", "    keys_test.go:245: bytes: 194\n"))
 
 	level1Summary3 := common.Level1Summary{
@@ -632,9 +634,14 @@ func GetTestData_Level2MultipleL1SummariesFailuresPasses() []common.Level1Summar
 		level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
 		level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
 	}
+
+	// the following test results have to be added manually (i.e. not in a loop) because
+	// they have unique data generated in the output / duration each time they're run
 	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1633358050430256000\n"))
 	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsedOutput("TestHashersAPI", 0, "0.00", "    hash_test.go:114: math rand seed is 1633358050203144000\n"))
 
+	// the following test results have to be added manually (i.e. not in a loop) because
+	// they have unique data generated in the output / duration each time they're run
 	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsedOutput("TestSha3", 0.23, "0.23", "    hash_test.go:158: math rand seed is 1633358050203374000\n"))
 	level1TestResult4Rows = append(level1TestResult4Rows, getPassedTestElapsedOutput("TestSha3", 0.22, "0.22", "    hash_test.go:158: math rand seed is 1633358050430467000\n"))
 
@@ -654,13 +661,17 @@ func GetTestData_Level2MultipleL1SummariesFailuresPasses() []common.Level1Summar
 		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
 	}
 
+	// the following test results have to be added in a separate loop because their results are the same 8 times out 10 test runs
 	for i := 0; i < 8; i++ {
 		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3", 0.22, "0.22"))
 		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
 	}
+
+	// the remaining 2 test runs (out of 10) have to be added manually since they have unique duration data not present in the other test runs
 	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3", 0.24, "0.24"))
 	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
 
+	// the remaining 2 test runs (out of 10) have to be added manually since they have unique duration data not present in the other test runs
 	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12"))
 	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11"))
 
@@ -679,19 +690,26 @@ func GetTestData_Level2MultipleL1SummariesFailuresPasses() []common.Level1Summar
 		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTest("TestHashersAPI"))
 	}
 
+	// the following test results have to be added in a separate loop because their results are the same 6 times out 10 test runs
 	for i := 0; i < 6; i++ {
 		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.22, "0.22"))
 	}
+	// the remaining 4 test runs (out of 10) have to be added manually since they have unique duration data not present in the other test runs
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.24, "0.24"))
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
 
+	// the following test results have to be added in a separate loop because their results are the same 9 times out 10 test runs
 	for i := 0; i < 9; i++ {
 		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
 		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
 	}
+
+	// the remaining 1 test run (out of 10) has to be added manually since it has unique duration data not present in the other test runs
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12"))
+
+	// the remaining 1 test run (out of 10) has to be added manually since it has unique duration data not present in the other test runs
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13"))
 
 	level1Summary6 := common.Level1Summary{
@@ -795,12 +813,17 @@ func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Lev
 		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
 	}
 
+	// the following test results have to be added in a separate loop because their results are the same 8 times out 10 test runs
 	for i := 0; i < 8; i++ {
 		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3", 0.22, "0.22"))
 		level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
 	}
+
+	// the remaining 2 test runs (out of 10) have to be added manually since they have unique duration data not present in the other test runs
 	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3", 0.24, "0.24"))
 	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
+
+	// the remaining 2 test runs (out of 10) have to be added manually since they have unique duration data not present in the other test runs
 	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12"))
 	level1TestResult5Rows = append(level1TestResult5Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.11, "0.11"))
 
@@ -819,16 +842,20 @@ func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Lev
 		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTest("TestHashersAPI"))
 	}
 
+	// the following test results have to be added in a separate loop because their results are the same 9 times out 10 test runs
 	for i := 0; i < 9; i++ {
 		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.1, "0.10"))
 		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.12, "0.12"))
 	}
+	// the remaining 1 test run (out of 10) have to be added manually since they have unique duration data not present in the other test runs
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_256", 0.12, "0.12"))
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3/SHA3_384", 0.13, "0.13"))
 
+	// the following test results have to be added in a separate loop because their results are the same 6 times out 10 test runs
 	for i := 0; i < 6; i++ {
 		level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.22, "0.22"))
 	}
+	// the remaining 4 test runs (out of 10) have to be added manually since they have unique duration data not present in the other test runs
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.24, "0.24"))
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
 	level1TestResult6Rows = append(level1TestResult6Rows, getPassedTestElapsed("TestSha3", 0.23, "0.23"))
@@ -874,6 +901,7 @@ func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Lev
 	for i := 0; i < 4; i++ {
 		level1TestResult9Rows = append(level1TestResult9Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
+	// the remaining 1 test runs (out of 5) have to be added manually since it wasn't a no-result test
 	level1TestResult9Rows = append(level1TestResult9Rows, getPassedTestPackage("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable"))
 
 	level1Summary9 := common.Level1Summary{
