@@ -34,13 +34,19 @@ type Attacker struct {
 	corruptedConnector insecure.CorruptedNodeConnector
 }
 
-func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orchestrator insecure.AttackOrchestrator) (*Attacker, error) {
+func NewAttacker(
+	logger zerolog.Logger,
+	address string,
+	codec network.Codec,
+	orchestrator insecure.AttackOrchestrator,
+	connector insecure.CorruptedNodeConnector) (*Attacker, error) {
+
 	attacker := &Attacker{
 		orchestrator:       orchestrator,
 		logger:             logger,
 		codec:              codec,
 		address:            address,
-		corruptedConnector: &CorruptedConnector{attackerAddress: address},
+		corruptedConnector: connector,
 		corruptedNodes:     make(map[flow.Identifier]insecure.CorruptedNodeConnection),
 	}
 

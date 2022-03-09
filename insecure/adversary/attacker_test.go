@@ -1,4 +1,4 @@
-package adversary
+package adversary_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/insecure/adversary"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -157,7 +158,7 @@ func withAttacker(
 	// mocks start up of orchestrator
 	orchestrator.On("Start", mock.AnythingOfType("*irrecoverable.signalerCtx")).Return().Once()
 
-	attacker, err := NewAttacker(unittest.Logger(), attackerAddress, codec, orchestrator)
+	attacker, err := adversary.NewAttacker(unittest.Logger(), attackerAddress, codec, orchestrator)
 
 	require.NoError(t, err)
 
