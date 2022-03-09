@@ -252,6 +252,14 @@ docker-build-access-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=access  --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
+# Observer is currently simply access node, this target is added for compatibility with deployment pipeline
+# Once proper observer is separated in the code, we should just need to change TARGET parameter below
+.PHONY: docker-build-observer
+docker-build-observer:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		-t "$(CONTAINER_REGISTRY)/observer:latest" -t "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)" .
+
+
 .PHONY: docker-build-ghost
 docker-build-ghost:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=ghost --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
@@ -287,7 +295,7 @@ docker-build-loader:
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
 
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader
@@ -322,6 +330,12 @@ docker-push-access:
 	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
 
+.PHONY: docker-push-observer
+docker-push-observer:
+	docker push "$(CONTAINER_REGISTRY)/observer:latest"
+	docker push "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)"
+
 .PHONY: docker-push-ghost
 docker-push-ghost:
 	docker push "$(CONTAINER_REGISTRY)/ghost:latest"
@@ -335,7 +349,7 @@ docker-push-loader:
 	docker push "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)"
 
 .PHONY: docker-push-flow
-docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access
+docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access docker-push-observer
 
 .PHONY: docker-push-benchnet
 docker-push-benchnet: docker-push-flow docker-push-loader

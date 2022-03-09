@@ -69,7 +69,7 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 		nodeID,
 		nodeConfig.Role,
 		nodeConfig.Address,
-		nodeConfig.Stake,
+		nodeConfig.Weight,
 		networkKey,
 		stakingKey,
 	)

@@ -7,27 +7,27 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
-// IsNodeStakedAt returns whether the node with the given ID is a valid
-// staked, un-ejected node as of the given state snapshot.
-func IsNodeStakedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
+// IsNodeAuthorizedAt returns whether the node with the given ID is a valid
+// un-ejected network participant as of the given state snapshot.
+func IsNodeAuthorizedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasStake(true),
+		filter.HasWeight(true),
 		filter.Not(filter.Ejected),
 	)
 }
 
-// IsNodeStakedWithRoleAt returns whether the node with the given ID is a valid
-// staked, un-ejected node with the specified role as of the given state snapshot.
+// IsNodeAuthorizedWithRoleAt returns whether the node with the given ID is a valid
+// un-ejected network participant with the specified role as of the given state snapshot.
 // Expected errors during normal operations:
 //  * storage.ErrNotFound if snapshot references an unknown block
 // All other errors are unexpected and potential symptoms of internal state corruption.
-func IsNodeStakedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow.Role) (bool, error) {
+func IsNodeAuthorizedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow.Role) (bool, error) {
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasStake(true),
+		filter.HasWeight(true),
 		filter.Not(filter.Ejected),
 		filter.HasRole(role),
 	)
