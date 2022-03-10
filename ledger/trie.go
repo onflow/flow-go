@@ -209,6 +209,9 @@ type Payload struct {
 
 // Size returns the size of the payload
 func (p *Payload) Size() int {
+	if p == nil {
+		return 0
+	}
 	return p.Key.Size() + p.Value.Size()
 }
 
@@ -240,6 +243,9 @@ func (p *Payload) Equals(other *Payload) bool {
 
 // DeepCopy returns a deep copy of the payload
 func (p *Payload) DeepCopy() *Payload {
+	if p == nil {
+		return nil
+	}
 	k := p.Key.DeepCopy()
 	v := p.Value.DeepCopy()
 	return &Payload{Key: k, Value: v}
