@@ -152,14 +152,15 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
 	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
 	cluster, err := snapshot.Epochs().Current().ClusterByChainID(guarantee.ChainID)
+	// reference block not found
 	if errors.Is(err, storage.ErrNotFound) {
 		return engine.NewUnverifiableInputError(
 			"could not get clusters with chainID %v for unknown reference block (id=%x): %w", guarantee.ChainID, guarantee.ReferenceBlockID, err)
 	}
 
-	// TODO: use sentinal error
-	if err != nil {
-		return engine.NewInvalidInputErrorf("invalid chain ID %v", guarantee.ChainID)
+	// cluster not found by the chain ID
+	if errors.Is(err, protocol.ErrClusterNotFound) {
+		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v, %v", guarantee.ChainID, err)
 	}
 
 	if err != nil {
@@ -169,16 +170,21 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// ensure the guarantors are from the same cluster
 	clusterMembers := cluster.Members()
 
-	var guarantors flow.IdentityList
-	guarantors, err = packer.DecodeSignerIdentifiersFromIndices(clusterMembers, guarantee.SignerIndices)
+	guarantorIndices, err := packer.DecodeSignerIndices(guarantee.SignerIndices, len(clusterMembers))
 	if err != nil {
-		return engine.NewInvalidInputErrorf("could not decode signer identifiers from indices: %v", err)
+		return engine.NewInvalidInputErrorf("could not decode guarantor indices: %v", err)
+	}
+
+	guarantors, err := packer.FilterByIndices(clusterMembers, guarantorIndices)
+	if err != nil {
+		return engine.NewInvalidInputErrorf("could not find guarantors: %w", err)
 	}
 
 	// determine whether signers reach minimally required stake threshold
 	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(clusterMembers.TotalStake()) // compute required stake threshold
-	if guarantors.TotalStake() < threshold {
-		return engine.NewInvalidInputErrorf("qc signers have insufficient stake of %d (required=%d)", signers.TotalStake(), threshold)
+	totalStake := flow.IdentityList(guarantors).TotalStake()
+	if totalStake < threshold {
+		return engine.NewInvalidInputErrorf("qc signers have insufficient stake of %d (required=%d)", totalStake, threshold)
 	}
 
 	return nil
