@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/seed"
-	"github.com/onflow/flow-go/storage"
 )
 
 // Epoch is a memory-backed implementation of protocol.Epoch.
@@ -50,14 +49,14 @@ func (e Epoch) DKG() (protocol.DKG, error) {
 }
 
 func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
-	if e.enc.Clusters != nil {
-		if i >= uint(len(e.enc.Clusters)) {
-			// TODO: use sentinal error
-			return nil, fmt.Errorf("no cluster with index %d", i)
-		}
-		return Cluster{e.enc.Clusters[i]}, nil
+	if e.enc.Clusters == nil {
+		return nil, protocol.ErrEpochNotCommitted
 	}
-	return nil, protocol.ErrEpochNotCommitted
+
+	if i >= uint(len(e.enc.Clusters)) {
+		return nil, fmt.Errorf("no cluster with index %d: %w", i, protocol.ErrClusterNotFound)
+	}
+	return Cluster{e.enc.Clusters[i]}, nil
 }
 
 func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
@@ -71,8 +70,7 @@ func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) 
 		}
 	}
 
-	// TODO: use sentinal error
-	return nil, fmt.Errorf("no cluster with the given chain ID %v: %w", chainID, storage.ErrNotFound)
+	return nil, fmt.Errorf("no cluster with the given chain ID %v: %w", chainID, protocol.ErrClusterNotFound)
 }
 
 type Epochs struct {
