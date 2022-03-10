@@ -639,7 +639,8 @@ func (suite *Suite) TestExecuteScript() {
 		connFactory := new(factorymock.ConnectionFactory)
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-		suite.backend = backend.New(suite.state,
+		suite.backend = backend.New(
+			suite.state,
 			suite.collClient,
 			nil,
 			blocks,
