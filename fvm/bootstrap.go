@@ -3,6 +3,7 @@ package fvm
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -229,6 +230,14 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.registerNodes(service, fungibleToken, flowToken)
 
 	return nil
+}
+
+func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
+	return math.MaxUint64
+}
+
+func (proc *BootstrapProcedure) MemoryLimit(_ Context) uint64 {
+	return math.MaxUint64
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {

@@ -33,19 +33,18 @@ var _ Environment = &ScriptEnv{}
 
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
-	ctx                Context
-	sth                *state.StateHolder
-	vm                 *VirtualMachine
-	accounts           state.Accounts
-	contracts          *handler.ContractHandler
-	programs           *handler.ProgramsHandler
-	accountKeys        *handler.AccountKeyHandler
-	metrics            *handler.MetricsHandler
-	computationHandler handler.ComputationMeteringHandler
-	uuidGenerator      *state.UUIDGenerator
-	logs               []string
-	rng                *rand.Rand
-	traceSpan          opentracing.Span
+	ctx           Context
+	sth           *state.StateHolder
+	vm            *VirtualMachine
+	accounts      state.Accounts
+	contracts     *handler.ContractHandler
+	programs      *handler.ProgramsHandler
+	accountKeys   *handler.AccountKeyHandler
+	metrics       *handler.MetricsHandler
+	uuidGenerator *state.UUIDGenerator
+	logs          []string
+	rng           *rand.Rand
+	traceSpan     opentracing.Span
 }
 
 func (e *ScriptEnv) Context() *Context {
@@ -68,18 +67,16 @@ func NewScriptEnvironment(
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
-	computationHandler := handler.NewComputationMeteringHandler(ctx.GasLimit)
 
 	env := &ScriptEnv{
-		ctx:                ctx,
-		sth:                sth,
-		vm:                 vm,
-		metrics:            metrics,
-		accounts:           accounts,
-		accountKeys:        accountKeys,
-		uuidGenerator:      uuidGenerator,
-		programs:           programsHandler,
-		computationHandler: computationHandler,
+		ctx:           ctx,
+		sth:           sth,
+		vm:            vm,
+		metrics:       metrics,
+		accounts:      accounts,
+		accountKeys:   accountKeys,
+		uuidGenerator: uuidGenerator,
+		programs:      programsHandler,
 	}
 
 	env.contracts = handler.NewContractHandler(
@@ -435,15 +432,19 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *ScriptEnv) GetComputationLimit() uint64 {
-	return e.computationHandler.Limit()
+	return uint64(e.sth.State().TotalComputationLimit())
 }
 
 func (e *ScriptEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.AddUsed(used)
+	// TODO update this interface with the proper cadence ones
+	if e.sth.EnforceComputationLimits() {
+		return e.sth.State().MeterComputation(1, uint(used))
+	}
+	return nil
 }
 
 func (e *ScriptEnv) GetComputationUsed() uint64 {
-	return e.computationHandler.Used()
+	return uint64(e.sth.State().TotalComputationUsed())
 }
 
 func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
