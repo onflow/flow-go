@@ -13,12 +13,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/ipfs/go-bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
+	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
+
+	cpu "github.com/shirou/gopsutil/v3/cpu"
+	mem "github.com/shirou/gopsutil/v3/mem"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
+	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -175,6 +180,9 @@ func main() {
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(executionDataService)
 		}).
+		AdminCommand("set-uploader-enabled", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return uploaderCommands.NewToggleUploaderCommand()
+		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -191,6 +199,14 @@ func main() {
 				blocktimer.DefaultBlockTimer,
 			)
 			return err
+		}).
+		Module("hardware specs", func(node *cmd.NodeConfig) error {
+			hwLogger := node.Logger.With().Str("system", "hardware").Logger()
+			err = logHardware(hwLogger)
+			if err != nil {
+				hwLogger.Error().Err(err)
+			}
+			return nil
 		}).
 		Module("execution metrics", func(node *cmd.NodeConfig) error {
 			collector = metrics.NewExecutionCollector(node.Tracer)
@@ -825,4 +841,38 @@ func copyBootstrapState(dir, trie string) error {
 	fmt.Printf("copied bootstrap state file from: %v, to: %v\n", src, dst)
 
 	return out.Close()
+}
+
+func logHardware(logger zerolog.Logger) error {
+
+	vmem, err := mem.VirtualMemory()
+	if err != nil {
+		return fmt.Errorf("failed to get virtual memory: %w", err)
+	}
+
+	info, err := cpu.Info()
+	if err != nil {
+		return fmt.Errorf("failed to get cpu info: %w", err)
+	}
+
+	logicalCores, err := cpu.Counts(true)
+	if err != nil {
+		return fmt.Errorf("failed to get logical cores: %w", err)
+	}
+
+	physicalCores, err := cpu.Counts(false)
+	if err != nil {
+		return fmt.Errorf("failed to get physical cores: %w", err)
+	}
+
+	if len(info) == 0 {
+		return fmt.Errorf("cpu info length is 0")
+	}
+
+	logger.Info().Msgf("CPU: ModelName=%s, MHz=%.0f, Family=%s, Model=%s, Stepping=%d, PhysicalCores=%d, LogicalCores=%d",
+		info[0].ModelName, info[0].Mhz, info[0].Family, info[0].Model, info[0].Stepping, physicalCores, logicalCores)
+
+	logger.Info().Msgf("RAM: Total=%d, Free=%d", vmem.Total, vmem.Free)
+
+	return nil
 }

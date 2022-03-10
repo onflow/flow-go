@@ -461,14 +461,13 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 func (fnb *FlowNodeBuilder) initProfiler() {
 	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
 	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
-	if !fnb.BaseConfig.profilerEnabled {
-		return
-	}
+
 	profiler, err := debug.NewAutoProfiler(
 		fnb.Logger,
 		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
 		fnb.BaseConfig.profilerDuration,
+		fnb.BaseConfig.profilerEnabled,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
@@ -1069,6 +1068,8 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
+	}).AdminCommand("set-profiler-enabled", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetProfilerEnabledCommand{}
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
