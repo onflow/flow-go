@@ -317,7 +317,8 @@ func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identi
 	block := BlockWithParentFixture(parent)
 
 	block.Header.ProposerID = proposer
-	block.Header.ParentVoterIndices = packer.EncodeSignerIndices([]int{1}, 10)
+	indices, _ := packer.EncodeSignerIndices([]int{1}, 10)
+	block.Header.ParentVoterIndices = indices
 
 	return *block
 }
@@ -845,7 +846,8 @@ func SignerIndicesFixture(n int) []byte {
 	for i := 0; i < n; i++ {
 		list[i] = i
 	}
-	return packer.EncodeSignerIndices(list, 10)
+	indices, _ := packer.EncodeSignerIndices(list, 10)
+	return indices
 }
 
 // WithRole adds a role to an identity fixture.

@@ -22,7 +22,11 @@ func EncodeSignerIdentifiersToIndices(fullIdentities []flow.Identifier, signerID
 		return nil, fmt.Errorf("unknown signers %v", signersLookup)
 	}
 
-	signerIndices := EncodeSignerIndices(indices, len(fullIdentities))
+	signerIndices, err := EncodeSignerIndices(indices, len(fullIdentities))
+	if err != nil {
+		return nil, err
+	}
+
 	return signerIndices, nil
 }
 

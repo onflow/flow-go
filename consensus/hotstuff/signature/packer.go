@@ -210,7 +210,10 @@ func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners
 		return nil, nil, fmt.Errorf("unknown beacon signers %v", beaconSignersLookup)
 	}
 
-	signerIndices := pcker.EncodeSignerIndices(indices, len(fullMembers))
+	signerIndices, err := pcker.EncodeSignerIndices(indices, len(fullMembers))
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not encode signer indices: %w", err)
+	}
 
 	serialized, err := serializeToBitVector(sigType)
 	if err != nil {

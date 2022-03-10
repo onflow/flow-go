@@ -6,19 +6,28 @@ import (
 
 // EncodeSignerIndices encodes indices into compacted bit vector. Each bit represents whether the identity at
 // that index is a signer.
-// It assumes the indices is in the increasing order,
+// Note, the indices in the first argument must be in the strict increasing order,
 // otherwise, decoding the signer indices will not recover to the original indices.
-// TODO : check index in the indices are in the increasing order
-func EncodeSignerIndices(indices []int, count int) []byte {
+// An error will return if indices is not ordered correctly.
+func EncodeSignerIndices(indices []int, count int) ([]byte, error) {
 	totalBytes := bytesCount(count)
 	bytes := make([]byte, totalBytes)
-	for _, index := range indices {
+	for i, index := range indices {
+		if i > 0 {
+			if index <= indices[i-1] {
+				return nil, fmt.Errorf(
+					"the indices are not in strict increasing order, %v (indices[%v]) must < %v (indices[%v])",
+					indices[i-1], i-1,
+					indices[i], i)
+			}
+		}
+
 		byt := index >> 3
 		offset := 7 - (index & 7)
 		mask := byte(1 << offset)
 		bytes[byt] ^= mask
 	}
-	return bytes
+	return bytes, nil
 }
 
 // DecodeSignerIndices decodes the given compacted signer indices to a slice of indices.
