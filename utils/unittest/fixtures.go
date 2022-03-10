@@ -15,7 +15,6 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	hotstuffPacker "github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -29,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )

@@ -6,8 +6,8 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/packer"
 )
 
 // Validator is responsible for validating QC, Block and Vote

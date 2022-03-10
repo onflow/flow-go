@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/model/flow"
+	pcker "github.com/onflow/flow-go/module/packer"
 )
 
 // ConsensusSigDataPacker implements the hotstuff.Packer interface.
@@ -209,7 +210,7 @@ func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners
 		return nil, nil, fmt.Errorf("unknown beacon signers %v", beaconSignersLookup)
 	}
 
-	signerIndices := packer.EncodeSignerIndices(indices, len(fullMembers))
+	signerIndices := pcker.EncodeSignerIndices(indices, len(fullMembers))
 
 	serialized, err := serializeToBitVector(sigType)
 	if err != nil {

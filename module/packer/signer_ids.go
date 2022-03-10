@@ -3,7 +3,6 @@ package packer
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,7 +21,7 @@ func EncodeSignerIdentifiersToIndices(fullIdentities []flow.Identifier, signerID
 		return nil, fmt.Errorf("unknown signers %v", signersLookup)
 	}
 
-	signerIndices := packer.EncodeSignerIndices(indices, len(fullIdentities))
+	signerIndices := EncodeSignerIndices(indices, len(fullIdentities))
 	return signerIndices, nil
 }
 
