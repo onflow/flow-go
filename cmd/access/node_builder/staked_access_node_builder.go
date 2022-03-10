@@ -2,6 +2,7 @@ package node_builder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -286,66 +288,78 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 		var dstore datastore.Batching
 		var blobservice network.BlobService
 
-		builder.
-			Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				err := os.MkdirAll(builder.executionDataDir, 0700)
-				if err != nil {
-					return nil, err
+		builder.Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			err := os.MkdirAll(builder.executionDataDir, 0700)
+			if err != nil {
+				return nil, err
+			}
+
+			// TODO: we need to close this after the execution data services are stopped. it should probably be run as part of the node's postShutdown handler
+			dstore, err := badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
+			if err != nil {
+				return nil, err
+			}
+
+			builder.ShutdownFunc(func() error {
+				if err := dstore.Close(); err != nil {
+					return fmt.Errorf("could not close execution data datastore: %w", err)
 				}
-
-				// TODO: we need to close this after the execution data services are stopped. it should probably be run as part of the node's postShutdown handler
-				dstore, err := badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
-				if err != nil {
-					return nil, err
-				}
-
-				builder.ShutdownFunc(func() error {
-					if err := dstore.Close(); err != nil {
-						return fmt.Errorf("could not close execution data datastore: %w", err)
-					}
-					return nil
-				})
-
-				blobservice, err := node.Network.RegisterBlobService(engine.ExecutionDataService, dstore)
-				if err != nil {
-					return nil, err
-				}
-
-				eds := state_synchronization.NewExecutionDataService(
-					new(cbor.Codec),
-					compressor.NewLz4Compressor(),
-					blobservice,
-					metrics.NewExecutionDataServiceCollector(),
-					builder.Logger,
-				)
-
-				builder.ExecutionDataService = eds
-
-				return builder.ExecutionDataService, nil
-			}).
-			Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				edr, err := edrequester.NewExecutionDataRequester(
-					builder.Logger,
-					metrics.NewNoopCollector(),
-					dstore,
-					blobservice,
-					builder.ExecutionDataService,
-					builder.RootBlock,
-					builder.Storage.Blocks,
-					builder.Storage.Results,
-					builder.executionDataCheckEnabled,
-				)
-
-				if err != nil {
-					return nil, fmt.Errorf("could not create execution data requester: %w", err)
-				}
-
-				builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
-
-				builder.ExecutionDataRequester = edr
-
-				return builder.ExecutionDataRequester, nil
+				return nil
 			})
+
+			blobservice, err := node.Network.RegisterBlobService(engine.ExecutionDataService, dstore)
+			if err != nil {
+				return nil, err
+			}
+
+			eds := state_synchronization.NewExecutionDataService(
+				new(cbor.Codec),
+				compressor.NewLz4Compressor(),
+				blobservice,
+				metrics.NewExecutionDataServiceCollector(),
+				builder.Logger,
+			)
+
+			builder.ExecutionDataService = eds
+
+			return builder.ExecutionDataService, nil
+		})
+
+		errorHander := func(ctx context.Context, err error) component.ErrorHandlingResult {
+			if errors.Is(err, edrequester.ErrRequesterHalted) {
+				// the requester is halted and should remain disabled, but the node can continue
+				// to operate safely. pause here until the node shuts down
+				<-ctx.Done()
+			}
+
+			// all other errors are unhandled
+			return component.ErrorHandlingStop
+		}
+
+		builder.RestartableComponent("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			edr, err := edrequester.NewExecutionDataRequester(
+				builder.Logger,
+				metrics.NewNoopCollector(),
+				dstore,
+				blobservice,
+				builder.ExecutionDataService,
+				builder.RootBlock,
+				builder.Storage.Blocks,
+				builder.Storage.Results,
+				builder.executionDataFetchTimeout,
+				builder.executionDataCheckEnabled,
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create execution data requester: %w", err)
+			}
+
+			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
+
+			builder.ExecutionDataRequester = edr
+
+			return builder.ExecutionDataRequester, nil
+		}, errorHander)
 	}
 
 	if builder.supportsUnstakedFollower {

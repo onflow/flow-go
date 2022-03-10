@@ -505,7 +505,7 @@ func TestRequestBlocksWithSomeMissed(t *testing.T) {
 
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
-	blockCount := 10000
+	blockCount := 2000
 
 	rand.Seed(time.Now().UnixMilli())
 
@@ -549,6 +549,7 @@ func TestRequestBlocksWithSomeMissed(t *testing.T) {
 		testData.blocksByHeight[uint64(0)],
 		blocks,
 		results,
+		DefaultFetchTimeout,
 		false,
 	)
 	assert.NoError(t, err)
@@ -601,6 +602,7 @@ func TestRequestBlocksWithRandomDelays(t *testing.T) {
 		testData.blocksByHeight[uint64(0)],
 		blocks,
 		results,
+		DefaultFetchTimeout,
 		false,
 	)
 	assert.NoError(t, err)
@@ -695,6 +697,7 @@ func TestHappyCase(t *testing.T) {
 		testBlocksByHeight[uint64(0)],
 		blocks,
 		results,
+		DefaultFetchTimeout,
 		false,
 	)
 	assert.NoError(t, err)
