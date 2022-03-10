@@ -147,8 +147,7 @@ func (a *Attacker) Observe(stream insecure.Attacker_ObserveServer) error {
 				return stream.SendAndClose(&empty.Empty{})
 			}
 			if err != nil {
-				a.logger.Fatal().Err(err).Msg("could not read stream of corrupted node")
-				return stream.SendAndClose(&empty.Empty{})
+				return fmt.Errorf("could not read corrupted node's stream: %w", err)
 			}
 
 			if err = a.processObservedMsg(msg); err != nil {
