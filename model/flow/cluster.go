@@ -45,6 +45,8 @@ func (clusters ClusterList) Assignments() AssignmentList {
 
 // NewClusterList creates a new cluster list based on the given cluster assignment
 // and the provided list of identities.
+// The caller must ensure each assignment contains identities ordered in canonical order, so that
+// each cluster in the returned cluster list is ordered in canonical order as well.
 func NewClusterList(assignments AssignmentList, collectors IdentityList) (ClusterList, error) {
 
 	// build a lookup for all the identities by node identifier
@@ -68,6 +70,7 @@ func NewClusterList(assignments AssignmentList, collectors IdentityList) (Cluste
 			cluster = append(cluster, participant)
 			delete(lookup, participantID)
 		}
+
 		clusters = append(clusters, cluster)
 	}
 

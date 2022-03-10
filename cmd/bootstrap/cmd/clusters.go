@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // Construct cluster assignment with internal and partner nodes uniformly
@@ -33,6 +34,11 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo, se
 	// next, round-robin partner nodes into each cluster
 	for i, node := range partners {
 		assignments[i%len(assignments)] = append(assignments[i%len(assignments)], node.NodeID)
+	}
+
+	// in place sort to order the assignment in canonical order
+	for _, assignment := range assignments {
+		assignment.Sort(order.Canonical)
 	}
 
 	collectors := append(partners, internals...)
