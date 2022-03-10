@@ -407,6 +407,10 @@ func ProtoToExecutionResult(proto *entities.ExecutionResult) (*flow.ExecutionRes
 		if err != nil {
 			return nil, err
 		}
+		executionDataID, err := flow.HashToID(chunk.ExecutionDataId)
+		if err != nil {
+			return nil, err
+		}
 		chunkBody := flow.ChunkBody{
 			CollectionIndex:      uint(chunk.CollectionIndex),
 			StartState:           startState,
@@ -416,9 +420,10 @@ func ProtoToExecutionResult(proto *entities.ExecutionResult) (*flow.ExecutionRes
 			NumberOfTransactions: uint64(chunk.NumberOfTransactions),
 		}
 		parsedChunks[i] = &flow.Chunk{
-			ChunkBody: chunkBody,
-			Index:     chunk.Index,
-			EndState:  endState,
+			ChunkBody:       chunkBody,
+			Index:           chunk.Index,
+			EndState:        endState,
+			ExecutionDataID: executionDataID,
 		}
 	}
 	// convert ServiceEvents
