@@ -109,13 +109,12 @@ func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, bool
 // kept and the method call is a NoOp.
 func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 	v.lock.Lock()
+	defer v.lock.Unlock()
 	if v.lowestRetainedView >= lowestRetainedView {
-		v.lock.Unlock()
 		return
 	}
 	if len(v.collectors) == 0 {
 		v.lowestRetainedView = lowestRetainedView
-		v.lock.Unlock()
 		return
 	}
 
@@ -138,13 +137,11 @@ func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 	}
 	from := v.lowestRetainedView
 	v.lowestRetainedView = lowestRetainedView
-	sizeAfter := len(v.collectors)
-	v.lock.Unlock()
 
 	v.log.Debug().
 		Uint64("prior_lowest_retained_view", from).
 		Uint64("lowest_retained_view", lowestRetainedView).
 		Int("prior_size", sizeBefore).
-		Int("size", sizeAfter).
+		Int("size", len(v.collectors)).
 		Msgf("pruned vote collectors")
 }
