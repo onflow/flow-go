@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
@@ -38,7 +37,13 @@ import (
 )
 
 // MockChunkDataProviderFunc is a test helper function encapsulating the logic of whether to reply a chunk data pack request.
-type MockChunkDataProviderFunc func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit) bool
+type MockChunkDataProviderFunc func(
+	*testing.T,
+	CompleteExecutionReceiptList,
+	flow.Identifier,
+	flow.Identifier,
+	func(*messages.ChunkDataResponse, flow.Identifier) error,
+) bool
 
 // SetupChunkDataPackProvider creates and returns an execution node that only has a chunk data pack provider engine.
 //
@@ -51,13 +56,14 @@ func SetupChunkDataPackProvider(t *testing.T,
 	chainID flow.ChainID,
 	completeERs CompleteExecutionReceiptList,
 	assignedChunkIDs flow.IdentifierList,
-	provider MockChunkDataProviderFunc) (*enginemock.GenericNode,
+	provider MockChunkDataProviderFunc,
+) (*enginemock.GenericNode,
 	*mocknetwork.Engine, *sync.WaitGroup) {
 
 	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
+	err := exeNode.Net.RegisterDirectMessageHandler(engine.RequestChunks, exeEngine.Submit)
 	assert.Nil(t, err)
 
 	replied := make(map[flow.Identifier]struct{})
@@ -67,7 +73,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 
 	mu := &sync.Mutex{} // making testify Run thread-safe
 
-	exeEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
+	exeEngine.On("Submit", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -81,7 +87,9 @@ func SetupChunkDataPackProvider(t *testing.T,
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
-			shouldReply := provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
+			shouldReply := provider(t, completeERs, req.ChunkID, originID, func(resp *messages.ChunkDataResponse, target flow.Identifier) error {
+				return exeNode.Net.SendDirectMessage(engine.ProvideChunks, resp, target)
+			})
 			_, alreadyReplied := replied[req.ChunkID]
 			if shouldReply && !alreadyReplied {
 				/*
@@ -96,40 +104,19 @@ func SetupChunkDataPackProvider(t *testing.T,
 	return &exeNode, exeEngine, wg
 }
 
-// RespondChunkDataPackRequestImmediately immediately qualifies a chunk data request for reply by chunk data provider.
-func RespondChunkDataPackRequestImmediately(t *testing.T,
-	completeERs CompleteExecutionReceiptList,
-	chunkID flow.Identifier,
-	verID flow.Identifier,
-	con network.Conduit) bool {
-
-	// finds the chunk data pack of the requested chunk and sends it back.
-	res := completeERs.ChunkDataResponseOf(t, chunkID)
-
-	err := con.Unicast(res, verID)
-	assert.Nil(t, err)
-
-	log.Debug().
-		Hex("origin_id", logging.ID(verID)).
-		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("chunk data pack request answered by provider")
-
-	return true
-}
-
 // RespondChunkDataPackRequestAfterNTrials only qualifies a chunk data request for reply by chunk data provider after n times.
 func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 	tryCount := make(map[flow.Identifier]int)
 
-	return func(t *testing.T, completeERs CompleteExecutionReceiptList, chunkID flow.Identifier, verID flow.Identifier, con network.Conduit) bool {
+	return func(t *testing.T, completeERs CompleteExecutionReceiptList, chunkID flow.Identifier, verID flow.Identifier, responseSender func(*messages.ChunkDataResponse, flow.Identifier) error) bool {
 		tryCount[chunkID]++
 
 		if tryCount[chunkID] >= n {
 			// finds the chunk data pack of the requested chunk and sends it back.
 			res := completeERs.ChunkDataResponseOf(t, chunkID)
 
-			err := con.Unicast(res, verID)
-			assert.Nil(t, err)
+			err := responseSender(res, verID)
+			require.NoError(t, err)
 
 			log.Debug().
 				Hex("origin_id", logging.ID(verID)).

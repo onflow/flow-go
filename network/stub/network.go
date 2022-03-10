@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -173,8 +174,7 @@ func (n *Network) DeliverAll(syncOnProcess bool) {
 	n.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
 		err := n.sendToAllTargets(m, syncOnProcess)
 		if err != nil {
-			fmt.Println("ERROR SENDING")
-			fmt.Println(err)
+			log.Err(err).Interface("msg", m).Msg("could not deliver message")
 		}
 	})
 }
