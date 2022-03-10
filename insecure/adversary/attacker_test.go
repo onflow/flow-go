@@ -1,4 +1,4 @@
-package adversary
+package adversary_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/insecure/adversary"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -133,7 +134,7 @@ func withAttackerClient(
 	t *testing.T,
 	run func(*testing.T, *mockinsecure.AttackOrchestrator, insecure.Attacker_ObserveClient)) {
 
-	withAttacker(t, func(t *testing.T, attacker *Attacker, orchestrator *mockinsecure.AttackOrchestrator) {
+	withAttacker(t, func(t *testing.T, attacker *adversary.Attacker, orchestrator *mockinsecure.AttackOrchestrator) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -151,13 +152,13 @@ func withAttackerClient(
 
 // withAttacker creates an attacker with a mock orchestrator.
 // It then starts the attacker, executes the given run function on the attacker and its orchestrator, and finally terminates the attacker.
-func withAttacker(t *testing.T, run func(t *testing.T, attacker *Attacker, orchestrator *mockinsecure.AttackOrchestrator)) {
+func withAttacker(t *testing.T, run func(t *testing.T, attacker *adversary.Attacker, orchestrator *mockinsecure.AttackOrchestrator)) {
 	codec := cbor.NewCodec()
 	orchestrator := &mockinsecure.AttackOrchestrator{}
 	// mocks start up of orchestrator
 	orchestrator.On("Start", mock.AnythingOfType("*irrecoverable.signalerCtx")).Return().Once()
 
-	attacker, err := NewAttacker(unittest.Logger(), attackerAddress, codec, orchestrator)
+	attacker, err := adversary.NewAttacker(unittest.Logger(), attackerAddress, codec, orchestrator)
 	require.NoError(t, err)
 
 	// life-cycle management of attacker.
