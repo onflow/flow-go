@@ -48,6 +48,20 @@ func (_m *ExecutionDataService) Add(ctx context.Context, sd *state_synchronizati
 	return r0, r1, r2
 }
 
+// Delete provides a mock function with given fields: ctx, rootID
+func (_m *ExecutionDataService) Delete(ctx context.Context, rootID flow.Identifier) error {
+	ret := _m.Called(ctx, rootID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) error); ok {
+		r0 = rf(ctx, rootID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Done provides a mock function with given fields:
 func (_m *ExecutionDataService) Done() <-chan struct{} {
 	ret := _m.Called()

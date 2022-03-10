@@ -1977,18 +1977,11 @@ func WithTrieUpdates(updates []*ledger.TrieUpdate) func(*state_synchronization.E
 	}
 }
 
-func WithTransactionResults(results []flow.TransactionResult) func(*state_synchronization.ExecutionData) {
-	return func(executionData *state_synchronization.ExecutionData) {
-		executionData.TransactionResults = results
-	}
-}
-
 func ExecutionDataFixture(blockID flow.Identifier) *state_synchronization.ExecutionData {
 	return &state_synchronization.ExecutionData{
-		BlockID:            blockID,
-		Collections:        []*flow.Collection{},
-		Events:             []flow.EventsList{},
-		TrieUpdates:        []*ledger.TrieUpdate{},
-		TransactionResults: []flow.TransactionResult{},
+		BlockID:     blockID,
+		Collections: []*flow.Collection{},
+		Events:      []flow.EventsList{},
+		TrieUpdates: []*ledger.TrieUpdate{},
 	}
 }

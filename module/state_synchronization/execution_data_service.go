@@ -37,6 +37,9 @@ type ExecutionDataService interface {
 	// Get gets the ExecutionData for the given root CID from the blobservice.
 	Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error)
 
+	// Delete deletes all blobs that make up the ExecutionData for the given root CID from the blobstore.
+	Delete(ctx context.Context, rootID flow.Identifier) error
+
 	// Has checks if there is a value stored in the local blobstore for the given root CID
 	Has(ctx context.Context, rootID flow.Identifier) (bool, error)
 }
@@ -403,11 +406,56 @@ func (s *executionDataServiceImpl) Get(ctx context.Context, rootID flow.Identifi
 	return nil, ErrBlobTreeDepthExceeded
 }
 
+func (s *executionDataServiceImpl) deleteBlobs(ctx context.Context, cids []cid.Cid, logger zerolog.Logger) error {
+	for _, c := range cids {
+		logger.Debug().Msgf("deleting %s", c.String())
+		if err := s.blobService.DeleteBlob(ctx, c); err != nil {
+			return fmt.Errorf("failed to delete blob %s: %w", c.String(), err)
+		}
+	}
+	return nil
+}
+
+func (s *executionDataServiceImpl) Delete(ctx context.Context, rootID flow.Identifier) error {
+	rootCid := flow.IdToCid(rootID)
+
+	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
+	logger.Debug().Msg("deleting execution data")
+
+	s.metrics.ExecutionDataGetStarted()
+
+	cids := []cid.Cid{rootCid}
+	allCIDs := cids
+
+	for i := uint(0); i <= defaultMaxBlobTreeDepth; i++ {
+		v, _, err := s.getBlobs(ctx, cids, logger)
+
+		if err != nil {
+			logger.Error().Err(err).Msgf("failed to get level %d of blob tree during delete", i)
+
+			// delete what we found so far
+			return s.deleteBlobs(ctx, allCIDs, logger)
+		}
+
+		switch v := v.(type) {
+		case *ExecutionData:
+			// we found the full set. delete them all.
+			return s.deleteBlobs(ctx, allCIDs, logger)
+		case *[]cid.Cid:
+			cids = *v
+			allCIDs = append(allCIDs, cids...)
+		}
+	}
+
+	logger.Error().Err(ErrBlobTreeDepthExceeded).Msgf("blob tree depth exceeded during delete")
+	return s.deleteBlobs(ctx, allCIDs, logger)
+}
+
 // Has returns true if the given root CID is stored in the blobstore.
 // This method does not guarantee that the entire blob tree exists in the blobstore, nor that it
 // is properly formed. It only checks that there is an entry for the root CID
 func (s *executionDataServiceImpl) Has(ctx context.Context, rootID flow.Identifier) (bool, error) {
-	return s.blobService.HasBlob(ctx, flow.FlowIDToCid(rootID))
+	return s.blobService.HasBlob(ctx, flow.IdToCid(rootID))
 }
 
 // MalformedDataError is returned when malformed data is found at some level of the requested

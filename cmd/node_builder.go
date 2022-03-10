@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
@@ -71,6 +72,14 @@ type NodeBuilder interface {
 	// In both cases, the object is started according to its interface when the node is run,
 	// and the node will wait for the component to exit gracefully.
 	Component(name string, f ReadyDoneFactory) NodeBuilder
+
+	// RestartableComponent adds a new component to the node that conforms to the ReadyDoneAware
+	// interface, and calls the provided error handler when an irrecoverable error is encountered.
+	// Use RestartableComponent if the component is not critical to the node's safe operation and
+	// can/should be independently restarted when an irrecoverable error is encountered.
+	//
+	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
+	RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder
 
 	// ShutdownFunc adds a callback function that is called after all components have exited.
 	// All shutdown functions are called regardless of errors returned by previous callbacks. Any

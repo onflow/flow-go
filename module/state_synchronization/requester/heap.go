@@ -1,68 +1,44 @@
 package requester
 
-import (
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization"
-)
-
-const CacheSize = 100
-
-type blockEntry struct {
-	index         int // used by heap for lookups
-	height        uint64
-	blockID       flow.Identifier
-	executionData *state_synchronization.ExecutionData
-}
-
-func (e *blockEntry) purge() {
-	e.executionData = nil
-}
-
-type NotificationHeap []*blockEntry
+// NotificationHeap tracks outstanding notifications for the ExecutionDataRequester
+// This uses the standard implementation for PriorityQueue from the go docs
+// https://pkg.go.dev/container/heap
+// with the addition of PeekMin()
+type NotificationHeap []*BlockEntry
 
 func (h NotificationHeap) Len() int {
 	return len(h)
 }
 
 func (h NotificationHeap) Less(i, j int) bool {
-	return h[i].height < h[j].height
+	return h[i].Height < h[j].Height
 }
 
 func (h NotificationHeap) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
-	h[i].index = i
-	h[j].index = j
-
-	if i > CacheSize {
-		h[i].purge()
-	}
-	if j > CacheSize {
-		h[j].purge()
-	}
+	h[i].SetIndex(i)
+	h[j].SetIndex(j)
 }
 
 func (h *NotificationHeap) Push(x interface{}) {
 	n := len(*h)
-	entry := x.(*blockEntry)
-	entry.index = n
+	entry := x.(*BlockEntry)
+	entry.SetIndex(n)
 	*h = append(*h, entry)
-
-	if entry.index > CacheSize {
-		entry.purge()
-	}
 }
 
 func (h *NotificationHeap) Pop() interface{} {
 	old := *h
 	n := len(old)
 	entry := old[n-1]
-	old[n-1] = nil   // avoid memory leak
-	entry.index = -1 // for safety
+	old[n-1] = nil     // avoid memory leak
+	entry.SetIndex(-1) // for safety
 	*h = old[0 : n-1]
 	return entry
 }
 
-func (h *NotificationHeap) PeekMin() *blockEntry {
+// PeekMin returns the entry with the smallest height without modifying the heap
+func (h *NotificationHeap) PeekMin() *BlockEntry {
 	if len(*h) == 0 {
 		return nil
 	}

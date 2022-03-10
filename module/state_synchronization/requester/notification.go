@@ -8,8 +8,6 @@ import (
 	"sync"
 
 	"github.com/ipfs/go-datastore"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization"
 )
 
 const statusDBKey = "execution_requester_status"
@@ -78,14 +76,14 @@ func (s *status) save(ctx context.Context) error {
 	return nil
 }
 
-func (s *status) NextNotification() (uint64, flow.Identifier, *state_synchronization.ExecutionData, bool) {
+func (s *status) NextNotification() (*BlockEntry, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	next := s.lastNotified + 1
 
 	if s.heap.Len() == 0 {
-		return next, flow.ZeroID, nil, false
+		return &BlockEntry{Height: next}, false
 	}
 
 	// special case for block height 0
@@ -95,30 +93,26 @@ func (s *status) NextNotification() (uint64, flow.Identifier, *state_synchroniza
 
 	entry := s.heap.PeekMin()
 
-	if entry.height != next {
-		return next, flow.ZeroID, nil, false
+	if entry.Height != next {
+		return &BlockEntry{Height: next}, false
 	}
 
-	entry = heap.Pop(s.heap).(*blockEntry)
+	entry = heap.Pop(s.heap).(*BlockEntry)
 
 	s.firstNotificationSent = true
-	s.lastNotified = entry.height
+	s.lastNotified = entry.Height
 
-	return entry.height, entry.blockID, entry.executionData, true
+	return entry, true
 }
 
-func (s *status) Fetched(ctx context.Context, height uint64, blockID flow.Identifier, data *state_synchronization.ExecutionData) {
+func (s *status) Fetched(ctx context.Context, entry *BlockEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	defer s.save(ctx)
 
-	heap.Push(s.heap, &blockEntry{
-		height:        height,
-		blockID:       blockID,
-		executionData: data,
-	})
+	heap.Push(s.heap, entry)
 
-	s.LastReceived = height
+	s.LastReceived = entry.Height
 }
 
 func (s *status) Halt(ctx context.Context) {

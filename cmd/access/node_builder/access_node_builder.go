@@ -102,6 +102,7 @@ type AccessNodeConfig struct {
 	rpcMetricsEnabled            bool
 	executionDataSyncEnabled     bool
 	executionDataCheckEnabled    bool
+	executionDataFetchTimeout    time.Duration
 	executionDataDir             string
 	baseOptions                  []cmd.Option
 
@@ -155,6 +156,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		observerNetworkingKeyPath: cmd.NotSet,
 		executionDataSyncEnabled:  false,
 		executionDataCheckEnabled: false,
+		executionDataFetchTimeout: edrequester.DefaultFetchTimeout,
 		executionDataDir:          filepath.Join(homedir, ".flow", "execution_data"),
 	}
 }
@@ -481,6 +483,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.BoolVar(&builder.executionDataCheckEnabled, "execution-data-startup-check", defaultConfig.executionDataSyncEnabled, "whether to check execution data exists for all heights during startup")
+		flags.DurationVar(&builder.executionDataFetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataFetchTimeout, "timeout to use when fetching execution data from the network e.g. 300s")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 	}).ValidateFlags(func() error {
 		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {

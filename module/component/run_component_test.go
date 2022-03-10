@@ -261,7 +261,7 @@ func TestRunComponentStartupError(t *testing.T) {
 	}
 
 	called := false
-	onError := func(err error) component.ErrorHandlingResult {
+	onError := func(ctx context.Context, err error) component.ErrorHandlingResult {
 		called = true
 		require.ErrorIs(t, err, ErrFatal)  //check that really got the fatal error we were expecting
 		return component.ErrorHandlingStop //stop component after receiving the error (don't restart it)
@@ -281,7 +281,7 @@ func TestRunComponentShutdownError(t *testing.T) {
 	}
 
 	fatals := 0
-	onError := func(err error) component.ErrorHandlingResult {
+	onError := func(ctx context.Context, err error) component.ErrorHandlingResult {
 		fatals++
 		require.ErrorIs(t, err, ErrFatal)
 		if fatals < 3 { //restart component after first and second error
@@ -306,7 +306,7 @@ func TestRunComponentConcurrentError(t *testing.T) {
 	}
 
 	fatals := 0
-	onError := func(err error) component.ErrorHandlingResult {
+	onError := func(ctx context.Context, err error) component.ErrorHandlingResult {
 		fatals++
 		require.ErrorIs(t, err, ErrFatal)
 		if fatals < 2 {
@@ -329,7 +329,7 @@ func TestRunComponentNoError(t *testing.T) {
 		return NewNonErroringComponent(100 * time.Millisecond), nil
 	}
 
-	onError := func(err error) component.ErrorHandlingResult {
+	onError := func(ctx context.Context, err error) component.ErrorHandlingResult {
 		require.Fail(t, "error handler should not have been called")
 		return component.ErrorHandlingStop
 	}
@@ -343,7 +343,7 @@ func TestRunComponentCancel(t *testing.T) {
 		return NewNonErroringComponent(math.MaxInt64), nil
 	}
 
-	onError := func(err error) component.ErrorHandlingResult {
+	onError := func(ctx context.Context, err error) component.ErrorHandlingResult {
 		require.Fail(t, "error handler should not have been called")
 		return component.ErrorHandlingStop
 	}
@@ -360,7 +360,7 @@ func TestRunComponentFactoryError(t *testing.T) {
 		return nil, ErrCouldNotCreateComponent
 	}
 
-	onError := func(err error) component.ErrorHandlingResult {
+	onError := func(ctx context.Context, err error) component.ErrorHandlingResult {
 		require.Fail(t, "error handler should not have been called")
 		return component.ErrorHandlingStop
 	}
