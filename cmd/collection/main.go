@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	"github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
+	"github.com/onflow/flow-go/engine/collection/rpc"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
@@ -37,7 +38,6 @@ import (
 	builder "github.com/onflow/flow-go/module/builder/collection"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/ingress"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
@@ -69,8 +69,8 @@ func main() {
 		startupTime                            time.Time
 
 		followerState protocol.MutableState
-		ingestConf    ingest.Config
-		ingressConf   ingress.Config
+		ingestConf    ingest.Config = ingest.DefaultConfig()
+		rpcConf       rpc.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
@@ -93,11 +93,11 @@ func main() {
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
-		flags.UintVar(&txLimit, "tx-limit", 50000,
+		flags.UintVar(&txLimit, "tx-limit", 50_000,
 			"maximum number of transactions in the memory pool")
-		flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
+		flags.StringVarP(&rpcConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 			"the address the ingress server listens on")
-		flags.BoolVar(&ingressConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
+		flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
 			"whether to enable the rpc metrics")
 		flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
 			"maximum per-transaction computation limit (gas limit)")
@@ -337,6 +337,7 @@ func main() {
 				node.Network,
 				node.State,
 				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				colMetrics,
 				node.Me,
 				node.RootChainID.Chain(),
@@ -345,11 +346,11 @@ func main() {
 			)
 			return ing, err
 		}).
-		Component("transaction ingress server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			server := ingress.New(ingressConf, ing, node.RootChainID)
+		Component("transaction ingress rpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			server := rpc.New(rpcConf, ing, node.Logger, node.RootChainID)
 			return server, nil
 		}).
-		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("collection provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
 				coll, err := node.Storage.Collections.ByID(collID)
 				return coll, err

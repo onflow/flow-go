@@ -59,7 +59,7 @@ func (suite *Suite) SetupTest() {
 	suite.headers.On("Store", mock.Anything).Return(nil)
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil)
 	suite.state.On("Final").Return(suite.snapshot)
-	suite.cache.On("PruneByHeight", mock.Anything).Return()
+	suite.cache.On("PruneByView", mock.Anything).Return()
 	suite.cache.On("Size", mock.Anything).Return(uint(0))
 
 	metrics := metrics.NewNoopCollector()
