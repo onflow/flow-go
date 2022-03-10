@@ -18,11 +18,7 @@ type Meter interface {
 	// TODO move storage metering to here
 	// MeterStorageRead(byteSize uint) error
 	// MeterStorageWrite(byteSize uint) error
-	// TotalNumberOfStorageReads() int
-	// TotalNumberOfStorageWrites() int
-	// TotalByteSizeOfStorageReads() int
-	// TotalByteSizeOfStorageWrites() int
-	// TotalByteSizeOfStorageInteractions() int
+	// TotalBytesReadFromStorage() int
+	// TotalBytesWroteToStorage() int
+	// TotalBytesOfStorageInteractions() int
 }
-
-// TODO (disabling metering during problem), currently handled on the stateHolder level

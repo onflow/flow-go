@@ -6,14 +6,15 @@ import (
 
 var _ interfaceMeter.Meter = &Meter{}
 
+// Meter is a noop meter
 type Meter struct{}
 
-// NewMeter returns a noop meter
+// NewMeter construct a new noop meter
 func NewMeter() *Meter {
 	return &Meter{}
 }
 
-// NewChild construct a new noop meter
+// NewChild returns a new noop meter
 func (m *Meter) NewChild() interfaceMeter.Meter {
 	return &Meter{}
 }

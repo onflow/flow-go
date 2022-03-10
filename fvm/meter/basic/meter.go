@@ -7,10 +7,9 @@ import (
 
 var _ interfaceMeter.Meter = &Meter{}
 
-// Meter is a basic meter, which collects memory and computation usage
-// and enforeces limits
-// for any kind of memory or computation usage it sums intensity to the total
-// memory and computation used respectively.
+// Meter collects memory and computation usage and enforeces limits
+// for any each memory/computation usage call it sums intensity to the total
+// memory/computation usage metrics and returns error if limits are not met.
 type Meter struct {
 	computationUsed  uint
 	computationLimit uint
@@ -18,6 +17,7 @@ type Meter struct {
 	memoryLimit      uint
 }
 
+// NewMeter constructs a new Meter
 func NewMeter(computationLimit, memoryLimit uint) *Meter {
 	return &Meter{
 		computationLimit: uint(computationLimit),
@@ -25,7 +25,7 @@ func NewMeter(computationLimit, memoryLimit uint) *Meter {
 	}
 }
 
-// NewChild construct a new Meter instance with the same limits as parent meter
+// NewChild construct a new Meter instance with the same limits as parent
 func (m *Meter) NewChild() interfaceMeter.Meter {
 	return &Meter{
 		computationLimit: m.computationLimit,
@@ -33,10 +33,8 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 	}
 }
 
-// MergeMeter merges two meters, and checks for the limits
+// MergeMeter merges the input meter into the current meter and checks for the limits
 func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
-	// TODO type check
-
 	m.computationUsed = m.computationUsed + child.TotalComputationUsed()
 	if m.computationUsed > m.computationLimit {
 		return errors.NewComputationLimitExceededError(uint64(m.computationLimit))
@@ -63,7 +61,7 @@ func (m *Meter) TotalComputationUsed() uint {
 	return m.computationUsed
 }
 
-// TotalComputationUsed returns the limit for the total computation used
+// TotalComputationUsed returns the total computation limit
 func (m *Meter) TotalComputationLimit() uint {
 	return m.computationLimit
 }
@@ -77,12 +75,12 @@ func (m *Meter) MeterMemory(kind uint, intensity uint) error {
 	return nil
 }
 
-// TotalMemoryUsed returns the total amount of used memory
+// TotalMemoryUsed returns the total memory used
 func (m *Meter) TotalMemoryUsed() uint {
 	return m.memoryUsed
 }
 
-// TotalMemoryLimit returns the limit for total memory used
+// TotalMemoryLimit returns the total memory limit
 func (m *Meter) TotalMemoryLimit() uint {
 	return m.memoryLimit
 }
