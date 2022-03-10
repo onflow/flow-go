@@ -12,6 +12,7 @@
           {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
         ],
         "result": "1",
+        "no_result": false,
         "elapsed": 0
       }
     },
@@ -27,6 +28,7 @@
           {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
         ],
         "result": "1",
+        "no_result": false,
         "elapsed": 0
       }
     },
@@ -42,6 +44,7 @@
           {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
         ],
         "result": "1",
+        "no_result": false,
         "elapsed": 0
       }
     },
@@ -57,6 +60,7 @@
           {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
         ],
         "result": "1",
+        "no_result": false,
         "elapsed": 0
       }
     },
@@ -72,6 +76,7 @@
           {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
         ],
         "result": "1",
+        "no_result": false,
         "elapsed": 0
       }
     },
@@ -88,6 +93,7 @@
           {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
         ],
         "result": "1",
+        "no_result": false,
         "elapsed": 0
       }
     },
@@ -104,6 +110,7 @@
           {"item": "--- PASS: TestSha3 (0.23s)\n"}
         ],
         "result": "1",
+        "no_result": false,
         "elapsed": 0.23
       }
     },
@@ -119,6 +126,7 @@
           {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
         ],
         "result": "1",
+        "no_result": false,
         "elapsed": 0.1
       }
     },
@@ -134,6 +142,7 @@
           {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
         ],
         "result": "1",
+        "no_result": false,
         "elapsed": 0.12
       }
     }

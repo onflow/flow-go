@@ -50,7 +50,14 @@ func generateLevel2SummaryFromStructs(level1Summaries []common.Level1Summary) co
 				level2TestResult.Passed++
 			case "0":
 				level2TestResult.Failed++
-				saveFailureMessage(level1TestResultRow.TestResult)
+
+				// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
+				if level1TestResultRow.TestResult.NoResult {
+					level2TestResult.NoResult++
+					saveNoResultMessage(level1TestResultRow.TestResult)
+				} else {
+					saveFailureMessage(level1TestResultRow.TestResult)
+				}
 			case "skip":
 				level2TestResult.Skipped++
 
@@ -59,19 +66,6 @@ func generateLevel2SummaryFromStructs(level1Summaries []common.Level1Summary) co
 
 				// truncate last duration - don't count durations of skips
 				level2TestResult.Durations = level2TestResult.Durations[:len(level2TestResult.Durations)-1]
-
-			// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
-			// we want to highlight these tests, so they show up at the top in Grafana
-			// we do this by simulating a really low fail rate so that the average success rate
-			// will be very low compared to other tests, so it will show up on the "flakiest test" panel
-			case "-100":
-				level2TestResult.NoResult++
-				// don't count no result as a run
-				level2TestResult.Runs--
-
-				// truncate last duration - don't count durations of no-results
-				level2TestResult.Durations = level2TestResult.Durations[:len(level2TestResult.Durations)-1]
-				saveNoResultMessage(level1TestResultRow.TestResult)
 			default:
 				panic(fmt.Sprintf("unexpected test result: %s", level1TestResultRow.TestResult.Result))
 			}
@@ -114,26 +108,22 @@ func buildLevel1SummariesFromJSON(level1Directory string) []common.Level1Summary
 }
 
 func saveFailureMessage(testResult common.Level1TestResult) {
-	saveMessageHelper(testResult, "0", failuresDir, "failure")
+	saveMessageHelper(testResult, failuresDir, "failure")
 }
 
 func saveNoResultMessage(testResult common.Level1TestResult) {
-	saveMessageHelper(testResult, "-100", noResultsDir, "no-result")
+	saveMessageHelper(testResult, noResultsDir, "no-result")
 }
 
 // for each failed / no-result test, we want to save the raw output message as a text file
-// there could be multiple failures / no-results of the same test so we want to save each failed / no-result message in a separate text file
-// each test with failures / no-results will have a uniquely named (based on test name and package) sub-directory where failed / no-result messages are saved
+// there could be multiple failures / no-results of the same test, so we want to save each failed / no-result message in a separate text file
+// each test with failures / no-results will have a uniquely named (based on test name and package) subdirectory where failed / no-result messages are saved
 // e.g. "failures/TestSanitySha3_256+github.com-onflow-flow-go-crypto-hash" will store failed messages text files
 // from test TestSanitySha3_256 from the "github.com/onflow/flow-go/crypto/hash" package
 // failure and no-result messages are saved in a similar way so this helper function
 // handles saving both types of messages
-func saveMessageHelper(testResult common.Level1TestResult, expectedResult string, messagesDir string, messageFileStem string) {
-	if testResult.Result != expectedResult {
-		panic(fmt.Sprintf("unexpected test result: " + testResult.Result))
-	}
-
-	// each sub directory corresponds to a failed / no-result test name and package name
+func saveMessageHelper(testResult common.Level1TestResult, messagesDir string, messageFileStem string) {
+	// each subdirectory corresponds to a failed / no-result test name and package name
 	messagesDirFullPath := messagesDir + testResult.Test + "+" + strings.ReplaceAll(testResult.Package, "/", "-") + "/"
 
 	// there could already be previous failures / no-results for this test, so it's important

@@ -54,6 +54,7 @@ func getPassedTestPackage(name string, packageName string) common.Level1TestResu
 			Test:       name,
 			Package:    packageName,
 			Result:     "1",
+			NoResult:   false,
 			Elapsed:    0,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -75,6 +76,7 @@ func getPassedTestElapsed(name string, elapsed float32, elapsedStr string) commo
 			Test:       name,
 			Package:    CRYPTO_HASH_PACKAGE,
 			Result:     "1",
+			NoResult:   false,
 			Elapsed:    elapsed,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -102,6 +104,7 @@ func getPassedTestElapsedOutput(name string, elapsed float32, elapsedStr string,
 			Test:       name,
 			Package:    CRYPTO_HASH_PACKAGE,
 			Result:     "1",
+			NoResult:   false,
 			Elapsed:    elapsed,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -124,6 +127,7 @@ func getFailedTest_TestSanitySha2_256() common.Level1TestResultRow {
 			Test:       "TestSanitySha2_256",
 			Package:    CRYPTO_HASH_PACKAGE,
 			Result:     "0",
+			NoResult:   false,
 			Elapsed:    0,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -159,6 +163,7 @@ func getFailedTest_TestSanitySha3_256() common.Level1TestResultRow {
 			Test:       "TestSanitySha3_256",
 			Package:    CRYPTO_HASH_PACKAGE,
 			Result:     "0",
+			NoResult:   false,
 			Elapsed:    0,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -193,7 +198,8 @@ func getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.Level1Test
 			JobRunDate: getJobRunDate(),
 			Test:       "TestEncodableRandomBeaconPrivKeyMsgPack",
 			Package:    "github.com/onflow/flow-go/model/encodable",
-			Result:     "-100",
+			Result:     "0",
+			NoResult:   true,
 			Elapsed:    0,
 			Output: []struct {
 				Item string "json:\"item\""
