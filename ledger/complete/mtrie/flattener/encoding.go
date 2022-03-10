@@ -311,7 +311,7 @@ func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 		scratch = make([]byte, encodedTrieSize)
 	}
 
-	// Read encoded trie (8 + 32 bytes)
+	// Read encoded trie
 	_, err := io.ReadFull(reader, scratch[:encodedTrieSize])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read serialized trie: %w", err)

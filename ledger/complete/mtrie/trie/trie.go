@@ -371,7 +371,7 @@ func update(
 				regSizeDelta -= int64(oldPayloadSize)
 
 				if oldPayloadSize > 0 {
-					regCountDelta -= 1
+					regCountDelta--
 				}
 
 				break
@@ -428,14 +428,26 @@ func update(
 		rChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
 	} else {
 		// runtime optimization: process the left child is a separate thread
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			lChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
-		}()
+
+		// Since we're receiving 4 items from goroutine, use a
+		// channel to prevent them going on the heap.
+		type updateResult struct {
+			child               *node.Node
+			regCountDelta       int64
+			regSizeDelta        int64
+			lowestHeightTouched int
+		}
+		results := make(chan updateResult, 1)
+		go func(retChan chan<- updateResult) {
+			child, regCountDelta, regSizeDelta, lowestHeightTouched := update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
+			retChan <- updateResult{child, regCountDelta, regSizeDelta, lowestHeightTouched}
+		}(results)
+
 		rChild, rRegCountDelta, rRegSizeDelta, rLowestHeightTouched = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
-		wg.Wait()
+
+		// Wait for results from goroutine.
+		ret := <-results
+		lChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = ret.child, ret.regCountDelta, ret.regSizeDelta, ret.lowestHeightTouched
 	}
 
 	regCountDelta += lRegCountDelta + rRegCountDelta
