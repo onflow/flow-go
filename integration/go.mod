@@ -25,7 +25,7 @@ require (
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.24.0
 	github.com/onflow/flow-go/crypto v0.21.4-0.20211125190211-7b31c986316e // replaced by version on-disk
-	github.com/onflow/flow/protobuf/go/flow v0.2.3
+	github.com/onflow/flow/protobuf/go/flow v0.2.4-0.20220303221547-7461394e001d
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.21.0
 	github.com/stretchr/testify v1.7.0
@@ -43,4 +43,4 @@ replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/crypto => ../crypto
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.2-patch.1
+// replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.2-patch.1
