@@ -3,6 +3,7 @@ CONSENSUS = 3
 EXECUTION = 2
 VERIFICATION = 1
 ACCESS = 2
+OBSERVER = 2
 UNSTAKED_ACCESS = 0
 NCLUSTERS=1
 EPOCHLEN=10000   # 0 means use default
@@ -26,6 +27,7 @@ init:
 		-execution=$(EXECUTION) \
 		-verification=$(VERIFICATION) \
 		-access=$(ACCESS) \
+		-observer=$(OBSERVER) \
 		-unstaked-access=$(UNSTAKED_ACCESS) \
 		-nclusters=$(NCLUSTERS) \
 		-epoch-length=$(EPOCHLEN) \
@@ -38,7 +40,7 @@ init:
 # Creates a light version of the localnet with just 1 instance for each node type
 .PHONY: init-light
 init-light:
-	$(MAKE) -e COLLECTION=1 CONSENSUS=1 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
+	$(MAKE) -e COLLECTION=1 CONSENSUS=1 EXECUTION=1 VERIFICATION=1 ACCESS=1 OBSERVER=1 NCLUSTERS=1 init
 
 # Creates a version of localnet configured with short epochs
 .PHONY: init-short-epochs

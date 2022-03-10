@@ -9,13 +9,12 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/plus3it/gorecurcopy"
-	"gopkg.in/yaml.v2"
-
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/plus3it/gorecurcopy"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -31,6 +30,7 @@ const (
 	DefaultExecutionCount      = 1
 	DefaultVerificationCount   = 1
 	DefaultAccessCount         = 1
+	DefaultObserverCount       = 1
 	DefaultUnstakedAccessCount = 0
 	DefaultNClusters           = 1
 	DefaultProfiler            = false
@@ -52,6 +52,7 @@ var (
 	executionCount         int
 	verificationCount      int
 	accessCount            int
+	observerCount          int
 	unstakedAccessCount    int
 	nClusters              uint
 	numViewsInStakingPhase uint64
@@ -68,6 +69,7 @@ func init() {
 	flag.IntVar(&executionCount, "execution", DefaultExecutionCount, "number of execution nodes")
 	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of staked access nodes")
+	flag.IntVar(&observerCount, "observer", DefaultObserverCount, "number of observer nodes")
 	flag.IntVar(&unstakedAccessCount, "unstaked-access", DefaultUnstakedAccessCount, "number of un-staked access nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
 	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
@@ -89,6 +91,7 @@ func main() {
 	fmt.Printf("- Execution: %d\n", executionCount)
 	fmt.Printf("- Verification: %d\n", verificationCount)
 	fmt.Printf("- Staked Access: %d\n", accessCount)
+	fmt.Printf("- Observer: %d\n\n", observerCount)
 	fmt.Printf("- Unstaked Access: %d\n\n", unstakedAccessCount)
 
 	nodes := prepareNodes()
@@ -207,6 +210,13 @@ func prepareNodes() []testnet.NodeConfig {
 
 	for i := 0; i < accessCount; i++ {
 		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess))
+	}
+
+	for i := 0; i < observerCount; i++ {
+		// TODO use RoleObserver
+		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess, func(cfg *testnet.NodeConfig) {
+			cfg.SupportsUnstakedNodes = true
+		}))
 	}
 
 	for i := 0; i < unstakedAccessCount; i++ {
