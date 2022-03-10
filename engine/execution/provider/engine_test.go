@@ -26,17 +26,18 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	t.Run("non-verification engine", func(t *testing.T) {
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
+		net := new(mocknetwork.Network)
 
 		execState := new(state.ExecutionState)
-		chunkConduit := mocknetwork.Conduit{}
 
 		e := Engine{
 			state:                  ps,
 			unit:                   engine.NewUnit(),
 			execState:              execState,
 			metrics:                metrics.NewNoopCollector(),
-			chunksConduit:          &chunkConduit,
-			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+			net:                    net,
+			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil },
+		}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -57,29 +58,26 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		e.onChunkDataRequest(context.Background(), originID, req)
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
-		// no chunk data pack response should be sent to an invalid role's request
-		chunkConduit.AssertNotCalled(t, "Unicast")
-
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
 		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
 	})
 
 	t.Run("unauthorized (0 weight) origin", func(t *testing.T) {
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
+		net := new(mocknetwork.Network)
 
 		execState := new(state.ExecutionState)
-		chunkConduit := mocknetwork.Conduit{}
 
 		e := Engine{
 			state:                  ps,
 			unit:                   engine.NewUnit(),
 			execState:              execState,
 			metrics:                metrics.NewNoopCollector(),
-			chunksConduit:          &chunkConduit,
-			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil },
+			net:                    net,
+		}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -100,29 +98,26 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		e.onChunkDataRequest(context.Background(), originID, req)
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
-		// no chunk data pack response should be sent to a request coming from 0-weight node
-		chunkConduit.AssertNotCalled(t, "Unicast")
-
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
 		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
 	})
 
 	t.Run("un-authorized (not found origin) origin", func(t *testing.T) {
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
+		net := new(mocknetwork.Network)
 
 		execState := new(state.ExecutionState)
-		chunkConduit := mocknetwork.Conduit{}
 
 		e := Engine{
 			state:                  ps,
 			unit:                   engine.NewUnit(),
 			execState:              execState,
 			metrics:                metrics.NewNoopCollector(),
-			chunksConduit:          &chunkConduit,
-			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil },
+			net:                    net,
+		}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -143,18 +138,15 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		e.onChunkDataRequest(context.Background(), originID, req)
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
-		// no chunk data pack response should be sent to a request coming from a non-existing origin ID
-		chunkConduit.AssertNotCalled(t, "Unicast")
-
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
 		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
 	})
 
 	t.Run("non-existent chunk", func(t *testing.T) {
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
+		net := new(mocknetwork.Network)
 
 		execState := new(state.ExecutionState)
 		chunkConduit := mocknetwork.Conduit{}
@@ -165,9 +157,10 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			state:                  ps,
 			unit:                   engine.NewUnit(),
 			execState:              execState,
-			chunksConduit:          &chunkConduit,
 			metrics:                metrics.NewNoopCollector(),
-			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil },
+			net:                    net,
+		}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -182,9 +175,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 
-		// no chunk data pack response should be sent to a request coming from a non-existing origin ID
-		chunkConduit.AssertNotCalled(t, "Unicast")
-
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
 		execState.AssertExpectations(t)
@@ -194,17 +184,18 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
-		chunkConduit := new(mocknetwork.Conduit)
+		net := new(mocknetwork.Network)
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{
+		e := &Engine{
 			state:                  ps,
 			unit:                   engine.NewUnit(),
-			chunksConduit:          chunkConduit,
 			execState:              execState,
 			metrics:                metrics.NewNoopCollector(),
-			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+			checkAuthorizedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil },
+			net:                    net,
+		}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -214,15 +205,18 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		ps.On("AtBlockID", blockID).Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		chunkConduit.On("Unicast", mock.Anything, originIdentity.NodeID).
-			Run(func(args mock.Arguments) {
-				res, ok := args[0].(*messages.ChunkDataResponse)
-				require.True(t, ok)
+		net.On(
+			"SendDirectMessage",
+			mock.AnythingOfType("network.Channel"),
+			mock.AnythingOfType("*messages.ChunkDataResponse"),
+			originIdentity.NodeID,
+		).Run(func(args mock.Arguments) {
+			res, ok := args[1].(*messages.ChunkDataResponse)
+			require.True(t, ok)
 
-				actualChunkID := res.ChunkDataPack.ChunkID
-				assert.Equal(t, chunkID, actualChunkID)
-			}).
-			Return(nil)
+			actualChunkID := res.ChunkDataPack.ChunkID
+			assert.Equal(t, chunkID, actualChunkID)
+		}).Return(nil)
 
 		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 		execState.On("ChunkDataPackByChunkID", mock.Anything, chunkID).Return(chunkDataPack, nil)
@@ -239,27 +233,26 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
 		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
+		net.AssertExpectations(t)
 	})
 
 	t.Run("reply to chunk data pack request only when authorized", func(t *testing.T) {
-
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
-		chunkConduit := new(mocknetwork.Conduit)
+		net := new(mocknetwork.Network)
 
 		execState := new(state.ExecutionState)
 
 		currentAuthorizedState := true
 		checkAuthorizedAtBlock := func(_ flow.Identifier) (bool, error) { return currentAuthorizedState, nil }
 
-		e := Engine{
+		e := &Engine{
 			state:                  ps,
 			unit:                   engine.NewUnit(),
-			chunksConduit:          chunkConduit,
 			execState:              execState,
 			metrics:                metrics.NewNoopCollector(),
 			checkAuthorizedAtBlock: checkAuthorizedAtBlock,
+			net:                    net,
 		}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -272,15 +265,18 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		ps.On("AtBlockID", blockID).Return(ss)
 
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
-		chunkConduit.On("Unicast", mock.Anything, originIdentity.NodeID).
-			Run(func(args mock.Arguments) {
-				res, ok := args[0].(*messages.ChunkDataResponse)
-				require.True(t, ok)
+		net.On(
+			"SendDirectMessage",
+			mock.AnythingOfType("network.Channel"),
+			mock.AnythingOfType("*messages.ChunkDataResponse"),
+			originIdentity.NodeID,
+		).Run(func(args mock.Arguments) {
+			res, ok := args[1].(*messages.ChunkDataResponse)
+			require.True(t, ok)
 
-				actualChunkID := res.ChunkDataPack.ChunkID
-				assert.Equal(t, chunkID, actualChunkID)
-			}).
-			Return(nil).Once()
+			actualChunkID := res.ChunkDataPack.ChunkID
+			assert.Equal(t, chunkID, actualChunkID)
+		}).Return(nil).Once()
 
 		execState.On("ChunkDataPackByChunkID", mock.Anything, chunkID).Return(chunkDataPack, nil).Twice()
 
@@ -301,6 +297,6 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
 		execState.AssertExpectations(t)
-		chunkConduit.AssertExpectations(t)
+		net.AssertExpectations(t)
 	})
 }
