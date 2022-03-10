@@ -60,7 +60,7 @@ func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
 	return nil, protocol.ErrEpochNotCommitted
 }
 
-func (e Epoch) ClusterByChainID(chainID string) (protocol.Cluster, error) {
+func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
 	if e.enc.Clusters == nil {
 		return nil, protocol.ErrEpochNotCommitted
 	}
@@ -72,7 +72,7 @@ func (e Epoch) ClusterByChainID(chainID string) (protocol.Cluster, error) {
 	}
 
 	// TODO: use sentinal error
-	return fmt.Errorf("no cluster with the given chain ID %v: %w", chainID, storage.ErrNotFound)
+	return nil, fmt.Errorf("no cluster with the given chain ID %v: %w", chainID, storage.ErrNotFound)
 }
 
 type Epochs struct {
@@ -141,6 +141,10 @@ func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 }
 
 func (es *setupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
+	return nil, protocol.ErrEpochNotCommitted
+}
+
+func (es *setupEpoch) ClusterByChainID(_ flow.ChainID) (protocol.Cluster, error) {
 	return nil, protocol.ErrEpochNotCommitted
 }
 
