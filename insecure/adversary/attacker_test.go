@@ -155,9 +155,6 @@ func withAttacker(
 
 	codec := cbor.NewCodec()
 	orchestrator := &mockinsecure.AttackOrchestrator{}
-	// mocks start up of orchestrator
-	orchestrator.On("Start", mock.AnythingOfType("*irrecoverable.signalerCtx")).Return().Once()
-
 	connector := &mockinsecure.CorruptedNodeConnector{}
 	corruptedIds := unittest.IdentityListFixture(messageCount)
 	connector.On("Connect", mock.Anything, mock.Anything).
@@ -165,7 +162,10 @@ func withAttacker(
 			func(ctx context.Context, id flow.Identifier) insecure.CorruptedNodeConnection {
 				_, ok := corruptedIds.ByNodeID(id)
 				require.True(t, ok)
-				return &mockinsecure.CorruptedNodeConnection{}
+				connection := &mockinsecure.CorruptedNodeConnection{}
+				// mocks closing connections at the termination time of the attacker.
+				connection.On("CloseConnection").Return(nil)
+				return connection
 			},
 			func(ctx context.Context, id flow.Identifier) error {
 				_, ok := corruptedIds.ByNodeID(id)
@@ -189,6 +189,9 @@ func withAttacker(
 			return
 		}
 	}()
+
+	// mocks registering attacker as the attack network functionality for orchestrator.
+	orchestrator.On("WithAttackNetwork", attacker).Return().Once()
 
 	// starts attacker
 	attacker.Start(attackCtx)

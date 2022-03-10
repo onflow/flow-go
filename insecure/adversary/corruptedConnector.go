@@ -14,10 +14,18 @@ import (
 
 type CorruptedConnector struct {
 	attackerAddress string
+	corruptedIds    flow.IdentityList
 }
 
-func (c *CorruptedConnector) Connect(ctx context.Context, address flow.Identifier) (insecure.CorruptedNodeConnection, error) {
-	corruptedAddress, err := corruptedConduitFactoryAddress(address)
+func NewCorruptedConnector(attackerAddress string, corruptedIds flow.IdentityList) *CorruptedConnector {
+	return &CorruptedConnector{
+		corruptedIds:    corruptedIds,
+		attackerAddress: attackerAddress,
+	}
+}
+
+func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifier) (insecure.CorruptedNodeConnection, error) {
+	corruptedAddress, err := c.corruptedConduitFactoryAddress(targetId)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate corruptible conduit factory address for: %w", err)
 	}
@@ -44,10 +52,15 @@ func (c *CorruptedConnector) Connect(ctx context.Context, address flow.Identifie
 }
 
 // corruptedConduitFactoryAddress generates and returns the gRPC interface address of corruptible conduit factory for given identity.
-func corruptedConduitFactoryAddress(address string) (string, error) {
-	corruptedAddress, _, err := net.SplitHostPort(address)
+func (c *CorruptedConnector) corruptedConduitFactoryAddress(id flow.Identifier) (string, error) {
+	identity, found := c.corruptedIds.ByNodeID(id)
+	if !found {
+		return "", fmt.Errorf("could not find corrupted id for identifier: %x", id)
+	}
+
+	corruptedAddress, _, err := net.SplitHostPort(identity.Address)
 	if err != nil {
-		return "", fmt.Errorf("could not extract address of corruptible conduit factory %s: %w", address, err)
+		return "", fmt.Errorf("could not extract address of corruptible conduit factory %s: %w", identity.Address, err)
 	}
 
 	return net.JoinHostPort(corruptedAddress, strconv.Itoa(insecure.CorruptedFactoryPort)), nil
