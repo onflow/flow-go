@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	sealing "github.com/onflow/flow-go/engine/consensus"
@@ -169,15 +170,15 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(flow.Identifier) {
+func (e *Engine) OnFinalizedBlock(*model.Block) {
 	e.finalizationEventsNotifier.Notify()
 }
 
 // OnBlockIncorporated implements the `OnBlockIncorporated` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
-	e.pendingIncorporatedBlocks.Push(incorporatedBlockID)
+func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
+	e.pendingIncorporatedBlocks.Push(incorporatedBlock.BlockID)
 	e.blockIncorporatedNotifier.Notify()
 }
 
