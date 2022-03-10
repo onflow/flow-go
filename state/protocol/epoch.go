@@ -81,7 +81,7 @@ type Epoch interface {
 
 	// ClusterByChainID returns the detailed cluster information for the cluster with
 	// the given chain ID, in this epoch
-	ClusterByChainID(chainID string) (Cluster, error)
+	ClusterByChainID(chainID flow.ChainID) (Cluster, error)
 
 	// DKG returns the result of the distributed key generation procedure.
 	DKG() (DKG, error)

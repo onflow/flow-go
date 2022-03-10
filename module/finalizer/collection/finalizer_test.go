@@ -181,9 +181,9 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, // block.Header.ParentVoterIndices,
-					Signature:    block.Header.ParentVoterSigData,
+					CollectionID:  block.Payload.Collection.ID(),
+					SignerIndices: block.Header.ParentVoterIndices,
+					Signature:     block.Header.ParentVoterSigData,
 				},
 			})
 		})
@@ -232,16 +232,16 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 2)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, // block1.Header.ParentVoterIndices,
-					Signature:    block1.Header.ParentVoterSigData,
+					CollectionID:  block1.Payload.Collection.ID(),
+					SignerIndices: block1.Header.ParentVoterIndices,
+					Signature:     block1.Header.ParentVoterSigData,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block2.Payload.Collection.ID(),
-					SignerIDs:    block2.Header.ParentVoterIndices,
-					Signature:    block2.Header.ParentVoterSigData,
+					CollectionID:  block2.Payload.Collection.ID(),
+					SignerIndices: block2.Header.ParentVoterIndices,
+					Signature:     block2.Header.ParentVoterSigData,
 				},
 			})
 		})
@@ -289,9 +289,9 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, // block1.Header.ParentVoterIndices,
-					Signature:    block1.Header.ParentVoterSigData,
+					CollectionID:  block1.Payload.Collection.ID(),
+					SignerIndices: block1.Header.ParentVoterIndices,
+					Signature:     block1.Header.ParentVoterSigData,
 				},
 			})
 		})
@@ -341,9 +341,9 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, // block1.Header.ParentVoterIndices,
-					Signature:    block1.Header.ParentVoterSigData,
+					CollectionID:  block1.Payload.Collection.ID(),
+					SignerIndices: block1.Header.ParentVoterIndices,
+					Signature:     block1.Header.ParentVoterSigData,
 				},
 			})
 		})
