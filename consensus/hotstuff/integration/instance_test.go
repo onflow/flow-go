@@ -227,7 +227,6 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				panic(fmt.Errorf("could not encode signer indices: %w", err))
 			}
 
-			// voterIndices := packer.EncodeSignerIndices(
 			qc := &flow.QuorumCertificate{
 				View:          votes[0].View,
 				BlockID:       votes[0].BlockID,
