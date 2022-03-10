@@ -42,7 +42,66 @@ func testAttackerObserve(t *testing.T, concurrencyDegree int) {
 		concurrencyDegree,
 		func(t *testing.T,
 			orchestrator *mockinsecure.AttackOrchestrator,
-			connector *mockinsecure.CorruptedNodeConnector,
+			connections map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
+			corruptedIds flow.IdentityList,
+			client insecure.Attacker_ObserveClient,
+			messages []*insecure.Message,
+			events []*insecure.Event) {
+
+			orchestratorWG := sync.WaitGroup{}
+			orchestratorWG.Add(concurrencyDegree) // keeps track of total events that orchestrator receives
+
+			mu := sync.Mutex{}
+			seen := make(map[*insecure.Event]struct{}) // keeps track of unique events received by orchestrator
+			orchestrator.On("HandleEventFromCorruptedNode", mock.Anything).Run(func(args mock.Arguments) {
+				mu.Lock()
+				defer mu.Unlock()
+
+				e, ok := args[0].(*insecure.Event)
+				require.True(t, ok)
+
+				// event should not be seen before.
+				_, ok = seen[e]
+				require.False(t, ok)
+
+				// received event by orchestrator must be an expected one.
+				require.Contains(t, events, e)
+				seen[e] = struct{}{}
+				orchestratorWG.Done()
+
+			}).Return(nil)
+
+			// sends all messages concurrently to the attacker (imitating corruptible conduits sending
+			// messages conccurently to attacker).
+			attackerSendWG := sync.WaitGroup{}
+			attackerSendWG.Add(concurrencyDegree)
+
+			for _, msg := range messages {
+				msg := msg
+
+				go func() {
+					err := client.Send(msg)
+					require.NoError(t, err)
+					attackerSendWG.Done()
+				}()
+			}
+
+			// all messages should be sent to attacker in a timely fashion.
+			unittest.RequireReturnsBefore(t, attackerSendWG.Wait, 1*time.Second, "could not send all messages to attacker on time")
+			// all events should be relayed to the orchestrator by the attacker in a timely fashion.
+			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 1*time.Second, "orchestrator could not receive messages on time")
+		})
+}
+
+// testAttackerObserve evaluates that upon receiving concurrent messages from corruptible conduits, the attacker
+// decodes the messages into events and relays them to its registered orchestrator.
+func testAttackNetwork(t *testing.T, concurrencyDegree int) {
+	withAttacker(
+		t,
+		concurrencyDegree,
+		func(t *testing.T,
+			orchestrator *mockinsecure.AttackOrchestrator,
+			connections map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
 			corruptedIds flow.IdentityList,
 			client insecure.Attacker_ObserveClient,
 			messages []*insecure.Message,
@@ -160,7 +219,7 @@ func withAttacker(
 	scenario func(
 		*testing.T,
 		*mockinsecure.AttackOrchestrator,
-		*mockinsecure.CorruptedNodeConnector,
+		map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
 		flow.IdentityList,
 		insecure.Attacker_ObserveClient,
 		[]*insecure.Message,
@@ -190,7 +249,7 @@ func withAttacker(
 
 	// mocks registering attacker as the attack network functionality for orchestrator.
 	orchestrator.On("WithAttackNetwork", attacker).Return().Once()
-	mockConnectorForConnect(t, connector, corruptedIds)
+	connections := mockConnectorForConnect(t, connector, corruptedIds)
 
 	// starts attacker
 	attacker.Start(attackCtx)
@@ -205,14 +264,15 @@ func withAttacker(
 
 	// creates fixtures and runs the scenario
 	msgs, events := messageFixtures(t, codec, messageCount)
-	scenario(t, orchestrator, connector, corruptedIds, clientStream, msgs, events)
+	scenario(t, orchestrator, connections, corruptedIds, clientStream, msgs, events)
 
 	// terminates resources
 	cancel()
 	unittest.RequireCloseBefore(t, attacker.Done(), 1*time.Second, "could not stop attacker on time")
 }
 
-func mockConnectorForConnect(t *testing.T, connector *mockinsecure.CorruptedNodeConnector, corruptedIds flow.IdentityList) {
+func mockConnectorForConnect(t *testing.T, connector *mockinsecure.CorruptedNodeConnector, corruptedIds flow.IdentityList) map[flow.Identifier]*mockinsecure.CorruptedNodeConnection {
+	connections := make(map[flow.Identifier]*mockinsecure.CorruptedNodeConnection)
 	connector.On("Connect", mock.Anything, mock.Anything).
 		Return(
 			func(ctx context.Context, id flow.Identifier) insecure.CorruptedNodeConnection {
@@ -221,6 +281,7 @@ func mockConnectorForConnect(t *testing.T, connector *mockinsecure.CorruptedNode
 				connection := &mockinsecure.CorruptedNodeConnection{}
 				// mocks closing connections at the termination time of the attacker.
 				connection.On("CloseConnection").Return(nil)
+				connections[id] = connection
 				return connection
 			},
 			func(ctx context.Context, id flow.Identifier) error {
@@ -228,4 +289,6 @@ func mockConnectorForConnect(t *testing.T, connector *mockinsecure.CorruptedNode
 				require.True(t, ok)
 				return nil
 			})
+
+	return connections
 }
