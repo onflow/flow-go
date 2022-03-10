@@ -40,7 +40,13 @@ func testAttackerObserve(t *testing.T, concurrencyDegree int) {
 	withAttacker(
 		t,
 		concurrencyDegree,
-		func(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, client insecure.Attacker_ObserveClient, messages []*insecure.Message, events []*insecure.Event) {
+		func(t *testing.T,
+			orchestrator *mockinsecure.AttackOrchestrator,
+			connector *mockinsecure.CorruptedNodeConnector,
+			corruptedIds flow.IdentityList,
+			client insecure.Attacker_ObserveClient,
+			messages []*insecure.Message,
+			events []*insecure.Event) {
 
 			orchestratorWG := sync.WaitGroup{}
 			orchestratorWG.Add(concurrencyDegree) // keeps track of total events that orchestrator receives
@@ -151,27 +157,19 @@ func messageFixtures(t *testing.T, codec network.Codec, count int) ([]*insecure.
 func withAttacker(
 	t *testing.T,
 	messageCount int, // number of messages received by attacker from corruptible conduits while playing scenario.
-	scenario func(*testing.T, *mockinsecure.AttackOrchestrator, insecure.Attacker_ObserveClient, []*insecure.Message, []*insecure.Event)) {
+	scenario func(
+		*testing.T,
+		*mockinsecure.AttackOrchestrator,
+		*mockinsecure.CorruptedNodeConnector,
+		flow.IdentityList,
+		insecure.Attacker_ObserveClient,
+		[]*insecure.Message,
+		[]*insecure.Event)) {
 
 	codec := cbor.NewCodec()
 	orchestrator := &mockinsecure.AttackOrchestrator{}
 	connector := &mockinsecure.CorruptedNodeConnector{}
 	corruptedIds := unittest.IdentityListFixture(messageCount)
-	connector.On("Connect", mock.Anything, mock.Anything).
-		Return(
-			func(ctx context.Context, id flow.Identifier) insecure.CorruptedNodeConnection {
-				_, ok := corruptedIds.ByNodeID(id)
-				require.True(t, ok)
-				connection := &mockinsecure.CorruptedNodeConnection{}
-				// mocks closing connections at the termination time of the attacker.
-				connection.On("CloseConnection").Return(nil)
-				return connection
-			},
-			func(ctx context.Context, id flow.Identifier) error {
-				_, ok := corruptedIds.ByNodeID(id)
-				require.True(t, ok)
-				return nil
-			})
 
 	attacker, err := adversary.NewAttacker(
 		unittest.Logger(), attackerAddress, codec, orchestrator, connector, corruptedIds)
@@ -192,6 +190,7 @@ func withAttacker(
 
 	// mocks registering attacker as the attack network functionality for orchestrator.
 	orchestrator.On("WithAttackNetwork", attacker).Return().Once()
+	mockConnectorForConnect(t, connector, corruptedIds)
 
 	// starts attacker
 	attacker.Start(attackCtx)
@@ -206,9 +205,27 @@ func withAttacker(
 
 	// creates fixtures and runs the scenario
 	msgs, events := messageFixtures(t, codec, messageCount)
-	scenario(t, orchestrator, clientStream, msgs, events)
+	scenario(t, orchestrator, connector, corruptedIds, clientStream, msgs, events)
 
 	// terminates resources
 	cancel()
 	unittest.RequireCloseBefore(t, attacker.Done(), 1*time.Second, "could not stop attacker on time")
+}
+
+func mockConnectorForConnect(t *testing.T, connector *mockinsecure.CorruptedNodeConnector, corruptedIds flow.IdentityList) {
+	connector.On("Connect", mock.Anything, mock.Anything).
+		Return(
+			func(ctx context.Context, id flow.Identifier) insecure.CorruptedNodeConnection {
+				_, ok := corruptedIds.ByNodeID(id)
+				require.True(t, ok)
+				connection := &mockinsecure.CorruptedNodeConnection{}
+				// mocks closing connections at the termination time of the attacker.
+				connection.On("CloseConnection").Return(nil)
+				return connection
+			},
+			func(ctx context.Context, id flow.Identifier) error {
+				_, ok := corruptedIds.ByNodeID(id)
+				require.True(t, ok)
+				return nil
+			})
 }
