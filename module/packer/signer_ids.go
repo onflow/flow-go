@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// EncodeSignerIdentifiersToIndices encodes the given signerIDs into compacted bit vector
 func EncodeSignerIdentifiersToIndices(fullIdentities []flow.Identifier, signerIDs flow.IdentifierList) ([]byte, error) {
 	signersLookup := signerIDs.Lookup()
 
@@ -25,6 +26,7 @@ func EncodeSignerIdentifiersToIndices(fullIdentities []flow.Identifier, signerID
 	return signerIndices, nil
 }
 
+// DecodeSignerIdentifiersFromIndices decodes the given compacted bit vector into signerIDs
 func DecodeSignerIdentifiersFromIndices(fullIdentities []flow.Identifier, signerIndices []byte) ([]flow.Identifier, error) {
 	indices, err := DecodeSignerIndices(signerIndices, len(fullIdentities))
 	if err != nil {

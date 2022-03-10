@@ -4,6 +4,24 @@ import (
 	"fmt"
 )
 
+// EncodeSignerIndices encodes indices into compacted bit vector. Each bit represents whether the identity at
+// that index is a signer.
+// It assumes the indices is in the increasing order,
+// otherwise, decoding the signer indices will not recover to the original indices.
+// TODO : check index in the indices are in the increasing order
+func EncodeSignerIndices(indices []int, count int) []byte {
+	totalBytes := bytesCount(count)
+	bytes := make([]byte, totalBytes)
+	for _, index := range indices {
+		byt := index >> 3
+		offset := 7 - (index & 7)
+		mask := byte(1 << offset)
+		bytes[byt] ^= mask
+	}
+	return bytes
+}
+
+// DecodeSignerIndices decodes the given compacted signer indices to a slice of indices.
 func DecodeSignerIndices(indices []byte, count int) ([]int, error) {
 	if bytesCount(count) != len(indices) {
 		return nil, fmt.Errorf("signer indices has wrong count, expect count %v, but actually got %v",
@@ -31,21 +49,6 @@ func DecodeSignerIndices(indices []byte, count int) ([]int, error) {
 	}
 
 	return signerIndices, nil
-}
-
-// EncodeSignerIndices encodes indices into bytes, it assumes the indices is in the increasing order,
-// otherwise, decoding the signer indices will not recover to the original indices.
-// TODO : check index in the indices are in the increasing order
-func EncodeSignerIndices(indices []int, count int) []byte {
-	totalBytes := bytesCount(count)
-	bytes := make([]byte, totalBytes)
-	for _, index := range indices {
-		byt := index >> 3
-		offset := 7 - (index & 7)
-		mask := byte(1 << offset)
-		bytes[byt] ^= mask
-	}
-	return bytes
 }
 
 func bytesCount(count int) int {
