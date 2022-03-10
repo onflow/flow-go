@@ -75,14 +75,6 @@ func WithMaxKeySizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-// WithMeter sets the meter
-func WithMeter(m meter.Meter) func(st *State) *State {
-	return func(st *State) *State {
-		st.meter = m
-		return st
-	}
-}
-
 // WithMaxValueSizeAllowed sets limit on max value size
 func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
 	return func(st *State) *State {
@@ -95,6 +87,14 @@ func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
 func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	return func(st *State) *State {
 		st.maxInteractionAllowed = limit
+		return st
+	}
+}
+
+// WithMeter sets the meter
+func WithMeter(m meter.Meter) func(st *State) *State {
+	return func(st *State) *State {
+		st.meter = m
 		return st
 	}
 }
