@@ -354,16 +354,24 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := *resp.Block
-			expected, _ := convert.BlockHeaderToMessage(header)
-			require.Equal(suite.T(), *expected, actual)
+			expectedMessage, err := convert.BlockHeaderToMessage(header)
+			require.NoError(suite.T(), err)
+			require.Equal(suite.T(), *expectedMessage, actual)
+			expectedBlockHeader, err := convert.MessageToBlockHeader(&actual)
+			require.NoError(suite.T(), err)
+			require.Equal(suite.T(), expectedBlockHeader, header)
 		}
 
 		assertBlockResp := func(resp *accessproto.BlockResponse, err error, block *flow.Block) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
-			expected, _ := convert.BlockToMessage(block)
-			require.Equal(suite.T(), expected, actual)
+			expectedMessage, err := convert.BlockToMessage(block)
+			require.NoError(suite.T(), err)
+			require.Equal(suite.T(), expectedMessage, actual)
+			expectedBlock, err := convert.MessageToBlock(resp.Block)
+			require.NoError(suite.T(), err)
+			require.Equal(suite.T(), expectedBlock.ID(), block.ID())
 		}
 
 		suite.Run("get header 1 by ID", func() {
@@ -462,7 +470,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
 			}
-			parsedExecResult, err := convert.ProtoToExecutionResult(resp.ExecutionResult)
+			parsedExecResult, err := convert.MessageToExecutionResult(resp.ExecutionResult)
 			require.NoError(suite.T(), err)
 			assert.Equal(suite.T(), parsedExecResult, executionResult)
 			assert.Equal(suite.T(), parsedExecResult.ID(), executionResult.ID())
