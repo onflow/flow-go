@@ -50,8 +50,7 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 
 func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	proc.ComputationMeteringHandler = handler.NewComputationMeteringHandler(
-		DefaultGasLimit,
-		handler.WithCoumputationWeightFactors(map[uint]uint{handler.MeteredOperationfunction_or_loop_call: 1}))
+		DefaultGasLimit)
 
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, proc, sth, programs)

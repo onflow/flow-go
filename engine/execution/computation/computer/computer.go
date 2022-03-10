@@ -404,7 +404,6 @@ func (e *blockComputer) executeTransaction(
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
-		Uint64("computationUsed", tx.ComputationUsed).
 		Logger()
 
 	if tx.Err != nil {

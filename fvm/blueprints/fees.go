@@ -11,6 +11,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const TransactionFeesExecutionEffortWeightsPathDomain = "storage"
+const TransactionFeesExecutionEffortWeightsPathIdentifier = "executionEffortWeights"
+
 const deployTxFeesTransactionTemplate = `
 transaction {
   prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {

@@ -12,7 +12,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 	t.Run("Get Limit", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit,
-			WithCoumputationWeightFactors(map[uint]uint{
+			WithComputationWeightFactors(map[uint]uint{
 				0: 1,
 			}))
 
@@ -23,7 +23,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 	t.Run("Set/Get Used", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit,
-			WithCoumputationWeightFactors(map[uint]uint{
+			WithComputationWeightFactors(map[uint]uint{
 				0: 1,
 			}))
 
@@ -37,7 +37,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 	t.Run("Set/Get Used twice", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit,
-			WithCoumputationWeightFactors(map[uint]uint{
+			WithComputationWeightFactors(map[uint]uint{
 				0: 1,
 			}))
 
@@ -54,7 +54,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 	t.Run("Add used adds to intensity", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit,
-			WithCoumputationWeightFactors(map[uint]uint{
+			WithComputationWeightFactors(map[uint]uint{
 				0: 1,
 			}))
 
@@ -71,7 +71,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 	t.Run("Add used adds to intensity to sub-meter but not on meter", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit,
-			WithCoumputationWeightFactors(map[uint]uint{
+			WithComputationWeightFactors(map[uint]uint{
 				0: 1,
 			}))
 
@@ -93,7 +93,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 	t.Run("Sub Meter", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit,
-			WithCoumputationWeightFactors(map[uint]uint{
+			WithComputationWeightFactors(map[uint]uint{
 				0: 1,
 			}))
 
@@ -120,7 +120,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 	t.Run("Sub Sub Meter", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit,
-			WithCoumputationWeightFactors(map[uint]uint{
+			WithComputationWeightFactors(map[uint]uint{
 				0: 1,
 			}))
 
@@ -161,7 +161,7 @@ func TestComputationMeteringHandler(t *testing.T) {
 
 	t.Run("Sub Sub Meter - discard in wrong order", func(t *testing.T) {
 		h := NewComputationMeteringHandler(limit,
-			WithCoumputationWeightFactors(map[uint]uint{
+			WithComputationWeightFactors(map[uint]uint{
 				0: 1,
 			}))
 		subMeter := h.StartSubMeter(2 * limit)

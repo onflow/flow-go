@@ -2,7 +2,6 @@ package handler
 
 import (
 	"fmt"
-
 	"github.com/onflow/cadence/runtime"
 )
 
@@ -163,8 +162,12 @@ func ComputationLimit(ctxGasLimit, txGasLimit, defaultGasLimit uint64) uint64 {
 	return txGasLimit
 }
 
+var fallbackWeightFactors = map[uint]uint{MeteredOperationfunction_or_loop_call: 1}
+
 func NewComputationMeteringHandler(computationLimit uint64, options ...ComputationMeteringOption) *ComputationMeteringHandler {
-	h := &ComputationMeteringHandler{}
+	h := &ComputationMeteringHandler{
+		weights: fallbackWeightFactors,
+	}
 	h.computation = &computationMeter{
 		limit:       computationLimit,
 		intensities: map[uint]uint{},
@@ -177,10 +180,14 @@ func NewComputationMeteringHandler(computationLimit uint64, options ...Computati
 	return h
 }
 
-func WithCoumputationWeightFactors(weights map[uint]uint) ComputationMeteringOption {
+func WithComputationWeightFactors(weights map[uint]uint) ComputationMeteringOption {
 	return func(handler *ComputationMeteringHandler) {
-		handler.weights = weights
+		handler.SetWeights(weights)
 	}
+}
+
+func (c *ComputationMeteringHandler) SetWeights(weights map[uint]uint) {
+	c.weights = weights
 }
 
 func (c *ComputationMeteringHandler) Limit() uint64 {
