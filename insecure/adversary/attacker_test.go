@@ -36,36 +36,17 @@ func TestAttackerObserve_MultipleConcurrentMessages(t *testing.T) {
 // testAttackerObserve evaluates that upon receiving concurrent messages from corruptible conduits, the attacker
 // decodes the messages into events and relays them to its registered orchestrator.
 func testAttackerObserve(t *testing.T, concurrencyDegree int) {
-	withAttacker(
+	// creates event fixtures and their corresponding messages.
+	messages, events := messageFixtures(t, cbor.NewCodec(), concurrencyDegree)
+
+	withAttackerClient(
 		t,
-		concurrencyDegree,
-		func(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, client insecure.Attacker_ObserveClient, messages []*insecure.Message, events []*insecure.Event) {
-
-			orchestratorWG := sync.WaitGroup{}
-			orchestratorWG.Add(concurrencyDegree) // keeps track of total events that orchestrator receives
-
-			mu := sync.Mutex{}
-			seen := make(map[*insecure.Event]struct{}) // keeps track of unique events received by orchestrator
-			orchestrator.On("HandleEventFromCorruptedNode", mock.Anything).Run(func(args mock.Arguments) {
-				mu.Lock()
-				defer mu.Unlock()
-
-				e, ok := args[0].(*insecure.Event)
-				require.True(t, ok)
-
-				// event should not be seen before.
-				_, ok = seen[e]
-				require.False(t, ok)
-
-				// received event by orchestrator must be an expected one.
-				require.Contains(t, events, e)
-				seen[e] = struct{}{}
-				orchestratorWG.Done()
-
-			}).Return(nil)
+		func(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, client insecure.Attacker_ObserveClient) {
+			// mocks orchestrator to receive each event exactly once.
+			orchestratorWG := mockOrchestratorHandlingEvent(t, orchestrator, events)
 
 			// sends all messages concurrently to the attacker (imitating corruptible conduits sending
-			// messages conccurently to attacker).
+			// messages concurrently to attacker).
 			attackerSendWG := sync.WaitGroup{}
 			attackerSendWG.Add(concurrencyDegree)
 
@@ -145,25 +126,43 @@ func messageFixtures(t *testing.T, codec network.Codec, count int) ([]*insecure.
 	return msgs, events
 }
 
-// withAttacker is a test helper that creates and starts an attacker server, prepares a set of message fixtures and runs the given scenario
-// against the attacker and generated messages.
-func withAttacker(
+// withAttackerClient creates an attacker with a mock orchestrator, starts the attacker, creates a streaming gRPC client to it, and
+// executes the injected run function on the orchestrator and gRPC client of attacker. Finally, it terminates the gRPC client and the
+// attacker.
+func withAttackerClient(
 	t *testing.T,
-	messageCount int, // number of messages received by attacker from corruptible conduits while playing scenario.
-	scenario func(*testing.T, *mockinsecure.AttackOrchestrator, insecure.Attacker_ObserveClient, []*insecure.Message, []*insecure.Event)) {
+	run func(*testing.T, *mockinsecure.AttackOrchestrator, insecure.Attacker_ObserveClient)) {
 
+	withAttacker(t, func(t *testing.T, attacker *Attacker, orchestrator *mockinsecure.AttackOrchestrator) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+		require.NoError(t, err)
+
+		client := insecure.NewAttackerClient(gRpcClient)
+		clientStream, err := client.Observe(ctx)
+		require.NoError(t, err)
+
+		// creates fixtures and runs the scenario
+		run(t, orchestrator, clientStream)
+	})
+}
+
+// withAttacker creates an attacker with a mock orchestrator.
+// It then starts the attacker, executes the given run function on the attacker and its orchestrator, and finally terminates the attacker.
+func withAttacker(t *testing.T, run func(t *testing.T, attacker *Attacker, orchestrator *mockinsecure.AttackOrchestrator)) {
 	codec := cbor.NewCodec()
 	orchestrator := &mockinsecure.AttackOrchestrator{}
 	// mocks start up of orchestrator
 	orchestrator.On("Start", mock.AnythingOfType("*irrecoverable.signalerCtx")).Return().Once()
 
 	attacker, err := NewAttacker(unittest.Logger(), attackerAddress, codec, orchestrator)
-
 	require.NoError(t, err)
 
+	// life-cycle management of attacker.
 	ctx, cancel := context.WithCancel(context.Background())
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
-
 	go func() {
 		select {
 		case err := <-errChan:
@@ -177,19 +176,38 @@ func withAttacker(
 	attacker.Start(attackCtx)
 	unittest.RequireCloseBefore(t, attacker.Ready(), 1*time.Second, "could not start attacker on time")
 
-	gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-	require.NoError(t, err)
+	run(t, attacker, orchestrator)
 
-	client := insecure.NewAttackerClient(gRpcClient)
-	clientStream, err := client.Observe(ctx)
-	require.NoError(t, err)
-
-	// creates fixtures and runs the scenario
-	msgs, events := messageFixtures(t, codec, messageCount)
-	scenario(t, orchestrator, clientStream, msgs, events)
-
-	// terminates resources
+	// terminates attacker
 	cancel()
-	attacker.Stop()
 	unittest.RequireCloseBefore(t, attacker.Done(), 1*time.Second, "could not stop attacker on time")
+}
+
+// mockOrchestratorHandlingEvent mocks the given orchestrator to receive each of the given events exactly once. The returned wait group is
+// released when individual events are seen by orchestrator exactly once.
+func mockOrchestratorHandlingEvent(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, events []*insecure.Event) *sync.WaitGroup {
+	orchestratorWG := &sync.WaitGroup{}
+	orchestratorWG.Add(len(events)) // keeps track of total events that orchestrator receives
+
+	mu := sync.Mutex{}
+	seen := make(map[*insecure.Event]struct{}) // keeps track of unique events received by orchestrator
+	orchestrator.On("HandleEventFromCorruptedNode", mock.Anything).Run(func(args mock.Arguments) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		e, ok := args[0].(*insecure.Event)
+		require.True(t, ok)
+
+		// event should not be seen before.
+		_, ok = seen[e]
+		require.False(t, ok)
+
+		// received event by orchestrator must be an expected one.
+		require.Contains(t, events, e)
+		seen[e] = struct{}{}
+		orchestratorWG.Done()
+
+	}).Return(nil)
+
+	return orchestratorWG
 }
