@@ -277,6 +277,97 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm.AssertExpectations(t)
 	})
 
+	t.Run("Same block has same execution result", func(t *testing.T) {
+		execCtx := fvm.NewContext(zerolog.Nop())
+
+		vm := new(computermock.VirtualMachine)
+		committer := new(computermock.ViewCommitter)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
+		require.NoError(t, err)
+
+		collectionCount := 2
+		transactionsPerCollection := 2
+		eventsPerTransaction := 2
+		eventsPerCollection := eventsPerTransaction * transactionsPerCollection
+		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
+		//totalEventCount := eventsPerTransaction * totalTransactionCount
+
+		// create a block with 2 collections with 2 transactions each
+		block1 := generateBlock(collectionCount, transactionsPerCollection, rag)
+		block2 := blockCopy(block1)
+
+		programs := programs.NewEmptyPrograms()
+
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, programs).
+			Run(func(args mock.Arguments) {
+				tx := args[1].(*fvm.TransactionProcedure)
+
+				tx.Err = fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided")
+				// create dummy events
+				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
+			}).
+			Return(nil).
+			Times(totalTransactionCount * 2)
+
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil, nil).
+			Times((collectionCount + 1) * 2)
+
+		view1 := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+		view2 := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		result1, err1 := exe.ExecuteBlock(context.Background(), block1, view1, programs)
+		result2, err2 := exe.ExecuteBlock(context.Background(), block2, view2, programs)
+		assert.NoError(t, err1)
+		assert.NoError(t, err2)
+
+		for i := 0; i < collectionCount; i++ {
+			assert.Len(t, result1.Events[i], eventsPerCollection)
+			assert.Len(t, result2.Events[i], eventsPerCollection)
+		}
+
+		// events should have been indexed by transaction and event
+		k := 0
+		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
+			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
+
+				chunkIndex := k / eventsPerCollection
+				eventIndex := k % eventsPerCollection
+
+				e1 := result1.Events[chunkIndex][eventIndex]
+				e2 := result2.Events[chunkIndex][eventIndex]
+				assert.EqualValues(t, expectedEventIndex, int(e1.EventIndex))
+				assert.EqualValues(t, expectedTxIndex, e1.TransactionIndex)
+				assert.EqualValues(t, expectedEventIndex, int(e2.EventIndex))
+				assert.EqualValues(t, expectedTxIndex, e2.TransactionIndex)
+				k++
+			}
+		}
+
+		expectedResults := make([]flow.TransactionResult, 0)
+		for _, c := range block1.CompleteCollections {
+			for _, t := range c.Transactions {
+				txResult := flow.TransactionResult{
+					TransactionID: t.ID(),
+					ErrorMessage:  fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided").Error(),
+				}
+				expectedResults = append(expectedResults, txResult)
+			}
+		}
+		assert.ElementsMatch(t, expectedResults, result1.TransactionResults[0:len(result1.TransactionResults)-1]) //strip system chunk
+		assert.ElementsMatch(t, expectedResults, result2.TransactionResults[0:len(result2.TransactionResults)-1]) //strip system chunk
+
+		assertEventHashesMatch(t, collectionCount+1, result1)
+		assertEventHashesMatch(t, collectionCount+1, result2)
+
+		vm.AssertExpectations(t)
+	})
+
 	t.Run("service events are emitted", func(t *testing.T) {
 		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvoker(zerolog.Nop()), //we don't need to check signatures or sequence numbers
@@ -735,4 +826,13 @@ func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 		events[i] = event
 	}
 	return events
+}
+
+func blockCopy(oldBlock *entity.ExecutableBlock) *entity.ExecutableBlock {
+	newBlock := &entity.ExecutableBlock{}
+	newBlock.Block = oldBlock.Block
+	newBlock.CompleteCollections = oldBlock.CompleteCollections
+	newBlock.StartState = oldBlock.StartState
+	newBlock.Executing = oldBlock.Executing
+	return newBlock
 }
