@@ -384,6 +384,13 @@ func main() {
 								// more recent block has higher priority
 								return true
 							} else if ra.BlobTreeRecord.BlockID == rb.BlobTreeRecord.BlockID {
+								// later chunk has higher priority
+								if ra.BlobTreeRecord.ChunkIndex > rb.BlobTreeRecord.ChunkIndex {
+									return true
+								} else if rb.BlobTreeRecord.ChunkIndex > ra.BlobTreeRecord.ChunkIndex {
+									return false
+								}
+
 								// deeper node in the same blob tree has higher priority
 								return ra.BlobTreeLocation.Height < rb.BlobTreeLocation.Height
 							} else {
