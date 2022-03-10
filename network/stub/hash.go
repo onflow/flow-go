@@ -11,7 +11,7 @@ import (
 )
 
 // eventKey generates a unique fingerprint for the tuple of (sender, event, type of event, channel)
-func eventKey(from flow.Identifier, channel network.Channel, event interface{}) (string, error) {
+func eventKey(from flow.Identifier, channel network.Channel, event interface{}, isDirect bool) (string, error) {
 	marshaler := json.NewMarshaler()
 
 	tag, err := marshaler.Marshal([]byte(fmt.Sprintf("testthenetwork %s %T", channel, event)))
@@ -41,6 +41,11 @@ func eventKey(from flow.Identifier, channel network.Channel, event interface{}) 
 	}
 
 	_, err = hasher.Write(sender)
+	if err != nil {
+		return "", fmt.Errorf("could not write to hasher: %w", err)
+	}
+
+	_, err = hasher.Write([]byte(fmt.Sprintf("%t", isDirect)))
 	if err != nil {
 		return "", fmt.Errorf("could not write to hasher: %w", err)
 	}

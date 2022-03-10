@@ -116,8 +116,8 @@ func TestExecutionFlow(t *testing.T) {
 	// create collection node that can respond collections to execution node
 	// check collection node received the collection request from execution node
 	providerEngine := new(mocknetwork.Engine)
-	provConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
-	providerEngine.On("Process", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
+	collectionNode.Net.RegisterDirectMessageHandler(engine.ProvideCollections, providerEngine.Submit)
+	providerEngine.On("Submit", engine.ProvideCollections, exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args.Get(1).(flow.Identifier)
 			req := args.Get(2).(*messages.EntityRequest)
@@ -141,7 +141,7 @@ func TestExecutionFlow(t *testing.T) {
 				Blobs:     blobs,
 			}
 
-			err := provConduit.Publish(res, originID)
+			err := collectionNode.Net.SendDirectMessage(engine.ProvideCollections, res, originID)
 			assert.NoError(t, err)
 		}).
 		Once().
@@ -181,12 +181,12 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	// submit block from consensus node
-	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&block))
+	err = sendBlock(exeNode, conID.NodeID, unittest.ProposalFromBlock(&block))
 	require.NoError(t, err)
 
 	// submit the child block from consensus node, which trigger the parent block
 	// to be passed to BlockProcessable
-	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
+	err = sendBlock(exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -367,10 +367,10 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 		}).Return(nil)
 
 	// submit block2 from consensus node to execution node 1
-	err = sendBlock(&exe1Node, conID.NodeID, proposal1)
+	err = sendBlock(exe1Node, conID.NodeID, proposal1)
 	require.NoError(t, err)
 
-	err = sendBlock(&exe1Node, conID.NodeID, proposal2)
+	err = sendBlock(exe1Node, conID.NodeID, proposal2)
 	assert.NoError(t, err)
 
 	// ensure block 1 has been executed
@@ -387,10 +387,10 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	assert.NotEqual(t, scExe1Genesis, scExe1Block1)
 
 	// submit block 3 and block 4 from consensus node to execution node 1 (who have block1),
-	err = sendBlock(&exe1Node, conID.NodeID, proposal3)
+	err = sendBlock(exe1Node, conID.NodeID, proposal3)
 	assert.NoError(t, err)
 
-	err = sendBlock(&exe1Node, conID.NodeID, proposal4)
+	err = sendBlock(exe1Node, conID.NodeID, proposal4)
 	assert.NoError(t, err)
 
 	// ensure block 1, 2 and 3 have been executed
@@ -415,7 +415,6 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testmock.GenericNode, cols []*flow.Collection) *mocknetwork.Engine {
 	collectionEngine := new(mocknetwork.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
 
 	// make lookup
 	colMap := make(map[flow.Identifier][]byte)
@@ -423,7 +422,10 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 		blob, _ := msgpack.Marshal(col)
 		colMap[col.ID()] = blob
 	}
-	collectionEngine.On("Process", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
+
+	collectionNode.Net.RegisterDirectMessageHandler(engine.ProvideCollections, collectionEngine.Submit)
+
+	collectionEngine.On("Submit", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[1].(flow.Identifier)
 			req := args[2].(*messages.EntityRequest)
@@ -432,7 +434,7 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
 			}
 			res := &messages.EntityResponse{Blobs: [][]byte{blob}, EntityIDs: req.EntityIDs[:1]}
-			err := colConduit.Publish(res, originID)
+			err := collectionNode.Net.SendDirectMessage(engine.ProvideCollections, res, originID)
 			assert.NoError(t, err)
 		}).
 		Return(nil).
@@ -504,10 +506,10 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 		}).
 		Return(nil)
 
-	err = sendBlock(&exeNode, exeID.NodeID, proposal)
+	err = sendBlock(exeNode, exeID.NodeID, proposal)
 	require.NoError(t, err)
 
-	err = sendBlock(&exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
+	err = sendBlock(exeNode, conID.NodeID, unittest.ProposalFromBlock(&child))
 	require.NoError(t, err)
 
 	hub.DeliverAllEventually(t, func() bool {

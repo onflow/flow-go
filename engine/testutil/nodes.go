@@ -460,7 +460,7 @@ type CheckerMock struct {
 	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) *testmock.ExecutionNode {
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.PublicDB)
@@ -523,6 +523,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	metrics := metrics.NewNoopCollector()
+	node.Net.On("SetDirectMessageConfig", engine.RequestChunks, mock.AnythingOfType("network.DirectMessageConfig")).Return(nil)
 	pusherEngine, err := executionprovider.New(
 		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkAuthorizedAtBlock, 10, 10,
 	)
@@ -651,7 +652,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	return testmock.ExecutionNode{
+	return &testmock.ExecutionNode{
 		GenericNode:         node,
 		MutableState:        followerState,
 		IngestionEngine:     ingestionEngine,
@@ -859,6 +860,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.RequesterEngine == nil {
+		node.Net.On("SetDirectMessageConfig", engine.RequestChunks, mock.AnythingOfType("network.DirectMessageConfig")).Return(nil)
 		node.RequesterEngine, err = vereq.New(node.Log,
 			node.State,
 			node.Net,

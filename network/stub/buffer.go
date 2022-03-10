@@ -13,8 +13,10 @@ type PendingMessage struct {
 	From    flow.Identifier
 	Channel network.Channel
 	Event   interface{}
-	// The id of the receiver nodes
-	TargetIDs []flow.Identifier
+
+	IsDirect bool
+	// The id of the receiver node
+	TargetID flow.Identifier
 }
 
 // Buffer buffers all the pending messages to be sent over the mock network from one node to a list of nodes

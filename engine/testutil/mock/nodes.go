@@ -212,12 +212,13 @@ type ExecutionNode struct {
 	cancel context.CancelFunc
 }
 
-func (en ExecutionNode) Ready() {
+func (en *ExecutionNode) Ready() {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	en.cancel = cancel
 
 	en.SyncEngine.Start(signalerCtx)
-	en.cancel = cancel
+	en.FinalizedHeader.Start(signalerCtx)
 
 	<-util.AllReady(
 		en.Ledger,
@@ -227,10 +228,11 @@ func (en ExecutionNode) Ready() {
 		en.RequestEngine,
 		en.SyncEngine,
 		en.DiskWAL,
+		en.FinalizedHeader,
 	)
 }
 
-func (en ExecutionNode) Done() {
+func (en *ExecutionNode) Done() {
 	en.cancel()
 
 	util.AllDone(
@@ -242,6 +244,7 @@ func (en ExecutionNode) Done() {
 		en.RequestEngine,
 		en.SyncEngine,
 		en.DiskWAL,
+		en.FinalizedHeader,
 	)
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()

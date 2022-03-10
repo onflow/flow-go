@@ -29,8 +29,9 @@ type Network struct {
 	me             module.Local                                 // used to represent information of the attached node.
 	hub            *Hub                                         // used to attach Network layers of nodes together.
 	engines        map[network.Channel]network.MessageProcessor // used to keep track of attached engines of the node.
-	seenEventIDs   sync.Map                                     // used to keep track of event IDs seen by attached engines.
-	qCD            chan struct{}                                // used to stop continuous delivery mode of the Network.
+	handlers       map[network.Channel]network.DirectMessageHandler
+	seenEventIDs   sync.Map      // used to keep track of event IDs seen by attached engines.
+	qCD            chan struct{} // used to stop continuous delivery mode of the Network.
 	conduitFactory network.ConduitFactory
 }
 
@@ -44,6 +45,7 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) (*Network, erro
 		me:             me,
 		hub:            hub,
 		engines:        make(map[network.Channel]network.MessageProcessor),
+		handlers:       make(map[network.Channel]network.DirectMessageHandler),
 		qCD:            make(chan struct{}),
 		conduitFactory: conduit.NewDefaultConduitFactory(),
 	}
@@ -60,6 +62,28 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) (*Network, erro
 // GetID returns the identity of the attached node.
 func (n *Network) GetID() flow.Identifier {
 	return n.me.NodeID()
+}
+
+func (n *Network) RegisterDirectMessageHandler(channel network.Channel, handler network.DirectMessageHandler) error {
+	n.Lock()
+	defer n.Unlock()
+
+	n.handlers[channel] = handler
+
+	return nil
+}
+
+func (n *Network) SendDirectMessage(channel network.Channel, event interface{}, target flow.Identifier) error {
+	m := &PendingMessage{
+		From:     n.GetID(),
+		Channel:  channel,
+		Event:    event,
+		TargetID: target,
+		IsDirect: true,
+	}
+
+	n.hub.Buffer.Save(m)
+	return nil
 }
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the
@@ -91,12 +115,11 @@ func (n *Network) UnRegisterChannel(channel network.Channel) error {
 
 // submit is called when the attached Engine to the channel is sending an event to an
 // Engine attached to the same channel on another node or nodes.
-func (n *Network) submit(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(channel network.Channel, event interface{}) error {
 	m := &PendingMessage{
-		From:      n.GetID(),
-		Channel:   channel,
-		Event:     event,
-		TargetIDs: targetIDs,
+		From:    n.GetID(),
+		Channel: channel,
+		Event:   event,
 	}
 
 	n.buffer(m)
@@ -148,40 +171,11 @@ func (n *Network) buffer(msg *PendingMessage) {
 // in the Network to deliver.
 func (n *Network) DeliverAll(syncOnProcess bool) {
 	n.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
-		_ = n.sendToAllTargets(m, syncOnProcess)
-	})
-}
-
-// DeliverAllExcept flushes all pending messages in the buffer except
-// those that satisfy the shouldDrop predicate function. All messages that
-// satisfy the shouldDrop predicate are permanently dropped.
-// The message receivers might be triggered to forward some messages to their peers,
-// so this function will block until all receivers have done their forwarding,
-// and there is no more message in the Network to deliver.
-//
-// If syncOnProcess is true, the sender and receiver are synchronized on processing the message.
-// Otherwise they sync on delivery of the message.
-func (n *Network) DeliverAllExcept(syncOnProcess bool, shouldDrop func(*PendingMessage) bool) {
-	n.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
-		if shouldDrop(m) {
-			return
+		err := n.sendToAllTargets(m, syncOnProcess)
+		if err != nil {
+			fmt.Println("ERROR SENDING")
+			fmt.Println(err)
 		}
-		_ = n.sendToAllTargets(m, syncOnProcess)
-	})
-}
-
-// DeliverSome delivers all messages in the buffer that satisfy the
-// shouldDeliver predicate. Any messages that are not delivered remain in the
-// buffer.
-//
-// If syncOnProcess is true, the sender and receiver are synchronized on processing the message.
-// Otherwise they sync on delivery of the message.
-func (n *Network) DeliverSome(syncOnProcess bool, shouldDeliver func(*PendingMessage) bool) {
-	n.hub.Buffer.Deliver(func(m *PendingMessage) bool {
-		if shouldDeliver(m) {
-			return n.sendToAllTargets(m, syncOnProcess) != nil
-		}
-		return false
 	})
 }
 
@@ -197,46 +191,74 @@ func (n *Network) sendToAllTargets(m *PendingMessage, syncOnProcess bool) error 
 	n.Lock()
 	defer n.Unlock()
 
-	key, err := eventKey(m.From, m.Channel, m.Event)
+	key, err := eventKey(m.From, m.Channel, m.Event, m.IsDirect)
 	if err != nil {
 		return fmt.Errorf("could not generate event key for event: %w", err)
 	}
 
-	for _, nodeID := range m.TargetIDs {
+	if m.IsDirect {
 		// finds the Network of the targeted node
-		receiverNetwork, exist := n.hub.GetNetwork(nodeID)
+		receiverNetwork, exist := n.hub.GetNetwork(m.TargetID)
 		if !exist {
-			continue
+			return fmt.Errorf("could not find the receiver network: %s", m.TargetID)
 		}
 
 		// checks if the given engine already received the event.
 		// this prevents a node receiving the same event twice.
 		if receiverNetwork.haveSeen(key) {
-			continue
+			return nil
 		}
 
 		// marks the peer has seen the event
 		receiverNetwork.seen(key)
 
-		// finds the engine of the targeted Network
-		receiverEngine, ok := receiverNetwork.engines[m.Channel]
+		receiverHandler, ok := receiverNetwork.handlers[m.Channel]
 		if !ok {
-			return fmt.Errorf("could find engine ID: %v for node: %v", m.Channel, nodeID)
+			return fmt.Errorf("could not find handler ID: %v for node: %v", m.Channel, m.TargetID)
 		}
 
 		if syncOnProcess {
-			// sender and receiver are synced over processing the message
-			if err := receiverEngine.Process(m.Channel, m.From, m.Event); err != nil {
-				return fmt.Errorf("receiver engine failed to process event (%v): %w", m.Event, err)
-			}
+			receiverHandler(m.Channel, m.From, m.Event)
 		} else {
-			// sender and receiver are synced over delivery of message
 			go func() {
-				_ = receiverEngine.Process(m.Channel, m.From, m.Event)
+				receiverHandler(m.Channel, m.From, m.Event)
 			}()
 		}
+	} else {
+		for nodeID, receiverNetwork := range n.hub.networks {
+			if nodeID == m.From {
+				continue
+			}
 
+			// finds the engine of the targeted Network
+			receiverEngine, ok := receiverNetwork.engines[m.Channel]
+			if !ok {
+				continue
+			}
+
+			// checks if the given engine already received the event.
+			// this prevents a node receiving the same event twice.
+			if receiverNetwork.haveSeen(key) {
+				continue
+			}
+
+			// marks the peer has seen the event
+			receiverNetwork.seen(key)
+
+			if syncOnProcess {
+				// sender and receiver are synced over processing the message
+				if err := receiverEngine.Process(m.Channel, m.From, m.Event); err != nil {
+					return fmt.Errorf("receiver engine failed to process event (%v): %w", m.Event, err)
+				}
+			} else {
+				// sender and receiver are synced over delivery of message
+				go func() {
+					_ = receiverEngine.Process(m.Channel, m.From, m.Event)
+				}()
+			}
+		}
 	}
+
 	return nil
 }
 
