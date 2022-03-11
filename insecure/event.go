@@ -10,10 +10,17 @@ import (
 // The corruptible conduit relays the message to the attacker instead of dispatching it through the Flow network.
 // The attacker decodes the message into an event and relays it to the orchestrator.
 type Event struct {
-	CorruptedId flow.Identifier     // identifier of corrupted conduit
-	Channel     network.Channel     // channel of the event on the corrupted conduit
-	Content     interface{}         // the protocol-level event itself.
-	Protocol    Protocol            // networking-layer protocol that this event was meant to send on.
-	TargetNum   uint32              // number of randomly chosen targets (used in multicast protocol).
-	TargetIds   flow.IdentifierList // set of target identifiers
+	CorruptedId flow.Identifier // identifier of corrupted conduit
+	Channel     network.Channel // channel of the event on the corrupted conduit
+	Protocol    Protocol        // networking-layer protocol that this event was meant to send on.
+	TargetNum   uint32          // number of randomly chosen targets (used in multicast protocol).
+
+	// set of target identifiers (can be any subset of nodes, either honest or corrupted).
+	TargetIds flow.IdentifierList
+
+	// the protocol-level event that the corrupted node is relaying to
+	// the attacker. The event is originated by the corrupted node, and is
+	// sent to attacker to decide on its content before dispatching it to the
+	// Flow network.
+	FlowProtocolEvent interface{}
 }

@@ -98,12 +98,12 @@ func messageFixture(t *testing.T, codec network.Codec) (*insecure.Message, *inse
 	// creates corresponding event of that message that
 	// is sent by attacker to orchestrator.
 	e := &insecure.Event{
-		CorruptedId: originId,
-		Channel:     channel,
-		Content:     content,
-		Protocol:    protocol,
-		TargetNum:   targets,
-		TargetIds:   targetIds,
+		CorruptedId:       originId,
+		Channel:           channel,
+		FlowProtocolEvent: content,
+		Protocol:          protocol,
+		TargetNum:         targets,
+		TargetIds:         targetIds,
 	}
 
 	return m, e

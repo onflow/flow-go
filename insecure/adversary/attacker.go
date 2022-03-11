@@ -137,12 +137,12 @@ func (a *Attacker) processObservedMsg(message *insecure.Message) error {
 	}
 
 	err = a.orchestrator.HandleEventFromCorruptedNode(&insecure.Event{
-		CorruptedId: sender,
-		Channel:     network.Channel(message.ChannelID),
-		Content:     event,
-		Protocol:    message.Protocol,
-		TargetNum:   message.Targets,
-		TargetIds:   targetIds,
+		CorruptedId:       sender,
+		Channel:           network.Channel(message.ChannelID),
+		FlowProtocolEvent: event,
+		Protocol:          message.Protocol,
+		TargetNum:         message.Targets,
+		TargetIds:         targetIds,
 	})
 	if err != nil {
 		return fmt.Errorf("could not handle event by orchestrator: %w", err)
