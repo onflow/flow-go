@@ -300,14 +300,6 @@ func TestSamples(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("basic randmoness", func(t *testing.T) {
-
-		listSize := 100
-		samplesSize := 20
-
-		// statictics parameters
-		sampleSize := 100000
-		tolerance := 0.05
-		// tests the subset sampling randomness
 		samplingDistribution := make([]float64, listSize)
 		// tests the subset ordering randomness (using a particular element testElement)
 		orderingDistribution := make([]float64, samplesSize)
