@@ -2,6 +2,7 @@ package reporters
 
 import (
 	"fmt"
+	"math"
 	goRuntime "runtime"
 	"sync"
 
@@ -10,8 +11,8 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
@@ -64,7 +65,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	st := state.NewState(l)
+	st := state.NewState(l, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
 	sth := state.NewStateHolder(st)
 	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
 
@@ -119,6 +120,7 @@ type balanceProcessor struct {
 	ctx           fvm.Context
 	view          state.View
 	prog          *programs.Programs
+	intf          runtime.Interface
 	balanceScript []byte
 	momentsScript []byte
 
@@ -132,12 +134,35 @@ type balanceProcessor struct {
 	fusdScript []byte
 }
 
-func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
-
+func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 	prog := programs.NewEmptyPrograms()
-	balanceScript := []byte(fmt.Sprintf(`
+
+	v := view.NewChild()
+	st := state.NewState(v, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	sth := state.NewStateHolder(st)
+	accounts := state.NewAccounts(sth)
+
+	return &balanceProcessor{
+		vm:       vm,
+		ctx:      ctx,
+		view:     v,
+		accounts: accounts,
+		st:       st,
+		prog:     prog,
+		intf:     fvm.NewScriptEnvironment(ctx, vm, sth, prog),
+	}
+}
+
+func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
+	bp := NewBalanceReporter(chain, view)
+
+	bp.logger = logger
+	bp.rwa = rwa
+	bp.rwc = rwc
+	bp.rwm = rwm
+	bp.balanceScript = []byte(fmt.Sprintf(`
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
 
@@ -149,9 +174,9 @@ func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc Report
 
 					return vaultRef.balance
 				}
-			`, fvm.FungibleTokenAddress(ctx.Chain), fvm.FlowTokenAddress(ctx.Chain)))
+			`, fvm.FungibleTokenAddress(bp.ctx.Chain), fvm.FlowTokenAddress(bp.ctx.Chain)))
 
-	fusdScript := []byte(fmt.Sprintf(`
+	bp.fusdScript = []byte(fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FUSD from 0x%s
 
@@ -164,9 +189,9 @@ func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc Report
 
 				return vaultRef.balance
 			}
-			`, fvm.FungibleTokenAddress(ctx.Chain), "3c5959b568896393"))
+			`, fvm.FungibleTokenAddress(bp.ctx.Chain), "3c5959b568896393"))
 
-	momentsScript := []byte(`
+	bp.momentsScript = []byte(`
 			import TopShot from 0x0b2a3299cc857e29
 
 			pub fun main(account: Address): Int {
@@ -178,26 +203,7 @@ func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc Report
 			}
 			`)
 
-	v := view.NewChild()
-	st := state.NewState(v)
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
-
-	return &balanceProcessor{
-		logger:        logger,
-		vm:            vm,
-		ctx:           ctx,
-		view:          v,
-		accounts:      accounts,
-		st:            st,
-		prog:          prog,
-		rwa:           rwa,
-		rwc:           rwc,
-		rwm:           rwm,
-		balanceScript: balanceScript,
-		momentsScript: momentsScript,
-		fusdScript:    fusdScript,
-	}
+	return bp
 }
 
 func (c *balanceProcessor) reportAccountData(indx uint64) {
@@ -365,40 +371,33 @@ func (c *balanceProcessor) storageUsed(address flow.Address) (uint64, error) {
 }
 
 func (c *balanceProcessor) isDapper(address flow.Address) (bool, error) {
-	id := resourceId(address,
-		interpreter.PathValue{
-			Domain:     common.PathDomainPublic,
-			Identifier: "dapperUtilityCoinReceiver",
-		})
-
-	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key, false)
+	receiver, err := c.ReadStored(address, common.PathDomainPublic, "dapperUtilityCoinReceiver")
 	if err != nil {
 		return false, fmt.Errorf("could not load dapper receiver at %s: %w", address, err)
 	}
-	return len(receiver) != 0, nil
+	return receiver != nil, nil
 }
 
 func (c *balanceProcessor) hasReceiver(address flow.Address) (bool, error) {
-	id := resourceId(address,
-		interpreter.PathValue{
-			Domain:     common.PathDomainPublic,
-			Identifier: "flowTokenReceiver",
-		})
+	receiver, err := c.ReadStored(address, common.PathDomainPublic, "flowTokenReceiver")
 
-	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key, false)
 	if err != nil {
 		return false, fmt.Errorf("could not load receiver at %s: %w", address, err)
 	}
-	return len(receiver) != 0, nil
+	return receiver != nil, nil
 }
 
-func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterID {
-	// Copied logic from interpreter.storageKey(path)
-	key := fmt.Sprintf("%s\x1F%s", path.Domain.Identifier(), path.Identifier)
-
-	return flow.RegisterID{
-		Owner:      string(address.Bytes()),
-		Controller: "",
-		Key:        key,
+func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDomain, id string) (cadence.Value, error) {
+	addr, err := common.BytesToAddress(address.Bytes())
+	if err != nil {
+		return nil, err
 	}
+	receiver, err := c.vm.Runtime.ReadStored(addr,
+		cadence.Path{
+			Domain:     domain.Identifier(),
+			Identifier: id,
+		},
+		runtime.Context{Interface: c.intf},
+	)
+	return receiver, err
 }
