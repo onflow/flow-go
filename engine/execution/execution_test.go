@@ -225,7 +225,7 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
 	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
-		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)

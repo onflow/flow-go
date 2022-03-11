@@ -66,7 +66,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	suite.execID = exec.NodeID
 	suite.verifID = verif.NodeID
 
-	clusters := flow.ClusterList{flow.IdentityList{coll}}
+	clusters := flow.IdentityList{coll}
 
 	identities := flow.IdentityList{access, con, coll, exec, verif}
 	suite.finalIdentities = identities.Copy()
@@ -81,6 +81,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	suite.epoch = &mockprotocol.Epoch{}
 	headers := &mockstorage.Headers{}
 	pool := &mockmempool.Guarantees{}
+	cluster := &mockprotocol.Cluster{}
 
 	// this state basically works like a normal protocol state
 	// returning everything correctly, using the created header
@@ -108,7 +109,8 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	)
 	ref.On("Epochs").Return(suite.query)
 	suite.query.On("Current").Return(suite.epoch)
-	suite.epoch.On("ClusterByChainID", head.ChainID).Return(clusters, nil)
+	cluster.On("Members").Return(clusters)
+	suite.epoch.On("ClusterByChainID", head.ChainID).Return(cluster, nil)
 
 	state.On("AtBlockID", mock.Anything).Return(ref)
 	ref.On("Identity", mock.Anything).Return(
