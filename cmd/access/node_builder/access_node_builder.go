@@ -110,6 +110,9 @@ type AccessNodeConfig struct {
 	executionDataSyncEnabled     bool
 	executionDataCheckEnabled    bool
 	executionDataFetchTimeout    time.Duration
+	executionDataRootBlockHeight uint64
+	executionDataMaxCacheEntries uint64
+	executionDataMaxSearchAhead  uint64
 	executionDataDir             string
 	baseOptions                  []cmd.Option
 
@@ -160,11 +163,14 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
-		observerNetworkingKeyPath: cmd.NotSet,
-		executionDataSyncEnabled:  false,
-		executionDataCheckEnabled: false,
-		executionDataFetchTimeout: edrequester.DefaultFetchTimeout,
-		executionDataDir:          filepath.Join(homedir, ".flow", "execution_data"),
+		observerNetworkingKeyPath:    cmd.NotSet,
+		executionDataSyncEnabled:     false,
+		executionDataCheckEnabled:    false,
+		executionDataFetchTimeout:    edrequester.DefaultFetchTimeout,
+		executionDataRootBlockHeight: 0,
+		executionDataMaxCacheEntries: edrequester.DefaultMaxCachedEntries,
+		executionDataMaxSearchAhead:  edrequester.DefaultMaxSearchAhead,
+		executionDataDir:             filepath.Join(homedir, ".flow", "execution_data"),
 	}
 }
 
@@ -458,13 +464,31 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	}
 
 	builder.RestartableComponent("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+
+		rootHeight := builder.RootBlock.Header.Height
+
+		// Validation of the root block height needs to be done after loading state
+		if builder.executionDataRootBlockHeight > 0 {
+			if builder.executionDataRootBlockHeight < rootHeight {
+				return nil, fmt.Errorf("execution data root block height (%d) cannot be less than the root block height for the spork (%d)", builder.executionDataRootBlockHeight, rootHeight)
+			}
+
+			if builder.executionDataRootBlockHeight > builder.Finalized.Height {
+				return nil, fmt.Errorf("execution data root block height (%d) cannot be greater than the latest finalized block height (%d)", builder.executionDataRootBlockHeight, builder.Finalized.Height)
+			}
+
+			rootHeight = builder.executionDataRootBlockHeight
+		}
+
 		edr, err := edrequester.New(
 			builder.Logger,
 			metrics.NewNoopCollector(),
 			dstore,
 			blobservice,
 			builder.ExecutionDataService,
-			builder.RootBlock.Header.Height, // TODO: make configurable, will require validation to ensure it's within the current spork's window
+			rootHeight,
+			builder.executionDataMaxCacheEntries,
+			builder.executionDataMaxSearchAhead,
 			builder.Storage.Blocks,
 			builder.Storage.Results,
 			builder.executionDataFetchTimeout,
@@ -572,10 +596,17 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.BoolVar(&builder.executionDataCheckEnabled, "execution-data-startup-check", defaultConfig.executionDataSyncEnabled, "whether to check execution data exists for all heights during startup")
 		flags.DurationVar(&builder.executionDataFetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataFetchTimeout, "timeout to use when fetching execution data from the network e.g. 300s")
+		flags.Uint64Var(&builder.executionDataRootBlockHeight, "execution-data-root-height", defaultConfig.executionDataRootBlockHeight, "height of first block to sync execution data from")
+		flags.Uint64Var(&builder.executionDataMaxCacheEntries, "execution-data-max-cache-entries", defaultConfig.executionDataMaxCacheEntries, "max number of execution data entries to cache for notifications")
+		flags.Uint64Var(&builder.executionDataMaxSearchAhead, "execution-data-max-search-ahead", defaultConfig.executionDataMaxSearchAhead, "max number of heights to search ahead of the lowest outstanding execution data height")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 	}).ValidateFlags(func() error {
 		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-unstaked-node is true")
+		}
+
+		if builder.executionDataSyncEnabled && builder.executionDataMaxSearchAhead == 0 {
+			return errors.New("execution-data-max-search-ahead must be greater than 0")
 		}
 
 		return nil

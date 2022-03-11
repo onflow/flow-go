@@ -14,6 +14,7 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -30,28 +31,32 @@ import (
 )
 
 const (
-	// Timeout for fetching ExecutionData from the db/network
+	// DefaultFetchTimeout is the default timeout for fetching ExecutionData from the db/network
 	DefaultFetchTimeout = 5 * time.Minute
+
+	// DefaultMaxCachedEntries is the default the number of ExecutionData objects to keep when
+	// waiting to send notifications. Dropped data is refetched from disk.
+	DefaultMaxCachedEntries = 50
+
+	// DefaultMaxSearchAhead is the default max number of unsent notifications to allow before
+	// pausing new fetches. After exceeding this limit, the requester will stop processing new
+	// finalized block notifications. This prevents unbounded memory use by the requester if it
+	// gets stuck fetching a specific height.
+	DefaultMaxSearchAhead = 5000
 
 	// Number of goroutines to use for downloading new ExecutionData from the network.
 	fetchWorkers = 4
 
-	// The number of ExecutionData objects to keep when waiting to send notifications. Dropped
-	// data is refetched from disk.
-	executionDataCacheSize = 50
-
+	// Number of fetch requests to accept on the fetch queue before blocking
 	// Note: this must be greater than fetchWorkers, otherwise the retry queue could overflow
 	// resulting in lost retry requests
 	fetchQueueLength = fetchWorkers * 2
-
-	// Max number of unsent notifications to allow before pausing new fetches. After exceeding this``
-	// limit, the requester will stop processing new finalized block notifications. This prevents
-	// unbounded memory use by the requester if it gets stuck fetching a specific height.
-	maxOutstandingNotifications = 5000
 )
 
+// ErrRequesterHalted is returned when an invalid ExectutionData is encountered
 var ErrRequesterHalted = errors.New("requester was halted due to invalid data")
 
+// ExecutionDataReceivedCallback is a callback that is called ExecutionData is received for a new block
 type ExecutionDataReceivedCallback func(*state_synchronization.ExecutionData)
 
 // ExecutionDataRequester downloads ExecutionData for newly sealed blocks from the network using the
@@ -64,7 +69,7 @@ type ExecutionDataReceivedCallback func(*state_synchronization.ExecutionData)
 // priority is to consume the data locally.
 type ExecutionDataRequester interface {
 	component.Component
-	OnBlockFinalized(flow.Identifier)
+	OnBlockFinalized(*model.Block)
 	AddOnExecutionDataFetchedConsumer(fn ExecutionDataReceivedCallback)
 }
 
@@ -106,7 +111,7 @@ type executionDataRequesterImpl struct {
 	startupCheck bool
 	fetchTimeout time.Duration
 
-	statusLoaded chan struct{}
+	bootstrapped chan struct{}
 }
 
 // NewexecutionDataRequester creates a new execution data requester component
@@ -117,6 +122,8 @@ func New(
 	blobservice network.BlobService,
 	eds state_synchronization.ExecutionDataService,
 	rootBlockHeight uint64,
+	maxCachedEntries uint64,
+	maxSearchAhead uint64,
 	blocks storage.Blocks,
 	results storage.ExecutionResults,
 	fetchTimeout time.Duration,
@@ -135,15 +142,15 @@ func New(
 		status: status.New(
 			datastore,
 			log.With().Str("component", "requester_status").Logger(),
-			executionDataCacheSize,
-			maxOutstandingNotifications,
+			maxCachedEntries,
+			maxSearchAhead,
 		),
 
 		finalizedBlocks:    make(chan flow.Identifier, 1),
 		fetchRequests:      make(chan *status.BlockEntry, fetchQueueLength),
 		fetchRetryRequests: make(chan *status.BlockEntry, fetchQueueLength),
 		notifications:      make(chan struct{}, fetchQueueLength),
-		statusLoaded:       make(chan struct{}),
+		bootstrapped:       make(chan struct{}),
 	}
 
 	builder := component.NewComponentManagerBuilder().
@@ -171,8 +178,8 @@ func (e *executionDataRequesterImpl) AddOnExecutionDataFetchedConsumer(fn Execut
 	e.consumers = append(e.consumers, fn)
 }
 
-func (e *executionDataRequesterImpl) OnBlockFinalized(blockID flow.Identifier) {
-	logger := e.log.With().Str("finalized_block_id", blockID.String()).Logger()
+func (e *executionDataRequesterImpl) OnBlockFinalized(block *model.Block) {
+	logger := e.log.With().Str("finalized_block_id", block.BlockID.String()).Logger()
 
 	// stop accepting new blocks if the component is shutting down
 	if util.CheckClosed(e.cm.ShutdownSignal()) {
@@ -189,7 +196,7 @@ func (e *executionDataRequesterImpl) OnBlockFinalized(blockID flow.Identifier) {
 	logger.Debug().Msg("received finalized block notification")
 
 	select {
-	case e.finalizedBlocks <- blockID:
+	case e.finalizedBlocks <- block.BlockID:
 	default:
 		logger.Warn().Msg("finalized block queue is full")
 	}
@@ -198,23 +205,24 @@ func (e *executionDataRequesterImpl) OnBlockFinalized(blockID flow.Identifier) {
 // finalizedBlockProcessor runs the main process that processes finalized block notifications and
 // requests ExecutionData for each block seal
 func (e *executionDataRequesterImpl) finalizedBlockProcessor(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-e.eds.Ready()
-	ready()
+	// Load previous requester state from db if it exists
+	err := e.status.Load(ctx, e.rootBlockHeight)
+	if err != nil {
+		e.log.Error().Err(err).Msg("failed to load notification state. using defaults")
+	}
 
-	// Boostrapping happens after the node is ready since it should not block node startup
-	err := e.loadSyncState(ctx)
-
-	if errors.Is(err, ErrRequesterHalted) {
-		// Requester came up halted. By not closing the statusLoaded channel, none of the other
-		// workers will start, effectively disabling the component.
+	// Requester came up halted.
+	if e.status.Halted() {
 		e.log.Error().Msg("HALTING REQUESTER: requester was halted on a previous run due to invalid data")
+		// By not closing the bootstrapped channel, none of the other workers will start, effectively
+		// disabling the component.
 		return
 	}
+	e.log.Debug().Msgf("starting with LastReceived: %d", e.status.LastReceived())
 
-	if err != nil {
-		ctx.Throw(fmt.Errorf("error loading execution state sync state: %w", err))
-	}
-	close(e.statusLoaded)
+	close(e.bootstrapped)
+
+	<-e.eds.Ready()
 
 	// only run datastore check if enabled
 	if e.startupCheck {
@@ -224,29 +232,29 @@ func (e *executionDataRequesterImpl) finalizedBlockProcessor(ctx irrecoverable.S
 		if err != nil {
 			ctx.Throw(err)
 		}
-
-		// TODO: eventually we will want to add a check to remove orphaned CIDs from the datastore
 	}
+
+	ready()
 
 	// Start ingesting new finalized block notifications
 	e.finalizationProcessingLoop(ctx)
 }
 
 func (e *executionDataRequesterImpl) fetchRequestProcessor(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	<-e.bootstrapped
 	<-e.eds.Ready()
 	ready()
 
-	<-e.statusLoaded
 	e.fetchRequestProcessingLoop(ctx)
 }
 
 func (e *executionDataRequesterImpl) notificationProcessor(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	// the notifier will use the ExecutionDataService to fetch blocks that aren't in the cache,
 	// so it must be available
+	<-e.bootstrapped
 	<-e.eds.Ready()
 	ready()
 
-	<-e.statusLoaded
 	e.notificationProcessingLoop(ctx)
 }
 
@@ -544,21 +552,6 @@ func (e *executionDataRequesterImpl) notifyConsumers(executionData *state_synchr
 }
 
 // Bootstrap Methods
-
-func (e *executionDataRequesterImpl) loadSyncState(ctx irrecoverable.SignalerContext) error {
-	err := e.status.Load(ctx, e.rootBlockHeight)
-	if err != nil {
-		e.log.Error().Err(err).Msg("failed to load notification state. using defaults")
-	}
-
-	if e.status.Halted() {
-		return ErrRequesterHalted
-	}
-
-	e.log.Debug().Msgf("starting with LastReceived: %d", e.status.LastReceived())
-
-	return nil
-}
 
 func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerContext, lastReceivedHeight uint64) error {
 	// we're only interested in inspecting blobs that exist in our local db, so create an
