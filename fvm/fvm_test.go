@@ -3600,7 +3600,6 @@ func TestEnforcingComputationLimit(t *testing.T) {
 
 			err := vm.Run(ctx, tx, simpleView, programs.NewEmptyPrograms())
 			require.NoError(t, err)
-			fmt.Println(tx.Err)
 			require.Equal(t, test.expCompUsed, tx.ComputationUsed)
 			if test.ok {
 				require.NoError(t, tx.Err)
