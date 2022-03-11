@@ -5,7 +5,10 @@ package state_synchronization
 import (
 	context "context"
 
+	cid "github.com/ipfs/go-cid"
+
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	state_synchronization "github.com/onflow/flow-go/module/state_synchronization"
@@ -48,18 +51,29 @@ func (_m *ExecutionDataService) Add(ctx context.Context, sd *state_synchronizati
 	return r0, r1, r2
 }
 
-// Delete provides a mock function with given fields: ctx, rootID
-func (_m *ExecutionDataService) Delete(ctx context.Context, rootID flow.Identifier) error {
+// Check provides a mock function with given fields: ctx, rootID
+func (_m *ExecutionDataService) Check(ctx context.Context, rootID flow.Identifier) ([]cid.Cid, []error) {
 	ret := _m.Called(ctx, rootID)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) error); ok {
+	var r0 []cid.Cid
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) []cid.Cid); ok {
 		r0 = rf(ctx, rootID)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]cid.Cid)
+		}
 	}
 
-	return r0
+	var r1 []error
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) []error); ok {
+		r1 = rf(ctx, rootID)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]error)
+		}
+	}
+
+	return r0, r1
 }
 
 // Done provides a mock function with given fields:
@@ -89,27 +103,6 @@ func (_m *ExecutionDataService) Get(ctx context.Context, rootID flow.Identifier)
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*state_synchronization.ExecutionData)
 		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(ctx, rootID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Has provides a mock function with given fields: ctx, rootID
-func (_m *ExecutionDataService) Has(ctx context.Context, rootID flow.Identifier) (bool, error) {
-	ret := _m.Called(ctx, rootID)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) bool); ok {
-		r0 = rf(ctx, rootID)
-	} else {
-		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error

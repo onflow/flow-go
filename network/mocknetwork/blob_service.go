@@ -133,27 +133,6 @@ func (_m *BlobService) GetSession(ctx context.Context) network.BlobGetter {
 	return r0
 }
 
-// HasBlob provides a mock function with given fields: ctx, c
-func (_m *BlobService) HasBlob(ctx context.Context, c cid.Cid) (bool, error) {
-	ret := _m.Called(ctx, c)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(context.Context, cid.Cid) bool); ok {
-		r0 = rf(ctx, c)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, cid.Cid) error); ok {
-		r1 = rf(ctx, c)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Ready provides a mock function with given fields:
 func (_m *BlobService) Ready() <-chan struct{} {
 	ret := _m.Called()

@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/local"
+	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
@@ -39,15 +40,11 @@ const (
 	// data is refetched from disk.
 	executionDataCacheSize = 50
 
-	// Max number of block finalization notifications to enqueue. Dropped notifications are
-	// backfilled once a new finalized block notification is processed.
-	finalizationQueueLength = 2
-
 	// Note: this must be greater than fetchWorkers, otherwise the retry queue could overflow
 	// resulting in lost retry requests
-	fetchQueueLength = 500
+	fetchQueueLength = fetchWorkers * 2
 
-	// Max number of unsent notifications to allow before pausing new fetches. After exceeding this
+	// Max number of unsent notifications to allow before pausing new fetches. After exceeding this``
 	// limit, the requester will stop processing new finalized block notifications. This prevents
 	// unbounded memory use by the requester if it gets stuck fetching a specific height.
 	maxOutstandingNotifications = 5000
@@ -94,16 +91,16 @@ type executionDataRequesterImpl struct {
 	finalizedBlocks chan flow.Identifier
 
 	// fetchQueue accepts new fetch requests, which are consumed by a pool of fetch workers.
-	fetchRequests chan *BlockEntry
+	fetchRequests chan *status.BlockEntry
 
 	// fetchRetryQueue accepts fetch retry requests, which are also consumed by the same pool of
 	// fetch workers as fetchQueue, however fetchRetryQueue takes priority.
-	fetchRetryRequests chan *BlockEntry
+	fetchRetryRequests chan *status.BlockEntry
 
 	// Notifiers for queue consumers
 	notifications chan struct{}
 
-	status     *status
+	status     *status.Status
 	consumerMu sync.RWMutex
 
 	startupCheck bool
@@ -135,14 +132,16 @@ func NewExecutionDataRequester(
 		results:         results,
 		startupCheck:    startupCheck,
 		fetchTimeout:    fetchTimeout,
-		status: &status{
-			db:           datastore,
-			maxCacheSize: executionDataCacheSize,
-		},
+		status: status.New(
+			datastore,
+			log.With().Str("component", "requester_status").Logger(),
+			executionDataCacheSize,
+			maxOutstandingNotifications,
+		),
 
-		finalizedBlocks:    make(chan flow.Identifier, finalizationQueueLength),
-		fetchRequests:      make(chan *BlockEntry, fetchQueueLength),
-		fetchRetryRequests: make(chan *BlockEntry, fetchQueueLength),
+		finalizedBlocks:    make(chan flow.Identifier, 1),
+		fetchRequests:      make(chan *status.BlockEntry, fetchQueueLength),
+		fetchRetryRequests: make(chan *status.BlockEntry, fetchQueueLength),
 		notifications:      make(chan struct{}, fetchQueueLength),
 		statusLoaded:       make(chan struct{}),
 	}
@@ -181,6 +180,12 @@ func (e *executionDataRequesterImpl) OnBlockFinalized(blockID flow.Identifier) {
 		return
 	}
 
+	// limit how far ahead of the notifications we're allowed to get
+	if e.status.IsPaused() {
+		logger.Debug().Msg("ignoring finalized block. requester is paused")
+		return
+	}
+
 	logger.Debug().Msg("received finalized block notification")
 
 	select {
@@ -213,7 +218,7 @@ func (e *executionDataRequesterImpl) finalizedBlockProcessor(ctx irrecoverable.S
 
 	// only run datastore check if enabled
 	if e.startupCheck {
-		err = e.checkDatastore(ctx, e.status.LastReceived)
+		err = e.checkDatastore(ctx, e.status.LastReceived())
 
 		// Any error should crash the component
 		if err != nil {
@@ -258,10 +263,7 @@ func (e *executionDataRequesterImpl) finalizationProcessingLoop(ctx irrecoverabl
 		case <-ctx.Done():
 			return
 		case blockID := <-e.finalizedBlocks:
-			// limit
-			if len(*e.status.heap) < maxOutstandingNotifications {
-				e.processFinalizedBlock(ctx, blockID)
-			}
+			e.processFinalizedBlock(ctx, blockID)
 		}
 	}
 }
@@ -274,17 +276,21 @@ func (e *executionDataRequesterImpl) processFinalizedBlock(ctx irrecoverable.Sig
 		ctx.Throw(fmt.Errorf("failed to lookup finalized block %s in protocol state db: %w", blockID, err))
 	}
 
-	logger := e.log.With().Str("finalized_block_id", block.ID().String()).Logger()
-
 	// loop through all finalized blocks since the last processed block, and extract all seals
-	lastHeight := e.status.lastProcessed
+	lastHeight := e.status.LastProcessed()
 
+	logger := e.log.With().Str("finalized_block_id", blockID.String()).Logger()
 	logger.Debug().
 		Uint64("start_height", lastHeight+1).
 		Uint64("end_height", block.Header.Height).
 		Msg("checking for seals")
 
 	for height := lastHeight + 1; height <= block.Header.Height; height++ {
+		if e.status.IsPaused() {
+			logger.Debug().Uint64("height", height).Msg("pausing seal processing until workers catch up")
+			break
+		}
+
 		logger.Debug().Uint64("height", height).Msg("processing height")
 		err := e.processSealsFromHeight(ctx, height)
 
@@ -292,7 +298,7 @@ func (e *executionDataRequesterImpl) processFinalizedBlock(ctx irrecoverable.Sig
 			ctx.Throw(fmt.Errorf("failed to process seals from height %d: %w", height, err))
 		}
 
-		e.status.lastProcessed = height
+		e.status.Processed(height)
 	}
 
 	logger.Debug().Msg("done processing")
@@ -342,8 +348,8 @@ func (e *executionDataRequesterImpl) processSealsFromHeight(ctx irrecoverable.Si
 	return nil
 }
 
-func (e *executionDataRequesterImpl) requestsFromSeals(seals []*flow.Seal) ([]*BlockEntry, error) {
-	requests := []*BlockEntry{}
+func (e *executionDataRequesterImpl) requestsFromSeals(seals []*flow.Seal) ([]*status.BlockEntry, error) {
+	requests := []*status.BlockEntry{}
 
 	for _, seal := range seals {
 		sealedBlock, err := e.blocks.ByID(seal.BlockID)
@@ -352,7 +358,7 @@ func (e *executionDataRequesterImpl) requestsFromSeals(seals []*flow.Seal) ([]*B
 			return nil, fmt.Errorf("failed to lookup sealed block in protocol state db: %w", err)
 		}
 
-		requests = append(requests, &BlockEntry{
+		requests = append(requests, &status.BlockEntry{
 			BlockID: seal.BlockID,
 			Height:  sealedBlock.Header.Height,
 		})
@@ -386,12 +392,10 @@ func (e *executionDataRequesterImpl) fetchRequestProcessingLoop(ctx irrecoverabl
 	}
 }
 
-func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.SignalerContext, request *BlockEntry) {
+func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.SignalerContext, request *status.BlockEntry) {
 	logger := e.log.With().Str("block_id", request.BlockID.String()).Logger()
-
 	logger.Debug().Msgf("processing fetch request for block %d", request.Height)
 
-	// The ExecutionResult contains the root CID for the block's execution data
 	result, err := e.results.ByBlockID(request.BlockID)
 
 	// By the time the block is sealed, the ExecutionResult must be in the db
@@ -414,24 +418,34 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 		ctx.Throw(ErrRequesterHalted)
 	}
 
-	// TODO: check for badger errors (and crash)
-
-	// for everything else, refetch
-	if err != nil {
+	// Some or all of the blob was missing or corrupt. retry
+	if isBlobNotFoundError(err) {
 		logger.Error().Err(err).Msg("failed to get execution data for block")
 
 		select {
 		case e.fetchRetryRequests <- request:
 		default:
-			// Since the retry queue is always checked first, there can be at most fetchWorkers + 1
-			// outstanding retry requests. In practice, this can only happen if the retry channel's
-			// buffer size is misconfigured.
+			// We can't block here otherwise we risk a deadlock. However, since the retry queue is
+			// always checked first, there can be at most fetchWorkers outstanding retry requests.
+			// In practice, this situation can only happen if the retry channel's buffer size is
+			// misconfigured.
 			logger.Error().
 				Str("execution_data_id", result.ExecutionDataID.String()).
 				Msg("fetch retry queue is full")
+			// TODO: add metric
 		}
 		return
 	}
+
+	// Any other error is unexpected
+	if err != nil {
+		logger.Error().Err(err).
+			Str("execution_data_id", result.ExecutionDataID.String()).
+			Msg("unexpected error fetching execution data")
+
+		ctx.Throw(err)
+	}
+
 	logger.Debug().Msgf("Fetched execution data for block %d", request.Height)
 
 	request.ExecutionData = executionData
@@ -461,7 +475,7 @@ func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverabl
 	_, _, err = e.eds.Add(signalerCtx, executionData)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to writing execution data to blobstore: %w", err)
+		return nil, fmt.Errorf("failed to write execution data to blobstore: %w", err)
 	}
 
 	return executionData, nil
@@ -491,7 +505,7 @@ func (e *executionDataRequesterImpl) sendNotifications(ctx irrecoverable.Signale
 
 		// we haven't finished fetching the next block to notify
 		if !ok {
-			e.log.Debug().Msgf("waiting to notify for block %d", entry.Height)
+			e.log.Debug().Msgf("waiting to notify for block %d", e.status.NextNotificationHeight())
 			return
 		}
 
@@ -532,24 +546,16 @@ func (e *executionDataRequesterImpl) notifyConsumers(executionData *state_synchr
 // Bootstrap Methods
 
 func (e *executionDataRequesterImpl) loadSyncState(ctx irrecoverable.SignalerContext) error {
-	err := e.status.Load(ctx)
+	err := e.status.Load(ctx, e.rootBlockHeight)
 	if err != nil {
-		e.log.Error().Err(err).Msg("failed to load notification state. using default")
+		e.log.Error().Err(err).Msg("failed to load notification state. using defaults")
 	}
 
-	if e.status.Halted {
+	if e.status.Halted() {
 		return ErrRequesterHalted
 	}
 
-	// defaults to the start block when booting with a fresh db
-	if e.status.LastReceived == 0 {
-		e.status.LastReceived = e.rootBlockHeight
-		e.log.Debug().Msgf("setting LastReceived to root block height: %d", e.status.LastReceived)
-	}
-
-	// notifications restart after a fresh boot
-	e.status.lastNotified = e.status.LastReceived
-	e.status.lastProcessed = e.status.LastReceived
+	e.log.Debug().Msgf("starting with LastReceived: %d", e.status.LastReceived())
 
 	return nil
 }
@@ -602,7 +608,7 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 
 		if !exists {
 			// block until fetch is accepted
-			e.fetchRequests <- &BlockEntry{
+			e.fetchRequests <- &status.BlockEntry{
 				BlockID: block.ID(),
 				Height:  height,
 			}
@@ -659,8 +665,10 @@ func (e *executionDataRequesterImpl) checkExecutionData(ctx irrecoverable.Signal
 	return missing, errs.ErrorOrNil()
 }
 
+// localExecutionDataService returns an ExecutionDataService that's configured to use only the local
+// datastore, and to rehash blobs on read. This is used to check the validity of blobs that exist in
+// the local db.
 func (e *executionDataRequesterImpl) localExecutionDataService(ctx irrecoverable.SignalerContext) (state_synchronization.ExecutionDataService, error) {
-	// start the blob service configured to rehash blobs on read
 	blobService := local.NewBlobService(e.ds, local.WithHashOnRead(true))
 	blobService.Start(ctx)
 
@@ -687,6 +695,11 @@ func isInvalidBlobError(err error) bool {
 	return errors.As(err, &malformedDataError) ||
 		errors.As(err, &blobSizeLimitExceededError) ||
 		errors.Is(err, state_synchronization.ErrBlobTreeDepthExceeded)
+}
+
+func isBlobNotFoundError(err error) bool {
+	var blobNotFoundError *state_synchronization.BlobNotFoundError
+	return errors.As(err, &blobNotFoundError)
 }
 
 // [ ] Add metrics
