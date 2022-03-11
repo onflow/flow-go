@@ -2,9 +2,11 @@ package reporters_test
 
 import (
 	"math"
+	"math/big"
 	"testing"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
@@ -60,5 +62,5 @@ func TestLookupValues(t *testing.T) {
 
 	stored, err := bp.ReadStored(address1, common.PathDomainStorage, "Foo")
 	require.NoError(t, err)
-	require.Equal(t, one, stored)
+	require.Equal(t, stored, cadence.Int{Value: big.NewInt(1)})
 }
