@@ -192,6 +192,8 @@ func (w *DiskWAL) replay(
 			// it allows us to load less segments.
 			latestCheckpoint := availableCheckpoints[len(availableCheckpoints)-1]
 
+			w.log.Info().Int("checkpoint", latestCheckpoint).Msg("loading checkpoint")
+
 			forestSequencing, err := checkpointer.LoadCheckpoint(latestCheckpoint)
 			if err != nil {
 				w.log.Warn().Int("checkpoint", latestCheckpoint).Err(err).
@@ -200,8 +202,9 @@ func (w *DiskWAL) replay(
 				availableCheckpoints = availableCheckpoints[:len(availableCheckpoints)-1]
 				continue
 			}
-			w.log.Info().Int("checkpoint", latestCheckpoint).
-				Msg("checkpoint loaded")
+
+			w.log.Info().Int("checkpoint", latestCheckpoint).Msg("checkpoint loaded")
+
 			err = checkpointFn(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("error while handling checkpoint: %w", err)
@@ -236,7 +239,7 @@ func (w *DiskWAL) replay(
 		}
 	}
 
-	w.log.Debug().Msgf("replying segments from %d to %d", startSegment, to)
+	w.log.Info().Msgf("replaying segments from %d to %d", startSegment, to)
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),

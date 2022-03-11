@@ -22,6 +22,8 @@ type Config struct {
 	MaxTransactionByteSize uint64
 	// maximum collection byte size, it acts as hard limit max for the tx size.
 	MaxCollectionByteSize uint64
+	// maximum number of un-processed transaction messages to hold in the queue.
+	MaxMessageQueueSize uint
 }
 
 func DefaultConfig() Config {
@@ -33,5 +35,6 @@ func DefaultConfig() Config {
 		CheckScriptsParse:      true,
 		MaxAddressIndex:        flow.DefaultMaxAddressIndex,
 		PropagationRedundancy:  2,
+		MaxMessageQueueSize:    10_000,
 	}
 }
