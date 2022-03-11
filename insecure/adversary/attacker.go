@@ -22,7 +22,7 @@ const networkingProtocolTCP = "tcp"
 // Attacker implements the adversarial domain that is orchestrating an attack through corrupted nodes.
 type Attacker struct {
 	component.Component
-	address      string
+	address      net.Addr
 	server       *grpc.Server
 	logger       zerolog.Logger
 	orchestrator insecure.AttackOrchestrator
@@ -35,7 +35,6 @@ func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orc
 		orchestrator: orchestrator,
 		logger:       logger,
 		codec:        codec,
-		address:      address,
 	}
 
 	// setting lifecycle management module.
@@ -44,11 +43,12 @@ func NewAttacker(logger zerolog.Logger, address string, codec network.Codec, orc
 			// starts up gRPC server of attacker at given address.
 			s := grpc.NewServer()
 			insecure.RegisterAttackerServer(s, attacker)
-			ln, err := net.Listen(networkingProtocolTCP, attacker.address)
+			ln, err := net.Listen(networkingProtocolTCP, address)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
 			}
 			attacker.server = s
+			attacker.address = ln.Addr()
 
 			wg := sync.WaitGroup{}
 			wg.Add(1)
@@ -86,6 +86,10 @@ func (a *Attacker) start(ctx irrecoverable.SignalerContext) {
 // Stop stops the sub-modules of attacker.
 func (a *Attacker) Stop() {
 	a.server.Stop()
+}
+
+func (a Attacker) Address() net.Addr {
+	return a.address
 }
 
 // Observe implements the gRPC interface of attacker that is exposed to the corrupted conduits.

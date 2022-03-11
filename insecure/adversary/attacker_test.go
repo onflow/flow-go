@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -23,8 +24,6 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-const attackerAddress = "localhost:8000"
 
 func TestAttackerObserve_SingleMessage(t *testing.T) {
 	testAttackerObserve(t, 1)
@@ -138,7 +137,7 @@ func withAttackerClient(
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+		gRpcClient, err := grpc.Dial(attacker.Address().String(), grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 		require.NoError(t, err)
 
 		client := insecure.NewAttackerClient(gRpcClient)
@@ -158,7 +157,7 @@ func withAttacker(t *testing.T, run func(t *testing.T, attacker *adversary.Attac
 	// mocks start up of orchestrator
 	orchestrator.On("Start", mock.AnythingOfType("*irrecoverable.signalerCtx")).Return().Once()
 
-	attacker, err := adversary.NewAttacker(unittest.Logger(), attackerAddress, codec, orchestrator)
+	attacker, err := adversary.NewAttacker(unittest.Logger(), "localhost:0", codec, orchestrator)
 	require.NoError(t, err)
 
 	// life-cycle management of attacker.
@@ -176,6 +175,10 @@ func withAttacker(t *testing.T, run func(t *testing.T, attacker *adversary.Attac
 	// starts attacker
 	attacker.Start(attackCtx)
 	unittest.RequireCloseBefore(t, attacker.Ready(), 1*time.Second, "could not start attacker on time")
+
+	assert.Eventually(t, func() bool {
+		return attacker.Address() != nil
+	}, 5*time.Second, 10*time.Millisecond)
 
 	run(t, attacker, orchestrator)
 
