@@ -431,19 +431,18 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 	return uuid, err
 }
 
-func (e *ScriptEnv) GetComputationLimit() uint64 {
-	return uint64(e.sth.State().TotalComputationLimit())
-}
-
-func (e *ScriptEnv) SetComputationUsed(used uint64) error {
-	// TODO update this interface with the proper cadence ones
+func (e *ScriptEnv) meterComputation(kind, intensity uint) error {
 	if e.sth.EnforceComputationLimits() {
-		return e.sth.State().MeterComputation(1, uint(used))
+		return e.sth.State().MeterComputation(kind, intensity)
 	}
 	return nil
 }
 
-func (e *ScriptEnv) GetComputationUsed() uint64 {
+func (e *ScriptEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
+	return e.meterComputation(uint(kind), intensity)
+}
+
+func (e *ScriptEnv) ComputationUsed() uint64 {
 	return uint64(e.sth.State().TotalComputationUsed())
 }
 

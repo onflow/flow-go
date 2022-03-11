@@ -225,7 +225,6 @@ func (i *TransactionInvoker) Process(
 
 	// if tx failed this will only contain fee deduction logs and computation
 	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as

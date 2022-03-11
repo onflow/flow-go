@@ -1,6 +1,8 @@
 package basic
 
 import (
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	interfaceMeter "github.com/onflow/flow-go/fvm/meter"
 )
@@ -49,9 +51,18 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit
 func (m *Meter) MeterComputation(kind uint, intensity uint) error {
-	m.computationUsed += intensity
-	if m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(uint64(m.computationLimit))
+	var meterable bool
+	switch common.ComputationKind(kind) {
+	case common.ComputationKindStatement,
+		common.ComputationKindLoop,
+		common.ComputationKindFunctionInvocation:
+		meterable = true
+	}
+	if meterable {
+		m.computationUsed += intensity
+		if m.computationUsed > m.computationLimit {
+			return errors.NewComputationLimitExceededError(uint64(m.computationLimit))
+		}
 	}
 	return nil
 }

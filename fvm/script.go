@@ -116,6 +116,6 @@ func (i ScriptInvoker) Process(
 	proc.Value = value
 	proc.Logs = env.Logs()
 	proc.Events = env.Events()
-	proc.GasUsed = env.GetComputationUsed()
+	proc.GasUsed = env.ComputationUsed()
 	return nil
 }
