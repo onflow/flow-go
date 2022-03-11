@@ -458,7 +458,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	}
 
 	builder.RestartableComponent("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		edr, err := edrequester.NewExecutionDataRequester(
+		edr, err := edrequester.New(
 			builder.Logger,
 			metrics.NewNoopCollector(),
 			dstore,

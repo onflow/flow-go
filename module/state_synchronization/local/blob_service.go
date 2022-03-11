@@ -18,17 +18,14 @@ type blobService struct {
 	component.Component
 	blockService blockservice.BlockService
 	blockStore   blockstore.Blockstore
-	config       BlobServiceConfig
 }
 
 var _ network.BlobService = (*blobService)(nil)
 var _ component.Component = (*blobService)(nil)
 
-type BlobServiceConfig struct {
-	HashOnRead bool
-}
-
-// WithReprovideInterval sets the interval at which DHT provider entries are refreshed
+// WithHashOnRead sets whether or not the blobstore will rehash the blob data on read
+// When set, calls to GetBlob will fail with an error if the hash of the data in storage does not
+// match its CID
 func WithHashOnRead(enabled bool) network.BlobServiceOption {
 	return func(bs network.BlobService) {
 		bs.(*blobService).blockStore.HashOnRead(enabled)
