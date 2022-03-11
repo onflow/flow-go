@@ -38,7 +38,7 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo, se
 
 	// in place sort to order the assignment in canonical order
 	for _, assignment := range assignments {
-		assignment.Sort(order.Canonical)
+		flow.IdentifierList(assignment).Sort(order.IdentifierCanonical)
 	}
 
 	collectors := append(partners, internals...)
