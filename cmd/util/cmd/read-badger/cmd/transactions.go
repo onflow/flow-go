@@ -70,6 +70,8 @@ var transactionsDuplicateCmd = &cobra.Command{
 		// txID -> list of blocks
 		megaMap := map[flow.Identifier]map[flow.Identifier]struct{}{}
 
+		missingHeights := map[uint64]struct{}{}
+
 		blockNo := 0
 		totalTxs := 0
 
@@ -105,6 +107,8 @@ var transactionsDuplicateCmd = &cobra.Command{
 			if err != nil {
 				panic(fmt.Sprintf("header %s if here but not block", blockID.String()))
 			}
+
+			missingHeights[block.Header.Height] = struct{}{}
 
 			txIndex := uint32(0)
 			for i, guarantee := range block.Payload.Guarantees {
@@ -158,11 +162,13 @@ var transactionsDuplicateCmd = &cobra.Command{
 									panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
 								}
 							}
+							delete(missingHeights, block.Header.Height) // assume existing entries means whole block is mapped for a height
 							indexNewEntries++
 						} else {
 							panic(fmt.Sprintf("error while querying transaction result by (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
 						}
 					} else {
+						delete(missingHeights, block.Header.Height) // assume existing entries means whole block is mapped for a height
 						indexExistingEntries++
 					}
 
@@ -190,6 +196,12 @@ var transactionsDuplicateCmd = &cobra.Command{
 		err = batch.Flush()
 		if err != nil {
 			log.Error().Err(err).Msg("cannot flush write batch")
+		}
+
+		if len(missingHeights) > 0 {
+			log.Info().Int("missing_heights_count", len(missingHeights)).Msg("missing block heights")
+		} else {
+			log.Info().Msg("all heights mapped")
 		}
 
 		log.Info().Int("existing_entries", indexExistingEntries).Int("new_entries", indexNewEntries).Msg("index fixed")
