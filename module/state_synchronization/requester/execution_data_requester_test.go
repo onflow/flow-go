@@ -2,7 +2,6 @@ package requester
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -388,6 +387,9 @@ func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServ
 		},
 	)
 
+	eds.On("Add", mock.Anything, mock.AnythingOfType("*state_synchronization.ExecutionData")).
+		Return(flow.ZeroID, nil, nil)
+
 	eds.On("Has", mock.Anything, mock.AnythingOfType("flow.Identifier")).Return(
 		func(ctx context.Context, id flow.Identifier) bool {
 			if ed, _ := get(ctx, id); ed != nil {
@@ -520,11 +522,11 @@ func TestRequestBlocksWithSomeMissed(t *testing.T) {
 		failures := rand.Intn(10)
 		attempts := 0
 		missing[i] = func(ed *state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error) {
-			if attempts < failures*2 { // this func is run twice for every attempt by the mock (once for ExecutionData one for errors)
+			if attempts < failures { // this func is run twice for every attempt by the mock (once for ExecutionData one for errors)
 				attempts++
 				// This should fail the first n fetch attempts
 				time.Sleep(time.Duration(rand.Intn(25)) * time.Millisecond)
-				return nil, errors.New("simulating fetch error")
+				return nil, &state_synchronization.BlobNotFoundError{}
 			}
 			return ed, nil
 		}
