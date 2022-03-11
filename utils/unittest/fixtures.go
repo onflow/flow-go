@@ -1732,8 +1732,10 @@ func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCom
 
 func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.EpochCommit) {
 	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(assignments))
-	for range assignments {
-		qcs = append(qcs, QuorumCertificateWithSignerIDsFixture())
+	for _, assignment := range assignments {
+		qcWithSignerIndex := QuorumCertificateWithSignerIDsFixture()
+		qcWithSignerIndex.SignerIDs = assignment
+		qcs = append(qcs, qcWithSignerIndex)
 	}
 	return func(commit *flow.EpochCommit) {
 		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)
