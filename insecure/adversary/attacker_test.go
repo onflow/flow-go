@@ -1,6 +1,7 @@
 package adversary_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -38,7 +39,7 @@ func TestAttackerObserve_MultipleConcurrentMessages(t *testing.T) {
 // decodes the messages into events and relays them to its registered orchestrator.
 func testAttackerObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	messages, events, identities := messageFixtures(t, cbor.NewCodec(), concurrencyDegree)
+	messages, events, identities := messageFixtures(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
 	withAttackerClient(
 		t,
@@ -72,12 +73,23 @@ func testAttackerObserve(t *testing.T, concurrencyDegree int) {
 // messageFixture creates and returns a randomly generated gRPC message that is sent between a corruptible conduit and the attacker.
 // It also generates and returns the corresponding application-layer event of that message, which is sent between the attacker and the
 // orchestrator.
-func messageFixture(t *testing.T, codec network.Codec) (*insecure.Message, *insecure.Event, *flow.Identity) {
+func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protocol) (*insecure.Message, *insecure.Event, *flow.Identity) {
 	// fixture for content of message
 	originId := unittest.IdentifierFixture()
-	targetIds := unittest.IdentifierListFixture(10)
-	targets := uint32(3)
-	protocol := insecure.Protocol_MULTICAST
+
+	var targetIds flow.IdentifierList
+	targets := uint32(0)
+
+	if protocol == insecure.Protocol_UNICAST {
+		targetIds = unittest.IdentifierListFixture(1)
+	} else {
+		targetIds = unittest.IdentifierListFixture(10)
+	}
+
+	if protocol == insecure.Protocol_MULTICAST {
+		targets = uint32(3)
+	}
+
 	channel := network.Channel("test-channel")
 	content := &message.TestMessage{
 		Text: fmt.Sprintf("this is a test message: %d", rand.Int()),
@@ -114,13 +126,14 @@ func messageFixture(t *testing.T, codec network.Codec) (*insecure.Message, *inse
 // messageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
 // The messages are sent between a corruptible conduit and the attacker.
 // The events are the corresponding protocol-level representation of messages.
-func messageFixtures(t *testing.T, codec network.Codec, count int) ([]*insecure.Message, []*insecure.Event, flow.IdentityList) {
+func messageFixtures(t *testing.T, codec network.Codec, protocol insecure.Protocol, count int) ([]*insecure.Message, []*insecure.Event,
+	flow.IdentityList) {
 	msgs := make([]*insecure.Message, count)
 	events := make([]*insecure.Event, count)
 	identities := flow.IdentityList{}
 
 	for i := 0; i < count; i++ {
-		m, e, id := messageFixture(t, codec)
+		m, e, id := messageFixture(t, codec, protocol)
 
 		msgs[i] = m
 		events[i] = e
@@ -140,26 +153,108 @@ func withAttackerClient(
 	corruptedIds flow.IdentityList,
 	run func(*testing.T, *mockinsecure.AttackOrchestrator, insecure.Attacker_ObserveClient)) {
 
-	withAttacker(t, corruptedIds, func(t *testing.T, attacker *adversary.Attacker, orchestrator *mockinsecure.AttackOrchestrator) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	withAttacker(t, corruptedIds,
+		func(
+			t *testing.T,
+			attacker *adversary.Attacker,
+			_ map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
+			orchestrator *mockinsecure.AttackOrchestrator) {
 
-		gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
-		require.NoError(t, err)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-		client := insecure.NewAttackerClient(gRpcClient)
-		clientStream, err := client.Observe(ctx)
-		require.NoError(t, err)
+			gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+			require.NoError(t, err)
 
-		// creates fixtures and runs the scenario
-		run(t, orchestrator, clientStream)
-	})
+			client := insecure.NewAttackerClient(gRpcClient)
+			clientStream, err := client.Observe(ctx)
+			require.NoError(t, err)
+
+			// creates fixtures and runs the scenario
+			run(t, orchestrator, clientStream)
+		})
+}
+
+func TestAttackNetworkUnicast_SingleMessage(t *testing.T) {
+	testAttackNetworkUnicast(t, 1)
+}
+
+func testAttackNetworkUnicast(t *testing.T, concurrencyDegree int) {
+	// creates event fixtures and their corresponding messages.
+	_, events, corruptedIds := messageFixtures(t, cbor.NewCodec(), insecure.Protocol_UNICAST, concurrencyDegree)
+
+	withAttacker(t,
+		corruptedIds,
+		func(t *testing.T,
+			attacker *adversary.Attacker,
+			connections map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
+			_ *mockinsecure.AttackOrchestrator) {
+
+			connectionRcvWG := &sync.WaitGroup{}
+			connectionRcvWG.Add(concurrencyDegree)
+
+			for _, corruptedId := range corruptedIds {
+				corruptedId := corruptedId
+				connection, ok := connections[corruptedId.NodeID]
+				require.True(t, ok)
+
+				connection.On("SendMessage", mock.Anything).Run(func(args mock.Arguments) {
+					msg, ok := args[0].(*insecure.Message)
+					require.True(t, ok)
+
+					matchEventForMessage(t, events, msg)
+
+					connectionRcvWG.Done()
+				}).Return(nil)
+			}
+
+			attackerSendWG := &sync.WaitGroup{}
+			attackerSendWG.Add(concurrencyDegree)
+
+			for _, event := range events {
+				event := event
+				go func() {
+					err := attacker.RpcUnicastOnChannel(event.CorruptedId, event.Channel, event.Content, event.TargetIds[0])
+					require.NoError(t, err)
+
+					attackerSendWG.Done()
+				}()
+			}
+
+			// all events should be sent to attacker in a timely fashion.
+			unittest.RequireReturnsBefore(t, attackerSendWG.Wait, 1*time.Second, "could not send all events to attacker on time")
+			// all events should be relayed to the connections by the attacker in a timely fashion.
+			unittest.RequireReturnsBefore(t, connectionRcvWG.Wait, 1*time.Second, "connections could not receive messages on time")
+		})
+}
+
+func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message) {
+	codec := cbor.NewCodec()
+
+	for _, event := range events {
+		if bytes.Equal(event.CorruptedId[:], message.OriginID) {
+			require.Equal(t, event.Channel.String(), message.ChannelID)
+			require.Equal(t, event.Protocol, message.Protocol)
+			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.TargetIDs)
+			require.Equal(t, event.TargetNum, message.Targets)
+
+			content, err := codec.Decode(message.Payload)
+			require.NoError(t, err)
+
+			require.Equal(t, event.Content, content)
+
+			return
+		}
+	}
+
+	require.Fail(t, fmt.Sprintf("could not find any matching event for the message: %v", message))
 }
 
 // withAttacker creates an attacker with a mock orchestrator.
 // It then starts the attacker, executes the given run function on the attacker and its orchestrator, and finally terminates the attacker.
-func withAttacker(t *testing.T, corruptedIds flow.IdentityList, run func(t *testing.T, attacker *adversary.Attacker,
-	orchestrator *mockinsecure.AttackOrchestrator)) {
+func withAttacker(t *testing.T,
+	corruptedIds flow.IdentityList,
+	run func(*testing.T, *adversary.Attacker, map[flow.Identifier]*mockinsecure.CorruptedNodeConnection, *mockinsecure.AttackOrchestrator)) {
 	codec := cbor.NewCodec()
 	orchestrator := &mockinsecure.AttackOrchestrator{}
 	connector := &mockinsecure.CorruptedNodeConnector{}
@@ -181,14 +276,13 @@ func withAttacker(t *testing.T, corruptedIds flow.IdentityList, run func(t *test
 
 	// mocks registering attacker as the attack network functionality for orchestrator.
 	orchestrator.On("WithAttackNetwork", attacker).Return().Once()
-	// TODO: start here and implement withAttackNetwork
-	mockConnectorForConnect(t, connector, corruptedIds)
+	connections := mockConnectorForConnect(t, connector, corruptedIds)
 
 	// starts attacker
 	attacker.Start(attackCtx)
 	unittest.RequireCloseBefore(t, attacker.Ready(), 1*time.Second, "could not start attacker on time")
 
-	run(t, attacker, orchestrator)
+	run(t, attacker, connections, orchestrator)
 
 	// terminates attacker
 	cancel()
