@@ -176,12 +176,32 @@ func withAttackerClient(
 }
 
 func TestAttackNetworkUnicast_SingleMessage(t *testing.T) {
-	testAttackNetworkUnicast(t, 1)
+	testAttackNetwork(t, insecure.Protocol_UNICAST, 1)
 }
 
-func testAttackNetworkUnicast(t *testing.T, concurrencyDegree int) {
+func TestAttackNetworkUnicast_ConcurrentMessages(t *testing.T) {
+	testAttackNetwork(t, insecure.Protocol_UNICAST, 10)
+}
+
+func TestAttackNetworkMulticast_SingleMessage(t *testing.T) {
+	testAttackNetwork(t, insecure.Protocol_MULTICAST, 1)
+}
+
+func TestAttackNetworkMulticast_ConcurrentMessages(t *testing.T) {
+	testAttackNetwork(t, insecure.Protocol_MULTICAST, 10)
+}
+
+func TestAttackNetworkPublish_SingleMessage(t *testing.T) {
+	testAttackNetwork(t, insecure.Protocol_PUBLISH, 1)
+}
+
+func TestAttackNetworkPublish_ConcurrentMessages(t *testing.T) {
+	testAttackNetwork(t, insecure.Protocol_PUBLISH, 10)
+}
+
+func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	_, events, corruptedIds := messageFixtures(t, cbor.NewCodec(), insecure.Protocol_UNICAST, concurrencyDegree)
+	_, events, corruptedIds := messageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
 
 	withAttacker(t,
 		corruptedIds,
@@ -214,9 +234,18 @@ func testAttackNetworkUnicast(t *testing.T, concurrencyDegree int) {
 			for _, event := range events {
 				event := event
 				go func() {
-					err := attacker.RpcUnicastOnChannel(event.CorruptedId, event.Channel, event.Content, event.TargetIds[0])
-					require.NoError(t, err)
+					var err error
 
+					switch protocol {
+					case insecure.Protocol_UNICAST:
+						err = attacker.RpcUnicastOnChannel(event.CorruptedId, event.Channel, event.Content, event.TargetIds[0])
+					case insecure.Protocol_MULTICAST:
+						err = attacker.RpcMulticastOnChannel(event.CorruptedId, event.Channel, event.Content, event.TargetNum, event.TargetIds...)
+					case insecure.Protocol_PUBLISH:
+						err = attacker.RpcPublishOnChannel(event.CorruptedId, event.Channel, event.Content, event.TargetIds...)
+					}
+
+					require.NoError(t, err)
 					attackerSendWG.Done()
 				}()
 			}
