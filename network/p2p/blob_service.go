@@ -137,10 +137,6 @@ func (bs *blobService) GetSession(ctx context.Context) network.BlobGetter {
 	return &blobServiceSession{blockservice.NewSession(ctx, bs.blockService)}
 }
 
-func (bs *blobService) HasBlob(ctx context.Context, c cid.Cid) (bool, error) {
-	return bs.blockStore.Has(ctx, c)
-}
-
 type blobServiceSession struct {
 	session *blockservice.Session
 }

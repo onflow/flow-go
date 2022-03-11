@@ -31,7 +31,7 @@ func Example() {
 	// handling behaviors, e.g. restarting the component, firing an alert to pagerduty, etc ...
 	// the shutdown of the component is handled for you by RunComponent, but you may consider
 	// performing additional cleanup here
-	onError := func(ctx context.Context, err error) component.ErrorHandlingResult {
+	onError := func(err error) component.ErrorHandlingResult {
 		// check the error type to decide whether to restart or shutdown
 		if errors.Is(err, ErrTriggerRestart) {
 			fmt.Printf("Restarting component after fatal error: %v\n", err)

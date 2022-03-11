@@ -9,11 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ipfs/go-datastore"
+	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -31,10 +34,12 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/component"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -44,6 +49,7 @@ import (
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
@@ -393,6 +399,86 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder
 		buildFollowerEngine().
 		buildFinalizedHeader().
 		buildSyncEngine()
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
+	var dstore datastore.Batching
+	var blobservice network.BlobService
+
+	builder.Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		err := os.MkdirAll(builder.executionDataDir, 0700)
+		if err != nil {
+			return nil, err
+		}
+
+		dstore, err := badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
+		if err != nil {
+			return nil, err
+		}
+
+		builder.ShutdownFunc(func() error {
+			if err := dstore.Close(); err != nil {
+				return fmt.Errorf("could not close execution data datastore: %w", err)
+			}
+			return nil
+		})
+
+		blobservice, err := node.Network.RegisterBlobService(engine.ExecutionDataService, dstore)
+		if err != nil {
+			return nil, err
+		}
+
+		eds := state_synchronization.NewExecutionDataService(
+			new(cbor.Codec),
+			compressor.NewLz4Compressor(),
+			blobservice,
+			metrics.NewExecutionDataServiceCollector(),
+			builder.Logger,
+		)
+
+		builder.ExecutionDataService = eds
+
+		return builder.ExecutionDataService, nil
+	})
+
+	errorHander := func(err error) component.ErrorHandlingResult {
+		if errors.Is(err, edrequester.ErrRequesterHalted) {
+			// the requester is halted and should remain disabled, but the node can continue
+			// to operate safely. after the node starts back up, it will detect that it was
+			// previously halted and won't start.
+			return component.ErrorHandlingRestart
+		}
+
+		// all other errors are unhandled
+		return component.ErrorHandlingStop
+	}
+
+	builder.RestartableComponent("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		edr, err := edrequester.NewExecutionDataRequester(
+			builder.Logger,
+			metrics.NewNoopCollector(),
+			dstore,
+			blobservice,
+			builder.ExecutionDataService,
+			builder.RootBlock.Header.Height, // TODO: make configurable, will require validation to ensure it's within the current spork's window
+			builder.Storage.Blocks,
+			builder.Storage.Results,
+			builder.executionDataFetchTimeout,
+			builder.executionDataCheckEnabled,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("could not create execution data requester: %w", err)
+		}
+
+		builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
+
+		builder.ExecutionDataRequester = edr
+
+		return builder.ExecutionDataRequester, nil
+	}, errorHander)
 
 	return builder
 }

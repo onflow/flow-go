@@ -32,6 +32,9 @@ type status struct {
 	// the entire datastore.
 	Halted bool
 
+	// Maximum number of blocks within the notification heap that can have ExecutionData
+	maxCacheSize uint64
+
 	heap *NotificationHeap
 
 	mu sync.RWMutex
@@ -86,14 +89,14 @@ func (s *status) NextNotification() (*BlockEntry, bool) {
 		return &BlockEntry{Height: next}, false
 	}
 
-	// special case for block height 0
+	// Special case for block height 0 to distinguish between an unset uint64 and 0
 	if !s.firstNotificationSent && s.lastNotified == 0 {
 		next = 0
 	}
 
 	entry := s.heap.PeekMin()
 
-	if entry.Height != next {
+	if entry == nil || entry.Height != next {
 		return &BlockEntry{Height: next}, false
 	}
 
@@ -108,11 +111,18 @@ func (s *status) NextNotification() (*BlockEntry, bool) {
 func (s *status) Fetched(ctx context.Context, entry *BlockEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	defer s.save(ctx)
+
+	// Enforce a maximum possible cache size. The cache will be effective under normal operation.
+	// However, if the requester gets stuck on a block for more than maxCacheSize blocks, the cache
+	// will be empty.
+	if entry.Height > (s.lastNotified + s.maxCacheSize) {
+		entry.ExecutionData = nil
+	}
 
 	heap.Push(s.heap, entry)
 
 	s.LastReceived = entry.Height
+	s.save(ctx)
 }
 
 func (s *status) Halt(ctx context.Context) {
@@ -120,6 +130,5 @@ func (s *status) Halt(ctx context.Context) {
 	defer s.mu.Unlock()
 
 	s.Halted = true
-
 	s.save(ctx)
 }

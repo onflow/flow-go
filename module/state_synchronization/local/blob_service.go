@@ -18,16 +18,32 @@ type blobService struct {
 	component.Component
 	blockService blockservice.BlockService
 	blockStore   blockstore.Blockstore
+	config       BlobServiceConfig
 }
 
 var _ network.BlobService = (*blobService)(nil)
 var _ component.Component = (*blobService)(nil)
 
+type BlobServiceConfig struct {
+	HashOnRead bool
+}
+
+// WithReprovideInterval sets the interval at which DHT provider entries are refreshed
+func WithHashOnRead(enabled bool) network.BlobServiceOption {
+	return func(bs network.BlobService) {
+		bs.(*blobService).blockStore.HashOnRead(enabled)
+	}
+}
+
 // NewBlobService creates a new BlobService that only interacts with the provided datastore
-func NewBlobService(ds datastore.Batching) *blobService {
+func NewBlobService(ds datastore.Batching, opts ...network.BlobServiceOption) *blobService {
 	bstore := blockstore.NewBlockstore(ds)
 	bs := &blobService{
 		blockStore: bstore,
+	}
+
+	for _, opt := range opts {
+		opt(bs)
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -79,10 +95,6 @@ func (bs *blobService) DeleteBlob(ctx context.Context, c cid.Cid) error {
 
 func (bs *blobService) GetSession(ctx context.Context) network.BlobGetter {
 	return &blobServiceSession{blockservice.NewSession(ctx, bs.blockService)}
-}
-
-func (bs *blobService) HasBlob(ctx context.Context, c cid.Cid) (bool, error) {
-	return bs.blockStore.Has(ctx, c)
 }
 
 type blobServiceSession struct {
