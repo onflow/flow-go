@@ -3593,7 +3593,8 @@ func TestEnforcingComputationLimit(t *testing.T) {
 				SetGasLimit(computationLimit)
 
 			if test.payerIsServAcc {
-				txBody.SetPayer(chain.ServiceAddress())
+				txBody.SetPayer(chain.ServiceAddress()).
+					SetGasLimit(0)
 			}
 			tx := fvm.Transaction(txBody, 0)
 
