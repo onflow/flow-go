@@ -16,14 +16,14 @@ func (h NotificationHeap) Less(i, j int) bool {
 
 func (h NotificationHeap) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
-	h[i].SetIndex(i)
-	h[j].SetIndex(j)
+	h[i].index = i
+	h[j].index = j
 }
 
 func (h *NotificationHeap) Push(x interface{}) {
 	n := len(*h)
 	entry := x.(*BlockEntry)
-	entry.SetIndex(n)
+	entry.index = n
 	*h = append(*h, entry)
 }
 
@@ -31,8 +31,8 @@ func (h *NotificationHeap) Pop() interface{} {
 	old := *h
 	n := len(old)
 	entry := old[n-1]
-	old[n-1] = nil     // avoid memory leak
-	entry.SetIndex(-1) // for safety
+	old[n-1] = nil   // avoid memory leak
+	entry.index = -1 // for safety
 	*h = old[0 : n-1]
 	return entry
 }

@@ -917,9 +917,9 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 // to close before starting, and then call the started callback after they are ready(). The started
 // callback closes the parentReady channel of the next component, and so on.
 //
-// TODO: Instead of this serial startup, components should wait for their depenedencies to be ready
+// TODO: Instead of this serial startup, components should wait for their dependencies to be ready
 // using their ReadyDoneAware interface. After components are updated to use the idempotent
-// ReadyDoneAware interface and explicilty wait for their dependencies to be ready, we can remove
+// ReadyDoneAware interface and explicitly wait for their dependencies to be ready, we can remove
 // this channel chaining.
 func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
 	// Add a closure that starts the component when the node is started, and then waits for it to exit

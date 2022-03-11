@@ -8,7 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
+	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-datastore"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/encoding/cbor"
@@ -80,8 +83,8 @@ type executionDataRequesterImpl struct {
 	blocks  storage.Blocks
 	results storage.ExecutionResults
 
-	// The first block for which to request ExecutionData
-	rootBlock *flow.Block
+	// The first block height for which to request ExecutionData
+	rootBlockHeight uint64
 
 	// List of callbacks to call when ExecutionData is successfully fetched for a block
 	consumers []ExecutionDataReceivedCallback
@@ -116,23 +119,26 @@ func NewExecutionDataRequester(
 	datastore datastore.Batching,
 	blobservice network.BlobService,
 	eds state_synchronization.ExecutionDataService,
-	rootBlock *flow.Block,
+	rootBlockHeight uint64,
 	blocks storage.Blocks,
 	results storage.ExecutionResults,
 	fetchTimeout time.Duration,
 	startupCheck bool,
 ) (ExecutionDataRequester, error) {
 	e := &executionDataRequesterImpl{
-		log:          log.With().Str("component", "execution_data_requester").Logger(),
-		ds:           datastore,
-		bs:           blobservice,
-		eds:          eds,
-		rootBlock:    rootBlock,
-		blocks:       blocks,
-		results:      results,
-		startupCheck: startupCheck,
-		fetchTimeout: fetchTimeout,
-		status:       &status{db: datastore},
+		log:             log.With().Str("component", "execution_data_requester").Logger(),
+		ds:              datastore,
+		bs:              blobservice,
+		eds:             eds,
+		rootBlockHeight: rootBlockHeight,
+		blocks:          blocks,
+		results:         results,
+		startupCheck:    startupCheck,
+		fetchTimeout:    fetchTimeout,
+		status: &status{
+			db:           datastore,
+			maxCacheSize: executionDataCacheSize,
+		},
 
 		finalizedBlocks:    make(chan flow.Identifier, finalizationQueueLength),
 		fetchRequests:      make(chan *BlockEntry, fetchQueueLength),
@@ -193,6 +199,13 @@ func (e *executionDataRequesterImpl) finalizedBlockProcessor(ctx irrecoverable.S
 	// Boostrapping happens after the node is ready since it should not block node startup
 	err := e.loadSyncState(ctx)
 
+	if errors.Is(err, ErrRequesterHalted) {
+		// Requester came up halted. By not closing the statusLoaded channel, none of the other
+		// workers will start, effectively disabling the component.
+		e.log.Error().Msg("HALTING REQUESTER: requester was halted on a previous run due to invalid data")
+		return
+	}
+
 	if err != nil {
 		ctx.Throw(fmt.Errorf("error loading execution state sync state: %w", err))
 	}
@@ -206,6 +219,8 @@ func (e *executionDataRequesterImpl) finalizedBlockProcessor(ctx irrecoverable.S
 		if err != nil {
 			ctx.Throw(err)
 		}
+
+		// TODO: eventually we will want to add a check to remove orphaned CIDs from the datastore
 	}
 
 	// Start ingesting new finalized block notifications
@@ -371,7 +386,7 @@ func (e *executionDataRequesterImpl) fetchRequestProcessingLoop(ctx irrecoverabl
 	}
 }
 
-func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.SignalerContext, request *BlockEntry) error {
+func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.SignalerContext, request *BlockEntry) {
 	logger := e.log.With().Str("block_id", request.BlockID.String()).Logger()
 
 	logger.Debug().Msgf("processing fetch request for block %d", request.Height)
@@ -386,11 +401,9 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 
 	executionData, err := e.fetchExecutionData(ctx, result.ExecutionDataID)
 
-	var malformedDataError *state_synchronization.MalformedDataError
-	var blobSizeLimitExceededError *state_synchronization.BlobSizeLimitExceededError
-	if errors.As(err, &malformedDataError) || errors.As(err, &blobSizeLimitExceededError) {
+	if isInvalidBlobError(err) {
 		// This means an execution result was sealed with an invalid execution data id (invalid data).
-		// Eventually, verification nodes will verify that the execution data id is valid, and not sign the receipt
+		// Eventually, verification nodes will verify that the execution data is valid, and not sign the receipt
 
 		// TODO: add metric
 		logger.Error().Err(err).
@@ -401,6 +414,9 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 		ctx.Throw(ErrRequesterHalted)
 	}
 
+	// TODO: check for badger errors (and crash)
+
+	// for everything else, refetch
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to get execution data for block")
 
@@ -413,9 +429,8 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 			logger.Error().
 				Str("execution_data_id", result.ExecutionDataID.String()).
 				Msg("fetch retry queue is full")
-			return nil
 		}
-		return nil
+		return
 	}
 	logger.Debug().Msgf("Fetched execution data for block %d", request.Height)
 
@@ -425,11 +440,9 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 
 	select {
 	case <-ctx.Done():
-		return nil
+		return
 	case e.notifications <- struct{}{}:
 	}
-
-	return nil
 }
 
 // fetchExecutionData fetches the ExecutionData by its ID, using fetchTimeout
@@ -437,9 +450,21 @@ func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverabl
 	ctx, cancel := context.WithTimeout(signalerCtx, e.fetchTimeout)
 	defer cancel()
 
-	// Fetch the ExecutionData for blockID from the blobstore. If it doesn't exist locally, it will
-	// be fetched from the network.
-	return e.eds.Get(ctx, executionDataID)
+	// Get the data from the network
+	executionData, err := e.eds.Get(ctx, executionDataID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Write it to the local blobstore
+	_, _, err = e.eds.Add(signalerCtx, executionData)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to writing execution data to blobstore: %w", err)
+	}
+
+	return executionData, nil
 }
 
 // Notification Worker Methods
@@ -513,13 +538,12 @@ func (e *executionDataRequesterImpl) loadSyncState(ctx irrecoverable.SignalerCon
 	}
 
 	if e.status.Halted {
-		e.log.Error().Msg("HALTING REQUESTER: requester was halted on a previous run due to invalid data")
-		ctx.Throw(ErrRequesterHalted)
+		return ErrRequesterHalted
 	}
 
 	// defaults to the start block when booting with a fresh db
 	if e.status.LastReceived == 0 {
-		e.status.LastReceived = e.rootBlock.Header.Height
+		e.status.LastReceived = e.rootBlockHeight
 		e.log.Debug().Msgf("setting LastReceived to root block height: %d", e.status.LastReceived)
 	}
 
@@ -531,8 +555,6 @@ func (e *executionDataRequesterImpl) loadSyncState(ctx irrecoverable.SignalerCon
 }
 
 func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerContext, lastReceivedHeight uint64) error {
-	genesis := e.rootBlock.Header.Height
-
 	// we're only interested in inspecting blobs that exist in our local db, so create an
 	// ExecutionDataService that only uses the local datastore
 	localEDS, err := e.localExecutionDataService(ctx)
@@ -547,7 +569,7 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 
 	// Search from genesis to the lastReceivedHeight, and confirm data is still available for all heights
 	// Update the notification state based on the data in the db
-	for height := genesis; height <= lastReceivedHeight; height++ {
+	for height := e.rootBlockHeight; height <= lastReceivedHeight; height++ {
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -590,41 +612,56 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 	return nil
 }
 
-func (e *executionDataRequesterImpl) checkExecutionData(ctx irrecoverable.SignalerContext, eds state_synchronization.ExecutionDataService, rootID flow.Identifier) (bool, error) {
-	// check that the data in the db is valid
-	_, err := e.eds.Get(ctx, rootID)
+func (e *executionDataRequesterImpl) checkExecutionData(ctx irrecoverable.SignalerContext, localEDS state_synchronization.ExecutionDataService, rootID flow.Identifier) (bool, error) {
+	invalidCIDs, cidErrs := localEDS.Check(ctx, rootID)
 
-	// The data was validated when it was originally stored, so any errors now about the data
-	// validity indicate the data was modified on disk
+	// Check returns a list of CIDs with the corresponding errors encountered while retrieving their
+	// data from the local datastore.
 
-	var blobSizeLimitExceededError *state_synchronization.BlobSizeLimitExceededError
-	if errors.As(err, &blobSizeLimitExceededError) {
-		// This shouldn't be possible. It would mean that the data was updated in the db to
-		// be well-formed but oversized.
-		// Note: the criteria for this error cannot be made more strict, otherwise nodes may suddenly
-		// fail to start up. If a stricter criteria is needed, we can add a new error type.
-		return false, ErrRequesterHalted
+	if len(invalidCIDs) == 0 {
+		return true, nil
 	}
 
-	var malformedDataError *state_synchronization.MalformedDataError
-	if errors.As(err, &malformedDataError) {
-		// This is a special case where the data was corrupted on disk. Delete and refetch
-		// Note: since the data is malformed, it's possible that some portion of the blobs for this
-		// block are not deleted.
-		// TODO: We will also need a tool to find orphaned blobs and delete them from the store
-		e.eds.Delete(ctx, rootID)
+	// Track if this blob should be refetched
+	missing := false
+
+	var errs *multierror.Error
+	for i, cid := range invalidCIDs {
+		err := cidErrs[i]
+
+		// Not Found, just report and continue
+		if errors.Is(err, blockservice.ErrNotFound) {
+			missing = true
+			continue
+		}
+
+		// The blob's hash didn't match. This is a special case where the data was corrupted on
+		// disk. Delete and refetch
+		if errors.Is(err, blockstore.ErrHashMismatch) {
+			if err := e.bs.DeleteBlob(ctx, cid); err != nil {
+				return false, fmt.Errorf("failed to delete corrupted CID %s from rootCID %s: %w", cid, rootID, err)
+			}
+
+			missing = true
+			continue
+		}
+
+		// It should not be possible to encounter one of these errors since they are checked when
+		// the block is originally received
+		if isInvalidBlobError(err) {
+			return false, ErrRequesterHalted
+		}
+
+		// Record any other errors to return
+		errs = multierror.Append(errs, err)
 	}
 
-	// Any errors at this point should be handled by refetching the data
-	if err != nil {
-		return false, nil
-	}
-
-	return true, nil
+	return missing, errs.ErrorOrNil()
 }
 
 func (e *executionDataRequesterImpl) localExecutionDataService(ctx irrecoverable.SignalerContext) (state_synchronization.ExecutionDataService, error) {
-	blobService := local.NewBlobService(e.ds)
+	// start the blob service configured to rehash blobs on read
+	blobService := local.NewBlobService(e.ds, local.WithHashOnRead(true))
 	blobService.Start(ctx)
 
 	eds := state_synchronization.NewExecutionDataService(
@@ -644,8 +681,14 @@ func (e *executionDataRequesterImpl) localExecutionDataService(ctx irrecoverable
 	return eds, nil
 }
 
-// [x] Fix cache limits
-// [ ] Handle irrecoverable errors from this component without crashing the node
+func isInvalidBlobError(err error) bool {
+	var malformedDataError *state_synchronization.MalformedDataError
+	var blobSizeLimitExceededError *state_synchronization.BlobSizeLimitExceededError
+	return errors.As(err, &malformedDataError) ||
+		errors.As(err, &blobSizeLimitExceededError) ||
+		errors.Is(err, state_synchronization.ErrBlobTreeDepthExceeded)
+}
+
 // [ ] Add metrics
 // * Fetches in progress
 // * Fetch duration

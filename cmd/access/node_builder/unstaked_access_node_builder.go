@@ -266,6 +266,9 @@ func (builder *UnstakedAccessNodeBuilder) enqueueMiddleware() {
 // Currently, the unstaked AN only runs the follower engine.
 func (builder *UnstakedAccessNodeBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
+	if builder.executionDataSyncEnabled {
+		builder.BuildExecutionDataRequester()
+	}
 	return builder.FlowAccessNodeBuilder.Build()
 }
 
