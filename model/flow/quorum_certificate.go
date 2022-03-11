@@ -26,6 +26,9 @@ type QuorumCertificate struct {
 	SigData []byte
 }
 
+// QuorumCertificateWithSignerIDs is a QuorumCertificate model with signer IDs instead of indices.
+// it is needed for backward-compatibility with the FlowEpoch smart contract which generates QCs
+// using signer IDs.
 type QuorumCertificateWithSignerIDs struct {
 	View      uint64
 	BlockID   Identifier

@@ -170,9 +170,9 @@ func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType,
 	return types, nil
 }
 
-// encodeSignerIndicesAndSigType encodes the given stakingSigners and beaconSigners into signer indices and sig types
-// the given fullMembers provides the canonical order of signer index for each signer.
-// for instance, assuming fullMembers are [A,B,C,D,E,F], stakingSigners are [D,E], beaconSigners are [A,B], then
+// encodeSignerIndicesAndSigType encodes the given stakingSigners and beaconSigners into signer indices and sig types.
+// The given fullMembers provides the canonical order of signer index for each signer.
+// For instance, assuming fullMembers are [A,B,C,D,E,F], stakingSigners are [D,E], beaconSigners are [A,B], then
 // the signerIndices will be [byte([1,1,0,1,1,0,0,0])],
 // 			bit 1 indicates the node at that index signed, bit 0 indicates the node at that index didn't sign
 // the sigType will be [byte([1,1,0,0,0,0,0,0])],

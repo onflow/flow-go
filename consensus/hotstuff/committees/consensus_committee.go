@@ -69,7 +69,7 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 }
 
 // Identities returns the identities of all the consensus participants at the given block.
-// The order of the identity is the canonical order
+// The order of the identities is the canonical order
 func (c *Consensus) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
 	il, err := c.state.AtBlockID(blockID).Identities(filter.IsVotingConsensusCommitteeMember)
 	return il, err
