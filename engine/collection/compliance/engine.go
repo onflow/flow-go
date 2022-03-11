@@ -8,8 +8,10 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,21 +36,23 @@ const defaultVoteQueueCapacity = 1000
 // Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit           *engine.Unit
-	lm             *lifecycle.LifecycleManager
-	log            zerolog.Logger
-	metrics        module.EngineMetrics
-	me             module.Local
-	headers        storage.Headers
-	payloads       storage.ClusterPayloads
-	state          protocol.State
-	core           *Core
-	pendingBlocks  engine.MessageStore
-	pendingVotes   engine.MessageStore
-	messageHandler *engine.MessageHandler
-	con            network.Conduit
-	stopHotstuff   context.CancelFunc
-	cluster        flow.IdentityList // consensus participants in our cluster
+	unit                       *engine.Unit
+	lm                         *lifecycle.LifecycleManager
+	log                        zerolog.Logger
+	metrics                    module.EngineMetrics
+	me                         module.Local
+	headers                    storage.Headers
+	payloads                   storage.ClusterPayloads
+	state                      protocol.State
+	core                       *Core
+	pendingBlocks              engine.MessageStore
+	pendingVotes               engine.MessageStore
+	messageHandler             *engine.MessageHandler
+	finalizedView              counters.StrictMonotonousCounter
+	finalizationEventsNotifier engine.Notifier
+	con                        network.Conduit
+	stopHotstuff               context.CancelFunc
+	cluster                    flow.IdentityList // consensus participants in our cluster
 }
 
 func NewEngine(
@@ -144,20 +148,21 @@ func NewEngine(
 	)
 
 	eng := &Engine{
-		unit:           engine.NewUnit(),
-		lm:             lifecycle.NewLifecycleManager(),
-		log:            engineLog,
-		metrics:        core.metrics,
-		me:             me,
-		headers:        core.headers,
-		payloads:       payloads,
-		state:          state,
-		core:           core,
-		pendingBlocks:  pendingBlocks,
-		pendingVotes:   pendingVotes,
-		messageHandler: handler,
-		con:            nil,
-		cluster:        currentCluster,
+		unit:                       engine.NewUnit(),
+		lm:                         lifecycle.NewLifecycleManager(),
+		log:                        engineLog,
+		metrics:                    core.metrics,
+		me:                         me,
+		headers:                    core.headers,
+		payloads:                   payloads,
+		state:                      state,
+		core:                       core,
+		pendingBlocks:              pendingBlocks,
+		pendingVotes:               pendingVotes,
+		messageHandler:             handler,
+		finalizationEventsNotifier: engine.NewNotifier(),
+		con:                        nil,
+		cluster:                    currentCluster,
 	}
 
 	chainID, err := core.state.Params().ChainID()
@@ -198,6 +203,7 @@ func (e *Engine) Ready() <-chan struct{} {
 	}
 	e.lm.OnStart(func() {
 		e.unit.Launch(e.loop)
+		e.unit.Launch(e.finalizationProcessingLoop)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
@@ -415,4 +421,27 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 // Note the header has incomplete fields, because it was converted from a hotstuff.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return e.BroadcastProposalWithDelay(header, 0)
+}
+
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+//  (1) Informs sealing.Core about finalization of respective block.
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	if e.finalizedView.Set(block.View) {
+		e.finalizationEventsNotifier.Notify()
+	}
+}
+
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (e *Engine) finalizationProcessingLoop() {
+	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-finalizationNotifier:
+			e.core.ProcessFinalizedView(e.finalizedView.Value())
+		}
+	}
 }

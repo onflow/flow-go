@@ -161,8 +161,8 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 			return nil, fmt.Errorf("node id cannot be zero")
 		}
 
-		if node.Stake == 0 {
-			return nil, fmt.Errorf("node (id=%s) cannot have 0 stake", node.NodeID)
+		if node.Weight == 0 {
+			return nil, fmt.Errorf("node (id=%s) cannot have 0 weight", node.NodeID)
 		}
 
 		dkgParticipant, ok := participantLookup[node.NodeID]
