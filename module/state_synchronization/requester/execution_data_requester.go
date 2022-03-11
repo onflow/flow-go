@@ -110,7 +110,7 @@ type executionDataRequesterImpl struct {
 }
 
 // NewexecutionDataRequester creates a new execution data requester component
-func NewExecutionDataRequester(
+func New(
 	log zerolog.Logger,
 	edrMetrics module.ExecutionDataServiceMetrics, // TODO: add requester specific metrics
 	datastore datastore.Batching,

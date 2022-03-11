@@ -120,7 +120,7 @@ func TestExecutionDataRequesterSuite(t *testing.T) {
 // 			})
 // 		}
 
-// 		ed := unittest.ExecutionDataFixture(block.ID())
+// 		ed := ExecutionDataFixture(block.ID())
 // 		cid, _, err := suite.eds.Add(suite.ctx, ed)
 // 		require.NoError(suite.T(), err)
 
@@ -138,7 +138,7 @@ func TestExecutionDataRequesterSuite(t *testing.T) {
 // 		suite.allBlocks = append(blocks, block)
 // 		results = append(results, result)
 
-// 		suite.allExecutionData[block.ID()] = unittest.ExecutionDataFixture(block.ID())
+// 		suite.allExecutionData[block.ID()] = ExecutionDataFixture(block.ID())
 // 		suite.allBlobs[flow.FlowIDToCid(cid)] = true
 
 // 		previousBlock = block
@@ -221,7 +221,7 @@ func (suite *ExecutionDataRequesterSuite) TearDownTest() {
 
 // 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
-// 	edr, err := NewExecutionDataRequester(
+// 	edr, err := New(
 // 		suite.logger,
 // 		metrics.NewNoopCollector(),
 // 		finalizationDistributor,
@@ -542,7 +542,7 @@ func TestRequestBlocksWithSomeMissed(t *testing.T) {
 	eds := mockExecutionDataService(testData.executionDataEntries)
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
-	edr, err := NewExecutionDataRequester(
+	edr, err := New(
 		logger,
 		metrics.NewNoopCollector(),
 		ds,
@@ -595,7 +595,7 @@ func TestRequestBlocksWithRandomDelays(t *testing.T) {
 	eds := mockExecutionDataService(testData.executionDataEntries)
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
-	edr, err := NewExecutionDataRequester(
+	edr, err := New(
 		logger,
 		metrics.NewNoopCollector(),
 		ds,
@@ -665,7 +665,7 @@ func TestHappyCase(t *testing.T) {
 
 		block := buildBlock(uint64(i), previousBlock, seals)
 
-		ed := unittest.ExecutionDataFixture(block.ID())
+		ed := ExecutionDataFixture(block.ID())
 		cid, _, err := eds.Add(ctx, ed)
 		require.NoError(t, err)
 
@@ -690,7 +690,7 @@ func TestHappyCase(t *testing.T) {
 
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
-	edr, err := NewExecutionDataRequester(
+	edr, err := New(
 		logger,
 		metrics.NewNoopCollector(),
 		ds,
@@ -824,7 +824,7 @@ func generateTestData(ctx context.Context, t *testing.T, blockCount int, missing
 		height := uint64(i)
 		block := buildBlock(height, previousBlock, seals)
 
-		ed := unittest.ExecutionDataFixture(block.ID())
+		ed := ExecutionDataFixture(block.ID())
 		cid := unittest.IdentifierFixture()
 
 		result := buildResult(block, cid, previousResult)
