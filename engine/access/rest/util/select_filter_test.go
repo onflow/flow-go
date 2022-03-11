@@ -211,9 +211,9 @@ func generateBlock() (models.Block, error) {
 		Payload: &models.BlockPayload{
 			CollectionGuarantees: []models.CollectionGuarantee{
 				{
-					CollectionId: "abcdef0123456789",
-					SignerIds:    multipleDummySignatures,
-					Signature:    dummySignature,
+					CollectionId:  "abcdef0123456789",
+					SignerIndices: fmt.Sprintf("%x", []byte{1}),
+					Signature:     dummySignature,
 				},
 			},
 			BlockSeals: []models.BlockSeal{
