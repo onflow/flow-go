@@ -46,23 +46,23 @@ type TransactionTypePool struct {
 }
 
 func (p *TransactionTypePool) GetRandomTransactionType() TransactionType {
-	return p.Pool[rand.Intn(len(p.Pool))]
-	//// 2 out of 3 transactions should be of type `SimpleTxType`
-	//if rand.Intn(3) == 0 {
-	//	return p.Pool[rand.Intn(len(p.Pool))]
-	//}
-	//// otherwise, return a `MixedTxType` with 2 different SimpleTxTypes
-	//a := rand.Intn(len(p.Pool))
-	//b := a
-	//for b == a {
-	//	b = rand.Intn(len(p.Pool))
-	//}
-	//return &MixedTxType{
-	//	simpleTypes: []*SimpleTxType{
-	//		p.Pool[a].(*SimpleTxType),
-	//		p.Pool[b].(*SimpleTxType),
-	//	},
-	//}
+	//return p.Pool[rand.Intn(len(p.Pool))]
+	// 2 out of 3 transactions should be of type `SimpleTxType`
+	if rand.Intn(3) == 0 {
+		return p.Pool[rand.Intn(len(p.Pool))]
+	}
+	// otherwise, return a `MixedTxType` with 2 different SimpleTxTypes
+	a := rand.Intn(len(p.Pool))
+	b := a
+	for b == a {
+		b = rand.Intn(len(p.Pool))
+	}
+	return &MixedTxType{
+		simpleTypes: []*SimpleTxType{
+			p.Pool[a].(*SimpleTxType),
+			p.Pool[b].(*SimpleTxType),
+		},
+	}
 }
 
 func simpleTemplateTx(rep uint64, body string) string {
@@ -119,7 +119,7 @@ func (m *MixedTxType) GenerateTransaction(context TransactionTypeContext) (Gener
 		if tt.slopePoints == 0 {
 			loopLength = tt.paramMax/uint64(len(m.simpleTypes)) + 1
 		} else {
-			loopLength = tt.paramMax/uint64(len(m.simpleTypes))/5 + 1 // rand.Uint64()%(tt.paramMax/uint64(len(m.simpleTypes))) + 1
+			loopLength = rand.Uint64()%(tt.paramMax/uint64(len(m.simpleTypes))) + 1 //tt.paramMax/uint64(len(m.simpleTypes))/5 + 1 //
 		}
 		bodies[i] = loopTemplateTx(loopLength, tt.body)
 	}
@@ -165,9 +165,9 @@ func (s *SimpleTxType) GenerateTransaction(context TransactionTypeContext) (Gene
 
 	var loopLength uint64
 	if s.slopePoints == 0 {
-		loopLength = s.paramMax/5 + 1 // s.paramMax + 1
+		loopLength = s.paramMax + 1 //s.paramMax/5 + 1 //
 	} else {
-		loopLength = s.paramMax/5 + 1 // rand.Uint64()%s.paramMax + 1
+		loopLength = rand.Uint64()%s.paramMax + 1 // s.paramMax/5 + 1 //
 	}
 
 	script := simpleTemplateTx(loopLength, s.body)
@@ -187,21 +187,21 @@ func (s *SimpleTxType) Name() string {
 
 // AdjustParameterRange adjusts the parameter range of the transaction type so that the generated transactions take up to desiredMaxTime
 func (s *SimpleTxType) AdjustParameterRange(parameter uint64, executionTime uint64) {
-	//s.mu.Lock()
-	//defer s.mu.Unlock()
-	//
-	//prevParamMax := s.paramMax
-	//
-	//s.slope = (float64(s.slopePoints)*s.slope + (float64(executionTime) / float64(parameter))) / float64(s.slopePoints+1)
-	//s.slopePoints++
-	//
-	//s.paramMax = uint64(desiredMaxTime / s.slope)
-	//if s.paramMax < 1 {
-	//	s.paramMax = 1
-	//}
-	//if (float64(s.paramMax)-float64(prevParamMax))/float64(prevParamMax) > 2.0 {
-	//	s.paramMax = prevParamMax * 2
-	//}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	prevParamMax := s.paramMax
+
+	s.slope = (float64(s.slopePoints)*s.slope + (float64(executionTime) / float64(parameter))) / float64(s.slopePoints+1)
+	s.slopePoints++
+
+	s.paramMax = uint64(desiredMaxTime / s.slope)
+	if s.paramMax < 1 {
+		s.paramMax = 1
+	}
+	if (float64(s.paramMax)-float64(prevParamMax))/float64(prevParamMax) > 2.0 {
+		s.paramMax = prevParamMax * 2
+	}
 }
 
 func (s *SimpleTxType) GetSlope() float64 {
