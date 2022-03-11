@@ -54,7 +54,7 @@ func DecodeSignerIndices(indices []byte, count int) ([]int, error) {
 	// remaining bits (if any), they must be all `0`s
 	remainings := byt << (8 - offset)
 	if remainings != byte(0) {
-		return nil, fmt.Errorf("the remaining bites are expected to be all 0s, but are %v", remainings)
+		return nil, fmt.Errorf("the remaining bits are expected to be all 0s, but are %v", remainings)
 	}
 
 	return signerIndices, nil

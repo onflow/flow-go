@@ -578,9 +578,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			}
 
 			signerIndices, err := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
-			if err != nil {
-				t.Fatalf("signer indices can not be created %v", err)
-			}
+			require.NoError(t, err)
 
 			// ensure that QC contains correct field
 			expectedQC := &flow.QuorumCertificate{
