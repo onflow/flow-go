@@ -69,9 +69,9 @@ const (
 	// and signed by service account, higher limits are allowed
 	// for service transactions to consider flexibility for network services
 	// such as governance transactions, etc.
-	ServiceTransactionComputationLimit             = 1_000_000_000 // 1B
-	ServiceTransactionMemoryLimit                  = 100_000_000   // 100G
-	ServiceTransactionEventCollectionByteSizeLimit = 10_000_000    // 10G
+	ServiceTransactionComputationLimit             = 100_000_000_000 // 100B
+	ServiceTransactionMemoryLimit                  = 100_000_000     // 100G
+	ServiceTransactionEventCollectionByteSizeLimit = 100_000_000     // 100G
 )
 
 func defaultContext(logger zerolog.Logger) Context {
