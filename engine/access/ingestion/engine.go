@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/guarantor"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -626,6 +627,10 @@ func (e *Engine) lookupCollection(collId flow.Identifier) (bool, error) {
 // requestCollections registers collection requests with the requester engine
 func (e *Engine) requestCollections(missingColls []*flow.CollectionGuarantee) {
 	for _, cg := range missingColls {
-		e.request.EntityByID(cg.ID(), filter.HasNodeID(cg.SignerIDs...))
+		guarantors, err := guarantor.FindGuarantors(e.state, cg)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
+		}
+		e.request.EntityByID(cg.ID(), filter.HasNodeID(guarantors...))
 	}
 }

@@ -27,11 +27,11 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/guarantor"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -996,7 +996,7 @@ func (e *Engine) matchOrRequestCollections(
 			Hex("collection_id", logging.ID(guarantee.ID())).
 			Msg("requesting collection")
 
-		guarantors, err := e.findGuarantors(guarantee)
+		guarantors, err := guarantor.FindGuarantors(e.state, guarantee)
 		if err != nil {
 			return fmt.Errorf("could not find guarantors: %w", err)
 		}
@@ -1013,26 +1013,6 @@ func (e *Engine) matchOrRequestCollections(
 		Msg("requested all collections")
 
 	return nil
-}
-
-func (e *Engine) findGuarantors(guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
-	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
-	cluster, err := snapshot.Epochs().Current().ClusterByChainID(guarantee.ChainID)
-
-	if err != nil {
-		// protocol state must have validated the block that contains the guarantee, so the cluster
-		// must be found, otherwise, it's an internal error
-		return nil, fmt.Errorf(
-			"internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
-			guarantee.ReferenceBlockID, guarantee.ChainID, err)
-	}
-
-	guarantorIDs, err := packer.DecodeSignerIdentifiersFromIndices(cluster.Members().NodeIDs(), guarantee.SignerIndices)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode guarantor indices: %v", err)
-	}
-
-	return guarantorIDs, nil
 }
 
 func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, error) {
