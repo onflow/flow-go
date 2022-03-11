@@ -121,6 +121,15 @@ func WithChain(chain flow.Chain) Option {
 	}
 }
 
+// WithGasLimit sets the computation limit for a virtual machine context.
+// @depricated, please use WithComputationLimit instead.
+func WithGasLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.ComputationLimit = limit
+		return ctx
+	}
+}
+
 // WithComputationLimit sets the computation limit for a virtual machine context.
 func WithComputationLimit(limit uint64) Option {
 	return func(ctx Context) Context {
