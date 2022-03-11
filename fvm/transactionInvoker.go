@@ -183,7 +183,7 @@ func (i *TransactionInvoker) Process(
 	}
 
 	// Dump all intensities to the log before fee deduction. Fee deduction uses an unmerged sub-meter anyway.
-	if i.logger.GetLevel() >= zerolog.InfoLevel {
+	if i.logger.Info().Enabled() {
 		d := zerolog.Dict()
 		for s, u := range env.computationHandler.Intensities() {
 			d.Uint64(s, u)
