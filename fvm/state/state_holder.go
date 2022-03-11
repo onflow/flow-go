@@ -66,5 +66,8 @@ func (s *StateHolder) DisableAllLimitEnforcements() {
 
 // EnforceInteractionLimits returns if the interaction limits should be enforced or not
 func (s *StateHolder) EnforceInteractionLimits() bool {
+	if s.payerIsServiceAccount {
+		return false
+	}
 	return s.enforceInteractionLimits
 }
