@@ -6,8 +6,8 @@ package state
 // the state it is recommended that such services wraps
 // a state manager instead of a state itself.
 type StateHolder struct {
-	enforceMemoryLimits      bool
-	enforceComputationLimits bool
+	EnforceMemoryLimits      bool
+	EnforceComputationLimits bool
 	enforceInteractionLimits bool
 	payerIsServiceAccount    bool
 	startState               *State
@@ -17,8 +17,8 @@ type StateHolder struct {
 // NewStateHolder constructs a new state manager
 func NewStateHolder(startState *State) *StateHolder {
 	return &StateHolder{
-		enforceMemoryLimits:      true,
-		enforceComputationLimits: true,
+		EnforceMemoryLimits:      true,
+		EnforceComputationLimits: true,
 		enforceInteractionLimits: true,
 		startState:               startState,
 		activeState:              startState,
@@ -53,37 +53,18 @@ func (s *StateHolder) NewChild() *State {
 // EnableLimitEnforcement enables all the limits
 func (s *StateHolder) EnableAllLimitEnforcements() {
 	s.enforceInteractionLimits = true
-	s.enforceComputationLimits = true
-	s.enforceMemoryLimits = true
+	s.EnforceComputationLimits = true
+	s.EnforceMemoryLimits = true
 }
 
 // DisableAllLimitEnforcements disables all the limits
 func (s *StateHolder) DisableAllLimitEnforcements() {
 	s.enforceInteractionLimits = false
-	s.enforceComputationLimits = false
-	s.enforceMemoryLimits = false
-}
-
-// EnforceInteractionLimits returns if the interaction limits should be enforced or not
-func (s *StateHolder) EnforceMemoryLimits() bool {
-	if s.payerIsServiceAccount {
-		return false
-	}
-	return s.enforceMemoryLimits
-}
-
-// EnforceInteractionLimits returns if the interaction limits should be enforced or not
-func (s *StateHolder) EnforceComputationLimits() bool {
-	if s.payerIsServiceAccount {
-		return false
-	}
-	return s.enforceComputationLimits
+	s.EnforceComputationLimits = false
+	s.EnforceMemoryLimits = false
 }
 
 // EnforceInteractionLimits returns if the interaction limits should be enforced or not
 func (s *StateHolder) EnforceInteractionLimits() bool {
-	if s.payerIsServiceAccount {
-		return false
-	}
 	return s.enforceInteractionLimits
 }

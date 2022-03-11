@@ -530,7 +530,7 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *TransactionEnv) meterComputation(kind, intensity uint) error {
-	if e.sth.EnforceComputationLimits() {
+	if e.sth.EnforceComputationLimits {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
 	return nil

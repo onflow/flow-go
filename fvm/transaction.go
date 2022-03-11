@@ -83,6 +83,11 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
 	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
 	// TODO replace tx.Gas with individual limits for computation and memory
+
+	// set service transactions to use max limit
+	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
+		return ServiceTransactionComputationLimit
+	}
 	// decide computation limit
 	computationLimit := proc.Transaction.GasLimit
 	// if the computation limit is set to zero by user, fallback to the gas limit set by the context
@@ -99,6 +104,12 @@ func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
 func (proc *TransactionProcedure) MemoryLimit(ctx Context) uint64 {
 	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
 	// TODO let user select a lower limit for memory (when its part of fees)
+
+	// set service transactions to use max limit
+	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
+		return ServiceTransactionMemoryLimit
+	}
+
 	memoryLimit := uint64(0) // TODO use the one set by tx
 	// if the memory limit is set to zero by user, fallback to the gas limit set by the context
 	if memoryLimit == 0 {
