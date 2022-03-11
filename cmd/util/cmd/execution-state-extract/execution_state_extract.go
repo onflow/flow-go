@@ -66,7 +66,13 @@ func extractExecutionState(
 			OutputDir: outputDir,
 		}
 
+		orderedMapMigration := mgr.OrderedMapMigration{
+			Log:       log,
+			OutputDir: dir,
+		}
+
 		migrations = []ledger.Migration{
+			orderedMapMigration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
@@ -89,11 +95,7 @@ func extractExecutionState(
 				Chain: chain,
 				RWF:   reportFileWriterFactory,
 			},
-			&reporters.BalanceReporter{
-				Log:   log,
-				Chain: chain,
-				RWF:   reportFileWriterFactory,
-			},
+			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
 		}
 	}
 

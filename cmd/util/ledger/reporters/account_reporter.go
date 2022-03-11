@@ -2,6 +2,7 @@ package reporters
 
 import (
 	"fmt"
+	"math"
 	goRuntime "runtime"
 	"sync"
 
@@ -10,8 +11,8 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
@@ -64,7 +65,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	defer rwm.Close()
 
 	l := migrations.NewView(payload)
-	st := state.NewState(l)
+	st := state.NewState(l, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
 	sth := state.NewStateHolder(st)
 	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
 
@@ -365,40 +366,33 @@ func (c *balanceProcessor) storageUsed(address flow.Address) (uint64, error) {
 }
 
 func (c *balanceProcessor) isDapper(address flow.Address) (bool, error) {
-	id := resourceId(address,
-		interpreter.PathValue{
-			Domain:     common.PathDomainPublic,
-			Identifier: "dapperUtilityCoinReceiver",
-		})
-
-	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key, false)
+	receiver, err := c.ReadStored(address, common.PathDomainPublic, "dapperUtilityCoinReceiver")
 	if err != nil {
 		return false, fmt.Errorf("could not load dapper receiver at %s: %w", address, err)
 	}
-	return len(receiver) != 0, nil
+	return receiver != nil, nil
 }
 
 func (c *balanceProcessor) hasReceiver(address flow.Address) (bool, error) {
-	id := resourceId(address,
-		interpreter.PathValue{
-			Domain:     common.PathDomainPublic,
-			Identifier: "flowTokenReceiver",
-		})
+	receiver, err := c.ReadStored(address, common.PathDomainPublic, "flowTokenReceiver")
 
-	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key, false)
 	if err != nil {
 		return false, fmt.Errorf("could not load receiver at %s: %w", address, err)
 	}
-	return len(receiver) != 0, nil
+	return receiver != nil, nil
 }
 
-func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterID {
-	// Copied logic from interpreter.storageKey(path)
-	key := fmt.Sprintf("%s\x1F%s", path.Domain.Identifier(), path.Identifier)
-
-	return flow.RegisterID{
-		Owner:      string(address.Bytes()),
-		Controller: "",
-		Key:        key,
+func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDomain, id string) (cadence.Value, error) {
+	addr, err := common.BytesToAddress(address.Bytes())
+	if err != nil {
+		return nil, err
 	}
+	receiver, err := c.vm.Runtime.ReadStored(addr,
+		cadence.Path{
+			Domain:     domain.Identifier(),
+			Identifier: "flowTokenReceiver",
+		},
+		runtime.Context{},
+	)
+	return receiver, err
 }
