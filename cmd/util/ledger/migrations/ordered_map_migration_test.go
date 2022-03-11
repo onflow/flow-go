@@ -43,8 +43,10 @@ func TestOrderedMapMigration(t *testing.T) {
 	})
 
 	encodeValue := func(v interpreter.Value) ledger.Value {
-		storable, _ := v.Storable(mig.NewStorage, atree.Address(address1), math.MaxUint64)
-		encodedInt, _ := atree.Encode(storable, interpreter.CBOREncMode)
+		storable, err := v.Storable(mig.NewStorage, atree.Address(address1), math.MaxUint64)
+		require.NoError(t, err)
+		encodedInt, err := atree.Encode(storable, interpreter.CBOREncMode)
+		require.NoError(t, err)
 		return encodedInt
 	}
 
@@ -206,8 +208,10 @@ func TestContractValue(t *testing.T) {
 	})
 
 	encodeValue := func(v interpreter.Value) ledger.Value {
-		storable, _ := v.Storable(mig.NewStorage, atree.Address(address1), math.MaxUint64)
-		encodedInt, _ := atree.Encode(storable, interpreter.CBOREncMode)
+		storable, err := v.Storable(mig.NewStorage, atree.Address(address1), math.MaxUint64)
+		require.NoError(t, err)
+		encodedInt, err := atree.Encode(storable, interpreter.CBOREncMode)
+		require.NoError(t, err)
 		return encodedInt
 	}
 
