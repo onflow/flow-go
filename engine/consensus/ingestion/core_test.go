@@ -108,7 +108,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	)
 	ref.On("Epochs").Return(suite.query)
 	suite.query.On("Current").Return(suite.epoch)
-	suite.epoch.On("Clustering").Return(clusters, nil)
+	suite.epoch.On("ClusterByChainID", head.ChainID).Return(clusters, nil)
 
 	state.On("AtBlockID", mock.Anything).Return(ref)
 	ref.On("Identity", mock.Anything).Return(
@@ -303,6 +303,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeUnknownOrigin() {
 // validGuarantee returns a valid collection guarantee based on the suite state.
 func (suite *IngestionCoreSuite) validGuarantee() *flow.CollectionGuarantee {
 	guarantee := unittest.CollectionGuaranteeFixture()
+	guarantee.ChainID = suite.head.ChainID
 
 	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
 		[]flow.Identifier{suite.collID}, []flow.Identifier{suite.collID})
