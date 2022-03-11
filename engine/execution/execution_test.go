@@ -16,6 +16,7 @@ import (
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -89,16 +90,20 @@ func TestExecutionFlow(t *testing.T) {
 	}
 
 	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID)
+	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
+		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	require.NoError(t, err)
+
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{
 				CollectionID:     col1.ID(),
-				SignerIDs:        []flow.Identifier{colID.NodeID},
+				SignerIndices:    signerIndices,
 				ReferenceBlockID: genesis.ID(),
 			},
 			{
 				CollectionID:     col2.ID(),
-				SignerIDs:        []flow.Identifier{colID.NodeID},
+				SignerIndices:    signerIndices,
 				ReferenceBlockID: genesis.ID(),
 			},
 		},
@@ -219,13 +224,16 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 	// make collection
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
+	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
+		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	require.NoError(t, err)
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{
 				CollectionID:     col.ID(),
-				SignerIDs:        []flow.Identifier{colID.NodeID},
+				SignerIndices:    signerIndices,
 				ReferenceBlockID: ref.ID(),
 			},
 		},
@@ -247,11 +255,14 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	// make collection
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
+	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
+		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	require.NoError(t, err)
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
-			{CollectionID: col.ID(), SignerIDs: []flow.Identifier{colID.NodeID}, ReferenceBlockID: ref.ID()},
+			{CollectionID: col.ID(), SignerIndices: signerIndices, ReferenceBlockID: ref.ID()},
 		},
 	})
 
@@ -266,11 +277,15 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
 	require.NoError(t, err)
 
+	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
+		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+	require.NoError(t, err)
+
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID)
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
-			{CollectionID: col.ID(), SignerIDs: []flow.Identifier{colID.NodeID}, ReferenceBlockID: ref.ID()},
+			{CollectionID: col.ID(), SignerIndices: signerIndices, ReferenceBlockID: ref.ID()},
 		},
 	})
 
