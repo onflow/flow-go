@@ -12,6 +12,9 @@ import (
 	"github.com/onflow/flow-go/module/util"
 )
 
+// ErrComponentShutdown is returned by a component which has already been shut down.
+var ErrComponentShutdown = fmt.Errorf("component has already shut down")
+
 // Component represents a component which can be started and stopped, and exposes
 // channels that close when startup and shutdown have completed.
 // Once Start has been called, the channel returned by Done must close eventually,

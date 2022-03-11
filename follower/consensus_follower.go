@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	access "github.com/onflow/flow-go/cmd/access/node_builder"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
@@ -193,11 +194,11 @@ func NewConsensusFollower(
 }
 
 // onBlockFinalized relays the block finalization event to all registered consumers.
-func (cf *ConsensusFollowerImpl) onBlockFinalized(finalizedBlockID flow.Identifier) {
+func (cf *ConsensusFollowerImpl) onBlockFinalized(finalizedBlock *model.Block) {
 	cf.consumersMu.RLock()
 	for _, consumer := range cf.consumers {
 		cf.consumersMu.RUnlock()
-		consumer(finalizedBlockID)
+		consumer(finalizedBlock)
 		cf.consumersMu.RLock()
 	}
 	cf.consumersMu.RUnlock()
