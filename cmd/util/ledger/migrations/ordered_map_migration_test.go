@@ -4,12 +4,12 @@ import (
 	"math"
 	"testing"
 
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/engine/execution/state"
