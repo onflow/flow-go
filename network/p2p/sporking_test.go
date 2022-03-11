@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -220,21 +219,17 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
 	topic network.Topic) {
-	msg := &message.Message{
-		Payload: []byte("hello"),
-	}
-	payload, err := msg.Marshal()
-	require.NoError(t, err)
+	data := []byte("hello")
 
 	// send a 1-k message from source node to destination node
-	err = sourceNode.Publish(ctx, topic, payload)
+	err := sourceNode.Publish(ctx, topic, data)
 	require.NoError(t, err)
 
 	// assert that the message is received by the destination node
 	unittest.AssertReturnsBefore(t, func() {
 		msg, err := dstnSub.Next(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, payload, msg.Data)
+		assert.Equal(t, data, msg.Data)
 	},
 		// libp2p hearbeats every second, so at most the message should take 1 second
 		2*time.Second)
@@ -245,14 +240,10 @@ func testOneToKMessagingFails(ctx context.Context,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
 	topic network.Topic) {
-	msg := &message.Message{
-		Payload: []byte("hello"),
-	}
-	payload, err := msg.Marshal()
-	require.NoError(t, err)
+	data := []byte("hello")
 
 	// send a 1-k message from source node to destination node
-	err = sourceNode.Publish(ctx, topic, payload)
+	err := sourceNode.Publish(ctx, topic, data)
 	require.NoError(t, err)
 
 	// assert that the message is never received by the destination node

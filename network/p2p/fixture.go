@@ -23,7 +23,6 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -114,7 +113,7 @@ func nodeFixture(
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(logger, noopMetrics)
 
-	builder := NewNodeBuilder(logger, parameters.address, parameters.key, sporkId, validator.TopicValidatorFactory(cborcodec.NewCodec())).
+	builder := NewNodeBuilder(logger, parameters.address, parameters.key, sporkId, validator.TopicValidatorFactory(nil)).
 		SetConnectionManager(connManager).
 		SetPubSub(pubsub.NewGossipSub).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {

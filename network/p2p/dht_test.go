@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	flownet "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -134,12 +133,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan peer.ID, count)
 
-	msg := &message.Message{
-		Payload: []byte("hello"),
-	}
-
-	data, err := msg.Marshal()
-	require.NoError(t, err)
+	data := []byte("hello")
 
 	for _, n := range nodes {
 		// defines a func to read from the subscription

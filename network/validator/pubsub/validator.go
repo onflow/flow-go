@@ -63,10 +63,16 @@ type ValidatorData struct {
 func TopicValidatorFactory(codec network.Codec) func(...MessageValidator) pubsub.ValidatorEx {
 	return func(validators ...MessageValidator) pubsub.ValidatorEx {
 		return func(ctx context.Context, receivedFrom peer.ID, rawMsg *pubsub.Message) pubsub.ValidationResult {
-			decodedMessage, err := codec.Decode(rawMsg.Data)
+			var msg interface{} = rawMsg.GetData()
 
-			if err != nil {
-				return pubsub.ValidationReject
+			if codec != nil {
+				decodedMsg, err := codec.Decode(rawMsg.Data)
+
+				if err != nil {
+					return pubsub.ValidationReject
+				}
+
+				msg = decodedMsg
 			}
 
 			from, err := messageSigningID(rawMsg)
@@ -75,13 +81,13 @@ func TopicValidatorFactory(codec network.Codec) func(...MessageValidator) pubsub
 			}
 
 			rawMsg.ValidatorData = ValidatorData{
-				Message: decodedMessage,
+				Message: msg,
 				From:    from,
 			}
 
 			result := pubsub.ValidationAccept
 			for _, validator := range validators {
-				switch res := validator(ctx, from, decodedMessage); res {
+				switch res := validator(ctx, from, msg); res {
 				case pubsub.ValidationReject:
 					return res
 				case pubsub.ValidationIgnore:

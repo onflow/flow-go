@@ -227,8 +227,9 @@ func (builder *LibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 			unicast.NewLibP2PStreamFactory(host),
 			builder.sporkID,
 		),
-		pCache: pCache,
-		pubSub: pubSub,
+		pCache:                pCache,
+		pubSub:                pubSub,
+		topicValidatorFactory: builder.topicValidatorFactory,
 	}
 
 	return node, nil
