@@ -195,7 +195,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNotAdded() {
 func (suite *IngestionCoreSuite) TestOnGuaranteeNoGuarantors() {
 	// create a guarantee without any signers
 	guarantee := suite.validGuarantee()
-	guarantee.SignerIDs = nil
+	guarantee.SignerIndices = nil
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
