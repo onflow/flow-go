@@ -245,7 +245,7 @@ func (e *executionDataRequesterImpl) fetchRequestProcessor(ctx irrecoverable.Sig
 	<-e.eds.Ready()
 	ready()
 
-	e.fetchRequestProcessingLoop(ctx)
+	e.fetchProcessingLoop(ctx)
 }
 
 func (e *executionDataRequesterImpl) notificationProcessor(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -318,7 +318,10 @@ func (e *executionDataRequesterImpl) processSealsFromHeight(ctx irrecoverable.Si
 		return fmt.Errorf("failed to get block: %w", err)
 	}
 
-	logger := e.log.With().Str("finalized_block_id", block.ID().String()).Uint64("finalized_block_height", height).Logger()
+	logger := e.log.With().
+		Str("finalized_block_id", block.ID().String()).
+		Uint64("finalized_block_height", height).
+		Logger()
 
 	if len(block.Payload.Seals) == 0 {
 		logger.Debug().Msg("no seals in block")
@@ -328,8 +331,8 @@ func (e *executionDataRequesterImpl) processSealsFromHeight(ctx irrecoverable.Si
 	logger.Debug().Msgf("checking %d seals in block", len(block.Payload.Seals))
 
 	// Find all seals in the block and sort them by height (ascending). This helps with processing
-	// lower height first since notifications are sent in order and seals are not guaranteed to
-	// be sorted
+	// lower heights first since notifications are sent in order and seals are not guaranteed to
+	// be sorted.
 
 	requests, err := e.requestsFromSeals(block.Payload.Seals)
 	if err != nil {
@@ -377,7 +380,7 @@ func (e *executionDataRequesterImpl) requestsFromSeals(seals []*flow.Seal) ([]*s
 
 // Fetch Worker Methods
 
-func (e *executionDataRequesterImpl) fetchRequestProcessingLoop(ctx irrecoverable.SignalerContext) {
+func (e *executionDataRequesterImpl) fetchProcessingLoop(ctx irrecoverable.SignalerContext) {
 	for {
 		// prioritize shutdowns
 		if ctx.Err() != nil {
