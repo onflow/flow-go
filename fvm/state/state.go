@@ -234,7 +234,7 @@ func (s *State) MergeState(other *State, enforceLimit bool) error {
 
 	err = s.meter.MergeMeter(other.meter)
 	if err != nil {
-		return errors.NewStateMergeFailure(err)
+		return err
 	}
 
 	// apply address updates
