@@ -164,12 +164,14 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("internal error retrieving collector clusters: %w", err)
+		return fmt.Errorf("internal error retrieving collector clusters for guarantee (ReferenceBlockID: %v, ChainID: %v): %w",
+			guarantee.ReferenceBlockID, guarantee.ChainID, err)
 	}
 
 	// ensure the guarantors are from the same cluster
 	clusterMembers := cluster.Members()
 
+	// TODO: validate checksum
 	guarantorIndices, err := packer.DecodeSignerIndices(guarantee.SignerIndices, len(clusterMembers))
 	if err != nil {
 		return engine.NewInvalidInputErrorf("could not decode guarantor indices: %v", err)
