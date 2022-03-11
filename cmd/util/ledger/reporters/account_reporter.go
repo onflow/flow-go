@@ -120,6 +120,7 @@ type balanceProcessor struct {
 	ctx           fvm.Context
 	view          state.View
 	prog          *programs.Programs
+	intf          runtime.Interface
 	balanceScript []byte
 	momentsScript []byte
 
@@ -133,72 +134,69 @@ type balanceProcessor struct {
 	fusdScript []byte
 }
 
-func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
-
+func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 	prog := programs.NewEmptyPrograms()
-	balanceScript := []byte(fmt.Sprintf(`
+
+	v := view.NewChild()
+	st := state.NewState(v, state.WithMaxInteractionSizeAllowed(math.MaxUint64))
+	sth := state.NewStateHolder(st)
+	accounts := state.NewAccounts(sth)
+
+	return &balanceProcessor{
+		vm:       vm,
+		ctx:      ctx,
+		view:     v,
+		accounts: accounts,
+		st:       st,
+		prog:     prog,
+		intf:     fvm.NewScriptEnvironment(ctx, vm, sth, prog),
+	}
+}
+
+func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
+	bp := NewBalanceReporter(chain, view)
+
+	bp.logger = logger
+	bp.rwa = rwa
+	bp.rwc = rwc
+	bp.rwm = rwm
+	bp.balanceScript = []byte(fmt.Sprintf(`
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
-
 				pub fun main(account: Address): UFix64 {
 					let acct = getAccount(account)
 					let vaultRef = acct.getCapability(/public/flowTokenBalance)
 						.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 						?? panic("Could not borrow Balance reference to the Vault")
-
 					return vaultRef.balance
 				}
-			`, fvm.FungibleTokenAddress(ctx.Chain), fvm.FlowTokenAddress(ctx.Chain)))
+			`, fvm.FungibleTokenAddress(bp.ctx.Chain), fvm.FlowTokenAddress(bp.ctx.Chain)))
 
-	fusdScript := []byte(fmt.Sprintf(`
+	bp.fusdScript = []byte(fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FUSD from 0x%s
-
 			pub fun main(address: Address): UFix64 {
 				let account = getAccount(address)
-
 				let vaultRef = account.getCapability(/public/fusdBalance)!
 					.borrow<&FUSD.Vault{FungibleToken.Balance}>()
 					?? panic("Could not borrow Balance reference to the Vault")
-
 				return vaultRef.balance
 			}
-			`, fvm.FungibleTokenAddress(ctx.Chain), "3c5959b568896393"))
+			`, fvm.FungibleTokenAddress(bp.ctx.Chain), "3c5959b568896393"))
 
-	momentsScript := []byte(`
+	bp.momentsScript = []byte(`
 			import TopShot from 0x0b2a3299cc857e29
-
 			pub fun main(account: Address): Int {
 				let acct = getAccount(account)
 				let collectionRef = acct.getCapability(/public/MomentCollection)
 										.borrow<&{TopShot.MomentCollectionPublic}>()!
-
 				return collectionRef.getIDs().length
 			}
 			`)
 
-	v := view.NewChild()
-	st := state.NewState(v)
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
-
-	return &balanceProcessor{
-		logger:        logger,
-		vm:            vm,
-		ctx:           ctx,
-		view:          v,
-		accounts:      accounts,
-		st:            st,
-		prog:          prog,
-		rwa:           rwa,
-		rwc:           rwc,
-		rwm:           rwm,
-		balanceScript: balanceScript,
-		momentsScript: momentsScript,
-		fusdScript:    fusdScript,
-	}
+	return bp
 }
 
 func (c *balanceProcessor) reportAccountData(indx uint64) {
@@ -390,9 +388,9 @@ func (c *balanceProcessor) ReadStored(address flow.Address, domain common.PathDo
 	receiver, err := c.vm.Runtime.ReadStored(addr,
 		cadence.Path{
 			Domain:     domain.Identifier(),
-			Identifier: "flowTokenReceiver",
+			Identifier: id,
 		},
-		runtime.Context{},
+		runtime.Context{Interface: c.intf},
 	)
 	return receiver, err
 }

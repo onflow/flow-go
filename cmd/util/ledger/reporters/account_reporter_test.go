@@ -60,5 +60,5 @@ func TestLookupValues(t *testing.T) {
 
 	stored, err := bp.ReadStored(address1, common.PathDomainStorage, "Foo")
 	require.NoError(t, err)
-	require.Equal(t, stored, one)
+	require.Equal(t, one, stored)
 }
