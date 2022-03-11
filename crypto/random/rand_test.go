@@ -82,22 +82,9 @@ func TestChacha20Compliance(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 // The tests are targeting the PRG implementations in the package.
 // For now, the tests are only used for Chacha20 PRG, but can be ported
 // to test another PRG implementation.
-=======
-// TestEmptyPermutationSubset evaluates that
-//  * permuting an empty set returns an empty list
-//  * drawing a sample of size zero from a non-empty set returns an empty list
-func TestEmptyPermutationSubset(t *testing.T) {
-	seed := make([]byte, 32)
-	seed[0] = 45
-	stream_id := make([]byte, 12)
-
-	rng, err := NewRand(seed, stream_id)
-	require.NoError(t, err)
->>>>>>> 77ed91d3da (Implement ChaCha20 as a CSPRNG)
 
 // Simple unit testing of Uint using a very basic randomness test.
 // It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
@@ -134,7 +121,6 @@ func TestUint(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 // Simple unit testing of SubPermutation using a very basic randomness test.
 // It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
 //
@@ -147,15 +133,6 @@ func TestSubPermutation(t *testing.T) {
 	crand.Read(customizer)
 
 	rng, err := NewChacha20PRG(seed, customizer)
-=======
-func TestRandomShuffle(t *testing.T) {
-	listSize := 100
-	seed := make([]byte, 32)
-	seed[0] = 45
-
-	stream_id := make([]byte, 12)
-	rng, err := NewRand(seed, stream_id)
->>>>>>> 77ed91d3da (Implement ChaCha20 as a CSPRNG)
 	require.NoError(t, err)
 
 	t.Run("basic randomness", func(t *testing.T) {
@@ -197,7 +174,6 @@ func TestRandomShuffle(t *testing.T) {
 		assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic ordering randomness test failed. stdev %v, mean %v", stdev, mean))
 	})
 
-<<<<<<< HEAD
 	// Evaluate that
 	//  - permuting an empty set returns an empty list
 	//  - drawing a sample of size zero from a non-empty set returns an empty list
@@ -226,21 +202,9 @@ func TestRandomShuffle(t *testing.T) {
 		res, err = rng.SubPermutation(-3, 5)
 		require.Error(t, err)
 		assert.Nil(t, res)
-=======
-func TestEmptyShuffle(t *testing.T) {
-	seed := make([]byte, 32)
-	seed[0] = 45
-	stream_id := make([]byte, 12)
-	rng, err := NewRand(seed, stream_id)
-	require.NoError(t, err)
-	emptySlice := make([]float64, 0)
-	err = rng.Shuffle(len(emptySlice), func(i, j int) {
-		emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
->>>>>>> 77ed91d3da (Implement ChaCha20 as a CSPRNG)
 	})
 }
 
-<<<<<<< HEAD
 // Simple unit testing of Shuffle using a very basic randomness test.
 // It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
 func TestShuffle(t *testing.T) {
@@ -251,16 +215,6 @@ func TestShuffle(t *testing.T) {
 	crand.Read(customizer)
 
 	rng, err := NewChacha20PRG(seed, customizer)
-=======
-func TestRandomSamples(t *testing.T) {
-	listSize := 100
-	samplesSize := 20
-	seed := make([]byte, 32)
-	seed[0] = 45
-	stream_id := make([]byte, 12)
-
-	rng, err := NewRand(seed, stream_id)
->>>>>>> 77ed91d3da (Implement ChaCha20 as a CSPRNG)
 	require.NoError(t, err)
 
 	t.Run("basic randomness", func(t *testing.T) {
@@ -335,7 +289,6 @@ func TestRandomSamples(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 func TestSamples(t *testing.T) {
 
 	seed := make([]byte, Chacha20SeedLen)
@@ -344,25 +297,9 @@ func TestSamples(t *testing.T) {
 	crand.Read(customizer)
 
 	rng, err := NewChacha20PRG(seed, customizer)
-=======
-// TestEmptySamples verifies that drawing a sample of size zero leaves the original list unchanged
-func TestEmptySamples(t *testing.T) {
-	seed := make([]byte, 32)
-	seed[0] = 45
-	stream_id := make([]byte, 12)
-	rng, err := NewRand(seed, stream_id)
->>>>>>> 77ed91d3da (Implement ChaCha20 as a CSPRNG)
 	require.NoError(t, err)
 
 	t.Run("basic randmoness", func(t *testing.T) {
-
-		listSize := 100
-		samplesSize := 20
-
-		// statictics parameters
-		sampleSize := 100000
-		tolerance := 0.05
-		// tests the subset sampling randomness
 		samplingDistribution := make([]float64, listSize)
 		// tests the subset ordering randomness (using a particular element testElement)
 		orderingDistribution := make([]float64, samplesSize)
@@ -432,7 +369,6 @@ func TestEmptySamples(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 // TestStateRestore tests the serilaization and deserialization functions
 // Store and Restore
 func TestStateRestore(t *testing.T) {
@@ -445,19 +381,6 @@ func TestStateRestore(t *testing.T) {
 
 	// create an rng
 	rng, err := NewChacha20PRG(seed, customizer)
-=======
-// TestState tests the function State()
-func TestState(t *testing.T) {
-	// create a seed
-	len := 32 * 3 // 3 internal chacha20s
-	seed := make([]byte, len)
-	for i := 0; i < len; i++ {
-		seed[i] = byte(rand.Intn(256))
-	}
-	stream_id := make([]byte, 12)
-	// create an rng
-	rng, err := NewRand(seed, stream_id)
->>>>>>> 77ed91d3da (Implement ChaCha20 as a CSPRNG)
 	require.NoError(t, err)
 
 	// evolve the internal state of the rng
@@ -466,7 +389,6 @@ func TestState(t *testing.T) {
 		_ = rng.UintN(1024)
 	}
 	// get the internal state of the rng
-<<<<<<< HEAD
 	state := rng.Store()
 
 	// check the state is deterministic
@@ -484,20 +406,5 @@ func TestState(t *testing.T) {
 		rand1 := rng.UintN(1024)
 		rand2 := secondRng.UintN(1024)
 		assert.Equal(t, rand1, rand2, "the 2 rngs are not identical on round %d", i)
-=======
-	state := rng.State()
-	state_clone := rng.State()
-	require.True(t, bytes.Equal(state, state_clone), "State is not deterministic")
-	// seed a new rng with the internal state
-	secondRng, err := Restore(state)
-	require.NoError(t, err)
-	require.True(t, bytes.Equal(state, secondRng.State()), "State o Restore is not identity")
-	// test the 2 rngs are giving identical outputs
-	iterations = rand.Intn(100)
-	for i := 0; i < iterations; i++ {
-		rand1 := rng.UintN(1024)
-		rand2 := secondRng.UintN(1024)
-		require.Equal(t, rand1, rand2, "the 2 rngs are not identical on round %d", i)
->>>>>>> 77ed91d3da (Implement ChaCha20 as a CSPRNG)
 	}
 }

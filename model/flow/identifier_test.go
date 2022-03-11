@@ -85,10 +85,6 @@ func TestIdentifierSample(t *testing.T) {
 }
 
 func TestMerkleRoot(t *testing.T) {
-<<<<<<< HEAD
-=======
-
->>>>>>> c244555900 (Update the trie PUT function for use of ID calc)
 	total := 10
 	ids := make([]flow.Identifier, total)
 	for i := range ids {
