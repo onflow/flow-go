@@ -310,3 +310,20 @@ func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
 	require.Error(cs.T(), err)
 	require.True(cs.T(), engine.IsIncompatibleInputTypeError(err))
 }
+
+// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+// Tests the whole processing pipeline.
+func (cs *ComplianceSuite) TestOnFinalizedBlock() {
+	finalizedBlock := unittest.ClusterBlockFixture()
+	cs.head = &finalizedBlock
+
+	*cs.pending = module.PendingClusterBlockBuffer{}
+	cs.pending.On("PruneByView", finalizedBlock.Header.View).Return(nil).Once()
+	cs.pending.On("Size").Return(uint(0)).Once()
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header, finalizedBlock.Header.View-1))
+
+	require.Eventually(cs.T(),
+		func() bool {
+			return cs.pending.AssertCalled(cs.T(), "PruneByView", finalizedBlock.Header.View)
+		}, time.Second, time.Millisecond*20)
+}

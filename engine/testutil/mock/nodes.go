@@ -66,6 +66,10 @@ type StateFixture struct {
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
+	// context and cancel function used to start/stop components
+	Ctx    irrecoverable.SignalerContext
+	Cancel context.CancelFunc
+
 	Log            zerolog.Logger
 	Metrics        *metrics.NoopCollector
 	Tracer         module.Tracer
@@ -128,6 +132,7 @@ type CollectionNode struct {
 }
 
 func (n CollectionNode) Ready() <-chan struct{} {
+	n.IngestionEngine.Start(n.Ctx)
 	return util.AllReady(
 		n.PusherEngine,
 		n.ProviderEngine,
@@ -139,6 +144,7 @@ func (n CollectionNode) Ready() <-chan struct{} {
 func (n CollectionNode) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
+		n.GenericNode.Cancel()
 		<-util.AllDone(
 			n.PusherEngine,
 			n.ProviderEngine,

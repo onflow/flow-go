@@ -133,7 +133,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByHeight", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return()
 
 	closed := func() <-chan struct{} {
 		channel := make(chan struct{})
@@ -155,7 +155,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.metrics = metrics.NewNoopCollector()
 
 	// initialize the engine
-	e, err := NewCore(
+	core, err := NewCore(
 		unittest.Logger(),
 		cs.metrics,
 		cs.metrics,
@@ -167,7 +167,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
-	cs.core = e
+	cs.core = core
 	// assign engine with consensus & synchronization
 	cs.core.hotstuff = cs.hotstuff
 	cs.core.sync = cs.sync
