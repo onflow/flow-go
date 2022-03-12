@@ -328,6 +328,29 @@ type ExecutionDataServiceMetrics interface {
 	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64)
 }
 
+type ExecutionDataRequesterMetrics interface {
+	// ExecutionDataFetchStarted records an in-progress download
+	ExecutionDataFetchStarted()
+
+	// ExecutionDataFetchFinished records a completed download
+	ExecutionDataFetchFinished(duration time.Duration, success bool, height uint64)
+
+	// NotificationSent reports that ExecutionData received notifications were sent for a block height
+	NotificationSent(height uint64)
+
+	// FinalizationEventDropped reports the total number of finalized block notifications dropped
+	FinalizationEventDropped()
+
+	// RetryDropped reports the total number of ExecutionData download retries requests dropped
+	RetryDropped()
+
+	// FetchRetried reports that a download retry was processed
+	FetchRetried()
+
+	// Halted reports the requester is halted
+	Halted()
+}
+
 type RuntimeMetrics interface {
 	// TransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)

@@ -155,3 +155,11 @@ func (nc *NoopCollector) ExecutionDataAddStarted()                              
 func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)                  {}
 func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
 func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)                  {}
+func (nc *NoopCollector) ExecutionDataFetchStarted()                                            {}
+func (nc *NoopCollector) ExecutionDataFetchFinished(duration time.Duration, success bool, height uint64) {
+}
+func (nc *NoopCollector) NotificationSent(height uint64) {}
+func (nc *NoopCollector) FinalizationEventDropped()      {}
+func (nc *NoopCollector) RetryDropped()                  {}
+func (nc *NoopCollector) FetchRetried()                  {}
+func (nc *NoopCollector) Halted()                        {}

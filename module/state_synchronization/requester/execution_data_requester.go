@@ -75,11 +75,12 @@ type ExecutionDataRequester interface {
 
 type executionDataRequesterImpl struct {
 	component.Component
-	cm  *component.ComponentManager
-	ds  datastore.Batching
-	bs  network.BlobService
-	eds state_synchronization.ExecutionDataService
-	log zerolog.Logger
+	cm      *component.ComponentManager
+	ds      datastore.Batching
+	bs      network.BlobService
+	eds     state_synchronization.ExecutionDataService
+	metrics module.ExecutionDataRequesterMetrics
+	log     zerolog.Logger
 
 	// Local db objects
 	blocks  storage.Blocks
@@ -117,7 +118,7 @@ type executionDataRequesterImpl struct {
 // NewexecutionDataRequester creates a new execution data requester component
 func New(
 	log zerolog.Logger,
-	edrMetrics module.ExecutionDataServiceMetrics, // TODO: add requester specific metrics
+	edrMetrics module.ExecutionDataRequesterMetrics,
 	datastore datastore.Batching,
 	blobservice network.BlobService,
 	eds state_synchronization.ExecutionDataService,
@@ -134,6 +135,7 @@ func New(
 		ds:              datastore,
 		bs:              blobservice,
 		eds:             eds,
+		metrics:         edrMetrics,
 		rootBlockHeight: rootBlockHeight,
 		blocks:          blocks,
 		results:         results,
@@ -199,6 +201,7 @@ func (e *executionDataRequesterImpl) OnBlockFinalized(block *model.Block) {
 	case e.finalizedBlocks <- block.BlockID:
 	default:
 		logger.Warn().Msg("finalized block queue is full")
+		e.metrics.FinalizationEventDropped()
 	}
 }
 
@@ -390,6 +393,7 @@ func (e *executionDataRequesterImpl) fetchProcessingLoop(ctx irrecoverable.Signa
 		select {
 		case request := <-e.fetchRetryRequests:
 			e.processFetchRequest(ctx, request)
+			e.metrics.FetchRetried()
 			continue
 		default:
 		}
@@ -414,23 +418,22 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 		ctx.Throw(fmt.Errorf("failed to lookup execution result for block: %w", err))
 	}
 
-	executionData, err := e.fetchExecutionData(ctx, result.ExecutionDataID)
+	executionData, err := e.fetchExecutionData(ctx, result.ExecutionDataID, request.Height)
 
 	if isInvalidBlobError(err) {
 		// This means an execution result was sealed with an invalid execution data id (invalid data).
 		// Eventually, verification nodes will verify that the execution data is valid, and not sign the receipt
-
-		// TODO: add metric
 		logger.Error().Err(err).
 			Str("execution_data_id", result.ExecutionDataID.String()).
 			Msg("HALTING REQUESTER: invalid execution data found")
 
 		e.status.Halt(ctx)
+		e.metrics.Halted()
 		ctx.Throw(ErrRequesterHalted)
 	}
 
 	// Some or all of the blob was missing or corrupt. retry
-	if isBlobNotFoundError(err) {
+	if isBlobNotFoundError(err) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		logger.Error().Err(err).Msg("failed to get execution data for block")
 
 		select {
@@ -443,7 +446,8 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 			logger.Error().
 				Str("execution_data_id", result.ExecutionDataID.String()).
 				Msg("fetch retry queue is full")
-			// TODO: add metric
+
+			e.metrics.RetryDropped()
 		}
 		return
 	}
@@ -471,12 +475,19 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 }
 
 // fetchExecutionData fetches the ExecutionData by its ID, using fetchTimeout
-func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier) (*state_synchronization.ExecutionData, error) {
+func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier, height uint64) (executionData *state_synchronization.ExecutionData, err error) {
 	ctx, cancel := context.WithTimeout(signalerCtx, e.fetchTimeout)
 	defer cancel()
 
+	start := time.Now()
+	e.metrics.ExecutionDataFetchStarted()
+	defer func() {
+		// needs to be run inside a closure so the variables are resolved when the defer is executed
+		e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
+	}()
+
 	// Get the data from the network
-	executionData, err := e.eds.Get(ctx, executionDataID)
+	executionData, err = e.eds.Get(ctx, executionDataID)
 
 	if err != nil {
 		return nil, err
@@ -521,6 +532,7 @@ func (e *executionDataRequesterImpl) sendNotifications(ctx irrecoverable.Signale
 		}
 
 		e.log.Debug().Msgf("notifying for block %d", entry.Height)
+		e.metrics.NotificationSent(entry.Height)
 
 		// ExecutionData may have been purged, in which case, look it up again
 		if entry.ExecutionData == nil {
@@ -595,6 +607,7 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 				Msg("HALTING REQUESTER: invalid execution data found")
 
 			e.status.Halt(ctx)
+			e.metrics.Halted()
 			ctx.Throw(ErrRequesterHalted)
 		}
 
