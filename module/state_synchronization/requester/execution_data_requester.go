@@ -710,16 +710,3 @@ func isBlobNotFoundError(err error) bool {
 	var blobNotFoundError *state_synchronization.BlobNotFoundError
 	return errors.As(err, &blobNotFoundError)
 }
-
-// [ ] Add metrics
-// * Fetches in progress
-// * Fetch duration
-// * Blocks behind latest
-// * Outstanding notifications
-// * Outstanding fetches
-// * Dropped finalization messages
-// * Dropped retry requests
-// * Failed downloads
-// * most highest notified height
-// * most highest fetched height
-// * heap size
