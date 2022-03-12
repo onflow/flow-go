@@ -482,7 +482,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 		edr, err := edrequester.New(
 			builder.Logger,
-			metrics.NewNoopCollector(),
+			metrics.NewExecutionDataRequesterCollector(),
 			dstore,
 			blobservice,
 			builder.ExecutionDataService,
