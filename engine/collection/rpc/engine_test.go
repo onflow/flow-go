@@ -1,4 +1,4 @@
-package ingress
+package rpc
 
 import (
 	"context"
@@ -10,24 +10,24 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
+	rpcmock "github.com/onflow/flow-go/engine/collection/rpc/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSubmitTransaction(t *testing.T) {
-	engine := mocknetwork.Engine{}
+	backend := new(rpcmock.Backend)
 
 	h := handler{
 		chainID: flow.Testnet,
-		engine:  &engine,
+		backend: backend,
 	}
 
 	tx := unittest.TransactionBodyFixture()
 
 	t.Run("should submit transaction to engine", func(t *testing.T) {
-		engine.On("ProcessLocal", &tx).Return(nil).Once()
+		backend.On("ProcessTransaction", &tx).Return(nil).Once()
 
 		res, err := h.SendTransaction(context.Background(), &access.SendTransactionRequest{
 			Transaction: convert.TransactionToMessage(tx),
@@ -35,7 +35,7 @@ func TestSubmitTransaction(t *testing.T) {
 		require.NoError(t, err)
 
 		// should submit the transaction to the engine
-		engine.AssertCalled(t, "ProcessLocal", &tx)
+		backend.AssertCalled(t, "ProcessTransaction", &tx)
 
 		// should return the fingerprint of the submitted transaction
 		assert.Equal(t, tx.ID(), flow.HashToID(res.Id))
@@ -43,7 +43,7 @@ func TestSubmitTransaction(t *testing.T) {
 
 	t.Run("should pass through error", func(t *testing.T) {
 		expected := errors.New("error")
-		engine.On("ProcessLocal", &tx).Return(expected).Once()
+		backend.On("ProcessTransaction", &tx).Return(expected).Once()
 
 		res, err := h.SendTransaction(context.Background(), &access.SendTransactionRequest{
 			Transaction: convert.TransactionToMessage(tx),
@@ -53,7 +53,7 @@ func TestSubmitTransaction(t *testing.T) {
 		}
 
 		// should submit the transaction to the engine
-		engine.AssertCalled(t, "ProcessLocal", &tx)
+		backend.AssertCalled(t, "ProcessTransaction", &tx)
 
 		// should only return the error
 		assert.Nil(t, res)

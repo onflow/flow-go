@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"testing"
 	"time"
 
@@ -216,9 +217,9 @@ func (fm *followerManager) startFollower(ctx context.Context) {
 		"timed out while waiting for consensus follower to start")
 }
 
-func (fm *followerManager) onBlockFinalizedConsumer(finalizedBlockID flow.Identifier) {
+func (fm *followerManager) onBlockFinalizedConsumer(block *model.Block) {
 	// push the finalized block ID to the blockIDChannel channel
-	fm.blockIDChan <- finalizedBlockID
+	fm.blockIDChan <- block.BlockID
 }
 
 // getBlock checks if the underlying storage of the consensus follower has a block
