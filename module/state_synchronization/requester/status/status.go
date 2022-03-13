@@ -14,6 +14,8 @@ import (
 const statusDBKey = "execution_requester_status"
 
 type Status struct {
+	startHeight uint64
+
 	// The highest block height whose ExecutionData has been fetched
 	lastReceived uint64
 
@@ -45,40 +47,50 @@ type Status struct {
 	log zerolog.Logger
 }
 
+// persistedStatus is the status data that is persisted to the db, so it can be reused across reloads
 type persistedStatus struct {
-	LastReceived uint64
+	// LastNotified is the highest consecutive execution data received. When loaded, this is used
+	// as the starting point requesting ExecutionData for new blocks.
+	// Note: LastNotified is used instead of LastReceived since there could be a large gap of
+	// un-downloaded blocks between LastReceived and LastNotified. Using LastNotified allows the
+	// requester to backfill all of missing blocks even when it's not configured to recheck the
+	// datastore.
+	LastNotified uint64
 
-	// Persisted to the db so the condition can be detected without inspecting the entire datastore
+	// Halted is persisted to the db so the condition can be detected without inspecting the entire
+	// datastore
 	Halted bool
 }
 
-func New(db datastore.Batching, log zerolog.Logger, maxCachedEntries, maxSearchAhead uint64) *Status {
-	return &Status{
-		db:  db,
-		log: log,
+func New(db datastore.Batching, log zerolog.Logger, startHeight uint64, maxCachedEntries, maxSearchAhead uint64) *Status {
+	h := &notificationHeap{}
+	heap.Init(h)
 
+	return &Status{
+		db:   db,
+		log:  log,
+		heap: h,
+
+		startHeight:      startHeight,
 		maxCachedEntries: maxCachedEntries,
 		maxSearchAhead:   maxSearchAhead,
 	}
 }
 
 // Load loads status from the db
-func (s *Status) Load(ctx context.Context, startHeight uint64) error {
+func (s *Status) Load(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	defer func() {
 		// defaults to the start block when booting with a fresh db
-		if s.lastReceived == 0 {
-			s.lastReceived = startHeight
+		if s.lastNotified == 0 {
+			s.lastNotified = s.startHeight
 		}
 
 		// notifications restart after a fresh boot
-		s.lastNotified = s.lastReceived
-		s.lastProcessed = s.lastReceived
+		s.lastReceived = s.lastNotified
+		s.lastProcessed = s.lastNotified
 	}()
-
-	s.heap = &notificationHeap{}
-	heap.Init(s.heap)
 
 	data, err := s.db.Get(ctx, datastore.NewKey(statusDBKey))
 	if err == datastore.ErrNotFound {
@@ -96,7 +108,7 @@ func (s *Status) Load(ctx context.Context, startHeight uint64) error {
 		return fmt.Errorf("failed to unmarshal status: %w", err)
 	}
 
-	s.lastReceived = savedStatus.LastReceived
+	s.lastNotified = savedStatus.LastNotified
 	s.halted = savedStatus.Halted
 
 	return nil
@@ -105,7 +117,7 @@ func (s *Status) Load(ctx context.Context, startHeight uint64) error {
 // save writes status to the db
 func (s *Status) save(ctx context.Context) error {
 	savedStatus := persistedStatus{
-		LastReceived: s.lastReceived,
+		LastNotified: s.lastNotified,
 		Halted:       s.halted,
 	}
 
@@ -125,7 +137,7 @@ func (s *Status) save(ctx context.Context) error {
 // NextNotification returns the BlockEntry for the next notification to send and marks it as notified.
 // If the next notification is available, it returns the BlockEntry and true. Otherwise, it returns
 // nil and false.
-func (s *Status) NextNotification() (*BlockEntry, bool) {
+func (s *Status) NextNotification(ctx context.Context) (*BlockEntry, bool) {
 	// This needs a write lock since it may modify the heap
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -133,22 +145,43 @@ func (s *Status) NextNotification() (*BlockEntry, bool) {
 	entry := s.heap.PeekMin()
 	next := s.nextHeight()
 
+	// Next notification is not available yet
+	if entry == nil || entry.Height > next {
+		return nil, false
+	}
+
+	// Remove any entires below the next height. This clears out any duplicates that have already
+	// been notified.
+	for entry.Height < next && s.heap.Len() > 0 {
+		entry = heap.Pop(s.heap).(*BlockEntry)
+	}
+
+	// All entries were duplicates. The heap now is empty
 	if entry == nil || entry.Height != next {
 		return nil, false
 	}
 
-	entry = heap.Pop(s.heap).(*BlockEntry)
+	// Now we have the next height to notify
 
 	s.firstNotificationSent = true
 	s.lastNotified = entry.Height
+
+	if err := s.save(ctx); err != nil {
+		s.log.Error().Err(err).Msg("failed to persist fetched state")
+	}
 
 	return entry, true
 }
 
 // Fetched submits the BlockEntry for notification
-func (s *Status) Fetched(ctx context.Context, entry *BlockEntry) {
+func (s *Status) Fetched(entry *BlockEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// don't accept entries we've already notified for
+	if entry.Height < s.nextHeight() {
+		return
+	}
 
 	// Enforce a maximum possible cache size. The cache will be effective under normal operation.
 	// However, if the requester gets stuck on a block for more than maxCachedEntries blocks, the cache
@@ -159,11 +192,12 @@ func (s *Status) Fetched(ctx context.Context, entry *BlockEntry) {
 
 	heap.Push(s.heap, entry)
 
-	s.lastReceived = entry.Height
-
-	if err := s.save(ctx); err != nil {
-		s.log.Error().Err(err).Msg("failed to persist halted state")
+	// Only track the highest height
+	if entry.Height <= s.lastReceived {
+		return
 	}
+
+	s.lastReceived = entry.Height
 }
 
 // Processed marks a height as processed
@@ -182,7 +216,7 @@ func (s *Status) Halt(ctx context.Context) {
 	s.halted = true
 
 	if err := s.save(ctx); err != nil {
-		s.log.Error().Err(err).Msg("failed to persist fetched state")
+		s.log.Error().Err(err).Msg("failed to persist halted state")
 	}
 }
 
@@ -202,6 +236,14 @@ func (s *Status) LastProcessed() uint64 {
 	defer s.mu.RUnlock()
 
 	return s.lastProcessed
+}
+
+// LastNotified returns the last block height that was notified by the requester
+func (s *Status) LastNotified() uint64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.lastNotified
 }
 
 // LastReceived returns the last block height that was received by the requester
@@ -232,10 +274,17 @@ func (s *Status) NextNotificationHeight() uint64 {
 func (s *Status) nextHeight() uint64 {
 	next := s.lastNotified + 1
 
-	// Special case for block height 0 to distinguish between an unset uint64 and 0
-	if !s.firstNotificationSent && s.lastNotified == 0 {
-		next = 0
+	// Special case for the first block
+	if !s.firstNotificationSent && s.lastNotified == s.startHeight {
+		next = s.startHeight
 	}
 
 	return next
+}
+
+func (s *Status) OutstandingNotifications() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.heap.Len()
 }

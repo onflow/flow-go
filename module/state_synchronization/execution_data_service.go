@@ -453,7 +453,7 @@ func (s *executionDataServiceImpl) Check(ctx context.Context, rootID flow.Identi
 		}
 	}
 
-	logger.Error().Err(ErrBlobTreeDepthExceeded).Msgf("blob tree depth exceeded during delete")
+	logger.Error().Err(ErrBlobTreeDepthExceeded).Msgf("blob tree depth exceeded during check")
 	return []cid.Cid{rootCid}, []error{ErrBlobTreeDepthExceeded}
 }
 

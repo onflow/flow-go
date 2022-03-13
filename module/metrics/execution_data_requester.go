@@ -38,7 +38,7 @@ func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
 	downloadsInProgress := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataRequester,
-		Name:      "execution_requester_download_in_progress",
+		Name:      "execution_requester_in_progress_downloads",
 		Help:      "number of concurrently running execution data download operations",
 	})
 
@@ -73,7 +73,7 @@ func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
 	downloadRetries := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataRequester,
-		Name:      "execution_requester_download_retries",
+		Name:      "execution_requester_download_retries_total",
 		Help:      "number of execution data download retries",
 	})
 
