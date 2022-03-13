@@ -38,10 +38,15 @@ CC_VERSION_STR="$($CC_VAL --version)"
 # we use uname to record which arch we are running on
 ARCH=$(uname -m 2>/dev/null || true)
 
-# Compile x86_64 as westmere by default.
-# See https://github.com/onflow/flow-go/pull/1993#issuecomment-1056048192
-if [[ "$ARCH" = "x86_64" ]]; then
+if [[ "$ARCH" =~ "x86_64" ]]; then
+    # Compile as westmere arch to avoid cross-compilation issues on machines not supporting AVX extensions.
+    # Relic performance as used in flow crypto library is not impacted by whether it is compiled with "native" or "westmere", as proven by benchmark results.  
     MARCH="-march=westmere"
+elif [[ "$ARCH" =~ ^(arm64|armv7|armv7s)$ && "${CC_VERSION_STR[0]}" =~ (clang)  ]]; then
+    #  the "-march=native" option is not supported with clang on ARM
+    MARCH=""
+else
+    MARCH="-march=native"
 else
     # Use defaults for ARM
     MARCH=""
