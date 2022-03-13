@@ -87,7 +87,7 @@ type executionDataRequesterImpl struct {
 	results storage.ExecutionResults
 
 	// The first block height for which to request ExecutionData
-	rootBlockHeight uint64
+	startBlockHeight uint64
 
 	// List of callbacks to call when ExecutionData is successfully fetched for a block
 	consumers []ExecutionDataReceivedCallback
@@ -122,7 +122,7 @@ func New(
 	datastore datastore.Batching,
 	blobservice network.BlobService,
 	eds state_synchronization.ExecutionDataService,
-	rootBlockHeight uint64,
+	startBlockHeight uint64,
 	maxCachedEntries uint64,
 	maxSearchAhead uint64,
 	blocks storage.Blocks,
@@ -131,19 +131,20 @@ func New(
 	startupCheck bool,
 ) (ExecutionDataRequester, error) {
 	e := &executionDataRequesterImpl{
-		log:             log.With().Str("component", "execution_data_requester").Logger(),
-		ds:              datastore,
-		bs:              blobservice,
-		eds:             eds,
-		metrics:         edrMetrics,
-		rootBlockHeight: rootBlockHeight,
-		blocks:          blocks,
-		results:         results,
-		startupCheck:    startupCheck,
-		fetchTimeout:    fetchTimeout,
+		log:              log.With().Str("component", "execution_data_requester").Logger(),
+		ds:               datastore,
+		bs:               blobservice,
+		eds:              eds,
+		metrics:          edrMetrics,
+		startBlockHeight: startBlockHeight,
+		blocks:           blocks,
+		results:          results,
+		startupCheck:     startupCheck,
+		fetchTimeout:     fetchTimeout,
 		status: status.New(
 			datastore,
 			log.With().Str("component", "requester_status").Logger(),
+			startBlockHeight,
 			maxCachedEntries,
 			maxSearchAhead,
 		),
@@ -209,7 +210,7 @@ func (e *executionDataRequesterImpl) OnBlockFinalized(block *model.Block) {
 // requests ExecutionData for each block seal
 func (e *executionDataRequesterImpl) finalizedBlockProcessor(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	// Load previous requester state from db if it exists
-	err := e.status.Load(ctx, e.rootBlockHeight)
+	err := e.status.Load(ctx)
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to load notification state. using defaults")
 	}
@@ -465,7 +466,7 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 
 	request.ExecutionData = executionData
 
-	e.status.Fetched(ctx, request)
+	e.status.Fetched(request)
 
 	select {
 	case <-ctx.Done():
@@ -523,7 +524,7 @@ func (e *executionDataRequesterImpl) notificationProcessingLoop(ctx irrecoverabl
 
 func (e *executionDataRequesterImpl) sendNotifications(ctx irrecoverable.SignalerContext) {
 	for {
-		entry, ok := e.status.NextNotification()
+		entry, ok := e.status.NextNotification(ctx)
 
 		// we haven't finished fetching the next block to notify
 		if !ok {
@@ -583,7 +584,7 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 
 	// Search from genesis to the lastReceivedHeight, and confirm data is still available for all heights
 	// Update the notification state based on the data in the db
-	for height := e.rootBlockHeight; height <= lastReceivedHeight; height++ {
+	for height := e.startBlockHeight; height <= lastReceivedHeight; height++ {
 		if ctx.Err() != nil {
 			return nil
 		}

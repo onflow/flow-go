@@ -86,35 +86,35 @@ type AccessNodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
-	staked                       bool
-	bootstrapNodeAddresses       []string
-	bootstrapNodePublicKeys      []string
-	observerNetworkingKeyPath    string
-	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
-	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports unstaked access nodes/unstaked consensus follower engines
-	collectionGRPCPort           uint
-	executionGRPCPort            uint
-	pingEnabled                  bool
-	nodeInfoFile                 string
-	apiRatelimits                map[string]int
-	apiBurstlimits               map[string]int
-	rpcConf                      rpc.Config
-	ExecutionNodeAddress         string // deprecated
-	HistoricalAccessRPCs         []access.AccessAPIClient
-	logTxTimeToFinalized         bool
-	logTxTimeToExecuted          bool
-	logTxTimeToFinalizedExecuted bool
-	retryEnabled                 bool
-	rpcMetricsEnabled            bool
-	executionDataSyncEnabled     bool
-	executionDataCheckEnabled    bool
-	executionDataFetchTimeout    time.Duration
-	executionDataRootBlockHeight uint64
-	executionDataMaxCacheEntries uint64
-	executionDataMaxSearchAhead  uint64
-	executionDataDir             string
-	baseOptions                  []cmd.Option
+	staked                        bool
+	bootstrapNodeAddresses        []string
+	bootstrapNodePublicKeys       []string
+	observerNetworkingKeyPath     string
+	bootstrapIdentities           flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	NetworkKey                    crypto.PrivateKey // the networking key passed in by the caller when being used as a library
+	supportsUnstakedFollower      bool              // True if this is a staked Access node which also supports unstaked access nodes/unstaked consensus follower engines
+	collectionGRPCPort            uint
+	executionGRPCPort             uint
+	pingEnabled                   bool
+	nodeInfoFile                  string
+	apiRatelimits                 map[string]int
+	apiBurstlimits                map[string]int
+	rpcConf                       rpc.Config
+	ExecutionNodeAddress          string // deprecated
+	HistoricalAccessRPCs          []access.AccessAPIClient
+	logTxTimeToFinalized          bool
+	logTxTimeToExecuted           bool
+	logTxTimeToFinalizedExecuted  bool
+	retryEnabled                  bool
+	rpcMetricsEnabled             bool
+	executionDataSyncEnabled      bool
+	executionDataCheckEnabled     bool
+	executionDataFetchTimeout     time.Duration
+	executionDataStartBlockHeight uint64
+	executionDataMaxCachedEntries uint64
+	executionDataMaxSearchAhead   uint64
+	executionDataDir              string
+	baseOptions                   []cmd.Option
 
 	PublicNetworkConfig PublicNetworkConfig
 }
@@ -163,14 +163,14 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
-		observerNetworkingKeyPath:    cmd.NotSet,
-		executionDataSyncEnabled:     false,
-		executionDataCheckEnabled:    false,
-		executionDataFetchTimeout:    edrequester.DefaultFetchTimeout,
-		executionDataRootBlockHeight: 0,
-		executionDataMaxCacheEntries: edrequester.DefaultMaxCachedEntries,
-		executionDataMaxSearchAhead:  edrequester.DefaultMaxSearchAhead,
-		executionDataDir:             filepath.Join(homedir, ".flow", "execution_data"),
+		observerNetworkingKeyPath:     cmd.NotSet,
+		executionDataSyncEnabled:      false,
+		executionDataCheckEnabled:     false,
+		executionDataFetchTimeout:     edrequester.DefaultFetchTimeout,
+		executionDataStartBlockHeight: 0,
+		executionDataMaxCachedEntries: edrequester.DefaultMaxCachedEntries,
+		executionDataMaxSearchAhead:   edrequester.DefaultMaxSearchAhead,
+		executionDataDir:              filepath.Join(homedir, ".flow", "execution_data"),
 	}
 }
 
@@ -464,20 +464,20 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	}
 
 	builder.RestartableComponent("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-		rootHeight := builder.RootBlock.Header.Height
+		// The default startHeight should be from the first block executed for the spork (one after the root)
+		startHeight := builder.RootBlock.Header.Height + 1
 
 		// Validation of the root block height needs to be done after loading state
-		if builder.executionDataRootBlockHeight > 0 {
-			if builder.executionDataRootBlockHeight < rootHeight {
-				return nil, fmt.Errorf("execution data root block height (%d) cannot be less than the root block height for the spork (%d)", builder.executionDataRootBlockHeight, rootHeight)
+		if builder.executionDataStartBlockHeight > 0 {
+			if builder.executionDataStartBlockHeight <= builder.RootBlock.Header.Height {
+				return nil, fmt.Errorf("execution data start block height (%d) must be greater than the root block height for the spork (%d)", builder.executionDataStartBlockHeight, builder.RootBlock.Header.Height)
 			}
 
-			if builder.executionDataRootBlockHeight > builder.Finalized.Height {
-				return nil, fmt.Errorf("execution data root block height (%d) cannot be greater than the latest finalized block height (%d)", builder.executionDataRootBlockHeight, builder.Finalized.Height)
+			if builder.executionDataStartBlockHeight > builder.Finalized.Height {
+				return nil, fmt.Errorf("execution data start block height (%d) must be less than the latest finalized block height (%d)", builder.executionDataStartBlockHeight, builder.Finalized.Height)
 			}
 
-			rootHeight = builder.executionDataRootBlockHeight
+			startHeight = builder.executionDataStartBlockHeight
 		}
 
 		edr, err := edrequester.New(
@@ -486,8 +486,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			dstore,
 			blobservice,
 			builder.ExecutionDataService,
-			rootHeight,
-			builder.executionDataMaxCacheEntries,
+			startHeight,
+			builder.executionDataMaxCachedEntries,
 			builder.executionDataMaxSearchAhead,
 			builder.Storage.Blocks,
 			builder.Storage.Results,
@@ -596,8 +596,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.BoolVar(&builder.executionDataCheckEnabled, "execution-data-startup-check", defaultConfig.executionDataSyncEnabled, "whether to check execution data exists for all heights during startup")
 		flags.DurationVar(&builder.executionDataFetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataFetchTimeout, "timeout to use when fetching execution data from the network e.g. 300s")
-		flags.Uint64Var(&builder.executionDataRootBlockHeight, "execution-data-root-height", defaultConfig.executionDataRootBlockHeight, "height of first block to sync execution data from")
-		flags.Uint64Var(&builder.executionDataMaxCacheEntries, "execution-data-max-cache-entries", defaultConfig.executionDataMaxCacheEntries, "max number of execution data entries to cache for notifications")
+		flags.Uint64Var(&builder.executionDataStartBlockHeight, "execution-data-start-height", defaultConfig.executionDataStartBlockHeight, "height of first block to sync execution data from")
+		flags.Uint64Var(&builder.executionDataMaxCachedEntries, "execution-data-max-cache-entries", defaultConfig.executionDataMaxCachedEntries, "max number of execution data entries to cache for notifications")
 		flags.Uint64Var(&builder.executionDataMaxSearchAhead, "execution-data-max-search-ahead", defaultConfig.executionDataMaxSearchAhead, "max number of heights to search ahead of the lowest outstanding execution data height")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 	}).ValidateFlags(func() error {
