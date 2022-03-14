@@ -48,7 +48,7 @@ func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
 			id.NodeID,
 			id.Role,
 			id.Address,
-			id.Stake,
+			id.Weight,
 			networkKeys[i],
 			stakingKeys[i],
 		)

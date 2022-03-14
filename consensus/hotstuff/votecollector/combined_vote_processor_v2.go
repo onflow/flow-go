@@ -77,7 +77,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 	}
 
 	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
-	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight())
 
 	return NewCombinedVoteProcessor(
 		log,
@@ -86,7 +86,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 		rbRector,
 		f.onQCCreated,
 		f.packer,
-		minRequiredStake,
+		minRequiredWeight,
 	), nil
 }
 
@@ -101,14 +101,14 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 // still contribute only to consensus (as fallback).
 // CombinedVoteProcessorV2 is Concurrency safe.
 type CombinedVoteProcessorV2 struct {
-	log              zerolog.Logger
-	block            *model.Block
-	stakingSigAggtor hotstuff.WeightedSignatureAggregator
-	rbRector         hotstuff.RandomBeaconReconstructor
-	onQCCreated      hotstuff.OnQCCreated
-	packer           hotstuff.Packer
-	minRequiredStake uint64
-	done             atomic.Bool
+	log               zerolog.Logger
+	block             *model.Block
+	stakingSigAggtor  hotstuff.WeightedSignatureAggregator
+	rbRector          hotstuff.RandomBeaconReconstructor
+	onQCCreated       hotstuff.OnQCCreated
+	packer            hotstuff.Packer
+	minRequiredWeight uint64
+	done              atomic.Bool
 }
 
 var _ hotstuff.VerifyingVoteProcessor = (*CombinedVoteProcessorV2)(nil)
@@ -119,17 +119,17 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 	rbRector hotstuff.RandomBeaconReconstructor,
 	onQCCreated hotstuff.OnQCCreated,
 	packer hotstuff.Packer,
-	minRequiredStake uint64,
+	minRequiredWeight uint64,
 ) *CombinedVoteProcessorV2 {
 	return &CombinedVoteProcessorV2{
-		log:              log.With().Hex("block_id", block.BlockID[:]).Logger(),
-		block:            block,
-		stakingSigAggtor: stakingSigAggtor,
-		rbRector:         rbRector,
-		onQCCreated:      onQCCreated,
-		packer:           packer,
-		minRequiredStake: minRequiredStake,
-		done:             *atomic.NewBool(false),
+		log:               log.With().Hex("block_id", block.BlockID[:]).Logger(),
+		block:             block,
+		stakingSigAggtor:  stakingSigAggtor,
+		rbRector:          rbRector,
+		onQCCreated:       onQCCreated,
+		packer:            packer,
+		minRequiredWeight: minRequiredWeight,
+		done:              *atomic.NewBool(false),
 	}
 }
 
@@ -233,7 +233,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	}
 
 	// checking of conditions for building QC are satisfied
-	if p.stakingSigAggtor.TotalWeight() < p.minRequiredStake {
+	if p.stakingSigAggtor.TotalWeight() < p.minRequiredWeight {
 		return nil
 	}
 	if !p.rbRector.EnoughShares() {

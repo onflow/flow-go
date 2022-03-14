@@ -29,7 +29,7 @@ type Forest struct {
 	// needed trie in the forest might cause a fatal application logic error.
 	tries          *lru.Cache
 	forestCapacity int
-	onTreeEvicted  func(tree *trie.MTrie) error
+	onTreeEvicted  func(tree *trie.MTrie)
 	metrics        module.LedgerMetrics
 }
 
@@ -40,7 +40,7 @@ type Forest struct {
 // THIS IS A ROUGH HEURISTIC as it might evict tries that are still needed.
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Used trie will never be needed again.
-func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
+func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie)) (*Forest, error) {
 	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
 	var cache *lru.Cache
 	var err error
@@ -50,8 +50,7 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 			if !ok {
 				panic(fmt.Sprintf("cache contains item of type %T", value))
 			}
-			//TODO Log error
-			_ = onTreeEvicted(trie)
+			onTreeEvicted(trie)
 		})
 	} else {
 		cache, err = lru.New(forestCapacity)
