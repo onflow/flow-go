@@ -449,7 +449,7 @@ type HeroCacheMetrics interface {
 	OnKeyGetFailure()
 
 	// OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
-	// This normally happens when the cache is full.
+	// This normally happens -- and is expected -- when the cache is full.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
 	OnEntityEjectionDueToFullCapacity()
 
