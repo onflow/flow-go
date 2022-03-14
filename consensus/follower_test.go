@@ -69,9 +69,9 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock consensus committee
 	s.committee = &mockhotstuff.Committee{}
-	s.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
-			return identities.Filter(selector)
+	s.committee.On("Identities", mock.Anything).Return(
+		func(blockID flow.Identifier) flow.IdentityList {
+			return identities
 		},
 		nil,
 	)
