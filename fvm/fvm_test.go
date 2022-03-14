@@ -3133,6 +3133,34 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			},
 		},
 		{
+			name:          "Transaction fees are deducted and fe deduction is emitted",
+			fundWith:      fundingAmount,
+			tryToTransfer: transferAmount,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+				var feeDeduction flow.Event //fee deduction event
+				for _, e := range tx.Events {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", fvm.FlowFeesAddress(flow.Testnet.Chain())) {
+						feeDeduction = e
+						break
+					}
+				}
+				require.NotEmpty(t, feeDeduction.Payload)
+
+				payload, err := jsoncdc.Decode(feeDeduction.Payload)
+				require.NoError(t, err)
+
+				event := payload.(cadence.Event)
+
+				require.Equal(t, txFees, event.Fields[0].ToGoValue())
+				// Inclusion effort should be equivalent to 1.0 UFix64
+				require.Equal(t, uint64(100_000_000), event.Fields[1].ToGoValue())
+				// Execution effort should be non-0
+				require.Greater(t, event.Fields[2].ToGoValue(), uint64(0))
+
+			},
+		},
+		{
 			name:          "If just enough balance, fees are deducted",
 			fundWith:      txFees + transferAmount,
 			tryToTransfer: transferAmount,
