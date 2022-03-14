@@ -16,8 +16,8 @@ type Context struct {
 	Blocks                        Blocks
 	Metrics                       handler.MetricsReporter
 	Tracer                        module.Tracer
-	GasLimit                      uint64
-	ComputationCostMatrix         map[string]uint64
+	ComputationLimit              uint64
+	MemoryLimit                   uint64
 	MaxStateKeySize               uint64
 	MaxStateValueSize             uint64
 	MaxStateInteractionSize       uint64
@@ -60,9 +60,18 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	DefaultGasLimit                     = 100_000 // 100K
-	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
+	DefaultComputationLimit             = 100_000     // 100K
+	DefaultMemoryLimit                  = 100_000_000 // 100G
+	DefaultEventCollectionByteSizeLimit = 256_000     // 256KB
 	DefaultMaxNumOfTxRetries            = 3
+
+	// service transaction is a transaction have service account as payer
+	// and signed by service account, higher limits are allowed
+	// for service transactions to consider flexibility for network services
+	// such as governance transactions, etc.
+	ServiceTransactionComputationLimit             = 100_000_000_000 // 100B
+	ServiceTransactionMemoryLimit                  = 100_000_000     // 100G
+	ServiceTransactionEventCollectionByteSizeLimit = 100_000_000     // 100G
 )
 
 func defaultContext(logger zerolog.Logger) Context {
@@ -71,8 +80,8 @@ func defaultContext(logger zerolog.Logger) Context {
 		Blocks:                        nil,
 		Metrics:                       &handler.NoopMetricsReporter{},
 		Tracer:                        nil,
-		GasLimit:                      DefaultGasLimit,
-		ComputationCostMatrix:         make(map[string]uint64),
+		ComputationLimit:              DefaultComputationLimit,
+		MemoryLimit:                   DefaultMemoryLimit,
 		MaxStateKeySize:               state.DefaultMaxKeySize,
 		MaxStateValueSize:             state.DefaultMaxValueSize,
 		MaxStateInteractionSize:       state.DefaultMaxInteractionSize,
@@ -112,10 +121,27 @@ func WithChain(chain flow.Chain) Option {
 	}
 }
 
-// WithGasLimit sets the gas limit for a virtual machine context.
+// WithGasLimit sets the computation limit for a virtual machine context.
+// @depricated, please use WithComputationLimit instead.
 func WithGasLimit(limit uint64) Option {
 	return func(ctx Context) Context {
-		ctx.GasLimit = limit
+		ctx.ComputationLimit = limit
+		return ctx
+	}
+}
+
+// WithComputationLimit sets the computation limit for a virtual machine context.
+func WithComputationLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.ComputationLimit = limit
+		return ctx
+	}
+}
+
+// WithMemoryLimit sets the memory limit for a virtual machine context.
+func WithMemoryLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.MemoryLimit = limit
 		return ctx
 	}
 }

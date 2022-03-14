@@ -23,16 +23,13 @@ func DeductTransactionFeesInvocation(
 	env Environment,
 	traceSpan opentracing.Span,
 ) func(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
-	sc, err := systemcontracts.SystemContractsForChain(env.Context().Chain.ChainID())
-	if err != nil {
-		panic(err) // this should never happen, otherwise there is a bug in the system contracts addresses
-	}
+	feesAddress := FlowFeesAddress(env.Context().Chain)
 
 	return func(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
 		invoker := NewTransactionContractFunctionInvoker(
 			common.AddressLocation{
-				Address: common.Address(sc.FlowFees.Address),
-				Name:    sc.FlowFees.Name,
+				Address: common.Address(feesAddress),
+				Name:    systemcontracts.ContractNameFlowFees,
 			},
 			systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
 			[]interpreter.Value{

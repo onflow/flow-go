@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,15 +24,14 @@ func Script(code []byte) *ScriptProcedure {
 }
 
 type ScriptProcedure struct {
-	ID                         flow.Identifier
-	Script                     []byte
-	Arguments                  [][]byte
-	Value                      cadence.Value
-	Logs                       []string
-	Events                     []flow.Event
-	GasUsed                    uint64
-	Err                        errors.Error
-	ComputationMeteringHandler *handler.ComputationMeteringHandler
+	ID        flow.Identifier
+	Script    []byte
+	Arguments [][]byte
+	Value     cadence.Value
+	Logs      []string
+	Events    []flow.Event
+	GasUsed   uint64
+	Err       errors.Error
 }
 
 type ScriptProcessor interface {
@@ -49,8 +47,6 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 }
 
 func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
-	proc.ComputationMeteringHandler = handler.NewComputationMeteringHandler(
-		DefaultGasLimit)
 
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, proc, sth, programs)
@@ -70,6 +66,24 @@ func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	return nil
 }
 
+func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
+	computationLimit := ctx.ComputationLimit
+	// if ctx.ComputationLimit is also zero, fallback to the default computation limit
+	if computationLimit == 0 {
+		computationLimit = DefaultComputationLimit
+	}
+	return computationLimit
+}
+
+func (proc *ScriptProcedure) MemoryLimit(ctx Context) uint64 {
+	memoryLimit := ctx.MemoryLimit
+	// if ctx.MemoryLimit is also zero, fallback to the default memory limit
+	if memoryLimit == 0 {
+		memoryLimit = DefaultMemoryLimit
+	}
+	return memoryLimit
+}
+
 type ScriptInvoker struct{}
 
 func NewScriptInvoker() ScriptInvoker {
@@ -83,7 +97,7 @@ func (i ScriptInvoker) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env := NewScriptEnvironment(ctx, vm, sth, programs, proc.ComputationMeteringHandler)
+	env := NewScriptEnvironment(ctx, vm, sth, programs)
 	location := common.ScriptLocation(proc.ID[:])
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
@@ -103,6 +117,6 @@ func (i ScriptInvoker) Process(
 	proc.Value = value
 	proc.Logs = env.Logs()
 	proc.Events = env.Events()
-	proc.GasUsed = env.GetComputationUsed()
+	proc.GasUsed = env.ComputationUsed()
 	return nil
 }

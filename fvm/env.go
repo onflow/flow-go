@@ -3,7 +3,7 @@ package fvm
 import (
 	"github.com/onflow/cadence/runtime"
 
-	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/state"
 )
 
 // Environment accepts a context and a virtual machine instance and provides
@@ -11,6 +11,6 @@ import (
 type Environment interface {
 	Context() *Context
 	VM() *VirtualMachine
-	ComputationHandler() *handler.ComputationMeteringHandler
+	StateHolder() *state.StateHolder
 	runtime.Interface
 }

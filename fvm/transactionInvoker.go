@@ -3,8 +3,6 @@ package fvm
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"io/ioutil"
 	"path"
 	"strconv"
@@ -20,7 +18,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/extralog"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -65,12 +62,9 @@ func (i *TransactionInvoker) Process(
 	retry := false
 	numberOfRetries := 0
 
-	computationLimit := handler.ComputationLimit(ctx.GasLimit, proc.Transaction.GasLimit, DefaultGasLimit)
-	computationHandler := handler.NewComputationMeteringHandler(computationLimit)
-
 	parentState := sth.State()
 	childState := sth.NewChild()
-	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, computationHandler)
+	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 	predeclaredValues := valueDeclarations(ctx, env)
 
 	setComputationMeteringHandlerWithWeights(env)
@@ -96,7 +90,6 @@ func (i *TransactionInvoker) Process(
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
-		sth.EnableLimitEnforcement()
 	}()
 
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
@@ -124,7 +117,7 @@ func (i *TransactionInvoker) Process(
 			proc.ServiceEvents = make([]flow.Event, 0)
 
 			// reset env
-			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, computationHandler)
+			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 		}
 
 		location := common.TransactionLocation(proc.ID[:])
@@ -166,16 +159,16 @@ func (i *TransactionInvoker) Process(
 	// }
 
 	// disable the limit checks on states
-	sth.DisableLimitEnforcement()
 
+	sth.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
 	// disable the limit checks on states
-	feesError := i.deductTransactionFees(env, proc)
+	feesError := i.deductTransactionFees(env, proc, sth)
 	if feesError != nil {
 		txError = feesError
 	}
 
-	sth.EnableLimitEnforcement()
+	sth.EnableAllLimitEnforcements()
 
 	// applying contract changes
 	// this writes back the contract contents to accounts
@@ -193,7 +186,9 @@ func (i *TransactionInvoker) Process(
 
 	// it there was any transaction error clear changes and try to deduct fees again
 	if txError != nil {
-		sth.DisableLimitEnforcement()
+		sth.DisableAllLimitEnforcements()
+		defer sth.EnableAllLimitEnforcements()
+
 		// drop delta since transaction failed
 		childState.View().DropDelta()
 		// if tx fails just do clean up
@@ -206,10 +201,10 @@ func (i *TransactionInvoker) Process(
 			Msg("transaction executed with error")
 
 		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, computationHandler)
+		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
-		feesError = i.deductTransactionFees(env, proc)
+		feesError = i.deductTransactionFees(env, proc, sth)
 
 		updatedKeys, err = env.Commit()
 		if err != nil && feesError == nil {
@@ -227,14 +222,14 @@ func (i *TransactionInvoker) Process(
 				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 				Msg("transaction fee deduction executed with error")
 
-			i.logExecutionIntensities(computationHandler, txIDStr)
+			i.logExecutionIntensities(sth, txIDStr)
 			return feesError
 		}
 	}
 
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
+	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -245,39 +240,22 @@ func (i *TransactionInvoker) Process(
 	proc.Events = append(proc.Events, env.Events()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
-	i.logExecutionIntensities(computationHandler, txIDStr)
+	i.logExecutionIntensities(sth, txIDStr)
 	return txError
 }
 
-func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) (err error) {
+func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure, sth *state.StateHolder) (err error) {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
 
-	computationUsed := env.computationHandler.Used()
-
-	// start a new computation meter for deducting transaction fees.
-	subMeter := env.computationHandler.StartSubMeter(DefaultGasLimit)
-	defer func() {
-		merr := subMeter.Discard()
-		if merr == nil {
-			return
-		}
-		if err != nil {
-			// The error merr (from discarding the subMeter) will be hidden by err (transaction fee deduction error)
-			// as it has priority. So log merr.
-			i.logger.Error().Err(merr).
-				Msg("error discarding computation meter in deductTransactionFees (while also handling a deductTransactionFees error)")
-			return
-		}
-		err = merr
-	}()
+	computationUsed := sth.State().TotalComputationUsed()
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
 	// Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
-	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, computationUsed)
+	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, uint64(computationUsed))
 
 	if err != nil {
 		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
@@ -438,66 +416,72 @@ func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedu
 }
 
 // logExecutionIntensities logs execution intensities of the transaction
-func (i *TransactionInvoker) logExecutionIntensities(cmh *handler.ComputationMeteringHandler, txHash string) {
+func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
 	if i.logger.GetLevel() >= zerolog.DebugLevel {
-		d := zerolog.Dict()
-		for s, u := range cmh.Intensities() {
-			d.Uint(strconv.FormatUint(uint64(s), 10), u)
+		computation := zerolog.Dict()
+		for s, u := range sth.State().ComputationIntensities() {
+			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
+		}
+		memory := zerolog.Dict()
+		for s, u := range sth.State().ComputationIntensities() {
+			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		i.logger.Info().
 			Str("txHash", txHash).
-			Dict("intensities", d).
+			Dict("computationIntensities", computation).
+			Dict("memoryIntensities", memory).
 			Msg("transaction execution intensities")
 	}
 }
 
 // setComputationMeteringHandlerWithWeights reads stored execution effort weights and execution effort limit from the service account
 func setComputationMeteringHandlerWithWeights(env Environment) {
-	service := runtime.Address(env.Context().Chain.ServiceAddress())
-
-	value, err := env.VM().Runtime.ReadStored(
-		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier,
-		},
-		runtime.Context{Interface: env},
-	)
-	if err != nil {
-		// log error and return
-		return
-	}
-
-	weights, ok := cadenceValueToExecutionEffortWeights(value)
-	if !ok {
-		// log that values could not be decoded and set defaults
-		return
-	}
-
-	env.ComputationHandler().SetWeights(weights)
+	//service := runtime.Address(env.Context().Chain.ServiceAddress())
+	//
+	//value, err := env.VM().Runtime.ReadStored(
+	//	service,
+	//	cadence.Path{
+	//		Domain:     blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
+	//		Identifier: blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier,
+	//	},
+	//	runtime.Context{Interface: env},
+	//)
+	//if err != nil {
+	//	// log error and return
+	//	return
+	//}
+	//
+	//weights, ok := cadenceValueToExecutionEffortWeights(value)
+	//if !ok {
+	//	// log that values could not be decoded and set defaults
+	//	return
+	//}
+	//
+	//env.ComputationHandler().SetWeights(weights)
 }
 
-func cadenceValueToExecutionEffortWeights(value cadence.Value) (map[uint]uint, bool) {
-	weights := make(map[uint]uint)
-
-	dict, ok := value.(cadence.Dictionary)
-	if !ok {
-		return nil, false
-	}
-
-	for _, p := range dict.Pairs {
-		key, ok := p.Key.(cadence.UInt32)
-		if !ok {
-			return nil, false
-		}
-
-		value, ok := p.Value.(cadence.UInt32)
-		if !ok {
-			return nil, false
-		}
-
-		weights[uint(key)] = uint(value)
-	}
-
-	return weights, true
-}
+//
+//func cadenceValueToExecutionEffortWeights(value cadence.Value) (map[uint]uint, bool) {
+//	weights := make(map[uint]uint)
+//
+//	dict, ok := value.(cadence.Dictionary)
+//	if !ok {
+//		return nil, false
+//	}
+//
+//	for _, p := range dict.Pairs {
+//		key, ok := p.Key.(cadence.UInt32)
+//		if !ok {
+//			return nil, false
+//		}
+//
+//		value, ok := p.Value.(cadence.UInt32)
+//		if !ok {
+//			return nil, false
+//		}
+//
+//		weights[uint(key)] = uint(value)
+//	}
+//
+//	return weights, true
+//}

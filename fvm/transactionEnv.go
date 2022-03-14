@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/flow-go/fvm/meter"
 	"math/rand"
 	"time"
 
@@ -33,25 +34,24 @@ var _ runtime.Interface = &TransactionEnv{}
 
 // TransactionEnv is a read-write environment used for executing flow transactions.
 type TransactionEnv struct {
-	vm                 *VirtualMachine
-	ctx                Context
-	sth                *state.StateHolder
-	programs           *handler.ProgramsHandler
-	accounts           state.Accounts
-	uuidGenerator      *state.UUIDGenerator
-	contracts          *handler.ContractHandler
-	accountKeys        *handler.AccountKeyHandler
-	metrics            *handler.MetricsHandler
-	computationHandler *handler.ComputationMeteringHandler
-	eventHandler       *handler.EventHandler
-	addressGenerator   flow.AddressGenerator
-	rng                *rand.Rand
-	logs               []string
-	tx                 *flow.TransactionBody
-	txIndex            uint32
-	txID               flow.Identifier
-	traceSpan          opentracing.Span
-	authorizers        []runtime.Address
+	vm               *VirtualMachine
+	ctx              Context
+	sth              *state.StateHolder
+	programs         *handler.ProgramsHandler
+	accounts         state.Accounts
+	uuidGenerator    *state.UUIDGenerator
+	contracts        *handler.ContractHandler
+	accountKeys      *handler.AccountKeyHandler
+	metrics          *handler.MetricsHandler
+	eventHandler     *handler.EventHandler
+	addressGenerator flow.AddressGenerator
+	rng              *rand.Rand
+	logs             []string
+	tx               *flow.TransactionBody
+	txIndex          uint32
+	txID             flow.Identifier
+	traceSpan        opentracing.Span
+	authorizers      []runtime.Address
 }
 
 func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
@@ -65,7 +65,6 @@ func NewTransactionEnvironment(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan opentracing.Span,
-	computationHandler *handler.ComputationMeteringHandler,
 ) *TransactionEnv {
 
 	accounts := state.NewAccounts(sth)
@@ -82,21 +81,20 @@ func NewTransactionEnvironment(
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
 	env := &TransactionEnv{
-		vm:                 vm,
-		ctx:                ctx,
-		sth:                sth,
-		metrics:            metrics,
-		programs:           programsHandler,
-		accounts:           accounts,
-		accountKeys:        accountKeys,
-		addressGenerator:   generator,
-		uuidGenerator:      uuidGenerator,
-		eventHandler:       eventHandler,
-		computationHandler: computationHandler,
-		tx:                 tx,
-		txIndex:            txIndex,
-		txID:               tx.ID(),
-		traceSpan:          traceSpan,
+		vm:               vm,
+		ctx:              ctx,
+		sth:              sth,
+		metrics:          metrics,
+		programs:         programsHandler,
+		accounts:         accounts,
+		accountKeys:      accountKeys,
+		addressGenerator: generator,
+		uuidGenerator:    uuidGenerator,
+		eventHandler:     eventHandler,
+		tx:               tx,
+		txIndex:          txIndex,
+		txID:             tx.ID(),
+		traceSpan:        traceSpan,
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
@@ -128,8 +126,8 @@ func (e *TransactionEnv) VM() *VirtualMachine {
 	return e.vm
 }
 
-func (e *TransactionEnv) ComputationHandler() *handler.ComputationMeteringHandler {
-	return e.computationHandler
+func (e *TransactionEnv) StateHolder() *state.StateHolder {
+	return e.sth
 }
 
 func (e *TransactionEnv) seedRNG(header *flow.Header) {
@@ -216,7 +214,7 @@ func (e *TransactionEnv) GetValue(owner, key []byte) ([]byte, error) {
 	}
 	valueByteSize = len(v)
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationGetValue, uint(valueByteSize))
+	err = e.meterComputation(meter.MeteredOperationGetValue, uint(valueByteSize))
 	if err != nil {
 		return nil, fmt.Errorf("get value failed: %w", err)
 	}
@@ -233,7 +231,7 @@ func (e *TransactionEnv) SetValue(owner, key, value []byte) error {
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationSetValue, uint(len(value)))
+	err := e.meterComputation(meter.MeteredOperationSetValue, uint(len(value)))
 	if err != nil {
 		return fmt.Errorf("set value failed: %w", err)
 	}
@@ -255,7 +253,7 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationValueExists, 1)
+	err = e.meterComputation(meter.MeteredOperationValueExists, 1)
 	if err != nil {
 		return false, fmt.Errorf("checking value existence failed: %w", err)
 	}
@@ -270,7 +268,7 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
 func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	err := e.computationHandler.AddUsed(handler.MeteredOperationAllocateStorageIndex, 1)
+	err := e.meterComputation(meter.MeteredOperationAllocateStorageIndex, 1)
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("allocate storage index failed: %w", err)
 	}
@@ -288,7 +286,7 @@ func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, e
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationGetStorageUsed, 1)
+	err = e.meterComputation(meter.MeteredOperationGetStorageUsed, 1)
 	if err != nil {
 		return value, fmt.Errorf("getting storage used failed: %w", err)
 	}
@@ -307,7 +305,7 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationGetStorageCapacity, 1)
+	err = e.meterComputation(meter.MeteredOperationGetStorageCapacity, 1)
 	if err != nil {
 		return value, fmt.Errorf("get storage capacity failed: %w", err)
 	}
@@ -340,7 +338,7 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationGetAccountBalance, 1)
+	err = e.meterComputation(meter.MeteredOperationGetAccountBalance, 1)
 	if err != nil {
 		return value, fmt.Errorf("get account balance failed: %w", err)
 	}
@@ -361,7 +359,7 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationGetAccountAvailableBalance, 1)
+	err = e.meterComputation(meter.MeteredOperationGetAccountAvailableBalance, 1)
 	if err != nil {
 		return value, fmt.Errorf("get account available balance failed: %w", err)
 	}
@@ -387,7 +385,7 @@ func (e *TransactionEnv) ResolveLocation(
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationResolveLocation, 1)
+	err := e.meterComputation(meter.MeteredOperationResolveLocation, 1)
 	if err != nil {
 		return nil, fmt.Errorf("resolve location failed: %w", err)
 	}
@@ -459,7 +457,7 @@ func (e *TransactionEnv) GetCode(location runtime.Location) ([]byte, error) {
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationGetCode, 1)
+	err := e.meterComputation(meter.MeteredOperationGetCode, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
@@ -490,7 +488,7 @@ func (e *TransactionEnv) GetAccountContractNames(address runtime.Address) ([]str
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationGetAccountContractNames, 1)
+	err := e.meterComputation(meter.MeteredOperationGetAccountContractNames, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get account contract names failed: %w", err)
 	}
@@ -511,7 +509,7 @@ func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Prog
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationGetProgram, 1)
+	err := e.meterComputation(meter.MeteredOperationGetProgram, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get program failed: %w", err)
 	}
@@ -539,7 +537,7 @@ func (e *TransactionEnv) SetProgram(location common.Location, program *interpret
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationSetProgram, 1)
+	err := e.meterComputation(meter.MeteredOperationSetProgram, 1)
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)
 	}
@@ -574,7 +572,7 @@ func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationEmitEvent, 1)
+	err := e.meterComputation(meter.MeteredOperationEmitEvent, 1)
 	if err != nil {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
@@ -596,7 +594,7 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationGenerateUUID, 1)
+	err := e.meterComputation(meter.MeteredOperationGenerateUUID, 1)
 	if err != nil {
 		return 0, fmt.Errorf("generate uuid failed: %w", err)
 	}
@@ -612,16 +610,19 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 	return uuid, err
 }
 
-func (e *TransactionEnv) GetComputationLimit() uint64 {
-	return e.computationHandler.Limit()
+func (e *TransactionEnv) meterComputation(kind, intensity uint) error {
+	if e.sth.EnforceComputationLimits {
+		return e.sth.State().MeterComputation(kind, intensity)
+	}
+	return nil
 }
 
-func (e *TransactionEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.AddUsed(handler.MeteredOperationfunction_or_loop_call, uint(used))
+func (e *TransactionEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
+	return e.meterComputation(uint(kind), intensity)
 }
 
-func (e *TransactionEnv) GetComputationUsed() uint64 {
-	return e.computationHandler.Used()
+func (e *TransactionEnv) ComputationUsed() uint64 {
+	return uint64(e.sth.State().TotalComputationUsed())
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
@@ -666,7 +667,7 @@ func (e *TransactionEnv) Hash(data []byte, tag string, hashAlgorithm runtime.Has
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationHash, 1)
+	err := e.meterComputation(meter.MeteredOperationHash, 1)
 	if err != nil {
 		return nil, fmt.Errorf("hash failed: %w", err)
 	}
@@ -688,7 +689,7 @@ func (e *TransactionEnv) VerifySignature(
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationVerifySignature, 1)
+	err := e.meterComputation(meter.MeteredOperationVerifySignature, 1)
 	if err != nil {
 		return false, fmt.Errorf("verify signature failed: %w", err)
 	}
@@ -711,7 +712,7 @@ func (e *TransactionEnv) VerifySignature(
 }
 
 func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
-	err := e.computationHandler.AddUsed(1, handler.MeteredOperationValidatePublicKey)
+	err := e.meterComputation(1, meter.MeteredOperationValidatePublicKey)
 	if err != nil {
 		return fmt.Errorf("validate public key failed: %w", err)
 	}
@@ -728,7 +729,7 @@ func (e *TransactionEnv) GetCurrentBlockHeight() (uint64, error) {
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationGetCurrentBlockHeight, 1)
+	err := e.meterComputation(meter.MeteredOperationGetCurrentBlockHeight, 1)
 	if err != nil {
 		return 0, fmt.Errorf("get current block height failed: %w", err)
 	}
@@ -764,7 +765,7 @@ func (e *TransactionEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, e
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationGetBlockAtHeight, 1)
+	err := e.meterComputation(meter.MeteredOperationGetBlockAtHeight, 1)
 	if err != nil {
 		return runtime.Block{}, false, fmt.Errorf("get block at height failed: %w", err)
 	}
@@ -795,13 +796,10 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationCreateAccount, 1)
-	if err != nil {
-		return address, fmt.Errorf("create account failed: %w", err)
-	}
+	err = e.meterComputation(meter.MeteredOperationCreateAccount, 1)
 
-	e.sth.DisableLimitEnforcement() // don't enforce limit during account creation
-	defer e.sth.EnableLimitEnforcement()
+	e.sth.DisableAllLimitEnforcements() // don't enforce limit during account creation
+	defer e.sth.EnableAllLimitEnforcements()
 
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
@@ -836,13 +834,14 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationAddEncodedAccountKey, 1)
+	err := e.meterComputation(meter.MeteredOperationAddEncodedAccountKey, 1)
 	if err != nil {
 		return fmt.Errorf("add encoded account key failed: %w", err)
 	}
 
-	e.sth.DisableLimitEnforcement() // don't enforce limit during adding a key
-	defer e.sth.EnableLimitEnforcement()
+	// TODO do a call to track the computation usage and memory usage
+	e.sth.DisableAllLimitEnforcements() // don't enforce limit during adding a key
+	defer e.sth.EnableAllLimitEnforcements()
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
@@ -867,7 +866,7 @@ func (e *TransactionEnv) RevokeEncodedAccountKey(address runtime.Address, index 
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationRevokeEncodedAccountKey, 1)
+	err = e.meterComputation(meter.MeteredOperationRevokeEncodedAccountKey, 1)
 	if err != nil {
 		return publicKey, fmt.Errorf("revoke encoded account key failed: %w", err)
 	}
@@ -903,7 +902,7 @@ func (e *TransactionEnv) AddAccountKey(
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationAddAccountKey, 1)
+	err := e.meterComputation(meter.MeteredOperationAddAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("add account key failed: %w", err)
 	}
@@ -927,7 +926,7 @@ func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationGetAccountKey, 1)
+	err := e.meterComputation(meter.MeteredOperationGetAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get account key failed: %w", err)
 	}
@@ -951,7 +950,7 @@ func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 		defer sp.Finish()
 	}
 
-	err := e.computationHandler.AddUsed(handler.MeteredOperationRevokeAccountKey, 1)
+	err := e.meterComputation(meter.MeteredOperationRevokeAccountKey, 1)
 	if err != nil {
 		return nil, fmt.Errorf("revoke account key failed: %w", err)
 	}
@@ -965,7 +964,7 @@ func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationUpdateAccountContractCode, 1)
+	err = e.meterComputation(meter.MeteredOperationUpdateAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("update account contract code failed: %w", err)
 	}
@@ -989,7 +988,7 @@ func (e *TransactionEnv) GetAccountContractCode(address runtime.Address, name st
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationGetAccountContractCode, 1)
+	err = e.meterComputation(meter.MeteredOperationGetAccountContractCode, 1)
 	if err != nil {
 		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}
@@ -1011,7 +1010,7 @@ func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name
 		defer sp.Finish()
 	}
 
-	err = e.computationHandler.AddUsed(handler.MeteredOperationRemoveAccountContractCode, 1)
+	err = e.meterComputation(meter.MeteredOperationRemoveAccountContractCode, 1)
 	if err != nil {
 		return fmt.Errorf("remove account contract code failed: %w", err)
 	}

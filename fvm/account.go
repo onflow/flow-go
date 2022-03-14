@@ -3,7 +3,6 @@ package fvm
 import (
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -23,10 +22,8 @@ func getAccount(
 		return nil, err
 	}
 
-	computationMeteringHandler := handler.NewComputationMeteringHandler(DefaultGasLimit)
-
 	if ctx.ServiceAccountEnabled {
-		env := NewScriptEnvironment(ctx, vm, sth, programs, computationMeteringHandler)
+		env := NewScriptEnvironment(ctx, vm, sth, programs)
 		balance, err := env.GetAccountBalance(common.Address(address))
 		if err != nil {
 			return nil, err
