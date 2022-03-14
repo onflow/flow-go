@@ -65,7 +65,7 @@ func (cc *CacheCollector) CacheHit(resource string) {
 }
 
 // CacheNotFound records the number of times the queried item was not found in either cache
-// or database
+// or database.
 func (cc *CacheCollector) CacheNotFound(resource string) {
 	cc.notfounds.With(prometheus.Labels{LabelResource: resource}).Inc()
 }

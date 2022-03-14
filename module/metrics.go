@@ -98,7 +98,7 @@ type CacheMetrics interface {
 	CacheEntries(resource string, entries uint)
 	// CacheHit report the number of times the queried item is found in the cache
 	CacheHit(resource string)
-	// CacheNotFound report the number of items the queried item is not found in the cache, nor found in the database
+	// CacheNotFound records the number of times the queried item was not found in either cache or database.
 	CacheNotFound(resource string)
 	// CacheMiss report the number of times the queried item is not found in the cache, but found in the database.
 	CacheMiss(resource string)
