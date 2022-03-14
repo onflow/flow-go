@@ -25,7 +25,6 @@ func getAccount(
 	}
 
 	if ctx.ServiceAccountEnabled {
-		// TODO wire the context to here
 		env := NewScriptEnvironment(context.Background(), ctx, vm, sth, programs)
 		balance, err := env.GetAccountBalance(common.Address(address))
 		if err != nil {
