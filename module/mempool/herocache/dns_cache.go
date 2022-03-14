@@ -29,7 +29,8 @@ func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.Her
 					txtCollector))),
 		ipCache: stdmap.NewBackend(
 			stdmap.WithBackData(
-				herocache.NewCache(sizeLimit,
+				herocache.NewCache(
+					sizeLimit,
 					herocache.DefaultOversizeFactor,
 					heropool.LRUEjection,
 					logger,
