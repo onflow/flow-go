@@ -46,9 +46,24 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 	histogramNormalizedBucketSlotAvailable := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
-		Buckets:   []float64{0, 0.05, 0.1, 0.25, 0.5, 0.75, 1},
-		Name:      cacheName + "_" + "normalized_bucket_available_slot_count",
-		Help:      "normalized histogram of available slots across all buckets",
+
+		// Note that the notion of "bucket" in HeroCache differs from Prometheus.
+		// A HeroCache "bucket" is used to group the keys of the entities.
+		// A Prometheus "bucket" is used to group collected data points within a range.
+		// This metric represents the histogram of normalized available slots in buckets, where
+		// a data point set to 1 represents a bucket with all slots available (i.e., a fully empty bucket),
+		// and a data point set to 0 means a bucket with no available slots (i.e., a completely full bucket).
+		//
+		// We generally set total slots of a bucket in HeroCache to 16. Hence:
+		// Prometheus bucket 1 represents total number of HeroCache buckets with at most 16 available slots.
+		// Prometheus bucket 0.75 represents total number of HeroCache buckets with at most 12 available slots.
+		// Prometheus bucket 0.5 represents total number of HeroCache buckets with at most 8 available slots.
+		// Prometheus bucket 0.25 represents total number of HeroCache buckets with at most 4 available slots.
+		// Prometheus bucket 0.1 represents total number of HeroCache buckets with at most 1 available slots.
+		// Prometheus bucket 0 represents total number of HeroCache buckets with no (i.e., zero) available slots.
+		Buckets: []float64{0, 0.1, 0.25, 0.5, 0.75, 1},
+		Name:    cacheName + "_" + "normalized_bucket_available_slot_count",
+		Help:    "normalized histogram of available slots across all buckets",
 	})
 
 	countKeyGetSuccess := prometheus.NewCounter(prometheus.CounterOpts{
