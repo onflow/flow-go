@@ -1,6 +1,8 @@
 package wintermute
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/insecure"
@@ -59,6 +61,13 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(corruptedId flow.Identifier,
 	num uint32,
 	targetIds ...flow.Identifier) error {
 
-	// TODO: implement wintermute attack logic.
-	panic("implement me")
+	corruptedIdentity, ok := o.corruptedIds.ByNodeID(corruptedId)
+	if !ok {
+		return fmt.Errorf("could not find corrupted identity for: %x", corruptedId)
+	}
+
+	if corruptedIdentity.Role == flow.RoleExecution {
+
+	}
+
 }

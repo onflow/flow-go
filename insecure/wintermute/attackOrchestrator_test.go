@@ -2,13 +2,23 @@ package wintermute
 
 import (
 	"context"
-	mockinsecure "github.com/onflow/flow-go/insecure/mock"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/utils/unittest"
+	"testing"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"testing"
+
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/testutil"
+	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
+	verificationtest "github.com/onflow/flow-go/engine/verification/utils/unittest"
+	"github.com/onflow/flow-go/insecure"
+	mockinsecure "github.com/onflow/flow-go/insecure/mock"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestWintermuteOrchestrator(t *testing.T) {
@@ -60,4 +70,47 @@ func TestWintermuteOrchestrator(t *testing.T) {
 	// orchestrator replaces honestExecutionResult1 1 and honestExecutionResult1 2 with corrupted agreeing ones and send them over network
 	// to execution node 1 and execution 2, respectively.
 	//attackNetwork.On("")
+}
+
+// if an execution receipt is coming from one corrupted EN, then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
+// enforces that corrupted EN to send this counterfeit receipt.
+//
+// if an execution receipt is coming from one corrupted EN, then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
+// enforces that corrupted EN to send this counterfeit receipt.
+// The orchestrator then also enforces the second corrupted EN to send the same counterfeit result on its behalf to the network.
+func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
+	rootSnapShot, all, corrupted := bootstrapWintermuteFlowSystem(t)
+
+	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
+	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
+	// Container blocks only contain receipts of their preceding reference blocks. But they do not
+	// hold any guarantees.
+	root, err := rootSnapShot.State.Final().Head()
+	require.NoError(t, err)
+
+	completeERs := verificationtest.CompleteExecutionReceiptChainFixture(t, root, 1, verificationtest.WithExecutorIDs(corruptedEnIds.NodeIDs()))
+
+	net := &mockinsecure.AttackNetwork{}
+	o := NewOrchestrator(all, corrupted, net, unittest.Logger())
+
+	corruptedEn1 := corrupted.Filter(filter.HasRole(flow.RoleExecution))[0]
+	targetIds, err := rootSnapShot.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
+	require.NoError(t, err)
+
+	o.HandleEventFromCorruptedNode(corruptedEn1.NodeID, engine.PushReceipts, receipt, insecure.Protocol_PUBLISH, uint32(0), targetIds.NodeIDs()...)
+}
+
+func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow.IdentityList, flow.IdentityList) {
+	// creates identities to bootstrap system with
+	corruptedVnIds := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleVerification))
+	corruptedEnIds := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	identities := unittest.CompleteIdentitySet(append(corruptedVnIds, corruptedEnIds...)...)
+	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))    // one honest execution node
+	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))) // one honest verification node
+
+	// bootstraps the system
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	stateFixture := testutil.CompleteStateFixture(t, metrics.NewNoopCollector(), trace.NewNoopTracer(), rootSnapshot)
+
+	return stateFixture, identities, append(corruptedEnIds, corruptedVnIds...)
 }
