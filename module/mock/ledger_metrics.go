@@ -29,7 +29,7 @@ func (_m *LedgerMetrics) LatestTrieMaxDepth(number uint64) {
 }
 
 // LatestTrieMaxDepthDiff provides a mock function with given fields: number
-func (_m *LedgerMetrics) LatestTrieMaxDepthDiff(number uint64) {
+func (_m *LedgerMetrics) LatestTrieMaxDepthDiff(number int64) {
 	_m.Called(number)
 }
 
@@ -39,7 +39,7 @@ func (_m *LedgerMetrics) LatestTrieRegCount(number uint64) {
 }
 
 // LatestTrieRegCountDiff provides a mock function with given fields: number
-func (_m *LedgerMetrics) LatestTrieRegCountDiff(number uint64) {
+func (_m *LedgerMetrics) LatestTrieRegCountDiff(number int64) {
 	_m.Called(number)
 }
 
