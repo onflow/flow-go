@@ -43,7 +43,7 @@ type VirtualMachine interface {
 }
 
 type ComputationManager interface {
-	ExecuteScript([]byte, [][]byte, *flow.Header, state.View) ([]byte, error)
+	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
 		block *entity.ExecutableBlock,
@@ -53,6 +53,7 @@ type ComputationManager interface {
 }
 
 var DefaultScriptLogThreshold = 1 * time.Second
+var DefaultScriptTimeout = 10 * time.Second
 
 const MaxScriptErrorMessageSize = 1000 // 1000 chars
 
@@ -67,6 +68,7 @@ type Manager struct {
 	blockComputer      computer.BlockComputer
 	programsCache      *ProgramsCache
 	scriptLogThreshold time.Duration
+	scriptTimeout      time.Duration
 	uploaders          []uploader.Uploader
 	eds                state_synchronization.ExecutionDataService
 	edCache            state_synchronization.ExecutionDataCIDCache
@@ -83,6 +85,7 @@ func New(
 	programsCacheSize uint,
 	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
+	scriptTimeout time.Duration,
 	uploaders []uploader.Uploader,
 	eds state_synchronization.ExecutionDataService,
 	edCache state_synchronization.ExecutionDataCIDCache,
@@ -117,6 +120,7 @@ func New(
 		blockComputer:      blockComputer,
 		programsCache:      programsCache,
 		scriptLogThreshold: scriptLogThreshold,
+		scriptTimeout:      scriptTimeout,
 		uploaders:          uploaders,
 		eds:                eds,
 		edCache:            edCache,
@@ -133,7 +137,13 @@ func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Pro
 	return blockPrograms.ChildPrograms()
 }
 
-func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view state.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(
+	ctx context.Context,
+	code []byte,
+	arguments [][]byte,
+	blockHeader *flow.Header,
+	view state.View,
+) ([]byte, error) {
 
 	startedAt := time.Now()
 
@@ -147,10 +157,11 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 		e.log.Info().Uint32("trackerID", trackerID).Msg("script execution is complete")
 	}()
 
+	requestCtx, cancel := context.WithTimeout(ctx, e.scriptTimeout)
+	defer cancel()
+
+	script := fvm.NewScriptWithContextAndArgs(code, requestCtx, arguments...)
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
-
-	script := fvm.Script(code).WithArguments(arguments...)
-
 	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
 	err := func() (err error) {

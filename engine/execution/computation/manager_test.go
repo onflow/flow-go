@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -221,11 +223,11 @@ func TestExecuteScript(t *testing.T) {
 	eds := new(state_synchronization.ExecutionDataService)
 	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	engine, err := New(logger, metrics.NewNoopCollector(), nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds, edCache)
+	engine, err := New(logger, metrics.NewNoopCollector(), nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, DefaultScriptTimeout, nil, eds, edCache)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(script, nil, &header, scriptView)
+	_, err = engine.ExecuteScript(context.Background(), script, nil, &header, scriptView)
 	require.NoError(t, err)
 }
 
@@ -238,18 +240,15 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	buffer := &bytes.Buffer{}
 	log := zerolog.New(buffer)
 
-	view := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
-		return nil, nil
-	})
 	header := unittest.BlockHeaderFixture()
 
 	eds := new(state_synchronization.ExecutionDataService)
 	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, nil, eds, edCache)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, DefaultScriptTimeout, nil, eds, edCache)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
+	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
 
 	require.Error(t, err)
 
@@ -265,18 +264,15 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	buffer := &bytes.Buffer{}
 	log := zerolog.New(buffer)
 
-	view := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
-		return nil, nil
-	})
 	header := unittest.BlockHeaderFixture()
 
 	eds := new(state_synchronization.ExecutionDataService)
 	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond, nil, eds, edCache)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond, DefaultScriptTimeout, nil, eds, edCache)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
+	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
 
 	require.NoError(t, err)
 
@@ -292,18 +288,15 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	buffer := &bytes.Buffer{}
 	log := zerolog.New(buffer)
 
-	view := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
-		return nil, nil
-	})
 	header := unittest.BlockHeaderFixture()
 
 	eds := new(state_synchronization.ExecutionDataService)
 	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second, nil, eds, edCache)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second, DefaultScriptTimeout, nil, eds, edCache)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
+	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
 
 	require.NoError(t, err)
 
@@ -356,4 +349,97 @@ func (f *FakeUploader) Upload(computationResult *execution.ComputationResult) er
 	}
 	f.data[computationResult.ExecutableBlock.ID()] = computationResult
 	return nil
+}
+
+func noopView() *delta.View {
+	return delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+}
+
+func TestExecuteScriptTimeout(t *testing.T) {
+
+	timeout := 1 * time.Millisecond
+	manager, err := New(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		nil,
+		nil,
+		nil,
+		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
+		fvm.NewContext(zerolog.Nop()),
+		DefaultProgramsCacheSize,
+		committer.NewNoopViewCommitter(),
+		DefaultScriptLogThreshold,
+		timeout,
+		nil,
+		nil,
+		nil)
+
+	require.NoError(t, err)
+
+	script := []byte(`
+	pub fun main(): Int {
+		var i = 0
+		while i < 10000 {
+			i = i + 1
+		}
+		return i
+	}
+	`)
+
+	header := unittest.BlockHeaderFixture()
+	value, err := manager.ExecuteScript(context.Background(), script, nil, &header, noopView())
+
+	require.Error(t, err)
+	require.Nil(t, value)
+	require.Contains(t, err.Error(), fvmErrors.ErrCodeScriptExecutionTimedOutError.String())
+}
+
+func TestExecuteScriptCancelled(t *testing.T) {
+
+	timeout := 30 * time.Second
+	manager, err := New(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		nil,
+		nil,
+		nil,
+		fvm.NewVirtualMachine(fvm.NewInterpreterRuntime()),
+		fvm.NewContext(zerolog.Nop()),
+		DefaultProgramsCacheSize,
+		committer.NewNoopViewCommitter(),
+		DefaultScriptLogThreshold,
+		timeout,
+		nil,
+		nil,
+		nil)
+
+	require.NoError(t, err)
+
+	script := []byte(`
+	pub fun main(): Int {
+		var i = 0
+		var j = 0 
+		while i < 10000000 {
+			i = i + 1
+			j = i + j
+		}
+		return i
+	}
+	`)
+
+	var value []byte
+	var wg sync.WaitGroup
+	reqCtx, cancel := context.WithCancel(context.Background())
+	wg.Add(1)
+	go func() {
+		header := unittest.BlockHeaderFixture()
+		value, err = manager.ExecuteScript(reqCtx, script, nil, &header, noopView())
+		wg.Done()
+	}()
+	cancel()
+	wg.Wait()
+	require.Nil(t, value)
+	require.Contains(t, err.Error(), fvmErrors.ErrCodeScriptExecutionCancelledError.String())
 }

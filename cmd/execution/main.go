@@ -117,6 +117,7 @@ func main() {
 		checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
 		diskWAL                       *wal.DiskWAL
 		scriptLogThreshold            time.Duration
+		scriptTimeout                 time.Duration
 		chdpQueryTimeout              uint
 		chdpDeliveryTimeout           uint
 		enableBlockDataUpload         bool
@@ -149,6 +150,7 @@ func main() {
 			flags.UintVar(&chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.DurationVar(&scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold, "threshold for logging script execution")
+			flags.DurationVar(&scriptTimeout, "script-timeout", computation.DefaultScriptTimeout, "script execution timeout limit")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.UintVar(&transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
@@ -451,6 +453,7 @@ func main() {
 				cadenceExecutionCache,
 				committer,
 				scriptLogThreshold,
+				scriptTimeout,
 				blockDataUploaders,
 				executionDataService,
 				executionDataCIDCache,

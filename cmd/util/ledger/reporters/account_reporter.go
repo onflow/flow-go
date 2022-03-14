@@ -1,6 +1,7 @@
 package reporters
 
 import (
+	"context"
 	"fmt"
 	"math"
 	goRuntime "runtime"
@@ -151,7 +152,7 @@ func NewBalanceReporter(chain flow.Chain, view state.View) *balanceProcessor {
 		accounts: accounts,
 		st:       st,
 		prog:     prog,
-		intf:     fvm.NewScriptEnvironment(ctx, vm, sth, prog),
+		intf:     fvm.NewScriptEnvironment(context.Background(), ctx, vm, sth, prog),
 	}
 }
 
