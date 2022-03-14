@@ -129,35 +129,44 @@ func (h *HeroCacheCollector) BucketAvailableSlots(availableSlots uint64, totalSl
 	h.normalizedBucketSlotAvailableHistogram.Observe(normalizedAvailableSlots)
 }
 
-// OnSuccessfulWrite is called whenever a new entity is successfully added to the cache.
+// OnSuccessfulWrite is called whenever a new (key, entity) pair is successfully added to the cache.
 func (h *HeroCacheCollector) OnSuccessfulWrite() {
 	h.successfulWriteCount.Inc()
 }
 
-// OnUnsuccessfulWrite is tracking the total number of unsuccessful writes caused by adding a duplicate entity to the cache.
-// A duplicate entity is dropped by the cache when it is written to the cache.
-func (h *HeroCacheCollector) OnUnsuccessfulWrite() {
-	h.unsuccessfulWriteCount.Inc()
-}
-
-// OnEntityEjectedAtFullCapacity is called whenever adding a new entity to the cache results in ejection of another entity.
+// OnEntityEjectedAtFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
 // This normally happens when the cache is full.
+// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
 func (h *HeroCacheCollector) OnEntityEjectedAtFullCapacity() {
 	h.fullCapacityEntityEjectionCount.Inc()
 }
 
-// OnEmergencyKeyEjection is called whenever a bucket is found full and all of its keys are valid.
-// Hence, adding a new entity to that bucket will replace the oldest valid key inside that bucket.
+// OnEmergencyKeyEjection is called whenever a bucket is found full and all of its keys are valid, i.e.,
+// each key belongs to an existing (key, entity) pair.
+// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
+// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
 func (h *HeroCacheCollector) OnEmergencyKeyEjection() {
 	h.emergencyKeyEjectionCount.Inc()
 }
 
-// OnSuccessfulRead tracks total number of successful read queries. A read query is successful if its entity is available in the cache.
+// OnUnsuccessfulWrite is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
+// A duplicate key is dropped by the cache when it is written to the cache.
+// Note: in context of HeroCache, the key corresponds to the identifier of its entity. Hence, a duplicate key corresponds to
+// a duplicate entity.
+func (h *HeroCacheCollector) OnUnsuccessfulWrite() {
+	h.unsuccessfulWriteCount.Inc()
+}
+
+// OnSuccessfulRead tracks total number of successful read queries.
+// A read query is successful if the entity corresponding to its key is available in the cache.
+// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
 func (h *HeroCacheCollector) OnSuccessfulRead() {
 	h.successfulReadCount.Inc()
 }
 
-// OnUnsuccessfulRead tracks total number of unsuccessful read queries. A read query is unsuccessful if its entity is not available in the cache.
+// OnUnsuccessfulRead tracks total number of unsuccessful read queries.
+// A read query is unsuccessful if the entity corresponding to its key is not available in the cache.
+// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
 func (h *HeroCacheCollector) OnUnsuccessfulRead() {
 	h.unsuccessfulReadCount.Inc()
 }
