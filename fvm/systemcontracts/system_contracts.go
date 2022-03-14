@@ -76,7 +76,6 @@ type SystemContracts struct {
 	Epoch     SystemContract
 	ClusterQC SystemContract
 	DKG       SystemContract
-	FlowFees  SystemContract
 }
 
 // ServiceEvents is a container for all service events on a particular chain.
@@ -112,10 +111,6 @@ func SystemContractsForChain(chainID flow.ChainID) (*SystemContracts, error) {
 		DKG: SystemContract{
 			Address: addresses[ContractNameDKG],
 			Name:    ContractNameDKG,
-		},
-		FlowFees: SystemContract{
-			Address: addresses[ContractNameFlowFees],
-			Name:    ContractNameFlowFees,
 		},
 	}
 
@@ -159,9 +154,6 @@ var (
 	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
 	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet and Canary
 	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
-
-	flowFeesContractAddressMainnet = flow.HexToAddress("f919ee77447b7497")
-	flowFeesContractAddresTestnet  = flow.HexToAddress("912d5440f7e3769e")
 )
 
 func init() {
@@ -173,7 +165,6 @@ func init() {
 		ContractNameEpoch:     stakingContractAddressMainnet,
 		ContractNameClusterQC: stakingContractAddressMainnet,
 		ContractNameDKG:       stakingContractAddressMainnet,
-		ContractNameFlowFees:  flowFeesContractAddressMainnet,
 	}
 	contractAddressesByChainID[flow.Mainnet] = mainnet
 
@@ -183,15 +174,9 @@ func init() {
 		ContractNameEpoch:     stakingContractAddressTestnet,
 		ContractNameClusterQC: stakingContractAddressTestnet,
 		ContractNameDKG:       stakingContractAddressTestnet,
-		ContractNameFlowFees:  flowFeesContractAddresTestnet,
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 	contractAddressesByChainID[flow.Canary] = testnet
-
-	transientFlowFeesAddress, err := flow.Emulator.Chain().AddressAtIndex(4)
-	if err != nil {
-		panic(err)
-	}
 
 	// Transient test networks
 	// All system contracts are deployed to the service account
@@ -199,7 +184,6 @@ func init() {
 		ContractNameEpoch:     flow.Emulator.Chain().ServiceAddress(),
 		ContractNameClusterQC: flow.Emulator.Chain().ServiceAddress(),
 		ContractNameDKG:       flow.Emulator.Chain().ServiceAddress(),
-		ContractNameFlowFees:  transientFlowFeesAddress,
 	}
 	contractAddressesByChainID[flow.Emulator] = transient
 	contractAddressesByChainID[flow.Localnet] = transient
