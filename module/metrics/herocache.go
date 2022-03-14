@@ -129,44 +129,44 @@ func (h *HeroCacheCollector) BucketAvailableSlots(availableSlots uint64, totalSl
 	h.normalizedBucketSlotAvailableHistogram.Observe(normalizedAvailableSlots)
 }
 
-// OnSuccessfulWrite is called whenever a new (key, entity) pair is successfully added to the cache.
-func (h *HeroCacheCollector) OnSuccessfulWrite() {
+// OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
+func (h *HeroCacheCollector) OnKeyPutSuccess() {
 	h.successfulWriteCount.Inc()
 }
 
-// OnEntityEjectedAtFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
-// This normally happens when the cache is full.
-// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-func (h *HeroCacheCollector) OnEntityEjectedAtFullCapacity() {
-	h.fullCapacityEntityEjectionCount.Inc()
-}
-
-// OnEmergencyKeyEjection is called whenever a bucket is found full and all of its keys are valid, i.e.,
-// each key belongs to an existing (key, entity) pair.
-// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
-// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-func (h *HeroCacheCollector) OnEmergencyKeyEjection() {
-	h.emergencyKeyEjectionCount.Inc()
-}
-
-// OnUnsuccessfulWrite is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
+// OnKeyPutFailure is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
 // A duplicate key is dropped by the cache when it is written to the cache.
 // Note: in context of HeroCache, the key corresponds to the identifier of its entity. Hence, a duplicate key corresponds to
 // a duplicate entity.
-func (h *HeroCacheCollector) OnUnsuccessfulWrite() {
+func (h *HeroCacheCollector) OnKeyPutFailure() {
 	h.unsuccessfulWriteCount.Inc()
 }
 
-// OnSuccessfulRead tracks total number of successful read queries.
+// OnKeyGetSuccess tracks total number of successful read queries.
 // A read query is successful if the entity corresponding to its key is available in the cache.
 // Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-func (h *HeroCacheCollector) OnSuccessfulRead() {
+func (h *HeroCacheCollector) OnKeyGetSuccess() {
 	h.successfulReadCount.Inc()
 }
 
-// OnUnsuccessfulRead tracks total number of unsuccessful read queries.
+// OnKeyGetFailure tracks total number of unsuccessful read queries.
 // A read query is unsuccessful if the entity corresponding to its key is not available in the cache.
 // Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-func (h *HeroCacheCollector) OnUnsuccessfulRead() {
+func (h *HeroCacheCollector) OnKeyGetFailure() {
 	h.unsuccessfulReadCount.Inc()
+}
+
+// OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
+// This normally happens when the cache is full.
+// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
+func (h *HeroCacheCollector) OnEntityEjectionDueToFullCapacity() {
+	h.fullCapacityEntityEjectionCount.Inc()
+}
+
+// OnEntityEjectionDueToEmergency is called whenever a bucket is found full and all of its keys are valid, i.e.,
+// each key belongs to an existing (key, entity) pair.
+// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
+// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
+func (h *HeroCacheCollector) OnEntityEjectionDueToEmergency() {
+	h.emergencyKeyEjectionCount.Inc()
 }

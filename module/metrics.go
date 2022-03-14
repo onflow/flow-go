@@ -429,33 +429,33 @@ type HeroCacheMetrics interface {
 	// BucketAvailableSlots keeps track of number of available slots in buckets of cache.
 	BucketAvailableSlots(uint64, uint64)
 
-	// OnSuccessfulWrite is called whenever a new (key, entity) pair is successfully added to the cache.
-	OnSuccessfulWrite()
+	// OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
+	OnKeyPutSuccess()
 
-	// OnEntityEjectedAtFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
-	// This normally happens when the cache is full.
-	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-	OnEntityEjectedAtFullCapacity()
-
-	// OnEmergencyKeyEjection is called whenever a bucket is found full and all of its keys are valid, i.e.,
-	// each key belongs to an existing (key, entity) pair.
-	// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
-	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-	OnEmergencyKeyEjection()
-
-	// OnUnsuccessfulWrite is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
+	// OnKeyPutFailure is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
 	// A duplicate key is dropped by the cache when it is written to the cache.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity. Hence, a duplicate key corresponds to
 	// a duplicate entity.
-	OnUnsuccessfulWrite()
+	OnKeyPutFailure()
 
-	// OnSuccessfulRead tracks total number of successful read queries.
+	// OnKeyGetSuccess tracks total number of successful read queries.
 	// A read query is successful if the entity corresponding to its key is available in the cache.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-	OnSuccessfulRead()
+	OnKeyGetSuccess()
 
-	// OnUnsuccessfulRead tracks total number of unsuccessful read queries.
+	// OnKeyGetFailure tracks total number of unsuccessful read queries.
 	// A read query is unsuccessful if the entity corresponding to its key is not available in the cache.
 	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
-	OnUnsuccessfulRead()
+	OnKeyGetFailure()
+
+	// OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
+	// This normally happens when the cache is full.
+	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
+	OnEntityEjectionDueToFullCapacity()
+
+	// OnEntityEjectionDueToEmergency is called whenever a bucket is found full and all of its keys are valid, i.e.,
+	// each key belongs to an existing (key, entity) pair.
+	// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
+	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
+	OnEntityEjectionDueToEmergency()
 }

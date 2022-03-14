@@ -265,7 +265,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	slotToUse, unique := c.slotIndexInBucket(b, entityId32of256, entityId)
 	if !unique {
 		// entityId already exists
-		c.collector.OnUnsuccessfulWrite()
+		c.collector.OnKeyPutFailure()
 		return false
 	}
 
@@ -273,7 +273,7 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 		// bucket is full, and we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
 		c.invalidateEntity(b, slotToUse)
-		c.collector.OnEmergencyKeyEjection()
+		c.collector.OnEntityEjectionDueToEmergency()
 		c.logger.Warn().
 			Hex("replaced_entity_id", logging.ID(linkedId)).
 			Hex("added_entity_id", logging.ID(entityId)).
@@ -284,13 +284,13 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	entityIndex, ejection := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
 	if ejection {
 		// cache is at its full size and ejection happened to make room for this new entity.
-		c.collector.OnEntityEjectedAtFullCapacity()
+		c.collector.OnEntityEjectionDueToFullCapacity()
 	}
 
 	c.buckets[b].slots[slotToUse].slotAge = c.slotCount
 	c.buckets[b].slots[slotToUse].entityIndex = entityIndex
 	c.buckets[b].slots[slotToUse].entityId32of256 = entityId32of256
-	c.collector.OnSuccessfulWrite()
+	c.collector.OnKeyPutSuccess()
 	return true
 }
 
@@ -306,7 +306,7 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotInd
 		id, entity, linked := c.linkedEntityOf(b, s)
 		if !linked {
 			// no linked entity for this (bucketIndex, slotIndex) pair.
-			c.collector.OnUnsuccessfulRead()
+			c.collector.OnKeyGetFailure()
 			return nil, 0, 0, false
 		}
 
@@ -315,11 +315,11 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotInd
 			continue
 		}
 
-		c.collector.OnSuccessfulRead()
+		c.collector.OnKeyGetSuccess()
 		return entity, b, s, true
 	}
 
-	c.collector.OnUnsuccessfulRead()
+	c.collector.OnKeyGetFailure()
 	return nil, 0, 0, false
 }
 
