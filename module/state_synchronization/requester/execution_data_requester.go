@@ -22,11 +22,11 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/local"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -679,7 +679,7 @@ func (e *executionDataRequesterImpl) checkExecutionData(ctx irrecoverable.Signal
 // datastore, and to rehash blobs on read. This is used to check the validity of blobs that exist in
 // the local db.
 func (e *executionDataRequesterImpl) localExecutionDataService(ctx irrecoverable.SignalerContext) (state_synchronization.ExecutionDataService, error) {
-	blobService := local.NewBlobService(e.ds, local.WithHashOnRead(true))
+	blobService := p2p.NewBlobService(e.ds, p2p.WithHashOnRead(true))
 	blobService.Start(ctx)
 
 	eds := state_synchronization.NewExecutionDataService(
