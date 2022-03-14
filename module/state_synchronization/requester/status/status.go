@@ -14,6 +14,7 @@ import (
 const statusDBKey = "execution_requester_status"
 
 type Status struct {
+	// The first block height for which notifications should be sent
 	startHeight uint64
 
 	// The highest block height whose ExecutionData has been fetched
@@ -50,28 +51,28 @@ type Status struct {
 // persistedStatus is the status data that is persisted to the db, so it can be reused across reloads
 type persistedStatus struct {
 	// LastNotified is the highest consecutive execution data received. When loaded, this is used
-	// as the starting point requesting ExecutionData for new blocks.
+	// as the starting point for requesting ExecutionData for new blocks.
 	// Note: LastNotified is used instead of LastReceived since there could be a large gap of
 	// un-downloaded blocks between LastReceived and LastNotified. Using LastNotified allows the
 	// requester to backfill all of missing blocks even when it's not configured to recheck the
 	// datastore.
 	LastNotified uint64
 
-	// Halted is persisted to the db so the condition can be detected without inspecting the entire
-	// datastore
+	// Halted is persisted so the condition can be detected without inspecting the entire datastore
 	Halted bool
 }
 
 func New(db datastore.Batching, log zerolog.Logger, startHeight uint64, maxCachedEntries, maxSearchAhead uint64) *Status {
-	h := &notificationHeap{}
-	heap.Init(h)
-
 	return &Status{
 		db:   db,
 		log:  log,
-		heap: h,
+		heap: &notificationHeap{},
 
-		startHeight:      startHeight,
+		startHeight:   startHeight,
+		lastNotified:  startHeight,
+		lastReceived:  startHeight,
+		lastProcessed: startHeight,
+
 		maxCachedEntries: maxCachedEntries,
 		maxSearchAhead:   maxSearchAhead,
 	}
@@ -81,16 +82,6 @@ func New(db datastore.Batching, log zerolog.Logger, startHeight uint64, maxCache
 func (s *Status) Load(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	defer func() {
-		// defaults to the start block when booting with a fresh db
-		if s.lastNotified == 0 {
-			s.lastNotified = s.startHeight
-		}
-
-		// notifications restart after a fresh boot
-		s.lastReceived = s.lastNotified
-		s.lastProcessed = s.lastNotified
-	}()
 
 	data, err := s.db.Get(ctx, datastore.NewKey(statusDBKey))
 	if err == datastore.ErrNotFound {
@@ -101,15 +92,19 @@ func (s *Status) Load(ctx context.Context) error {
 		return fmt.Errorf("failed to load status: %w", err)
 	}
 
-	savedStatus := persistedStatus{}
+	saved := persistedStatus{}
 
-	err = json.Unmarshal(data, &savedStatus)
+	err = json.Unmarshal(data, &saved)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal status: %w", err)
 	}
 
-	s.lastNotified = savedStatus.LastNotified
-	s.halted = savedStatus.Halted
+	s.lastNotified = saved.LastNotified
+	s.halted = saved.Halted
+
+	// processing restarts after a fresh boot.
+	s.lastReceived = s.lastNotified
+	s.lastProcessed = s.lastNotified
 
 	return nil
 }
@@ -142,29 +137,24 @@ func (s *Status) NextNotification(ctx context.Context) (*BlockEntry, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	entry := s.heap.PeekMin()
+	var entry *BlockEntry
 	next := s.nextHeight()
 
-	// Next notification is not available yet
-	if entry == nil || entry.Height > next {
-		return nil, false
-	}
-
-	// Remove any entires below the next height. This clears out any duplicates that have already
-	// been notified.
-	for entry.Height < next && s.heap.Len() > 0 {
+	// Remove any entries for the next height or below. This ensures duplicate or unexpected heights
+	// below the tracked heights are removed. If there are duplicate entries for the same height, the
+	// last entry popped from the heap will be returned.
+	for s.heap.Len() > 0 && s.heap.PeekMin().Height <= next {
 		entry = heap.Pop(s.heap).(*BlockEntry)
 	}
 
-	// All entries were duplicates. The heap now is empty
 	if entry == nil || entry.Height != next {
 		return nil, false
 	}
 
 	// Now we have the next height to notify
 
-	s.firstNotificationSent = true
 	s.lastNotified = entry.Height
+	s.firstNotificationSent = true
 
 	if err := s.save(ctx); err != nil {
 		s.log.Error().Err(err).Msg("failed to persist fetched state")
@@ -178,26 +168,23 @@ func (s *Status) Fetched(entry *BlockEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// don't accept entries we've already notified for
+	// don't accept entries which have already been notified
 	if entry.Height < s.nextHeight() {
 		return
 	}
 
 	// Enforce a maximum possible cache size. The cache will be effective under normal operation.
-	// However, if the requester gets stuck on a block for more than maxCachedEntries blocks, the cache
-	// will be empty.
-	if entry.Height > (s.lastNotified + s.maxCachedEntries) {
+	// However, the cache will be under utilized if there is a large gap of unfetched heights.
+	if entry.Height >= (s.lastNotified + s.maxCachedEntries) {
 		entry.ExecutionData = nil
 	}
 
 	heap.Push(s.heap, entry)
 
 	// Only track the highest height
-	if entry.Height <= s.lastReceived {
-		return
+	if entry.Height > s.lastReceived {
+		s.lastReceived = entry.Height
 	}
-
-	s.lastReceived = entry.Height
 }
 
 // Processed marks a height as processed
@@ -220,9 +207,9 @@ func (s *Status) Halt(ctx context.Context) {
 	}
 }
 
-// IsPaused returns true if the requester should pause fetching new heights
-// This puts a limit on the number of blocks that are fetched when the requester gets stuck on
-// fetching a past height.
+// IsPaused returns true if the requester should pause downloading new heights
+// This puts a limit on the number of blocks that are downloaded when the requester is temporarily
+// unable to download a past height.
 func (s *Status) IsPaused() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -230,7 +217,7 @@ func (s *Status) IsPaused() bool {
 	return s.lastProcessed > (s.lastNotified + s.maxSearchAhead)
 }
 
-// LastProcessed returns the last block height that was processed by the requester
+// LastProcessed returns the last block height that was marked Processed
 func (s *Status) LastProcessed() uint64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -238,7 +225,7 @@ func (s *Status) LastProcessed() uint64 {
 	return s.lastProcessed
 }
 
-// LastNotified returns the last block height that was notified by the requester
+// LastNotified returns the last block height that was returned from NextNotification
 func (s *Status) LastNotified() uint64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -246,7 +233,7 @@ func (s *Status) LastNotified() uint64 {
 	return s.lastNotified
 }
 
-// LastReceived returns the last block height that was received by the requester
+// LastReceived returns the last block height that was marked Fetched
 func (s *Status) LastReceived() uint64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -282,6 +269,7 @@ func (s *Status) nextHeight() uint64 {
 	return next
 }
 
+// OutstandingNotifications returns the number of blocks that have been Fetched but not notified
 func (s *Status) OutstandingNotifications() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

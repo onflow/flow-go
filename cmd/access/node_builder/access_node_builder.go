@@ -464,7 +464,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	}
 
 	builder.RestartableComponent("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// The default startHeight should be from the first block executed for the spork (one after the root)
+		// The default startHeight is the first block executed for the spork
 		startHeight := builder.RootBlock.Header.Height + 1
 
 		// Validation of the root block height needs to be done after loading state

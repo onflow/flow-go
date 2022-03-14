@@ -685,7 +685,7 @@ func (e *executionDataRequesterImpl) localExecutionDataService(ctx irrecoverable
 	eds := state_synchronization.NewExecutionDataService(
 		new(cbor.Codec),
 		compressor.NewLz4Compressor(),
-		local.NewBlobService(e.ds),
+		blobService,
 		metrics.NewNoopCollector(),
 		e.log,
 	)

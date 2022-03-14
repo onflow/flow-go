@@ -2,6 +2,7 @@ package status_test
 
 import (
 	"context"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -151,9 +153,9 @@ func (suite *StatusSuite) TestCache() {
 			}
 		}
 
-		assert.Len(suite.T(), notified, int(testLength))
-		assert.LessOrEqual(suite.T(), int(suite.maxCachedEntries), cached)
-		assert.Equal(suite.T(), notified, heights)
+		assert.Len(suite.T(), notified, int(testLength), "missing notifications")
+		assert.LessOrEqual(suite.T(), cached, int(suite.maxCachedEntries), "too many cached entries")
+		assert.Equal(suite.T(), heights, notified, "missing/out of order notifications")
 	}
 
 	suite.Run("max cached enforced properly when fetched in order", func() {
@@ -177,7 +179,6 @@ func (suite *StatusSuite) TestCache() {
 func (suite *StatusSuite) TestNotifications() {
 	entry0 := EntryFixture(suite.rootHeight)
 	entry1 := EntryFixture(suite.rootHeight + 1)
-	entry2 := EntryFixture(suite.rootHeight + 2)
 	entry3 := EntryFixture(suite.rootHeight + 3)
 
 	suite.Run("returns false when no pending notifications", func() {
@@ -220,25 +221,14 @@ func (suite *StatusSuite) TestNotifications() {
 		assert.Nil(suite.T(), entry)
 	})
 
-	suite.Run("drops duplicate entries", func() {
-		suite.reset(true)
+	rand.Seed(time.Now().UnixNano())
+	blockCount := 100
+	expected := make([]uint64, blockCount)
+	for i := 0; i < blockCount; i++ {
+		expected[i] = suite.rootHeight + uint64(i)
+	}
 
-		suite.status.Fetched(EntryFixture(entry3.Height))
-		suite.status.Fetched(EntryFixture(entry3.Height))
-		suite.status.Fetched(entry3)
-		suite.status.Fetched(entry3)
-		suite.status.Fetched(EntryFixture(entry2.Height))
-		suite.status.Fetched(entry2)
-		suite.status.Fetched(entry2)
-		suite.status.Fetched(entry1)
-		suite.status.Fetched(entry1)
-		suite.status.Fetched(EntryFixture(entry1.Height))
-		suite.status.Fetched(EntryFixture(entry1.Height))
-		suite.status.Fetched(EntryFixture(entry1.Height))
-		suite.status.Fetched(EntryFixture(entry1.Height))
-		suite.status.Fetched(EntryFixture(entry1.Height))
-		suite.status.Fetched(entry0)
-
+	check := func() {
 		heights := []uint64{}
 		for {
 			entry, ok := suite.status.NextNotification(suite.ctx)
@@ -248,12 +238,37 @@ func (suite *StatusSuite) TestNotifications() {
 			heights = append(heights, entry.Height)
 		}
 
-		assert.Equal(suite.T(), []uint64{
-			entry0.Height,
-			entry1.Height,
-			entry2.Height,
-			entry3.Height,
-		}, heights)
+		assert.Equal(suite.T(), expected, heights)
+	}
+
+	suite.Run("drops duplicate entries fetched in order", func() {
+		suite.reset(true)
+
+		for _, height := range expected {
+			for j := 0; j <= rand.Intn(3); j++ {
+				suite.status.Fetched(EntryFixture(height))
+			}
+		}
+
+		check()
+	})
+
+	suite.Run("drops duplicate entries fetched in random order", func() {
+		suite.reset(true)
+
+		blocks := make(map[flow.Identifier]*status.BlockEntry, blockCount)
+		for _, height := range expected {
+			for j := 0; j <= rand.Intn(3); j++ {
+				entry := EntryFixture(height)
+				blocks[entry.BlockID] = entry
+			}
+		}
+
+		for _, entry := range blocks {
+			suite.status.Fetched(entry)
+		}
+
+		check()
 	})
 
 	suite.Run("lastNotified loaded from db", func() {
