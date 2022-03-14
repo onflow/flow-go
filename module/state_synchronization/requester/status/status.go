@@ -13,6 +13,8 @@ import (
 
 const statusDBKey = "execution_requester_status"
 
+// Status encapsulate the ExecutionDataRequester's state and provides methods to consistently
+// manage the requester's responsibilities.
 type Status struct {
 	// The first block height for which notifications should be sent
 	startHeight uint64
@@ -62,6 +64,7 @@ type persistedStatus struct {
 	Halted bool
 }
 
+// New returns a new Status struct
 func New(db datastore.Batching, log zerolog.Logger, startHeight uint64, maxCachedEntries, maxSearchAhead uint64) *Status {
 	return &Status{
 		db:   db,
