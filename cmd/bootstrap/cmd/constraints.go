@@ -9,16 +9,16 @@ import (
 // ensureUniformNodeWeightsPerRole verifies that the following condition is satisfied for each role R:
 // * all node with role R must have the same weight
 func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
-	// ensure all nodes of the same role have equal stake/weight
+	// ensure all nodes of the same role have equal weight
 	for _, role := range flow.Roles() {
 		withRole := allNodes.Filter(filter.HasRole(role))
-		expectedStake := withRole[0].Stake
+		expectedWeight := withRole[0].Weight
 		for _, node := range withRole {
-			if node.Stake != expectedStake {
+			if node.Weight != expectedWeight {
 				log.Fatal().Msgf(
-					"will not bootstrap configuration with non-equal stakes\n"+
-						"found nodes with role %s and stake1=%d, stake2=%d",
-					role, expectedStake, node.Stake)
+					"will not bootstrap configuration with non-equal weights\n"+
+						"found nodes with role %s and weight1=%d, weight2=%d",
+					role, expectedWeight, node.Weight)
 			}
 		}
 	}

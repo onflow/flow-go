@@ -19,26 +19,37 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
+// DefaultInitialWeight is the default initial weight for a node identity.
+const DefaultInitialWeight = 1000
+
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
-// Identity represents a node identity.
+// Identity represents the public identity of one network participant (node).
 type Identity struct {
 	// NodeID uniquely identifies a particular node. A node's ID is fixed for
 	// the duration of that node's participation in the network.
-	NodeID  Identifier
+	NodeID Identifier
+	// Address is the network address where the node can be reached.
 	Address string
-	Role    Role
-	// Stake represents the node's *weight*. The stake (quantity of $FLOW held
-	// in escrow during the node's participation) is strictly managed by the
-	// service account. The protocol software strictly considers weight, which
-	// represents how much voting power a given node has.
+	// Role is the node's role in the network and defines its abilities and
+	// responsibilities.
+	Role Role
+	// Weight represents the node's authority to perform certain tasks relative
+	// to other nodes. For example, in the consensus committee, the node's weight
+	// represents the weight assigned to its votes.
 	//
-	// NOTE: Nodes that are registered for an upcoming epoch, or that are in
-	// the process of un-staking, have 0 weight.
+	// A node's weight is distinct from its stake. Stake represents the quantity
+	// of FLOW tokens held by the network in escrow during the course of the node's
+	// participation in the network. The stake is strictly managed by the service
+	// account smart contracts.
 	//
-	// TODO: to be renamed to Weight
-	Stake uint64
+	// Nodes which are registered to join at the next epoch will appear in the
+	// identity table but are considered to have zero weight up until their first
+	// epoch begins. Likewise nodes which were registered in the previous epoch
+	// but have left at the most recent epoch boundary will appear in the identity
+	// table with zero weight.
+	Weight uint64
 	// Ejected represents whether a node has been permanently removed from the
 	// network. A node may be ejected for either:
 	// * committing one protocol felony
@@ -65,14 +76,14 @@ func ParseIdentity(identity string) (*Identity, error) {
 	}
 	address := matches[3] + matches[4]
 	role, _ := ParseRole(matches[1])
-	stake, _ := strconv.ParseUint(matches[5], 10, 64)
+	weight, _ := strconv.ParseUint(matches[5], 10, 64)
 
 	// create the identity
 	iy := Identity{
 		NodeID:  nodeID,
 		Address: address,
 		Role:    role,
-		Stake:   stake,
+		Weight:  weight,
 	}
 
 	return &iy, nil
@@ -80,7 +91,7 @@ func ParseIdentity(identity string) (*Identity, error) {
 
 // String returns a string representation of the identity.
 func (iy Identity) String() string {
-	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Stake)
+	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Weight)
 }
 
 // ID returns a unique identifier for the identity.
@@ -95,25 +106,24 @@ func (iy Identity) Checksum() Identifier {
 
 type encodableIdentity struct {
 	NodeID        Identifier
-	Address       string
+	Address       string `json:",omitempty"`
 	Role          Role
-	Stake         uint64
+	Weight        uint64
 	StakingPubKey []byte
 	NetworkPubKey []byte
 }
 
-// stealthIdentity represents a node identity without an address
-type stealthIdentity struct {
-	NodeID        Identifier
-	Address       string `json:"-"`
-	Role          Role
-	Stake         uint64
-	StakingPubKey []byte
-	NetworkPubKey []byte
+// decodableIdentity provides backward-compatible decoding of old models
+// which use the Stake field in place of Weight.
+type decodableIdentity struct {
+	encodableIdentity
+	// Stake previously was used in place of the Weight field.
+	// Deprecated: supported in decoding for backward-compatibility
+	Stake uint64
 }
 
 func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
-	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
+	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Weight, nil, nil}
 	if iy.StakingPubKey != nil {
 		ie.StakingPubKey = iy.StakingPubKey.Encode()
 	}
@@ -124,20 +134,12 @@ func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 }
 
 func (iy Identity) MarshalJSON() ([]byte, error) {
-	var identity interface{}
 	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
 	}
 
-	// if the address is empty, suppress the Address field in the output json
-	if encodable.Address == "" {
-		identity = stealthIdentity(encodable)
-	} else {
-		identity = encodable
-	}
-
-	data, err := json.Marshal(identity)
+	data, err := json.Marshal(encodable)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode json: %w", err)
 	}
@@ -184,7 +186,7 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
 	identity.Role = ie.Role
-	identity.Stake = ie.Stake
+	identity.Weight = ie.Weight
 	var err error
 	if ie.StakingPubKey != nil {
 		if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
@@ -200,12 +202,19 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 }
 
 func (iy *Identity) UnmarshalJSON(b []byte) error {
-	var encodable encodableIdentity
-	err := json.Unmarshal(b, &encodable)
+	var decodable decodableIdentity
+	err := json.Unmarshal(b, &decodable)
 	if err != nil {
 		return fmt.Errorf("could not decode json: %w", err)
 	}
-	err = identityFromEncodable(encodable, iy)
+	// compat: translate Stake fields to Weight
+	if decodable.Stake != 0 {
+		if decodable.Weight != 0 {
+			return fmt.Errorf("invalid identity with both Stake and Weight fields")
+		}
+		decodable.Weight = decodable.Stake
+	}
+	err = identityFromEncodable(decodable.encodableIdentity, iy)
 	if err != nil {
 		return fmt.Errorf("could not convert from encodable json: %w", err)
 	}
@@ -248,7 +257,7 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 	if iy.Role != other.Role {
 		return false
 	}
-	if iy.Stake != other.Stake {
+	if iy.Weight != other.Weight {
 		return false
 	}
 	if iy.Ejected != other.Ejected {
@@ -399,11 +408,11 @@ func (il IdentityList) Fingerprint() Identifier {
 	return MerkleRoot(GetIDs(il)...)
 }
 
-// TotalStake returns the total stake of all given identities.
-func (il IdentityList) TotalStake() uint64 {
+// TotalWeight returns the total weight of all given identities.
+func (il IdentityList) TotalWeight() uint64 {
 	var total uint64
 	for _, identity := range il {
-		total += identity.Stake
+		total += identity.Weight
 	}
 	return total
 }

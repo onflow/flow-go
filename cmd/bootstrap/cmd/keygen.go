@@ -99,7 +99,7 @@ func init() {
 	rootCmd.AddCommand(keygenCmd)
 
 	// required parameters
-	keygenCmd.Flags().StringVar(&flagConfig, "config", "node-config.json", "path to a JSON file containing multiple node configurations (Role, Address, Stake)")
+	keygenCmd.Flags().StringVar(&flagConfig, "config", "node-config.json", "path to a JSON file containing multiple node configurations (Role, Address, Weight)")
 	cmd.MarkFlagRequired(keygenCmd, "config")
 
 	// optional parameters, used for generating machine account files

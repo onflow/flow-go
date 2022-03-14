@@ -11,6 +11,7 @@ import (
 	"github.com/ipfs/go-cid"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
@@ -27,6 +28,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
+
+var uploadEnabled = true
+
+func SetUploaderEnabled(enabled bool) {
+	uploadEnabled = enabled
+
+	log.Info().Msgf("changed uploadEnabled to %v", enabled)
+}
 
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
@@ -259,11 +268,10 @@ func (e *Manager) ComputeBlock(
 		}
 
 		ed := &state_synchronization.ExecutionData{
-			BlockID:            block.ID(),
-			Collections:        collections,
-			Events:             result.Events,
-			TrieUpdates:        result.TrieUpdates,
-			TransactionResults: result.TransactionResults,
+			BlockID:     block.ID(),
+			Collections: collections,
+			Events:      result.Events,
+			TrieUpdates: result.TrieUpdates,
 		}
 
 		var err error
@@ -272,12 +280,14 @@ func (e *Manager) ComputeBlock(
 		return err
 	})
 
-	for _, uploader := range e.uploaders {
-		uploader := uploader
+	if uploadEnabled {
+		for _, uploader := range e.uploaders {
+			uploader := uploader
 
-		group.Go(func() error {
-			return uploader.Upload(result)
-		})
+			group.Go(func() error {
+				return uploader.Upload(result)
+			})
+		}
 	}
 
 	err = group.Wait()
