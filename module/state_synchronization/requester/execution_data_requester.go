@@ -15,6 +15,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -94,7 +96,7 @@ type executionDataRequesterImpl struct {
 
 	// finalizedBlockQueue accepts new finalized blocks to prevent blocking in the OnBlockFinalized
 	// callback
-	finalizedBlocks chan flow.Identifier
+	finalizationNotifier engine.Notifier
 
 	// fetchQueue accepts new fetch requests, which are consumed by a pool of fetch workers.
 	fetchRequests chan *status.BlockEntry
@@ -113,11 +115,14 @@ type executionDataRequesterImpl struct {
 	fetchTimeout time.Duration
 
 	bootstrapped chan struct{}
+
+	finalizedHeader *synchronization.FinalizedHeaderCache
 }
 
 // NewexecutionDataRequester creates a new execution data requester component
 func New(
 	log zerolog.Logger,
+	finalizedHeader *synchronization.FinalizedHeaderCache,
 	edrMetrics module.ExecutionDataRequesterMetrics,
 	datastore datastore.Batching,
 	blobservice network.BlobService,
@@ -148,12 +153,12 @@ func New(
 			maxCachedEntries,
 			maxSearchAhead,
 		),
-
-		finalizedBlocks:    make(chan flow.Identifier, 1),
-		fetchRequests:      make(chan *status.BlockEntry, fetchQueueLength),
-		fetchRetryRequests: make(chan *status.BlockEntry, fetchQueueLength),
-		notifications:      make(chan struct{}, fetchQueueLength),
-		bootstrapped:       make(chan struct{}),
+		finalizedHeader:      finalizedHeader,
+		finalizationNotifier: engine.NewNotifier(),
+		fetchRequests:        make(chan *status.BlockEntry, fetchQueueLength),
+		fetchRetryRequests:   make(chan *status.BlockEntry, fetchQueueLength),
+		notifications:        make(chan struct{}, fetchQueueLength),
+		bootstrapped:         make(chan struct{}),
 	}
 
 	builder := component.NewComponentManagerBuilder().
@@ -198,12 +203,7 @@ func (e *executionDataRequesterImpl) OnBlockFinalized(block *model.Block) {
 
 	logger.Debug().Msg("received finalized block notification")
 
-	select {
-	case e.finalizedBlocks <- block.BlockID:
-	default:
-		logger.Warn().Msg("finalized block queue is full")
-		e.metrics.FinalizationEventDropped()
-	}
+	e.finalizationNotifier.Notify()
 }
 
 // finalizedBlockProcessor runs the main process that processes finalized block notifications and
@@ -274,30 +274,23 @@ func (e *executionDataRequesterImpl) finalizationProcessingLoop(ctx irrecoverabl
 		select {
 		case <-ctx.Done():
 			return
-		case blockID := <-e.finalizedBlocks:
-			e.processFinalizedBlock(ctx, blockID)
+		case <-e.finalizationNotifier.Channel():
+			e.processFinalizedBlock(ctx, e.finalizedHeader.Get())
 		}
 	}
 }
 
-func (e *executionDataRequesterImpl) processFinalizedBlock(ctx irrecoverable.SignalerContext, blockID flow.Identifier) {
-	block, err := e.blocks.ByID(blockID)
-
-	// block must be in the db, otherwise there's a problem with the state
-	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to lookup finalized block %s in protocol state db: %w", blockID, err))
-	}
-
+func (e *executionDataRequesterImpl) processFinalizedBlock(ctx irrecoverable.SignalerContext, header *flow.Header) {
 	// loop through all finalized blocks since the last processed block, and extract all seals
 	lastHeight := e.status.LastProcessed()
 
-	logger := e.log.With().Str("finalized_block_id", blockID.String()).Logger()
+	logger := e.log.With().Str("finalized_block_id", header.ID().String()).Logger()
 	logger.Debug().
 		Uint64("start_height", lastHeight+1).
-		Uint64("end_height", block.Header.Height).
+		Uint64("end_height", header.Height).
 		Msg("checking for seals")
 
-	for height := lastHeight + 1; height <= block.Header.Height; height++ {
+	for height := lastHeight + 1; height <= header.Height; height++ {
 		if e.status.IsPaused() {
 			logger.Debug().Uint64("height", height).Msg("pausing seal processing until workers catch up")
 			break
