@@ -539,7 +539,7 @@ func (ec *ExecutionCollector) LatestTrieRegCount(number uint64) {
 }
 
 // LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieRegCountDiff(number uint64) {
+func (ec *ExecutionCollector) LatestTrieRegCountDiff(number int64) {
 	ec.latestTrieRegCountDiff.Set(float64(number))
 }
 
@@ -549,7 +549,7 @@ func (ec *ExecutionCollector) LatestTrieMaxDepth(number uint64) {
 }
 
 // LatestTrieMaxDepthDiff records the difference between the max depth of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieMaxDepthDiff(number uint64) {
+func (ec *ExecutionCollector) LatestTrieMaxDepthDiff(number int64) {
 	ec.latestTrieMaxDepthDiff.Set(float64(number))
 }
 
