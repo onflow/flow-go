@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -45,6 +46,7 @@ type ScriptEnv struct {
 	logs          []string
 	rng           *rand.Rand
 	traceSpan     opentracing.Span
+	reqContext    context.Context
 }
 
 func (e *ScriptEnv) Context() *Context {
@@ -56,7 +58,8 @@ func (e *ScriptEnv) VM() *VirtualMachine {
 }
 
 func NewScriptEnvironment(
-	ctx Context,
+	reqContext context.Context,
+	fvmContext Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
@@ -66,10 +69,10 @@ func NewScriptEnvironment(
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(ctx.Metrics)
+	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
 
 	env := &ScriptEnv{
-		ctx:           ctx,
+		ctx:           fvmContext,
 		sth:           sth,
 		vm:            vm,
 		metrics:       metrics,
@@ -77,6 +80,7 @@ func NewScriptEnvironment(
 		accountKeys:   accountKeys,
 		uuidGenerator: uuidGenerator,
 		programs:      programsHandler,
+		reqContext:    reqContext,
 	}
 
 	env.contracts = handler.NewContractHandler(
@@ -85,8 +89,8 @@ func NewScriptEnvironment(
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
-	if ctx.BlockHeader != nil {
-		env.seedRNG(ctx.BlockHeader)
+	if fvmContext.BlockHeader != nil {
+		env.seedRNG(fvmContext.BlockHeader)
 	}
 
 	return env
@@ -439,7 +443,16 @@ func (e *ScriptEnv) meterComputation(kind, intensity uint) error {
 }
 
 func (e *ScriptEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
-	return e.meterComputation(uint(kind), intensity)
+	select {
+	case <-e.reqContext.Done():
+		err := e.reqContext.Err()
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.NewScriptExecutionTimedOutError()
+		}
+		return errors.NewScriptExecutionCancelledError(err)
+	default:
+		return e.meterComputation(uint(kind), intensity)
+	}
 }
 
 func (e *ScriptEnv) ComputationUsed() uint64 {

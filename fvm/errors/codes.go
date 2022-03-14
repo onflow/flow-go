@@ -61,6 +61,8 @@ const (
 	ErrCodeTransactionFeeDeductionFailedError ErrorCode = 1109
 	ErrCodeComputationLimitExceededError      ErrorCode = 1110
 	ErrCodeMemoryLimitExceededError           ErrorCode = 1111
+	ErrCodeScriptExecutionCancelledError      ErrorCode = 1112
+	ErrCodeScriptExecutionTimedOutError       ErrorCode = 1113
 
 	// accounts errors 1200 - 1250
 	// ErrCodeAccountError              ErrorCode = 1200 - reserved

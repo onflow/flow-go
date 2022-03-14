@@ -308,3 +308,55 @@ func (e *EncodingUnsupportedValueError) Error() string {
 func (e *EncodingUnsupportedValueError) Code() ErrorCode {
 	return ErrCodeEncodingUnsupportedValue
 }
+
+// ScriptExecutionCancelledError indicates that Cadence Script execution
+// has been cancelled (e.g. request connection has been droped)
+//
+// note: this error is used by scripts only and
+// won't be emitted for transactions since transaction execution has to be deterministic.
+type ScriptExecutionCancelledError struct {
+	err error
+}
+
+// NewScriptExecutionCancelledError construct a new ScriptExecutionCancelledError
+func NewScriptExecutionCancelledError(err error) *ScriptExecutionCancelledError {
+	return &ScriptExecutionCancelledError{err: err}
+}
+
+func (e *ScriptExecutionCancelledError) Error() string {
+	return fmt.Sprintf(
+		"%s script execution is cancelled: %s",
+		e.Code().String(),
+		e.err.Error(),
+	)
+}
+
+// Code returns the error code for this error
+func (e *ScriptExecutionCancelledError) Code() ErrorCode {
+	return ErrCodeScriptExecutionCancelledError
+}
+
+// ScriptExecutionTimedOutError indicates that Cadence Script execution
+// has been taking more time than what is allowed.
+//
+// note: this error is used by scripts only and
+// won't be emitted for transactions since transaction execution has to be deterministic.
+type ScriptExecutionTimedOutError struct {
+}
+
+// NewScriptExecutionTimedOutError construct a new ScriptExecutionTimedOutError
+func NewScriptExecutionTimedOutError() *ScriptExecutionTimedOutError {
+	return &ScriptExecutionTimedOutError{}
+}
+
+func (e *ScriptExecutionTimedOutError) Error() string {
+	return fmt.Sprintf(
+		"%s script execution is timed out and did not finish executing within the maximum execution time allowed",
+		e.Code().String(),
+	)
+}
+
+// Code returns the error code for this error
+func (e *ScriptExecutionTimedOutError) Code() ErrorCode {
+	return ErrCodeScriptExecutionTimedOutError
+}
