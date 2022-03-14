@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -109,8 +110,8 @@ func (f *FinalizedHeaderCache) Done() <-chan struct{} {
 //  (1) Updates local state of last finalized snapshot.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (f *FinalizedHeaderCache) onFinalizedBlock(blockID flow.Identifier) {
-	f.log.Debug().Str("block_id", blockID.String()).Msg("received new block finalization callback")
+func (f *FinalizedHeaderCache) onFinalizedBlock(block *model.Block) {
+	f.log.Debug().Str("block_id", block.BlockID.String()).Msg("received new block finalization callback")
 	// notify that there is new finalized block
 	f.finalizationEventNotifier.Notify()
 }

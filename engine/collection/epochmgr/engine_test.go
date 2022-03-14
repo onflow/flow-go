@@ -185,14 +185,14 @@ func (suite *Suite) ComponentsForEpoch(epoch realprotocol.Epoch) *mockComponents
 	return components
 }
 
-// MockAsUnstakedNode mocks the factory to return a sentinel indicating
-// we are not a staked node in the epoch
-func (suite *Suite) MockAsUnstakedNode() {
+// MockAsUnauthorizedNode mocks the factory to return a sentinel indicating
+// we are not authorized in the epoch
+func (suite *Suite) MockAsUnauthorizedNode() {
 
 	suite.factory = new(epochmgr.EpochComponentsFactory)
 	suite.factory.
 		On("Create", mock.Anything).
-		Return(nil, nil, nil, nil, nil, ErrUnstakedForEpoch)
+		Return(nil, nil, nil, nil, nil, ErrNotAuthorizedForEpoch)
 
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)
@@ -222,12 +222,12 @@ func (suite *Suite) TestRestartInSetupPhase() {
 
 // When a collection node joins the network at an epoch boundary, they must
 // start running during the EpochSetup phase in the epoch before they become
-// a staked member so they submit their cluster QC vote.
+// an authorized member so they submit their cluster QC vote.
 //
 // These nodes must kick off the root QC voter but should not attempt to
 // participate in cluster consensus in the current epoch.
-func (suite *Suite) TestStartAsUnstakedNode() {
-	suite.MockAsUnstakedNode()
+func (suite *Suite) TestStartAsUnauthorizedNode() {
+	suite.MockAsUnauthorizedNode()
 
 	// we are in setup phase
 	suite.snap.On("Phase").Return(flow.EpochPhaseSetup, nil)
