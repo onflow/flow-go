@@ -268,11 +268,10 @@ func (e *Manager) ComputeBlock(
 		}
 
 		ed := &state_synchronization.ExecutionData{
-			BlockID:            block.ID(),
-			Collections:        collections,
-			Events:             result.Events,
-			TrieUpdates:        result.TrieUpdates,
-			TransactionResults: result.TransactionResults,
+			BlockID:     block.ID(),
+			Collections: collections,
+			Events:      result.Events,
+			TrieUpdates: result.TrieUpdates,
 		}
 
 		var err error

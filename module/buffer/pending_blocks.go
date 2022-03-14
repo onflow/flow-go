@@ -59,10 +59,11 @@ func (b *PendingBlocks) DropForParent(parentID flow.Identifier) {
 	b.backend.dropForParent(parentID)
 }
 
-func (b *PendingBlocks) PruneByHeight(height uint64) {
-	b.backend.pruneByHeight(height)
+// PruneByView prunes any pending blocks with views less or equal to the given view.
+func (b *PendingBlocks) PruneByView(view uint64) {
+	b.backend.pruneByView(view)
 }
 
 func (b *PendingBlocks) Size() uint {
-	return uint(len(b.backend.blocksByID))
+	return b.backend.size()
 }
