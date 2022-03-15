@@ -47,9 +47,6 @@ elif [[ "$ARCH" =~ ^(arm64|armv7|armv7s)$ && "${CC_VERSION_STR[0]}" =~ (clang)  
     MARCH=""
 else
     MARCH="-march=native"
-else
-    # Use defaults for ARM
-    MARCH=""
 fi
 
 # Set RELIC config for Flow
