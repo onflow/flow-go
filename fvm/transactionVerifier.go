@@ -21,13 +21,11 @@ const (
 )
 
 type TransactionSignatureVerifier struct {
-	SignatureVerifier  crypto.SignatureVerifier
 	KeyWeightThreshold int
 }
 
 func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatureVerifier {
 	return &TransactionSignatureVerifier{
-		SignatureVerifier:  crypto.DefaultSignatureVerifier{},
 		KeyWeightThreshold: keyWeightThreshold,
 	}
 }
@@ -184,7 +182,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	valid, err := v.SignatureVerifier.Verify(
+	valid, err := crypto.Verify(
 		txSig.Signature,
 		string(flow.TransactionDomainTag[:]),
 		message,

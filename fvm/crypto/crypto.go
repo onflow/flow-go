@@ -120,7 +120,6 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) error {
 // VerifySignatureFromRuntime is an adapter that performs signature verification using
 // raw values provided by the Cadence runtime.
 func VerifySignatureFromRuntime(
-	verifier SignatureVerifier,
 	signature []byte,
 	tag string,
 	message []byte,
@@ -165,7 +164,7 @@ func VerifySignatureFromRuntime(
 		return false, errors.NewValueErrorf(hex.EncodeToString(rawPublicKey), "cannot decode public key: %w", err)
 	}
 
-	valid, err := verifier.Verify(
+	valid, err := Verify(
 		signature,
 		tag,
 		message,
@@ -179,23 +178,7 @@ func VerifySignatureFromRuntime(
 	return valid, nil
 }
 
-type SignatureVerifier interface {
-	Verify(
-		signature []byte,
-		tag string,
-		message []byte,
-		publicKey crypto.PublicKey,
-		hashAlgo hash.HashingAlgorithm,
-	) (bool, error)
-}
-
-type DefaultSignatureVerifier struct{}
-
-func NewDefaultSignatureVerifier() DefaultSignatureVerifier {
-	return DefaultSignatureVerifier{}
-}
-
-func (DefaultSignatureVerifier) Verify(
+func Verify(
 	signature []byte,
 	tag string,
 	message []byte,

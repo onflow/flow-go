@@ -110,7 +110,6 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 					}
 
 					ok, err := crypto.VerifySignatureFromRuntime(
-						crypto.NewDefaultSignatureVerifier(),
 						signature,
 						tag,
 						[]byte("some data"),
@@ -150,7 +149,6 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 		}
 
 		ok, err := crypto.VerifySignatureFromRuntime(
-			crypto.NewDefaultSignatureVerifier(),
 			signature,
 			string(tag),
 			[]byte("some data"),
@@ -258,7 +256,6 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 						signature := sig.Bytes()
 
 						ok, err := crypto.VerifySignatureFromRuntime(
-							crypto.NewDefaultSignatureVerifier(),
 							signature,
 							c.verifyTag,
 							[]byte("some data"),
@@ -359,7 +356,7 @@ func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_inval
 	invalidSignatureAlgo := runtime.SignatureAlgorithm(164)
 
 	_, err := crypto.VerifySignatureFromRuntime(
-		nil, nil, "", nil, nil, invalidSignatureAlgo, 0,
+		nil, "", nil, nil, invalidSignatureAlgo, 0,
 	)
 
 	require.IsType(t, &errors.ValueError{}, err)
@@ -386,7 +383,7 @@ func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_inval
 	invalidHashAlgo := runtime.HashAlgorithm(164)
 
 	_, err := crypto.VerifySignatureFromRuntime(
-		nil, nil, "", nil, nil, runtime.SignatureAlgorithmECDSA_P256, invalidHashAlgo,
+		nil, "", nil, nil, runtime.SignatureAlgorithmECDSA_P256, invalidHashAlgo,
 	)
 
 	require.IsType(t, &errors.ValueError{}, err)
@@ -413,7 +410,7 @@ func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_inval
 	invalidPublicKey := []byte{0xc3, 0x28} //some invalid UTF8
 
 	_, err := crypto.VerifySignatureFromRuntime(
-		nil, nil, flow.UserTagString, nil, invalidPublicKey, runtime.SignatureAlgorithmECDSA_P256, runtime.HashAlgorithmSHA2_256,
+		nil, flow.UserTagString, nil, invalidPublicKey, runtime.SignatureAlgorithmECDSA_P256, runtime.HashAlgorithmSHA2_256,
 	)
 
 	require.IsType(t, &errors.ValueError{}, err)
