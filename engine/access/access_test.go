@@ -766,13 +766,25 @@ func (suite *Suite) TestExecuteScript() {
 
 func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	collection := unittest.CollectionFixture(10)
+	refBlockID := unittest.IdentifierFixture()
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID: collection.ID(),
-		Signature:    crypto.Signature([]byte("signature A")),
+		CollectionID:     collection.ID(),
+		Signature:        crypto.Signature([]byte("signature A")),
+		ReferenceBlockID: refBlockID,
 	}
 	block := unittest.BlockFixture()
 	block.Payload.Guarantees = []*flow.CollectionGuarantee{guarantee}
 	block.Header.PayloadHash = block.Payload.Hash()
+
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(unittest.IdentityListFixture(0), nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.state.On("AtBlockID", refBlockID).Return(snap)
 
 	return block, collection
 }
