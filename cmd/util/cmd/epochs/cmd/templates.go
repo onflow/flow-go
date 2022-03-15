@@ -50,7 +50,7 @@ transaction(name: String,
 
             // the below arguments are unused and are safe to be left empty
             collectorClusters: [],
-            clusterQCs: [],
-            dkgPubKeys: [])
+            clusterQCs: [] as [FlowClusterQC.ClusterQC],
+            dkgPubKeys: [] as [String])
   }
 }`

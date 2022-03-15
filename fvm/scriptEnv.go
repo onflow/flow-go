@@ -92,7 +92,12 @@ func NewScriptEnvironment(
 	return env
 }
 
-func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+func (e *ScriptEnv) ResourceOwnerChanged(
+	*interpreter.Interpreter,
+	*interpreter.CompositeValue,
+	common.Address,
+	common.Address,
+) {
 }
 
 func (e *ScriptEnv) seedRNG(header *flow.Header) {

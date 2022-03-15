@@ -49,8 +49,8 @@ transaction(clusterWeights: [{String: UInt64}]) {
 		randomSource: %s,
 		collectorClusters: clusters,
         // NOTE: clusterQCs and dkgPubKeys are empty because these initial values are not used
-		clusterQCs: [],
-		dkgPubKeys: [],
+		clusterQCs: [] as [FlowClusterQC.ClusterQC],
+		dkgPubKeys: [] as [String],
 	)
   }
 }

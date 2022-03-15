@@ -655,6 +655,11 @@ func (_m *Environment) ResolveLocation(identifiers []ast.Identifier, location co
 	return r0, r1
 }
 
+// ResourceOwnerChanged provides a mock function with given fields: _a0, resource, oldOwner, newOwner
+func (_m *Environment) ResourceOwnerChanged(_a0 *interpreter.Interpreter, resource *interpreter.CompositeValue, oldOwner common.Address, newOwner common.Address) {
+	_m.Called(_a0, resource, oldOwner, newOwner)
+}
+
 // RevokeAccountKey provides a mock function with given fields: address, index
 func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*runtime.AccountKey, error) {
 	ret := _m.Called(address, index)

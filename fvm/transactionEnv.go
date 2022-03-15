@@ -53,7 +53,11 @@ type TransactionEnv struct {
 	authorizers      []runtime.Address
 }
 
-func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+func (e *TransactionEnv) ResourceOwnerChanged(
+	*interpreter.Interpreter,
+	*interpreter.CompositeValue,
+	common.Address,
+	common.Address) {
 }
 
 func NewTransactionEnvironment(
