@@ -516,6 +516,12 @@ func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarante
 	return guarantees
 }
 
+func WithReferenceBlockID(refBlockID flow.Identifier) func(*flow.CollectionGuarantee) {
+	return func(g *flow.CollectionGuarantee) {
+		g.ReferenceBlockID = refBlockID
+	}
+}
+
 func BlockSealsFixture(n int) []*flow.Seal {
 	seals := make([]*flow.Seal, 0, n)
 	for i := 0; i < n; i++ {
