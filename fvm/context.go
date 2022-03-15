@@ -64,14 +64,6 @@ const (
 	DefaultMemoryLimit                  = 100_000_000 // 100G
 	DefaultEventCollectionByteSizeLimit = 256_000     // 256KB
 	DefaultMaxNumOfTxRetries            = 3
-
-	// service transaction is a transaction have service account as payer
-	// and signed by service account, higher limits are allowed
-	// for service transactions to consider flexibility for network services
-	// such as governance transactions, etc.
-	ServiceTransactionComputationLimit             = 100_000_000_000 // 100B
-	ServiceTransactionMemoryLimit                  = 100_000_000     // 100G
-	ServiceTransactionEventCollectionByteSizeLimit = 100_000_000     // 100G
 )
 
 func defaultContext(logger zerolog.Logger) Context {
