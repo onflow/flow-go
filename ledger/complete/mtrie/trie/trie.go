@@ -320,7 +320,7 @@ func update(
 		if compactLeaf != nil {
 			// create a new node for the compact leaf path and payload. The old node shouldn't
 			// be recycled as it is still used by the tree copy before the update.
-			n = node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload().DeepCopy(), nodeHeight)
+			n = node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
 			return n, 0, 0, nodeHeight
 		}
 		return parentNode, 0, 0, nodeHeight
