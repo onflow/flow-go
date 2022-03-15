@@ -8,24 +8,24 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-// processSummary3TestRun processes a level 2 summary and produces level 3 summary which summarizes:
+// generateLevel3Summary processes a level 2 summary and produces level 3 summary which summarizes:
 // most failed tests, tests with no-results, longest running tests.
-func processSummary3TestRun(level2FilePath string, propertyFileDirectory string) common.TestSummary3 {
+func generateLevel3Summary(level2FilePath string, propertyFileDirectory string) common.Level3Summary {
 
 	config := common.ReadProperties(propertyFileDirectory)
 
-	var testSummary2 common.TestSummary2
+	var level2Summary common.Level2Summary
 
 	level2JsonBytes, err := os.ReadFile(level2FilePath)
 	common.AssertNoError(err, "error reading level 2 json")
 
-	err = json.Unmarshal(level2JsonBytes, &testSummary2)
+	err = json.Unmarshal(level2JsonBytes, &level2Summary)
 	common.AssertNoError(err, "error unmarshalling level 2 test run")
 
 	// there should be at least 1 level 2 test result in the supplied file
 	// if the json format is different in the supplied file, there won't be a marshalling error thrown
 	// this is an indirect way to tell if the json format was wrong (i.e. not a level 2 json format)
-	if len(testSummary2.TestResults) == 0 {
+	if len(level2Summary.TestResultsMap) == 0 {
 		panic("invalid summary 2 file - no test results found")
 	}
 
@@ -34,13 +34,13 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 	// 2. tests with failures (ordered by most failures)
 	// 3. tests with durations > 0 (ordered by longest durations)
 
-	noResultsTRS := []common.TestResultSummary{}
-	failuresTRS := []common.TestResultSummary{}
-	durationTRS := []common.TestResultSummary{}
+	noResultsTRS := []common.Level2TestResult{}
+	failuresTRS := []common.Level2TestResult{}
+	durationTRS := []common.Level2TestResult{}
 
 	// go through all level 2 test results to figure out grouping for tests with
 	// most failures, no-results, longest running
-	for _, trs := range testSummary2.TestResults {
+	for _, trs := range level2Summary.TestResultsMap {
 		if trs.NoResult > 0 {
 			noResultsTRS = append(noResultsTRS, *trs)
 		}
@@ -67,30 +67,30 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 		return durationTRS[i].AverageDuration > durationTRS[j].AverageDuration
 	})
 
-	var testSummary3 common.TestSummary3
-	testSummary3.NoResults = noResultsTRS
+	var level3Summary common.Level3Summary
+	level3Summary.NoResults = noResultsTRS
 
 	// total # of failed tests that satisfy min failure threshold
-	testSummary3.MostFailuresTotal = len(failuresTRS)
+	level3Summary.MostFailuresTotal = len(failuresTRS)
 
 	// check if # of failures exceeded max failures to return
 	if len(failuresTRS) > config.FailuresSliceMax {
 		// truncate slice to return only the first config.FailuresSliceMax failures
 		failuresTRS = failuresTRS[:config.FailuresSliceMax]
 	}
-	testSummary3.MostFailures = failuresTRS
+	level3Summary.MostFailures = failuresTRS
 
 	// total # of long tests that satisfy min duration threshold
-	testSummary3.LongestRunningTotal = len(durationTRS)
+	level3Summary.LongestRunningTotal = len(durationTRS)
 
 	// check if # of durations exceeded max durations to return
 	if len(durationTRS) > config.DurationSliceMax {
 		// truncate slice to return only the first config.DurationSliceMax durations
 		durationTRS = durationTRS[:config.DurationSliceMax]
 	}
-	testSummary3.LongestRunning = durationTRS
+	level3Summary.LongestRunning = durationTRS
 
-	return testSummary3
+	return level3Summary
 }
 
 func main() {
@@ -99,6 +99,6 @@ func main() {
 		panic("wrong number of arguments - expected arguments 1) path of level 2 file 2) directory of property file")
 	}
 
-	testSummary3 := processSummary3TestRun(os.Args[1], os.Args[2])
-	common.SaveToFile("level3-summary.json", testSummary3)
+	level3Summary := generateLevel3Summary(os.Args[1], os.Args[2])
+	common.SaveToFile("level3-summary.json", level3Summary)
 }
