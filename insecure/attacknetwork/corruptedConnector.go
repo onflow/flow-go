@@ -24,6 +24,7 @@ func NewCorruptedConnector(attackerAddress string, corruptedIds flow.IdentityLis
 	}
 }
 
+// Connect creates a connection the corruptible conduit factory of the given corrupted identity.
 func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifier) (insecure.CorruptedNodeConnection, error) {
 	corruptedAddress, err := c.corruptedConduitFactoryAddress(targetId)
 	if err != nil {
