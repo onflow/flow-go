@@ -24,8 +24,7 @@ type cache struct {
 
 func newCache(dnsCache mempool.DNSCache) *cache {
 	return &cache{
-		ttl: DefaultTimeToLive,
-		// dCache: herocache.NewDNSCache(sizeLimit, logger.With().Str("mempool", "dns-cache").Logger(), collector),
+		ttl:    DefaultTimeToLive,
 		dCache: dnsCache,
 	}
 }
