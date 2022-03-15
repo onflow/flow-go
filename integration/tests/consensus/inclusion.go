@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -115,8 +116,12 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()
-	sentinel.SignerIDs = []flow.Identifier{is.collID}
+	// there is only one collection node in the cluster
+	indices, err := packer.EncodeSignerIndices([]int{0}, 1)
+	require.NoError(t, err)
+	sentinel.SignerIndices = indices
 	sentinel.ReferenceBlockID = is.net.Root().ID()
+	sentinel.ChainID = is.net.BootstrapData.ClusterRootBlocks[0].Header.ChainID
 	colID := sentinel.CollectionID
 
 	is.waitUntilSeenProposal(deadline)

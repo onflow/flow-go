@@ -11,7 +11,7 @@ import (
 type CollectionGuarantee struct {
 	CollectionID     Identifier       // ID of the collection being guaranteed
 	ReferenceBlockID Identifier       // defines expiry of the collection
-	ChainID          ChainID          // to determine which cluster this guarantee belongs to
+	ChainID          ChainID          // the chainID of the cluster in order to determine which cluster this guarantee belongs to
 	SignerIndices    []byte           // encoded indices of the signers
 	Signature        crypto.Signature // guarantor signatures
 }
