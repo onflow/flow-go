@@ -742,6 +742,14 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	err = os.Mkdir(flowDataDir, 0700)
 	require.NoError(t, err)
 
+	// create the profiler dir for the node
+	profilerDir := filepath.Join(flowDataDir, "./profiler")
+	t.Logf("create profiler dir: %v", profilerDir)
+	err = os.MkdirAll(profilerDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+
 	// create a directory for the bootstrap files
 	// we create a node-specific bootstrap directory to enable testing nodes
 	// bootstrapping from different root state snapshots and epochs
