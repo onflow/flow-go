@@ -6,11 +6,12 @@ import (
 	"github.com/onflow/flow-go/insecure"
 )
 
-// CorruptedNodeConnection represents a connection to a corrupted conduit.
+// CorruptedNodeConnection abstracts connection from orchestrator to a corrupted conduit factory through the attack network.
 type CorruptedNodeConnection struct {
 	stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient
 }
 
+// SendMessage sends the message from orchestrator to the corrupted conduit factory.
 func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
 	err := c.stream.Send(message)
 	if err != nil {
@@ -20,6 +21,7 @@ func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
 	return nil
 }
 
+// CloseConnection closes the connection to the corrupted conduit factory.
 func (c *CorruptedNodeConnection) CloseConnection() error {
 	err := c.stream.CloseSend()
 	if err != nil {
