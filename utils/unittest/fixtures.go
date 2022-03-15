@@ -1009,9 +1009,11 @@ func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
 		flow.RoleExecution:    {},
 		flow.RoleVerification: {},
 	}
+	// don't add identities for roles that already exist
 	for _, identity := range identities {
 		delete(required, identity.Role)
 	}
+	// add identities for missing roles
 	for role := range required {
 		identities = append(identities, IdentityFixture(WithRole(role)))
 	}

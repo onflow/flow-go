@@ -66,8 +66,22 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(corruptedId flow.Identifier,
 		return fmt.Errorf("could not find corrupted identity for: %x", corruptedId)
 	}
 
-	if corruptedIdentity.Role == flow.RoleExecution {
+	// TODO: how do we keep track of state between calls to HandleEventFromCorruptedNode()?
+	// there will be many events sent to the orchestrator and we need a way to co-ordinate all the event calls
 
+	switch corruptedIdentity.Role {
+	case flow.RoleExecution:
+		// corrupt execution result
+		// TODO: do we corrupt a single execution result or all of them?
+		// TODO: how do we corrupt each execution result?
+		// e.g. honestExecutionResult1.Chunks[0].CollectionIndex = 999
+		// TODO: how do we allow unit tests to assert execution result(s) was corrupted? Return type is error
+
+	case flow.RoleVerification:
+	default:
+		// TODO should we return an error when role is neither EN nor VN?
+		panic("unexpected role for Wintermute attack")
 	}
 
+	return nil
 }

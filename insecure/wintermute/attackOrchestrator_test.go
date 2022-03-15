@@ -79,25 +79,25 @@ func TestWintermuteOrchestrator(t *testing.T) {
 // enforces that corrupted EN to send this counterfeit receipt.
 // The orchestrator then also enforces the second corrupted EN to send the same counterfeit result on its behalf to the network.
 func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
-	rootSnapShot, all, corrupted := bootstrapWintermuteFlowSystem(t)
+	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
 
-	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
+	// generates a chain of blocks in the form of rootHeader <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 	// Container blocks only contain receipts of their preceding reference blocks. But they do not
 	// hold any guarantees.
-	root, err := rootSnapShot.State.Final().Head()
+	rootHeader, err := rootStateFixture.State.Final().Head()
 	require.NoError(t, err)
 
-	completeERs := verificationtest.CompleteExecutionReceiptChainFixture(t, root, 1, verificationtest.WithExecutorIDs(corruptedEnIds.NodeIDs()))
+	completeExecutionReceipts := verificationtest.CompleteExecutionReceiptChainFixture(t, rootHeader, 1, verificationtest.WithExecutorIDs(corruptedIdentityList.NodeIDs()))
 
-	net := &mockinsecure.AttackNetwork{}
-	o := NewOrchestrator(all, corrupted, net, unittest.Logger())
+	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	wintermuteOrchestrator := NewOrchestrator(allIdentityList, corruptedIdentityList, mockAttackNetwork, unittest.Logger())
 
-	corruptedEn1 := corrupted.Filter(filter.HasRole(flow.RoleExecution))[0]
-	targetIds, err := rootSnapShot.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
+	corruptedEn1 := corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution))[0]
+	targetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
-	o.HandleEventFromCorruptedNode(corruptedEn1.NodeID, engine.PushReceipts, receipt, insecure.Protocol_PUBLISH, uint32(0), targetIds.NodeIDs()...)
+	wintermuteOrchestrator.HandleEventFromCorruptedNode(corruptedEn1.NodeID, engine.PushReceipts, completeExecutionReceipts, insecure.Protocol_PUBLISH, uint32(0), targetIds.NodeIDs()...)
 }
 
 func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow.IdentityList, flow.IdentityList) {

@@ -355,7 +355,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 // The chain is in the form of root <- R1,1 <- R1,2 <- ... <- C1 <- R2,1 <- R2,2 <- ... <- C2 <- ...
 // In this chain R refers to reference blocks that contain guarantees.
 // C refers to a container block that contains an execution receipt for its preceding reference blocks.
-// e.g., C1 contains an execution receipt for R1,1, R1,2, etc, and C2 contains a receipt for R2,1, R2,2, etc.
+// e.g., C1 contains an execution receipt for R1,1, R1,2, etc., and C2 contains a receipt for R2,1, R2,2, etc.
 // For sake of simplicity and test, container blocks (i.e., C) do not contain any guarantee.
 //
 // It returns a slice of complete execution receipt fixtures that contains a container block as well as all data to verify its contained receipts.
