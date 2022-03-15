@@ -435,14 +435,7 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 	return uuid, err
 }
 
-func (e *ScriptEnv) meterComputation(kind, intensity uint) error {
-	if e.sth.EnforceComputationLimits {
-		return e.sth.State().MeterComputation(kind, intensity)
-	}
-	return nil
-}
-
-func (e *ScriptEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
+func (e *ScriptEnv) checkContext() error {
 	select {
 	case <-e.reqContext.Done():
 		err := e.reqContext.Err()
@@ -451,8 +444,22 @@ func (e *ScriptEnv) MeterComputation(kind common.ComputationKind, intensity uint
 		}
 		return errors.NewScriptExecutionCancelledError(err)
 	default:
-		return e.meterComputation(uint(kind), intensity)
+		return nil
 	}
+}
+
+func (e *ScriptEnv) meterComputation(kind, intensity uint) error {
+	if err := e.checkContext(); err != nil {
+		return err
+	}
+	if e.sth.EnforceComputationLimits {
+		return e.sth.State().MeterComputation(kind, intensity)
+	}
+	return nil
+}
+
+func (e *ScriptEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
+	return e.meterComputation(uint(kind), intensity)
 }
 
 func (e *ScriptEnv) ComputationUsed() uint64 {
