@@ -301,6 +301,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 	})
 
 	t.Run("fuzzy set", func(t *testing.T) {
+		t.Skip()
 		rng, err := random.NewChacha20PRG(someSeed, []byte("leader_selec"))
 		require.NoError(t, err)
 
