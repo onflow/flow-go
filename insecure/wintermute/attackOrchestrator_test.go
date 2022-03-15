@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -90,14 +91,45 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 
 	completeExecutionReceipts := verificationtest.CompleteExecutionReceiptChainFixture(t, rootHeader, 1, verificationtest.WithExecutorIDs(corruptedIdentityList.NodeIDs()))
 
-	mockAttackNetwork := &mockinsecure.AttackNetwork{}
-	wintermuteOrchestrator := NewOrchestrator(allIdentityList, corruptedIdentityList, mockAttackNetwork, unittest.Logger())
-
 	corruptedEn1 := corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution))[0]
 	targetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
-	wintermuteOrchestrator.HandleEventFromCorruptedNode(corruptedEn1.NodeID, engine.PushReceipts, completeExecutionReceipts, insecure.Protocol_PUBLISH, uint32(0), targetIds.NodeIDs()...)
+	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	wintermuteOrchestrator := NewOrchestrator(allIdentityList, corruptedIdentityList, mockAttackNetwork, unittest.Logger())
+
+	mockAttackNetwork.
+		On("RpcUnicastOnChannel", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			corruptedId, ok := args[0].(flow.Identifier)
+			require.True(t, ok)
+
+			channel, ok := args[1].(network.Channel)
+			require.True(t, ok)
+
+			event, ok := args[2].(*flow.ExecutionReceipt)
+			require.True(t, ok)
+
+			receivedTargetIds, ok := args[3].(flow.Identifier)
+			require.True(t, ok)
+
+			// event should be dispatched to a corrupted execution node
+			corruptedIdentity, ok := corruptedIdentityList.ByNodeID(corruptedId)
+			require.True(t, ok)
+			require.Equal(t, flow.RoleExecution, corruptedIdentity.Role)
+
+			require.Equal(t, engine.PushReceipts, channel)
+			require.ElementsMatch(t, targetIds, receivedTargetIds)
+
+			require.NotEqual(t, completeExecutionReceipts[0].ContainerBlock.Payload.Results[0], event.ExecutionResult)
+		}).Return(nil)
+
+	wintermuteOrchestrator.HandleEventFromCorruptedNode(corruptedEn1.NodeID,
+		engine.PushReceipts,
+		completeExecutionReceipts,
+		insecure.Protocol_UNICAST,
+		uint32(0),
+		targetIds.NodeIDs()[0])
 }
 
 func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow.IdentityList, flow.IdentityList) {
