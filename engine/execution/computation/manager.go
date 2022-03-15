@@ -53,25 +53,25 @@ type ComputationManager interface {
 }
 
 var DefaultScriptLogThreshold = 1 * time.Second
-var DefaultScriptTimeout = 10 * time.Second
+var DefaultScriptExecutionTimeLimit = 10 * time.Second
 
 const MaxScriptErrorMessageSize = 1000 // 1000 chars
 
 // Manager manages computation and execution
 type Manager struct {
-	log                zerolog.Logger
-	metrics            module.ExecutionMetrics
-	me                 module.Local
-	protoState         protocol.State
-	vm                 VirtualMachine
-	vmCtx              fvm.Context
-	blockComputer      computer.BlockComputer
-	programsCache      *ProgramsCache
-	scriptLogThreshold time.Duration
-	scriptTimeout      time.Duration
-	uploaders          []uploader.Uploader
-	eds                state_synchronization.ExecutionDataService
-	edCache            state_synchronization.ExecutionDataCIDCache
+	log                      zerolog.Logger
+	metrics                  module.ExecutionMetrics
+	me                       module.Local
+	protoState               protocol.State
+	vm                       VirtualMachine
+	vmCtx                    fvm.Context
+	blockComputer            computer.BlockComputer
+	programsCache            *ProgramsCache
+	scriptLogThreshold       time.Duration
+	scriptExecutionTimeLimit time.Duration
+	uploaders                []uploader.Uploader
+	eds                      state_synchronization.ExecutionDataService
+	edCache                  state_synchronization.ExecutionDataCIDCache
 }
 
 func New(
@@ -85,7 +85,7 @@ func New(
 	programsCacheSize uint,
 	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
-	scriptTimeout time.Duration,
+	scriptExecutionTimeLimit time.Duration,
 	uploaders []uploader.Uploader,
 	eds state_synchronization.ExecutionDataService,
 	edCache state_synchronization.ExecutionDataCIDCache,
@@ -111,19 +111,19 @@ func New(
 	}
 
 	e := Manager{
-		log:                log,
-		metrics:            metrics,
-		me:                 me,
-		protoState:         protoState,
-		vm:                 vm,
-		vmCtx:              vmCtx,
-		blockComputer:      blockComputer,
-		programsCache:      programsCache,
-		scriptLogThreshold: scriptLogThreshold,
-		scriptTimeout:      scriptTimeout,
-		uploaders:          uploaders,
-		eds:                eds,
-		edCache:            edCache,
+		log:                      log,
+		metrics:                  metrics,
+		me:                       me,
+		protoState:               protoState,
+		vm:                       vm,
+		vmCtx:                    vmCtx,
+		blockComputer:            blockComputer,
+		programsCache:            programsCache,
+		scriptLogThreshold:       scriptLogThreshold,
+		scriptExecutionTimeLimit: scriptExecutionTimeLimit,
+		uploaders:                uploaders,
+		eds:                      eds,
+		edCache:                  edCache,
 	}
 
 	return &e, nil
@@ -157,7 +157,7 @@ func (e *Manager) ExecuteScript(
 		e.log.Info().Uint32("trackerID", trackerID).Msg("script execution is complete")
 	}()
 
-	requestCtx, cancel := context.WithTimeout(ctx, e.scriptTimeout)
+	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
 	defer cancel()
 
 	script := fvm.NewScriptWithContextAndArgs(code, requestCtx, arguments...)
