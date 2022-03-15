@@ -112,12 +112,12 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	// creates corresponding event of that message that
 	// is sent by attacker to orchestrator.
 	e := &insecure.Event{
-		CorruptedId: originId,
-		Channel:     channel,
-		Content:     content,
-		Protocol:    protocol,
-		TargetNum:   targets,
-		TargetIds:   targetIds,
+		CorruptedId:       originId,
+		Channel:           channel,
+		FlowProtocolEvent: content,
+		Protocol:          protocol,
+		TargetNum:         targets,
+		TargetIds:         targetIds,
 	}
 
 	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId))
@@ -238,11 +238,11 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 
 					switch protocol {
 					case insecure.Protocol_UNICAST:
-						err = attacker.RpcUnicastOnChannel(event.CorruptedId, event.Channel, event.Content, event.TargetIds[0])
+						err = attacker.RpcUnicastOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetIds[0])
 					case insecure.Protocol_MULTICAST:
-						err = attacker.RpcMulticastOnChannel(event.CorruptedId, event.Channel, event.Content, event.TargetNum, event.TargetIds...)
+						err = attacker.RpcMulticastOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetNum, event.TargetIds...)
 					case insecure.Protocol_PUBLISH:
-						err = attacker.RpcPublishOnChannel(event.CorruptedId, event.Channel, event.Content, event.TargetIds...)
+						err = attacker.RpcPublishOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetIds...)
 					}
 
 					require.NoError(t, err)
@@ -270,7 +270,7 @@ func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insec
 			content, err := codec.Decode(message.Payload)
 			require.NoError(t, err)
 
-			require.Equal(t, event.Content, content)
+			require.Equal(t, event.FlowProtocolEvent, content)
 
 			return
 		}
