@@ -140,7 +140,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	t := timestamppb.New(h.Header.Timestamp)
 	cg := make([]*entities.CollectionGuarantee, len(h.Payload.Guarantees))
 	for i, g := range h.Payload.Guarantees {
-		cg[i] = collectionGuaranteeToMessage(g)
+		cg[i] = CollectionGuaranteeToMessage(g)
 	}
 
 	seals := make([]*entities.BlockSeal, len(h.Payload.Seals))
@@ -161,7 +161,84 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	return &bh, nil
 }
 
-func collectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
+func BlockToMessageLight(h *flow.Block) *entities.Block {
+	id := h.ID()
+
+	parentID := h.Header.ParentID
+	t := timestamppb.New(h.Header.Timestamp)
+	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
+
+	return &entities.Block{
+		Id:                   id[:],
+		Height:               h.Header.Height,
+		ParentId:             parentID[:],
+		Timestamp:            t,
+		CollectionGuarantees: cg,
+		Signatures:           [][]byte{h.Header.ParentVoterSigData},
+	}
+}
+
+func MessageToBlock(m *entities.Block) (*flow.Block, error) {
+	payload, err := PayloadFromMessage(m)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract payload data from message: %w", err)
+	}
+	header, err := MessageToBlockHeader(m.BlockHeader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert block header: %w", err)
+	}
+	return &flow.Block{
+		Header:  header,
+		Payload: payload,
+	}, nil
+}
+
+func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.ExecutionReceiptMetaList {
+	execMetaList := make([]*flow.ExecutionReceiptMeta, len(m))
+	for i, message := range m {
+		execMetaList[i] = &flow.ExecutionReceiptMeta{
+			ExecutorID:        MessageToIdentifier(message.ExecutorId),
+			ResultID:          MessageToIdentifier(message.ResultId),
+			Spocks:            MessagesToSignatures(message.Spocks),
+			ExecutorSignature: MessageToSignature(message.ExecutorSignature),
+		}
+	}
+	return execMetaList[:]
+}
+
+func ExecutionResultMetaListToMessages(e flow.ExecutionReceiptMetaList) []*entities.ExecutionReceiptMeta {
+	messageList := make([]*entities.ExecutionReceiptMeta, len(e))
+	for i, execMeta := range e {
+		messageList[i] = &entities.ExecutionReceiptMeta{
+			ExecutorId:        IdentifierToMessage(execMeta.ExecutorID),
+			ResultId:          IdentifierToMessage(execMeta.ResultID),
+			Spocks:            SignaturesToMessages(execMeta.Spocks),
+			ExecutorSignature: MessageToSignature(execMeta.ExecutorSignature),
+		}
+	}
+	return messageList
+}
+
+func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
+	cgs := MessagesToCollectionGuarantees(m.CollectionGuarantees)
+	seals, err := MessagesToBlockSeals(m.BlockSeals)
+	if err != nil {
+		return nil, err
+	}
+	receipts := MessagesToExecutionResultMetaList(m.ExecutionReceiptMetaList)
+	results, err := MessagesToExecutionResults(m.ExecutionResultList)
+	if err != nil {
+		return nil, err
+	}
+	return &flow.Payload{
+		Guarantees: cgs,
+		Seals:      seals,
+		Receipts:   receipts,
+		Results:    results,
+	}, nil
+}
+
+func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
 	id := g.ID()
 
 	return &entities.CollectionGuarantee{
