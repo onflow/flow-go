@@ -402,8 +402,8 @@ func (e *Engine) prunePendingCache() {
 		return
 	}
 
-	// remove all pending blocks at or below the finalized height
-	e.pending.PruneByHeight(final.Height)
+	// remove all pending blocks at or below the finalized view
+	e.pending.PruneByView(final.View)
 
 	// always record the metric
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, e.pending.Size())

@@ -41,6 +41,8 @@ const (
 	MetricsPort                = 8080
 	RPCPort                    = 9000
 	SecuredRPCPort             = 9001
+	AdminToolPort              = 9002
+	AdminToolLocalPort         = 3700
 	HTTPPort                   = 8000
 )
 
@@ -255,28 +257,30 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 		numAccess       = 0
 	)
 
-	for _, container := range containers {
+	for n, container := range containers {
 		switch container.Role {
 		case flow.RoleConsensus:
 			services[container.ContainerName] = prepareConsensusService(
 				container,
 				numConsensus,
+				n,
 			)
 			numConsensus++
 		case flow.RoleCollection:
 			services[container.ContainerName] = prepareCollectionService(
 				container,
 				numCollection,
+				n,
 			)
 			numCollection++
 		case flow.RoleExecution:
-			services[container.ContainerName] = prepareExecutionService(container, numExecution)
+			services[container.ContainerName] = prepareExecutionService(container, numExecution, n)
 			numExecution++
 		case flow.RoleVerification:
-			services[container.ContainerName] = prepareVerificationService(container, numVerification)
+			services[container.ContainerName] = prepareVerificationService(container, numVerification, n)
 			numVerification++
 		case flow.RoleAccess:
-			services[container.ContainerName] = prepareAccessService(container, numAccess)
+			services[container.ContainerName] = prepareAccessService(container, numAccess, n)
 			numAccess++
 		}
 	}
@@ -284,7 +288,7 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 	return services
 }
 
-func prepareService(container testnet.ContainerConfig, i int) Service {
+func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 
 	// create a data dir for the node
 	dataDir := "./" + filepath.Join(DataDir, container.Role.String(), container.NodeID.String())
@@ -331,6 +335,11 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		},
 	}
 
+	// TODO: having trouble enabling admin tool for access node. skip Access node for now.
+	if container.Role != flow.RoleAccess {
+		service.Command = append(service.Command, fmt.Sprintf("--admin-addr=:%v", AdminToolPort))
+	}
+
 	// only specify build config for first service of each role
 	if i == 0 {
 		service.Build = Build{
@@ -361,8 +370,8 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 }
 
 // NOTE: accessNodeIDS is a comma separated list of access node IDS
-func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
-	service := prepareService(container, i)
+func prepareConsensusService(container testnet.ContainerConfig, i int, n int) Service {
+	service := prepareService(container, i, n)
 
 	timeout := 1200*time.Millisecond + consensusDelay
 	service.Command = append(
@@ -376,23 +385,31 @@ func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 		fmt.Sprint("--access-node-ids=*"),
 	)
 
+	service.Ports = []string{
+		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
+	}
+
 	return service
 }
 
-func prepareVerificationService(container testnet.ContainerConfig, i int) Service {
-	service := prepareService(container, i)
+func prepareVerificationService(container testnet.ContainerConfig, i int, n int) Service {
+	service := prepareService(container, i, n)
 
 	service.Command = append(
 		service.Command,
 		fmt.Sprintf("--chunk-alpha=1"),
 	)
 
+	service.Ports = []string{
+		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
+	}
+
 	return service
 }
 
 // NOTE: accessNodeIDS is a comma separated list of access node IDS
-func prepareCollectionService(container testnet.ContainerConfig, i int) Service {
-	service := prepareService(container, i)
+func prepareCollectionService(container testnet.ContainerConfig, i int, n int) Service {
+	service := prepareService(container, i, n)
 
 	timeout := 1200*time.Millisecond + collectionDelay
 	service.Command = append(
@@ -405,11 +422,15 @@ func prepareCollectionService(container testnet.ContainerConfig, i int) Service 
 		fmt.Sprint("--access-node-ids=*"),
 	)
 
+	service.Ports = []string{
+		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
+	}
+
 	return service
 }
 
-func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
-	service := prepareService(container, i)
+func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Service {
+	service := prepareService(container, i, n)
 
 	// create the execution state dir for the node
 	trieDir := "./" + filepath.Join(TrieDir, container.Role.String(), container.NodeID.String())
@@ -439,13 +460,14 @@ func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
 	service.Ports = []string{
 		fmt.Sprintf("%d:%d", ExecutionAPIPort+2*i, RPCPort),
 		fmt.Sprintf("%d:%d", ExecutionAPIPort+(2*i+1), SecuredRPCPort),
+		fmt.Sprintf("%d:%d", AdminToolLocalPort+n, AdminToolPort),
 	}
 
 	return service
 }
 
-func prepareAccessService(container testnet.ContainerConfig, i int) Service {
-	service := prepareService(container, i)
+func prepareAccessService(container testnet.ContainerConfig, i int, n int) Service {
+	service := prepareService(container, i, n)
 
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),

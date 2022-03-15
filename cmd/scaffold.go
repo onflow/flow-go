@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -120,6 +121,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultConfig.profilerDuration,
 		"the duration to run the auto-profile for")
+	fnb.flags.IntVar(&fnb.BaseConfig.profilerMemProfileRate, "profiler-mem-profile-rate", defaultConfig.profilerMemProfileRate,
+		"controls the fraction of memory allocations that are recorded and reported in the memory profile. 0 means turn off heap profiling entirely")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
 	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
@@ -146,6 +149,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpochPhase, "dynamic-startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpoch, "dynamic-startup-epoch", "current", "the target epoch for dynamic-startup, use \"current\" to start node in the current epoch")
 	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in which the node will check if it can start")
+
+	fnb.flags.BoolVar(&fnb.BaseConfig.InsecureSecretsDB, "insecure-secrets-db", false, "allow the node to start up without an secrets DB encryption key")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -294,6 +299,13 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 		}
 		fnb.RegisterDefaultAdminCommands()
 		fnb.Component("admin server", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			// set up all admin commands
+			for commandName, commandFunc := range fnb.adminCommands {
+				command := commandFunc(fnb.NodeConfig)
+				fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+				fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
+			}
+
 			var opts []admin.CommandRunnerOption
 
 			if node.AdminCert != NotSet {
@@ -425,7 +437,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Mempool:        metrics.NewNoopCollector(),
 		CleanCollector: metrics.NewNoopCollector(),
 	}
-	if fnb.BaseConfig.metricsEnabled {
+	if fnb.BaseConfig.MetricsEnabled {
 		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
@@ -449,14 +461,15 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
-	if !fnb.BaseConfig.profilerEnabled {
-		return
-	}
+	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
+	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
+
 	profiler, err := debug.NewAutoProfiler(
 		fnb.Logger,
 		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
 		fnb.BaseConfig.profilerDuration,
+		fnb.BaseConfig.profilerEnabled,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
@@ -526,15 +539,25 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 	log := sutil.NewLogger(fnb.Logger)
 
 	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
-	// attempt to read an encryption key for the secrets DB from the canonical path
-	// TODO enforce encryption in an upcoming spork https://github.com/dapperlabs/flow-go/issues/5893
-	encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
-	if errors.Is(err, os.ErrNotExist) {
+
+	// NOTE: SN nodes need to explicitly set --insecure-secrets-db to true in order to
+	// disable secrets database encryption
+	if fnb.NodeRole == flow.RoleConsensus.String() && fnb.InsecureSecretsDB {
 		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
-	} else if err != nil {
-		fnb.Logger.Fatal().Err(err).Msg("failed to read secrets db encryption key")
 	} else {
-		opts = opts.WithEncryptionKey(encryptionKey)
+		encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
+		if errors.Is(err, os.ErrNotExist) {
+			if fnb.NodeRole == flow.RoleConsensus.String() {
+				// missing key is a fatal error for SN nodes
+				fnb.Logger.Fatal().Err(err).Msg("secrets db encryption key not found")
+			} else {
+				fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
+			}
+		} else if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("failed to read secrets db encryption key")
+		} else {
+			opts = opts.WithEncryptionKey(encryptionKey)
+		}
 	}
 
 	secretsDB, err := bstorage.InitSecret(opts)
@@ -699,6 +722,10 @@ func (fnb *FlowNodeBuilder) initState() {
 // setRootSnapshot sets the root snapshot field and all related fields in the NodeConfig.
 func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) {
 	var err error
+
+	// validate the root snapshot QCs
+	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
+	fnb.MustNot(err).Msg("failed to validate root snapshot QCs")
 
 	fnb.RootSnapshot = rootSnapshot
 	// cache properties of the root snapshot, for convenience
@@ -971,7 +998,7 @@ func WithSecretsDBEnabled(enabled bool) Option {
 
 func WithMetricsEnabled(enabled bool) Option {
 	return func(config *BaseConfig) {
-		config.metricsEnabled = enabled
+		config.MetricsEnabled = enabled
 	}
 }
 
@@ -1028,14 +1055,12 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	fnb.EnqueuePingService()
 
-	if fnb.metricsEnabled {
+	if fnb.MetricsEnabled {
 		fnb.EnqueueMetricsServerInit()
 		if err := fnb.RegisterBadgerMetrics(); err != nil {
 			return err
 		}
 	}
-
-	fnb.EnqueueAdminServerInit()
 
 	fnb.EnqueueTracer()
 
@@ -1045,6 +1070,8 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
+	}).AdminCommand("set-profiler-enabled", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetProfilerEnabledCommand{}
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
@@ -1107,12 +1134,7 @@ func (fnb *FlowNodeBuilder) onStart() error {
 		}
 	}
 
-	// set up all admin commands
-	for commandName, commandFunc := range fnb.adminCommands {
-		command := commandFunc(fnb.NodeConfig)
-		fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
-		fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
-	}
+	fnb.EnqueueAdminServerInit()
 
 	// run all modules
 	for _, f := range fnb.modules {

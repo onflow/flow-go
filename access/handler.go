@@ -2,8 +2,6 @@ package access
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -456,56 +454,11 @@ func blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, erro
 }
 
 func executionResultToMessages(er *flow.ExecutionResult) (*access.ExecutionResultForBlockIDResponse, error) {
-
-	chunks := make([]*entities.Chunk, len(er.Chunks))
-
-	for i, chunk := range er.Chunks {
-		chunks[i] = chunkToMessage(chunk)
-	}
-
-	serviceEvents := make([]*entities.ServiceEvent, len(er.ServiceEvents))
-	var err error
-	for i, serviceEvent := range er.ServiceEvents {
-		serviceEvents[i], err = serviceEventToMessage(serviceEvent)
-		if err != nil {
-			return nil, fmt.Errorf("error while convering service event %d: %w", i, err)
-		}
-	}
-
-	return &access.ExecutionResultForBlockIDResponse{
-		ExecutionResult: &entities.ExecutionResult{
-			PreviousResultId: convert.IdentifierToMessage(er.PreviousResultID),
-			BlockId:          convert.IdentifierToMessage(er.BlockID),
-			Chunks:           chunks,
-			ServiceEvents:    serviceEvents,
-		},
-	}, nil
-}
-
-func serviceEventToMessage(event flow.ServiceEvent) (*entities.ServiceEvent, error) {
-
-	bytes, err := json.Marshal(event.Event)
+	execResult, err := convert.ExecutionResultToMessage(er)
 	if err != nil {
-		return nil, fmt.Errorf("cannot marshal service event: %w", err)
+		return nil, err
 	}
-
-	return &entities.ServiceEvent{
-		Type:    event.Type,
-		Payload: bytes,
-	}, nil
-}
-
-func chunkToMessage(chunk *flow.Chunk) *entities.Chunk {
-	return &entities.Chunk{
-		CollectionIndex:      uint32(chunk.CollectionIndex),
-		StartState:           convert.StateCommitmentToMessage(chunk.StartState),
-		EventCollection:      convert.IdentifierToMessage(chunk.EventCollection),
-		BlockId:              convert.IdentifierToMessage(chunk.BlockID),
-		TotalComputationUsed: chunk.TotalComputationUsed,
-		NumberOfTransactions: uint32(chunk.NumberOfTransactions),
-		Index:                chunk.Index,
-		EndState:             convert.StateCommitmentToMessage(chunk.EndState),
-	}
+	return &access.ExecutionResultForBlockIDResponse{ExecutionResult: execResult}, nil
 }
 
 func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {

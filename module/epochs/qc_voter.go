@@ -109,21 +109,21 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 
 	// this backoff configuration will never terminate on its own, but the
 	// request logic will exit when we exit the EpochSetup phase
-	expRetry, err := retry.NewExponential(retryDuration)
+	backoff, err := retry.NewExponential(retryDuration)
 	if err != nil {
 		log.Fatal().Err(err).Msg("create retry mechanism")
 	}
-	maxedRetry := retry.WithCappedDuration(retryDurationMax, expRetry)
-	withJitter := retry.WithJitterPercent(retryJitterPercent, maxedRetry)
+	backoff = retry.WithCappedDuration(retryDurationMax, backoff)
+	backoff = retry.WithJitterPercent(retryJitterPercent, backoff)
 
 	clientIndex, qcContractClient := voter.getInitialContractClient()
 	onMaxConsecutiveRetries := func(totalAttempts int) {
 		voter.updateContractClient(clientIndex)
 		log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
-	afterConsecutiveRetries := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
+	backoff = retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
-	err = retry.Do(ctx, afterConsecutiveRetries, func(ctx context.Context) error {
+	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
 		// check that we're still in the setup phase, if we're not we can't
 		// submit a vote anyway and must exit this process
 		phase, err := voter.state.Final().Phase()

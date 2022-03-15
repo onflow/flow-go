@@ -21,7 +21,10 @@ func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string, messageTy
 func (nc *NoopCollector) MessageAdded(priority int)                                              {}
 func (nc *NoopCollector) MessageRemoved(priority int)                                            {}
 func (nc *NoopCollector) QueueDuration(duration time.Duration, priority int)                     {}
-func (nc *NoopCollector) InboundProcessDuration(topic string, duration time.Duration)            {}
+func (nc *NoopCollector) MessageProcessingStarted(topic string)                                  {}
+func (nc *NoopCollector) MessageProcessingFinished(topic string, duration time.Duration)         {}
+func (nc *NoopCollector) DirectMessageStarted(topic string)                                      {}
+func (nc *NoopCollector) DirectMessageFinished(topic string)                                     {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                              {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)                          {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)                           {}
@@ -119,9 +122,9 @@ func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed uin
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                                   {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                     {}
 func (nc *NoopCollector) LatestTrieRegCount(number uint64)                                      {}
-func (nc *NoopCollector) LatestTrieRegCountDiff(number uint64)                                  {}
+func (nc *NoopCollector) LatestTrieRegCountDiff(number int64)                                   {}
 func (nc *NoopCollector) LatestTrieMaxDepth(number uint64)                                      {}
-func (nc *NoopCollector) LatestTrieMaxDepthDiff(number uint64)                                  {}
+func (nc *NoopCollector) LatestTrieMaxDepthDiff(number int64)                                   {}
 func (nc *NoopCollector) UpdateCount()                                                          {}
 func (nc *NoopCollector) ProofSize(bytes uint32)                                                {}
 func (nc *NoopCollector) UpdateValuesNumber(number uint64)                                      {}

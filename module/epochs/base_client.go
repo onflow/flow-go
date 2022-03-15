@@ -77,7 +77,7 @@ func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (
 		return sdk.EmptyID, fmt.Errorf("can not submit an unsigned transaction")
 	}
 
-	// submit trnsaction to client
+	// submit transaction to client
 	err := c.FlowClient.SendTransaction(ctx, *tx)
 	if err != nil {
 		return sdk.EmptyID, fmt.Errorf("failed to send transaction: %w", err)
@@ -89,16 +89,18 @@ func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (
 // WaitForSealed waits for a transaction to be sealed
 func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
 
-	constRetry, err := retry.NewConstant(waitForSealedRetryInterval)
+	log := c.Log.With().Str("tx_id", txID.Hex()).Logger()
+
+	backoff, err := retry.NewConstant(waitForSealedRetryInterval)
 	if err != nil {
 		c.Log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
-	maxedConstRetry := retry.WithMaxDuration(waitForSealedMaxDuration, constRetry)
+	backoff = retry.WithMaxDuration(waitForSealedMaxDuration, backoff)
 
 	attempts := 0
-	err = retry.Do(ctx, maxedConstRetry, func(ctx context.Context) error {
+	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
 		attempts++
-		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
+		log = c.Log.With().Int("attempt", attempts).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
 
 		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {

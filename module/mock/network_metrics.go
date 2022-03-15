@@ -18,19 +18,34 @@ func (_m *NetworkMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
+// DirectMessageFinished provides a mock function with given fields: topic
+func (_m *NetworkMetrics) DirectMessageFinished(topic string) {
+	_m.Called(topic)
+}
+
+// DirectMessageStarted provides a mock function with given fields: topic
+func (_m *NetworkMetrics) DirectMessageStarted(topic string) {
+	_m.Called(topic)
+}
+
 // InboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
 }
 
-// InboundProcessDuration provides a mock function with given fields: topic, duration
-func (_m *NetworkMetrics) InboundProcessDuration(topic string, duration time.Duration) {
-	_m.Called(topic, duration)
-}
-
 // MessageAdded provides a mock function with given fields: priority
 func (_m *NetworkMetrics) MessageAdded(priority int) {
 	_m.Called(priority)
+}
+
+// MessageProcessingFinished provides a mock function with given fields: topic, duration
+func (_m *NetworkMetrics) MessageProcessingFinished(topic string, duration time.Duration) {
+	_m.Called(topic, duration)
+}
+
+// MessageProcessingStarted provides a mock function with given fields: topic
+func (_m *NetworkMetrics) MessageProcessingStarted(topic string) {
+	_m.Called(topic)
 }
 
 // MessageRemoved provides a mock function with given fields: priority
