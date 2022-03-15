@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"strconv"
+	"time"
 )
 
 // AssertNoError checks that the passed in error is nil and panics
@@ -42,6 +43,26 @@ func convertToNDecimalPlacesInternal(n int, numerator, denominator float32) floa
 	ratioFloat, err := strconv.ParseFloat(ratioString, 32)
 	AssertNoError(err, "failure parsing string to float")
 	return float32(ratioFloat)
+}
+
+func GetCommitSha() string {
+	commitSha := os.Getenv("COMMIT_SHA")
+	if commitSha == "" {
+		panic("COMMIT_SHA can't be empty")
+	}
+	return commitSha
+}
+
+func GetCommitDate() time.Time {
+	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
+	AssertNoError(err, "error parsing COMMIT_DATE")
+	return commitDate.UTC()
+}
+
+func GetJobRunDate() time.Time {
+	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
+	AssertNoError(err, "error parsing JOB_STARTED")
+	return jobStarted.UTC()
 }
 
 // IsDirEmpty checks if directory is empty (has no files) and return true if it's empty, false otherwise.
