@@ -449,6 +449,11 @@ func (e *ScriptEnv) checkContext() error {
 }
 
 func (e *ScriptEnv) meterComputation(kind, intensity uint) error {
+	// this method is called on every unit of operation, so
+	// checking the context here is the most likely would capture
+	// timeouts or cancellation as soon as they happen, though
+	// we might revisit this when optimizing script execution
+	// by only checking on specific kind of meterComputation calls.
 	if err := e.checkContext(); err != nil {
 		return err
 	}
