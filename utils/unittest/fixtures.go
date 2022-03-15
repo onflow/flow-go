@@ -1560,6 +1560,16 @@ func QuorumCertificatesWithSignerIDsFixtures(n uint, opts ...func(*flow.QuorumCe
 	return qcs
 }
 
+func QuorumCertificatesWithAssignments(assignment flow.AssignmentList) []*flow.QuorumCertificateWithSignerIDs {
+	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(assignment))
+	for _, nodes := range assignment {
+		qc := QuorumCertificateWithSignerIDsFixture()
+		qc.SignerIDs = nodes
+		qcs = append(qcs, qc)
+	}
+	return qcs
+}
+
 func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
 	qc := flow.QuorumCertificate{
 		View:          uint64(rand.Uint32()),

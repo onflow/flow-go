@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -241,6 +242,27 @@ func SnapshotFromBootstrapStateWithProtocolVersion(
 	commit, ok := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 	if !ok {
 		return nil, fmt.Errorf("invalid commit event type (%T)", result.ServiceEvents[1].Event)
+	}
+
+	clustering, err := ClusteringFromSetupEvent(setup)
+	if err != nil {
+		return nil, fmt.Errorf("setup event has invalid clustering: %w", err)
+	}
+
+	// sanity check the commit event has the same number of cluster QC as the number clusters
+	if len(clustering) != len(commit.ClusterQCs) {
+		return nil, fmt.Errorf("mismatching number of ClusterQCs, expect %v but got %v",
+			len(clustering), len(commit.ClusterQCs))
+	}
+
+	// sanity check the QC in the commit event, which should be found in the identities in
+	// the setup event
+	for i, cluster := range clustering {
+		rootQCVoteData := commit.ClusterQCs[i]
+		_, err = packer.EncodeSignerIdentifiersToIndices(cluster.NodeIDs(), rootQCVoteData.VoterIDs)
+		if err != nil {
+			return nil, fmt.Errorf("mismatching cluster and qc: %w", err)
+		}
 	}
 
 	current, err := NewCommittedEpoch(setup, commit)
