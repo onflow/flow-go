@@ -1,4 +1,4 @@
-package adversary
+package attacknetwork
 
 import (
 	"fmt"

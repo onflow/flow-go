@@ -1,4 +1,4 @@
-package adversary_test
+package attacknetwork_test
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/insecure/adversary"
+	"github.com/onflow/flow-go/insecure/attacknetwork"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -25,33 +25,33 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const attackerAddress = "localhost:8000"
+const serverAddress = "localhost:0"
 
-func TestAttackerObserve_SingleMessage(t *testing.T) {
-	testAttackerObserve(t, 1)
+func TestAttackNetworkObserve_SingleMessage(t *testing.T) {
+	testAttackNetworkObserve(t, 1)
 }
 
-func TestAttackerObserve_MultipleConcurrentMessages(t *testing.T) {
-	testAttackerObserve(t, 10)
+func TestAttackNetworkObserve_MultipleConcurrentMessages(t *testing.T) {
+	testAttackNetworkObserve(t, 10)
 }
 
-// testAttackerObserve evaluates that upon receiving concurrent messages from corruptible conduits, the attacker
+// testAttackNetworkObserve evaluates that upon receiving concurrent messages from corruptible conduits, the attack network
 // decodes the messages into events and relays them to its registered orchestrator.
-func testAttackerObserve(t *testing.T, concurrencyDegree int) {
+func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	messages, events, identities := messageFixtures(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
-	withAttackerClient(
+	withAttackNetworkClient(
 		t,
 		identities,
 		func(t *testing.T, orchestrator *mockinsecure.AttackOrchestrator, client insecure.Attacker_ObserveClient) {
 			// mocks orchestrator to receive each event exactly once.
 			orchestratorWG := mockOrchestratorHandlingEvent(t, orchestrator, events)
 
-			// sends all messages concurrently to the attacker (imitating corruptible conduits sending
-			// messages concurrently to attacker).
-			attackerSendWG := sync.WaitGroup{}
-			attackerSendWG.Add(concurrencyDegree)
+			// sends all messages concurrently to the attack network (imitating corruptible conduits sending
+			// messages concurrently to attack network).
+			attackNetworkSendWG := sync.WaitGroup{}
+			attackNetworkSendWG.Add(concurrencyDegree)
 
 			for _, msg := range messages {
 				msg := msg
@@ -59,19 +59,19 @@ func testAttackerObserve(t *testing.T, concurrencyDegree int) {
 				go func() {
 					err := client.Send(msg)
 					require.NoError(t, err)
-					attackerSendWG.Done()
+					attackNetworkSendWG.Done()
 				}()
 			}
 
-			// all messages should be sent to attacker in a timely fashion.
-			unittest.RequireReturnsBefore(t, attackerSendWG.Wait, 1*time.Second, "could not send all messages to attacker on time")
-			// all events should be relayed to the orchestrator by the attacker in a timely fashion.
+			// all messages should be sent to attack network in a timely fashion.
+			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all messages to attack network on time")
+			// all events should be relayed to the orchestrator by the attack network in a timely fashion.
 			unittest.RequireReturnsBefore(t, orchestratorWG.Wait, 1*time.Second, "orchestrator could not receive messages on time")
 		})
 }
 
-// messageFixture creates and returns a randomly generated gRPC message that is sent between a corruptible conduit and the attacker.
-// It also generates and returns the corresponding application-layer event of that message, which is sent between the attacker and the
+// messageFixture creates and returns a randomly generated gRPC message that is sent between a corruptible conduit and the attack network.
+// It also generates and returns the corresponding application-layer event of that message, which is sent between the attack network and the
 // orchestrator.
 func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protocol) (*insecure.Message, *insecure.Event, *flow.Identity) {
 	// fixture for content of message
@@ -110,7 +110,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	}
 
 	// creates corresponding event of that message that
-	// is sent by attacker to orchestrator.
+	// is sent by attack network to orchestrator.
 	e := &insecure.Event{
 		CorruptedId:       originId,
 		Channel:           channel,
@@ -124,7 +124,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 }
 
 // messageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
-// The messages are sent between a corruptible conduit and the attacker.
+// The messages are sent between a corruptible conduit and the attack network.
 // The events are the corresponding protocol-level representation of messages.
 func messageFixtures(t *testing.T, codec network.Codec, protocol insecure.Protocol, count int) ([]*insecure.Message, []*insecure.Event,
 	flow.IdentityList) {
@@ -145,25 +145,25 @@ func messageFixtures(t *testing.T, codec network.Codec, protocol insecure.Protoc
 	return msgs, events, identities
 }
 
-// withAttackerClient creates an attacker with a mock orchestrator, starts the attacker, creates a streaming gRPC client to it, and
-// executes the injected run function on the orchestrator and gRPC client of attacker. Finally, it terminates the gRPC client and the
-// attacker.
-func withAttackerClient(
+// withAttackNetworkClient creates an attack network with a mock orchestrator, starts the attack network, creates a streaming gRPC client to it, and
+// executes the injected run function on the orchestrator and gRPC client of attack network. Finally, it terminates the gRPC client and the
+// attack network.
+func withAttackNetworkClient(
 	t *testing.T,
 	corruptedIds flow.IdentityList,
 	run func(*testing.T, *mockinsecure.AttackOrchestrator, insecure.Attacker_ObserveClient)) {
 
-	withAttacker(t, corruptedIds,
+	withAttackNetwork(t, corruptedIds,
 		func(
 			t *testing.T,
-			attacker *adversary.Attacker,
+			attackNetwork *attacknetwork.AttackNetwork,
 			_ map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
 			orchestrator *mockinsecure.AttackOrchestrator) {
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			gRpcClient, err := grpc.Dial(attackerAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+			gRpcClient, err := grpc.Dial(attackNetwork.ServerAddress().String(), grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 			require.NoError(t, err)
 
 			client := insecure.NewAttackerClient(gRpcClient)
@@ -203,10 +203,10 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 	// creates event fixtures and their corresponding messages.
 	_, events, corruptedIds := messageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
 
-	withAttacker(t,
+	withAttackNetwork(t,
 		corruptedIds,
 		func(t *testing.T,
-			attacker *adversary.Attacker,
+			attackNetwork *attacknetwork.AttackNetwork,
 			connections map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
 			_ *mockinsecure.AttackOrchestrator) {
 
@@ -228,8 +228,8 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 				}).Return(nil)
 			}
 
-			attackerSendWG := &sync.WaitGroup{}
-			attackerSendWG.Add(concurrencyDegree)
+			attackNetworkSendWG := &sync.WaitGroup{}
+			attackNetworkSendWG.Add(concurrencyDegree)
 
 			for _, event := range events {
 				event := event
@@ -238,21 +238,21 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 
 					switch protocol {
 					case insecure.Protocol_UNICAST:
-						err = attacker.RpcUnicastOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetIds[0])
+						err = attackNetwork.RpcUnicastOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetIds[0])
 					case insecure.Protocol_MULTICAST:
-						err = attacker.RpcMulticastOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetNum, event.TargetIds...)
+						err = attackNetwork.RpcMulticastOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetNum, event.TargetIds...)
 					case insecure.Protocol_PUBLISH:
-						err = attacker.RpcPublishOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetIds...)
+						err = attackNetwork.RpcPublishOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetIds...)
 					}
 
 					require.NoError(t, err)
-					attackerSendWG.Done()
+					attackNetworkSendWG.Done()
 				}()
 			}
 
-			// all events should be sent to attacker in a timely fashion.
-			unittest.RequireReturnsBefore(t, attackerSendWG.Wait, 1*time.Second, "could not send all events to attacker on time")
-			// all events should be relayed to the connections by the attacker in a timely fashion.
+			// all events should be sent to attackNetwork in a timely fashion.
+			unittest.RequireReturnsBefore(t, attackNetworkSendWG.Wait, 1*time.Second, "could not send all events to attackNetwork on time")
+			// all events should be relayed to the connections by the attackNetwork in a timely fashion.
 			unittest.RequireReturnsBefore(t, connectionRcvWG.Wait, 1*time.Second, "connections could not receive messages on time")
 		})
 }
@@ -279,43 +279,44 @@ func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insec
 	require.Fail(t, fmt.Sprintf("could not find any matching event for the message: %v", message))
 }
 
-// withAttacker creates an attacker with a mock orchestrator.
-// It then starts the attacker, executes the given run function on the attacker and its orchestrator, and finally terminates the attacker.
-func withAttacker(t *testing.T,
+// withAttackNetwork creates an attack network with a mock orchestrator.
+// It then starts the attack network, executes the given run function on the attack network and its orchestrator,
+// and finally terminates the attack network.
+func withAttackNetwork(t *testing.T,
 	corruptedIds flow.IdentityList,
-	run func(*testing.T, *adversary.Attacker, map[flow.Identifier]*mockinsecure.CorruptedNodeConnection, *mockinsecure.AttackOrchestrator)) {
+	run func(*testing.T, *attacknetwork.AttackNetwork, map[flow.Identifier]*mockinsecure.CorruptedNodeConnection, *mockinsecure.AttackOrchestrator)) {
 	codec := cbor.NewCodec()
 	orchestrator := &mockinsecure.AttackOrchestrator{}
 	connector := &mockinsecure.CorruptedNodeConnector{}
 
-	attacker, err := adversary.NewAttacker(unittest.Logger(), attackerAddress, codec, orchestrator, connector, corruptedIds)
+	attackNetwork, err := attacknetwork.NewAttackNetwork(unittest.Logger(), serverAddress, codec, orchestrator, connector, corruptedIds)
 	require.NoError(t, err)
 
-	// life-cycle management of attacker.
+	// life-cycle management of attackNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			t.Error("attacker startup encountered fatal error", err)
+			t.Error("attackNetwork startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
 	}()
 
-	// mocks registering attacker as the attack network functionality for orchestrator.
-	orchestrator.On("WithAttackNetwork", attacker).Return().Once()
+	// mocks registering attackNetwork as the attack network functionality for orchestrator.
+	orchestrator.On("WithAttackNetwork", attackNetwork).Return().Once()
 	connections := mockConnectorForConnect(t, connector, corruptedIds)
 
-	// starts attacker
-	attacker.Start(attackCtx)
-	unittest.RequireCloseBefore(t, attacker.Ready(), 1*time.Second, "could not start attacker on time")
+	// starts attackNetwork
+	attackNetwork.Start(attackCtx)
+	unittest.RequireCloseBefore(t, attackNetwork.Ready(), 1*time.Second, "could not start attackNetwork on time")
 
-	run(t, attacker, connections, orchestrator)
+	run(t, attackNetwork, connections, orchestrator)
 
-	// terminates attacker
+	// terminates attackNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, attacker.Done(), 1*time.Second, "could not stop attacker on time")
+	unittest.RequireCloseBefore(t, attackNetwork.Done(), 1*time.Second, "could not stop attackNetwork on time")
 }
 
 // mockOrchestratorHandlingEvent mocks the given orchestrator to receive each of the given events exactly once. The returned wait group is
@@ -355,7 +356,7 @@ func mockConnectorForConnect(t *testing.T, connector *mockinsecure.CorruptedNode
 				_, ok := corruptedIds.ByNodeID(id)
 				require.True(t, ok)
 				connection := &mockinsecure.CorruptedNodeConnection{}
-				// mocks closing connections at the termination time of the attacker.
+				// mocks closing connections at the termination time of the attack.
 				connection.On("CloseConnection").Return(nil)
 				connections[id] = connection
 				return connection
