@@ -102,6 +102,7 @@ func main() {
 		checkpointsToKeep             uint
 		stateDeltasLimit              uint
 		cadenceExecutionCache         uint
+		cadenceTracing                bool
 		chdpCacheSize                 uint
 		requestInterval               time.Duration
 		preferredExeNodeIDStr         string
@@ -142,6 +143,7 @@ func main() {
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
+			flags.BoolVar(&cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 			flags.UintVar(&chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.DurationVar(&scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold, "threshold for logging script execution")
@@ -420,7 +422,7 @@ func main() {
 			extralog.ExtraLogDumpPath = extraLogPath
 
 			options := []runtime.Option{}
-			if node.BaseConfig.TracerEnabled {
+			if cadenceTracing {
 				options = append(options, runtime.WithTracingEnabled(true))
 			}
 			rt := fvm.NewInterpreterRuntime(options...)

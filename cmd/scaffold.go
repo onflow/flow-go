@@ -123,7 +123,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.IntVar(&fnb.BaseConfig.profilerMemProfileRate, "profiler-mem-profile-rate", defaultConfig.profilerMemProfileRate,
 		"controls the fraction of memory allocations that are recorded and reported in the memory profile. 0 means turn off heap profiling entirely")
-	fnb.flags.BoolVar(&fnb.BaseConfig.TracerEnabled, "tracer-enabled", defaultConfig.TracerEnabled,
+	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
 	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
 		"adjusts the level of sampling when tracing is enabled. 0 means capture everything, higher value results in less samples")
@@ -416,7 +416,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 func (fnb *FlowNodeBuilder) initMetrics() {
 
 	fnb.Tracer = trace.NewNoopTracer()
-	if fnb.BaseConfig.TracerEnabled {
+	if fnb.BaseConfig.tracerEnabled {
 		serviceName := fnb.BaseConfig.NodeRole + "-" + fnb.BaseConfig.nodeIDHex[:8]
 		tracer, err := trace.NewTracer(fnb.Logger,
 			serviceName,
