@@ -87,7 +87,6 @@ func (i *TransactionInvoker) Process(
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
-		sth.EnableLimitEnforcement()
 	}()
 
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
@@ -157,8 +156,8 @@ func (i *TransactionInvoker) Process(
 	// }
 
 	// disable the limit checks on states
-	sth.DisableLimitEnforcement()
 
+	sth.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
 	// disable the limit checks on states
 	feesError := i.deductTransactionFees(env, proc)
@@ -166,7 +165,7 @@ func (i *TransactionInvoker) Process(
 		txError = feesError
 	}
 
-	sth.EnableLimitEnforcement()
+	sth.EnableAllLimitEnforcements()
 
 	// applying contract changes
 	// this writes back the contract contents to accounts
@@ -184,7 +183,9 @@ func (i *TransactionInvoker) Process(
 
 	// it there was any transaction error clear changes and try to deduct fees again
 	if txError != nil {
-		sth.DisableLimitEnforcement()
+		sth.DisableAllLimitEnforcements()
+		defer sth.EnableAllLimitEnforcements()
+
 		// drop delta since transaction failed
 		childState.View().DropDelta()
 		// if tx fails just do clean up
@@ -224,7 +225,7 @@ func (i *TransactionInvoker) Process(
 
 	// if tx failed this will only contain fee deduction logs and computation
 	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
+	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -242,23 +243,6 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
-
-	// start a new computation meter for deducting transaction fees.
-	subMeter := env.computationHandler.StartSubMeter(DefaultGasLimit)
-	defer func() {
-		merr := subMeter.Discard()
-		if merr == nil {
-			return
-		}
-		if err != nil {
-			// The error merr (from discarding the subMeter) will be hidden by err (transaction fee deduction error)
-			// as it has priority. So log merr.
-			i.logger.Error().Err(merr).
-				Msg("error discarding computation meter in deductTransactionFees (while also handling a deductTransactionFees error)")
-			return
-		}
-		err = merr
-	}()
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
 	_, err = deductTxFees(proc.Transaction.Payer)
