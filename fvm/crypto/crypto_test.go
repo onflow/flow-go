@@ -223,7 +223,6 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				verifyTag: "a very large tag with more than thirty two bytes",
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.Error(t, err)
-					require.Equal(t, err.Error(), "[Error Code: 1051] invalid value (a very large tag with more than thirty two bytes): tag length (48) is larger than max length allowed (32 bytes).")
 					require.False(t, sigOk)
 				},
 			},

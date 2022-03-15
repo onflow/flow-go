@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
@@ -145,11 +144,7 @@ func VerifySignatureFromRuntime(
 			return false, errors.NewValueErrorf(sigAlgo.String(), "cannot use hashing algorithm type %s with signature signature algorithm type %s",
 				hashAlgo, sigAlgo)
 		}
-
-		// tag length compatibility
-		if len(tag) > flow.DomainTagLength {
-			return false, errors.NewValueErrorf(tag, "tag length (%d) is larger than max length allowed (%d bytes).", len(tag), flow.DomainTagLength)
-		}
+		// tag constraints are checked when initializing a prefix-hasher
 
 		// check BLS compatibilites
 	} else if sigAlgo == crypto.BLSBLS12381 && hashAlgo != hash.KMAC128 {
@@ -159,20 +154,34 @@ func VerifySignatureFromRuntime(
 		// there are no tag constraints
 	}
 
+	// decode the public key
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
 		return false, errors.NewValueErrorf(hex.EncodeToString(rawPublicKey), "cannot decode public key: %w", err)
 	}
 
-	valid, err := Verify(
-		signature,
-		tag,
-		message,
-		publicKey,
-		hashAlgo,
-	)
+	// create a hasher
+	var hasher hash.Hasher
+	switch hashAlgo {
+	case hash.SHA2_256, hash.SHA3_256, hash.Keccak_256:
+		var err error
+		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
+			return false, errors.NewValueErrorf(err.Error(), "verification failed")
+		}
+	case hash.KMAC128:
+		hasher = crypto.NewBLSKMAC(tag)
+	default:
+		return false, errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
+	}
+
+	valid, err := publicKey.Verify(signature, message, hasher)
 	if err != nil {
-		return false, err
+		// All inputs are guaranteed to be valid at this stage.
+		// The check for crypto.InvalidInputs is only a sanity check
+		if crypto.IsInvalidInputsError(err) {
+			return false, err
+		}
+		panic(fmt.Errorf("verify signature failed with unexpected error %w", err))
 	}
 
 	return valid, nil
