@@ -2,13 +2,10 @@ package fvm_test
 
 import (
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
-	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -268,24 +265,23 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 
 type logExtractor struct {
 	TimeSpent       map[string]uint64
-	Weights         map[string]map[string]uint64
-	Columns         map[string]struct{}
 	InteractionUsed map[string]uint64
 }
 
 type txWeights struct {
-	TXHash        string
-	TimeSpentInMS uint64
-	Weights       map[string]uint64
+	TXHash                string `json:"txHash"`
+	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
+	ComputationUsed       uint   `json:"computationUsed"`
+	MemoryUsed            uint   `json:"memoryUsed"`
 }
 
 type txSuccessfulLog struct {
-	TXHash                string `json:"txHash"`
-	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
+	TxID          string `json:"tx_id"`
+	TimeSpentInMS uint64 `json:"timeSpentInMS"`
 }
 
 func (l *logExtractor) Write(p []byte) (n int, err error) {
-	if strings.Contains(string(p), "weights") {
+	if strings.Contains(string(p), "transaction execution data") {
 		w := txWeights{}
 		err := json.Unmarshal(p, &w)
 
@@ -294,12 +290,7 @@ func (l *logExtractor) Write(p []byte) (n int, err error) {
 			return len(p), nil
 		}
 
-		l.TimeSpent[w.TXHash] = w.TimeSpentInMS
-		l.Weights[w.TXHash] = w.Weights
-		for s := range w.Weights {
-			l.Columns[s] = struct{}{}
-		}
-
+		l.InteractionUsed[w.TXHash] = w.LedgerInteractionUsed
 	}
 	if strings.Contains(string(p), "transaction executed successfully") {
 		w := txSuccessfulLog{}
@@ -309,7 +300,7 @@ func (l *logExtractor) Write(p []byte) (n int, err error) {
 			fmt.Println(err)
 			return len(p), nil
 		}
-		l.InteractionUsed[w.TXHash] = w.LedgerInteractionUsed
+		l.TimeSpent[w.TxID] = w.TimeSpentInMS
 	}
 	return len(p), nil
 
@@ -330,8 +321,6 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 
 	logE := &logExtractor{
 		TimeSpent:       map[string]uint64{},
-		Weights:         map[string]map[string]uint64{},
-		Columns:         map[string]struct{}{},
 		InteractionUsed: map[string]uint64{},
 	}
 
@@ -498,42 +487,6 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			}
 		`))
 	})
-
-	var data [][]string
-	columns := []string{"tx"}
-	for s := range logE.Columns {
-		columns = append(columns, s)
-	}
-	columns = append(columns, "ms")
-
-	data = append(data, columns)
-
-	for s, u := range logE.TimeSpent {
-		cdata := make([]string, len(columns))
-		cdata[0] = s
-		for i := 1; i < len(columns)-1; i++ {
-			cdata[i] = strconv.FormatUint(logE.Weights[s][columns[i]], 10)
-		}
-		cdata[len(columns)-1] = strconv.FormatUint(u, 10)
-		data = append(data, cdata)
-	}
-
-	f, err := os.Create("data.csv")
-	defer func() {
-		_ = f.Close()
-	}()
-
-	if err != nil {
-
-		panic("")
-	}
-
-	w := csv.NewWriter(f)
-	err = w.WriteAll(data)
-
-	if err != nil {
-		panic("")
-	}
 }
 
 const TransferTxTemplate = `

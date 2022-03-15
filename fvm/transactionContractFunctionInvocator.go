@@ -2,7 +2,6 @@ package fvm
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/fvm/meter"
 
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -46,7 +46,7 @@ func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTrace
 	var span opentracing.Span
 
 	if env.StateHolder().EnforceComputationLimits {
-		err := env.StateHolder().State().MeterComputation(meter.MeteredOperationContractFunctionInvoke, 1)
+		err := env.StateHolder().State().MeterComputation(meter.ComputationKindContractFunctionInvoke, 1)
 		if err != nil {
 			return nil, err
 		}

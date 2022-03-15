@@ -210,6 +210,11 @@ func (s *State) MeterMemory(kind, intensity uint) error {
 	return s.meter.MeterMemory(kind, intensity)
 }
 
+// MemoryIntensities returns computation intensities
+func (s *State) MemoryIntensities() map[uint]uint {
+	return s.meter.MemoryIntensities()
+}
+
 // TotalMemoryUsed returns total memory used
 func (s *State) TotalMemoryUsed() uint {
 	return s.meter.TotalMemoryUsed()

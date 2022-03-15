@@ -197,7 +197,6 @@ func (i *TransactionInvoker) Process(
 		i.logger.Info().
 			Str("txHash", txIDStr).
 			Uint64("blockHeight", blockHeight).
-			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
 
 		// reset env
@@ -219,7 +218,6 @@ func (i *TransactionInvoker) Process(
 			i.logger.Info().
 				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
-				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 				Msg("transaction fee deduction executed with error")
 
 			i.logExecutionIntensities(sth, txIDStr)
@@ -417,20 +415,23 @@ func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedu
 
 // logExecutionIntensities logs execution intensities of the transaction
 func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
-	if i.logger.GetLevel() >= zerolog.DebugLevel {
+	if i.logger.Debug().Enabled() {
 		computation := zerolog.Dict()
 		for s, u := range sth.State().ComputationIntensities() {
 			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		memory := zerolog.Dict()
-		for s, u := range sth.State().ComputationIntensities() {
+		for s, u := range sth.State().MemoryIntensities() {
 			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 		}
 		i.logger.Info().
 			Str("txHash", txHash).
+			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
+			Uint("computationUsed", sth.State().TotalComputationUsed()).
+			Uint("memoryUsed", sth.State().TotalMemoryUsed()).
 			Dict("computationIntensities", computation).
 			Dict("memoryIntensities", memory).
-			Msg("transaction execution intensities")
+			Msg("transaction execution data")
 	}
 }
 

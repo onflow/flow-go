@@ -6,36 +6,36 @@ type MetringOperationType uint
 const (
 	// [2_000, 3_000) reserved for the FVM
 	_ = iota + 2_000
-	MeteredOperationContractFunctionInvoke
-	MeteredOperationHash
-	MeteredOperationVerifySignature
-	MeteredOperationAddAccountKey
-	MeteredOperationAddEncodedAccountKey
-	MeteredOperationAllocateStorageIndex
-	MeteredOperationCreateAccount
-	MeteredOperationEmitEvent
-	MeteredOperationGenerateUUID
-	MeteredOperationGetAccountAvailableBalance
-	MeteredOperationGetAccountBalance
-	MeteredOperationGetAccountContractCode
-	MeteredOperationGetAccountContractNames
-	MeteredOperationGetAccountKey
-	MeteredOperationGetBlockAtHeight
-	MeteredOperationGetCode
-	MeteredOperationGetCurrentBlockHeight
-	MeteredOperationGetProgram
-	MeteredOperationGetStorageCapacity
-	MeteredOperationGetStorageUsed
-	MeteredOperationGetValue
-	MeteredOperationRemoveAccountContractCode
-	MeteredOperationResolveLocation
-	MeteredOperationRevokeAccountKey
-	MeteredOperationRevokeEncodedAccountKey
-	MeteredOperationSetProgram
-	MeteredOperationSetValue
-	MeteredOperationUpdateAccountContractCode
-	MeteredOperationValidatePublicKey
-	MeteredOperationValueExists
+	ComputationKindContractFunctionInvoke
+	ComputationKindHash
+	ComputationKindVerifySignature
+	ComputationKindAddAccountKey
+	ComputationKindAddEncodedAccountKey
+	ComputationKindAllocateStorageIndex
+	ComputationKindCreateAccount
+	ComputationKindEmitEvent
+	ComputationKindGenerateUUID
+	ComputationKindGetAccountAvailableBalance
+	ComputationKindGetAccountBalance
+	ComputationKindGetAccountContractCode
+	ComputationKindGetAccountContractNames
+	ComputationKindGetAccountKey
+	ComputationKindGetBlockAtHeight
+	ComputationKindGetCode
+	ComputationKindGetCurrentBlockHeight
+	ComputationKindGetProgram
+	ComputationKindGetStorageCapacity
+	ComputationKindGetStorageUsed
+	ComputationKindGetValue
+	ComputationKindRemoveAccountContractCode
+	ComputationKindResolveLocation
+	ComputationKindRevokeAccountKey
+	ComputationKindRevokeEncodedAccountKey
+	ComputationKindSetProgram
+	ComputationKindSetValue
+	ComputationKindUpdateAccountContractCode
+	ComputationKindValidatePublicKey
+	ComputationKindValueExists
 )
 
 type Meter interface {
