@@ -2,12 +2,13 @@ package rest
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/rest/util"
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/model/flow"
