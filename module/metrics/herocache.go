@@ -73,7 +73,7 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		Help:      "total number of successful read queries",
 	})
 
-	unsuccessfulReadCount := prometheus.NewCounter(prometheus.CounterOpts{
+	countKeyGetFailure := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: nameSpace,
 		Subsystem: subsystemHeroCache,
 		Name:      cacheName + "_" + "unsuccessful_read_count_total",
@@ -114,7 +114,7 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 
 		// read
 		countKeyGetSuccess,
-		unsuccessfulReadCount,
+		countKeyGetFailure,
 
 		// write
 		countKeyPutSuccess,
@@ -128,7 +128,7 @@ func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometh
 		histogramNormalizedBucketSlotAvailable: histogramNormalizedBucketSlotAvailable,
 
 		countKeyGetSuccess: countKeyGetSuccess,
-		countKeyGetFailure: unsuccessfulReadCount,
+		countKeyGetFailure: countKeyGetFailure,
 
 		countKeyPutSuccess: countKeyPutSuccess,
 		countKeyPutFailure: countKeyPutFailure,
