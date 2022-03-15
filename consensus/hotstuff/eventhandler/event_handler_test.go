@@ -165,12 +165,12 @@ func NewVoter(t require.TestingT, lastVotedView uint64) *Voter {
 }
 
 // voter will not vote for any block, unless the blockID exists in votable map
-func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model.Vote, error) {
-	_, ok := v.votable[block.BlockID]
+func (v *Voter) ProduceVote(block *model.Proposal, curView uint64) (*model.Vote, error) {
+	_, ok := v.votable[block.Block.BlockID]
 	if !ok {
 		return nil, model.NoVoteError{Msg: "block not found"}
 	}
-	return createVote(block), nil
+	return createVote(block.Block), nil
 }
 
 // Forks mock allows to customize the Add QC and AddBlock function by specifying the addQC and addBlock callbacks

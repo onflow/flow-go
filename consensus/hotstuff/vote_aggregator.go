@@ -8,12 +8,12 @@ import (
 // BlockSigner abstracts the implementation of how a signature of a block or a vote is produced
 // and stored in a stateful crypto object for aggregation.
 // The VoteAggregator implements both the VoteAggregator interface and the BlockSigner interface so that
-// the EventHandler could use the VoteAggregator interface to sign a Block, and Voter/BlockProducer can use
+// the EventHandler could use the VoteAggregator interface to sign a Block, and SafetyRules/BlockProducer can use
 // the BlockSigner interface to create vote.
 // When `CreateVote` is called, it internally creates stateful VoteCollector object, which also has the ability
 // to verify the block and generate the vote signature.
 // The created vote collector will be added to the vote collectors map. These
-// implementation details are abstracted to Voter/BlockProducer.
+// implementation details are abstracted to SafetyRules/BlockProducer.
 type BlockSigner interface {
 	// CreateVote returns a vote for the given block.
 	// It returns:
