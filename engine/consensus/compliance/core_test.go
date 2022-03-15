@@ -75,7 +75,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	cs.myID = cs.participants[0].NodeID
 	block := unittest.BlockFixture()
@@ -217,7 +217,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByHeight", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return()
 
 	closed := func() <-chan struct{} {
 		channel := make(chan struct{})
