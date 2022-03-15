@@ -86,11 +86,11 @@ func NewAttackNetwork(
 			ready()
 
 			<-ctx.Done()
+
 			err = attackNetwork.stop()
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not stop attackNetwork: %w", err))
 			}
-
 		}).Build()
 
 	attackNetwork.Component = cm
@@ -101,14 +101,16 @@ func NewAttackNetwork(
 
 // start triggers the sub-modules of attack network.
 func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext) error {
+	// creates a connection to all corrupted nodes in the attack network.
 	for _, corruptedId := range a.corruptedIds {
-		corruptibleClient, err := a.corruptedConnector.Connect(ctx, corruptedId.NodeID)
+		connection, err := a.corruptedConnector.Connect(ctx, corruptedId.NodeID)
 		if err != nil {
-			return fmt.Errorf("could not establish corruptible client to node %x: %w", corruptedId.NodeID, err)
+			return fmt.Errorf("could not establish corruptible connection to node %x: %w", corruptedId.NodeID, err)
 		}
-		a.corruptedConnections[corruptedId.NodeID] = corruptibleClient
+		a.corruptedConnections[corruptedId.NodeID] = connection
 	}
 
+	// registers attack network for orchestrator.
 	a.orchestrator.WithAttackNetwork(a)
 
 	return nil
@@ -132,6 +134,7 @@ func (a *AttackNetwork) stop() error {
 	return errors.ErrorOrNil()
 }
 
+// ServerAddress returns the address on which the orchestrator is reachable from corrupted nodes.
 func (a AttackNetwork) ServerAddress() net.Addr {
 	return a.address
 }
@@ -143,6 +146,7 @@ func (a *AttackNetwork) Observe(stream insecure.Attacker_ObserveServer) error {
 	for {
 		select {
 		case <-a.cm.ShutdownSignal():
+			// attack network terminated, hence terminating this loop.
 			return nil
 		default:
 			msg, err := stream.Recv()
@@ -154,7 +158,7 @@ func (a *AttackNetwork) Observe(stream insecure.Attacker_ObserveServer) error {
 				return fmt.Errorf("could not read corrupted node's stream: %w", err)
 			}
 
-			if err = a.processObservedMsg(msg); err != nil {
+			if err = a.processMessageFromCorruptedNode(msg); err != nil {
 				a.logger.Fatal().Err(err).Msg("could not process message of corrupted node")
 				return stream.SendAndClose(&empty.Empty{})
 			}
@@ -162,9 +166,9 @@ func (a *AttackNetwork) Observe(stream insecure.Attacker_ObserveServer) error {
 	}
 }
 
-// processObserveMsg processes incoming messages arrived from corruptible conduits by passing them
+// processMessageFromCorruptedNode processes incoming messages arrived from corruptible conduits by passing them
 // to the orchestrator.
-func (a *AttackNetwork) processObservedMsg(message *insecure.Message) error {
+func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Message) error {
 	event, err := a.codec.Decode(message.Payload)
 	if err != nil {
 		return fmt.Errorf("could not decode observed payload: %w", err)
@@ -196,7 +200,11 @@ func (a *AttackNetwork) processObservedMsg(message *insecure.Message) error {
 }
 
 // RpcUnicastOnChannel enforces unicast-dissemination on the specified channel through a corrupted node.
-func (a *AttackNetwork) RpcUnicastOnChannel(corruptedId flow.Identifier, channel network.Channel, event interface{}, targetId flow.Identifier) error {
+func (a *AttackNetwork) RpcUnicastOnChannel(corruptedId flow.Identifier,
+	channel network.Channel,
+	event interface{},
+	targetId flow.Identifier) error {
+
 	connection, ok := a.corruptedConnections[corruptedId]
 	if !ok {
 		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", corruptedId)
@@ -216,8 +224,11 @@ func (a *AttackNetwork) RpcUnicastOnChannel(corruptedId flow.Identifier, channel
 }
 
 // RpcPublishOnChannel enforces a publish-dissemination on the specified channel through a corrupted node.
-func (a *AttackNetwork) RpcPublishOnChannel(corruptedId flow.Identifier, channel network.Channel, event interface{},
+func (a *AttackNetwork) RpcPublishOnChannel(corruptedId flow.Identifier,
+	channel network.Channel,
+	event interface{},
 	targetIds ...flow.Identifier) error {
+
 	connection, ok := a.corruptedConnections[corruptedId]
 	if !ok {
 		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", corruptedId)
@@ -237,8 +248,12 @@ func (a *AttackNetwork) RpcPublishOnChannel(corruptedId flow.Identifier, channel
 }
 
 // RpcMulticastOnChannel enforces a multicast-dissemination on the specified channel through a corrupted node.
-func (a *AttackNetwork) RpcMulticastOnChannel(corruptedId flow.Identifier, channel network.Channel, event interface{}, num uint32,
+func (a *AttackNetwork) RpcMulticastOnChannel(corruptedId flow.Identifier,
+	channel network.Channel,
+	event interface{},
+	num uint32,
 	targetIds ...flow.Identifier) error {
+
 	connection, ok := a.corruptedConnections[corruptedId]
 	if !ok {
 		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", corruptedId)
