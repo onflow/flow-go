@@ -105,7 +105,7 @@ func (_m *ExecutionMetrics) LatestTrieMaxDepth(number uint64) {
 }
 
 // LatestTrieMaxDepthDiff provides a mock function with given fields: number
-func (_m *ExecutionMetrics) LatestTrieMaxDepthDiff(number uint64) {
+func (_m *ExecutionMetrics) LatestTrieMaxDepthDiff(number int64) {
 	_m.Called(number)
 }
 
@@ -115,7 +115,7 @@ func (_m *ExecutionMetrics) LatestTrieRegCount(number uint64) {
 }
 
 // LatestTrieRegCountDiff provides a mock function with given fields: number
-func (_m *ExecutionMetrics) LatestTrieRegCountDiff(number uint64) {
+func (_m *ExecutionMetrics) LatestTrieRegCountDiff(number int64) {
 	_m.Called(number)
 }
 
