@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"time"
 )
 
@@ -26,4 +27,12 @@ type TimerInfo struct {
 
 func (m TimeoutMode) String() string {
 	return [...]string{"ReplicaTimeout", "VoteCollectionTimeout"}[m]
+}
+
+type TimeoutObject struct {
+	View       uint64
+	HighestQC  *flow.QuorumCertificate  // highest QC that this node has seen
+	LastViewTC *flow.TimeoutCertificate // TC for View - 1 if HighestQC.View != View - 1, else nil
+	SignerID   flow.Identifier
+	SigData    []byte // each node provides unique signature of View + HighestQC.View
 }
