@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/insecure"
 )
 
+// CorruptedNodeConnection represents a connection to a corrupted conduit.
 type CorruptedNodeConnection struct {
 	stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient
 }
