@@ -7,7 +7,7 @@
 set -e
 shopt -s extglob
 
-export JOB_STARTED=($(TZ=":America/Vancouver" date --rfc-3339=seconds))
+export JOB_STARTED=$(TZ=":America/Vancouver" date --rfc-3339=seconds)
 export JOB_ID=$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20)
 
 case $TEST_CATEGORY in
