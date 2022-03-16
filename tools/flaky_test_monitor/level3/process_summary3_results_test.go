@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common/testdata"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,35 +12,89 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateLevel3Summary(t *testing.T) {
-	testDataMap := map[string]string{
-		"1 failure the rest pass":                          "test1-1package-1failure",
-		"1 no-result test, no other tests":                 "test2-1-no-result-test",
-		"many no-result tests":                             "test3-multi-no-result-tests",
-		"many failures, many passes":                       "test4-multi-failures",
-		"many failures, many passes, many no-result tests": "test5-multi-durations",
-		"many failures - cap failures":                     "test6-multi-failures-cap",
-		"many durations - cap durations":                   "test7-multi-durations-cap",
+//func TestGenerateLevel2Summary_Struct(t *testing.T) {
+//	testDataMap := map[string]testdata.Level3TestData{
+//		"1 failure the rest pass": {
+//			Directory: "test1-1package-1failure",
+//		},
+//	}
+//
+//	for k, testData := range testDataMap {
+//		t.Run(k, func(t *testing.T) {
+//			actualLevel3Summary := generateLevel3SummaryFromStructs(testData.InputLevel2Summary, testData.PropertyFileDirectory)
+//		})
+//	}
+//}
+
+func TestGenerateLevel3Summary_JSON(t *testing.T) {
+	testDataMap := map[string]testdata.Level3TestData{
+		"1 failure the rest pass": {
+			Directory:              "test1-1package-1failure",
+			InputLevel2SummaryPath: filepath.Join(testDataDir, "test1-1package-1failure", "input", "test1-1package-1failure.json"),
+			PropertyFileDirectory:  filepath.Join(testDataDir, "test1-1package-1failure", "input"),
+		},
+		"1 no-result test, no other tests": {
+			Directory:              "test2-1-no-result-test",
+			InputLevel2SummaryPath: filepath.Join(testDataDir, "test2-1-no-result-test", "input", "test2-1-no-result-test.json"),
+			PropertyFileDirectory:  filepath.Join(testDataDir, "test2-1-no-result-test", "input"),
+		},
+		"many no-result tests": {
+			Directory:              "test3-multi-no-result-tests",
+			InputLevel2SummaryPath: filepath.Join(testDataDir, "test3-multi-no-result-tests", "input", "test3-multi-no-result-tests.json"),
+			PropertyFileDirectory:  filepath.Join(testDataDir, "test3-multi-no-result-tests", "input"),
+		},
+		"many failures, many passes": {
+			Directory:              "test4-multi-failures",
+			InputLevel2SummaryPath: filepath.Join(testDataDir, "test4-multi-failures", "input", "test4-multi-failures.json"),
+			PropertyFileDirectory:  filepath.Join(testDataDir, "test4-multi-failures", "input"),
+		},
+		"many failures, many passes, many no-result tests": {
+			Directory:              "test5-multi-durations",
+			InputLevel2SummaryPath: filepath.Join(testDataDir, "test5-multi-durations", "input", "test5-multi-durations.json"),
+			PropertyFileDirectory:  filepath.Join(testDataDir, "test5-multi-durations", "input"),
+		},
+		"many failures - cap failures": {
+			Directory:              "test6-multi-failures-cap",
+			InputLevel2SummaryPath: filepath.Join(testDataDir, "test6-multi-failures-cap", "input", "test6-multi-failures-cap.json"),
+			PropertyFileDirectory:  filepath.Join(testDataDir, "test6-multi-failures-cap", "input"),
+		},
+		"many durations - cap durations": {
+			Directory:              "test7-multi-durations-cap",
+			InputLevel2SummaryPath: filepath.Join(testDataDir, "test7-multi-durations-cap", "input", "test7-multi-durations-cap.json"),
+			PropertyFileDirectory:  filepath.Join(testDataDir, "test7-multi-durations-cap", "input"),
+		},
 	}
 
-	for k, testDir := range testDataMap {
+	for k, testData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
-			runGenerateLevel3Summary(t, testDir)
+			// ************************
+			//actualLevel3Summary := runGenerateLevel3Summary(t, testData.Directory)
+			runGenerateLevel3Summary(t, testData.Directory, testData)
+			// ************************
+			// read JSON file to determine expected level 3 summary
+			testData.ExpectedLevel3Summary = readExpectedLevel3SummaryFromJSON(t, testData)
+			//checkLevel3Summary(t, actualLevel3Summary, testData)
 		})
 	}
 
 }
 
+// HELPERS - UTILITIES
+
 const testDataDir = "../testdata/summary3"
 
-func runGenerateLevel3Summary(t *testing.T, testDir string) {
+func readExpectedLevel3SummaryFromJSON(t *testing.T, testData testdata.Level3TestData) common.Level3Summary {
+	var expectedLevel3Summary common.Level3Summary
 
+	return expectedLevel3Summary
+}
+
+func runGenerateLevel3Summary(t *testing.T, testDir string, testData testdata.Level3TestData) common.Level3Summary {
 	testDataBaseDir := filepath.Join(testDataDir, testDir)
-	inputTestDataPath := filepath.Join(testDataBaseDir, "input", testDir+".json")
 	expectedOutputTestDataPath := filepath.Join(testDataBaseDir, "expected-output", testDir+".json")
 
 	// **************************************************************
-	actualTestSummary3 := generateLevel3Summary(inputTestDataPath, filepath.Join(testDataBaseDir, "input"))
+	actualTestSummary3 := generateLevel3Summary(testData.InputLevel2SummaryPath, testData.PropertyFileDirectory)
 	// **************************************************************
 
 	// read in expected summary level 3
@@ -75,6 +130,7 @@ func runGenerateLevel3Summary(t *testing.T, testDir string) {
 	}
 
 	require.Equal(t, expectedTestSummary3, actualTestSummary3)
+	return actualTestSummary3
 }
 
 // test that script panics when supplied file path is invalid (can't find file)
@@ -92,4 +148,30 @@ func TestGenerateLevel3Summary_Panic_WrongFormat(t *testing.T) {
 			// supplied file is level 3 file, not level 2 - this should cause a panic
 			generateLevel3Summary(filepath.Join(testDataDir, "test1-1package-1failure/expected-output/test1-1package-1failure.json"), ".")
 		})
+}
+
+func checkLevel3Summary(t *testing.T, actualLevel3Summary common.Level3Summary, testData testdata.Level3TestData) {
+	// check # of no-results, failures and longest durations is the same for expected vs actual
+	require.Equal(t, len(testData.ExpectedLevel3Summary.NoResults), len(actualLevel3Summary.NoResults))
+
+	require.Equal(t, len(testData.ExpectedLevel3Summary.MostFailures), len(actualLevel3Summary.MostFailures))
+	require.Equal(t, testData.ExpectedLevel3Summary.MostFailuresTotal, actualLevel3Summary.MostFailuresTotal)
+
+	require.Equal(t, len(testData.ExpectedLevel3Summary.LongestRunning), len(actualLevel3Summary.LongestRunning))
+	require.Equal(t, testData.ExpectedLevel3Summary.LongestRunningTotal, actualLevel3Summary.LongestRunningTotal)
+
+	// check no-result, failure and duration lists are the same for expected vs actual
+	for noResultsIndex := range testData.ExpectedLevel3Summary.NoResults {
+		common.AssertLevel2TestResults(t, testData.ExpectedLevel3Summary.NoResults[noResultsIndex], actualLevel3Summary.NoResults[noResultsIndex])
+	}
+
+	for failuresIndex := range testData.ExpectedLevel3Summary.MostFailures {
+		common.AssertLevel2TestResults(t, testData.ExpectedLevel3Summary.MostFailures[failuresIndex], actualLevel3Summary.MostFailures[failuresIndex])
+	}
+
+	for durationIndex := range testData.ExpectedLevel3Summary.LongestRunning {
+		common.AssertLevel2TestResults(t, testData.ExpectedLevel3Summary.LongestRunning[durationIndex], actualLevel3Summary.LongestRunning[durationIndex])
+	}
+
+	require.Equal(t, testData.ExpectedLevel3Summary, actualLevel3Summary)
 }

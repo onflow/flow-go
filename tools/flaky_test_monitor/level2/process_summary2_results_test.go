@@ -73,17 +73,17 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 func TestGenerateLevel2Summary_JSON(t *testing.T) {
 	testDataMap := map[string]testdata.Level2TestData{
 		"1 level 1 summary, 1 failure the rest pass": {
-			Directory:        "test1-1package-1failure",
-			Level1DataPath:   "../testdata/summary2/test1-1package-1failure/input",
-			HasFailures:      true,
-			HasNoResultTests: false,
+			Directory:                "test1-1package-1failure",
+			InputLevel1SummariesPath: "../testdata/summary2/test1-1package-1failure/input",
+			HasFailures:              true,
+			HasNoResultTests:         false,
 		},
 	}
 	for k, testData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
 			setUp(t)
 			// ************************
-			actualLevel2Summary := generateLevel2Summary(testData.Level1DataPath)
+			actualLevel2Summary := generateLevel2Summary(testData.InputLevel1SummariesPath)
 			// ************************
 			// read JSON file to determine expected level 2 summary
 			testData.ExpectedLevel2Summary = readExpectedLevel2SummaryFromJSON(t, testData)

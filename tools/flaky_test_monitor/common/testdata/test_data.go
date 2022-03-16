@@ -20,12 +20,21 @@ type Level1TestData struct {
 
 // Level2TestData is used by level 2 tests to store what the expected level 1 inputs are and what the level 2 summary should be
 type Level2TestData struct {
-	Directory             string
-	Level1DataPath        string
-	HasFailures           bool
-	HasNoResultTests      bool
-	InputLevel1Summaries  []common.Level1Summary
+	Directory                string
+	InputLevel1Summaries     []common.Level1Summary // for tests that specify level 1 summary input as structs
+	InputLevel1SummariesPath string                 // for tests that specify level 1 summary input as JSON
+	HasFailures              bool
+	HasNoResultTests         bool
+
 	ExpectedLevel2Summary common.Level2Summary
+}
+
+type Level3TestData struct {
+	Directory              string
+	InputLevel2Summary     common.Level2Summary // for tests that specify level 2 summary input as struct
+	InputLevel2SummaryPath string               // for tests that specify level 2 summary input as JSON
+	PropertyFileDirectory  string
+	ExpectedLevel3Summary  common.Level3Summary
 }
 
 // ************** Helper Functions *****************
