@@ -76,42 +76,15 @@ func TestGenerateLevel3Summary_JSON(t *testing.T) {
 
 	for k, testData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
-			// ************************
-			//actualLevel3Summary := runGenerateLevel3Summary(t, testData.Directory)
-			runGenerateLevel3Summary(t, testData.Directory, testData)
-			// ************************
+			// **************************************************************
+			actualTestSummary3 := generateLevel3Summary(testData.InputLevel2SummaryPath, testData.PropertyFileDirectory)
+			// **************************************************************
 			// read JSON file to determine expected level 3 summary
 			testData.ExpectedLevel3Summary = readExpectedLevel3SummaryFromJSON(t, testData)
-			//checkLevel3Summary(t, actualLevel3Summary, testData)
+			checkLevel3Summary(t, actualTestSummary3, testData)
 		})
 	}
 
-}
-
-// HELPERS - UTILITIES
-
-const testDataDir = "../testdata/summary3"
-
-func readExpectedLevel3SummaryFromJSON(t *testing.T, testData testdata.Level3TestData) common.Level3Summary {
-	var expectedLevel3Summary common.Level3Summary
-	expectedTestSummary3JsonBytes, err := os.ReadFile(testData.ExpectedLevel3SummaryPath)
-	require.Nil(t, err)
-	require.NotEmpty(t, expectedTestSummary3JsonBytes)
-	err = json.Unmarshal(expectedTestSummary3JsonBytes, &expectedLevel3Summary)
-	require.Nil(t, err)
-	return expectedLevel3Summary
-}
-
-func runGenerateLevel3Summary(t *testing.T, testDir string, testData testdata.Level3TestData) common.Level3Summary {
-	// **************************************************************
-	actualTestSummary3 := generateLevel3Summary(testData.InputLevel2SummaryPath, testData.PropertyFileDirectory)
-	// **************************************************************
-
-	testData.ExpectedLevel3Summary = readExpectedLevel3SummaryFromJSON(t, testData)
-
-	checkLevel3Summary(t, actualTestSummary3, testData)
-
-	return actualTestSummary3
 }
 
 // test that script panics when supplied file path is invalid (can't find file)
@@ -129,6 +102,20 @@ func TestGenerateLevel3Summary_Panic_WrongFormat(t *testing.T) {
 			// supplied file is level 3 file, not level 2 - this should cause a panic
 			generateLevel3Summary(filepath.Join(testDataDir, "test1-1package-1failure/expected-output/test1-1package-1failure.json"), ".")
 		})
+}
+
+// HELPERS - UTILITIES
+
+const testDataDir = "../testdata/summary3"
+
+func readExpectedLevel3SummaryFromJSON(t *testing.T, testData testdata.Level3TestData) common.Level3Summary {
+	var expectedLevel3Summary common.Level3Summary
+	expectedTestSummary3JsonBytes, err := os.ReadFile(testData.ExpectedLevel3SummaryPath)
+	require.Nil(t, err)
+	require.NotEmpty(t, expectedTestSummary3JsonBytes)
+	err = json.Unmarshal(expectedTestSummary3JsonBytes, &expectedLevel3Summary)
+	require.Nil(t, err)
+	return expectedLevel3Summary
 }
 
 func checkLevel3Summary(t *testing.T, actualLevel3Summary common.Level3Summary, testData testdata.Level3TestData) {
