@@ -860,11 +860,21 @@ func TestValueSizesWithDuplicatePaths(t *testing.T) {
 	}
 }
 
-func TestTrieRegCountRegSize(t *testing.T) {
+// TestTrieAllocatedRegCountRegSize tests allocated register count and register size for updated trie.
+// It tests the following updates with prune flag set to true:
+//   * update empty trie with new paths and payloads
+//   * update trie with existing paths and updated payload
+//   * update trie with new paths and empty payloads
+//   * update trie with existing path and empty payload one by one until trie is empty
+// It also tests the following updates with prune flag set to false:
+//   * update trie with existing path and empty payload one by one until trie is empty
+//   * update trie with removed paths and empty payloads
+//   * update trie with removed paths and non-empty payloads
+func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 
 	rng := &LinearCongruentialGenerator{seed: 0}
 
-	// allocate 255 registers
+	// Allocate 255 registers
 	numberRegisters := 255
 	paths := make([]ledger.Path, numberRegisters)
 	payloads := make([]ledger.Payload, numberRegisters)
@@ -911,13 +921,17 @@ func TestTrieRegCountRegSize(t *testing.T) {
 	newPayloads := []ledger.Payload{}
 	for i := 0; i < len(paths); i++ {
 		oldPath := paths[i]
-		p1, _ := ledger.ToPath(oldPath[:])
-		p1[1] = 1
-		p2, _ := ledger.ToPath(oldPath[:])
-		p2[1] = 2
 
-		newPaths = append(newPaths, oldPath, p1, p2)
-		newPayloads = append(newPayloads, payloads[i], *ledger.EmptyPayload(), *ledger.EmptyPayload())
+		path1, _ := ledger.ToPath(oldPath[:])
+		path1[1] = 1
+		payload1 := ledger.Payload{Key: ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte{0x00, byte(i)}}}}}
+
+		path2, _ := ledger.ToPath(oldPath[:])
+		path2[1] = 2
+		payload2 := ledger.EmptyPayload()
+
+		newPaths = append(newPaths, oldPath, path1, path2)
+		newPayloads = append(newPayloads, payloads[i], payload1, *payload2)
 	}
 
 	updatedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, newPaths, newPayloads, true)

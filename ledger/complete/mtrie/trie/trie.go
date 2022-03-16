@@ -266,7 +266,11 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	}
 }
 
-// NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie.
+// NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie,
+// and returns:
+//   * updated trie
+//   * max depth touched during update (this isn't affected by prune flag)
+//   * error
 // The key-value pairs specify the registers whose values are supposed to hold updated values
 // compared to the parent trie. Constructing the new trie is done in a COPY-ON-WRITE manner:
 //   * The original trie remains unchanged.
@@ -282,10 +286,9 @@ func NewTrieWithUpdatedRegisters(
 	updatedPayloads []ledger.Payload,
 	prune bool,
 ) (*MTrie, uint16, error) {
-	parentRoot := parentTrie.root
 	updatedRoot, regCountDelta, regSizeDelta, lowestHeightTouched := update(
 		ledger.NodeMaxHeight,
-		parentRoot,
+		parentTrie.root,
 		updatedPaths,
 		updatedPayloads,
 		nil,
@@ -303,7 +306,14 @@ func NewTrieWithUpdatedRegisters(
 	return updatedTrie, maxDepthTouched, nil
 }
 
-// update traverses the subtree and updates the stored registers
+// update traverses the subtree, updates the stored registers, and returns:
+//   * new or orignial node (n)
+//   * allocated register count delta in subtrie (allocatedRegCountDelta)
+//   * allocated register size delta in subtrie (allocatedRegSizeDelta)
+//   * lowest height reached during recursive update in subtrie (lowestHeightTouched)
+// allocatedRegCountDelta and allocatedRegSizeDelta are used to compute updated
+// trie's allocated register count and size.  lowestHeightTouched is used to
+// compute max depth touched during update.
 // CAUTION: while updating, `paths` and `payloads` are permuted IN-PLACE for optimized processing.
 // UNSAFE: method requires the following conditions to be satisfied:
 //   * paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
@@ -313,7 +323,7 @@ func update(
 	nodeHeight int, parentNode *node.Node,
 	paths []ledger.Path, payloads []ledger.Payload, compactLeaf *node.Node,
 	prune bool,
-) (n *node.Node, regCountDelta int64, regSizeDelta int64, lowestHeightTouched int) {
+) (n *node.Node, allocatedRegCountDelta int64, allocatedRegSizeDelta int64, lowestHeightTouched int) {
 	// No new paths to write
 	if len(paths) == 0 {
 		// check is a compactLeaf from a higher height is still left.
@@ -328,11 +338,11 @@ func update(
 
 	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
 		n = node.NewLeaf(paths[0], payloads[0].DeepCopy(), nodeHeight)
-		payloadSize := payloads[0].Size()
-		if payloadSize == 0 {
+		if payloads[0].IsEmpty() {
+			// Unallocated register doesn't affect allocatedRegCountDelta and allocatedRegSizeDelta.
 			return n, 0, 0, nodeHeight
 		}
-		return n, 1, int64(payloadSize), nodeHeight
+		return n, 1, int64(payloads[0].Size()), nodeHeight
 	}
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
@@ -346,20 +356,22 @@ func update(
 					if !parentNode.Payload().Equals(&payloads[i]) {
 						n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
 
-						oldPayloadSize := parentNode.Payload().Size()
-						newPayloadSize := payloads[i].Size()
-						regSizeDelta = int64(newPayloadSize - oldPayloadSize)
-
-						regCountDelta = 0        // Register is updated, unless
-						if newPayloadSize == 0 { // if we're here then oldPayloadSize > 0
-							// Register is deleted.
-							regCountDelta = -1
-						} else if oldPayloadSize == 0 {
-							// Register is new.
-							regCountDelta = 1
+						allocatedRegCountDelta = 0
+						if payloads[i].IsEmpty() {
+							// Old payload is not empty while new payload is empty.
+							// Allocated register will be unallocated.
+							allocatedRegCountDelta = -1
+						} else if parentNode.Payload().IsEmpty() {
+							// Old payload is empty while new payload is not empty.
+							// Unallocated register will be allocated.
+							allocatedRegCountDelta = 1
 						}
 
-						return n, regCountDelta, regSizeDelta, nodeHeight
+						oldPayloadSize := parentNode.Payload().Size()
+						newPayloadSize := payloads[i].Size()
+						allocatedRegSizeDelta = int64(newPayloadSize - oldPayloadSize)
+
+						return n, allocatedRegCountDelta, allocatedRegSizeDelta, nodeHeight
 					}
 					// avoid creating a new node when the same payload is written
 					return parentNode, 0, 0, nodeHeight
@@ -367,12 +379,13 @@ func update(
 				// the case where the recursion carries on: len(paths)>1
 				found = true
 
-				oldPayloadSize := parentNode.Payload().Size()
-				regSizeDelta -= int64(oldPayloadSize)
-
-				if oldPayloadSize > 0 {
-					regCountDelta--
+				if !parentNode.Payload().IsEmpty() {
+					// Allocated register will be updated or unallocated at lower height.
+					allocatedRegCountDelta--
 				}
+
+				oldPayloadSize := parentNode.Payload().Size()
+				allocatedRegSizeDelta -= int64(oldPayloadSize)
 
 				break
 			}
@@ -450,8 +463,8 @@ func update(
 		lChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = ret.child, ret.regCountDelta, ret.regSizeDelta, ret.lowestHeightTouched
 	}
 
-	regCountDelta += lRegCountDelta + rRegCountDelta
-	regSizeDelta += lRegSizeDelta + rRegSizeDelta
+	allocatedRegCountDelta += lRegCountDelta + rRegCountDelta
+	allocatedRegSizeDelta += lRegSizeDelta + rRegSizeDelta
 	lowestHeightTouched = minInt(lLowestHeightTouched, rLowestHeightTouched)
 
 	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
@@ -466,11 +479,11 @@ func update(
 	// updated registers in the sub-trie
 	if prune {
 		n = node.NewInterimCompactifiedNode(nodeHeight, lChild, rChild)
-		return n, regCountDelta, regSizeDelta, lowestHeightTouched
+		return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched
 	}
 
 	n = node.NewInterimNode(nodeHeight, lChild, rChild)
-	return n, regCountDelta, regSizeDelta, lowestHeightTouched
+	return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched
 }
 
 // UnsafeProofs provides proofs for the given paths.

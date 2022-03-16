@@ -57,6 +57,9 @@ func BenchmarkOriginalCanonicalForm(b *testing.B) {
 	}
 }
 
+// TestPayloadKeyEquals tests whether keys are equal.
+// It tests equality of empty, nil, and not-empty keys.
+// Empty key and nil key should be equal.
 func TestPayloadKeyEquals(t *testing.T) {
 
 	nilKey := (*Key)(nil)
@@ -183,6 +186,9 @@ func TestPayloadKeyEquals(t *testing.T) {
 	})
 }
 
+// TestPayloadValueEquals tests whether values are equal.
+// It tests equality of empty, nil, and not-empty values.
+// Empty value and nil value should be equal.
 func TestPayloadValueEquals(t *testing.T) {
 
 	nilValue := (Value)(nil)
@@ -235,6 +241,9 @@ func TestPayloadValueEquals(t *testing.T) {
 	})
 }
 
+// TestPayloadEquals tests whether payloads are equal.
+// It tests equality of empty, nil, and not-empty payloads.
+// Empty payload and nil payload should be equal.
 func TestPayloadEquals(t *testing.T) {
 	nilPayload := (*Payload)(nil)
 	emptyPayload := EmptyPayload()
