@@ -49,6 +49,17 @@ func (s SkipReason) String() string {
 
 func SkipUnless(t *testing.T, reason SkipReason, message string) {
 	t.Helper()
+	skippedTestList := os.Getenv("SKIPPED_TEST_LIST")
+	if skippedTestList != "" {
+		f, err := os.OpenFile(skippedTestList, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		if _, err := f.WriteString(t.Name() + " " + reason.String()); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if os.Getenv(reason.String()) == "" {
 		t.Skip(message)
 	}
