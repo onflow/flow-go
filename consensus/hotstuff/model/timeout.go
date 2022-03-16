@@ -1,8 +1,9 @@
 package model
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // TimeoutMode enum type

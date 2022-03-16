@@ -23,11 +23,11 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	"github.com/onflow/flow-go/consensus/hotstuff/voter"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
@@ -66,7 +66,7 @@ type Instance struct {
 	producer   *blockproducer.BlockProducer
 	forks      *forks.Forks
 	aggregator *voteaggregator.VoteAggregator
-	voter      *voter.Voter
+	voter      *safetyrules.Voter
 	validator  *validator.Validator
 
 	// main logic
@@ -372,7 +372,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	require.NoError(t, err)
 
 	// initialize the voter
-	in.voter = voter.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())
+	in.voter = safetyrules.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())
 
 	// initialize the event handler
 	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)

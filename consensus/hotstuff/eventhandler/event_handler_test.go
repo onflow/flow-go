@@ -150,6 +150,7 @@ func (c *Committee) Self() flow.Identifier {
 }
 
 // The Voter mock will not vote for any block unless the block's ID exists in votable field's key
+// TODO(active-pacemaker): update this data structure when updating tests
 type Voter struct {
 	votable       map[flow.Identifier]struct{}
 	lastVotedView uint64
@@ -171,6 +172,18 @@ func (v *Voter) ProduceVote(block *model.Proposal, curView uint64) (*model.Vote,
 		return nil, model.NoVoteError{Msg: "block not found"}
 	}
 	return createVote(block.Block), nil
+}
+
+func (v *Voter) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+	panic("to be implemented")
+}
+
+func (v *Voter) IsSafeToVote(proposal *model.Proposal) bool {
+	panic("to be implemented")
+}
+
+func (v *Voter) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) bool {
+	panic("to be implemented")
 }
 
 // Forks mock allows to customize the Add QC and AddBlock function by specifying the addQC and addBlock callbacks

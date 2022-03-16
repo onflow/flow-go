@@ -16,10 +16,10 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/consensus/hotstuff/voter"
 	"github.com/onflow/flow-go/consensus/recovery"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -102,7 +102,7 @@ func NewParticipant(
 	}
 
 	// initialize the voter
-	voter := voter.New(modules.Signer, modules.Forks, modules.Persist, modules.Committee, voted)
+	voter := safetyrules.New(modules.Signer, modules.Forks, modules.Persist, modules.Committee, voted)
 
 	// initialize the event handler
 	eventHandler, err := eventhandler.NewEventHandler(
