@@ -90,7 +90,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 					pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 					require.NoError(t, err)
 
-					tag := string(flow.UserDomainTag[:])
+					tag := "random_tag"
 					var hasher hash.Hasher
 					if h != runtime.HashAlgorithmKMAC128_BLS_BLS12_381 {
 						hasher, err = crypto.NewPrefixedHashing(crypto.RuntimeToCryptoHashingAlgorithm(h), tag)
@@ -185,7 +185,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				},
 			}, {
 				signTag:   "padding test",
-				verifyTag: "padding test        ",
+				verifyTag: "padding test" + string([]byte{0, 0, 0, 0, 0}),
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
 					require.True(t, sigOk)

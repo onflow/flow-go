@@ -79,6 +79,25 @@ func TestPrefixedHash(t *testing.T) {
 				assert.Equal(t, expected, []byte(h))
 			}
 		})
+
+		t.Run(hashAlgo.String()+" with tagged prefix", func(t *testing.T) {
+			data := make([]byte, 100) // data to hash
+			rand.Read(data)
+			tag := "tag" // tag to be padded
+
+			hasher, err := crypto.NewPrefixedHashing(hashAlgo, tag)
+			require.NoError(t, err)
+			expected := hasher.ComputeHash(data)
+			for i := len(tag); i < flow.DomainTagLength; i++ {
+				paddedTag := make([]byte, i)
+				copy(paddedTag, tag)
+				paddedHasher, err := crypto.NewPrefixedHashing(hashAlgo, string(paddedTag))
+				require.NoError(t, err)
+				h := paddedHasher.ComputeHash(data)
+
+				assert.Equal(t, expected, h)
+			}
+		})
 	}
 
 	t.Run("non supported algorithm", func(t *testing.T) {
