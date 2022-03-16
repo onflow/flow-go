@@ -42,12 +42,10 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run flakiness summary script
-      working-directory: ./tools/flaky_test_monitor
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 25
         max_attempts: 10
-        shell: pwsh
-        command: ./skipped-test-tracker.sh
+        command: ./tools/flaky_test_monitor/skipped-test-tracker.sh
       env:
         TEST_CATEGORY: ${{ matrix.test-category }}

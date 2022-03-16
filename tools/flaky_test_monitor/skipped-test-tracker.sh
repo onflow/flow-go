@@ -13,8 +13,6 @@ case $TEST_CATEGORY in
     ;;
 esac
 
-cd ../..
-
 # checkout specified commit
 if [[ -n $COMMIT_SHA ]]
 then
