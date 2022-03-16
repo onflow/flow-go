@@ -69,4 +69,4 @@ GCS_URI="gs://$GCS_BUCKET/${JOB_STARTED%T*}/$TEST_CATEGORY-$JOB_ID.json"
 gsutil cp $TEST_RESULT_FILE $GCS_URI
 
 # upload results to BigQuery
-bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_TABLE $GCS_URI --autodetect
+bq load --source_format=NEWLINE_DELIMITED_JSON --autodetect $BIGQUERY_TABLE $GCS_URI
