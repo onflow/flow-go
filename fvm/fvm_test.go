@@ -1943,7 +1943,7 @@ func TestSignatureVerification(t *testing.T) {
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
 		func() hash.Hasher {
-			return crypto.NewBLSKMAC(flow.UserTagString)
+			return crypto.NewBLSKMAC("any_random_tag")
 		},
 	})
 }
@@ -3021,33 +3021,33 @@ func TestSigningWithTags(t *testing.T) {
 	}
 
 	cases := []struct {
-		name      string
-		tag       []byte
-		shouldWok bool
+		name       string
+		tag        []byte
+		shouldWork bool
 	}{
 		{
-			name:      "no tag",
-			tag:       nil,
-			shouldWok: false,
+			name:       "no tag",
+			tag:        nil,
+			shouldWork: false,
 		},
 		{
-			name:      "transaction tag",
-			tag:       flow.TransactionDomainTag[:],
-			shouldWok: true,
+			name:       "transaction tag",
+			tag:        flow.TransactionDomainTag[:],
+			shouldWork: true,
 		},
 		{
-			name:      "user tag",
-			tag:       flow.UserDomainTag[:],
-			shouldWok: false,
+			name:       "user tag",
+			tag:        flow.UserDomainTag[:],
+			shouldWork: false,
 		},
 	}
 
 	for i, c := range cases {
 		works := "works"
-		if !c.shouldWok {
+		if !c.shouldWork {
 			works = "doesn't work"
 		}
-		t.Run(fmt.Sprintf("Signing Transactions %d: with %s %s", i, c.name, works), checkWithTag(c.tag, c.shouldWok))
+		t.Run(fmt.Sprintf("Signing Transactions %d: with %s %s", i, c.name, works), checkWithTag(c.tag, c.shouldWork))
 	}
 
 }

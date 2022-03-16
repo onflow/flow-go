@@ -169,54 +169,33 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			require   func(t *testing.T, sigOk bool, err error)
 		}{
 			{
-				signTag:   "",
-				verifyTag: "",
+				signTag:   "random_tag",
+				verifyTag: "random_tag",
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
 					require.True(t, sigOk)
 				},
 			},
 			{
-				signTag:   "user",
-				verifyTag: "user",
+				signTag:   "",
+				verifyTag: "",
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
 					require.True(t, sigOk)
 				},
 			}, {
-				signTag:   string(flow.UserDomainTag[:]),
-				verifyTag: string(flow.UserDomainTag[:]),
+				signTag:   "padding test",
+				verifyTag: "padding test        ",
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
 					require.True(t, sigOk)
 				},
 			}, {
-				signTag:   flow.UserTagString,
-				verifyTag: flow.UserTagString,
-				require: func(t *testing.T, sigOk bool, err error) {
-					require.NoError(t, err)
-					require.True(t, sigOk)
-				},
-			}, {
-				signTag:   string(flow.UserDomainTag[:]),
-				verifyTag: "user",
+				signTag:   "valid tag",
+				verifyTag: "different valid tag",
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
 					require.False(t, sigOk)
-				},
-			}, {
-				signTag:   "user",
-				verifyTag: string(flow.UserDomainTag[:]),
-				require: func(t *testing.T, sigOk bool, err error) {
-					require.NoError(t, err)
-					require.False(t, sigOk)
-				},
-			}, {
-				signTag:   "random_tag",
-				verifyTag: "random_tag",
-				require: func(t *testing.T, sigOk bool, err error) {
-					require.NoError(t, err)
-					require.True(t, sigOk)
 				},
 			}, {
 				signTag:   "valid_tag",
@@ -409,7 +388,7 @@ func TestVerifySignatureFromRuntime_error_handling_produces_valid_utf8_for_inval
 	invalidPublicKey := []byte{0xc3, 0x28} //some invalid UTF8
 
 	_, err := crypto.VerifySignatureFromRuntime(
-		nil, flow.UserTagString, nil, invalidPublicKey, runtime.SignatureAlgorithmECDSA_P256, runtime.HashAlgorithmSHA2_256,
+		nil, "random_tag", nil, invalidPublicKey, runtime.SignatureAlgorithmECDSA_P256, runtime.HashAlgorithmSHA2_256,
 	)
 
 	require.IsType(t, &errors.ValueError{}, err)
