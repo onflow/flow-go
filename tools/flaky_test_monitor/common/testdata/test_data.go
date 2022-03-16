@@ -30,11 +30,12 @@ type Level2TestData struct {
 }
 
 type Level3TestData struct {
-	Directory              string
-	InputLevel2Summary     common.Level2Summary // for tests that specify level 2 summary input as struct
-	InputLevel2SummaryPath string               // for tests that specify level 2 summary input as JSON
-	PropertyFileDirectory  string
-	ExpectedLevel3Summary  common.Level3Summary
+	Directory                 string
+	InputLevel2Summary        common.Level2Summary // for tests that specify level 2 summary input as struct
+	InputLevel2SummaryPath    string               // for tests that specify level 2 summary input as JSON
+	PropertyFileDirectory     string
+	ExpectedLevel3Summary     common.Level3Summary // for tests that specify level 2 summary input as struct
+	ExpectedLevel3SummaryPath string               // for tests that specify level 2 summary input as JSON
 }
 
 // ************** Helper Functions *****************

@@ -28,40 +28,49 @@ import (
 
 func TestGenerateLevel3Summary_JSON(t *testing.T) {
 	testDataMap := map[string]testdata.Level3TestData{
+		//expectedOutputTestDataPath := filepath.Join(testDataBaseDir, "expected-output", testDir+".json")
+
 		"1 failure the rest pass": {
-			Directory:              "test1-1package-1failure",
-			InputLevel2SummaryPath: filepath.Join(testDataDir, "test1-1package-1failure", "input", "test1-1package-1failure.json"),
-			PropertyFileDirectory:  filepath.Join(testDataDir, "test1-1package-1failure", "input"),
+			Directory:                 "test1-1package-1failure",
+			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test1-1package-1failure", "input", "test1-1package-1failure.json"),
+			PropertyFileDirectory:     filepath.Join(testDataDir, "test1-1package-1failure", "input"),
+			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test1-1package-1failure", "expected-output", "test1-1package-1failure.json"),
 		},
 		"1 no-result test, no other tests": {
-			Directory:              "test2-1-no-result-test",
-			InputLevel2SummaryPath: filepath.Join(testDataDir, "test2-1-no-result-test", "input", "test2-1-no-result-test.json"),
-			PropertyFileDirectory:  filepath.Join(testDataDir, "test2-1-no-result-test", "input"),
+			Directory:                 "test2-1-no-result-test",
+			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test2-1-no-result-test", "input", "test2-1-no-result-test.json"),
+			PropertyFileDirectory:     filepath.Join(testDataDir, "test2-1-no-result-test", "input"),
+			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test2-1-no-result-test", "expected-output", "test2-1-no-result-test.json"),
 		},
 		"many no-result tests": {
-			Directory:              "test3-multi-no-result-tests",
-			InputLevel2SummaryPath: filepath.Join(testDataDir, "test3-multi-no-result-tests", "input", "test3-multi-no-result-tests.json"),
-			PropertyFileDirectory:  filepath.Join(testDataDir, "test3-multi-no-result-tests", "input"),
+			Directory:                 "test3-multi-no-result-tests",
+			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test3-multi-no-result-tests", "input", "test3-multi-no-result-tests.json"),
+			PropertyFileDirectory:     filepath.Join(testDataDir, "test3-multi-no-result-tests", "input"),
+			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test3-multi-no-result-tests", "expected-output", "test3-multi-no-result-tests.json"),
 		},
 		"many failures, many passes": {
-			Directory:              "test4-multi-failures",
-			InputLevel2SummaryPath: filepath.Join(testDataDir, "test4-multi-failures", "input", "test4-multi-failures.json"),
-			PropertyFileDirectory:  filepath.Join(testDataDir, "test4-multi-failures", "input"),
+			Directory:                 "test4-multi-failures",
+			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test4-multi-failures", "input", "test4-multi-failures.json"),
+			PropertyFileDirectory:     filepath.Join(testDataDir, "test4-multi-failures", "input"),
+			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test4-multi-failures", "expected-output", "test4-multi-failures.json"),
 		},
 		"many failures, many passes, many no-result tests": {
-			Directory:              "test5-multi-durations",
-			InputLevel2SummaryPath: filepath.Join(testDataDir, "test5-multi-durations", "input", "test5-multi-durations.json"),
-			PropertyFileDirectory:  filepath.Join(testDataDir, "test5-multi-durations", "input"),
+			Directory:                 "test5-multi-durations",
+			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test5-multi-durations", "input", "test5-multi-durations.json"),
+			PropertyFileDirectory:     filepath.Join(testDataDir, "test5-multi-durations", "input"),
+			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test5-multi-durations", "expected-output", "test5-multi-durations.json"),
 		},
 		"many failures - cap failures": {
-			Directory:              "test6-multi-failures-cap",
-			InputLevel2SummaryPath: filepath.Join(testDataDir, "test6-multi-failures-cap", "input", "test6-multi-failures-cap.json"),
-			PropertyFileDirectory:  filepath.Join(testDataDir, "test6-multi-failures-cap", "input"),
+			Directory:                 "test6-multi-failures-cap",
+			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test6-multi-failures-cap", "input", "test6-multi-failures-cap.json"),
+			PropertyFileDirectory:     filepath.Join(testDataDir, "test6-multi-failures-cap", "input"),
+			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test6-multi-failures-cap", "expected-output", "test6-multi-failures-cap.json"),
 		},
 		"many durations - cap durations": {
-			Directory:              "test7-multi-durations-cap",
-			InputLevel2SummaryPath: filepath.Join(testDataDir, "test7-multi-durations-cap", "input", "test7-multi-durations-cap.json"),
-			PropertyFileDirectory:  filepath.Join(testDataDir, "test7-multi-durations-cap", "input"),
+			Directory:                 "test7-multi-durations-cap",
+			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test7-multi-durations-cap", "input", "test7-multi-durations-cap.json"),
+			PropertyFileDirectory:     filepath.Join(testDataDir, "test7-multi-durations-cap", "input"),
+			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test7-multi-durations-cap", "expected-output", "test7-multi-durations-cap.json"),
 		},
 	}
 
@@ -85,25 +94,21 @@ const testDataDir = "../testdata/summary3"
 
 func readExpectedLevel3SummaryFromJSON(t *testing.T, testData testdata.Level3TestData) common.Level3Summary {
 	var expectedLevel3Summary common.Level3Summary
-
+	expectedTestSummary3JsonBytes, err := os.ReadFile(testData.ExpectedLevel3SummaryPath)
+	require.Nil(t, err)
+	require.NotEmpty(t, expectedTestSummary3JsonBytes)
+	err = json.Unmarshal(expectedTestSummary3JsonBytes, &expectedLevel3Summary)
+	require.Nil(t, err)
 	return expectedLevel3Summary
 }
 
 func runGenerateLevel3Summary(t *testing.T, testDir string, testData testdata.Level3TestData) common.Level3Summary {
-	testDataBaseDir := filepath.Join(testDataDir, testDir)
-	expectedOutputTestDataPath := filepath.Join(testDataBaseDir, "expected-output", testDir+".json")
 
 	// **************************************************************
 	actualTestSummary3 := generateLevel3Summary(testData.InputLevel2SummaryPath, testData.PropertyFileDirectory)
 	// **************************************************************
 
-	// read in expected summary level 3
-	var expectedTestSummary3 common.Level3Summary
-	expectedTestSummary3JsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
-	require.Nil(t, err)
-	require.NotEmpty(t, expectedTestSummary3JsonBytes)
-	err = json.Unmarshal(expectedTestSummary3JsonBytes, &expectedTestSummary3)
-	require.Nil(t, err)
+	expectedTestSummary3 := readExpectedLevel3SummaryFromJSON(t, testData)
 
 	// check all details of test summary level 2 between expected and actual
 
