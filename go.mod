@@ -16,7 +16,7 @@ require (
 	github.com/dgraph-io/badger/v2 v2.2007.3
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
-	github.com/fxamacker/cbor/v2 v2.3.1-0.20211029162100-5d5d7c3edd41
+	github.com/fxamacker/cbor/v2 v2.4.1-0.20220308180823-1fafba071fa5
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
@@ -58,7 +58,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.2.0
-	github.com/onflow/cadence v0.21.3-0.20220310201609-481cb23a7d6b
+	github.com/onflow/cadence v0.21.3-0.20220315195528-bf5f1fdc3c37
 	github.com/onflow/flow v0.2.3-0.20220131193101-d4e2ca43a621
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.2-0.20220316181225-1ae94da816da
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1

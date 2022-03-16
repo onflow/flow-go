@@ -53,9 +53,9 @@ func TestOrderedMapMigration(t *testing.T) {
 
 	t.Run("sort values", func(t *testing.T) {
 
-		one := interpreter.NewIntValueFromInt64(1)
+		one := interpreter.NewUnmeteredIntValueFromInt64(1)
 
-		str := interpreter.NewStringValue("test")
+		str := interpreter.NewUnmeteredStringValue("test")
 
 		array := interpreter.NewArrayValue(
 			mig.Interpreter,
@@ -143,12 +143,12 @@ func TestMultipleAccounts(t *testing.T) {
 
 	t.Run("sort values", func(t *testing.T) {
 
-		one := interpreter.NewIntValueFromInt64(1)
-		two := interpreter.NewIntValueFromInt64(1)
-		three := interpreter.NewIntValueFromInt64(1)
-		four := interpreter.NewIntValueFromInt64(1)
-		five := interpreter.NewIntValueFromInt64(1)
-		six := interpreter.NewIntValueFromInt64(1)
+		one := interpreter.NewUnmeteredIntValueFromInt64(1)
+		two := interpreter.NewUnmeteredIntValueFromInt64(1)
+		three := interpreter.NewUnmeteredIntValueFromInt64(1)
+		four := interpreter.NewUnmeteredIntValueFromInt64(1)
+		five := interpreter.NewUnmeteredIntValueFromInt64(1)
+		six := interpreter.NewUnmeteredIntValueFromInt64(1)
 
 		payload := []ledger.Payload{
 			{Key: createAccountPayloadKey(address1, "storage\x1fFoo"), Value: encodeValue(one, address1)},

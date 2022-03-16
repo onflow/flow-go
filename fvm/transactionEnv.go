@@ -548,6 +548,21 @@ func (e *TransactionEnv) ComputationUsed() uint64 {
 	return uint64(e.sth.State().TotalComputationUsed())
 }
 
+func (e *TransactionEnv) meterMemory(kind, intensity uint) error {
+	if e.sth.EnforceMemoryLimits {
+		return e.sth.State().MeterMemory(kind, intensity)
+	}
+	return nil
+}
+
+func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
+	return e.meterMemory(uint(usage.Kind), uint(usage.Amount))
+}
+
+func (e *TransactionEnv) MemoryUsed() uint64 {
+	return uint64(e.sth.State().TotalMemoryUsed())
+}
+
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 
 	flowAddress := flow.Address(address)

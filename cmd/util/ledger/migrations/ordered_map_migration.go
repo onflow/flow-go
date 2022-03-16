@@ -72,6 +72,7 @@ func (m *OrderedMapMigration) initPersistentSlabStorage(v *view) {
 
 	m.NewStorage = runtime.NewStorage(
 		NewAccountsAtreeLedger(accounts),
+		nil,
 	)
 }
 

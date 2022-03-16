@@ -289,7 +289,7 @@ func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration
 			Kind:           common.DeclarationKindFunction,
 			IsConstant:     true,
 			ArgumentLabels: nil,
-			Value: interpreter.NewHostFunctionValue(
+			Value: interpreter.NewUnmeteredHostFunctionValue(
 				func(invocation interpreter.Invocation) interpreter.Value {
 					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
 					if !ok {
