@@ -49,7 +49,7 @@ transaction(name: String,
             randomSource: randomSource,
 
             // the below arguments are unused and are safe to be left empty
-            collectorClusters: [],
+            collectorClusters: [] as [FlowClusterQC.Cluster],
             clusterQCs: [] as [FlowClusterQC.ClusterQC],
             dkgPubKeys: [] as [String])
   }

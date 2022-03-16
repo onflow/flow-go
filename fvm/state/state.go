@@ -195,7 +195,7 @@ func (s *State) TotalComputationUsed() uint {
 	return s.meter.TotalComputationUsed()
 }
 
-// TotalComputationUsed returns total computation limit
+// TotalComputationLimit returns total computation limit
 func (s *State) TotalComputationLimit() uint {
 	return s.meter.TotalComputationLimit()
 }
