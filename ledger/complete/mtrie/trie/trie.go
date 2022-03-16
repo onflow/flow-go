@@ -306,6 +306,15 @@ func NewTrieWithUpdatedRegisters(
 	return updatedTrie, maxDepthTouched, nil
 }
 
+// updateResult is a wrapper of return values from update().
+// It's used to communicate values from goroutine.
+type updateResult struct {
+	child                  *node.Node
+	allocatedRegCountDelta int64
+	allocatedRegSizeDelta  int64
+	lowestHeightTouched    int
+}
+
 // update traverses the subtree, updates the stored registers, and returns:
 //   * new or orignial node (n)
 //   * allocated register count delta in subtrie (allocatedRegCountDelta)
@@ -442,14 +451,9 @@ func update(
 	} else {
 		// runtime optimization: process the left child is a separate thread
 
-		// Since we're receiving 4 items from goroutine, use a
+		// Since we're receiving 4 values from goroutine, use a
 		// channel to prevent them going on the heap.
-		type updateResult struct {
-			child               *node.Node
-			regCountDelta       int64
-			regSizeDelta        int64
-			lowestHeightTouched int
-		}
+
 		results := make(chan updateResult, 1)
 		go func(retChan chan<- updateResult) {
 			child, regCountDelta, regSizeDelta, lowestHeightTouched := update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
@@ -460,7 +464,7 @@ func update(
 
 		// Wait for results from goroutine.
 		ret := <-results
-		lChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = ret.child, ret.regCountDelta, ret.regSizeDelta, ret.lowestHeightTouched
+		lChild, lRegCountDelta, lRegSizeDelta, lLowestHeightTouched = ret.child, ret.allocatedRegCountDelta, ret.allocatedRegSizeDelta, ret.lowestHeightTouched
 	}
 
 	allocatedRegCountDelta += lRegCountDelta + rRegCountDelta
