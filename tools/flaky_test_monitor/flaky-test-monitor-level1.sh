@@ -7,7 +7,7 @@
 set -e
 shopt -s extglob
 
-export JOB_STARTED=$(TZ=":America/Vancouver" date --rfc-3339=seconds)
+export JOB_STARTED=$(TZ=":America/Vancouver" date -Iseconds)
 export JOB_ID=$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20)
 
 case $TEST_CATEGORY in
@@ -67,9 +67,10 @@ else
 fi
 
 # TODO: upload skipped tests list to bigquery
+# we should only have to do this step for pushes to master
 cat $SKIPPED_TEST_LIST
 
-GCS_URI="gs://$GCS_BUCKET/${JOB_STARTED[0]}/$TEST_CATEGORY-$JOB_ID.json"
+GCS_URI="gs://$GCS_BUCKET/${JOB_STARTED%T*}/$TEST_CATEGORY-$JOB_ID.json"
 
 # upload results to GCS bucket
 gsutil cp $TEST_RESULT_FILE $GCS_URI
