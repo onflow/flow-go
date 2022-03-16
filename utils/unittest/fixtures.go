@@ -313,11 +313,11 @@ func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
 }
 
-func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier) flow.Block {
+func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier, participantCount int) flow.Block {
 	block := BlockWithParentFixture(parent)
 
 	block.Header.ProposerID = proposer
-	indices, _ := packer.EncodeSignerIndices([]int{1}, 10)
+	indices, _ := packer.EncodeSignerIndices([]int{0}, participantCount)
 	block.Header.ParentVoterIndices = indices
 
 	return *block
@@ -931,7 +931,7 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	stakingKey := StakingPrivKeyByIdentifier(nodeID)
 	identity := flow.Identity{
 		NodeID:        nodeID,
-		Address:       fmt.Sprintf("address-%v", nodeID[0:7]),
+		Address:       fmt.Sprintf("address-%x", nodeID[0:7]),
 		Role:          flow.RoleConsensus,
 		Stake:         1000,
 		StakingPubKey: stakingKey.PublicKey(),
