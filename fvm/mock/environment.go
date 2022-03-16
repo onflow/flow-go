@@ -599,6 +599,20 @@ func (_m *Environment) MeterComputation(operationType common.ComputationKind, in
 	return r0
 }
 
+// MeterMemory provides a mock function with given fields: usage
+func (_m *Environment) MeterMemory(usage common.MemoryUsage) error {
+	ret := _m.Called(usage)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(common.MemoryUsage) error); ok {
+		r0 = rf(usage)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ProgramLog provides a mock function with given fields: _a0
 func (_m *Environment) ProgramLog(_a0 string) error {
 	ret := _m.Called(_a0)

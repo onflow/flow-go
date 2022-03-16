@@ -142,6 +142,7 @@ func (r *FungibleTokenTracker) worker(
 		accounts := state.NewAccounts(sth)
 		storage := cadenceRuntime.NewStorage(
 			&migrations.AccountsAtreeLedger{Accounts: accounts},
+			nil,
 		)
 
 		owner, err := common.BytesToAddress(j.owner[:])

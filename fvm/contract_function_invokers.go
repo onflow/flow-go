@@ -163,7 +163,7 @@ func UseContractAuditVoucherInvocation(
 			systemcontracts.ContractDeploymentAuditsFunction_useVoucherForDeploy,
 			[]interpreter.Value{
 				interpreter.NewAddressValue(address),
-				interpreter.NewStringValue(code),
+				interpreter.NewUnmeteredStringValue(code),
 			},
 			useContractAuditVoucherInvocationArgumentTypes,
 			env.Context().Logger,
