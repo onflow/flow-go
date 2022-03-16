@@ -17,15 +17,18 @@ type CorruptedConnector struct {
 	corruptedIds    flow.IdentityList
 }
 
-func NewCorruptedConnector(attackerAddress string, corruptedIds flow.IdentityList) *CorruptedConnector {
+func NewCorruptedConnector(corruptedIds flow.IdentityList) *CorruptedConnector {
 	return &CorruptedConnector{
-		corruptedIds:    corruptedIds,
-		attackerAddress: attackerAddress,
+		corruptedIds: corruptedIds,
 	}
 }
 
 // Connect creates a connection the corruptible conduit factory of the given corrupted identity.
 func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifier) (insecure.CorruptedNodeConnection, error) {
+	if len(c.attackerAddress) == 0 {
+		return nil, fmt.Errorf("attacker address has not set on the connector")
+	}
+
 	corruptedAddress, err := c.corruptedConduitFactoryAddress(targetId)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate corruptible conduit factory address for: %w", err)
@@ -50,6 +53,10 @@ func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifi
 	}
 
 	return &CorruptedNodeConnection{stream: stream}, nil
+}
+
+func (c *CorruptedConnector) WithAttackerAddress(address string) {
+	c.attackerAddress = address
 }
 
 // corruptedConduitFactoryAddress generates and returns the gRPC interface address of corruptible conduit factory for given identity.
