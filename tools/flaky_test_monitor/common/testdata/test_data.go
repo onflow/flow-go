@@ -645,7 +645,6 @@ func GetTestData_Level2_Input_1NoResultNoOtherTests() []common.Level1Summary {
 // GetTestData_Level2_Expected_1NoResultNoOtherTests represents expected level 2 summary
 // with a single no result test and no other tests.
 func GetTestData_Level2_Expected_1NoResultNoOtherTests() common.Level2Summary {
-
 	testResultMap := make(map[string]*common.Level2TestResult)
 
 	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack"] = &common.Level2TestResult{
@@ -667,7 +666,7 @@ func GetTestData_Level2_Expected_1NoResultNoOtherTests() common.Level2Summary {
 }
 
 // GetTestData_Level2_Input_MultipleL1SummariesNoResults represents multiple level 1 summaries (as input into a level 2 parser)
-// and many no result tests within the level level 1 summaries.
+// and many no result tests within the level 1 summaries.
 func GetTestData_Level2_Input_MultipleL1SummariesNoResults() []common.Level1Summary {
 
 	// models level 1 summary with many passed tests and a single no result test, count=3
@@ -731,8 +730,200 @@ func GetTestData_Level2_Input_MultipleL1SummariesNoResults() []common.Level1Summ
 	return level1Summaries
 }
 
+// GetTestData_Level2_Expected_MultipleL1SummariesNoResults represents expected level 2 summary
+// with a single no result test and no other tests.
+func GetTestData_Level2_Expected_MultipleL1SummariesNoResults() common.Level2Summary {
+	testResultMap := make(map[string]*common.Level2TestResult)
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPrivKey"] = &common.Level2TestResult{
+		Test:            "TestEncodableNetworkPrivKey",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPrivKeyNil"] = &common.Level2TestResult{
+		Test:            "TestEncodableNetworkPrivKeyNil",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPubKey"] = &common.Level2TestResult{
+		Test:            "TestEncodableNetworkPubKey",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPubKeyNil"] = &common.Level2TestResult{
+		Test:            "TestEncodableNetworkPubKeyNil",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKey"] = &common.Level2TestResult{
+		Test:            "TestEncodableRandomBeaconPrivKey",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyNil"] = &common.Level2TestResult{
+		Test:            "TestEncodableRandomBeaconPrivKeyNil",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPubKey"] = &common.Level2TestResult{
+		Test:            "TestEncodableRandomBeaconPubKey",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPubKeyNil"] = &common.Level2TestResult{
+		Test:            "TestEncodableRandomBeaconPubKeyNil",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPrivKey"] = &common.Level2TestResult{
+		Test:            "TestEncodableStakingPrivKey",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPrivKeyNil"] = &common.Level2TestResult{
+		Test:            "TestEncodableStakingPrivKeyNil",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPubKey"] = &common.Level2TestResult{
+		Test:            "TestEncodableStakingPubKey",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPubKeyNil"] = &common.Level2TestResult{
+		Test:            "TestEncodableStakingPubKeyNil",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestIsHexString"] = &common.Level2TestResult{
+		Test:            "TestIsHexString",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            3,
+		Passed:          3,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack"] = &common.Level2TestResult{
+		Test:            "TestEncodableRandomBeaconPrivKeyMsgPack",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            14,
+		Passed:          1,
+		Failed:          13,
+		Skipped:         0,
+		NoResult:        13,
+		FailureRate:     0.93,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}
+
+	var level2Summary common.Level2Summary
+	level2Summary.TestResultsMap = testResultMap
+	return level2Summary
+}
+
 // GetTestData_Level2_Input_MultipleL1SummariesFailuresPasses represents multiple level 1 summaries (as input into a level 2 parser)
-// where there are many passed and failed tests within the level level 1 summaries.
+// and many no result tests within the level 1 summaries.
 func GetTestData_Level2_Input_MultipleL1SummariesFailuresPasses() []common.Level1Summary {
 
 	// level 1 summary with many passed tests and 1 failed test, count=1
