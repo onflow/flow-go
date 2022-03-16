@@ -21,36 +21,36 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 	// data driven table test
 	testDataMap := map[string]testdata.Level1TestData{
 		"1 count all pass": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountPass(),
-			RawJSONTestRunFile:    "test-result-crypto-hash-1-count-pass.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Level1_1CountPass(),
+			InputRawJSONTestRunFile: "test-result-crypto-hash-1-count-pass.json",
 		},
 
 		"1 count 1 fail the rest pass": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_1Count1FailRestPass(),
-			RawJSONTestRunFile:    "test-result-crypto-hash-1-count-fail.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Level1_1Count1FailRestPass(),
+			InputRawJSONTestRunFile: "test-result-crypto-hash-1-count-fail.json",
 		},
 
 		"1 count 2 skipped the rest pass": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountAllPass(),
-			RawJSONTestRunFile:    "test-result-crypto-hash-1-count-skip-pass.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Level1_1CountAllPass(),
+			InputRawJSONTestRunFile: "test-result-crypto-hash-1-count-skip-pass.json",
 		},
 
 		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
 		"2 count all pass": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_2CountPass(),
-			RawJSONTestRunFile:    "test-result-crypto-hash-2-count-pass.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Level1_2CountPass(),
+			InputRawJSONTestRunFile: "test-result-crypto-hash-2-count-pass.json",
 		},
 
 		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
 		"10 count all pass": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_10CountPass(),
-			RawJSONTestRunFile:    "test-result-crypto-hash-10-count-pass.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Level1_10CountPass(),
+			InputRawJSONTestRunFile: "test-result-crypto-hash-10-count-pass.json",
 		},
 
 		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
 		"10 count some failures": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_10CountSomeFailures(),
-			RawJSONTestRunFile:    "test-result-crypto-hash-10-count-fail.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Level1_10CountSomeFailures(),
+			InputRawJSONTestRunFile: "test-result-crypto-hash-10-count-fail.json",
 		},
 
 		// no result tests - tests below don't generate pass/fail result due to `go test` bug
@@ -59,28 +59,28 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
 		// this is a single unit test that produces a no result
 		"1 count single no result test": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountSingleNoResultTest(),
-			RawJSONTestRunFile:    "test-result-nil-test-single-1-count-pass.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Level1_Expected_1CountSingleNoResultTest(),
+			InputRawJSONTestRunFile: "test-result-nil-test-single-1-count-pass.json",
 		},
 
 		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
 		//multiple no result tests in a row
 		"5 no result tests in a row": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountSingleNoResultTest(),
-			RawJSONTestRunFile:    "test-result-nil-test-single-5-count-pass.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Level1_Expected_5CountSingleNoResultTest(),
+			InputRawJSONTestRunFile: "test-result-nil-test-single-5-count-pass.json",
 		},
 
 		//normal test at the end of a test run with multiple no result tests in front of it
 		"4 no result tests in a row, 1 normal test": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountMultipleNoResultTests(),
-			RawJSONTestRunFile:    "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Level1_Expected_5CountMultipleNoResultTests(),
+			InputRawJSONTestRunFile: "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
 		},
 
 		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
 		// group of unit tests with a single no result test
 		"3 count no result test with normal tests": {
-			ExpectedLevel1Summary: testdata.GetTestData_Leve1_3CountNoResultWithNormalTests(),
-			RawJSONTestRunFile:    "test-result-nil-test-others-normal-3-count-pass.json",
+			ExpectedLevel1Summary:   testdata.GetTestData_Leve1_Expected_3CountNoResultWithNormalTests(),
+			InputRawJSONTestRunFile: "test-result-nil-test-others-normal-3-count-pass.json",
 		},
 	}
 
@@ -92,7 +92,7 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			// simulate generating raw "go test -json" output by loading output from saved file
 			resultReader := FileResultReader{
-				rawJsonFile: filepath.Join(rawJsonFilePath, testData.RawJSONTestRunFile),
+				rawJsonFile: filepath.Join(rawJsonFilePath, testData.InputRawJSONTestRunFile),
 			}
 			// *****************************************************
 			actualLevel1Summary := generateLevel1Summary(&resultReader)

@@ -11,19 +11,21 @@ const COMMIT_SHA = "46baf6c6be29af9c040bc14195e195848598bbae"
 const JOB_STARTED = "2021-09-21T21:06:25-07:00"
 const CRYPTO_HASH_PACKAGE = "github.com/onflow/flow-go/crypto/hash"
 
-// Level1TestData is used by tests to store what the expected test result should be and what the raw
+// Level1TestData is used by level 1 tests to store what the expected test result should be and what the raw
 // JSON input file is
 type Level1TestData struct {
-	ExpectedLevel1Summary common.Level1Summary
-	RawJSONTestRunFile    string
+	ExpectedLevel1Summary   common.Level1Summary
+	InputRawJSONTestRunFile string
 }
 
+// Level2TestData is used by level 2 tests to store what the expected level 1 inputs are and what the level 2 summary should be
 type Level2TestData struct {
-	Directory        string
-	Level1DataPath   string
-	HasFailures      bool
-	HasNoResultTests bool
-	Level1Summaries  []common.Level1Summary
+	Directory             string
+	Level1DataPath        string
+	HasFailures           bool
+	HasNoResultTests      bool
+	InputLevel1Summaries  []common.Level1Summary
+	ExpectedLevel2Summary common.Level2Summary
 }
 
 // ************** Helper Functions *****************
@@ -221,9 +223,9 @@ func getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.Level1Test
 // Instead of having to represent these level 1 summaries as JSON files, they are represented as structs
 // to make them easier to maintain.
 
-// GetTestData_Level1_1CountSingleNoResultTest represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Level1_Expected_1CountSingleNoResultTest represents a level 1 summary (as exptected output from level 1 parser)
 // with a single no result test and no other tests, count=1.
-func GetTestData_Level1_1CountSingleNoResultTest() common.Level1Summary {
+func GetTestData_Level1_Expected_1CountSingleNoResultTest() common.Level1Summary {
 	testRun := common.Level1Summary{
 		Rows: []common.Level1TestResultRow{
 			getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack(),
@@ -409,9 +411,9 @@ func GetTestData_Level1_10CountSomeFailures() common.Level1Summary {
 	return level1Summary
 }
 
-// GetTestData_Level1_5CountSingleNoResultTest represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Level1_Expected_5CountSingleNoResultTest represents a level 1 summary (as exptected output from level 1 parser)
 // with single no result test, count=5.
-func GetTestData_Level1_5CountSingleNoResultTest() common.Level1Summary {
+func GetTestData_Level1_Expected_5CountSingleNoResultTest() common.Level1Summary {
 	var level1TestResultRows []common.Level1TestResultRow
 
 	for i := 0; i < 5; i++ {
@@ -424,9 +426,9 @@ func GetTestData_Level1_5CountSingleNoResultTest() common.Level1Summary {
 	return level1Summary
 }
 
-// GetTestData_Level1_5CountMultipleNoResultTests represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Level1_Expected_5CountMultipleNoResultTests represents a level 1 summary (as exptected output from level 1 parser)
 // with single no result test and a passed test, count=5.
-func GetTestData_Level1_5CountMultipleNoResultTests() common.Level1Summary {
+func GetTestData_Level1_Expected_5CountMultipleNoResultTests() common.Level1Summary {
 	var level1TestResultRows []common.Level1TestResultRow
 	for i := 0; i < 4; i++ {
 		level1TestResultRows = append(level1TestResultRows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
@@ -439,9 +441,9 @@ func GetTestData_Level1_5CountMultipleNoResultTests() common.Level1Summary {
 	return level1Summary
 }
 
-// GetTestData_Leve1_3CountNoResultWithNormalTests represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Leve1_Expected_3CountNoResultWithNormalTests represents a level 1 summary (as exptected output from level 1 parser)
 // with single no result test and many passed tests, count=3.
-func GetTestData_Leve1_3CountNoResultWithNormalTests() common.Level1Summary {
+func GetTestData_Leve1_Expected_3CountNoResultWithNormalTests() common.Level1Summary {
 	var level1TestResultRows []common.Level1TestResultRow
 
 	for i := 0; i < 3; i++ {
@@ -475,9 +477,9 @@ func GetTestData_Leve1_3CountNoResultWithNormalTests() common.Level1Summary {
 // Instead of having to represent these level 1 summaries as JSON files, they are represented as a list
 // of structs to make them easier to maintain.
 
-// GetTestData_Level2_1FailureRestPass represents a level 1 summary (as input into a level 2 parser)
+// GetTestData_Level2_Input_1FailureRestPass represents a level 1 summary (as input into a level 2 parser)
 // with count=1, many passed tests and a single failed test.
-func GetTestData_Level2_1FailureRestPass() []common.Level1Summary {
+func GetTestData_Level2_Input_1FailureRestPass() []common.Level1Summary {
 	var testResult1Rows []common.Level1TestResultRow
 	testResult1Rows = append(testResult1Rows, getFailedTest_TestSanitySha3_256())
 	testResult1Rows = append(testResult1Rows, getPassedTest("TestSanitySha3_384"))
@@ -498,9 +500,138 @@ func GetTestData_Level2_1FailureRestPass() []common.Level1Summary {
 	return level1Summaries
 }
 
-// GetTestsData_Level2_1NoResultNoOtherTests represents a level 1 summary (as input into a level 2 parser)
+// GetTestData_Level2_Expected_1FailureRestPass represents expected level 2 summary
+// with count=1, many passed tests and a single failed test.
+func GetTestData_Level2_Expected_1FailureRestPass() common.Level2Summary {
+	//var testResultMap map[string]*common.Level2TestResult
+
+	testResultMap := make(map[string]*common.Level2TestResult)
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha3_256"] = &common.Level2TestResult{
+		Test:            "TestSanitySha3_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          0,
+		Failed:          1,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     1,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha3_384"] = &common.Level2TestResult{
+		Test:            "TestSanitySha3_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha2_256"] = &common.Level2TestResult{
+		Test:            "TestSanitySha2_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha2_384"] = &common.Level2TestResult{
+		Test:            "TestSanitySha2_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanityKmac128"] = &common.Level2TestResult{
+		Test:            "TestSanityKmac128",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3"] = &common.Level2TestResult{
+		Test:            "TestSha3",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.23,
+		Durations:       []float32{0.23},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_256"] = &common.Level2TestResult{
+		Test:            "TestSha3/SHA3_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.11,
+		Durations:       []float32{0.11},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_384"] = &common.Level2TestResult{
+		Test:            "TestSha3/SHA3_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.12,
+		Durations:       []float32{0.12},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestHashersAPI"] = &common.Level2TestResult{
+		Test:            "TestHashersAPI",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	var level2Summary common.Level2Summary
+	level2Summary.TestResultsMap = testResultMap
+	return level2Summary
+}
+
+// GetTestsData_Level2_Input_1NoResultNoOtherTests represents a level 1 summary (as input into a level 2 parser)
 // with a single no result test and no other tests.
-func GetTestsData_Level2_1NoResultNoOtherTests() []common.Level1Summary {
+func GetTestsData_Level2_Input_1NoResultNoOtherTests() []common.Level1Summary {
 	var testResult1Rows []common.Level1TestResultRow
 	testResult1Rows = append(testResult1Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 
@@ -513,9 +644,9 @@ func GetTestsData_Level2_1NoResultNoOtherTests() []common.Level1Summary {
 	return leve1Summaries
 }
 
-// GetTestData_Level2_MultipleL1SummariesNoResults represents multiple level 1 summaries (as input into a level 2 parser)
+// GetTestData_Level2_Input_MultipleL1SummariesNoResults represents multiple level 1 summaries (as input into a level 2 parser)
 // and many no result tests within the level level 1 summaries.
-func GetTestData_Level2_MultipleL1SummariesNoResults() []common.Level1Summary {
+func GetTestData_Level2_Input_MultipleL1SummariesNoResults() []common.Level1Summary {
 
 	// models level 1 summary with many passed tests and a single no result test, count=3
 	var testResult1Rows []common.Level1TestResultRow
@@ -578,9 +709,9 @@ func GetTestData_Level2_MultipleL1SummariesNoResults() []common.Level1Summary {
 	return level1Summaries
 }
 
-// GetTestData_Level2MultipleL1SummariesFailuresPasses represents multiple level 1 summaries (as input into a level 2 parser)
+// GetTestData_Level2_Input_MultipleL1SummariesFailuresPasses represents multiple level 1 summaries (as input into a level 2 parser)
 // where there are many passed and failed tests within the level level 1 summaries.
-func GetTestData_Level2MultipleL1SummariesFailuresPasses() []common.Level1Summary {
+func GetTestData_Level2_Input_MultipleL1SummariesFailuresPasses() []common.Level1Summary {
 
 	// level 1 summary with many passed tests and 1 failed test, count=1
 	var level1TestResult1Rows []common.Level1TestResultRow
@@ -732,9 +863,9 @@ func GetTestData_Level2MultipleL1SummariesFailuresPasses() []common.Level1Summar
 	return level1Summaries
 }
 
-// GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults represents multiple level 1 summaries (as input into a level 2 parser)
+// GetTestData_Level2_Input_MultipleL1SummariesFailuresPassesNoResults represents multiple level 1 summaries (as input into a level 2 parser)
 // where there are many passed, failed and no result tests within the level level 1 summaries.
-func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Level1Summary {
+func GetTestData_Level2_Input_MultipleL1SummariesFailuresPassesNoResults() []common.Level1Summary {
 	// level 1 summary with many passed tests, 1 failed test, count=1
 	var level1TestResult1Rows []common.Level1TestResultRow
 	level1TestResult1Rows = append(level1TestResult1Rows, getFailedTest_TestSanitySha3_256())
