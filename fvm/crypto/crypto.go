@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
@@ -166,7 +167,7 @@ func VerifySignatureFromRuntime(
 	case hash.SHA2_256, hash.SHA3_256, hash.Keccak_256:
 		var err error
 		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
-			return false, errors.NewValueErrorf(err.Error(), "verification failed")
+			return false, errors.NewValueErrorf(err.Error(), "runtime verification failed")
 		}
 	case hash.KMAC128:
 		hasher = crypto.NewBLSKMAC(tag)
@@ -181,15 +182,14 @@ func VerifySignatureFromRuntime(
 		if crypto.IsInvalidInputsError(err) {
 			return false, err
 		}
-		panic(fmt.Errorf("verify signature failed with unexpected error %w", err))
+		panic(fmt.Errorf("verify runtime signature failed with unexpected error %w", err))
 	}
 
 	return valid, nil
 }
 
-func Verify(
+func VerifySignatureFromTransaction(
 	signature []byte,
-	tag string,
 	message []byte,
 	publicKey crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
@@ -197,16 +197,9 @@ func Verify(
 
 	var hasher hash.Hasher
 
-	switch hashAlgo {
-	case hash.SHA2_256, hash.SHA3_256, hash.Keccak_256:
-		var err error
-		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
-			return false, errors.NewValueErrorf(err.Error(), "verification failed")
-		}
-	case hash.KMAC128:
-		hasher = crypto.NewBLSKMAC(tag)
-	default:
-		return false, errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
+	var err error
+	if hasher, err = NewPrefixedHashing(hashAlgo, flow.TransactionTagString); err != nil {
+		return false, errors.NewValueErrorf(err.Error(), "transaction verification failed")
 	}
 
 	valid, err := publicKey.Verify(signature, message, hasher)
@@ -216,7 +209,7 @@ func Verify(
 		if crypto.IsInvalidInputsError(err) {
 			return false, err
 		}
-		panic(fmt.Errorf("verify signature failed with unexpected error %w", err))
+		panic(fmt.Errorf("verify transaction signature failed with unexpected error %w", err))
 	}
 
 	return valid, nil

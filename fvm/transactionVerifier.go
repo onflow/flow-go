@@ -182,9 +182,8 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	valid, err := crypto.Verify(
+	valid, err := crypto.VerifySignatureFromTransaction(
 		txSig.Signature,
-		string(flow.TransactionDomainTag[:]),
 		message,
 		accountKey.PublicKey,
 		accountKey.HashAlgo,
