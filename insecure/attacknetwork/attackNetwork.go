@@ -63,6 +63,7 @@ func NewAttackNetwork(
 			}
 			attackNetwork.server = s
 			attackNetwork.address = ln.Addr()
+			attackNetwork.corruptedConnector.WithAttackerAddress(ln.Addr().String())
 
 			wg := sync.WaitGroup{}
 			wg.Add(1)
