@@ -923,7 +923,7 @@ func GetTestData_Level2_Expected_MultipleL1SummariesNoResults() common.Level2Sum
 }
 
 // GetTestData_Level2_Input_MultipleL1SummariesFailuresPasses represents multiple level 1 summaries (as input into a level 2 parser)
-// and many no result tests within the level 1 summaries.
+// with many no result tests within the level 1 summaries.
 func GetTestData_Level2_Input_MultipleL1SummariesFailuresPasses() []common.Level1Summary {
 
 	// level 1 summary with many passed tests and 1 failed test, count=1
@@ -1074,6 +1074,133 @@ func GetTestData_Level2_Input_MultipleL1SummariesFailuresPasses() []common.Level
 	level1Summaries = append(level1Summaries, level1Summary5)
 	level1Summaries = append(level1Summaries, level1Summary6)
 	return level1Summaries
+}
+
+// GetTestData_Level2_Expected_MultipleL1SummariesFailuresPasses represents expected level 2 summary
+// with many no result tests within the level 1 summaries.
+func GetTestData_Level2_Expected_MultipleL1SummariesFailuresPasses() common.Level2Summary {
+	testResultMap := make(map[string]*common.Level2TestResult)
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha3_256"] = &common.Level2TestResult{
+		Test:            "TestSanitySha3_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            25,
+		Passed:          24,
+		Failed:          1,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0.04,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha3_384"] = &common.Level2TestResult{
+		Test:            "TestSanitySha3_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            25,
+		Passed:          25,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha2_256"] = &common.Level2TestResult{
+		Test:            "TestSanitySha2_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            25,
+		Passed:          15,
+		Failed:          10,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0.4,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha2_384"] = &common.Level2TestResult{
+		Test:            "TestSanitySha2_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            25,
+		Passed:          25,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanityKmac128"] = &common.Level2TestResult{
+		Test:            "TestSanityKmac128",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            25,
+		Passed:          25,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestHashersAPI"] = &common.Level2TestResult{
+		Test:            "TestHashersAPI",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            24,
+		Passed:          24,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3"] = &common.Level2TestResult{
+		Test:            "TestSha3",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            25,
+		Passed:          25,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.23,
+		Durations:       []float32{0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_256"] = &common.Level2TestResult{
+		Test:            "TestSha3/SHA3_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            25,
+		Passed:          25,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.10,
+		Durations:       []float32{0.11, 0.1, 0.11, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.12, 0.1, 0.11, 0.1, 0.1, 0.1, 0.1, 0.12, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_384"] = &common.Level2TestResult{
+		Test:            "TestSha3/SHA3_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            25,
+		Passed:          25,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.12,
+		Durations:       []float32{0.12, 0.12, 0.13, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.13, 0.12, 0.12, 0.12, 0.12, 0.12},
+	}
+
+	var level2Summary common.Level2Summary
+	level2Summary.TestResultsMap = testResultMap
+	return level2Summary
 }
 
 // GetTestData_Level2_Input_MultipleL1SummariesFailuresPassesNoResults represents multiple level 1 summaries (as input into a level 2 parser)

@@ -37,13 +37,14 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 			InputLevel1Summaries:  testdata.GetTestData_Level2_Input_MultipleL1SummariesNoResults(),
 			ExpectedLevel2Summary: testdata.GetTestData_Level2_Expected_MultipleL1SummariesNoResults(),
 		},
-		//
-		//"many level 1 summaries, many failures, many passes": {
-		//	Directory:            "test4-multi-failures",
-		//	HasFailures:          true,
-		//	HasNoResultTests:     false,
-		//	InputLevel1Summaries: testdata.GetTestData_Level2_Input_MultipleL1SummariesFailuresPasses(),
-		//},
+
+		"many level 1 summaries, many failures, many passes": {
+			Directory:             "test4-multi-failures",
+			HasFailures:           true,
+			HasNoResultTests:      false,
+			InputLevel1Summaries:  testdata.GetTestData_Level2_Input_MultipleL1SummariesFailuresPasses(),
+			ExpectedLevel2Summary: testdata.GetTestData_Level2_Expected_MultipleL1SummariesFailuresPasses(),
+		},
 		//
 		//"many level 1 summaries, many failures, many passes, many no-result tests": {
 		//	Directory:            "test5-multi-failures-multi-no-result-tests",
