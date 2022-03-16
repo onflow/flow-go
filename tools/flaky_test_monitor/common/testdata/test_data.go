@@ -503,8 +503,6 @@ func GetTestData_Level2_Input_1FailureRestPass() []common.Level1Summary {
 // GetTestData_Level2_Expected_1FailureRestPass represents expected level 2 summary
 // with count=1, many passed tests and a single failed test.
 func GetTestData_Level2_Expected_1FailureRestPass() common.Level2Summary {
-	//var testResultMap map[string]*common.Level2TestResult
-
 	testResultMap := make(map[string]*common.Level2TestResult)
 
 	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha3_256"] = &common.Level2TestResult{
@@ -629,9 +627,9 @@ func GetTestData_Level2_Expected_1FailureRestPass() common.Level2Summary {
 	return level2Summary
 }
 
-// GetTestsData_Level2_Input_1NoResultNoOtherTests represents a level 1 summary (as input into a level 2 parser)
+// GetTestData_Level2_Input_1NoResultNoOtherTests represents a level 1 summary (as input into a level 2 parser)
 // with a single no result test and no other tests.
-func GetTestsData_Level2_Input_1NoResultNoOtherTests() []common.Level1Summary {
+func GetTestData_Level2_Input_1NoResultNoOtherTests() []common.Level1Summary {
 	var testResult1Rows []common.Level1TestResultRow
 	testResult1Rows = append(testResult1Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 
@@ -642,6 +640,30 @@ func GetTestsData_Level2_Input_1NoResultNoOtherTests() []common.Level1Summary {
 	var leve1Summaries []common.Level1Summary
 	leve1Summaries = append(leve1Summaries, level1Summary)
 	return leve1Summaries
+}
+
+// GetTestData_Level2_Expected_1NoResultNoOtherTests represents expected level 2 summary
+// with a single no result test and no other tests.
+func GetTestData_Level2_Expected_1NoResultNoOtherTests() common.Level2Summary {
+
+	testResultMap := make(map[string]*common.Level2TestResult)
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack"] = &common.Level2TestResult{
+		Test:            "TestEncodableRandomBeaconPrivKeyMsgPack",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            1,
+		Passed:          0,
+		Failed:          1,
+		Skipped:         0,
+		NoResult:        1,
+		FailureRate:     1,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	var level2Summary common.Level2Summary
+	level2Summary.TestResultsMap = testResultMap
+	return level2Summary
 }
 
 // GetTestData_Level2_Input_MultipleL1SummariesNoResults represents multiple level 1 summaries (as input into a level 2 parser)
