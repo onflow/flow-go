@@ -221,23 +221,21 @@ func (v *TransactionSignatureVerifier) sigIsForProposalKey(
 }
 
 func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.TransactionBody) error {
-	observedSigs := make(map[string]bool)
+	observedSigs := make(map[flow.Address]map[uint64]bool)
 	for _, sig := range tx.PayloadSignatures {
-		key := sig.UniqueKeyString()
-		if observedSigs[key] {
+		if observedSigs[sig.Address][sig.KeyIndex] {
 			err := fmt.Errorf("duplicate signatures are provided for the same key %s", key)
 			return errors.NewInvalidPayloadSignatureError(sig.Address, sig.KeyIndex, err)
 		}
-		observedSigs[key] = true
+		observedSigs[sig.Address][sig.KeyIndex] = true
 	}
 
 	for _, sig := range tx.EnvelopeSignatures {
-		key := sig.UniqueKeyString()
-		if observedSigs[key] {
+		if observedSigs[sig.Address][sig.KeyIndex] {
 			err := fmt.Errorf("duplicate signatures are provided for the same key %s", key)
 			return errors.NewInvalidEnvelopeSignatureError(sig.Address, sig.KeyIndex, err)
 		}
-		observedSigs[key] = true
+		observedSigs[sig.Address][sig.KeyIndex] = true
 	}
 	return nil
 }
