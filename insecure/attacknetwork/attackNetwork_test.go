@@ -234,18 +234,9 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 			for _, event := range events {
 				event := event
 				go func() {
-					var err error
-
-					switch protocol {
-					case insecure.Protocol_UNICAST:
-						err = attackNetwork.RpcUnicastOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetIds[0])
-					case insecure.Protocol_MULTICAST:
-						err = attackNetwork.RpcMulticastOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetNum, event.TargetIds...)
-					case insecure.Protocol_PUBLISH:
-						err = attackNetwork.RpcPublishOnChannel(event.CorruptedId, event.Channel, event.FlowProtocolEvent, event.TargetIds...)
-					}
-
+					err := attackNetwork.Send(event)
 					require.NoError(t, err)
+
 					attackNetworkSendWG.Done()
 				}()
 			}
