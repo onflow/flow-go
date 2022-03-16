@@ -398,7 +398,6 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 }
 
 func TestExecuteOneBlock(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 	runWithEngine(t, func(ctx testingContext) {
 
 		// A <- B
@@ -408,7 +407,6 @@ func TestExecuteOneBlock(t *testing.T) {
 
 		ctx.mockStakedAtBlockID(blockA.ID(), true)
 		ctx.mockStakedAtBlockID(blockB.ID(), true)
-		ctx.mockSnapshot(&blockA, unittest.IdentityListFixture(1))
 		ctx.mockSnapshot(blockB.Block.Header, unittest.IdentityListFixture(1))
 
 		// blockA's start state is its parent's state commitment,
@@ -592,7 +590,6 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
 	runWithEngine(t, func(ctx testingContext) {
 
@@ -606,7 +603,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 		//blockCstartState := unittest.StateCommitmentFixture()
 
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header)
-		//blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
+		blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
 
 		logBlocks(map[string]*entity.ExecutableBlock{
 			"B": blockB,
@@ -820,7 +817,6 @@ func logBlocks(blocks map[string]*entity.ExecutableBlock) {
 }
 
 func TestExecuteBlockInOrder(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 	runWithEngine(t, func(ctx testingContext) {
 		// create blocks with the following relations
 		// A <- B
@@ -852,9 +848,14 @@ func TestExecuteBlockInOrder(t *testing.T) {
 
 		// make sure the seal height won't trigger state syncing, so that all blocks
 		// will be executed.
+		ctx.mockStakedAtBlockID(blocks["A"].ID(), true)
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		// a receipt for sealed block won't be broadcasted
 		ctx.snapshot.On("Head").Return(&blockSealed, nil)
+		ctx.mockSnapshot(blocks["A"].Block.Header, unittest.IdentityListFixture(1))
+		ctx.mockSnapshot(blocks["B"].Block.Header, unittest.IdentityListFixture(1))
+		ctx.mockSnapshot(blocks["C"].Block.Header, unittest.IdentityListFixture(1))
+		ctx.mockSnapshot(blocks["D"].Block.Header, unittest.IdentityListFixture(1))
 
 		// once block A is computed, it should trigger B and C being sent to compute,
 		// which in turn should trigger D
@@ -1023,7 +1024,6 @@ func Test_SPOCKGeneration(t *testing.T) {
 }
 
 func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
 	runWithEngine(t, func(ctx testingContext) {
 
@@ -1064,6 +1064,8 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		ctx.snapshot.On("Head").Return(&blockSealed, nil)
 
 		ctx.mockStakedAtBlockID(blocks["A"].ID(), true)
+		identity := *ctx.identity
+		identity.Stake = 0
 
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), false, *blocks["B"].StartState, nil)
@@ -1072,24 +1074,28 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 
 		wg.Add(1)
 		ctx.mockStakedAtBlockID(blocks["A"].ID(), true)
+		ctx.mockSnapshot(blocks["A"].Block.Header, flow.IdentityList{ctx.identity})
 
 		err := ctx.engine.handleBlock(context.Background(), blocks["A"].Block)
 		require.NoError(t, err)
 
 		wg.Add(1)
 		ctx.mockStakedAtBlockID(blocks["B"].ID(), false)
+		ctx.mockSnapshot(blocks["B"].Block.Header, flow.IdentityList{&identity}) // unstaked
 
 		err = ctx.engine.handleBlock(context.Background(), blocks["B"].Block)
 		require.NoError(t, err)
 
 		wg.Add(1)
 		ctx.mockStakedAtBlockID(blocks["C"].ID(), true)
+		ctx.mockSnapshot(blocks["C"].Block.Header, flow.IdentityList{ctx.identity})
 
 		err = ctx.engine.handleBlock(context.Background(), blocks["C"].Block)
 		require.NoError(t, err)
 
 		wg.Add(1)
 		ctx.mockStakedAtBlockID(blocks["D"].ID(), false)
+		ctx.mockSnapshot(blocks["D"].Block.Header, flow.IdentityList{&identity}) // unstaked
 
 		err = ctx.engine.handleBlock(context.Background(), blocks["D"].Block)
 		require.NoError(t, err)
