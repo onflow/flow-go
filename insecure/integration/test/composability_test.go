@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/insecure/attacknetwork"
 	"github.com/onflow/flow-go/insecure/corruptible"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
@@ -65,7 +67,7 @@ func TestComposability(t *testing.T) {
 
 func withCorruptibleConduitFactory(t *testing.T, run func(*testing.T, flow.Identity, *corruptible.ConduitFactory)) {
 	codec := cbor.NewCodec()
-	corruptedIdentity := unittest.IdentityFixture()
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 
 	// life-cycle management of attackNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -89,4 +91,35 @@ func withCorruptibleConduitFactory(t *testing.T, run func(*testing.T, flow.Ident
 	// terminates attackNetwork
 	cancel()
 	unittest.RequireCloseBefore(t, ccf.Done(), 1*time.Second, "could not stop corruptible conduit on time")
+}
+
+func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrupter func(*insecure.Event), run func(t *testing.T)) {
+	codec := cbor.NewCodec()
+	o := &mockOrchestrator{eventCorrupter: corrupter}
+	connector := attacknetwork.NewCorruptedConnector(corruptedIds)
+	attackNetwork, err := attacknetwork.NewAttackNetwork(unittest.Logger(), "localhost:0", codec, o, connector, corruptedIds)
+	require.NoError(t, err)
+
+	// life-cycle management of attackNetwork.
+	ctx, cancel := context.WithCancel(context.Background())
+	attackNetworkCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go func() {
+		select {
+		case err := <-errChan:
+			t.Error("attackNetwork startup encountered fatal error", err)
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	// starts corruptible conduit factory
+	attackNetwork.Start(attackNetworkCtx)
+	unittest.RequireCloseBefore(t, attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
+
+	run(t)
+
+	// terminates attackNetwork
+	cancel()
+	unittest.RequireCloseBefore(t, attackNetwork.Done(), 1*time.Second, "could not stop attack network on time")
+
 }
