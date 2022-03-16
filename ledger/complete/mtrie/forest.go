@@ -219,9 +219,9 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	}
 
 	f.metrics.LatestTrieRegCount(newTrie.AllocatedRegCount())
-	f.metrics.LatestTrieRegCountDiff(newTrie.AllocatedRegCount() - parentTrie.AllocatedRegCount())
+	f.metrics.LatestTrieRegCountDiff(int64(newTrie.AllocatedRegCount() - parentTrie.AllocatedRegCount()))
 	f.metrics.LatestTrieMaxDepth(uint64(newTrie.MaxDepth()))
-	f.metrics.LatestTrieMaxDepthDiff(uint64(newTrie.MaxDepth() - parentTrie.MaxDepth()))
+	f.metrics.LatestTrieMaxDepthDiff(int64(newTrie.MaxDepth() - parentTrie.MaxDepth()))
 
 	err = f.AddTrie(newTrie)
 	if err != nil {
