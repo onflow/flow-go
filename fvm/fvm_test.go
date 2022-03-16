@@ -96,35 +96,35 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 							//
 							// The withdraw amount and the account from getAccount
 							// would be the parameters to the transaction
-
+							
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
-
+							
 							transaction(amount: UFix64, to: Address) {
-
+							
 								// The Vault resource that holds the tokens that are being transferred
 								let sentVault: @FungibleToken.Vault
-
+							
 								prepare(signer: AuthAccount) {
-
+							
 									// Get a reference to the signer's stored vault
 									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
-
+							
 									// Withdraw tokens from the signer's stored vault
 									self.sentVault <- vaultRef.withdraw(amount: amount)
 								}
-
+							
 								execute {
-
+							
 									// Get the recipient's public account object
 									let recipient = getAccount(to)
-
+							
 									// Get a reference to the recipient's Receiver
 									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
 										.borrow<&{FungibleToken.Receiver}>()
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
-
+							
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
@@ -149,7 +149,7 @@ import FlowContractAudits from 0x%s
 
 transaction(deployAddress: Address, code: String) {
 	prepare(serviceAccount: AuthAccount) {
-
+		
 		let auditorAdmin = serviceAccount.borrow<&FlowContractAudits.Administrator>(from: FlowContractAudits.AdminStoragePath)
             ?? panic("Could not borrow a reference to the admin resource")
 
@@ -611,7 +611,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		tx := fvm.Transaction(txBody, 0)
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
-		require.NoError(t, tx.Err)
+		assert.NoError(t, tx.Err)
 	})
 
 	t.Run("account update with set code succeeds when there is a matching audit voucher", func(t *testing.T) {
@@ -938,7 +938,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
-							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
+							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>() 
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
@@ -1570,7 +1570,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		num, err := strconv.ParseUint(tx.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0x8872445cb397f6d2), num)
+		require.Equal(t, uint64(0xb9c618010e32a0fb), num)
 	})
 }
 
@@ -1614,12 +1614,6 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
 	assert.Equal(t, flow.HexToAddress("05"), address)
-}
-
-var createMessage = func(m string) (signableMessage []byte, message cadence.Array) {
-	signableMessage = []byte(m)
-	message = testutil.BytesToCadenceArray(signableMessage)
-	return signableMessage, message
 }
 
 func TestSignatureVerification(t *testing.T) {
@@ -1725,6 +1719,14 @@ func TestSignatureVerification(t *testing.T) {
 				)
 
 				return privateKey, publicKey
+			}
+
+			createMessage := func(m string) (signableMessage []byte, message cadence.Array) {
+				signableMessage = []byte(m)
+
+				message = testutil.BytesToCadenceArray(signableMessage)
+
+				return signableMessage, message
 			}
 
 			signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
@@ -1948,488 +1950,6 @@ func TestSignatureVerification(t *testing.T) {
 	})
 }
 
-func TestBLSMultiSignature(t *testing.T) {
-
-	t.Parallel()
-
-	type signatureAlgorithm struct {
-		name       string
-		seedLength int
-		algorithm  crypto.SigningAlgorithm
-	}
-
-	signatureAlgorithms := []signatureAlgorithm{
-		{"BLS_BLS12_381", crypto.KeyGenSeedMinLenBLSBLS12381, crypto.BLSBLS12381},
-		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
-	}
-	BLSSignatureAlgorithm := signatureAlgorithms[0]
-
-	randomSK := func(t *testing.T, signatureAlgorithm signatureAlgorithm) crypto.PrivateKey {
-		seed := make([]byte, signatureAlgorithm.seedLength)
-		n, err := rand.Read(seed)
-		require.Equal(t, n, signatureAlgorithm.seedLength)
-		require.NoError(t, err)
-		sk, err := crypto.GeneratePrivateKey(signatureAlgorithm.algorithm, seed)
-		require.NoError(t, err)
-		return sk
-	}
-
-	testVerifyPoP := func() {
-		t.Run("verifyBLSPoP", newVMTest().run(
-			func(
-				t *testing.T,
-				vm *fvm.VirtualMachine,
-				chain flow.Chain,
-				ctx fvm.Context,
-				view state.View,
-				programs *programs.Programs,
-			) {
-
-				code := func(signatureAlgorithm signatureAlgorithm) []byte {
-					return []byte(
-						fmt.Sprintf(
-							`
-								import Crypto
-
-								pub fun main(
-									publicKey: [UInt8],
-									proof: [UInt8]
-								): Bool {
-									let p = PublicKey(
-										publicKey: publicKey,
-										signatureAlgorithm: SignatureAlgorithm.%s
-									)
-									return p.verifyPoP(proof)
-								}
-								`,
-							signatureAlgorithm.name,
-						),
-					)
-				}
-
-				t.Run("valid and correct BLS key", func(t *testing.T) {
-
-					sk := randomSK(t, BLSSignatureAlgorithm)
-					publicKey := testutil.BytesToCadenceArray(
-						sk.PublicKey().Encode(),
-					)
-
-					proof, err := crypto.BLSGeneratePOP(sk)
-					require.NoError(t, err)
-					pop := testutil.BytesToCadenceArray(
-						proof,
-					)
-
-					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
-						jsoncdc.MustEncode(publicKey),
-						jsoncdc.MustEncode(pop),
-					)
-
-					err = vm.Run(ctx, script, view, programs)
-					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
-					assert.Equal(t, cadence.NewBool(true), script.Value)
-
-				})
-
-				t.Run("valid but incorrect BLS key", func(t *testing.T) {
-
-					sk := randomSK(t, BLSSignatureAlgorithm)
-					publicKey := testutil.BytesToCadenceArray(
-						sk.PublicKey().Encode(),
-					)
-
-					otherSk := randomSK(t, BLSSignatureAlgorithm)
-					proof, err := crypto.BLSGeneratePOP(otherSk)
-					require.NoError(t, err)
-
-					pop := testutil.BytesToCadenceArray(
-						proof,
-					)
-					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
-						jsoncdc.MustEncode(publicKey),
-						jsoncdc.MustEncode(pop),
-					)
-
-					err = vm.Run(ctx, script, view, programs)
-					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
-					assert.Equal(t, cadence.NewBool(false), script.Value)
-
-				})
-
-				for _, signatureAlgorithm := range signatureAlgorithms[1:] {
-					t.Run("valid non BLS key/"+signatureAlgorithm.name, func(t *testing.T) {
-						sk := randomSK(t, signatureAlgorithm)
-						publicKey := testutil.BytesToCadenceArray(
-							sk.PublicKey().Encode(),
-						)
-
-						random := make([]byte, crypto.SignatureLenBLSBLS12381)
-						_, err := rand.Read(random)
-						require.NoError(t, err)
-						pop := testutil.BytesToCadenceArray(
-							random,
-						)
-
-						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
-							jsoncdc.MustEncode(publicKey),
-							jsoncdc.MustEncode(pop),
-						)
-
-						err = vm.Run(ctx, script, view, programs)
-						assert.Error(t, err)
-					})
-				}
-			},
-		))
-	}
-
-	testBLSSignatureAggregation := func() {
-		t.Run("aggregateBLSSignatures", newVMTest().run(
-			func(
-				t *testing.T,
-				vm *fvm.VirtualMachine,
-				chain flow.Chain,
-				ctx fvm.Context,
-				view state.View,
-				programs *programs.Programs,
-			) {
-
-				code := []byte(
-					`
-							import Crypto
-
-							pub fun main(
-							signatures: [[UInt8]],
-							): [UInt8]? {
-								return BLS.aggregateSignatures(signatures)!
-							}
-						`,
-				)
-
-				// random message
-				input := make([]byte, 100)
-				_, err := rand.Read(input)
-				require.NoError(t, err)
-
-				// generate keys and signatures
-				numSigs := 50
-				sigs := make([]crypto.Signature, 0, numSigs)
-
-				kmac := crypto.NewBLSKMAC("test tag")
-				for i := 0; i < numSigs; i++ {
-					sk := randomSK(t, BLSSignatureAlgorithm)
-					// a valid BLS signature
-					s, err := sk.Sign(input, kmac)
-					require.NoError(t, err)
-					sigs = append(sigs, s)
-				}
-
-				t.Run("valid BLS signatures", func(t *testing.T) {
-
-					signatures := make([]cadence.Value, 0, numSigs)
-					for _, sig := range sigs {
-						s := testutil.BytesToCadenceArray(sig)
-						signatures = append(signatures, s)
-					}
-
-					script := fvm.Script(code).WithArguments(
-						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
-						}),
-					)
-
-					err = vm.Run(ctx, script, view, programs)
-					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
-
-					expectedSig, err := crypto.AggregateBLSSignatures(sigs)
-					require.NoError(t, err)
-					assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedSig)}, script.Value)
-				})
-
-				t.Run("at least one invalid BLS signature", func(t *testing.T) {
-
-					signatures := make([]cadence.Value, 0, numSigs)
-					// alter one random signature
-					tmp := sigs[numSigs/2]
-					sigs[numSigs/2] = crypto.BLSInvalidSignature()
-
-					for _, sig := range sigs {
-						s := testutil.BytesToCadenceArray(sig)
-						signatures = append(signatures, s)
-					}
-
-					script := fvm.Script(code).WithArguments(
-						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
-						}),
-					)
-
-					// revert the change
-					sigs[numSigs/2] = tmp
-
-					err = vm.Run(ctx, script, view, programs)
-					assert.NoError(t, err)
-					assert.Error(t, script.Err)
-					assert.Equal(t, nil, script.Value)
-				})
-
-				t.Run("empty signature list", func(t *testing.T) {
-
-					signatures := []cadence.Value{}
-					script := fvm.Script(code).WithArguments(
-						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
-						}),
-					)
-
-					err = vm.Run(ctx, script, view, programs)
-					assert.NoError(t, err)
-					assert.Error(t, script.Err)
-					assert.Equal(t, nil, script.Value)
-				})
-			},
-		))
-	}
-
-	testKeyAggregation := func() {
-		t.Run("aggregateBLSPublicKeys", newVMTest().run(
-			func(
-				t *testing.T,
-				vm *fvm.VirtualMachine,
-				chain flow.Chain,
-				ctx fvm.Context,
-				view state.View,
-				programs *programs.Programs,
-			) {
-
-				code := func(signatureAlgorithm signatureAlgorithm) []byte {
-					return []byte(
-						fmt.Sprintf(
-							`
-								import Crypto
-
-								pub fun main(
-									publicKeys: [[UInt8]]
-								): [UInt8]? {
-									let pks: [PublicKey] = []
-									for pk in publicKeys {
-										pks.append(PublicKey(
-											publicKey: pk,
-											signatureAlgorithm: SignatureAlgorithm.%s
-										))
-									}
-									return BLS.aggregatePublicKeys(pks)!.publicKey
-								}
-								`,
-							signatureAlgorithm.name,
-						),
-					)
-				}
-
-				pkNum := 100
-				pks := make([]crypto.PublicKey, 0, pkNum)
-
-				t.Run("valid BLS keys", func(t *testing.T) {
-
-					publicKeys := make([]cadence.Value, 0, pkNum)
-					for i := 0; i < pkNum; i++ {
-						sk := randomSK(t, BLSSignatureAlgorithm)
-						pk := sk.PublicKey()
-						pks = append(pks, pk)
-						publicKeys = append(
-							publicKeys,
-							testutil.BytesToCadenceArray(pk.Encode()),
-						)
-					}
-
-					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
-						jsoncdc.MustEncode(cadence.Array{
-							Values: publicKeys,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
-						}),
-					)
-
-					err := vm.Run(ctx, script, view, programs)
-					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
-					expectedPk, err := crypto.AggregateBLSPublicKeys(pks)
-					require.NoError(t, err)
-
-					assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedPk.Encode())}, script.Value)
-				})
-
-				for _, signatureAlgorithm := range signatureAlgorithms[1:] {
-					t.Run("non BLS keys/"+signatureAlgorithm.name, func(t *testing.T) {
-
-						publicKeys := make([]cadence.Value, 0, pkNum)
-						for i := 0; i < pkNum; i++ {
-							sk := randomSK(t, signatureAlgorithm)
-							pk := sk.PublicKey()
-							pks = append(pks, pk)
-							publicKeys = append(
-								publicKeys,
-								testutil.BytesToCadenceArray(sk.PublicKey().Encode()),
-							)
-						}
-
-						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
-							jsoncdc.MustEncode(cadence.Array{
-								Values: publicKeys,
-								ArrayType: cadence.VariableSizedArrayType{
-									ElementType: cadence.VariableSizedArrayType{
-										ElementType: cadence.UInt8Type{},
-									},
-								},
-							}),
-						)
-
-						err := vm.Run(ctx, script, view, programs)
-						assert.Error(t, err)
-					})
-				}
-
-				t.Run("empty list", func(t *testing.T) {
-
-					publicKeys := []cadence.Value{}
-					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
-						jsoncdc.MustEncode(cadence.Array{
-							Values: publicKeys,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
-						}),
-					)
-
-					err := vm.Run(ctx, script, view, programs)
-					assert.NoError(t, err)
-					assert.Error(t, script.Err)
-					assert.Equal(t, nil, script.Value)
-				})
-			},
-		))
-	}
-
-	testBLSCombinedAggregations := func() {
-		t.Run("Combined Aggregations", newVMTest().run(
-			func(
-				t *testing.T,
-				vm *fvm.VirtualMachine,
-				chain flow.Chain,
-				ctx fvm.Context,
-				view state.View,
-				programs *programs.Programs,
-			) {
-
-				message, cadenceMessage := createMessage("random_message")
-				tag := "random_tag"
-
-				code := []byte(`
-							import Crypto
-
-							pub fun main(
-								publicKeys: [[UInt8]],
-								signatures: [[UInt8]],
-								message:  [UInt8],
-								tag: String,
-							): Bool {
-								let pks: [PublicKey] = []
-								for pk in publicKeys {
-									pks.append(PublicKey(
-										publicKey: pk,
-										signatureAlgorithm: SignatureAlgorithm.BLS_BLS12_381
-									))
-								}
-								let aggPk = BLS.aggregatePublicKeys(pks)!
-								let aggSignature = BLS.aggregateSignatures(signatures)!
-								let boo = aggPk.verify(
-									signature: aggSignature,
-									signedData: message,
-									domainSeparationTag: tag,
-									hashAlgorithm: HashAlgorithm.KMAC128_BLS_BLS12_381)
-								return boo
-							}
-							`)
-
-				num := 50
-				publicKeys := make([]cadence.Value, 0, num)
-				signatures := make([]cadence.Value, 0, num)
-
-				kmac := crypto.NewBLSKMAC(string(tag))
-				for i := 0; i < num; i++ {
-					sk := randomSK(t, BLSSignatureAlgorithm)
-					pk := sk.PublicKey()
-					publicKeys = append(
-						publicKeys,
-						testutil.BytesToCadenceArray(pk.Encode()),
-					)
-					sig, err := sk.Sign(message, kmac)
-					require.NoError(t, err)
-					signatures = append(
-						signatures,
-						testutil.BytesToCadenceArray(sig),
-					)
-				}
-
-				script := fvm.Script(code).WithArguments(
-					jsoncdc.MustEncode(cadence.Array{ // keys
-						Values: publicKeys,
-						ArrayType: cadence.VariableSizedArrayType{
-							ElementType: cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type{},
-							},
-						},
-					}),
-					jsoncdc.MustEncode(cadence.Array{ // signatures
-						Values: signatures,
-						ArrayType: cadence.VariableSizedArrayType{
-							ElementType: cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type{},
-							},
-						},
-					}),
-					jsoncdc.MustEncode(cadenceMessage),
-					jsoncdc.MustEncode(cadence.String(tag)),
-				)
-
-				err := vm.Run(ctx, script, view, programs)
-				assert.NoError(t, err)
-				assert.NoError(t, script.Err)
-				assert.Equal(t, cadence.NewBool(true), script.Value)
-			},
-		))
-	}
-
-	testVerifyPoP()
-	testKeyAggregation()
-	testBLSSignatureAggregation()
-	testBLSCombinedAggregations()
-}
-
 func TestHashing(t *testing.T) {
 
 	t.Parallel()
@@ -2452,7 +1972,7 @@ func TestHashing(t *testing.T) {
 		return []byte(fmt.Sprintf(
 			`
 				import Crypto
-
+				
 				pub fun main(data: [UInt8]): [UInt8] {
 					return Crypto.hash(data, algorithm: HashAlgorithm.%s)
 				}
@@ -2462,7 +1982,7 @@ func TestHashing(t *testing.T) {
 		return []byte(fmt.Sprintf(
 			`
 				import Crypto
-
+				
 				pub fun main(data: [UInt8], tag: String): [UInt8] {
 					return Crypto.hashWithTag(data, tag: tag, algorithm: HashAlgorithm.%s)
 				}
@@ -2835,13 +2355,13 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-
+					
 					pub fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 							?? panic("Could not borrow Balance reference to the Vault")
-
+					
 						return vaultRef.balance
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
@@ -3058,13 +2578,13 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-
+					
 					pub fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 							?? panic("Could not borrow Balance reference to the Vault")
-
+					
 						return vaultRef.balance
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
