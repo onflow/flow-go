@@ -60,7 +60,7 @@ require (
 	github.com/onflow/atree v0.2.0
 	github.com/onflow/cadence v0.21.3-0.20220310201609-481cb23a7d6b
 	github.com/onflow/flow v0.2.3-0.20220131193101-d4e2ca43a621
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.2-0.20220315184306-9726cbbed556
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.2-0.20220316181225-1ae94da816da
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.24.0
