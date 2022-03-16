@@ -30,13 +30,13 @@ type Level2TestData struct {
 // following functions are used to construct expected TestRun data
 
 func getCommitDate() time.Time {
-	commitDate, err := time.Parse(time.RFC3339, "2021-09-22T01:06:25Z")
+	commitDate, err := time.Parse(time.RFC3339, "2021-09-21T18:06:25-07:00")
 	common.AssertNoError(err, "time parse - commit date")
 	return commitDate
 }
 
 func getJobRunDate() time.Time {
-	jobRunDate, err := time.Parse(time.RFC3339, "2021-09-22T04:06:25Z")
+	jobRunDate, err := time.Parse(time.RFC3339, "2021-09-21T21:06:25-07:00")
 	common.AssertNoError(err, "time parse - job run date")
 	return jobRunDate
 }
@@ -424,7 +424,7 @@ func GetTestData_Level1_5CountSingleExceptionTest() common.Level1Summary {
 	return level1Summary
 }
 
-// GetTestData_Level1_5CountMultipleExceptionTests represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Level1_5CountMultipleExceptionTests represents a level 1 summary (as expected output from level 1 parser)
 // with single no result test and a passed test, count=5.
 func GetTestData_Level1_5CountMultipleExceptionTests() common.Level1Summary {
 	var level1TestResultRows []common.Level1TestResultRow
@@ -553,7 +553,7 @@ func GetTestData_Level2_MultipleL1SummariesExceptions() []common.Level1Summary {
 		testResult3Rows = append(testResult3Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
 
-	// the remaining 1 test runs (out of 5) has to be added manually since it wasn't an exception test
+	// the remaining 1 test runs (out of 5) has to be added manually since it wasn't an exception
 	testResult3Rows = append(testResult3Rows, getPassedTestPackageElapsedOutput("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable", 0, "0.00", "    keys_test.go:245: bytes: 194\n"))
 
 	level1Summary3 := common.Level1Summary{
@@ -907,7 +907,7 @@ func GetTestData_Level2MultipleL1SummariesFailuresPassesExceptions() []common.Le
 	for i := 0; i < 4; i++ {
 		level1TestResult9Rows = append(level1TestResult9Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
-	// the remaining 1 test runs (out of 5) have to be added manually since it wasn't an exception test
+	// the remaining 1 test runs (out of 5) have to be added manually since it wasn't an exception
 	level1TestResult9Rows = append(level1TestResult9Rows, getPassedTestPackage("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable"))
 
 	level1Summary9 := common.Level1Summary{

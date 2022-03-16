@@ -21,15 +21,15 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 			Level1Summaries: testdata.GetTestData_Level2_1FailureRestPass(),
 		},
 
-		"1 level 1 summary, 1 exception test, no other tests": {
-			Directory:       "test2-1-exception-test",
+		"1 level 1 summary, 1 exception, no other tests": {
+			Directory:       "test2-1-exception",
 			HasFailures:     false,
 			HasExceptions:   true,
 			Level1Summaries: testdata.GetTestsData_Level2_1ExceptionNoOtherTests(),
 		},
 
-		"many level 1 summaries, many exception tests": {
-			Directory:       "test3-multi-exception-tests",
+		"many level 1 summaries, many exceptions": {
+			Directory:       "test3-multi-exceptions",
 			HasFailures:     false,
 			HasExceptions:   true,
 			Level1Summaries: testdata.GetTestData_Level2_MultipleL1SummariesExceptions(),
@@ -42,8 +42,8 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 			Level1Summaries: testdata.GetTestData_Level2MultipleL1SummariesFailuresPasses(),
 		},
 
-		"many level 1 summaries, many failures, many passes, many exception tests": {
-			Directory:       "test5-multi-failures-multi-exception-tests",
+		"many level 1 summaries, many failures, many passes, many exceptions": {
+			Directory:       "test5-multi-failures-multi-exceptions",
 			HasFailures:     true,
 			HasExceptions:   true,
 			Level1Summaries: testdata.GetTestData_Level2MultipleL1SummariesFailuresPassesExceptions(),

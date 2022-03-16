@@ -13,13 +13,13 @@ import (
 
 func TestGenerateLevel3Summary(t *testing.T) {
 	testDataMap := map[string]string{
-		"1 failure the rest pass":                          "test1-1package-1failure",
-		"1 exception test, no other tests":                 "test2-1-exception-test",
-		"many exception tests":                             "test3-multi-exception-tests",
-		"many failures, many passes":                       "test4-multi-failures",
-		"many failures, many passes, many exception tests": "test5-multi-durations",
-		"many failures - cap failures":                     "test6-multi-failures-cap",
-		"many durations - cap durations":                   "test7-multi-durations-cap",
+		"1 failure the rest pass":                     "test1-1package-1failure",
+		"1 exception, no other tests":                 "test2-1-exception",
+		"many exceptions":                             "test3-multi-exceptions",
+		"many failures, many passes":                  "test4-multi-failures",
+		"many failures, many passes, many exceptions": "test5-multi-durations",
+		"many failures - cap failures":                "test6-multi-failures-cap",
+		"many durations - cap durations":              "test7-multi-durations-cap",
 	}
 
 	for k, testDir := range testDataMap {

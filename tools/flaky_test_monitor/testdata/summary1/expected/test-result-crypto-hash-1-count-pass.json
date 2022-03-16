@@ -4,8 +4,8 @@
       "json": {
         "test": "TestSanitySha3_256",
         "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-        "commit_date": "2021-09-22T01:06:25Z",
-        "job_run_date": "2021-09-22T04:06:25Z",
+        "commit_date": "2021-09-21T18:06:25-07:00",
+        "job_run_date": "2021-09-21T21:06:25-07:00",
         "package": "github.com/onflow/flow-go/crypto/hash",
         "output": [
           {
@@ -24,8 +24,8 @@
       "json": {
         "test": "TestSanitySha2_256",
         "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-        "commit_date": "2021-09-22T01:06:25Z",
-        "job_run_date": "2021-09-22T04:06:25Z",
+        "commit_date": "2021-09-21T18:06:25-07:00",
+        "job_run_date": "2021-09-21T21:06:25-07:00",
         "package": "github.com/onflow/flow-go/crypto/hash",
         "output": [
           {
@@ -44,8 +44,8 @@
       "json": {
         "test": "TestSanitySha3_384",
         "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-        "commit_date": "2021-09-22T01:06:25Z",
-        "job_run_date": "2021-09-22T04:06:25Z",
+        "commit_date": "2021-09-21T18:06:25-07:00",
+        "job_run_date": "2021-09-21T21:06:25-07:00",
         "package": "github.com/onflow/flow-go/crypto/hash",
         "output": [
           {
@@ -64,8 +64,8 @@
       "json": {
         "test": "TestSanitySha2_384",
         "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-        "commit_date": "2021-09-22T01:06:25Z",
-        "job_run_date": "2021-09-22T04:06:25Z",
+        "commit_date": "2021-09-21T18:06:25-07:00",
+        "job_run_date": "2021-09-21T21:06:25-07:00",
         "package": "github.com/onflow/flow-go/crypto/hash",
         "output": [
           {
@@ -84,8 +84,8 @@
       "json": {
         "test": "TestSanityKmac128",
         "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-        "commit_date": "2021-09-22T01:06:25Z",
-        "job_run_date": "2021-09-22T04:06:25Z",
+        "commit_date": "2021-09-21T18:06:25-07:00",
+        "job_run_date": "2021-09-21T21:06:25-07:00",
         "package": "github.com/onflow/flow-go/crypto/hash",
         "output": [
           {
@@ -104,8 +104,8 @@
       "json": {
         "test": "TestHashersAPI",
         "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-        "commit_date": "2021-09-22T01:06:25Z",
-        "job_run_date": "2021-09-22T04:06:25Z",
+        "commit_date": "2021-09-21T18:06:25-07:00",
+        "job_run_date": "2021-09-21T21:06:25-07:00",
         "package": "github.com/onflow/flow-go/crypto/hash",
         "output": [
           {
@@ -127,8 +127,8 @@
       "json": {
         "test": "TestSha3",
         "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-        "commit_date": "2021-09-22T01:06:25Z",
-        "job_run_date": "2021-09-22T04:06:25Z",
+        "commit_date": "2021-09-21T18:06:25-07:00",
+        "job_run_date": "2021-09-21T21:06:25-07:00",
         "package": "github.com/onflow/flow-go/crypto/hash",
         "output": [
           {
@@ -150,8 +150,8 @@
       "json": {
         "test": "TestSha3/SHA3_256",
         "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-        "commit_date": "2021-09-22T01:06:25Z",
-        "job_run_date": "2021-09-22T04:06:25Z",
+        "commit_date": "2021-09-21T18:06:25-07:00",
+        "job_run_date": "2021-09-21T21:06:25-07:00",
         "package": "github.com/onflow/flow-go/crypto/hash",
         "output": [
           {
@@ -170,8 +170,8 @@
       "json": {
         "test": "TestSha3/SHA3_384",
         "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-        "commit_date": "2021-09-22T01:06:25Z",
-        "job_run_date": "2021-09-22T04:06:25Z",
+        "commit_date": "2021-09-21T18:06:25-07:00",
+        "job_run_date": "2021-09-21T21:06:25-07:00",
         "package": "github.com/onflow/flow-go/crypto/hash",
         "output": [
           {

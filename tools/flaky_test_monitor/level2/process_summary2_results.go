@@ -172,7 +172,7 @@ func postProcessLevel2Summary(testSummary2 common.Level2Summary) {
 		common.AssertNoError(err, "error removing failures directory")
 	}
 
-	// check if there are no exception tests so can delete exceptions sub-directory
+	// check if there are no exceptions so can delete exceptions sub-directory
 	if common.IsDirEmpty(exceptionsDir) {
 		err := os.RemoveAll(exceptionsDir)
 		common.AssertNoError(err, "error removing exceptions directory")
