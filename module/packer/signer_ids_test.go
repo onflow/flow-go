@@ -24,6 +24,14 @@ func TestEncodeDecodeIdentities(t *testing.T) {
 	}
 }
 
+func TestEncodeIdentity(t *testing.T) {
+	only := unittest.IdentifierListFixture(1)
+	indices, err := packer.EncodeSignerIdentifiersToIndices(only, only)
+	require.NoError(t, err)
+	// byte(1,0,0,0,0,0,0,0)
+	require.Equal(t, []byte{byte(1 << 7)}, indices)
+}
+
 func TestEncodeFail(t *testing.T) {
 	fullIdentities := unittest.IdentifierListFixture(20)
 	_, err := packer.EncodeSignerIdentifiersToIndices(fullIdentities[1:], fullIdentities[:10])

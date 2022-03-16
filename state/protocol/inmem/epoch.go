@@ -69,8 +69,11 @@ func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) 
 			return Cluster{cluster}, nil
 		}
 	}
-
-	return nil, fmt.Errorf("no cluster with the given chain ID %v: %w", chainID, protocol.ErrClusterNotFound)
+	chainIDs := make([]string, 0, len(e.enc.Clusters))
+	for _, cluster := range e.enc.Clusters {
+		chainIDs = append(chainIDs, string(cluster.RootBlock.Header.ChainID))
+	}
+	return nil, fmt.Errorf("no cluster with the given chain ID %v, available chainIDs %v: %w", chainID, chainIDs, protocol.ErrClusterNotFound)
 }
 
 type Epochs struct {
