@@ -103,38 +103,14 @@ func readExpectedLevel3SummaryFromJSON(t *testing.T, testData testdata.Level3Tes
 }
 
 func runGenerateLevel3Summary(t *testing.T, testDir string, testData testdata.Level3TestData) common.Level3Summary {
-
 	// **************************************************************
 	actualTestSummary3 := generateLevel3Summary(testData.InputLevel2SummaryPath, testData.PropertyFileDirectory)
 	// **************************************************************
 
-	expectedTestSummary3 := readExpectedLevel3SummaryFromJSON(t, testData)
+	testData.ExpectedLevel3Summary = readExpectedLevel3SummaryFromJSON(t, testData)
 
-	// check all details of test summary level 2 between expected and actual
+	checkLevel3Summary(t, actualTestSummary3, testData)
 
-	// check # of no-results, failures and longest durations is the same for expected vs actual
-	require.Equal(t, len(expectedTestSummary3.NoResults), len(actualTestSummary3.NoResults))
-
-	require.Equal(t, len(expectedTestSummary3.MostFailures), len(actualTestSummary3.MostFailures))
-	require.Equal(t, expectedTestSummary3.MostFailuresTotal, actualTestSummary3.MostFailuresTotal)
-
-	require.Equal(t, len(expectedTestSummary3.LongestRunning), len(actualTestSummary3.LongestRunning))
-	require.Equal(t, expectedTestSummary3.LongestRunningTotal, actualTestSummary3.LongestRunningTotal)
-
-	// check no-result, failure and duration lists are the same for expected vs actual
-	for noResultsIndex := range expectedTestSummary3.NoResults {
-		common.AssertLevel2TestResults(t, expectedTestSummary3.NoResults[noResultsIndex], actualTestSummary3.NoResults[noResultsIndex])
-	}
-
-	for failuresIndex := range expectedTestSummary3.MostFailures {
-		common.AssertLevel2TestResults(t, expectedTestSummary3.MostFailures[failuresIndex], actualTestSummary3.MostFailures[failuresIndex])
-	}
-
-	for durationIndex := range expectedTestSummary3.LongestRunning {
-		common.AssertLevel2TestResults(t, expectedTestSummary3.LongestRunning[durationIndex], actualTestSummary3.LongestRunning[durationIndex])
-	}
-
-	require.Equal(t, expectedTestSummary3, actualTestSummary3)
 	return actualTestSummary3
 }
 
