@@ -30,18 +30,18 @@ type ProviderEngine interface {
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
 // Also generates and saves execution receipts
 type Engine struct {
-	unit                *engine.Unit
-	log                 zerolog.Logger
-	tracer              module.Tracer
-	receiptCon          network.Conduit
-	state               protocol.State
-	execState           state.ReadOnlyExecutionState
-	me                  module.Local
-	chunksConduit       network.Conduit
-	metrics             module.ExecutionMetrics
-	checkStakedAtBlock  func(blockID flow.Identifier) (bool, error)
-	chdpQueryTimeout    time.Duration
-	chdpDeliveryTimeout time.Duration
+	unit                   *engine.Unit
+	log                    zerolog.Logger
+	tracer                 module.Tracer
+	receiptCon             network.Conduit
+	state                  protocol.State
+	execState              state.ReadOnlyExecutionState
+	me                     module.Local
+	chunksConduit          network.Conduit
+	metrics                module.ExecutionMetrics
+	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
+	chdpQueryTimeout       time.Duration
+	chdpDeliveryTimeout    time.Duration
 }
 
 func New(
@@ -52,7 +52,7 @@ func New(
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
-	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
+	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	chdpQueryTimeout uint,
 	chdpDeliveryTimeout uint,
 ) (*Engine, error) {
@@ -60,16 +60,16 @@ func New(
 	log := logger.With().Str("engine", "receipts").Logger()
 
 	eng := Engine{
-		unit:                engine.NewUnit(),
-		log:                 log,
-		tracer:              tracer,
-		state:               state,
-		me:                  me,
-		execState:           execState,
-		metrics:             metrics,
-		checkStakedAtBlock:  checkStakedAtBlock,
-		chdpQueryTimeout:    time.Duration(chdpQueryTimeout) * time.Second,
-		chdpDeliveryTimeout: time.Duration(chdpDeliveryTimeout) * time.Second,
+		unit:                   engine.NewUnit(),
+		log:                    log,
+		tracer:                 tracer,
+		state:                  state,
+		me:                     me,
+		execState:              execState,
+		metrics:                metrics,
+		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
+		chdpQueryTimeout:       time.Duration(chdpQueryTimeout) * time.Second,
+		chdpDeliveryTimeout:    time.Duration(chdpDeliveryTimeout) * time.Second,
 	}
 
 	var err error
@@ -182,11 +182,11 @@ func (e *Engine) onChunkDataRequest(
 		return
 	}
 
-	_, err = e.ensureStaked(chunkDataPack.ChunkID, originID)
+	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, originID)
 	if err != nil {
 		lg.Error().
 			Err(err).
-			Msg("could not verify staked identity of chunk data pack request, dropping it")
+			Msg("could not verify authorization of identity of chunk data pack request, dropping it")
 		return
 	}
 
@@ -236,19 +236,19 @@ func (e *Engine) onChunkDataRequest(
 	})
 }
 
-func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
+func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
 
 	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
 	if err != nil {
 		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
 	}
 
-	stakedAt, err := e.checkStakedAtBlock(blockID)
+	authorizedAt, err := e.checkAuthorizedAtBlock(blockID)
 	if err != nil {
 		return nil, engine.NewInvalidInputErrorf("cannot check block staking status: %w", err)
 	}
-	if !stakedAt {
-		return nil, engine.NewInvalidInputErrorf("this node is not staked at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
+	if !authorizedAt {
+		return nil, engine.NewInvalidInputErrorf("this node is not authorized at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
 	}
 
 	origin, err := e.state.AtBlockID(blockID).Identity(originID)
@@ -261,8 +261,8 @@ func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier)
 		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
 	}
 
-	if origin.Stake == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s is not staked at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
+	if origin.Weight == 0 {
+		return nil, engine.NewInvalidInputErrorf("node %s has zero weight at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
 	}
 	return origin, nil
 }

@@ -33,25 +33,27 @@ var _ runtime.Interface = &TransactionEnv{}
 
 // TransactionEnv is a read-write environment used for executing flow transactions.
 type TransactionEnv struct {
-	vm                 *VirtualMachine
-	ctx                Context
-	sth                *state.StateHolder
-	programs           *handler.ProgramsHandler
-	accounts           state.Accounts
-	uuidGenerator      *state.UUIDGenerator
-	contracts          *handler.ContractHandler
-	accountKeys        *handler.AccountKeyHandler
-	metrics            *handler.MetricsHandler
-	computationHandler handler.ComputationMeteringHandler
-	eventHandler       *handler.EventHandler
-	addressGenerator   flow.AddressGenerator
-	rng                *rand.Rand
-	logs               []string
-	tx                 *flow.TransactionBody
-	txIndex            uint32
-	txID               flow.Identifier
-	traceSpan          opentracing.Span
-	authorizers        []runtime.Address
+	vm               *VirtualMachine
+	ctx              Context
+	sth              *state.StateHolder
+	programs         *handler.ProgramsHandler
+	accounts         state.Accounts
+	uuidGenerator    *state.UUIDGenerator
+	contracts        *handler.ContractHandler
+	accountKeys      *handler.AccountKeyHandler
+	metrics          *handler.MetricsHandler
+	eventHandler     *handler.EventHandler
+	addressGenerator flow.AddressGenerator
+	rng              *rand.Rand
+	logs             []string
+	tx               *flow.TransactionBody
+	txIndex          uint32
+	txID             flow.Identifier
+	traceSpan        opentracing.Span
+	authorizers      []runtime.Address
+}
+
+func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
 }
 
 func NewTransactionEnvironment(
@@ -76,24 +78,22 @@ func NewTransactionEnvironment(
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
-	computationHandler := handler.NewComputationMeteringHandler(computationLimit(ctx, tx))
 
 	env := &TransactionEnv{
-		vm:                 vm,
-		ctx:                ctx,
-		sth:                sth,
-		metrics:            metrics,
-		programs:           programsHandler,
-		accounts:           accounts,
-		accountKeys:        accountKeys,
-		addressGenerator:   generator,
-		uuidGenerator:      uuidGenerator,
-		eventHandler:       eventHandler,
-		computationHandler: computationHandler,
-		tx:                 tx,
-		txIndex:            txIndex,
-		txID:               tx.ID(),
-		traceSpan:          traceSpan,
+		vm:               vm,
+		ctx:              ctx,
+		sth:              sth,
+		metrics:          metrics,
+		programs:         programsHandler,
+		accounts:         accounts,
+		accountKeys:      accountKeys,
+		addressGenerator: generator,
+		uuidGenerator:    uuidGenerator,
+		eventHandler:     eventHandler,
+		tx:               tx,
+		txIndex:          txIndex,
+		txID:             tx.ID(),
+		traceSpan:        traceSpan,
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
@@ -107,18 +107,6 @@ func NewTransactionEnvironment(
 	}
 
 	return env
-}
-
-func computationLimit(ctx Context, tx *flow.TransactionBody) uint64 {
-	// if gas limit is set to zero fallback to the gas limit set by the context
-	if tx.GasLimit == 0 {
-		// if context gasLimit is also zero, fallback to the default gas limit
-		if ctx.GasLimit == 0 {
-			return DefaultGasLimit
-		}
-		return ctx.GasLimit
-	}
-	return tx.GasLimit
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {
@@ -172,7 +160,7 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
 	}
-	addresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+	addresses, ok := utils.CadenceValueToAddressSlice(value)
 	if !ok {
 		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
@@ -541,16 +529,19 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 	return uuid, err
 }
 
-func (e *TransactionEnv) GetComputationLimit() uint64 {
-	return e.computationHandler.Limit()
+func (e *TransactionEnv) meterComputation(kind, intensity uint) error {
+	if e.sth.EnforceComputationLimits {
+		return e.sth.State().MeterComputation(kind, intensity)
+	}
+	return nil
 }
 
-func (e *TransactionEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.AddUsed(used)
+func (e *TransactionEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
+	return e.meterComputation(uint(kind), intensity)
 }
 
-func (e *TransactionEnv) GetComputationUsed() uint64 {
-	return e.computationHandler.Used()
+func (e *TransactionEnv) ComputationUsed() uint64 {
+	return uint64(e.sth.State().TotalComputationUsed())
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
@@ -629,7 +620,7 @@ func (e *TransactionEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
+func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
 	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
@@ -699,8 +690,8 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		defer sp.Finish()
 	}
 
-	e.sth.DisableLimitEnforcement() // don't enforce limit during account creation
-	defer e.sth.EnableLimitEnforcement()
+	e.sth.DisableAllLimitEnforcements() // don't enforce limit during account creation
+	defer e.sth.EnableAllLimitEnforcements()
 
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
@@ -734,8 +725,9 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvAddAccountKey)
 		defer sp.Finish()
 	}
-	e.sth.DisableLimitEnforcement() // don't enforce limit during adding a key
-	defer e.sth.EnableLimitEnforcement()
+	// TODO do a call to track the computation usage and memory usage
+	e.sth.DisableAllLimitEnforcements() // don't enforce limit during adding a key
+	defer e.sth.EnableAllLimitEnforcements()
 
 	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
@@ -961,4 +953,16 @@ func (e *TransactionEnv) Commit() ([]programs.ContractUpdateKey, error) {
 		return nil, err
 	}
 	return e.contracts.Commit()
+}
+
+func (e *TransactionEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
+	return crypto.VerifyPOP(pk, sig)
+}
+
+func (e *TransactionEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
+	return crypto.AggregateSignatures(sigs)
+}
+
+func (e *TransactionEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	return crypto.AggregatePublicKeys(keys)
 }

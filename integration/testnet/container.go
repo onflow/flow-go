@@ -3,14 +3,15 @@ package testnet
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
@@ -92,7 +93,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		conf.Identifier,
 		conf.Role,
 		GetPrivateNodeInfoAddress(nodeName),
-		conf.Stake,
+		conf.Weight,
 		networkKey,
 		stakingKey,
 	)
@@ -238,7 +239,7 @@ func (c *Container) Pause() error {
 
 	err := c.net.cli.ContainerStop(ctx, c.ID, &checkContainerTimeout)
 	if err != nil {
-		return fmt.Errorf("could not stop container: %w", err)
+		return fmt.Errorf("could not stop container with ID (%s): %w", c.ID, err)
 	}
 
 	err = c.waitForCondition(ctx, containerStopped)

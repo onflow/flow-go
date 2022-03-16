@@ -53,7 +53,7 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 		if seal, err := r.seals.ByID(data.value.(flow.Identifier)); err != nil {
 			return nil, fmt.Errorf("failed to get seal by ID: %w", err)
 		} else {
-			return convertToMap(seal)
+			return commands.ConvertToMap(seal)
 		}
 	}
 
@@ -119,7 +119,7 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 		}
 	}
 
-	return convertToInterfaceList(result)
+	return commands.ConvertToInterfaceList(result)
 }
 
 func (r *ReadSealsCommand) Validator(req *admin.CommandRequest) error {

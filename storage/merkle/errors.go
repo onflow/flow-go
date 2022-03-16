@@ -41,8 +41,8 @@ type InvalidProofError struct {
 	err error
 }
 
-// NewInvalidProofErrorf constructs a new InvalidProofError
-func NewInvalidProofErrorf(msg string, args ...interface{}) *InvalidProofError {
+// newInvalidProofErrorf constructs a new InvalidProofError
+func newInvalidProofErrorf(msg string, args ...interface{}) *InvalidProofError {
 	return &InvalidProofError{err: fmt.Errorf(msg, args...)}
 }
 

@@ -1,20 +1,16 @@
 package fvm
 
 import (
-	"encoding/hex"
 	"fmt"
+	"math"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -231,6 +227,14 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	return nil
 }
 
+func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
+	return math.MaxUint64
+}
+
+func (proc *BootstrapProcedure) MemoryLimit(_ Context) uint64 {
+	return math.MaxUint64
+}
+
 func (b *BootstrapProcedure) createAccount() flow.Address {
 	address, err := b.addressGenerator.NextAddress()
 	if err != nil {
@@ -367,7 +371,10 @@ func (b *BootstrapProcedure) deployDKG(service flow.Address) {
 	contract := contracts.FlowDKG()
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(service, contract, "FlowDKG"),
+		Transaction(
+			blueprints.DeployContractTransaction(service, contract, "FlowDKG"),
+			0,
+		),
 		b.sth,
 		b.programs,
 	)
@@ -378,7 +385,10 @@ func (b *BootstrapProcedure) deployQC(service flow.Address) {
 	contract := contracts.FlowQC()
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(service, contract, "FlowClusterQC"),
+		Transaction(
+			blueprints.DeployContractTransaction(service, contract, "FlowClusterQC"),
+			0,
+		),
 		b.sth,
 		b.programs,
 	)
@@ -395,10 +405,13 @@ func (b *BootstrapProcedure) deployIDTableStaking(service, fungibleToken, flowTo
 
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployIDTableStakingTransaction(service,
-			contract,
-			b.epochConfig.EpochTokenPayout,
-			b.epochConfig.RewardCut),
+		Transaction(
+			blueprints.DeployIDTableStakingTransaction(service,
+				contract,
+				b.epochConfig.EpochTokenPayout,
+				b.epochConfig.RewardCut),
+			0,
+		),
 		b.sth,
 		b.programs,
 	)
@@ -423,7 +436,10 @@ func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken, flow
 
 	txError, err := b.vm.invokeMetaTransaction(
 		context,
-		deployEpochTransaction(service, contract, b.epochConfig),
+		Transaction(
+			blueprints.DeployEpochTransaction(service, contract, b.epochConfig),
+			0,
+		),
 		b.sth,
 		b.programs,
 	)
@@ -540,10 +556,11 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 		// give a vault resource to the staking account
 		txError, err := b.vm.invokeMetaTransaction(
 			b.ctx,
-			setupAccountTransaction(
-				fungibleToken,
-				flowToken,
-				nodeAddress,
+			Transaction(
+				blueprints.SetupAccountTransaction(fungibleToken,
+					flowToken,
+					nodeAddress),
+				0,
 			),
 			b.sth,
 			b.programs,
@@ -553,10 +570,11 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 		// fund the staking account
 		txError, err = b.vm.invokeMetaTransaction(
 			b.ctx,
-			fundAccountTransaction(service,
+			Transaction(blueprints.FundAccountTransaction(service,
 				fungibleToken,
 				flowToken,
 				nodeAddress),
+				0),
 			b.sth,
 			b.programs,
 		)
@@ -567,10 +585,11 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 		// and set it up with the QC/DKG participant resource
 		txError, err = b.vm.invokeMetaTransaction(
 			b.ctx,
-			registerNodeTransaction(service,
+			Transaction(blueprints.RegisterNodeTransaction(service,
 				flowToken,
 				nodeAddress,
 				id),
+				0),
 			b.sth,
 			b.programs,
 		)
@@ -582,7 +601,10 @@ func (b *BootstrapProcedure) deployStakingProxyContract(service flow.Address) {
 	contract := contracts.FlowStakingProxy()
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(service, contract, "StakingProxy"),
+		Transaction(
+			blueprints.DeployContractTransaction(service, contract, "StakingProxy"),
+			0,
+		),
 		b.sth,
 		b.programs,
 	)
@@ -597,7 +619,7 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 	if err != nil {
 		panic(err)
 	}
-	publicKeys[0] = bytesToCadenceArray(encodedPublicKey)
+	publicKeys[0] = blueprints.BytesToCadenceArray(encodedPublicKey)
 
 	contract := contracts.FlowLockedTokens(
 		fungibleTokenAddress.Hex(),
@@ -608,7 +630,10 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployLockedTokensTransaction(service, contract, publicKeys),
+		Transaction(
+			blueprints.DeployLockedTokensTransaction(service, contract, publicKeys),
+			0,
+		),
 		b.sth,
 		b.programs,
 	)
@@ -629,304 +654,14 @@ func (b *BootstrapProcedure) deployStakingCollection(service flow.Address, fungi
 		service.Hex())
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(service, contract, "FlowStakingCollection"),
+		Transaction(
+			blueprints.DeployContractTransaction(service, contract, "FlowStakingCollection"),
+			0,
+		),
 		b.sth,
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
-}
-
-const deployContractTransactionTemplate = `
-transaction {
-  prepare(signer: AuthAccount) {
-    signer.contracts.add(name: "%s", code: "%s".decodeHex())
-  }
-}
-`
-
-const deployIDTableStakingTransactionTemplate = `
-transaction {
-  prepare(serviceAccount: AuthAccount) {
-	serviceAccount.contracts.add(name: "FlowIDTableStaking", code: "%s".decodeHex(), epochTokenPayout: UFix64(%d), rewardCut: UFix64(%d))
-  }
-}
-`
-
-const deployEpochTransactionTemplate = `
-import FlowClusterQC from 0x%s
-
-transaction(clusterWeights: [{String: UInt64}]) {
-  prepare(serviceAccount: AuthAccount)	{
-
-    // first, construct Cluster objects from cluster weights
-    let clusters: [FlowClusterQC.Cluster] = []
-    var clusterIndex: UInt16 = 0
-    for weightMapping in clusterWeights {
-      let cluster = FlowClusterQC.Cluster(clusterIndex, weightMapping)
-      clusterIndex = clusterIndex + 1
-    }
-
-	serviceAccount.contracts.add(
-		name: "FlowEpoch",
-		code: "%s".decodeHex(),
-		currentEpochCounter: UInt64(%d),
-		numViewsInEpoch: UInt64(%d),
-		numViewsInStakingAuction: UInt64(%d),
-		numViewsInDKGPhase: UInt64(%d),
-		numCollectorClusters: UInt16(%d),
-		FLOWsupplyIncreasePercentage: UFix64(%d),
-		randomSource: %s,
-		collectorClusters: clusters,
-        // NOTE: clusterQCs and dkgPubKeys are empty because these initial values are not used
-		clusterQCs: [],
-		dkgPubKeys: [],
-	)
-  }
-}
-`
-
-const setupAccountTemplate = `
-// This transaction is a template for a transaction
-// to add a Vault resource to their account
-// so that they can use the flowToken
-
-import FungibleToken from 0x%s
-import FlowToken from 0x%s
-
-transaction {
-
-    prepare(signer: AuthAccount) {
-
-        if signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) == nil {
-            // Create a new flowToken Vault and put it in storage
-            signer.save(<-FlowToken.createEmptyVault(), to: /storage/flowTokenVault)
-
-            // Create a public capability to the Vault that only exposes
-            // the deposit function through the Receiver interface
-            signer.link<&FlowToken.Vault{FungibleToken.Receiver}>(
-                /public/flowTokenReceiver,
-                target: /storage/flowTokenVault
-            )
-
-            // Create a public capability to the Vault that only exposes
-            // the balance field through the Balance interface
-            signer.link<&FlowToken.Vault{FungibleToken.Balance}>(
-                /public/flowTokenBalance,
-                target: /storage/flowTokenVault
-            )
-        }
-    }
-}
-`
-
-const fundAccountTemplate = `
-import FungibleToken from 0x%s
-import FlowToken from 0x%s
-
-transaction(amount: UFix64, recipient: Address) {
-	let sentVault: @FungibleToken.Vault
-	prepare(signer: AuthAccount) {
-	let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-		?? panic("failed to borrow reference to sender vault")
-	self.sentVault <- vaultRef.withdraw(amount: amount)
-	}
-	execute {
-	let receiverRef =  getAccount(recipient)
-		.getCapability(/public/flowTokenReceiver)
-		.borrow<&{FungibleToken.Receiver}>()
-		?? panic("failed to borrow reference to recipient vault")
-	receiverRef.deposit(from: <-self.sentVault)
-	}
-}
-`
-
-const deployLockedTokensTemplate = `
-transaction(publicKeys: [[UInt8]]) {
-    
-    prepare(admin: AuthAccount) {
-        admin.contracts.add(name: "LockedTokens", code: "%s".decodeHex(), admin)
-
-    }
-}
-`
-
-func deployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) *TransactionProcedure {
-	return Transaction(
-		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(
-				deployLockedTokensTemplate,
-				hex.EncodeToString(contract),
-			))).
-			AddArgument(jsoncdc.MustEncode(cadence.NewArray(publicKeys))).
-			AddAuthorizer(service),
-		0,
-	)
-}
-
-func deployContractTransaction(address flow.Address, contract []byte, contractName string) *TransactionProcedure {
-	return Transaction(
-		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, contractName, hex.EncodeToString(contract)))).
-			AddAuthorizer(address),
-		0,
-	)
-}
-
-func deployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) *TransactionProcedure {
-	return Transaction(
-		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(
-				deployIDTableStakingTransactionTemplate,
-				hex.EncodeToString(contract),
-				epochTokenPayout,
-				rewardCut))).
-			AddAuthorizer(service),
-		0,
-	)
-}
-
-func deployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *TransactionProcedure {
-	tx := Transaction(
-		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(
-				deployEpochTransactionTemplate,
-				service,
-				hex.EncodeToString(contract),
-				epochConfig.CurrentEpochCounter,
-				epochConfig.NumViewsInEpoch,
-				epochConfig.NumViewsInStakingAuction,
-				epochConfig.NumViewsInDKGPhase,
-				epochConfig.NumCollectorClusters,
-				epochConfig.FLOWsupplyIncreasePercentage,
-				epochConfig.RandomSource,
-			))).
-			AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters)).
-			AddAuthorizer(service),
-		0,
-	)
-	return tx
-}
-
-func setupAccountTransaction(
-	fungibleToken flow.Address,
-	flowToken flow.Address,
-	accountAddress flow.Address,
-) *TransactionProcedure {
-	return Transaction(
-		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(setupAccountTemplate, fungibleToken, flowToken))).
-			AddAuthorizer(accountAddress),
-		0,
-	)
-}
-
-func fundAccountTransaction(
-	service flow.Address,
-	fungibleToken flow.Address,
-	flowToken flow.Address,
-	nodeAddress flow.Address,
-) *TransactionProcedure {
-
-	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", 2_000_000))
-	if err != nil {
-		panic(err)
-	}
-
-	return Transaction(
-		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(fundAccountTemplate, fungibleToken, flowToken))).
-			AddArgument(jsoncdc.MustEncode(cdcAmount)).
-			AddArgument(jsoncdc.MustEncode(cadence.NewAddress(nodeAddress))).
-			AddAuthorizer(service),
-		0,
-	)
-}
-
-// registerNodeTransaction creates a new node struct object.
-// Then, if the node is a collector node, creates a new account and adds a QC object to it
-// If the node is a consensus node, it creates a new account and adds a DKG object to it
-func registerNodeTransaction(
-	service flow.Address,
-	flowTokenAddress flow.Address,
-	nodeAddress flow.Address,
-	id *flow.Identity,
-) *TransactionProcedure {
-
-	env := templates.Environment{
-		FlowTokenAddress:         flowTokenAddress.HexWithPrefix(),
-		IDTableAddress:           service.HexWithPrefix(),
-		QuorumCertificateAddress: service.HexWithPrefix(),
-		DkgAddress:               service.HexWithPrefix(),
-		EpochAddress:             service.HexWithPrefix(),
-	}
-
-	// Use NetworkingKey as the public key of the machine account.
-	// We do this for tests/localnet but normally it should be a separate key.
-	accountKey := flow.AccountPublicKey{
-		PublicKey: id.NetworkPubKey,
-		SignAlgo:  id.NetworkPubKey.Algorithm(),
-		HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
-		Weight:    1000,
-	}
-
-	encAccountKey, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
-	if err != nil {
-		panic(err)
-	}
-
-	cadencePublicKeys := cadence.NewArray(
-		[]cadence.Value{
-			bytesToCadenceArray(encAccountKey),
-		},
-	)
-
-	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", id.Stake))
-	if err != nil {
-		panic(err)
-	}
-
-	cdcNodeID, err := cadence.NewString(id.NodeID.String())
-	if err != nil {
-		panic(err)
-	}
-
-	cdcAddress, err := cadence.NewString(id.Address)
-	if err != nil {
-		panic(err)
-	}
-
-	cdcNetworkPubKey, err := cadence.NewString(id.NetworkPubKey.String()[2:])
-	if err != nil {
-		panic(err)
-	}
-
-	cdcStakingPubKey, err := cadence.NewString(id.StakingPubKey.String()[2:])
-	if err != nil {
-		panic(err)
-	}
-
-	// register node
-	return Transaction(
-		flow.NewTransactionBody().
-			SetScript(templates.GenerateEpochRegisterNodeScript(env)).
-			AddArgument(jsoncdc.MustEncode(cdcNodeID)).
-			AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(id.Role)))).
-			AddArgument(jsoncdc.MustEncode(cdcAddress)).
-			AddArgument(jsoncdc.MustEncode(cdcNetworkPubKey)).
-			AddArgument(jsoncdc.MustEncode(cdcStakingPubKey)).
-			AddArgument(jsoncdc.MustEncode(cdcAmount)).
-			AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
-			AddAuthorizer(nodeAddress),
-		0,
-	)
-}
-
-func bytesToCadenceArray(b []byte) cadence.Array {
-	values := make([]cadence.Value, len(b))
-	for i, v := range b {
-		values[i] = cadence.NewUInt8(v)
-	}
-	return cadence.NewArray(values)
 }
 
 const (

@@ -144,8 +144,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	deltas, err := NewDeltas(1000)
 	require.NoError(t, err)
 
-	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return stateProtocol.IsNodeStakedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
+	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
 	engine, err = New(
@@ -169,7 +169,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		deltas,
 		10,
 		false,
-		checkStakedAtBlock,
+		checkAuthorizedAtBlock,
 		false,
 	)
 	require.NoError(t, err)
@@ -307,7 +307,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		}).
 		Return(nil)
 
-	protocolSnapshot := ctx.mockStakedAtBlockID(executableBlock.ID(), expectBroadcast)
+	protocolSnapshot := ctx.mockHasWeightAtBlockID(executableBlock.ID(), expectBroadcast)
 
 	if !expectBroadcast {
 		broadcastMock.Maybe()
@@ -316,11 +316,11 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 	return protocolSnapshot
 }
 
-func (ctx testingContext) mockStakedAtBlockID(blockID flow.Identifier, staked bool) *protocol.Snapshot {
+func (ctx testingContext) mockHasWeightAtBlockID(blockID flow.Identifier, hasWeight bool) *protocol.Snapshot {
 	identity := *ctx.identity
-	identity.Stake = 0
-	if staked {
-		identity.Stake = 100
+	identity.Weight = 0
+	if hasWeight {
+		identity.Weight = 100
 	}
 	snap := new(protocol.Snapshot)
 	snap.On("Identity", identity.NodeID).Return(&identity, nil)
@@ -391,7 +391,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
-		ctx.mockStakedAtBlockID(blockB.ID(), true)
+		ctx.mockHasWeightAtBlockID(blockB.ID(), true)
 
 		// blockA's start state is its parent's state commitment,
 		// and blockA's parent has been executed.
@@ -1001,7 +1001,7 @@ func Test_SPOCKGeneration(t *testing.T) {
 	})
 }
 
-func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
+func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
 	runWithEngine(t, func(ctx testingContext) {
@@ -1042,7 +1042,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		// a receipt for sealed block won't be broadcasted
 		ctx.snapshot.On("Head").Return(&blockSealed, nil)
 
-		ctx.mockStakedAtBlockID(blocks["A"].ID(), true)
+		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
 
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), false, *blocks["B"].StartState, nil)
@@ -1050,25 +1050,25 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["D"], unittest.IdentifierFixture(), false, *blocks["D"].StartState, nil)
 
 		wg.Add(1)
-		ctx.mockStakedAtBlockID(blocks["A"].ID(), true)
+		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
 
 		err := ctx.engine.handleBlock(context.Background(), blocks["A"].Block)
 		require.NoError(t, err)
 
 		wg.Add(1)
-		ctx.mockStakedAtBlockID(blocks["B"].ID(), false)
+		ctx.mockHasWeightAtBlockID(blocks["B"].ID(), false)
 
 		err = ctx.engine.handleBlock(context.Background(), blocks["B"].Block)
 		require.NoError(t, err)
 
 		wg.Add(1)
-		ctx.mockStakedAtBlockID(blocks["C"].ID(), true)
+		ctx.mockHasWeightAtBlockID(blocks["C"].ID(), true)
 
 		err = ctx.engine.handleBlock(context.Background(), blocks["C"].Block)
 		require.NoError(t, err)
 
 		wg.Add(1)
-		ctx.mockStakedAtBlockID(blocks["D"].ID(), false)
+		ctx.mockHasWeightAtBlockID(blocks["D"].ID(), false)
 
 		err = ctx.engine.handleBlock(context.Background(), blocks["D"].Block)
 		require.NoError(t, err)
@@ -1152,8 +1152,8 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	deltas, err := NewDeltas(10)
 	require.NoError(t, err)
 
-	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return stateProtocol.IsNodeStakedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
+	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
 	engine, err = New(
@@ -1177,7 +1177,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		deltas,
 		10,
 		false,
-		checkStakedAtBlock,
+		checkAuthorizedAtBlock,
 		false,
 	)
 

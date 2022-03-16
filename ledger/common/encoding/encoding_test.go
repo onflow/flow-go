@@ -71,6 +71,120 @@ func Test_PayloadEncodingDecoding(t *testing.T) {
 	require.True(t, newp.Equals(p))
 }
 
+func Test_NilPayloadWithoutPrefixEncodingDecoding(t *testing.T) {
+
+	buf := []byte{1, 2, 3}
+	bufLen := len(buf)
+
+	// Test encoded payload data length
+	encodedPayloadLen := encoding.EncodedPayloadLengthWithoutPrefix(nil)
+	require.Equal(t, 0, encodedPayloadLen)
+
+	// Encode payload and append to buffer
+	encoded := encoding.EncodeAndAppendPayloadWithoutPrefix(buf, nil)
+	// Test encoded data size
+	require.Equal(t, bufLen, len(encoded))
+	// Test original input data isn't modified
+	require.Equal(t, buf, encoded)
+	// Test returned encoded data reuses input data
+	require.True(t, &buf[0] == &encoded[0])
+
+	// Decode and copy payload (excluding prefix)
+	newp, err := encoding.DecodePayloadWithoutPrefix(encoded[bufLen:], false)
+	require.NoError(t, err)
+	require.Nil(t, newp)
+
+	// Zerocopy option has no effect for nil payload, but test it anyway.
+	// Decode payload (excluding prefix) with zero copy
+	newp, err = encoding.DecodePayloadWithoutPrefix(encoded[bufLen:], true)
+	require.NoError(t, err)
+	require.Nil(t, newp)
+}
+
+func Test_PayloadWithoutPrefixEncodingDecoding(t *testing.T) {
+
+	kp1t := uint16(1)
+	kp1v := []byte("key part 1")
+	kp1 := ledger.NewKeyPart(kp1t, kp1v)
+
+	kp2t := uint16(22)
+	kp2v := []byte("key part 2")
+	kp2 := ledger.NewKeyPart(kp2t, kp2v)
+
+	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
+	v := ledger.Value([]byte{'A'})
+	p := ledger.NewPayload(k, v)
+
+	const encodedPayloadSize = 47 // size of encoded payload p without prefix (version + type)
+
+	testCases := []struct {
+		name     string
+		payload  *ledger.Payload
+		bufCap   int
+		zeroCopy bool
+	}{
+		// full cap means no capacity for appending payload (new alloc)
+		{"full cap zerocopy", p, 0, true},
+		{"full cap", p, 0, false},
+		// small cap means not enough capacity for appending payload (new alloc)
+		{"small cap zerocopy", p, encodedPayloadSize - 1, true},
+		{"small cap", p, encodedPayloadSize - 1, false},
+		// exact cap means exact capacity for appending payload (no alloc)
+		{"exact cap zerocopy", p, encodedPayloadSize, true},
+		{"exact cap", p, encodedPayloadSize, false},
+		// large cap means extra capacity than is needed for appending payload (no alloc)
+		{"large cap zerocopy", p, encodedPayloadSize + 1, true},
+		{"large cap", p, encodedPayloadSize + 1, false},
+	}
+
+	bufPrefix := []byte{1, 2, 3}
+	bufPrefixLen := len(bufPrefix)
+
+	for _, tc := range testCases {
+
+		t.Run(tc.name, func(t *testing.T) {
+
+			// Create a buffer of specified cap + prefix length
+			buffer := make([]byte, bufPrefixLen, bufPrefixLen+tc.bufCap)
+			copy(buffer, bufPrefix)
+
+			// Encode payload and append to buffer
+			encoded := encoding.EncodeAndAppendPayloadWithoutPrefix(buffer, tc.payload)
+			encodedPayloadLen := encoding.EncodedPayloadLengthWithoutPrefix(tc.payload)
+			// Test encoded data size
+			require.Equal(t, len(encoded), bufPrefixLen+encodedPayloadLen)
+			// Test if original input data is modified
+			require.Equal(t, bufPrefix, encoded[:bufPrefixLen])
+			// Test if input buffer is reused if it fits
+			if tc.bufCap >= encodedPayloadLen {
+				require.True(t, &buffer[0] == &encoded[0])
+			} else {
+				// new alloc
+				require.True(t, &buffer[0] != &encoded[0])
+			}
+
+			// Decode payload (excluding prefix)
+			newp, err := encoding.DecodePayloadWithoutPrefix(encoded[bufPrefixLen:], tc.zeroCopy)
+			require.NoError(t, err)
+			require.True(t, newp.Equals(tc.payload))
+
+			// Reset encoded payload
+			for i := 0; i < len(encoded); i++ {
+				encoded[i] = 0
+			}
+
+			if tc.zeroCopy {
+				// Test if decoded payload is changed after source data is modified
+				// because data is shared.
+				require.False(t, newp.Equals(tc.payload))
+			} else {
+				// Test if decoded payload is unchanged after source data is modified.
+				require.True(t, newp.Equals(tc.payload))
+			}
+		})
+	}
+}
+
 // Test_ProofEncodingDecoding tests encoding decoding functionality of a proof
 func Test_TrieProofEncodingDecoding(t *testing.T) {
 	p, _ := utils.TrieProofFixture()

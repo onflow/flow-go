@@ -26,10 +26,10 @@ import (
 // components before giving up.
 const DefaultStartupTimeout = 30 * time.Second
 
-// ErrUnstakedForEpoch is returned when we attempt to create epoch components
-// for an epoch in which we are not staked. This is the case for epochs during
-// which this node is joining or leaving the network.
-var ErrUnstakedForEpoch = fmt.Errorf("we are not a staked node in the epoch")
+// ErrNotAuthorizedForEpoch is returned when we attempt to create epoch components
+// for an epoch in which we are not an authorized network participant. This is the
+// case for epochs during which this node is joining or leaving the network.
+var ErrNotAuthorizedForEpoch = fmt.Errorf("we are not an authorized participant for the epoch")
 
 // EpochComponents represents all dependencies for running an epoch.
 type EpochComponents struct {
@@ -156,8 +156,8 @@ func New(
 	}
 
 	components, err := e.createEpochComponents(epoch)
-	// don't set up consensus components if we aren't staked in current epoch
-	if errors.Is(err, ErrUnstakedForEpoch) {
+	// don't set up consensus components if we aren't authorized in current epoch
+	if errors.Is(err, ErrNotAuthorizedForEpoch) {
 		return e, nil
 	}
 	if err != nil {
@@ -189,13 +189,16 @@ func (e *Engine) Ready() <-chan struct{} {
 	}, func() {
 		// check the current phase on startup, in case we are in setup phase
 		// and haven't yet voted for the next root QC
-		phase, err := e.state.Final().Phase()
+		finalSnapshot := e.state.Final()
+		phase, err := finalSnapshot.Phase()
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not check phase")
+			e.log.Fatal().Err(err).Msg("could not check phase")
 			return
 		}
 		if phase == flow.EpochPhaseSetup {
-			e.unit.Launch(e.onEpochSetupPhaseStarted)
+			e.unit.Launch(func() {
+				e.onEpochSetupPhaseStarted(finalSnapshot.Epochs().Next())
+			})
 		}
 	})
 }
@@ -217,7 +220,7 @@ func (e *Engine) Done() <-chan struct{} {
 // createEpochComponents instantiates and returns epoch-scoped components for
 // the given epoch, using the configured factory.
 //
-// Returns ErrUnstakedForEpoch if this node is not staked in the epoch.
+// Returns ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
 
 	state, prop, sync, hot, aggregator, err := e.factory.Create(epoch)
@@ -241,8 +244,11 @@ func (e *Engine) EpochTransition(_ uint64, first *flow.Header) {
 }
 
 // EpochSetupPhaseStarted handles the epoch setup phase started protocol event.
-func (e *Engine) EpochSetupPhaseStarted(_ uint64, _ *flow.Header) {
-	e.unit.Launch(e.onEpochSetupPhaseStarted)
+func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
+	e.unit.Launch(func() {
+		nextEpoch := e.state.AtBlockID(first.ID()).Epochs().Next()
+		e.onEpochSetupPhaseStarted(nextEpoch)
+	})
 }
 
 // onEpochTransition is called when we transition to a new epoch. It arranges
@@ -251,7 +257,7 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
-	epoch := e.state.Final().Epochs().Current()
+	epoch := e.state.AtBlockID(first.ID()).Epochs().Current()
 	counter, err := epoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not get epoch counter: %w", err)
@@ -262,8 +268,8 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 	lastEpochMaxHeight := first.Height - 1
 
 	log := e.log.With().
-		Uint64("epoch_max_height", lastEpochMaxHeight).
-		Uint64("epoch_counter", counter).
+		Uint64("last_epoch_max_height", lastEpochMaxHeight).
+		Uint64("cur_epoch_counter", counter).
 		Logger()
 
 	// exit early and log if the epoch already exists
@@ -277,8 +283,8 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 
 	// create components for new epoch
 	components, err := e.createEpochComponents(epoch)
-	// if we are not staked in this epoch, skip starting up cluster consensus
-	if errors.Is(err, ErrUnstakedForEpoch) {
+	// if we are not authorized in this epoch, skip starting up cluster consensus
+	if errors.Is(err, ErrNotAuthorizedForEpoch) {
 		e.prepareToStopEpochComponents(counter-1, lastEpochMaxHeight)
 		return nil
 	}
@@ -318,13 +324,13 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 	stopAtHeight := epochMaxHeight + flow.DefaultTransactionExpiry + 1
 
 	log := e.log.With().
-		Uint64("epoch_max_height", epochMaxHeight).
-		Uint64("epoch_counter", epochCounter).
+		Uint64("stopping_epoch_max_height", epochMaxHeight).
+		Uint64("stopping_epoch_counter", epochCounter).
 		Uint64("stop_at_height", stopAtHeight).
 		Str("step", "epoch_transition").
 		Logger()
 
-	log.Debug().Msgf("preparing to stop epoch components at height %d", stopAtHeight)
+	log.Info().Msgf("preparing to stop epoch components at height %d", stopAtHeight)
 
 	e.heightEvents.OnHeight(stopAtHeight, func() {
 		e.unit.Launch(func() {
@@ -348,13 +354,11 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 // setup phase, or when the node is restarted during the epoch setup phase. It
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
-func (e *Engine) onEpochSetupPhaseStarted() {
-
-	epoch := e.state.Final().Epochs().Next()
+func (e *Engine) onEpochSetupPhaseStarted(nextEpoch protocol.Epoch) {
 
 	ctx, cancel := context.WithCancel(e.unit.Ctx())
 	defer cancel()
-	err := e.voter.Vote(ctx, epoch)
+	err := e.voter.Vote(ctx, nextEpoch)
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to submit QC vote for next epoch")
 	}

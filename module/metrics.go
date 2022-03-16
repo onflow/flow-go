@@ -50,8 +50,15 @@ type NetworkMetrics interface {
 	// QueueDuration tracks the time spent by a message with the given priority in the queue
 	QueueDuration(duration time.Duration, priority int)
 
-	// InboundProcessDuration tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
-	InboundProcessDuration(topic string, duration time.Duration)
+	DirectMessageStarted(topic string)
+
+	DirectMessageFinished(topic string)
+
+	// MessageProcessingStarted tracks the start of a call to process a message from the given topic
+	MessageProcessingStarted(topic string)
+
+	// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+	MessageProcessingFinished(topic string, duration time.Duration)
 
 	// OutboundConnections updates the metric tracking the number of outbound connections of this node
 	OutboundConnections(connectionCount uint)
@@ -267,13 +274,13 @@ type LedgerMetrics interface {
 	LatestTrieRegCount(number uint64)
 
 	// LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
-	LatestTrieRegCountDiff(number uint64)
+	LatestTrieRegCountDiff(number int64)
 
 	// LatestTrieMaxDepth records the maximum depth of the last created trie
 	LatestTrieMaxDepth(number uint64)
 
 	// LatestTrieMaxDepthDiff records the difference between the max depth of the latest created trie and parent trie
-	LatestTrieMaxDepthDiff(number uint64)
+	LatestTrieMaxDepthDiff(number int64)
 
 	// UpdateCount increase a counter of performed updates
 	UpdateCount()

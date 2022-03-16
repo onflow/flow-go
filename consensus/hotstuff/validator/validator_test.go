@@ -404,10 +404,10 @@ type QCSuite struct {
 
 func (qs *QCSuite) SetupTest() {
 
-	// create a list of 10 nodes with one stake each
+	// create a list of 10 nodes with 1-weight each
 	qs.participants = unittest.IdentityListFixture(10,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithStake(1),
+		unittest.WithWeight(1),
 	)
 
 	// signers are a qualified majority at 7
@@ -463,18 +463,18 @@ func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 }
 
 // TestQCSignersError tests that a qc fails validation if:
-// QC signer's have insufficient stake (but are all valid consensus participants otherwise)
-func (qs *QCSuite) TestQCInsufficientStake() {
-	// signers only have stake 6 out of 10 total (NOT have a supermajority)
+// QC signer's have insufficient weight (but are all valid consensus participants otherwise)
+func (qs *QCSuite) TestQCInsufficientWeight() {
+	// signers only have weight 6 out of 10 total (NOT have a supermajority)
 	qs.signers = qs.participants[:6]
 	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
 
 	// the QC should not be validated anymore
 	err := qs.validator.ValidateQC(qs.qc, qs.block)
-	assert.Error(qs.T(), err, "a QC should be rejected if it has insufficient voted stake")
+	assert.Error(qs.T(), err, "a QC should be rejected if it has insufficient voted weight")
 
 	// we should get a threshold error to bubble up for extra info
-	assert.True(qs.T(), model.IsInvalidBlockError(err), "if there is insufficient voted stake, an invalid block error should be raised")
+	assert.True(qs.T(), model.IsInvalidBlockError(err), "if there is insufficient voted weight, an invalid block error should be raised")
 }
 
 // TestQCSignatureError tests that validation errors if:

@@ -39,32 +39,32 @@ import (
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
 
-	unit               *engine.Unit
-	log                zerolog.Logger
-	me                 module.Local
-	request            module.Requester // used to request collections
-	state              protocol.State
-	receiptHasher      hash.Hasher // used as hasher to sign the execution receipt
-	blocks             storage.Blocks
-	collections        storage.Collections
-	events             storage.Events
-	serviceEvents      storage.ServiceEvents
-	transactionResults storage.TransactionResults
-	computationManager computation.ComputationManager
-	providerEngine     provider.ProviderEngine
-	mempool            *Mempool
-	execState          state.ExecutionState
-	metrics            module.ExecutionMetrics
-	tracer             module.Tracer
-	extensiveLogging   bool
-	spockHasher        hash.Hasher
-	syncThreshold      int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
-	syncFilter         flow.IdentityFilter // specify the filter to sync state from
-	syncConduit        network.Conduit     // sending state syncing requests
-	syncDeltas         mempool.Deltas      // storing the synced state deltas
-	syncFast           bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
-	checkStakedAtBlock func(blockID flow.Identifier) (bool, error)
-	pauseExecution     bool
+	unit                   *engine.Unit
+	log                    zerolog.Logger
+	me                     module.Local
+	request                module.Requester // used to request collections
+	state                  protocol.State
+	receiptHasher          hash.Hasher // used as hasher to sign the execution receipt
+	blocks                 storage.Blocks
+	collections            storage.Collections
+	events                 storage.Events
+	serviceEvents          storage.ServiceEvents
+	transactionResults     storage.TransactionResults
+	computationManager     computation.ComputationManager
+	providerEngine         provider.ProviderEngine
+	mempool                *Mempool
+	execState              state.ExecutionState
+	metrics                module.ExecutionMetrics
+	tracer                 module.Tracer
+	extensiveLogging       bool
+	spockHasher            hash.Hasher
+	syncThreshold          int                 // the threshold for how many sealed unexecuted blocks to trigger state syncing.
+	syncFilter             flow.IdentityFilter // specify the filter to sync state from
+	syncConduit            network.Conduit     // sending state syncing requests
+	syncDeltas             mempool.Deltas      // storing the synced state deltas
+	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
+	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
+	pauseExecution         bool
 }
 
 func New(
@@ -88,7 +88,7 @@ func New(
 	syncDeltas mempool.Deltas,
 	syncThreshold int,
 	syncFast bool,
-	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
+	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pauseExecution bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
@@ -96,31 +96,31 @@ func New(
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:               engine.NewUnit(),
-		log:                log,
-		me:                 me,
-		request:            request,
-		state:              state,
-		receiptHasher:      utils.NewExecutionReceiptHasher(),
-		spockHasher:        utils.NewSPOCKHasher(),
-		blocks:             blocks,
-		collections:        collections,
-		events:             events,
-		serviceEvents:      serviceEvents,
-		transactionResults: transactionResults,
-		computationManager: executionEngine,
-		providerEngine:     providerEngine,
-		mempool:            mempool,
-		execState:          execState,
-		metrics:            metrics,
-		tracer:             tracer,
-		extensiveLogging:   extLog,
-		syncFilter:         syncFilter,
-		syncThreshold:      syncThreshold,
-		syncDeltas:         syncDeltas,
-		syncFast:           syncFast,
-		checkStakedAtBlock: checkStakedAtBlock,
-		pauseExecution:     pauseExecution,
+		unit:                   engine.NewUnit(),
+		log:                    log,
+		me:                     me,
+		request:                request,
+		state:                  state,
+		receiptHasher:          utils.NewExecutionReceiptHasher(),
+		spockHasher:            utils.NewSPOCKHasher(),
+		blocks:                 blocks,
+		collections:            collections,
+		events:                 events,
+		serviceEvents:          serviceEvents,
+		transactionResults:     transactionResults,
+		computationManager:     executionEngine,
+		providerEngine:         providerEngine,
+		mempool:                mempool,
+		execState:              execState,
+		metrics:                metrics,
+		tracer:                 tracer,
+		extensiveLogging:       extLog,
+		syncFilter:             syncFilter,
+		syncThreshold:          syncThreshold,
+		syncDeltas:             syncDeltas,
+		syncFast:               syncFast,
+		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
+		pauseExecution:         pauseExecution,
 	}
 
 	// move to state syncing engine
@@ -603,11 +603,11 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	broadcasted := false
 
 	if !isExecutedBlockSealed {
-		stakedAtBlock, err := e.checkStakedAtBlock(executableBlock.ID())
+		authorizedAtBlock, err := e.checkAuthorizedAtBlock(executableBlock.ID())
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("could not check staking status")
 		}
-		if stakedAtBlock {
+		if authorizedAtBlock {
 			err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 			if err != nil {
 				e.log.Err(err).Msg("critical: failed to broadcast the receipt")
@@ -626,6 +626,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("final_state", finalState[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
 		Bool("sealed", isExecutedBlockSealed).
 		Bool("broadcasted", broadcasted).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).

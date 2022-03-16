@@ -572,20 +572,25 @@ func main() {
 			validator := consensus.NewValidator(mainMetrics, committee, forks)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
-			aggregator, err := consensus.NewVoteAggregator(node.Logger, lowestViewForVoteProcessing, notifier, voteProcessorFactory)
+			aggregator, err := consensus.NewVoteAggregator(node.Logger,
+				lowestViewForVoteProcessing,
+				notifier,
+				voteProcessorFactory,
+				finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
 			hotstuffModules = &consensus.HotstuffModules{
-				Notifier:             notifier,
-				Committee:            committee,
-				Signer:               signer,
-				Persist:              persist,
-				QCCreatedDistributor: qcDistributor,
-				Forks:                forks,
-				Validator:            validator,
-				Aggregator:           aggregator,
+				Notifier:                notifier,
+				Committee:               committee,
+				Signer:                  signer,
+				Persist:                 persist,
+				QCCreatedDistributor:    qcDistributor,
+				FinalizationDistributor: finalizationDistributor,
+				Forks:                   forks,
+				Validator:               validator,
+				Aggregator:              aggregator,
 			}
 
 			return aggregator, nil
@@ -679,6 +684,7 @@ func main() {
 			}
 
 			comp = comp.WithConsensus(hot)
+			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
 			return comp, nil
 		}).
 		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
