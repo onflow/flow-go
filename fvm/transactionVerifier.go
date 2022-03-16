@@ -143,7 +143,7 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 		if err != nil {
 			return nil, false, err
 		}
-		if v.sigIsForProposalKey(txSig, proposalKey) {
+		if !proposalKeyVerified && v.sigIsForProposalKey(txSig, proposalKey) {
 			proposalKeyVerified = true
 		}
 
@@ -225,7 +225,7 @@ func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.Trans
 	for _, sig := range tx.PayloadSignatures {
 		key := sig.UniqueKeyString()
 		if observedSigs[key] {
-			err := fmt.Errorf("duplicate signatures are provided for the same key")
+			err := fmt.Errorf("duplicate signatures are provided for the same key %s", key)
 			return errors.NewInvalidPayloadSignatureError(sig.Address, sig.KeyIndex, err)
 		}
 		observedSigs[key] = true
@@ -234,7 +234,7 @@ func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.Trans
 	for _, sig := range tx.EnvelopeSignatures {
 		key := sig.UniqueKeyString()
 		if observedSigs[key] {
-			err := fmt.Errorf("duplicate signatures are provided for the same key")
+			err := fmt.Errorf("duplicate signatures are provided for the same key %s", key)
 			return errors.NewInvalidEnvelopeSignatureError(sig.Address, sig.KeyIndex, err)
 		}
 		observedSigs[key] = true
