@@ -199,74 +199,22 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 	return nil
 }
 
-// RpcUnicastOnChannel enforces unicast-dissemination on the specified channel through a corrupted node.
-func (a *AttackNetwork) RpcUnicastOnChannel(corruptedId flow.Identifier,
-	channel network.Channel,
-	event interface{},
-	targetId flow.Identifier) error {
+// Send enforces dissemination of given event via its encapsulated corrupted node networking layer through the Flow network
+func (a *AttackNetwork) Send(event *insecure.Event) error {
 
-	connection, ok := a.corruptedConnections[corruptedId]
+	connection, ok := a.corruptedConnections[event.CorruptedId]
 	if !ok {
-		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", corruptedId)
+		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", event.CorruptedId)
 	}
 
-	msg, err := a.eventToMessage(corruptedId, event, channel, insecure.Protocol_UNICAST, 0, targetId)
+	msg, err := a.eventToMessage(event.CorruptedId, event.FlowProtocolEvent, event.Channel, event.Protocol, event.TargetNum, event.TargetIds...)
 	if err != nil {
-		return fmt.Errorf("could not convert event to unicast message: %w", err)
+		return fmt.Errorf("could not convert event to message: %w", err)
 	}
 
 	err = connection.SendMessage(msg)
 	if err != nil {
-		return fmt.Errorf("could not sent unicast event to corrupted node: %w", err)
-	}
-
-	return nil
-}
-
-// RpcPublishOnChannel enforces a publish-dissemination on the specified channel through a corrupted node.
-func (a *AttackNetwork) RpcPublishOnChannel(corruptedId flow.Identifier,
-	channel network.Channel,
-	event interface{},
-	targetIds ...flow.Identifier) error {
-
-	connection, ok := a.corruptedConnections[corruptedId]
-	if !ok {
-		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", corruptedId)
-	}
-
-	msg, err := a.eventToMessage(corruptedId, event, channel, insecure.Protocol_PUBLISH, 0, targetIds...)
-	if err != nil {
-		return fmt.Errorf("could not convert event to publish message: %w", err)
-	}
-
-	err = connection.SendMessage(msg)
-	if err != nil {
-		return fmt.Errorf("could not sent publish event to corrupted node: %w", err)
-	}
-
-	return nil
-}
-
-// RpcMulticastOnChannel enforces a multicast-dissemination on the specified channel through a corrupted node.
-func (a *AttackNetwork) RpcMulticastOnChannel(corruptedId flow.Identifier,
-	channel network.Channel,
-	event interface{},
-	num uint32,
-	targetIds ...flow.Identifier) error {
-
-	connection, ok := a.corruptedConnections[corruptedId]
-	if !ok {
-		return fmt.Errorf("no connection available for corrupted conduit factory to node %x: ", corruptedId)
-	}
-
-	msg, err := a.eventToMessage(corruptedId, event, channel, insecure.Protocol_MULTICAST, num, targetIds...)
-	if err != nil {
-		return fmt.Errorf("could not convert event to multicast message: %w", err)
-	}
-
-	err = connection.SendMessage(msg)
-	if err != nil {
-		return fmt.Errorf("could not sent multicast event to corrupted node: %w", err)
+		return fmt.Errorf("could not sent event to corrupted node: %w", err)
 	}
 
 	return nil
