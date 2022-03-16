@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
@@ -224,6 +225,14 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.registerNodes(service, fungibleToken, flowToken)
 
 	return nil
+}
+
+func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
+	return math.MaxUint64
+}
+
+func (proc *BootstrapProcedure) MemoryLimit(_ Context) uint64 {
+	return math.MaxUint64
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
