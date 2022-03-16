@@ -12,12 +12,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
@@ -151,8 +152,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 	chainID flow.ChainID) testmock.GenericNode {
 
 	me := LocalFixture(t, identity)
-	net, err := stub.NewNetwork(stateFixture.State, me, hub)
-	require.NoError(t, err)
+	net := stub.NewNetwork(t, stateFixture.State, me, hub)
 
 	parentCtx, cancel := context.WithCancel(context.Background())
 	ctx, _ := irrecoverable.WithSignaler(parentCtx)

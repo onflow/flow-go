@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -34,10 +36,16 @@ type Network struct {
 	conduitFactory network.ConduitFactory
 }
 
+func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
+	return func(n *Network) {
+		n.conduitFactory = factory
+	}
+}
+
 // NewNetwork create a mocked Network.
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
-func NewNetwork(state protocol.State, me module.Local, hub *Hub) (*Network, error) {
+func NewNetwork(t testing.TB, state protocol.State, me module.Local, hub *Hub, opts ...func(*Network)) *Network {
 	net := &Network{
 		ctx:            context.Background(),
 		state:          state,
@@ -48,13 +56,15 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) (*Network, erro
 		conduitFactory: conduit.NewDefaultConduitFactory(),
 	}
 
-	if err := net.conduitFactory.RegisterAdapter(net); err != nil {
-		return nil, fmt.Errorf("could not register adapter to the conduit factory: %w", err)
+	for _, opt := range opts {
+		opt(net)
 	}
+
+	require.NoError(t, net.conduitFactory.RegisterAdapter(net))
 
 	// AddNetwork the Network to a hub so that Networks can find each other.
 	hub.AddNetwork(net)
-	return net, nil
+	return net
 }
 
 // GetID returns the identity of the attached node.
