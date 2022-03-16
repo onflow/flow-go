@@ -9,27 +9,78 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common/testdata"
 )
 
-type TestData struct {
-	directory        string
-	hasFailures      bool
-	hasNoResultTests bool
-}
+func TestGenerateLevel2Summary_Struct(t *testing.T) {
+	testDataMap := map[string]testdata.Level2TestData{
+		"1 level 1 summary, 1 failure the rest pass": {
+			Directory:        "test1-1package-1failure",
+			HasFailures:      true,
+			HasNoResultTests: false,
+			Level1Summaries:  testdata.GetTestData_Level2_1FailureRestPass(),
+		},
 
-func TestProcessSummary2TestRun(t *testing.T) {
-	testDataMap := map[string]TestData{
-		"1 level 1 summary, 1 failure the rest pass":                               {"test1-1package-1failure", true, false},
-		"1 level 1 summary, 1 no-result test, no other tests":                      {"test2-1-no-result-test", false, true},
-		"many level 1 summaries, many no-result tests":                             {"test3-multi-no-result-tests", false, true},
-		"many level 1 summaries, many failures, many passes":                       {"test4-multi-failures", true, false},
-		"many level 1 summaries, many failures, many passes, many no-result tests": {"test5-multi-failures-multi-no-result-tests", true, true},
+		"1 level 1 summary, 1 no-result test, no other tests": {
+			Directory:        "test2-1-no-result-test",
+			HasFailures:      false,
+			HasNoResultTests: true,
+			Level1Summaries:  testdata.GetTestsData_Level2_1NoResultNoOtherTests(),
+		},
+
+		"many level 1 summaries, many no-result tests": {
+			Directory:        "test3-multi-no-result-tests",
+			HasFailures:      false,
+			HasNoResultTests: true,
+			Level1Summaries:  testdata.GetTestData_Level2_MultipleL1SummariesNoResults(),
+		},
+
+		"many level 1 summaries, many failures, many passes": {
+			Directory:        "test4-multi-failures",
+			HasFailures:      true,
+			HasNoResultTests: false,
+			Level1Summaries:  testdata.GetTestData_Level2MultipleL1SummariesFailuresPasses(),
+		},
+
+		"many level 1 summaries, many failures, many passes, many no-result tests": {
+			Directory:        "test5-multi-failures-multi-no-result-tests",
+			HasFailures:      true,
+			HasNoResultTests: true,
+			Level1Summaries:  testdata.GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults(),
+		},
 	}
 
 	for k, testData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
 			setUp(t)
-			runProcessSummary2TestRun(t, testData.directory, testData.hasFailures, testData.hasNoResultTests)
+			// ************************
+			actualLevel2Summary := generateLevel2SummaryFromStructs(testData.Level1Summaries)
+			// ************************
+			checkLevel2Summary(t, actualLevel2Summary, testData)
+			tearDown(t)
+		})
+	}
+}
+
+// TestGenerateLevel2Summary_JSON uses real level 1 JSON files as input
+// Don't want to use too many tests since they are more brittle to changes to JSON data structure.
+// That's why have very few of these. For new tests, it's best to add level 1 data as structs.
+func TestGenerateLevel2Summary_JSON(t *testing.T) {
+	testDataMap := map[string]testdata.Level2TestData{
+		"1 level 1 summary, 1 failure the rest pass": {
+			Directory:        "test1-1package-1failure",
+			Level1DataPath:   "../testdata/summary2/test1-1package-1failure/input",
+			HasFailures:      true,
+			HasNoResultTests: false,
+		},
+	}
+	for k, testData := range testDataMap {
+		t.Run(k, func(t *testing.T) {
+			setUp(t)
+			// ************************
+			actualLevel2Summary := generateLevel2Summary(testData.Level1DataPath)
+			// ************************
+			checkLevel2Summary(t, actualLevel2Summary, testData)
 			tearDown(t)
 		})
 	}
@@ -58,43 +109,43 @@ func deleteMessagesDir(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool, hasNoResultTests bool) {
-	inputTestDataPath := filepath.Join("../testdata/summary2", testDir, "input")
-
-	expectedOutputTestDataPath := filepath.Join("../testdata/summary2", testDir, "expected-output", testDir+".json")
-	expectedFailureMessagesPath := filepath.Join("../testdata/summary2", testDir, "expected-output/failures")
-	expectedNoResultMessagesPath := filepath.Join("../testdata/summary2", testDir, "expected-output/no-results")
-
-	// **************************************************************
-	actualTestSummary2 := processSummary2TestRun(inputTestDataPath)
-	// **************************************************************
+func checkLevel2Summary(t *testing.T, actualLevel2Summary common.Level2Summary, testData testdata.Level2TestData) {
+	expectedOutputTestDataPath := filepath.Join("../testdata/summary2", testData.Directory, "expected-output", testData.Directory+".json")
+	expectedFailureMessagesPath := filepath.Join("../testdata/summary2", testData.Directory, "expected-output/failures")
+	expectedNoResultMessagesPath := filepath.Join("../testdata/summary2", testData.Directory, "expected-output/no-results")
 
 	// read in expected summary level 2
-	var expectedTestSummary2 common.TestSummary2
-	expectedTestSummary2JsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
+	var expectedLevel2Summary common.Level2Summary
+	expectedLevel2SummaryJsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
 	require.Nil(t, err)
-	require.NotEmpty(t, expectedTestSummary2JsonBytes)
-	err = json.Unmarshal(expectedTestSummary2JsonBytes, &expectedTestSummary2)
+	require.NotEmpty(t, expectedLevel2SummaryJsonBytes)
+	err = json.Unmarshal(expectedLevel2SummaryJsonBytes, &expectedLevel2Summary)
 	require.Nil(t, err)
 
-	//check all details of test summary level 2 between expected and actual
-	require.Equal(t, len(expectedTestSummary2.TestResults), len(actualTestSummary2.TestResults))
+	require.Equal(t, len(expectedLevel2Summary.TestResultsMap), len(actualLevel2Summary.TestResultsMap))
 
-	for expectedTestResultSummaryKey := range expectedTestSummary2.TestResults {
-		expectedTestSummary, isFoundExpected := expectedTestSummary2.TestResults[expectedTestResultSummaryKey]
-		actualTestSummary, isFoundActual := actualTestSummary2.TestResults[expectedTestResultSummaryKey]
+	// check every expected test runs level 2 summary exists in map of actual test runs level 2 summaries
+	for expectedLevel2TestResultKey := range expectedLevel2Summary.TestResultsMap {
+		expectedLevel2TestResult := expectedLevel2Summary.TestResultsMap[expectedLevel2TestResultKey]
+		actualLevel2TestResults, isFoundActual := actualLevel2Summary.TestResultsMap[expectedLevel2TestResultKey]
 
-		require.True(t, isFoundExpected)
-		require.True(t, isFoundActual)
+		require.True(t, isFoundActual, common.PrintLevel2TestResult(expectedLevel2TestResult, "expected not in actual"))
 
-		common.AssertTestSummariesEqual(t, *expectedTestSummary, *actualTestSummary)
+		common.AssertLevel2TestResults(t, *expectedLevel2TestResult, *actualLevel2TestResults)
 	}
 
-	// make sure calculated summary level 2 is what we expected
-	require.Equal(t, expectedTestSummary2, actualTestSummary2)
+	// check every actual test runs level 2 summary exists in map of expected test runs level 2 summaries
+	for actualLevel2TestResultKey := range actualLevel2Summary.TestResultsMap {
+		actualLevel2TestResult := actualLevel2Summary.TestResultsMap[actualLevel2TestResultKey]
+		exptectedLevel2TestResult, isFoundExpected := expectedLevel2Summary.TestResultsMap[actualLevel2TestResultKey]
 
-	checkFailureMessages(t, hasFailures, expectedFailureMessagesPath)
-	checkNoResultMessages(t, hasNoResultTests, expectedNoResultMessagesPath)
+		require.True(t, isFoundExpected, common.PrintLevel2TestResult(actualLevel2TestResult, "actual not in expected"))
+
+		common.AssertLevel2TestResults(t, *exptectedLevel2TestResult, *actualLevel2TestResult)
+	}
+
+	checkFailureMessages(t, testData.HasFailures, expectedFailureMessagesPath)
+	checkNoResultMessages(t, testData.HasNoResultTests, expectedNoResultMessagesPath)
 }
 
 // check failure messages created
