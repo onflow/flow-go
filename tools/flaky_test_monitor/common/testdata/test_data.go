@@ -19,11 +19,11 @@ type Level1TestData struct {
 }
 
 type Level2TestData struct {
-	Directory        string
-	Level1DataPath   string
-	HasFailures      bool
-	HasNoResultTests bool
-	Level1Summaries  []common.Level1Summary
+	Directory       string
+	Level1DataPath  string
+	HasFailures     bool
+	HasExceptions   bool
+	Level1Summaries []common.Level1Summary
 }
 
 // ************** Helper Functions *****************
@@ -54,7 +54,7 @@ func getPassedTestPackage(name string, packageName string) common.Level1TestResu
 			Test:       name,
 			Package:    packageName,
 			Result:     "1",
-			NoResult:   false,
+			Exception:  false,
 			Elapsed:    0,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -76,7 +76,7 @@ func getPassedTestElapsed(name string, elapsed float32, elapsedStr string) commo
 			Test:       name,
 			Package:    CRYPTO_HASH_PACKAGE,
 			Result:     "1",
-			NoResult:   false,
+			Exception:  false,
 			Elapsed:    elapsed,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -104,7 +104,7 @@ func getPassedTestElapsedOutput(name string, elapsed float32, elapsedStr string,
 			Test:       name,
 			Package:    CRYPTO_HASH_PACKAGE,
 			Result:     "1",
-			NoResult:   false,
+			Exception:  false,
 			Elapsed:    elapsed,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -127,7 +127,7 @@ func getFailedTest_TestSanitySha2_256() common.Level1TestResultRow {
 			Test:       "TestSanitySha2_256",
 			Package:    CRYPTO_HASH_PACKAGE,
 			Result:     "0",
-			NoResult:   false,
+			Exception:  false,
 			Elapsed:    0,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -163,7 +163,7 @@ func getFailedTest_TestSanitySha3_256() common.Level1TestResultRow {
 			Test:       "TestSanitySha3_256",
 			Package:    CRYPTO_HASH_PACKAGE,
 			Result:     "0",
-			NoResult:   false,
+			Exception:  false,
 			Elapsed:    0,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -190,7 +190,7 @@ func getFailedTest_TestSanitySha3_256() common.Level1TestResultRow {
 	return row
 }
 
-func getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.Level1TestResultRow {
+func getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.Level1TestResultRow {
 	row := common.Level1TestResultRow{
 		TestResult: common.Level1TestResult{
 			CommitSha:  COMMIT_SHA,
@@ -199,7 +199,7 @@ func getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.Level1Test
 			Test:       "TestEncodableRandomBeaconPrivKeyMsgPack",
 			Package:    "github.com/onflow/flow-go/model/encodable",
 			Result:     "0",
-			NoResult:   true,
+			Exception:  true,
 			Elapsed:    0,
 			Output: []struct {
 				Item string "json:\"item\""
@@ -221,12 +221,12 @@ func getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.Level1Test
 // Instead of having to represent these level 1 summaries as JSON files, they are represented as structs
 // to make them easier to maintain.
 
-// GetTestData_Level1_1CountSingleNoResultTest represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Level1_1CountSingleExceptionTest represents a level 1 summary (as exptected output from level 1 parser)
 // with a single no result test and no other tests, count=1.
-func GetTestData_Level1_1CountSingleNoResultTest() common.Level1Summary {
+func GetTestData_Level1_1CountSingleExceptionTest() common.Level1Summary {
 	testRun := common.Level1Summary{
 		Rows: []common.Level1TestResultRow{
-			getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack(),
+			getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack(),
 		},
 	}
 	return testRun
@@ -409,13 +409,13 @@ func GetTestData_Level1_10CountSomeFailures() common.Level1Summary {
 	return level1Summary
 }
 
-// GetTestData_Level1_5CountSingleNoResultTest represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Level1_5CountSingleExceptionTest represents a level 1 summary (as exptected output from level 1 parser)
 // with single no result test, count=5.
-func GetTestData_Level1_5CountSingleNoResultTest() common.Level1Summary {
+func GetTestData_Level1_5CountSingleExceptionTest() common.Level1Summary {
 	var level1TestResultRows []common.Level1TestResultRow
 
 	for i := 0; i < 5; i++ {
-		level1TestResultRows = append(level1TestResultRows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+		level1TestResultRows = append(level1TestResultRows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
 
 	level1Summary := common.Level1Summary{
@@ -424,12 +424,12 @@ func GetTestData_Level1_5CountSingleNoResultTest() common.Level1Summary {
 	return level1Summary
 }
 
-// GetTestData_Level1_5CountMultipleNoResultTests represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Level1_5CountMultipleExceptionTests represents a level 1 summary (as exptected output from level 1 parser)
 // with single no result test and a passed test, count=5.
-func GetTestData_Level1_5CountMultipleNoResultTests() common.Level1Summary {
+func GetTestData_Level1_5CountMultipleExceptionTests() common.Level1Summary {
 	var level1TestResultRows []common.Level1TestResultRow
 	for i := 0; i < 4; i++ {
-		level1TestResultRows = append(level1TestResultRows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+		level1TestResultRows = append(level1TestResultRows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
 	level1TestResultRows = append(level1TestResultRows, getPassedTestPackageElapsedOutput("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable", 0, "0.00", "    keys_test.go:245: bytes: 194\n"))
 
@@ -439,9 +439,9 @@ func GetTestData_Level1_5CountMultipleNoResultTests() common.Level1Summary {
 	return level1Summary
 }
 
-// GetTestData_Leve1_3CountNoResultWithNormalTests represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Leve1_3CountExceptionWithNormalTests represents a level 1 summary (as exptected output from level 1 parser)
 // with single no result test and many passed tests, count=3.
-func GetTestData_Leve1_3CountNoResultWithNormalTests() common.Level1Summary {
+func GetTestData_Leve1_3CountExceptionWithNormalTests() common.Level1Summary {
 	var level1TestResultRows []common.Level1TestResultRow
 
 	for i := 0; i < 3; i++ {
@@ -458,7 +458,7 @@ func GetTestData_Leve1_3CountNoResultWithNormalTests() common.Level1Summary {
 		level1TestResultRows = append(level1TestResultRows, getPassedTestPackage("TestEncodableStakingPubKey", "github.com/onflow/flow-go/model/encodable"))
 		level1TestResultRows = append(level1TestResultRows, getPassedTestPackage("TestEncodableStakingPubKeyNil", "github.com/onflow/flow-go/model/encodable"))
 		level1TestResultRows = append(level1TestResultRows, getPassedTestPackage("TestIsHexString", "github.com/onflow/flow-go/model/encodable"))
-		level1TestResultRows = append(level1TestResultRows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+		level1TestResultRows = append(level1TestResultRows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
 
 	level1Summary := common.Level1Summary{
@@ -498,11 +498,11 @@ func GetTestData_Level2_1FailureRestPass() []common.Level1Summary {
 	return level1Summaries
 }
 
-// GetTestsData_Level2_1NoResultNoOtherTests represents a level 1 summary (as input into a level 2 parser)
+// GetTestsData_Level2_1ExceptionNoOtherTests represents a level 1 summary (as input into a level 2 parser)
 // with a single no result test and no other tests.
-func GetTestsData_Level2_1NoResultNoOtherTests() []common.Level1Summary {
+func GetTestsData_Level2_1ExceptionNoOtherTests() []common.Level1Summary {
 	var testResult1Rows []common.Level1TestResultRow
-	testResult1Rows = append(testResult1Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+	testResult1Rows = append(testResult1Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 
 	level1Summary := common.Level1Summary{
 		Rows: testResult1Rows,
@@ -513,9 +513,9 @@ func GetTestsData_Level2_1NoResultNoOtherTests() []common.Level1Summary {
 	return leve1Summaries
 }
 
-// GetTestData_Level2_MultipleL1SummariesNoResults represents multiple level 1 summaries (as input into a level 2 parser)
+// GetTestData_Level2_MultipleL1SummariesExceptions represents multiple level 1 summaries (as input into a level 2 parser)
 // and many no result tests within the level level 1 summaries.
-func GetTestData_Level2_MultipleL1SummariesNoResults() []common.Level1Summary {
+func GetTestData_Level2_MultipleL1SummariesExceptions() []common.Level1Summary {
 
 	// models level 1 summary with many passed tests and a single no result test, count=3
 	var testResult1Rows []common.Level1TestResultRow
@@ -533,7 +533,7 @@ func GetTestData_Level2_MultipleL1SummariesNoResults() []common.Level1Summary {
 		testResult1Rows = append(testResult1Rows, getPassedTestPackage("TestEncodableStakingPubKey", "github.com/onflow/flow-go/model/encodable"))
 		testResult1Rows = append(testResult1Rows, getPassedTestPackage("TestEncodableStakingPubKeyNil", "github.com/onflow/flow-go/model/encodable"))
 		testResult1Rows = append(testResult1Rows, getPassedTestPackage("TestIsHexString", "github.com/onflow/flow-go/model/encodable"))
-		testResult1Rows = append(testResult1Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+		testResult1Rows = append(testResult1Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
 
 	level1Summary1 := common.Level1Summary{
@@ -542,7 +542,7 @@ func GetTestData_Level2_MultipleL1SummariesNoResults() []common.Level1Summary {
 
 	// models a level 1 summary with a single no result test, count=1
 	var testResult2Rows []common.Level1TestResultRow
-	testResult2Rows = append(testResult2Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+	testResult2Rows = append(testResult2Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	level1Summary2 := common.Level1Summary{
 		Rows: testResult2Rows,
 	}
@@ -550,10 +550,10 @@ func GetTestData_Level2_MultipleL1SummariesNoResults() []common.Level1Summary {
 	// models level 1 summary with count=5 where 4 of the results are "no result" and the 5th one passed
 	var testResult3Rows []common.Level1TestResultRow
 	for i := 0; i < 4; i++ {
-		testResult3Rows = append(testResult3Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+		testResult3Rows = append(testResult3Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
 
-	// the remaining 1 test runs (out of 5) has to be added manually since it wasn't a no-result test
+	// the remaining 1 test runs (out of 5) has to be added manually since it wasn't an exception test
 	testResult3Rows = append(testResult3Rows, getPassedTestPackageElapsedOutput("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable", 0, "0.00", "    keys_test.go:245: bytes: 194\n"))
 
 	level1Summary3 := common.Level1Summary{
@@ -563,7 +563,7 @@ func GetTestData_Level2_MultipleL1SummariesNoResults() []common.Level1Summary {
 	// models level 1 summary for a single no result test, count=5
 	var testResult4Rows []common.Level1TestResultRow
 	for i := 0; i < 5; i++ {
-		testResult4Rows = append(testResult4Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+		testResult4Rows = append(testResult4Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
 
 	level1Summary4 := common.Level1Summary{
@@ -732,9 +732,9 @@ func GetTestData_Level2MultipleL1SummariesFailuresPasses() []common.Level1Summar
 	return level1Summaries
 }
 
-// GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults represents multiple level 1 summaries (as input into a level 2 parser)
+// GetTestData_Level2MultipleL1SummariesFailuresPassesExceptions represents multiple level 1 summaries (as input into a level 2 parser)
 // where there are many passed, failed and no result tests within the level level 1 summaries.
-func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Level1Summary {
+func GetTestData_Level2MultipleL1SummariesFailuresPassesExceptions() []common.Level1Summary {
 	// level 1 summary with many passed tests, 1 failed test, count=1
 	var level1TestResult1Rows []common.Level1TestResultRow
 	level1TestResult1Rows = append(level1TestResult1Rows, getFailedTest_TestSanitySha3_256())
@@ -887,7 +887,7 @@ func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Lev
 		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableStakingPubKey", "github.com/onflow/flow-go/model/encodable"))
 		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestEncodableStakingPubKeyNil", "github.com/onflow/flow-go/model/encodable"))
 		level1TestResult7Rows = append(level1TestResult7Rows, getPassedTestPackage("TestIsHexString", "github.com/onflow/flow-go/model/encodable"))
-		level1TestResult7Rows = append(level1TestResult7Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+		level1TestResult7Rows = append(level1TestResult7Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
 
 	level1Summary7 := common.Level1Summary{
@@ -896,7 +896,7 @@ func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Lev
 
 	// level 1 summary with 1 no result test, count=1
 	var level1TestResult8Rows []common.Level1TestResultRow
-	level1TestResult8Rows = append(level1TestResult8Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+	level1TestResult8Rows = append(level1TestResult8Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 
 	level1Summary8 := common.Level1Summary{
 		Rows: level1TestResult8Rows,
@@ -905,9 +905,9 @@ func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Lev
 	// level 1 summary with 1 no result test, 1 passed test, count=5
 	var level1TestResult9Rows []common.Level1TestResultRow
 	for i := 0; i < 4; i++ {
-		level1TestResult9Rows = append(level1TestResult9Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+		level1TestResult9Rows = append(level1TestResult9Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
-	// the remaining 1 test runs (out of 5) have to be added manually since it wasn't a no-result test
+	// the remaining 1 test runs (out of 5) have to be added manually since it wasn't an exception test
 	level1TestResult9Rows = append(level1TestResult9Rows, getPassedTestPackage("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable"))
 
 	level1Summary9 := common.Level1Summary{
@@ -917,7 +917,7 @@ func GetTestData_Level2MultipleL1SummariesFailuresPassesNoResults() []common.Lev
 	// level 1 summary with 1 no result test, count=5
 	var level1TestResult10Rows []common.Level1TestResultRow
 	for i := 0; i < 5; i++ {
-		level1TestResult10Rows = append(level1TestResult10Rows, getNoResultTest_TestEncodableRandomBeaconPrivKeyMsgPack())
+		level1TestResult10Rows = append(level1TestResult10Rows, getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack())
 	}
 
 	level1Summary10 := common.Level1Summary{

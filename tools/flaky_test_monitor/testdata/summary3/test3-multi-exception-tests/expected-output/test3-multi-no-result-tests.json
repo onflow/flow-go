@@ -1,5 +1,5 @@
 {
-  "no_results": [
+  "exceptions": [
     {
       "test": "TestEncodableRandomBeaconPrivKeyMsgPack3",
       "package": "github.com/onflow/flow-go/model/encodable",
@@ -7,14 +7,13 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "no_result": 33,
+      "exceptions": 33,
       "failure_rate": 0,
       "average_duration": 0,
       "durations": [
         0
       ]
     },
-
     {
       "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
       "package": "github.com/onflow/flow-go/model/encodable",
@@ -22,14 +21,13 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "no_result": 13,
+      "exceptions": 13,
       "failure_rate": 0,
       "average_duration": 0,
       "durations": [
         0
       ]
     },
-
     {
       "test": "TestEncodableRandomBeaconPrivKeyMsgPack4",
       "package": "github.com/onflow/flow-go/model/encodable",
@@ -37,14 +35,13 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "no_result": 12,
+      "exceptions": 12,
       "failure_rate": 0,
       "average_duration": 0,
       "durations": [
         0
       ]
     },
-
     {
       "test": "TestEncodableRandomBeaconPrivKeyMsgPack2",
       "package": "github.com/onflow/flow-go/model/encodable",
@@ -52,7 +49,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "no_result": 3,
+      "exceptions": 3,
       "failure_rate": 0,
       "average_duration": 0,
       "durations": [
@@ -60,12 +57,8 @@
       ]
     }
   ],
-
   "most_failures": [],
-
   "most_failures_total": 0,
-
   "longest_running": [],
-
   "longest_running_total": 0
 }

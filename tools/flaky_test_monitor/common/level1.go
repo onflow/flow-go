@@ -38,7 +38,7 @@ type Level1TestResult struct {
 	Output  []struct {
 		Item string `json:"item"`
 	} `json:"output"`
-	Result   string  `json:"result"`
-	Elapsed  float32 `json:"elapsed"`
-	NoResult bool    `json:"no_result"`
+	Result    string  `json:"result"`
+	Elapsed   float32 `json:"elapsed"`
+	Exception bool    `json:"exception"`
 }

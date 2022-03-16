@@ -56,18 +56,18 @@ func GetCommitSha() string {
 func GetCommitDate() time.Time {
 	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
 	AssertNoError(err, "error parsing COMMIT_DATE")
-	return commitDate.UTC()
+	return commitDate
 }
 
 func GetJobRunDate() time.Time {
 	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
 	AssertNoError(err, "error parsing JOB_STARTED")
-	return jobStarted.UTC()
+	return jobStarted
 }
 
 // IsDirEmpty checks if directory is empty (has no files) and return true if it's empty, false otherwise.
-// Useful for determining whether to delete the failures / no-results directories
-// for cases when there were no failures / no-results.
+// Useful for determining whether to delete the failures / exceptions directories
+// for cases when there were no failures / exceptions.
 // From https://stackoverflow.com/a/30708914/5719544.
 func IsDirEmpty(name string) bool {
 	f, err := os.Open(name)

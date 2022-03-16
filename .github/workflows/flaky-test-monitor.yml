@@ -1,7 +1,12 @@
-name: Flaky Test Summary
+name: Flaky Test Monitor
 
 on:
+  schedule:
+    - cron: '0 */4 * * *' # every 4 hours
   push:
+    branches:
+      - master
+  pull_request: # TODO: remove this before merging
     branches:
       - master
 
@@ -9,6 +14,7 @@ env:
   NUM_RUNS: 1
   GCS_BUCKET: production_ddp_flow_test_metrics
   COMMIT_SHA: ${{ github.sha }}
+  BIGQUERY_TABLE: dev_src_flow_test_metrics.flaky_test_monitor_level_1 # TODO: update to production_src_flow_test_metrics before merging
 
 jobs:
   level1:
@@ -18,8 +24,8 @@ jobs:
       matrix:
         test-category:
           - unit
-          - crypto-unit
-          - integration-unit
+          - unit-crypto
+          - unit-integration
           - integration-common
           - integration-network
           - integration-epochs

@@ -59,27 +59,27 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
 		// this is a single unit test that produces a no result
 		"1 count single no result test": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountSingleNoResultTest(),
+			ExpectedLevel1Summary: testdata.GetTestData_Level1_1CountSingleExceptionTest(),
 			RawJSONTestRunFile:    "test-result-nil-test-single-1-count-pass.json",
 		},
 
 		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
 		//multiple no result tests in a row
 		"5 no result tests in a row": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountSingleNoResultTest(),
+			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountSingleExceptionTest(),
 			RawJSONTestRunFile:    "test-result-nil-test-single-5-count-pass.json",
 		},
 
 		//normal test at the end of a test run with multiple no result tests in front of it
 		"4 no result tests in a row, 1 normal test": {
-			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountMultipleNoResultTests(),
+			ExpectedLevel1Summary: testdata.GetTestData_Level1_5CountMultipleExceptionTests(),
 			RawJSONTestRunFile:    "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
 		},
 
 		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
 		// group of unit tests with a single no result test
 		"3 count no result test with normal tests": {
-			ExpectedLevel1Summary: testdata.GetTestData_Leve1_3CountNoResultWithNormalTests(),
+			ExpectedLevel1Summary: testdata.GetTestData_Leve1_3CountExceptionWithNormalTests(),
 			RawJSONTestRunFile:    "test-result-nil-test-others-normal-3-count-pass.json",
 		},
 	}

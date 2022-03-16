@@ -122,12 +122,12 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 			case "pass":
 				lastTestResultPointer.Result = "1"
 				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
-				lastTestResultPointer.NoResult = false
+				lastTestResultPointer.Exception = false
 
 			case "fail":
 				lastTestResultPointer.Result = "0"
 				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
-				lastTestResultPointer.NoResult = false
+				lastTestResultPointer.Exception = false
 
 			// skipped tests will be removed after all test results are gathered,
 			// since it would be more complicated to remove it here
@@ -159,11 +159,11 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 
 			// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
 			// we want to highlight these tests in Grafana
-			// we do this by setting the NoResult field to true, so we can filter by that field in Grafana
+			// we do this by setting the Exception field to true, so we can filter by that field in Grafana
 			if testResult.Result == "" {
-				// count no-result as a failure
+				// count exception as a failure
 				testResult.Result = "0"
-				testResult.NoResult = true
+				testResult.Exception = true
 			}
 
 			// only include passed or failed tests - don't include skipped tests

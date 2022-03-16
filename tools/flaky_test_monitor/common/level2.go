@@ -21,7 +21,7 @@ type Level2TestResult struct {
 	Passed          int       `json:"passed"`
 	Failed          int       `json:"failed"`
 	Skipped         int       `json:"skipped"`
-	NoResult        int       `json:"no_result"`
+	Exceptions      int       `json:"exceptions"`
 	FailureRate     float32   `json:"failure_rate"`
 	AverageDuration float32   `json:"average_duration"`
 	Durations       []float32 `json:"durations"`
@@ -37,7 +37,7 @@ func AssertLevel2TestResults(t *testing.T, expectedLevel2TestResult, actualLevel
 	require.Equal(t, expectedLevel2TestResult.Passed, actualLevel2TestResult.Passed, "passed not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, expectedLevel2TestResult.Failed, actualLevel2TestResult.Failed, "failed not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, expectedLevel2TestResult.Skipped, actualLevel2TestResult.Skipped, "skipped not equal; test: "+expectedLevel2TestResult.Test)
-	require.Equal(t, expectedLevel2TestResult.NoResult, actualLevel2TestResult.NoResult, "no result not equal; test: "+expectedLevel2TestResult.Test)
+	require.Equal(t, expectedLevel2TestResult.Exceptions, actualLevel2TestResult.Exceptions, "no result not equal; test: "+expectedLevel2TestResult.Test)
 
 	require.Equal(t, expectedLevel2TestResult.FailureRate, actualLevel2TestResult.FailureRate, "failure rate not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, expectedLevel2TestResult.AverageDuration, actualLevel2TestResult.AverageDuration, "avg duration not equal; test: "+expectedLevel2TestResult.Test)
@@ -56,7 +56,7 @@ func PrintLevel2TestResult(level2TestResult *Level2TestResult, message string) s
 	builder.WriteString("\nRuns: " + fmt.Sprintf("%d", level2TestResult.Runs))
 	builder.WriteString("\nPassed: " + fmt.Sprintf("%d", level2TestResult.Passed))
 	builder.WriteString("\nFailed: " + fmt.Sprintf("%d", level2TestResult.Failed))
-	builder.WriteString("\nNo Result: " + fmt.Sprintf("%d", level2TestResult.NoResult))
+	builder.WriteString("\nNo Result: " + fmt.Sprintf("%d", level2TestResult.Exceptions))
 	builder.WriteString("\nSkipped: " + fmt.Sprintf("%d", level2TestResult.Skipped))
 	builder.WriteString("\nAvg Duration: " + fmt.Sprintf("%f", level2TestResult.AverageDuration))
 
