@@ -19,4 +19,7 @@ type CorruptedNodeConnection interface {
 type CorruptedNodeConnector interface {
 	// Connect creates a connection the corruptible conduit factory of the given corrupted identity.
 	Connect(context.Context, flow.Identifier) (CorruptedNodeConnection, error)
+
+	// WithAttackerAddress sets the address of attacker for registration on corruptible conduit factories.
+	WithAttackerAddress(string)
 }
