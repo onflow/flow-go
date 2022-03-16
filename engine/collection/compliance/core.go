@@ -37,6 +37,7 @@ type Core struct {
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
 	voteAggregator    hotstuff.VoteAggregator
+	timeoutAggregator hotstuff.TimeoutAggregator
 }
 
 // NewCore instantiates the business logic for the collector clusters' compliance engine.
@@ -297,6 +298,27 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlock
 		SignerID: originID,
 		SigData:  vote.SigData,
 	})
+	return nil
+}
+
+func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) error {
+	t := &model.TimeoutObject{
+		View:       timeout.View,
+		HighestQC:  timeout.HighestQC,
+		LastViewTC: timeout.LastViewTC,
+		SignerID:   originID,
+		SigData:    timeout.SigData,
+	}
+
+	c.log.Debug().
+		Uint64("view", t.View).
+		Hex("voter", t.SignerID[:]).
+		Str("timeout_id", t.ID().String()).
+		Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
+
+	// forward the timeout to hotstuff for processing
+	c.timeoutAggregator.AddTimeout(t)
+
 	return nil
 }
 
