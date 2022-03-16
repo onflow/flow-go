@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches:
-      - master
       - 'auto-cadence-upgrade/**'
       - staging
       - trying
@@ -66,7 +65,7 @@ jobs:
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 25
-        max_attempts: 2
+        max_attempts: 3
         command: make ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v1

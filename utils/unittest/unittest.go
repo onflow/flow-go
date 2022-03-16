@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -47,21 +48,33 @@ func (s SkipReason) String() string {
 	return "UNKNOWN"
 }
 
+func (s SkipReason) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func ParseSkipReason(reason string) SkipReason {
+	switch reason {
+	case "TEST_FLAKY":
+		return TEST_FLAKY
+	case "TEST_WIP":
+		return TEST_WIP
+	case "TEST_REQUIRES_GCP_ACCESS":
+		return TEST_REQUIRES_GCP_ACCESS
+	case "TEST_DEPRECATED":
+		return TEST_DEPRECATED
+	case "TEST_LONG_RUNNING":
+		return TEST_LONG_RUNNING
+	case "TEST_RESOURCE_INTENSIVE":
+		return TEST_RESOURCE_INTENSIVE
+	default:
+		return 0
+	}
+}
+
 func SkipUnless(t *testing.T, reason SkipReason, message string) {
 	t.Helper()
-	skippedTestList := os.Getenv("SKIPPED_TEST_LIST")
-	if skippedTestList != "" {
-		f, err := os.OpenFile(skippedTestList, os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer f.Close()
-		if _, err := f.WriteString(t.Name() + " " + reason.String()); err != nil {
-			t.Fatal(err)
-		}
-	}
 	if os.Getenv(reason.String()) == "" {
-		t.Skip(message)
+		t.Skip(message + " [" + reason.String() + "]")
 	}
 }
 

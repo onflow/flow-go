@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // ResultReader gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for unit testing)
@@ -34,7 +36,7 @@ func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
 }
 
-func generateLevel1Summary(resultReader ResultReader) common.Level1Summary {
+func generateLevel1Summary(resultReader ResultReader) (common.Level1Summary, map[string]unittest.SkipReason) {
 	reader := resultReader.getReader()
 	scanner := bufio.NewScanner(reader)
 
@@ -45,9 +47,9 @@ func generateLevel1Summary(resultReader ResultReader) common.Level1Summary {
 	err := scanner.Err()
 	common.AssertNoError(err, "error returning EOF for scanner")
 
-	testRun := finalizeLevel1Summary(testResultMap)
+	testRun, skippedTests := finalizeLevel1Summary(testResultMap)
 
-	return testRun
+	return testRun, skippedTests
 }
 
 // Raw JSON result step from `go test -json` execution
@@ -147,14 +149,27 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 	return testResultMap
 }
 
-func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) common.Level1Summary {
+func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) (common.Level1Summary, map[string]unittest.SkipReason) {
 	var level1Summary common.Level1Summary
+	skippedTests := make(map[string]unittest.SkipReason)
 
 	for _, testResults := range testResultMap {
 		for _, testResult := range testResults {
-			// don't add skipped tests since they can't be used to compute an average pass rate
 			if testResult.Result == "skip" {
-				continue
+				output := testResult.Output[len(testResult.Output)-2].Item
+				r := regexp.MustCompile(`\[([a-zA-Z0-9_]+)\]$`)
+				matches := r.FindStringSubmatch(output)
+				if len(matches) == 2 {
+					skipReason := unittest.ParseSkipReason(matches[1])
+					if skipReason != 0 {
+						skippedTests[testResult.Test] = skipReason
+
+						// don't add skipped tests since they can't be used to compute an average pass rate
+						continue
+					}
+				}
+
+				panic("could not parse skip reason from test output: " + output)
 			}
 
 			// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
@@ -172,7 +187,7 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 		}
 	}
 
-	return level1Summary
+	return level1Summary, skippedTests
 }
 
 // level 1 flaky test summary processor
@@ -181,7 +196,11 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 func main() {
 	resultReader := StdinResultReader{}
 
-	testRun := generateLevel1Summary(resultReader)
+	testRun, skippedTests := generateLevel1Summary(resultReader)
 
 	common.SaveToFile(resultReader.getResultsFileName(), testRun)
+
+	if len(os.Args) > 2 {
+		common.SaveToFile(os.Args[2], skippedTests)
+	}
 }

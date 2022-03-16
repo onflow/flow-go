@@ -95,7 +95,7 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 				rawJsonFile: filepath.Join(rawJsonFilePath, testData.RawJSONTestRunFile),
 			}
 			// *****************************************************
-			actualLevel1Summary := generateLevel1Summary(&resultReader)
+			actualLevel1Summary, _ := generateLevel1Summary(&resultReader)
 			// *****************************************************
 			require.ElementsMatch(t, testData.ExpectedLevel1Summary.Rows, actualLevel1Summary.Rows)
 		})
@@ -154,7 +154,7 @@ func runGenerateLevel1Summary(t *testing.T, jsonExpectedActualFile string) commo
 		rawJsonFile: filepath.Join(rawJsonFilePath, jsonExpectedActualFile),
 	}
 	// *****************************************************
-	actualLevel1Summary := generateLevel1Summary(&resultReader)
+	actualLevel1Summary, _ := generateLevel1Summary(&resultReader)
 	// *****************************************************
 	return actualLevel1Summary
 }

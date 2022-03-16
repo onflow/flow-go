@@ -42,9 +42,6 @@ export JSON_OUTPUT=true
 export TEST_FLAKY=true
 export TEST_LONG_RUNNING=true
 
-touch skipped_tests.txt
-export SKIPPED_TEST_LIST=$(realpath skipped_tests.txt)
-
 # run tests and process results
 if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then
@@ -65,10 +62,6 @@ else
         ;;
     esac
 fi
-
-# TODO: upload skipped tests list to bigquery
-# we should only have to do this step for pushes to master
-cat $SKIPPED_TEST_LIST
 
 GCS_URI="gs://$GCS_BUCKET/${JOB_STARTED%T*}/$TEST_CATEGORY-$JOB_ID.json"
 
