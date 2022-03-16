@@ -494,6 +494,10 @@ type testRuntime struct {
 
 var _ runtime.Runtime = &testRuntime{}
 
+func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
+	panic("SetInvalidatedResourceValidationEnabled not expected")
+}
+
 func (e *testRuntime) SetTracingEnabled(_ bool) {
 	panic("SetTracingEnabled not expected")
 }
