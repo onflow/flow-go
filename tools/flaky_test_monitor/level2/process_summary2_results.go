@@ -78,16 +78,15 @@ func generateLevel2SummaryFromStructs(level1Summaries []common.Level1Summary) co
 	return level2Summary
 }
 
-// process level 1 summary files in a single directory and output level 2 summary
+// generateLevel2Summary processes level 1 summary files in a single directory and output level 2 summary
 func generateLevel2Summary(level1Directory string) common.Level2Summary {
-	level1Summaries := buildLevel1SummariesFromJSON(level1Directory)
-	level2Summary := generateLevel2SummaryFromStructs(level1Summaries)
-	return level2Summary
+	level1Summaries := readLevel1SummariesFromJSON(level1Directory)
+	return generateLevel2SummaryFromStructs(level1Summaries)
 }
 
-// buildLevel1SummariesFromJSON creates level 1 summaries so the same function can be used to process level 1
+// readLevel1SummariesFromJSON reads level 1 summaries so the same function can be used to process level 1
 // summaries whether they were created from JSON files (used in production) or from pre-constructed level 1 summary structs (used by testing)
-func buildLevel1SummariesFromJSON(level1Directory string) []common.Level1Summary {
+func readLevel1SummariesFromJSON(level1Directory string) []common.Level1Summary {
 	var level1Summaries []common.Level1Summary
 	dirEntries, err := os.ReadDir(filepath.Join(level1Directory))
 	common.AssertNoError(err, "error reading level 1 directory")

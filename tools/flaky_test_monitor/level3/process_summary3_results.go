@@ -8,26 +8,8 @@ import (
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-// generateLevel3Summary processes a level 2 summary and produces level 3 summary which summarizes:
-// most failed tests, tests with no-results, longest running tests.
-func generateLevel3Summary(level2FilePath string, propertyFileDirectory string) common.Level3Summary {
-
+func generateLevel3SummaryFromStructs(level2Summary common.Level2Summary, propertyFileDirectory string) common.Level3Summary {
 	config := common.ReadProperties(propertyFileDirectory)
-
-	var level2Summary common.Level2Summary
-
-	level2JsonBytes, err := os.ReadFile(level2FilePath)
-	common.AssertNoError(err, "error reading level 2 json")
-
-	err = json.Unmarshal(level2JsonBytes, &level2Summary)
-	common.AssertNoError(err, "error unmarshalling level 2 test run")
-
-	// there should be at least 1 level 2 test result in the supplied file
-	// if the json format is different in the supplied file, there won't be a marshalling error thrown
-	// this is an indirect way to tell if the json format was wrong (i.e. not a level 2 json format)
-	if len(level2Summary.TestResultsMap) == 0 {
-		panic("invalid summary 2 file - no test results found")
-	}
 
 	// create lists to keep track of 3 main things
 	// 1. tests with no-results (ordered by most no-results)
@@ -91,6 +73,34 @@ func generateLevel3Summary(level2FilePath string, propertyFileDirectory string) 
 	level3Summary.LongestRunning = durationTRS
 
 	return level3Summary
+}
+
+// generateLevel3Summary processes a level 2 summary and produces level 3 summary which summarizes:
+// most failed tests, tests with no-results, longest running tests.
+func generateLevel3Summary(level2FilePath string, propertyFileDirectory string) common.Level3Summary {
+	level2Summary := readLevel2SummaryFromJSON(level2FilePath)
+	return generateLevel3SummaryFromStructs(level2Summary, propertyFileDirectory)
+}
+
+// readLevel2SummaryFromJSON creates level 2 summary so the same function can be used to process level 2
+// summary whether it was created from JSON files (used in production) or from pre-constructed level 2 summary structs (used by testing)
+func readLevel2SummaryFromJSON(level2FilePath string) common.Level2Summary {
+	var level2Summary common.Level2Summary
+
+	level2JsonBytes, err := os.ReadFile(level2FilePath)
+	common.AssertNoError(err, "error reading level 2 json")
+
+	err = json.Unmarshal(level2JsonBytes, &level2Summary)
+	common.AssertNoError(err, "error unmarshalling level 2 test run")
+
+	// there should be at least 1 level 2 test result in the supplied file
+	// if the json format is different in the supplied file, there won't be a marshalling error thrown
+	// this is an indirect way to tell if the json format was wrong (i.e. not a level 2 json format)
+	if len(level2Summary.TestResultsMap) == 0 {
+		panic("invalid summary 2 file - no test results found")
+	}
+
+	return level2Summary
 }
 
 func main() {
