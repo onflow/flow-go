@@ -220,12 +220,24 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		txFee, err := cadence.NewUFix64("0.01")
 		require.NoError(t, err)
 
-		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
+		cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
 			{
 				createAccountTx,
 				spamTx,
 			},
-		}, txFee, fvm.DefaultMinimumStorageReservation)
+		},
+			[]fvm.Option{
+				fvm.WithTransactionFeesEnabled(true),
+				fvm.WithAccountStorageLimit(true),
+				// make sure we don't run out of memory first.
+				fvm.WithMemoryLimit(20_000_000_000),
+			}, []fvm.BootstrapProcedureOption{
+				fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+				fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+				fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+				fvm.WithTransactionFee(txFee),
+				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			})
 
 		// no error
 		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
