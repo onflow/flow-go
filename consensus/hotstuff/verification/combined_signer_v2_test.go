@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -79,7 +80,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
 	require.NoError(t, err)
 
-	expectedSig := signature.EncodeDoubleSig(stakingSig, beaconSig)
+	expectedSig := msig.EncodeDoubleSig(stakingSig, beaconSig)
 	require.Equal(t, expectedSig, proposal.SigData)
 
 	// vote should be valid
@@ -195,8 +196,8 @@ func Test_VerifyQC(t *testing.T) {
 	sigData := unittest.QCSigDataFixture()
 
 	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
-	require.ErrorIs(t, err, model.ErrInvalidFormat)
+	require.True(t, model.IsInvalidFormatError(err))
 
 	err = verifier.VerifyQC(nil, sigData, block)
-	require.ErrorIs(t, err, model.ErrInvalidFormat)
+	require.True(t, model.IsInvalidFormatError(err))
 }

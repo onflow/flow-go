@@ -4,11 +4,11 @@
 package verification
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
@@ -46,7 +46,7 @@ func NewCombinedVerifierV3(committee hotstuff.Committee, packer hotstuff.Packer)
 // VerifyVote verifies the validity of a combined signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
-// * model.ErrInvalidFormat if the signature has an incompatible format.
+// * model.InvalidFormatError if the signature has an incompatible format.
 // * model.ErrInvalidSignature is the signature is invalid
 // * model.InvalidSignerError if signer is _not_ part of the random beacon committee
 // * unexpected errors should be treated as symptoms of bugs or uncovered
@@ -58,13 +58,16 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 	// create the to-be-signed message
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	sigType, sig, err := signature.DecodeSingleSig(sigData)
+	sigType, sig, err := msig.DecodeSingleSig(sigData)
 	if err != nil {
-		return fmt.Errorf("could not decode signature for block %v: %w", block.BlockID, err)
+		if errors.Is(err, msig.ErrInvalidSignatureFormat) {
+			return model.NewInvalidFormatErrorf("could not decode signature for block %v: %w", block.BlockID, err)
+		}
+		return fmt.Errorf("unexpected internal error while decoding signature for block %v: %w", block.BlockID, err)
 	}
 
 	switch sigType {
-	case hotstuff.SigTypeStaking:
+	case encoding.SigTypeStaking:
 		// verify each signature against the message
 		stakingValid, err := signer.StakingPubKey.Verify(sig, msg, c.stakingHasher)
 		if err != nil {
@@ -74,7 +77,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 			return fmt.Errorf("invalid staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 		}
 
-	case hotstuff.SigTypeRandomBeacon:
+	case encoding.SigTypeRandomBeacon:
 		dkg, err := c.committee.DKG(block.BlockID)
 		if err != nil {
 			return fmt.Errorf("could not get dkg: %w", err)
@@ -97,7 +100,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 		}
 
 	default:
-		return fmt.Errorf("invalid signature type %d: %w", sigType, model.ErrInvalidFormat)
+		return model.NewInvalidFormatErrorf("invalid signature type %d", sigType)
 	}
 
 	return nil
@@ -107,7 +110,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 // given block. It is the responsibility of the calling code to ensure
 // that all `voters` are authorized, without duplicates. Return values:
 //  - nil if `sigData` is cryptographically valid
-//  - model.ErrInvalidFormat if `sigData` has an incompatible format
+//  - model.InvalidFormatError if `sigData` has an incompatible format
 //  - model.ErrInvalidSignature if a signature is invalid
 //  - model.InvalidSignerError if a signer is _not_ part of the random beacon committee
 //  - error if running into any unexpected exception (i.e. fatal error)
@@ -168,7 +171,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 		// To construct a valid QC, the node generating it must have collected _more_ than `threshold` signatures.
 		// Reporting fewer random beacon signers, the node is purposefully miss-representing node contributions.
 		// We reject QCs with under-reported random beacon signers to reduce the surface of potential grieving attacks.
-		return fmt.Errorf("require at least %d random beacon sig shares but only got %d: %w", threshold+1, numRbSigners, model.ErrInvalidFormat)
+		return model.NewInvalidFormatErrorf("require at least %d random beacon sig shares but only got %d", threshold+1, numRbSigners)
 	}
 	beaconPubKeys := make([]crypto.PublicKey, 0, numRbSigners)
 	for _, signerID := range blockSigData.RandomBeaconSigners {
@@ -201,7 +204,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	numStakingSigners := len(blockSigData.StakingSigners)
 	if numStakingSigners == 0 {
 		if len(blockSigData.AggregatedStakingSig) > 0 {
-			return fmt.Errorf("all replicas signed with random beacon keys, but QC has aggregated staking sig for block %v: %w", block.BlockID, model.ErrInvalidFormat)
+			return model.NewInvalidFormatErrorf("all replicas signed with random beacon keys, but QC has aggregated staking sig for block %v", block.BlockID)
 		}
 		// no aggregated staking sig to verify
 		return nil

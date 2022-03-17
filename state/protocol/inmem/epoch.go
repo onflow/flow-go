@@ -3,10 +3,11 @@ package inmem
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -168,7 +169,7 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 	rootQCVoteData := qcs[index]
 
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(members.NodeIDs(), rootQCVoteData.VoterIDs)
+	signerIndices, err := signature.EncodeSignersToIndices(members.NodeIDs(), rootQCVoteData.VoterIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode signer indices for rootQCVoteData.VoterIDs: %w", err)
 	}

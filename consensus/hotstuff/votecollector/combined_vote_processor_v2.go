@@ -167,9 +167,9 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if p.done.Load() {
 		return nil
 	}
-	stakingSig, randomBeaconSig, err := signature.DecodeDoubleSig(vote.SigData)
+	stakingSig, randomBeaconSig, err := msig.DecodeDoubleSig(vote.SigData)
 	if err != nil {
-		if errors.Is(err, model.ErrInvalidFormat) {
+		if errors.Is(err, msig.ErrInvalidSignatureFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)

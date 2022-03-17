@@ -41,5 +41,10 @@ func ClearBit(b []byte, i int) {
 
 // MakeBitVector allocates a byte slice of minimal size that can hold numberBits.
 func MakeBitVector(numberBits int) []byte {
-	return make([]byte, (numberBits+7)>>3)
+	return make([]byte, PaddedByteSliceLength(numberBits))
+}
+
+// PaddedByteSliceLength returns the minimal length of a byte slice that can store n bits.
+func PaddedByteSliceLength(n int) int {
+	return (n + 7) >> 3
 }

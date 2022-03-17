@@ -5,25 +5,25 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEncodeDecodeStakingSig(t *testing.T) {
 	sig := unittest.SignatureFixture()
-	encoded := EncodeSingleSig(hotstuff.SigTypeStaking, sig)
+	encoded := EncodeSingleSig(encoding.SigTypeStaking, sig)
 	decodedType, decodedSig, err := DecodeSingleSig(encoded)
 	require.NoError(t, err)
-	require.Equal(t, hotstuff.SigTypeStaking, decodedType)
+	require.Equal(t, encoding.SigTypeStaking, decodedType)
 	require.Equal(t, sig, decodedSig)
 }
 
 func TestEncodeDecodeRandomBeaconSig(t *testing.T) {
 	sig := unittest.SignatureFixture()
-	encoded := EncodeSingleSig(hotstuff.SigTypeRandomBeacon, sig)
+	encoded := EncodeSingleSig(encoding.SigTypeRandomBeacon, sig)
 	decodedType, decodedSig, err := DecodeSingleSig(encoded)
 	require.NoError(t, err)
-	require.Equal(t, hotstuff.SigTypeRandomBeacon, decodedType)
+	require.Equal(t, encoding.SigTypeRandomBeacon, decodedType)
 	require.Equal(t, sig, decodedSig)
 }
 
@@ -31,8 +31,8 @@ func TestEncodeDecodeRandomBeaconSig(t *testing.T) {
 func TestEncodeDecodeInvalidSig(t *testing.T) {
 	sig := unittest.SignatureFixture()
 
-	for i := int(hotstuff.SigTypeRandomBeacon) + 1; i < int(hotstuff.SigTypeRandomBeacon)+5; i++ {
-		sigType := hotstuff.SigType(i)
+	for i := int(encoding.SigTypeRandomBeacon) + 1; i < int(encoding.SigTypeRandomBeacon)+5; i++ {
+		sigType := encoding.SigType(i)
 		encoded := EncodeSingleSig(sigType, sig)
 		_, _, err := DecodeSingleSig(encoded)
 		require.Error(t, err)
@@ -48,15 +48,15 @@ func TestDecodeEmptySig(t *testing.T) {
 func TestEncodeTwoSigsDifferent(t *testing.T) {
 	sigs := unittest.SignaturesFixture(2)
 	sig1, sig2 := sigs[0], sigs[1]
-	encodedSig1 := EncodeSingleSig(hotstuff.SigTypeStaking, sig1)
-	encodedSig2 := EncodeSingleSig(hotstuff.SigTypeStaking, sig2)
+	encodedSig1 := EncodeSingleSig(encoding.SigTypeStaking, sig1)
+	encodedSig2 := EncodeSingleSig(encoding.SigTypeStaking, sig2)
 	require.NotEqual(t, encodedSig1, encodedSig2)
 }
 
 // encode the same sig with the different type, the encoded sig should be different
 func TestEncodeSameSigWithDifferentTypeShouldBeDifferen(t *testing.T) {
 	sig := unittest.SignatureFixture()
-	encodedAsStaking := EncodeSingleSig(hotstuff.SigTypeStaking, sig)
-	encodedAsRandomBeacon := EncodeSingleSig(hotstuff.SigTypeRandomBeacon, sig)
+	encodedAsStaking := EncodeSingleSig(encoding.SigTypeStaking, sig)
+	encodedAsRandomBeacon := EncodeSingleSig(encoding.SigTypeRandomBeacon, sig)
 	require.NotEqual(t, encodedAsStaking, encodedAsRandomBeacon)
 }

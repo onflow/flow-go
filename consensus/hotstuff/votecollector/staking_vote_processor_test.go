@@ -3,6 +3,8 @@ package votecollector
 import (
 	"errors"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"sync"
 	"testing"
 
@@ -21,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -156,7 +157,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	// prepare test setup: 13 votes with staking sigs
 	stakingSigners := s.allParticipants[:14].NodeIDs()
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(stakingSigners, stakingSigners)
+	signerIndices, err := signature.EncodeSignersToIndices(stakingSigners, stakingSigners)
 	require.NoError(s.T(), err)
 
 	// setup aggregator
