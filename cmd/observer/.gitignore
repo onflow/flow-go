@@ -1,0 +1,7 @@
+# Access node binary
+observer
+
+# Data directories of running collection nodes
+data*
+
+crypto/relic

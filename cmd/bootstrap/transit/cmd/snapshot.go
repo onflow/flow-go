@@ -20,8 +20,8 @@ import (
 // from an access node and write to disk
 var snapshotCmd = &cobra.Command{
 	Use:   "snapshot",
-	Short: "Download the latest protocol state snapshot from an access node and write to disk",
-	Long:  `Download the latest protocol state snapshot from an access node and write to disk`,
+	Short: "Download the latest protocol state snapshot from an access node, or observer service, and write to disk",
+	Long:  `Download the latest protocol state snapshot from an access node, or observer service, and write to disk`,
 	Run:   snapshot,
 }
 

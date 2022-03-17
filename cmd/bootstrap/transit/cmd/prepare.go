@@ -20,7 +20,7 @@ func init() {
 }
 
 func addPrepareCmdFlags() {
-	prepareCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	prepareCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification", "observer" or "access")`)
 	_ = prepareCmd.MarkFlagRequired("role")
 }
 

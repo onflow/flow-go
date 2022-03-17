@@ -49,7 +49,7 @@ type ContainerConfig struct {
 	Ghost                 bool
 	AdditionalFlags       []string
 	Debug                 bool
-	SupportsUnstakedNodes bool
+	SupportsObserverNodes bool
 }
 
 func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr sdk.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
@@ -105,7 +105,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		Ghost:                 conf.Ghost,
 		AdditionalFlags:       conf.AdditionalFlags,
 		Debug:                 conf.Debug,
-		SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
+		SupportsObserverNodes: conf.SupportsObserverNodes,
 	}
 
 	return containerConf
