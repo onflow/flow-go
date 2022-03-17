@@ -20,13 +20,6 @@ case $TEST_CATEGORY in
     ;;
 esac
 
-# save result processing script command for later use
-export TEST_RESULT_FILE=test-results-level1.json
-
-process_results="go run $(realpath ./level1/process_summary1_results.go) $TEST_RESULT_FILE"
-
-cd ../..
-
 # checkout specified commit
 if [[ -n $COMMIT_SHA ]]
 then
@@ -42,31 +35,36 @@ export JSON_OUTPUT=true
 export TEST_FLAKY=true
 export TEST_LONG_RUNNING=true
 
+OUTPUT_FILE=output.txt
+
 # run tests and process results
 if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then
     make docker-build-flow
-    make -C integration -s ${BASH_REMATCH[1]}-tests | $process_results
+    make -C integration -s ${BASH_REMATCH[1]}-tests > $OUTPUT_FILE
 else
     case $TEST_CATEGORY in
         unit)
             make install-mock-generators
             make generate-mocks
-            make -s unittest-main | $process_results
+            make -s unittest-main > $OUTPUT_FILE
         ;;
         unit-crypto)
-            make -C crypto -s test | $process_results
+            make -C crypto setup
+            make -C crypto -s test > $OUTPUT_FILE
         ;;
         unit-integration)
-            make -C integration -s test | $process_results
+            make -C integration -s test > $OUTPUT_FILE
         ;;
     esac
 fi
 
+cat $OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go results.json
+
 GCS_URI="gs://$GCS_BUCKET/${JOB_STARTED%T*}/$TEST_CATEGORY-$JOB_ID.json"
 
 # upload results to GCS bucket
-gsutil cp $TEST_RESULT_FILE $GCS_URI
+gsutil cp results.json $GCS_URI
 
 # upload results to BigQuery
 bq load --source_format=NEWLINE_DELIMITED_JSON --autodetect $BIGQUERY_TABLE $GCS_URI

@@ -43,11 +43,21 @@ cmd/collection/collection:
 cmd/util/util:
 	go build -o cmd/util/util --tags relic cmd/util/main.go
 
+############################################################################################
+# CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR
+
+.PHONY: unittest-main
+unittest-main:
+	# test all packages with Relic library enabled
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
     GO111MODULE=on go install github.com/vektra/mockery/cmd/mockery@v1.1.2; \
     GO111MODULE=on go install github.com/golang/mock/mockgen@v1.3.1;
+
+############################################################################################
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version install-mock-generators
@@ -57,11 +67,6 @@ install-tools: crypto/relic/build check-go-version install-mock-generators
 	GO111MODULE=on go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
 	GO111MODULE=on go install golang.org/x/tools/cmd/stringer@master;
-
-.PHONY: unittest-main
-unittest-main:
-	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
 
 .PHONY: unittest
 unittest: unittest-main
@@ -144,9 +149,6 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=engine/verification/fetcher/ -case=underscore -output="./engine/verification/fetcher/mock" -outpkg="mockfetcher"
 	GO111MODULE=on mockery -name '.*' -dir=insecure/ -case=underscore -output="./insecure/mock"  -outpkg="mockinsecure"
 	GO111MODULE=on mockery -name '.*' -dir=./cmd/util/ledger/reporters -case=underscore -output="./cmd/util/ledger/reporters/mock" -outpkg="mock"
-
-
-
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy

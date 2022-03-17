@@ -47,7 +47,6 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run flakiness summary script
-      working-directory: ./tools/flaky_test_monitor
-      run: ./flaky-test-monitor-level1.sh
+      run: ./tools/flaky_test_monitor/flaky-test-monitor-level1.sh
       env:
         TEST_CATEGORY: ${{ matrix.test-category }}
