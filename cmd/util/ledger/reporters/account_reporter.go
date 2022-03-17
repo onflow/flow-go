@@ -25,9 +25,10 @@ import (
 // AccountReporter iterates through registers keeping a map of register sizes
 // reports on storage metrics
 type AccountReporter struct {
-	Log   zerolog.Logger
-	RWF   ReportWriterFactory
-	Chain flow.Chain
+	Log                      zerolog.Logger
+	PreviousStateCommitement flow.StateCommitment
+	RWF                      ReportWriterFactory
+	Chain                    flow.Chain
 }
 
 var _ ledger.Reporter = &AccountReporter{}
