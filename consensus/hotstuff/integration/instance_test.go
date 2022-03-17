@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
-	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
@@ -31,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/packer"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -209,7 +207,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				View:     block.View,
 				BlockID:  block.BlockID,
 				SignerID: in.localID,
-				SigData:  unittest.RandomBytes(hsig.SigLen * 2), // double sig, one staking, one beacon
+				SigData:  unittest.RandomBytes(msig.SigLen * 2), // double sig, one staking, one beacon
 			}
 			return vote
 		},
@@ -222,8 +220,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				voterIDs = append(voterIDs, vote.SignerID)
 			}
 
-			signerIndices, err := packer.EncodeSignerIdentifiersToIndices(in.participants.NodeIDs(), voterIDs)
-			require.NoError(t, err, "could not encode signer indices")
+			signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), voterIDs)
+			require.NoError(t, fmt.Errorf("could not encode signer indices: %w", err))
 
 			qc := &flow.QuorumCertificate{
 				View:          votes[0].View,
@@ -390,7 +388,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 }
 
 func toIndices(all []flow.Identifier, signers []flow.Identifier) ([]byte, error) {
-	return packer.EncodeSignerIdentifiersToIndices(all, signers)
+	return msig.EncodeSignersToIndices(all, signers)
 }
 
 func (in *Instance) Run() error {

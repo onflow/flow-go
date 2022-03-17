@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/packer"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -51,14 +52,13 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
 	}
 
-	signerIndices, err := packer.DecodeSignerIndices(qc.SignerIndices, len(allParticipants))
+	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, qc.SignerIndices)
 	if err != nil {
-		return newInvalidBlockError(block, fmt.Errorf("qc.SignerIndices is invalid: %w", err))
-	}
-
-	signers, err := packer.FilterByIndices(allParticipants, signerIndices)
-	if err != nil {
-		return newInvalidBlockError(block, fmt.Errorf("could not find signers by indices: %w", err))
+		if errors.Is(err, signature.IllegallyPaddedBitVectorError) || errors.Is(err, signature.IncompatibleBitVectorLengthError) {
+			return newInvalidBlockError(block, fmt.Errorf("invalid signer indices: %w", err))
+		}
+		// unexpected error
+		return fmt.Errorf("unexpected internal error decoding signer indices: %w", err)
 	}
 
 	// determine whether signers reach minimally required stake threshold for consensus
@@ -76,7 +76,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
 		//       we expect `model.InvalidSignerError` here during normal operations.
 		switch {
-		case errors.Is(err, model.ErrInvalidFormat):
+		case model.IsInvalidFormatError(err):
 			return newInvalidBlockError(block, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidBlockError(block, fmt.Errorf("QC contains invalid signature(s): %w", err))
@@ -164,7 +164,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		// the random beacon committee. Consequently, `InvalidSignerError` should not occur atm.
 		// TODO: if the random beacon committee is a strict subset of the HotStuff committee,
 		//       we expect `model.InvalidSignerError` here during normal operations.
-		if errors.Is(err, model.ErrInvalidFormat) || errors.Is(err, model.ErrInvalidSignature) {
+		if model.IsInvalidFormatError(err) || errors.Is(err, model.ErrInvalidSignature) {
 			return nil, newInvalidVoteError(vote, err)
 		}
 		return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)

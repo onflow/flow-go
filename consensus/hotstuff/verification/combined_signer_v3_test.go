@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -76,7 +77,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
 	require.NoError(t, err)
 
-	expectedSig := signature.EncodeSingleSig(hotstuff.SigTypeRandomBeacon, beaconSig)
+	expectedSig := msig.EncodeSingleSig(encoding.SigTypeRandomBeacon, beaconSig)
 	require.Equal(t, expectedSig, proposal.SigData)
 
 	// Vote from a node that is _not_ part of the Random Beacon committee should be rejected.
@@ -145,7 +146,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
 	require.NoError(t, err)
 
-	expectedSig := signature.EncodeSingleSig(hotstuff.SigTypeStaking, stakingSig)
+	expectedSig := msig.EncodeSingleSig(encoding.SigTypeStaking, stakingSig)
 
 	// check the signature only has staking sig
 	require.Equal(t, expectedSig, proposal.SigData)
@@ -223,7 +224,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
-		require.ErrorIs(t, err, model.ErrInvalidFormat)
+		require.True(t, model.IsInvalidFormatError(err))
 	})
 
 	// Modify the correct QC: empty list of random beacon signers.
@@ -236,7 +237,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
-		require.ErrorIs(t, err, model.ErrInvalidFormat)
+		require.True(t, model.IsInvalidFormatError(err))
 	})
 
 	// Modify the correct QC: too few random beacon signers.
@@ -252,7 +253,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
-		require.ErrorIs(t, err, model.ErrInvalidFormat)
+		require.True(t, model.IsInvalidFormatError(err))
 	})
 
 }

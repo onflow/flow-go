@@ -1,9 +1,10 @@
 package signature
 
 import (
-	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/onflow/flow-go/model/encoding"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -12,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	pcker "github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -67,13 +68,13 @@ func TestPackUnpack(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
+	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(committee, signerIndices)
 	require.NoError(t, err)
 
 	unpacked, err := packer.Unpack(signerIDs, sig)
 	require.NoError(t, err)
 
-	// check that the unpack data match with the original data
+	// check that the unpacked data match with the original data
 	require.Equal(t, blockSigData.StakingSigners, unpacked.StakingSigners)
 	require.Equal(t, blockSigData.RandomBeaconSigners, unpacked.RandomBeaconSigners)
 	require.Equal(t, blockSigData.AggregatedStakingSig, unpacked.AggregatedStakingSig)
@@ -114,7 +115,7 @@ func TestPackUnpackManyNodes(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
+	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(committee, signerIndices)
 	require.NoError(t, err)
 
 	unpacked, err := packer.Unpack(signerIDs, sig)
@@ -134,7 +135,7 @@ func TestPackUnpackManyNodes(t *testing.T) {
 	require.Equal(t, expectedSignerIDs, signerIDs)
 }
 
-// if the sig data can not be decoded, return ErrInvalidFormat
+// if the sig data can not be decoded, return model.InvalidFormatError
 func TestFailToDecode(t *testing.T) {
 	identities := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
 	committee := identities.NodeIDs()
@@ -149,7 +150,7 @@ func TestFailToDecode(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
+	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(committee, signerIndices)
 	require.NoError(t, err)
 
 	// prepare invalid data by modifying the valid data
@@ -157,8 +158,7 @@ func TestFailToDecode(t *testing.T) {
 
 	_, err = packer.Unpack(signerIDs, invalidSigData)
 
-	require.Error(t, err)
-	require.True(t, errors.Is(err, model.ErrInvalidFormat))
+	require.True(t, model.IsInvalidFormatError(err))
 }
 
 // if the signer IDs doesn't match, return InvalidFormatError
@@ -176,7 +176,7 @@ func TestMismatchSignerIDs(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
+	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(committee, signerIndices)
 	require.NoError(t, err)
 
 	// prepare invalid signerIDs by modifying the valid signerIDs
@@ -185,8 +185,7 @@ func TestMismatchSignerIDs(t *testing.T) {
 
 	_, err = packer.Unpack(invalidSignerIDs, sig)
 
-	require.Error(t, err)
-	require.True(t, errors.Is(err, model.ErrInvalidFormat))
+	require.True(t, model.IsInvalidFormatError(err))
 
 	// with additional signer
 	// 9 nodes committee would require two bytes for sig type, the additional byte
@@ -195,7 +194,7 @@ func TestMismatchSignerIDs(t *testing.T) {
 	misPacked, err := packer.Unpack(invalidSignerIDs, sig)
 
 	require.Error(t, err, fmt.Sprintf("packed signers: %v", misPacked))
-	require.True(t, errors.Is(err, model.ErrInvalidFormat))
+	require.True(t, model.IsInvalidFormatError(err))
 }
 
 // if sig type doesn't match, return InvalidFormatError
@@ -213,7 +212,7 @@ func TestInvalidSigType(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
+	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(committee, signerIndices)
 	require.NoError(t, err)
 
 	data, err := packer.Decode(sig)
@@ -226,12 +225,12 @@ func TestInvalidSigType(t *testing.T) {
 
 	_, err = packer.Unpack(signerIDs, encoded)
 
-	require.True(t, errors.Is(err, model.ErrInvalidFormat))
+	require.True(t, model.IsInvalidFormatError(err))
 }
 
 func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 	t.Run("nothing", func(t *testing.T) {
-		expected := []hotstuff.SigType{}
+		expected := []encoding.SigType{}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{}, bytes)
@@ -242,7 +241,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 	})
 
 	t.Run("1 SigTypeStaking", func(t *testing.T) {
-		expected := []hotstuff.SigType{hotstuff.SigTypeStaking}
+		expected := []encoding.SigType{encoding.SigTypeStaking}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0}, bytes)
@@ -253,7 +252,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 	})
 
 	t.Run("1 SigTypeRandomBeacon", func(t *testing.T) {
-		expected := []hotstuff.SigType{hotstuff.SigTypeRandomBeacon}
+		expected := []encoding.SigType{encoding.SigTypeRandomBeacon}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{1 << 7}, bytes)
@@ -264,9 +263,9 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 	})
 
 	t.Run("2 SigTypeRandomBeacon", func(t *testing.T) {
-		expected := []hotstuff.SigType{
-			hotstuff.SigTypeRandomBeacon,
-			hotstuff.SigTypeRandomBeacon,
+		expected := []encoding.SigType{
+			encoding.SigTypeRandomBeacon,
+			encoding.SigTypeRandomBeacon,
 		}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
@@ -279,9 +278,9 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("8 SigTypeRandomBeacon", func(t *testing.T) {
 		count := 8
-		expected := make([]hotstuff.SigType, 0)
+		expected := make([]encoding.SigType, 0)
 		for i := 0; i < count; i++ {
-			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+			expected = append(expected, encoding.SigTypeRandomBeacon)
 		}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
@@ -294,9 +293,9 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("8 SigTypeStaking", func(t *testing.T) {
 		count := 8
-		expected := make([]hotstuff.SigType, 0)
+		expected := make([]encoding.SigType, 0)
 		for i := 0; i < count; i++ {
-			expected = append(expected, hotstuff.SigTypeStaking)
+			expected = append(expected, encoding.SigTypeStaking)
 		}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
@@ -309,9 +308,9 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("9 SigTypeRandomBeacon", func(t *testing.T) {
 		count := 9
-		expected := make([]hotstuff.SigType, 0)
+		expected := make([]encoding.SigType, 0)
 		for i := 0; i < count; i++ {
-			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+			expected = append(expected, encoding.SigTypeRandomBeacon)
 		}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
@@ -324,9 +323,9 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("9 SigTypeStaking", func(t *testing.T) {
 		count := 9
-		expected := make([]hotstuff.SigType, 0)
+		expected := make([]encoding.SigType, 0)
 		for i := 0; i < count; i++ {
-			expected = append(expected, hotstuff.SigTypeStaking)
+			expected = append(expected, encoding.SigTypeStaking)
 		}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
@@ -339,9 +338,9 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("16 SigTypeRandomBeacon, 2 groups", func(t *testing.T) {
 		count := 16
-		expected := make([]hotstuff.SigType, 0)
+		expected := make([]encoding.SigType, 0)
 		for i := 0; i < count; i++ {
-			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+			expected = append(expected, encoding.SigTypeRandomBeacon)
 		}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
@@ -354,12 +353,12 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("3 SigTypeRandomBeacon, 4 SigTypeStaking", func(t *testing.T) {
 		random, staking := 3, 4
-		expected := make([]hotstuff.SigType, 0)
+		expected := make([]encoding.SigType, 0)
 		for i := 0; i < random; i++ {
-			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+			expected = append(expected, encoding.SigTypeRandomBeacon)
 		}
 		for i := 0; i < staking; i++ {
-			expected = append(expected, hotstuff.SigTypeStaking)
+			expected = append(expected, encoding.SigTypeStaking)
 		}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
@@ -372,12 +371,12 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("3 SigTypeStaking, 4 SigTypeRandomBeacon", func(t *testing.T) {
 		staking, random := 3, 4
-		expected := make([]hotstuff.SigType, 0)
+		expected := make([]encoding.SigType, 0)
 		for i := 0; i < staking; i++ {
-			expected = append(expected, hotstuff.SigTypeStaking)
+			expected = append(expected, encoding.SigTypeStaking)
 		}
 		for i := 0; i < random; i++ {
-			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+			expected = append(expected, encoding.SigTypeRandomBeacon)
 		}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
@@ -391,12 +390,12 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("3 SigTypeStaking, 6 SigTypeRandomBeacon", func(t *testing.T) {
 		staking, random := 3, 6
-		expected := make([]hotstuff.SigType, 0)
+		expected := make([]encoding.SigType, 0)
 		for i := 0; i < staking; i++ {
-			expected = append(expected, hotstuff.SigTypeStaking)
+			expected = append(expected, encoding.SigTypeStaking)
 		}
 		for i := 0; i < random; i++ {
-			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+			expected = append(expected, encoding.SigTypeRandomBeacon)
 		}
 		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
@@ -411,9 +410,9 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 func TestDeserializeMismatchingBytes(t *testing.T) {
 	count := 9
-	expected := make([]hotstuff.SigType, 0)
+	expected := make([]encoding.SigType, 0)
 	for i := 0; i < count; i++ {
-		expected = append(expected, hotstuff.SigTypeStaking)
+		expected = append(expected, encoding.SigTypeStaking)
 	}
 	bytes, err := serializeToBitVector(expected)
 	require.NoError(t, err)
@@ -425,14 +424,13 @@ func TestDeserializeMismatchingBytes(t *testing.T) {
 		}
 		_, err := deserializeFromBitVector(bytes, invalidCount)
 		require.Error(t, err, fmt.Sprintf("invalid count: %v", invalidCount))
-		require.True(t, errors.Is(err, model.ErrInvalidFormat), fmt.Sprintf("invalid count: %v", invalidCount))
+		require.True(t, model.IsInvalidFormatError(err), fmt.Sprintf("invalid count: %v", invalidCount))
 	}
 }
 
 func TestDeserializeInvalidTailingBits(t *testing.T) {
 	_, err := deserializeFromBitVector([]byte{255, 1<<7 + 1<<1}, 9)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, model.ErrInvalidFormat))
+	require.True(t, model.IsInvalidFormatError(err))
 	require.Contains(t, fmt.Sprintf("%v", err), "remaining bits")
 }
 
@@ -465,7 +463,7 @@ func TestPackUnpackWithoutRBAggregatedSig(t *testing.T) {
 	signerIndices, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	signerIDs, err := pcker.DecodeSignerIdentifiersFromIndices(committee, signerIndices)
+	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(committee, signerIndices)
 	require.NoError(t, err)
 
 	unpacked, err := packer.Unpack(signerIDs, sig)
