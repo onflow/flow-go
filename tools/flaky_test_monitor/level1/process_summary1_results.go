@@ -200,6 +200,9 @@ func main() {
 
 	common.SaveToFile(resultReader.getResultsFileName(), testRun)
 
+	fmt.Println(os.Args)
+	fmt.Println(skippedTests)
+
 	if len(os.Args) > 2 {
 		common.SaveToFile(os.Args[2], skippedTests)
 	}
