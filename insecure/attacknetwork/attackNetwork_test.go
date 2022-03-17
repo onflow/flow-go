@@ -282,6 +282,7 @@ func withAttackNetwork(t *testing.T,
 
 	attackNetwork, err := attacknetwork.NewAttackNetwork(unittest.Logger(), serverAddress, codec, orchestrator, connector, corruptedIds)
 	require.NoError(t, err)
+	connector.On("WithAttackerAddress", mock.Anything).Return().Once()
 
 	// life-cycle management of attackNetwork.
 	ctx, cancel := context.WithCancel(context.Background())
