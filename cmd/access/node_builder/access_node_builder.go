@@ -71,17 +71,16 @@ type AccessNodeBuilder interface {
 	IsStaked() bool
 }
 
-// AccessNodeConfig defines all the user defined parameters required to bootstrap an access node
+// SharedNodeConfig defines all the user defined parameters required to bootstrap an access or observer node
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
-type AccessNodeConfig struct {
-	staked                       bool
+type SharedNodeConfig struct {
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
 	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
-	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports unstaked access nodes/unstaked consensus follower engines
+	supportsObserverFollower     bool              // True if this is an Access node which also supports observer, and consensus follower engines
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -96,9 +95,17 @@ type AccessNodeConfig struct {
 	logTxTimeToFinalizedExecuted bool
 	retryEnabled                 bool
 	rpcMetricsEnabled            bool
-	baseOptions                  []cmd.Option
+	BaseOptions                  []cmd.Option
 
 	PublicNetworkConfig PublicNetworkConfig
+}
+
+// AccessNodeConfig defines all the user defined parameters required to bootstrap an access node
+// For a node running as a standalone process, the config fields will be populated from the command line params,
+// while for a node running as a library, the config fields are expected to be initialized by the caller.
+type AccessNodeConfig struct {
+	SharedNodeConfig
+	staked bool
 }
 
 type PublicNetworkConfig struct {
@@ -108,9 +115,9 @@ type PublicNetworkConfig struct {
 	Metrics     module.NetworkMetrics
 }
 
-// DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
-func DefaultAccessNodeConfig() *AccessNodeConfig {
-	return &AccessNodeConfig{
+// DefaultSharedNodeConfig defines all the default values for the AccessNodeConfig
+func DefaultSharedNodeConfig() *SharedNodeConfig {
+	return &SharedNodeConfig{
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
@@ -136,10 +143,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		nodeInfoFile:                 "",
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
-		staked:                       true,
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
-		supportsUnstakedFollower:     false,
+		supportsObserverFollower:     false,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
@@ -148,9 +154,17 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 	}
 }
 
-// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
+// DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
+func DefaultAccessNodeConfig() *AccessNodeConfig {
+	return &AccessNodeConfig{
+		SharedNodeConfig: *DefaultSharedNodeConfig(),
+		staked:           true,
+	}
+}
+
+// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow Access Node
 // It is composed of the FlowNodeBuilder, the AccessNodeConfig and contains all the components and modules needed for the
-// staked and unstaked access nodes
+// Access Nodes
 type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	*AccessNodeConfig
@@ -382,7 +396,7 @@ func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
 
 func SupportsUnstakedNode(enable bool) Option {
 	return func(config *AccessNodeConfig) {
-		config.supportsUnstakedFollower = enable
+		config.supportsObserverFollower = enable
 	}
 }
 
@@ -394,7 +408,7 @@ func WithNetworkKey(key crypto.PrivateKey) Option {
 
 func WithBaseOptions(baseOptions []cmd.Option) Option {
 	return func(config *AccessNodeConfig) {
-		config.baseOptions = baseOptions
+		config.BaseOptions = baseOptions
 	}
 }
 
@@ -406,7 +420,7 @@ func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
 
 	return &FlowAccessNodeBuilder{
 		AccessNodeConfig:        config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
+		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.BaseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
 }
@@ -454,10 +468,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
+		flags.BoolVar(&builder.supportsObserverFollower, "supports-unstaked-node", defaultConfig.supportsObserverFollower, "true if this staked access node supports unstaked node")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 	}).ValidateFlags(func() error {
-		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
+		if builder.supportsObserverFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-unstaked-node is true")
 		}
 

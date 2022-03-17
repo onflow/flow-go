@@ -984,7 +984,7 @@ func WithAllRoles() func(*flow.Identity) {
 // setting up nodes or a particular role.
 func WithAllRolesExcept(except ...flow.Role) func(*flow.Identity) {
 	i := 0
-	roles := flow.Roles()
+	roles := flow.ServiceRoles()
 
 	// remove omitted roles
 	for _, omitRole := range except {

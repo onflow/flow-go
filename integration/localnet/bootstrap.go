@@ -19,31 +19,31 @@ import (
 )
 
 const (
-	BootstrapDir               = "./bootstrap"
-	ProfilerDir                = "./profiler"
-	DataDir                    = "./data"
-	TrieDir                    = "./trie"
-	DockerComposeFile          = "./docker-compose.nodes.yml"
-	DockerComposeFileVersion   = "3.7"
-	PrometheusTargetsFile      = "./targets.nodes.json"
-	DefaultCollectionCount     = 3
-	DefaultConsensusCount      = 3
-	DefaultExecutionCount      = 1
-	DefaultVerificationCount   = 1
-	DefaultAccessCount         = 1
-	DefaultUnstakedAccessCount = 0
-	DefaultNClusters           = 1
-	DefaultProfiler            = false
-	DefaultConsensusDelay      = 800 * time.Millisecond
-	DefaultCollectionDelay     = 950 * time.Millisecond
-	AccessAPIPort              = 3569
-	ExecutionAPIPort           = 3600
-	MetricsPort                = 8080
-	RPCPort                    = 9000
-	SecuredRPCPort             = 9001
-	AdminToolPort              = 9002
-	AdminToolLocalPort         = 3700
-	HTTPPort                   = 8000
+	BootstrapDir             = "./bootstrap"
+	ProfilerDir              = "./profiler"
+	DataDir                  = "./data"
+	TrieDir                  = "./trie"
+	DockerComposeFile        = "./docker-compose.nodes.yml"
+	DockerComposeFileVersion = "3.7"
+	PrometheusTargetsFile    = "./targets.nodes.json"
+	DefaultCollectionCount   = 3
+	DefaultConsensusCount    = 3
+	DefaultExecutionCount    = 1
+	DefaultVerificationCount = 1
+	DefaultAccessCount       = 1
+	DefaultObserverCount     = 0
+	DefaultNClusters         = 1
+	DefaultProfiler          = false
+	DefaultConsensusDelay    = 800 * time.Millisecond
+	DefaultCollectionDelay   = 950 * time.Millisecond
+	AccessAPIPort            = 3569
+	ExecutionAPIPort         = 3600
+	MetricsPort              = 8080
+	RPCPort                  = 9000
+	SecuredRPCPort           = 9001
+	AdminToolPort            = 9002
+	AdminToolLocalPort       = 3700
+	HTTPPort                 = 8000
 )
 
 var (
@@ -52,7 +52,7 @@ var (
 	executionCount         int
 	verificationCount      int
 	accessCount            int
-	unstakedAccessCount    int
+	observerCount          int
 	nClusters              uint
 	numViewsInStakingPhase uint64
 	numViewsInDKGPhase     uint64
@@ -68,7 +68,7 @@ func init() {
 	flag.IntVar(&executionCount, "execution", DefaultExecutionCount, "number of execution nodes")
 	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of staked access nodes")
-	flag.IntVar(&unstakedAccessCount, "unstaked-access", DefaultUnstakedAccessCount, "number of un-staked access nodes")
+	flag.IntVar(&observerCount, "observer", DefaultObserverCount, "number of observer nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
 	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
@@ -89,7 +89,7 @@ func main() {
 	fmt.Printf("- Execution: %d\n", executionCount)
 	fmt.Printf("- Verification: %d\n", verificationCount)
 	fmt.Printf("- Staked Access: %d\n", accessCount)
-	fmt.Printf("- Unstaked Access: %d\n\n", unstakedAccessCount)
+	fmt.Printf("- Observer: %d\n\n", observerCount)
 
 	nodes := prepareNodes()
 
@@ -180,6 +180,9 @@ func main() {
 	for i := 0; i < executionCount; i++ {
 		fmt.Printf("Execution API %d will be accessible at localhost:%d\n", i+1, ExecutionAPIPort+i)
 	}
+	for i := 0; i < observerCount; i++ {
+		fmt.Printf("Observer Service %d will be accessible at localhost:%d\n", i+1, AccessAPIPort+accessCount+i)
+	}
 
 	fmt.Println()
 
@@ -209,9 +212,9 @@ func prepareNodes() []testnet.NodeConfig {
 		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess))
 	}
 
-	for i := 0; i < unstakedAccessCount; i++ {
-		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess, func(cfg *testnet.NodeConfig) {
-			cfg.SupportsUnstakedNodes = true
+	for i := 0; i < observerCount; i++ {
+		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleObserverService, func(cfg *testnet.NodeConfig) {
+			cfg.SupportsObserverNodes = true
 		}))
 	}
 
@@ -282,6 +285,9 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 		case flow.RoleAccess:
 			services[container.ContainerName] = prepareAccessService(container, numAccess, n)
 			numAccess++
+		case flow.RoleObserverService:
+			services[container.ContainerName] = prepareObserverService(container, numAccess, n)
+			numAccess++
 		}
 	}
 
@@ -336,12 +342,12 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 	}
 
 	// TODO: having trouble enabling admin tool for access node. skip Access node for now.
-	if container.Role != flow.RoleAccess {
+	if container.Role != flow.RoleAccess && container.Role != flow.RoleObserverService {
 		service.Command = append(service.Command, fmt.Sprintf("--admin-addr=:%v", AdminToolPort))
 	}
 
 	// only specify build config for first service of each role
-	if i == 0 {
+	if i == 0 || container.Role == flow.RoleObserverService {
 		service.Build = Build{
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
@@ -355,7 +361,9 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 		}
 
 		// bring up access node before any other nodes
-		if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
+		if container.Role == flow.RoleConsensus ||
+			container.Role == flow.RoleCollection ||
+			container.Role == flow.RoleObserverService {
 			service.DependsOn = []string{"access_1"}
 		}
 
@@ -485,6 +493,11 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 	}
 
 	return service
+}
+
+func prepareObserverService(container testnet.ContainerConfig, i int, n int) Service {
+	container.Role = flow.RoleObserverService
+	return prepareAccessService(container, i, n)
 }
 
 func writeDockerComposeConfig(services Services) error {

@@ -84,7 +84,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 	builder.EnqueueNetworkInit()
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
-	if builder.supportsUnstakedFollower {
+	if builder.supportsObserverFollower {
 		builder.enqueueUnstakedNetworkInit()
 		builder.enqueueRelayNetwork()
 	}
@@ -258,7 +258,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			return builder.RequestEng, nil
 		})
 
-	if builder.supportsUnstakedFollower {
+	if builder.supportsObserverFollower {
 		builder.Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			syncRequestHandler, err := synceng.NewRequestHandlerEngine(
 				node.Logger.With().Bool("unstaked", true).Logger(),

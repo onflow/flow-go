@@ -124,7 +124,7 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 	stakedConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithID(suite.stakedID),
-		testnet.SupportsUnstakedNodes(),
+		testnet.SupportsObserverServices(),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	)
 
