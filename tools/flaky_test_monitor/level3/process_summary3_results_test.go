@@ -32,6 +32,12 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 			InputLevel2Summary:    testdata.GetTestData_Level3_Input_MultiNoResultTests(),
 			ExpectedLevel3Summary: testdata.GetTestData_Level3_Expected_MultiNoResultTests(),
 		},
+		"many failures, many passes": {
+			Directory:             "test4-multi-failures",
+			PropertyFileDirectory: filepath.Join(testDataDir, "test4-multi-failures", "input"),
+			InputLevel2Summary:    testdata.GetTestData_Level3_Input_MultiFailures(),
+			ExpectedLevel3Summary: testdata.GetTestData_Level3_Expected_MultiFailures(),
+		},
 	}
 
 	for k, testData := range testDataMap {
@@ -67,12 +73,12 @@ func TestGenerateLevel3Summary_JSON(t *testing.T) {
 		//	PropertyFileDirectory:     filepath.Join(testDataDir, "test3-multi-no-result-tests", "input"),
 		//	ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test3-multi-no-result-tests", "expected-output", "test3-multi-no-result-tests.json"),
 		//},
-		"many failures, many passes": {
-			Directory:                 "test4-multi-failures",
-			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test4-multi-failures", "input", "test4-multi-failures.json"),
-			PropertyFileDirectory:     filepath.Join(testDataDir, "test4-multi-failures", "input"),
-			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test4-multi-failures", "expected-output", "test4-multi-failures.json"),
-		},
+		//"many failures, many passes": {
+		//	Directory:                 "test4-multi-failures",
+		//	InputLevel2SummaryPath:    filepath.Join(testDataDir, "test4-multi-failures", "input", "test4-multi-failures.json"),
+		//	PropertyFileDirectory:     filepath.Join(testDataDir, "test4-multi-failures", "input"),
+		//	ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test4-multi-failures", "expected-output", "test4-multi-failures.json"),
+		//},
 		"many failures, many passes, many no-result tests": {
 			Directory:                 "test5-multi-durations",
 			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test5-multi-durations", "input", "test5-multi-durations.json"),
