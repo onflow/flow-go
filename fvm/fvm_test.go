@@ -3380,7 +3380,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			txBody.SetPayer(address)
 
 			if tc.gasLimit == 0 {
-				txBody.SetGasLimit(fvm.DefaultGasLimit)
+				txBody.SetGasLimit(fvm.DefaultComputationLimit)
 			} else {
 				txBody.SetGasLimit(tc.gasLimit)
 			}
@@ -3491,4 +3491,122 @@ func TestStorageUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, cadence.NewUInt64(5), script.Value)
+}
+
+func TestEnforcingComputationLimit(t *testing.T) {
+	t.Parallel()
+
+	rt := fvm.NewInterpreterRuntime()
+	chain := flow.Testnet.Chain()
+	vm := fvm.NewVirtualMachine(rt)
+
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvoker(zerolog.Nop()),
+		),
+	)
+
+	simpleView := utils.NewSimpleView()
+
+	const computationLimit = 5
+
+	type test struct {
+		name           string
+		code           string
+		payerIsServAcc bool
+		ok             bool
+		expCompUsed    uint64
+	}
+
+	tests := []test{
+		{
+			name: "infinite while loop",
+			code: `
+		      while true {}
+		    `,
+			payerIsServAcc: false,
+			ok:             false,
+			expCompUsed:    computationLimit + 1,
+		},
+		{
+			name: "limited while loop",
+			code: `
+              var i = 0
+              while i < 5 {
+                  i = i + 1
+              }
+            `,
+			payerIsServAcc: false,
+			ok:             false,
+			expCompUsed:    computationLimit + 1,
+		},
+		{
+			name: "too many for-in loop iterations",
+			code: `
+              for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {}
+            `,
+			payerIsServAcc: false,
+			ok:             false,
+			expCompUsed:    computationLimit + 1,
+		},
+		{
+			name: "too many for-in loop iterations",
+			code: `
+              for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {}
+            `,
+			payerIsServAcc: true,
+			ok:             true,
+			expCompUsed:    11,
+		},
+		{
+			name: "some for-in loop iterations",
+			code: `
+              for i in [1, 2, 3, 4] {}
+            `,
+			payerIsServAcc: false,
+			ok:             true,
+			expCompUsed:    5,
+		},
+	}
+
+	for _, test := range tests {
+
+		t.Run(test.name, func(t *testing.T) {
+
+			script := []byte(
+				fmt.Sprintf(
+					`
+                      transaction {
+                          prepare() {
+                              %s
+                          }
+                      }
+                    `,
+					test.code,
+				),
+			)
+
+			txBody := flow.NewTransactionBody().
+				SetScript(script).
+				SetGasLimit(computationLimit)
+
+			if test.payerIsServAcc {
+				txBody.SetPayer(chain.ServiceAddress()).
+					SetGasLimit(0)
+			}
+			tx := fvm.Transaction(txBody, 0)
+
+			err := vm.Run(ctx, tx, simpleView, programs.NewEmptyPrograms())
+			require.NoError(t, err)
+			require.Equal(t, test.expCompUsed, tx.ComputationUsed)
+			if test.ok {
+				require.NoError(t, tx.Err)
+			} else {
+				require.Error(t, tx.Err)
+			}
+
+		})
+	}
 }

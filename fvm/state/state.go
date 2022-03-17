@@ -8,11 +8,11 @@ import (
 	"sort"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/meter/noop"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO we started with high numbers here and we might
-// tune (reduce) them when we have more data
 const (
 	DefaultMaxKeySize         = 16_000      // ~16KB
 	DefaultMaxValueSize       = 256_000_000 // ~256MB
@@ -28,6 +28,7 @@ type mapKey struct {
 // all register touches
 type State struct {
 	view                  View
+	meter                 meter.Meter
 	updatedAddresses      map[flow.Address]struct{}
 	updateSize            map[mapKey]uint64
 	maxKeySizeAllowed     uint64
@@ -42,6 +43,7 @@ type State struct {
 func defaultState(view View) *State {
 	return &State{
 		view:                  view,
+		meter:                 noop.NewMeter(),
 		updatedAddresses:      make(map[flow.Address]struct{}),
 		updateSize:            make(map[mapKey]uint64),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
@@ -85,6 +87,14 @@ func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
 func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	return func(st *State) *State {
 		st.maxInteractionAllowed = limit
+		return st
+	}
+}
+
+// WithMeter sets the meter
+func WithMeter(m meter.Meter) func(st *State) *State {
+	return func(st *State) *State {
+		st.meter = m
 		return st
 	}
 }
@@ -165,18 +175,50 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enf
 	return nil
 }
 
+// Delete deletes a register
 func (s *State) Delete(owner, controller, key string, enforceLimit bool) error {
 	return s.Set(owner, controller, key, nil, enforceLimit)
 }
 
-// We don't need this later, it should be invisible to the cadence
+// Touch touches a register
 func (s *State) Touch(owner, controller, key string) error {
 	return s.view.Touch(owner, controller, key)
+}
+
+// MeterComputation meters computation usage
+func (s *State) MeterComputation(kind, intensity uint) error {
+	return s.meter.MeterComputation(kind, intensity)
+}
+
+// TotalComputationUsed returns total computation used
+func (s *State) TotalComputationUsed() uint {
+	return s.meter.TotalComputationUsed()
+}
+
+// TotalComputationLimit returns total computation limit
+func (s *State) TotalComputationLimit() uint {
+	return s.meter.TotalComputationLimit()
+}
+
+// MeterMemory meters memory usage
+func (s *State) MeterMemory(kind, intensity uint) error {
+	return s.meter.MeterMemory(kind, intensity)
+}
+
+// TotalMemoryUsed returns total memory used
+func (s *State) TotalMemoryUsed() uint {
+	return s.meter.TotalMemoryUsed()
+}
+
+// TotalMemoryLimit returns total memory limit
+func (s *State) TotalMemoryLimit() uint {
+	return s.meter.TotalMemoryLimit()
 }
 
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
 	return NewState(s.view.NewChild(),
+		WithMeter(s.meter.NewChild()),
 		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
 		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
 		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
@@ -188,6 +230,11 @@ func (s *State) MergeState(other *State, enforceLimit bool) error {
 	err := s.view.MergeView(other.view)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
+	}
+
+	err = s.meter.MergeMeter(other.meter)
+	if err != nil {
+		return err
 	}
 
 	// apply address updates
@@ -304,6 +351,9 @@ func IsFVMStateKey(owner, controller, key string) bool {
 			return true
 		}
 		if key == KeyStorageUsed {
+			return true
+		}
+		if key == KeyStorageIndex {
 			return true
 		}
 		if key == KeyAccountFrozen {
