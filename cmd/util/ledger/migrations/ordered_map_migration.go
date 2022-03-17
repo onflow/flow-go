@@ -98,6 +98,8 @@ type Pair = struct {
 	Value []byte
 }
 
+var _ interpreter.Value = RawStorable{}
+
 type RawStorable []byte
 
 func (RawStorable) IsValue() {}
@@ -106,7 +108,7 @@ func (v RawStorable) Accept(interpreter *interpreter.Interpreter, visitor interp
 	panic("unreachable")
 }
 
-func (RawStorable) Walk(_ func(interpreter.Value)) {
+func (RawStorable) Walk(*interpreter.Interpreter, func(interpreter.Value)) {
 	// NO-OP
 }
 
