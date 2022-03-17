@@ -26,6 +26,12 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 			InputLevel2Summary:    testdata.GetTestData_Level3_Input_1NoResultTest(),
 			ExpectedLevel3Summary: testdata.GetTestData_Level3_Expected_1NoResultTest(),
 		},
+		"many no-result tests": {
+			Directory:             "test3-multi-no-result-tests",
+			PropertyFileDirectory: filepath.Join(testDataDir, "test3-multi-no-result-tests", "input"),
+			InputLevel2Summary:    testdata.GetTestData_Level3_Input_MultiNoResultTests(),
+			ExpectedLevel3Summary: testdata.GetTestData_Level3_Expected_MultiNoResultTests(),
+		},
 	}
 
 	for k, testData := range testDataMap {
@@ -49,18 +55,18 @@ func TestGenerateLevel3Summary_JSON(t *testing.T) {
 			PropertyFileDirectory:     filepath.Join(testDataDir, "test1-1package-1failure", "input"),
 			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test1-1package-1failure", "expected-output", "test1-1package-1failure.json"),
 		},
-		"1 no-result test, no other tests": {
-			Directory:                 "test2-1-no-result-test",
-			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test2-1-no-result-test", "input", "test2-1-no-result-test.json"),
-			PropertyFileDirectory:     filepath.Join(testDataDir, "test2-1-no-result-test", "input"),
-			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test2-1-no-result-test", "expected-output", "test2-1-no-result-test.json"),
-		},
-		"many no-result tests": {
-			Directory:                 "test3-multi-no-result-tests",
-			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test3-multi-no-result-tests", "input", "test3-multi-no-result-tests.json"),
-			PropertyFileDirectory:     filepath.Join(testDataDir, "test3-multi-no-result-tests", "input"),
-			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test3-multi-no-result-tests", "expected-output", "test3-multi-no-result-tests.json"),
-		},
+		//"1 no-result test, no other tests": {
+		//	Directory:                 "test2-1-no-result-test",
+		//	InputLevel2SummaryPath:    filepath.Join(testDataDir, "test2-1-no-result-test", "input", "test2-1-no-result-test.json"),
+		//	PropertyFileDirectory:     filepath.Join(testDataDir, "test2-1-no-result-test", "input"),
+		//	ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test2-1-no-result-test", "expected-output", "test2-1-no-result-test.json"),
+		//},
+		//"many no-result tests": {
+		//	Directory:                 "test3-multi-no-result-tests",
+		//	InputLevel2SummaryPath:    filepath.Join(testDataDir, "test3-multi-no-result-tests", "input", "test3-multi-no-result-tests.json"),
+		//	PropertyFileDirectory:     filepath.Join(testDataDir, "test3-multi-no-result-tests", "input"),
+		//	ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test3-multi-no-result-tests", "expected-output", "test3-multi-no-result-tests.json"),
+		//},
 		"many failures, many passes": {
 			Directory:                 "test4-multi-failures",
 			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test4-multi-failures", "input", "test4-multi-failures.json"),

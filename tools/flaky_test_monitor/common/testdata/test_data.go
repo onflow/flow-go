@@ -1733,6 +1733,23 @@ func GetTestData_Level2_Expected_MultipleL1SummariesFailuresPassesNoResults() co
 // *************** Level 3 Summary Testing ******************
 // **********************************************************
 
+// utility - helper methods
+
+// buildBasicLevel2TestResult helps tests create expected level 2 test results in a more compact way with common defaults
+func buildBasicLevel2TestResult(test string, packageName string) *common.Level2TestResult {
+	return &common.Level2TestResult{
+		Test:            test,
+		Package:         packageName,
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		FailureRate:     0,
+		Skipped:         0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+}
+
 // The following GetTestData_Level3_*() functions are used by level 3 unit tests for constructing:
 // 1) GetTestData_Level3_Input*() - level 2 summaries that are used as inputs to generate level 3 summaries
 // 2) GetTestData_Level3_Expected*() - expected level 3 summaries as output that will be compared with
@@ -1984,6 +2001,124 @@ func GetTestData_Level3_Expected_1NoResultTest() common.Level3Summary {
 		MostFailuresTotal: 1,
 		NoResults: []common.Level2TestResult{
 			noResultLevel2TestResult,
+		},
+		LongestRunning:      []common.Level2TestResult{},
+		LongestRunningTotal: 0, // no test durations over 0 seconds
+	}
+	return expectedLevel3Summary
+}
+
+// GetTestData_Level3_Input_MultiNoResultTests represents level 2 summary (as input into a level 3 parser)
+// where there are multiple no-result tests.
+func GetTestData_Level3_Input_MultiNoResultTests() common.Level2Summary {
+	testResultMap := make(map[string]*common.Level2TestResult)
+
+	level2TestResult1 := buildBasicLevel2TestResult("TestEncodableNetworkPrivKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult1.Runs = 3
+	level2TestResult1.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPrivKey"] = level2TestResult1
+
+	level2TestResult2 := buildBasicLevel2TestResult("TestEncodableNetworkPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult2.Runs = 3
+	level2TestResult2.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPrivKeyNil"] = level2TestResult2
+
+	level2TestResult3 := buildBasicLevel2TestResult("TestEncodableNetworkPubKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult3.Runs = 3
+	level2TestResult3.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPubKey"] = level2TestResult3
+
+	level2TestResult4 := buildBasicLevel2TestResult("TestEncodableNetworkPubKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult4.Runs = 3
+	level2TestResult4.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPubKeyNil"] = level2TestResult4
+
+	level2TestResult5 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack4", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult5.NoResult = 12
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack4"] = level2TestResult5
+
+	level2TestResult6 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult6.Runs = 3
+	level2TestResult6.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKey"] = level2TestResult6
+
+	level2TestResult7 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult7.Runs = 3
+	level2TestResult7.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyNil"] = level2TestResult7
+
+	level2TestResult8 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPubKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult8.Runs = 3
+	level2TestResult8.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPubKey"] = level2TestResult8
+
+	level2TestResult9 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPubKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult9.Runs = 3
+	level2TestResult9.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPubKeyNil"] = level2TestResult9
+
+	level2TestResult10 := buildBasicLevel2TestResult("TestEncodableStakingPrivKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult10.Runs = 3
+	level2TestResult10.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPrivKey"] = level2TestResult10
+
+	level2TestResult11 := buildBasicLevel2TestResult("TestEncodableStakingPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult11.Runs = 3
+	level2TestResult11.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPrivKeyNil"] = level2TestResult11
+
+	level2TestResult12 := buildBasicLevel2TestResult("TestEncodableStakingPubKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult12.Runs = 3
+	level2TestResult12.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPubKey"] = level2TestResult12
+
+	level2TestResult13 := buildBasicLevel2TestResult("TestEncodableStakingPubKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult13.Runs = 3
+	level2TestResult13.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPubKeyNil"] = level2TestResult13
+
+	level2TestResult14 := buildBasicLevel2TestResult("TestIsHexString", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult14.Runs = 3
+	level2TestResult14.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestIsHexString"] = level2TestResult14
+
+	level2TestResult15 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult15.NoResult = 13
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack"] = level2TestResult15
+
+	level2TestResult16 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack2", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult16.NoResult = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack2"] = level2TestResult16
+
+	level2TestResult17 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack3", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult17.NoResult = 33
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack3"] = level2TestResult17
+
+	var level2Summary common.Level2Summary
+	level2Summary.TestResultsMap = testResultMap
+	return level2Summary
+}
+
+// GetTestData_Level3_Expected_MultiNoResultTests represents expected level 3 summary
+// where there are multiple no-result tests.
+func GetTestData_Level3_Expected_MultiNoResultTests() common.Level3Summary {
+	level2TestResult1 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack3", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult1.NoResult = 33
+
+	level2TestResult2 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult2.NoResult = 13
+
+	level2TestResult3 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack4", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult3.NoResult = 12
+
+	level2TestResult4 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack2", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult4.NoResult = 3
+
+	expectedLevel3Summary := common.Level3Summary{
+		MostFailures:      []common.Level2TestResult{},
+		MostFailuresTotal: 0,
+		NoResults: []common.Level2TestResult{
+			*level2TestResult1, *level2TestResult2, *level2TestResult3, *level2TestResult4,
 		},
 		LongestRunning:      []common.Level2TestResult{},
 		LongestRunningTotal: 0, // no test durations over 0 seconds
