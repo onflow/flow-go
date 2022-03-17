@@ -45,7 +45,7 @@ jobs:
         go-version: 1.16
     - name: Checkout repo
       uses: actions/checkout@v2
-    - name: Run flakiness summary script
+    - name: Run skipped test tracker script
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 25

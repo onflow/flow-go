@@ -58,6 +58,9 @@ else
     esac
 fi
 
+# TODO: now that we're writing to file instead of piping directly, we need a way to ignore errors
+# in the step above.
+
 cat $OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go results.json
 
 GCS_URI="gs://$GCS_BUCKET/${JOB_STARTED%T*}/$TEST_CATEGORY-$RUN_ID.json"

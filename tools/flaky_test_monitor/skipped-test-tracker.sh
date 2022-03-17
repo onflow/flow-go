@@ -49,7 +49,13 @@ fi
 cat $OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go results.json skipped-tests.json
 
 # TODO: send the skipped tests list to BigQuery
+echo "SKIPPED TESTS"
+
 cat skipped-tests.json
+
+echo "RESULTS"
+
+cat results.json
 
 echo $JOB_STARTED
 echo $RUN_ID
