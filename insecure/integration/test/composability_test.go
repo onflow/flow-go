@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/network"
 )
 
-func TestComposability(t *testing.T) {
+func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 	withCorruptibleConduitFactory(t, func(t *testing.T, corruptedIdentity flow.Identity, ccf *corruptible.ConduitFactory) {
 		corruptedEvent := &message.TestMessage{Text: "this is a corrupted message"}
 
@@ -86,7 +86,7 @@ func withCorruptibleConduitFactory(t *testing.T, run func(*testing.T, flow.Ident
 			return
 		}
 	}()
-	ccf := corruptible.NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, corruptedIdentity.NodeID, codec)
+	ccf := corruptible.NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, corruptedIdentity.NodeID, codec, "localhost:5000")
 
 	// starts corruptible conduit factory
 	ccf.Start(ccfCtx)
