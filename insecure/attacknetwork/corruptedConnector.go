@@ -33,7 +33,7 @@ func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifi
 	if err != nil {
 		return nil, fmt.Errorf("could not generate corruptible conduit factory address for: %w", err)
 	}
-	gRpcClient, err := grpc.Dial(corruptedAddress)
+	gRpcClient, err := grpc.Dial(corruptedAddress, grpc.WithInsecure())
 	if err != nil {
 		return nil, fmt.Errorf("could not dial corruptible conduit factory %s: %w", corruptedAddress, err)
 	}

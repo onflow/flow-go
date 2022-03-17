@@ -81,6 +81,7 @@ func (c *ConduitFactory) start(ctx irrecoverable.SignalerContext, address string
 	}
 	c.server = s
 	c.address = ln.Addr()
+	fmt.Println(c.address.String())
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -199,7 +200,7 @@ func (c *ConduitFactory) registerAttacker(ctx context.Context, address string) e
 		return fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", address)
 	}
 
-	clientConn, err := grpc.Dial(address)
+	clientConn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		return fmt.Errorf("could not establish a client connection to attacker: %w", err)
 	}
