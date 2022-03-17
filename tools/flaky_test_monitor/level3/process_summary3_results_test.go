@@ -44,6 +44,12 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 			InputLevel2Summary:    testdata.GetTestData_Level3_Input_MultiFailuresPassesNoResults(),
 			ExpectedLevel3Summary: testdata.GetTestData_Level3_Expected_MultiFailuresPassesNoResults(),
 		},
+		"many failures - max capacity": {
+			Directory:             "test6-multi-failures-cap",
+			PropertyFileDirectory: filepath.Join(testDataDir, "test6-multi-failures-cap", "input"),
+			InputLevel2Summary:    testdata.GetData_Level3_Input_MultiFailuresCapacity(),
+			ExpectedLevel3Summary: testdata.GetData_Level3_Expected_MultiFailuresCapacity(),
+		},
 	}
 
 	for k, testData := range testDataMap {
@@ -91,12 +97,12 @@ func TestGenerateLevel3Summary_JSON(t *testing.T) {
 		//	PropertyFileDirectory:     filepath.Join(testDataDir, "test5-multi-durations", "input"),
 		//	ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test5-multi-durations", "expected-output", "test5-multi-durations.json"),
 		//},
-		"many failures - cap failures": {
-			Directory:                 "test6-multi-failures-cap",
-			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test6-multi-failures-cap", "input", "test6-multi-failures-cap.json"),
-			PropertyFileDirectory:     filepath.Join(testDataDir, "test6-multi-failures-cap", "input"),
-			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test6-multi-failures-cap", "expected-output", "test6-multi-failures-cap.json"),
-		},
+		//"many failures - max capacity failures": {
+		//	Directory:                 "test6-multi-failures-cap",
+		//	InputLevel2SummaryPath:    filepath.Join(testDataDir, "test6-multi-failures-cap", "input", "test6-multi-failures-cap.json"),
+		//	PropertyFileDirectory:     filepath.Join(testDataDir, "test6-multi-failures-cap", "input"),
+		//	ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test6-multi-failures-cap", "expected-output", "test6-multi-failures-cap.json"),
+		//},
 		"many durations - cap durations": {
 			Directory:                 "test7-multi-durations-cap",
 			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test7-multi-durations-cap", "input", "test7-multi-durations-cap.json"),
