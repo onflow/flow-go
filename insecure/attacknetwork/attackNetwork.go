@@ -54,32 +54,7 @@ func NewAttackNetwork(
 	// setting lifecycle management module.
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// starts up gRPC server of attack network at given address.
-			s := grpc.NewServer()
-			insecure.RegisterAttackerServer(s, attackNetwork)
-			ln, err := net.Listen(networkingProtocolTCP, address)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
-			}
-			attackNetwork.server = s
-			attackNetwork.address = ln.Addr()
-			attackNetwork.corruptedConnector.WithAttackerAddress(ln.Addr().String())
-
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-			go func() {
-				wg.Done()
-				if err = s.Serve(ln); err != nil { // blocking call
-					ctx.Throw(fmt.Errorf("could not bind attackNetwork to the tcp listener: %w", err))
-				}
-			}()
-
-			// waits till gRPC server starts serving.
-			wg.Wait()
-			ready()
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			err := attackNetwork.start(ctx)
+			err := attackNetwork.start(ctx, address)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not start attackNetwork: %w", err))
 			}
@@ -101,7 +76,30 @@ func NewAttackNetwork(
 }
 
 // start triggers the sub-modules of attack network.
-func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext) error {
+func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string) error {
+	// starts up gRPC server of attack network at given address.
+	s := grpc.NewServer()
+	insecure.RegisterAttackerServer(s, a)
+	ln, err := net.Listen(networkingProtocolTCP, address)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
+	}
+	a.server = s
+	a.address = ln.Addr()
+	a.corruptedConnector.WithAttackerAddress(ln.Addr().String())
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		wg.Done()
+		if err = s.Serve(ln); err != nil { // blocking call
+			ctx.Throw(fmt.Errorf("could not bind attackNetwork to the tcp listener: %w", err))
+		}
+	}()
+
+	// waits till gRPC server starts serving.
+	wg.Wait()
+
 	// creates a connection to all corrupted nodes in the attack network.
 	for _, corruptedId := range a.corruptedIds {
 		connection, err := a.corruptedConnector.Connect(ctx, corruptedId.NodeID)
