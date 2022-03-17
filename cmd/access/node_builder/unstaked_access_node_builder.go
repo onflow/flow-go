@@ -67,7 +67,7 @@ func (builder *UnstakedAccessNodeBuilder) initNodeInfo() error {
 		return fmt.Errorf("could not get peer ID from public key: %w", err)
 	}
 
-	builder.NodeID, err = p2p.NewUnstakedNetworkIDTranslator().GetFlowID(builder.peerID)
+	builder.NodeID, err = p2p.NewPublicNetworkIDTranslator().GetFlowID(builder.peerID)
 	if err != nil {
 		return fmt.Errorf("could not get flow node ID: %w", err)
 	}
@@ -87,7 +87,7 @@ func (builder *UnstakedAccessNodeBuilder) InitIDProviders() {
 
 		builder.IdentityProvider = idCache
 
-		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
+		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
 
 		// use the default identifier provider
 		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {

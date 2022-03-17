@@ -1,19 +1,17 @@
-package node_builder
-
-// Deprecated
+package observer
 
 import (
-"context"
-"sync"
-"time"
+	"context"
+	"sync"
+	"time"
 
-"github.com/rs/zerolog"
-"github.com/sethvargo/go-retry"
-"go.uber.org/atomic"
+	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
+	"go.uber.org/atomic"
 
-"github.com/onflow/flow-go/model/flow"
-"github.com/onflow/flow-go/module/lifecycle"
-"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // upstreamConnector tries to connect the observer service with at least one of the configured bootstrap access nodes
@@ -116,4 +114,3 @@ func (connector *upstreamConnector) Done() <-chan struct{} {
 	})
 	return connector.lm.Stopped()
 }
-

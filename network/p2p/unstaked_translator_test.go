@@ -47,7 +47,7 @@ func TestIDTranslationSecp256k1(t *testing.T) {
 
 func TestUnstakedTranslationRoundTrip(t *testing.T) {
 	max_iterations := 50
-	unstakedTranslator := NewUnstakedNetworkIDTranslator()
+	unstakedTranslator := NewPublicNetworkIDTranslator()
 
 	tested_vectors := 0
 
