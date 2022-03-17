@@ -18,6 +18,7 @@ ci-benchmark:
 
 ############################################################################################
 # CAUTION: DO NOT MODIFY THE TARGETS BELOW! DOING SO WILL BREAK THE FLAKY TEST MONITOR
+# In particular, do not skip tests by commenting them out here.
 
 # Run unit tests for test utilities in this module
 .PHONY: test

@@ -78,6 +78,27 @@ func SkipUnless(t *testing.T, reason SkipReason, message string) {
 	}
 }
 
+type SkipBenchmarkReason int
+
+const (
+	BENCHMARK_EXPERIMENT SkipBenchmarkReason = iota + 1
+)
+
+func (s SkipBenchmarkReason) String() string {
+	switch s {
+	case BENCHMARK_EXPERIMENT:
+		return "BENCHMARK_EXPERIMENT"
+	}
+	return "UNKNOWN"
+}
+
+func SkipBenchmarkUnless(b *testing.B, reason SkipBenchmarkReason, message string) {
+	b.Helper()
+	if os.Getenv(reason.String()) == "" {
+		b.Skip(message)
+	}
+}
+
 func ExpectPanic(expectedMsg string, t *testing.T) {
 	if r := recover(); r != nil {
 		err := r.(error)

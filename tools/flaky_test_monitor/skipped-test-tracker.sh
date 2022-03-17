@@ -38,14 +38,14 @@ else
         unit)
             make install-mock-generators
             make generate-mocks
-            make unittest-main > $OUTPUT_FILE
+            make -s unittest-main > $OUTPUT_FILE
         ;;
         unit-crypto)
             make -C crypto setup
-            make -C crypto test-main > $OUTPUT_FILE
+            make -C crypto -s test-main > $OUTPUT_FILE
         ;;
         unit-integration)
-            make -C integration test > $OUTPUT_FILE
+            make -C integration -s test > $OUTPUT_FILE
         ;;
     esac
 fi
