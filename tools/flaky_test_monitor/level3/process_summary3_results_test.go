@@ -20,6 +20,12 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 			InputLevel2Summary:    testdata.GetTestData_Level3_Input_1Package1Failure(),
 			ExpectedLevel3Summary: testdata.GetTestData_Level3_Expected_1Package1Failure(),
 		},
+		"1 no-result test, no other tests": {
+			Directory:             "test2-1-no-result-test",
+			PropertyFileDirectory: filepath.Join(testDataDir, "test2-1-no-result-test", "input"),
+			InputLevel2Summary:    testdata.GetTestData_Level3_Input_1NoResultTest(),
+			ExpectedLevel3Summary: testdata.GetTestData_Level3_Expected_1NoResultTest(),
+		},
 	}
 
 	for k, testData := range testDataMap {

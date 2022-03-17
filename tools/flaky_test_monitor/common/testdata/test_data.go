@@ -1935,6 +1935,58 @@ func GetTestData_Level3_Expected_1Package1Failure() common.Level3Summary {
 		},
 		LongestRunningTotal: 3,
 	}
+	return expectedLevel3Summary
+}
 
+// GetTestData_Level3_Input_1NoResultTest represents level 2 summary (as input into a level 3 parser)
+// where there is 1 no-result test.
+func GetTestData_Level3_Input_1NoResultTest() common.Level2Summary {
+	testResultMap := make(map[string]*common.Level2TestResult)
+
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack"] = &common.Level2TestResult{
+		Test:            "TestEncodableRandomBeaconPrivKeyMsgPack",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            1,
+		Passed:          0,
+		Failed:          1,
+		Skipped:         0,
+		NoResult:        1,
+		FailureRate:     1,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	var level2Summary common.Level2Summary
+	level2Summary.TestResultsMap = testResultMap
+	return level2Summary
+}
+
+// GetTestData_Level3_Expected_1NoResultTest represents expected level 3 summary
+// where there is 1 no-result test.
+func GetTestData_Level3_Expected_1NoResultTest() common.Level3Summary {
+	noResultLevel2TestResult := common.Level2TestResult{
+		Test:            "TestEncodableRandomBeaconPrivKeyMsgPack",
+		Package:         "github.com/onflow/flow-go/model/encodable",
+		Runs:            1,
+		Passed:          0,
+		Failed:          1,
+		Skipped:         0,
+		NoResult:        1,
+		FailureRate:     1,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	expectedLevel3Summary := common.Level3Summary{
+		MostFailures: []common.Level2TestResult{
+			noResultLevel2TestResult,
+		},
+		MostFailuresTotal: 1,
+		NoResults: []common.Level2TestResult{
+			noResultLevel2TestResult,
+		},
+		LongestRunning:      []common.Level2TestResult{},
+		LongestRunningTotal: 0, // no test durations over 0 seconds
+	}
 	return expectedLevel3Summary
 }
