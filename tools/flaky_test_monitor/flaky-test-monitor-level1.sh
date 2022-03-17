@@ -51,7 +51,7 @@ else
         ;;
         unit-crypto)
             make -C crypto setup
-            make -C crypto -s test > $OUTPUT_FILE
+            make -C crypto -s test-main > $OUTPUT_FILE
         ;;
         unit-integration)
             make -C integration -s test > $OUTPUT_FILE
