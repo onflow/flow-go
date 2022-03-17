@@ -50,6 +50,12 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 			InputLevel2Summary:    testdata.GetData_Level3_Input_MultiFailuresCapacity(),
 			ExpectedLevel3Summary: testdata.GetData_Level3_Expected_MultiFailuresCapacity(),
 		},
+		"many durations - max capacity": {
+			Directory:             "test7-multi-durations-cap",
+			PropertyFileDirectory: filepath.Join(testDataDir, "test7-multi-durations-cap", "input"),
+			InputLevel2Summary:    testdata.GetData_Level3_Input_MultipleDurationsCapacity(),
+			ExpectedLevel3Summary: testdata.GetData_Level3_Expected_MultipleDurationsCapacity(),
+		},
 	}
 
 	for k, testData := range testDataMap {
@@ -103,12 +109,12 @@ func TestGenerateLevel3Summary_JSON(t *testing.T) {
 		//	PropertyFileDirectory:     filepath.Join(testDataDir, "test6-multi-failures-cap", "input"),
 		//	ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test6-multi-failures-cap", "expected-output", "test6-multi-failures-cap.json"),
 		//},
-		"many durations - cap durations": {
-			Directory:                 "test7-multi-durations-cap",
-			InputLevel2SummaryPath:    filepath.Join(testDataDir, "test7-multi-durations-cap", "input", "test7-multi-durations-cap.json"),
-			PropertyFileDirectory:     filepath.Join(testDataDir, "test7-multi-durations-cap", "input"),
-			ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test7-multi-durations-cap", "expected-output", "test7-multi-durations-cap.json"),
-		},
+		//"many durations - cap durations": {
+		//	Directory:                 "test7-multi-durations-cap",
+		//	InputLevel2SummaryPath:    filepath.Join(testDataDir, "test7-multi-durations-cap", "input", "test7-multi-durations-cap.json"),
+		//	PropertyFileDirectory:     filepath.Join(testDataDir, "test7-multi-durations-cap", "input"),
+		//	ExpectedLevel3SummaryPath: filepath.Join(testDataDir, "test7-multi-durations-cap", "expected-output", "test7-multi-durations-cap.json"),
+		//},
 	}
 
 	for k, testData := range testDataMap {
