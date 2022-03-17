@@ -23,44 +23,50 @@ import (
 
 func TestComposability(t *testing.T) {
 	withCorruptibleConduitFactory(t, func(t *testing.T, corruptedIdentity flow.Identity, ccf *corruptible.ConduitFactory) {
-		hub := stub.NewNetworkHub()
-		originalEvent := &message.TestMessage{Text: "this is a test message"}
 		corruptedEvent := &message.TestMessage{Text: "this is a corrupted message"}
-		testChannel := flownet.Channel("test-channel")
 
-		honestIdentity := unittest.IdentityFixture()
+		withAttackOrchestrator(t, flow.IdentityList{&corruptedIdentity}, func(event *insecure.Event) {
+			event.FlowProtocolEvent = corruptedEvent
+		}, func(t *testing.T) {
+			hub := stub.NewNetworkHub()
+			originalEvent := &message.TestMessage{Text: "this is a test message"}
 
-		corruptedNodeNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
-		corruptedEngine := &network.Engine{}
-		corruptedConduit, err := corruptedNodeNetwork.Register(testChannel, corruptedEngine)
-		require.NoError(t, err)
+			testChannel := flownet.Channel("test-channel")
 
-		honestNodeNetwork := stub.NewNetwork(t, honestIdentity.NodeID, hub)
-		honestEngine := &network.Engine{}
+			honestIdentity := unittest.IdentityFixture()
 
-		wg := &sync.WaitGroup{}
-		wg.Add(1)
-		honestEngine.OnProcess(func(channel flownet.Channel, originId flow.Identifier, event interface{}) error {
-			require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
-			require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
-			require.NotEqual(t, corruptedEvent, event)           // content of event must be swapped with corrupted event.
+			corruptedNodeNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
+			corruptedEngine := &network.Engine{}
+			corruptedConduit, err := corruptedNodeNetwork.Register(testChannel, corruptedEngine)
+			require.NoError(t, err)
 
-			wg.Done()
-			return nil
+			honestNodeNetwork := stub.NewNetwork(t, honestIdentity.NodeID, hub)
+			honestEngine := &network.Engine{}
+
+			wg := &sync.WaitGroup{}
+			wg.Add(1)
+			honestEngine.OnProcess(func(channel flownet.Channel, originId flow.Identifier, event interface{}) error {
+				require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
+				require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
+				require.NotEqual(t, corruptedEvent, event)           // content of event must be swapped with corrupted event.
+
+				wg.Done()
+				return nil
+			})
+			_, err = honestNodeNetwork.Register(testChannel, honestEngine)
+			require.NoError(t, err)
+
+			unittest.RequireReturnsBefore(t, func() {
+				corruptedNodeNetwork.StartConDev(100*time.Millisecond, true)
+			}, 100*time.Millisecond, "failed to start corrupted node network")
+
+			require.NoError(t, corruptedConduit.Unicast(originalEvent, honestIdentity.NodeID))
+
+			unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "honest node could not receive corrupted event on time")
+			unittest.RequireReturnsBefore(t, func() {
+				corruptedNodeNetwork.StopConDev()
+			}, 100*time.Millisecond, "failed to stop verification network")
 		})
-		_, err = honestNodeNetwork.Register(testChannel, honestEngine)
-		require.NoError(t, err)
-
-		unittest.RequireReturnsBefore(t, func() {
-			corruptedNodeNetwork.StartConDev(100*time.Millisecond, true)
-		}, 100*time.Millisecond, "failed to start corrupted node network")
-
-		require.NoError(t, corruptedConduit.Unicast(originalEvent, honestIdentity.NodeID))
-
-		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "honest node could not receive corrupted event on time")
-		unittest.RequireReturnsBefore(t, func() {
-			corruptedNodeNetwork.StopConDev()
-		}, 100*time.Millisecond, "failed to stop verification network")
 	})
 
 }
