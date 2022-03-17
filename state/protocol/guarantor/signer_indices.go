@@ -10,7 +10,9 @@ import (
 
 func FindGuarantors(state protocol.State, guarantee *flow.CollectionGuarantee) ([]flow.Identifier, error) {
 	snapshot := state.AtBlockID(guarantee.ReferenceBlockID)
-	cluster, err := snapshot.Epochs().Current().ClusterByChainID(guarantee.ChainID)
+	epochs := snapshot.Epochs()
+	epoch := epochs.Current()
+	cluster, err := epoch.ClusterByChainID(guarantee.ChainID)
 
 	if err != nil {
 		// protocol state must have validated the block that contains the guarantee, so the cluster

@@ -319,7 +319,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		block := unittest.BlockFixture()
 		block.SetPayload(unittest.PayloadFixture(
 			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesFixture(4, unittest.WithReferenceBlockID(refBlockID))...),
+				unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...),
 		))
 		// some blocks may not be present hence add a gap
 		height := startHeight + uint64(i)

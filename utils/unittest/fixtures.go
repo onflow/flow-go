@@ -516,12 +516,6 @@ func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarante
 	return guarantees
 }
 
-func WithReferenceBlockID(refBlockID flow.Identifier) func(*flow.CollectionGuarantee) {
-	return func(g *flow.CollectionGuarantee) {
-		g.ReferenceBlockID = refBlockID
-	}
-}
-
 func BlockSealsFixture(n int) []*flow.Seal {
 	seals := make([]*flow.Seal, 0, n)
 	for i := 0; i < n; i++ {
@@ -552,12 +546,20 @@ func CollectionFixture(n int) flow.Collection {
 	return flow.Collection{Transactions: transactions}
 }
 
+func FixedReferenceBlockID() flow.Identifier {
+	blockID := flow.Identifier{}
+	blockID[0] = byte(1)
+	return blockID
+}
+
 func CompleteCollectionFixture() *entity.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
-			CollectionID: flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
-			Signature:    SignatureFixture(),
+			CollectionID:     flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
+			Signature:        SignatureFixture(),
+			ReferenceBlockID: FixedReferenceBlockID(),
+			SignerIndices:    SignerIndicesFixture(1),
 		},
 		Transactions: []*flow.TransactionBody{&txBody},
 	}
@@ -566,8 +568,10 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.CompleteCollection {
 	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
-			CollectionID: flow.Collection{Transactions: txs}.ID(),
-			Signature:    SignatureFixture(),
+			CollectionID:     flow.Collection{Transactions: txs}.ID(),
+			Signature:        SignatureFixture(),
+			ReferenceBlockID: IdentifierFixture(),
+			SignerIndices:    SignerIndicesFixture(3),
 		},
 		Transactions: txs,
 	}
@@ -851,7 +855,7 @@ func SignerIndicesFixture(n int) []byte {
 	for i := 0; i < n; i++ {
 		list[i] = i
 	}
-	indices, _ := packer.EncodeSignerIndices(list, 10)
+	indices, _ := packer.EncodeSignerIndices(list, 1)
 	return indices
 }
 
