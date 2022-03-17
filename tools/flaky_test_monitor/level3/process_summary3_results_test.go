@@ -12,20 +12,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//func TestGenerateLevel2Summary_Struct(t *testing.T) {
-//	testDataMap := map[string]testdata.Level3TestData{
-//		"1 failure the rest pass": {
-//			Directory: "test1-1package-1failure",
-//		},
-//	}
-//
-//	for k, testData := range testDataMap {
-//		t.Run(k, func(t *testing.T) {
-//			actualLevel3Summary := generateLevel3SummaryFromStructs(testData.InputLevel2Summary, testData.PropertyFileDirectory)
-//		})
-//	}
-//}
+func TestGenerateLevel2Summary_Struct(t *testing.T) {
+	testDataMap := map[string]testdata.Level3TestData{
+		"1 failure the rest pass": {
+			Directory:             "test1-1package-1failure",
+			PropertyFileDirectory: filepath.Join(testDataDir, "test1-1package-1failure", "input"),
+			InputLevel2Summary:    testdata.GetTestData_Level3_Input_1Package1Failure(),
+			ExpectedLevel3Summary: testdata.GetTestData_Level3_Expected_1Package1Failure(),
+		},
+	}
 
+	for k, testData := range testDataMap {
+		t.Run(k, func(t *testing.T) {
+			actualLevel3Summary := generateLevel3SummaryFromStructs(testData.InputLevel2Summary, testData.PropertyFileDirectory)
+			checkLevel3Summary(t, actualLevel3Summary, testData)
+		})
+	}
+}
+
+// TestGenerateLevel3Summary_JSON uses real level 2 JSON file as input
+// Don't want to use too many tests since they are more brittle to changes to JSON data structure.
+// That's why have very few of these. For new tests, it's best to add level 2 data as structs.
 func TestGenerateLevel3Summary_JSON(t *testing.T) {
 	testDataMap := map[string]testdata.Level3TestData{
 		//expectedOutputTestDataPath := filepath.Join(testDataBaseDir, "expected-output", testDir+".json")

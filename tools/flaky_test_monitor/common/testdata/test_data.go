@@ -482,10 +482,11 @@ func GetTestData_Leve1_Expected_3CountNoResultWithNormalTests() common.Level1Sum
 // **********************************************************
 // ************** Level 2 Summaries Testing *****************
 // **********************************************************
-// The following GetTestData_Level2_*() functions are used by level 2 unit tests for constructing level 1 summaries
-// that are used as inputs to generate level 2 summaries.
-// Instead of having to represent these level 1 summaries as JSON files, they are represented as a list
-// of structs to make them easier to maintain.
+// The following GetTestData_Level2_*() functions are used by level 2 unit tests for constructing:
+// 1) GetTestData_Level2_Input*() - level 1 summaries that are used as inputs to generate level 2 summaries
+// 2) GetTestData_Level2_Expected*() - expected level 2 summaries
+// Instead of representing these level 1 and 2 summaries as JSON files, they are represented as
+// structs to make them easier to maintain.
 
 // GetTestData_Level2_Input_1FailureRestPass represents a level 1 summary (as input into a level 2 parser)
 // with count=1, many passed tests and a single failed test.
@@ -1726,5 +1727,214 @@ func GetTestData_Level2_Expected_MultipleL1SummariesFailuresPassesNoResults() co
 	var level2Summary common.Level2Summary
 	level2Summary.TestResultsMap = testResultMap
 	return level2Summary
+}
 
+// **********************************************************
+// *************** Level 3 Summary Testing ******************
+// **********************************************************
+
+// The following GetTestData_Level3_*() functions are used by level 3 unit tests for constructing:
+// 1) GetTestData_Level3_Input*() - level 2 summaries that are used as inputs to generate level 3 summaries
+// 2) GetTestData_Level3_Expected*() - expected level 3 summaries as output that will be compared with
+//    the generated level 3 summaries created by the level 3 parser.
+// Instead of representing these level 2 and 3 summaries as JSON files, they are represented as
+// structs to make them easier to maintain.
+
+// GetTestData_Level3_Input_1Package1Failure represents level 2 summary (as input into a level 3 parser)
+// where there is 1 test failure and multiple passed tests, all from the same package.
+func GetTestData_Level3_Input_1Package1Failure() common.Level2Summary {
+	testResultMap := make(map[string]*common.Level2TestResult)
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha3_256"] = &common.Level2TestResult{
+		Test:            "TestSanitySha3_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          0,
+		Failed:          1,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     1,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha3_384"] = &common.Level2TestResult{
+		Test:            "TestSanitySha3_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha2_256"] = &common.Level2TestResult{
+		Test:            "TestSanitySha2_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha2_384"] = &common.Level2TestResult{
+		Test:            "TestSanitySha2_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanityKmac128"] = &common.Level2TestResult{
+		Test:            "TestSanityKmac128",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestHashersAPI"] = &common.Level2TestResult{
+		Test:            "TestHashersAPI",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3"] = &common.Level2TestResult{
+		Test:            "TestSha3",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.23,
+		Durations:       []float32{0.23},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_256"] = &common.Level2TestResult{
+		Test:            "TestSha3/SHA3_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.11,
+		Durations:       []float32{0.11},
+	}
+
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_384"] = &common.Level2TestResult{
+		Test:            "TestSha3/SHA3_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.12,
+		Durations:       []float32{0.12},
+	}
+
+	var level2Summary common.Level2Summary
+	level2Summary.TestResultsMap = testResultMap
+	return level2Summary
+}
+
+// GetTestData_Level3_Expected_1Package1Failure represents expected level 3 summary
+// where there is 1 test failure and multiple passed tests, all from the same package.
+func GetTestData_Level3_Expected_1Package1Failure() common.Level3Summary {
+	mostFailuresLevel2TestResult := common.Level2TestResult{
+		Test:            "TestSanitySha3_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          0,
+		Failed:          1,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     1,
+		AverageDuration: 0,
+		Durations:       []float32{0},
+	}
+
+	longestRunningLevel2TestResult1 := common.Level2TestResult{
+		Test:            "TestSha3",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.23,
+		Durations:       []float32{0.23},
+	}
+
+	longestRunningLevel2TestResult2 := common.Level2TestResult{
+		Test:            "TestSha3/SHA3_384",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.12,
+		Durations:       []float32{0.12},
+	}
+
+	longestRunningLevel2TestResult3 := common.Level2TestResult{
+		Test:            "TestSha3/SHA3_256",
+		Package:         "github.com/onflow/flow-go/crypto/hash",
+		Runs:            1,
+		Passed:          1,
+		Failed:          0,
+		Skipped:         0,
+		NoResult:        0,
+		FailureRate:     0,
+		AverageDuration: 0.11,
+		Durations:       []float32{0.11},
+	}
+
+	expectedLevel3Summary := common.Level3Summary{
+		MostFailures: []common.Level2TestResult{
+			mostFailuresLevel2TestResult,
+		},
+		MostFailuresTotal: 1,
+		NoResults:         []common.Level2TestResult{},
+		LongestRunning: []common.Level2TestResult{
+			longestRunningLevel2TestResult1,
+			longestRunningLevel2TestResult2,
+			longestRunningLevel2TestResult3,
+		},
+		LongestRunningTotal: 3,
+	}
+
+	return expectedLevel3Summary
 }
