@@ -29,7 +29,7 @@ func DeductTransactionFeesInvocation(
 			},
 			systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
 			[]interpreter.Value{
-				interpreter.NewAddressValue(common.Address(payer)),
+				interpreter.NewAddressValue(env, common.Address(payer)),
 			},
 			deductTransactionFeesInvocationArgumentTypes,
 			env.Context().Logger,
@@ -57,8 +57,8 @@ func SetupNewAccountInvocation(
 			},
 			systemcontracts.ContractServiceAccountFunction_setupNewAccount,
 			[]interpreter.Value{
-				interpreter.NewAddressValue(common.Address(flowAddress)),
-				interpreter.NewAddressValue(payer),
+				interpreter.NewAddressValue(env, common.Address(flowAddress)),
+				interpreter.NewAddressValue(env, payer),
 			},
 			setupNewAccountInvocationArgumentTypes,
 			env.Context().Logger,
@@ -84,7 +84,7 @@ func AccountAvailableBalanceInvocation(
 			},
 			systemcontracts.ContractStorageFeesFunction_defaultTokenAvailableBalance,
 			[]interpreter.Value{
-				interpreter.NewAddressValue(address),
+				interpreter.NewAddressValue(env, address),
 			},
 			accountAvailableBalanceInvocationArgumentTypes,
 			env.Context().Logger,
@@ -109,7 +109,7 @@ func AccountBalanceInvocation(
 				Name:    systemcontracts.ContractServiceAccount},
 			systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
 			[]interpreter.Value{
-				interpreter.NewAddressValue(address),
+				interpreter.NewAddressValue(env, address),
 			},
 			accountBalanceInvocationArgumentTypes,
 			env.Context().Logger,
@@ -135,7 +135,7 @@ func AccountStorageCapacityInvocation(
 			},
 			systemcontracts.ContractStorageFeesFunction_calculateAccountCapacity,
 			[]interpreter.Value{
-				interpreter.NewAddressValue(address),
+				interpreter.NewAddressValue(env, address),
 			},
 			accountStorageCapacityInvocationArgumentTypes,
 			env.Context().Logger,
@@ -162,7 +162,7 @@ func UseContractAuditVoucherInvocation(
 			},
 			systemcontracts.ContractDeploymentAuditsFunction_useVoucherForDeploy,
 			[]interpreter.Value{
-				interpreter.NewAddressValue(address),
+				interpreter.NewAddressValue(env, address),
 				interpreter.NewUnmeteredStringValue(code),
 			},
 			useContractAuditVoucherInvocationArgumentTypes,
