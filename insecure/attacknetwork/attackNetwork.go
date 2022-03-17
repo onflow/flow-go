@@ -160,7 +160,6 @@ func (a *AttackNetwork) Observe(stream insecure.Attacker_ObserveServer) error {
 
 			if err = a.processMessageFromCorruptedNode(msg); err != nil {
 				a.logger.Fatal().Err(err).Msg("could not process message of corrupted node")
-				return stream.SendAndClose(&empty.Empty{})
 			}
 		}
 	}
