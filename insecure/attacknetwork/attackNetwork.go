@@ -189,7 +189,7 @@ func (a *AttackNetwork) processMessageFromCorruptedNode(message *insecure.Messag
 		Channel:           network.Channel(message.ChannelID),
 		FlowProtocolEvent: event,
 		Protocol:          message.Protocol,
-		TargetNum:         message.Targets,
+		TargetNum:         message.TargetNum,
 		TargetIds:         targetIds,
 	})
 	if err != nil {
@@ -236,7 +236,7 @@ func (a *AttackNetwork) eventToMessage(corruptedId flow.Identifier,
 	return &insecure.Message{
 		ChannelID: channel.String(),
 		OriginID:  corruptedId[:],
-		Targets:   num,
+		TargetNum: num,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
 		Protocol:  protocol,

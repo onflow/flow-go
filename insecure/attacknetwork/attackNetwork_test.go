@@ -78,7 +78,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	originId := unittest.IdentifierFixture()
 
 	var targetIds flow.IdentifierList
-	targets := uint32(0)
+	targetNum := uint32(0)
 
 	if protocol == insecure.Protocol_UNICAST {
 		targetIds = unittest.IdentifierListFixture(1)
@@ -87,7 +87,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	}
 
 	if protocol == insecure.Protocol_MULTICAST {
-		targets = uint32(3)
+		targetNum = uint32(3)
 	}
 
 	channel := network.Channel("test-channel")
@@ -103,7 +103,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	m := &insecure.Message{
 		ChannelID: "test-channel",
 		OriginID:  originId[:],
-		Targets:   targets,
+		TargetNum: targetNum,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
 		Protocol:  protocol,
@@ -116,7 +116,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 		Channel:           channel,
 		FlowProtocolEvent: content,
 		Protocol:          protocol,
-		TargetNum:         targets,
+		TargetNum:         targetNum,
 		TargetIds:         targetIds,
 	}
 
@@ -256,7 +256,7 @@ func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insec
 			require.Equal(t, event.Channel.String(), message.ChannelID)
 			require.Equal(t, event.Protocol, message.Protocol)
 			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.TargetIDs)
-			require.Equal(t, event.TargetNum, message.Targets)
+			require.Equal(t, event.TargetNum, message.TargetNum)
 
 			content, err := codec.Decode(message.Payload)
 			require.NoError(t, err)
