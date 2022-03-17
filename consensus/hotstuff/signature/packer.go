@@ -38,7 +38,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 
 	// breaking staking and random beacon signers into signerIDs and sig type for compaction
 	// each signer must have its signerID and sig type stored at the same index in the two slices
-	// For v2, RandomBeaconSigners is nil, because all StakingSigners are random beacon signers.
+	// For v2, RandomBeaconSigners is nil, as we don't track individually which nodes contributed to the random beacon
 	// For v3, RandomBeaconSigners is not nil, each RandomBeaconSigner also signed staking sig, so the returned signerIDs, should
 	// include both StakingSigners and RandomBeaconSigners
 	signerIndices, sigType, err := encodeSignerIndicesAndSigType(fullMembers.NodeIDs(), sig.StakingSigners, sig.RandomBeaconSigners)
@@ -171,18 +171,46 @@ func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType,
 
 // encodeSignerIndicesAndSigType encodes the given stakingSigners and beaconSigners into signer indices and sig types.
 // The given fullMembers provides the canonical order of signer index for each signer.
-// For instance, assuming fullMembers are [A,B,C,D,E,F], stakingSigners are [D,E], beaconSigners are [A,B], then
-// the signerIndices will be [byte([1,1,0,1,1,0,0,0])],
-// 			bit 1 indicates the node at that index signed, bit 0 indicates the node at that index didn't sign
-// the sigType will be [byte([1,1,0,0,0,0,0,0])],
-// 			bit 1 indicates the signer at the same index in signerIndices signed random beacon sig
-// 			bit 0 indicates the signer at the same index in signerIndices signed staking sig
+// As an example consider the case where we have a committee C of 10 nodes in canonical oder
+//            C = [A,B,C,D,E,F,G,H,I,J]
+// where nodes [B,F] are stakingSigners and beaconSigners are [C,E,G,I,J].
+//  * First return parameter: QC.signerIndices
+//    - We start with a bit vector v that has |C| number of bits
+//    - If a node contributed either as staking signer or beacon signer,
+//      we set the respective bit to 1:
+//          [A,B,C,D,E,F,G,H,I,J]
+//             ↓     ↓ ↓     ↓ ↓
+//           0,1,1,0,1,1,1,0,1,1
+//    - Lastly, right-pad the resulting bit vector with 0 to full bytes. We have 10 committee members,
+//      so we pad to 2 bytes:
+//           01101110 11000000
+//  * second return parameter: signature types
+//    - Here, we restrict our focus on the signers, which we encoded in the previous step.
+//      In out example, nodes [B,C,E,F,G,I,J] signed in canonical order. This is exactly the same order,
+//      as we have represented the signer in the last step.
+//    - For these 5 nodes in their canonical order, we encode each node's signature type as
+// 			bit-value 1: node was in beaconSigners
+// 			bit-value 0: node was in stakingSigners
+//      This results in the bit vector
+//            [B,C,E,F,G,I,J]
+//             ↓ ↓ ↓ ↓ ↓ ↓ ↓
+//             0,1,0,1,1,1,1
+//    - Again, we right-pad with zeros to full bytes, As we only had 7 signers, the sigType slice is 1byte long
+//             01011110
+// Prerequisites:
+//  * The inputs `stakingSigners` and `beaconSigners` are treated as sets, i.e. they
+//    should not contain any duplicates.
+//  * A node can be listed in either `stakingSigners` or `beaconSigners`. A node appearing in both lists
+//    constitutes an illegal input.
+//  * `stakingSigners` must be a subset of `fullMembers`
+//  * `beaconSigners` must be a subset of `fullMembers`
+// Violation of any of these prerequisites results in an error return.
 func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners flow.IdentifierList, beaconSigners flow.IdentifierList) ([]byte, []byte, error) {
 	stakingSignersLookup := stakingSigners.Lookup()
 	beaconSignersLookup := beaconSigners.Lookup()
 
 	indices := make([]int, 0, len(fullMembers))
-	sigType := make([]hotstuff.SigType, 0, len(fullMembers))
+	sigType := make([]hotstuff.SigType, 0, len(stakingSigners)+len(beaconSigners))
 
 	for i, member := range fullMembers {
 		if _, ok := stakingSignersLookup[member]; ok {
@@ -205,9 +233,8 @@ func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners
 	if len(stakingSignersLookup) > 0 {
 		return nil, nil, fmt.Errorf("unknown staking signers %v", stakingSignersLookup)
 	}
-
 	if len(beaconSignersLookup) > 0 {
-		return nil, nil, fmt.Errorf("unknown beacon signers %v", beaconSignersLookup)
+		return nil, nil, fmt.Errorf("unknown or duplicated beacon signers %v", beaconSignersLookup)
 	}
 
 	signerIndices, err := pcker.EncodeSignerIndices(indices, len(fullMembers))

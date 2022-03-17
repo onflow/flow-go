@@ -6,11 +6,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// EncodeSignerIdentifiersToIndices encodes the given signerIDs into compacted bit vector
+// EncodeSignerIdentifiersToIndices encodes the given signerIDs into compacted bit vector.
 // fullIdentities represents all identities who are eligible to sign the given resource. It excludes
 // identities who are ineligible to sign the given resource. For example, fullIdentities in the context
 // of a cluster consensus quorum certificate would include authorized members of the cluster and
-// exclude ejected members of the cluster, or unejected collection nodes from a different cluster.
+// exclude ejected members of the cluster, or any collection nodes from a different cluster.
 func EncodeSignerIdentifiersToIndices(fullIdentities []flow.Identifier, signerIDs flow.IdentifierList) ([]byte, error) {
 	signersLookup := signerIDs.Lookup()
 
