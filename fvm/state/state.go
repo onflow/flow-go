@@ -56,6 +56,10 @@ func (s *State) View() View {
 	return s.view
 }
 
+func (s *State) Meter() meter.Meter {
+	return s.meter
+}
+
 type StateOption func(st *State) *State
 
 // NewState constructs a new state

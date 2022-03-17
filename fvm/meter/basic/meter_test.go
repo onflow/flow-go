@@ -33,6 +33,8 @@ func TestComputationMetering(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 
+		m.SetMemoryWeights(map[uint]uint{0: 1})
+
 		err = m.MeterMemory(0, 2)
 		require.NoError(t, err)
 		require.Equal(t, uint(2), m.TotalMemoryUsed())

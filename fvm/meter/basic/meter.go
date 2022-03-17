@@ -13,19 +13,36 @@ var _ interfaceMeter.Meter = &Meter{}
 // for any each memory/computation usage call it sums intensity to the total
 // memory/computation usage metrics and returns error if limits are not met.
 type Meter struct {
-	computationUsed        uint
-	computationLimit       uint
-	memoryUsed             uint
-	memoryLimit            uint
+	computationUsed  uint
+	computationLimit uint
+	memoryUsed       uint
+	memoryLimit      uint
+
 	computationIntensities map[uint]uint
 	memoryIntensities      map[uint]uint
+
+	computationWeights map[uint]uint
+	memoryWeights      map[uint]uint
 }
+
+var (
+	// defaultComputationWeights is the default weights for computation intensities
+	// these weighs make the computation metering the same as it was before dynamic execution fees
+	defaultComputationWeights = map[uint]uint{
+		uint(common.ComputationKindStatement):          1,
+		uint(common.ComputationKindLoop):               1,
+		uint(common.ComputationKindFunctionInvocation): 1,
+	}
+	defaultMemoryWeights = map[uint]uint{}
+)
 
 // NewMeter constructs a new Meter
 func NewMeter(computationLimit, memoryLimit uint) *Meter {
 	return &Meter{
 		computationLimit:       uint(computationLimit),
 		memoryLimit:            uint(memoryLimit),
+		computationWeights:     defaultComputationWeights,
+		memoryWeights:          defaultMemoryWeights,
 		computationIntensities: make(map[uint]uint),
 		memoryIntensities:      make(map[uint]uint),
 	}
@@ -36,6 +53,8 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 	return &Meter{
 		computationLimit:       m.computationLimit,
 		memoryLimit:            m.memoryLimit,
+		computationWeights:     m.computationWeights,
+		memoryWeights:          m.memoryWeights,
 		computationIntensities: make(map[uint]uint),
 		memoryIntensities:      make(map[uint]uint),
 	}
@@ -63,21 +82,21 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 	return nil
 }
 
+// SetComputationWeights sets the weights of the different kinds of computation usage
+func (m *Meter) SetComputationWeights(w map[uint]uint) {
+	m.computationWeights = w
+}
+
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit
 func (m *Meter) MeterComputation(kind uint, intensity uint) error {
-	var meterable bool
 	m.computationIntensities[kind] += intensity
-	switch common.ComputationKind(kind) {
-	case common.ComputationKindStatement,
-		common.ComputationKindLoop,
-		common.ComputationKindFunctionInvocation:
-		meterable = true
+	w, ok := m.computationWeights[kind]
+	if !ok {
+		return nil
 	}
-	if meterable {
-		m.computationUsed += intensity
-		if m.computationUsed > m.computationLimit {
-			return errors.NewComputationLimitExceededError(uint64(m.computationLimit))
-		}
+	m.computationUsed += w * intensity
+	if m.computationUsed > m.computationLimit {
+		return errors.NewComputationLimitExceededError(uint64(m.computationLimit))
 	}
 	return nil
 }
@@ -97,9 +116,19 @@ func (m *Meter) TotalComputationLimit() uint {
 	return m.computationLimit
 }
 
+// SetMemoryWeights sets the weights of the different kinds of memory usage
+func (m *Meter) SetMemoryWeights(w map[uint]uint) {
+	m.memoryWeights = w
+}
+
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
 func (m *Meter) MeterMemory(kind uint, intensity uint) error {
-	m.memoryUsed += intensity
+	m.memoryIntensities[kind] += intensity
+	w, ok := m.memoryWeights[kind]
+	if !ok {
+		return nil
+	}
+	m.memoryUsed += w * intensity
 	if m.memoryUsed > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.memoryLimit))
 	}

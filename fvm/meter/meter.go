@@ -44,12 +44,14 @@ type Meter interface {
 	MergeMeter(child Meter) error
 
 	// computation metering
+	SetComputationWeights(map[uint]uint)
 	MeterComputation(kind uint, intensity uint) error
 	ComputationIntensities() map[uint]uint
 	TotalComputationUsed() uint
 	TotalComputationLimit() uint
 
 	// memory metering
+	SetMemoryWeights(map[uint]uint)
 	MeterMemory(kind uint, intensity uint) error
 	MemoryIntensities() map[uint]uint
 	TotalMemoryUsed() uint

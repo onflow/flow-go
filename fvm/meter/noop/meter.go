@@ -20,12 +20,16 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 }
 
 // MergeMeter merges two noop meters
-func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
+func (m *Meter) MergeMeter(_ interfaceMeter.Meter) error {
 	return nil
 }
 
+// SetComputationWeights is a noop
+func (m *Meter) SetComputationWeights(_ map[uint]uint) {
+}
+
 // MeterComputation is a noop
-func (m *Meter) MeterComputation(kind uint, _ uint) error {
+func (m *Meter) MeterComputation(_ uint, _ uint) error {
 	return nil
 }
 
@@ -44,8 +48,12 @@ func (m *Meter) TotalComputationLimit() uint {
 	return 0
 }
 
+// SetMemoryWeights is a noop
+func (m *Meter) SetMemoryWeights(_ map[uint]uint) {
+}
+
 // MeterMemory is a noop
-func (m *Meter) MeterMemory(kind uint, _ uint) error {
+func (m *Meter) MeterMemory(_ uint, _ uint) error {
 	return nil
 }
 
