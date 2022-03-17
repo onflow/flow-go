@@ -28,7 +28,7 @@ func init() {
 
 func addPullCmdFlags() {
 	pullCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
-	pullCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	pullCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification", "observer" or "access")`)
 	pullCmd.Flags().DurationVar(&flagTimeout, "timeout", time.Second*300, `timeout for pull, default: 5m`)
 
 	_ = pullCmd.MarkFlagRequired("token")

@@ -33,7 +33,7 @@ type State struct {
 
 type BootstrapConfig struct {
 	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
-	// an unstaked node
+	// an observer sevice
 	SkipNetworkAddressValidation bool
 }
 

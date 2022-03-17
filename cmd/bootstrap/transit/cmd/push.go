@@ -28,7 +28,7 @@ func init() {
 
 func addPushCmdFlags() {
 	pushCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
-	pushCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	pushCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification", "observer" or "access")`)
 	_ = pushCmd.MarkFlagRequired("token")
 }
 

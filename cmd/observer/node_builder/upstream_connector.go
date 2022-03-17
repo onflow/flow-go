@@ -1,19 +1,17 @@
-package node_builder
-
-// Deprecated
+package observer
 
 import (
-"context"
-"sync"
-"time"
+	"context"
+	"sync"
+	"time"
 
-"github.com/rs/zerolog"
-"github.com/sethvargo/go-retry"
-"go.uber.org/atomic"
+	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
+	"go.uber.org/atomic"
 
-"github.com/onflow/flow-go/model/flow"
-"github.com/onflow/flow-go/module/lifecycle"
-"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // upstreamConnector tries to connect the observer service with at least one of the configured bootstrap access nodes
@@ -57,10 +55,14 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 				defer wg.Done()
 				lg := connector.logger.With().Str("bootstrap_node", id.NodeID.String()).Logger()
 
-				backoff := retry.NewFibonacci(connector.retryInitialTimeout)
-				backoff = retry.WithMaxRetries(connector.maxRetries, backoff)
+				fibRetry, err := retry.NewFibonacci(connector.retryInitialTimeout)
+				if err != nil {
+					lg.Err(err).Msg("cannot create retry mechanism")
+					return
+				}
+				cappedFibRetry := retry.WithMaxRetries(connector.maxRetries, fibRetry)
 
-				if err := retry.Do(workerCtx, backoff, func(ctx context.Context) error {
+				if err = retry.Do(workerCtx, cappedFibRetry, func(ctx context.Context) error {
 					return retry.RetryableError(connector.connect(ctx, id))
 				}); err != nil {
 					lg.Err(err).Msg("failed to connect")
@@ -112,4 +114,3 @@ func (connector *upstreamConnector) Done() <-chan struct{} {
 	})
 	return connector.lm.Stopped()
 }
-
