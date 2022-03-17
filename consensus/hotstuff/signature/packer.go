@@ -16,7 +16,7 @@ import (
 // ConsensusSigDataPacker implements the hotstuff.Packer interface.
 // The encoding method is RLP.
 type ConsensusSigDataPacker struct {
-	SigDataPacker
+	model.SigDataPacker
 	committees hotstuff.Committee
 }
 
@@ -50,7 +50,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 		return nil, nil, fmt.Errorf("could not encode signer indices and sig types: %w", err)
 	}
 
-	data := SignatureData{
+	data := model.SignatureData{
 		SigType:                      sigType,
 		AggregatedStakingSig:         sig.AggregatedStakingSig,
 		AggregatedRandomBeaconSig:    sig.AggregatedRandomBeaconSig,
