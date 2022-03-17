@@ -28,6 +28,7 @@ type API interface {
 	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
 	GetTransactionResult(ctx context.Context, id flow.Identifier) (*TransactionResult, error)
+	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint64) (*TransactionResult, error)
 
 	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
 	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
