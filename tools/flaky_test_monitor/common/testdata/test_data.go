@@ -2158,3 +2158,226 @@ func GetTestData_Level3_Expected_MultiFailures() common.Level3Summary {
 	}
 	return expectedLevel3Summary
 }
+
+// GetTestData_Level3_Input_MultiFailuresPassesNoResults represents level 2 summary (as input into a level 3 parser)
+// where there are multiple failed, passed and no-result tests.
+func GetTestData_Level3_Input_MultiFailuresPassesNoResults() common.Level2Summary {
+	testResultMap := make(map[string]*common.Level2TestResult)
+
+	level2TestResult1 := buildBasicLevel2TestResult("TestSanitySha3_256", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult1.Runs = 25
+	level2TestResult1.Passed = 24
+	level2TestResult1.Failed = 1
+	level2TestResult1.FailureRate = 0.04
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha3_256"] = level2TestResult1
+
+	level2TestResult2 := buildBasicLevel2TestResult("TestSanitySha3_384", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult2.Runs = 25
+	level2TestResult2.Passed = 25
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha3_384"] = level2TestResult2
+
+	level2TestResult3 := buildBasicLevel2TestResult("TestSanitySha2_256", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult3.Runs = 24
+	level2TestResult3.Passed = 14
+	level2TestResult3.Failed = 10
+	level2TestResult3.Skipped = 1
+	level2TestResult3.FailureRate = 0.42
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha2_256"] = level2TestResult3
+
+	level2TestResult4 := buildBasicLevel2TestResult("TestSanitySha2_384", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult4.Runs = 25
+	level2TestResult4.Passed = 25
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanitySha2_384"] = level2TestResult4
+
+	level2TestResult5 := buildBasicLevel2TestResult("TestSanityKmac128", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult5.Runs = 25
+	level2TestResult5.Passed = 25
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanityKmac128"] = level2TestResult5
+
+	level2TestResult6 := buildBasicLevel2TestResult("TestSanityKmac128", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult6.Runs = 24
+	level2TestResult6.Passed = 24
+	level2TestResult6.Skipped = 1
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSanityKmac128"] = level2TestResult6
+
+	level2TestResult7 := buildBasicLevel2TestResult("TestSha3", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult7.Runs = 25
+	level2TestResult7.Passed = 25
+	level2TestResult7.AverageDuration = 0.23
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3"] = level2TestResult7
+
+	level2TestResult8 := buildBasicLevel2TestResult("TestSha3/SHA3_256", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult8.Runs = 25
+	level2TestResult8.Passed = 25
+	level2TestResult8.AverageDuration = 0.10
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_256"] = level2TestResult8
+
+	level2TestResult9 := buildBasicLevel2TestResult("TestSha3/SHA3_384", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult9.Runs = 25
+	level2TestResult9.Passed = 25
+	level2TestResult9.AverageDuration = 0.12
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_384"] = level2TestResult9
+
+	level2TestResult10 := buildBasicLevel2TestResult("TestEncodableNetworkPrivKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult10.Runs = 3
+	level2TestResult10.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPrivKey"] = level2TestResult10
+
+	level2TestResult11 := buildBasicLevel2TestResult("TestEncodableNetworkPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult11.Runs = 3
+	level2TestResult11.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPrivKeyNil"] = level2TestResult11
+
+	level2TestResult12 := buildBasicLevel2TestResult("TestEncodableNetworkPubKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult12.Runs = 3
+	level2TestResult12.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPubKey"] = level2TestResult12
+
+	level2TestResult13 := buildBasicLevel2TestResult("TestEncodableNetworkPubKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult13.Runs = 3
+	level2TestResult13.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPubKeyNil"] = level2TestResult13
+
+	level2TestResult14 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult14.Runs = 3
+	level2TestResult14.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKey"] = level2TestResult14
+
+	level2TestResult15 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult15.Runs = 3
+	level2TestResult15.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyNil"] = level2TestResult15
+
+	level2TestResult16 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPubKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult16.Runs = 3
+	level2TestResult16.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPubKey"] = level2TestResult16
+
+	level2TestResult17 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPubKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult17.Runs = 3
+	level2TestResult17.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPubKeyNil"] = level2TestResult17
+
+	level2TestResult18 := buildBasicLevel2TestResult("TestEncodableStakingPrivKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult18.Runs = 3
+	level2TestResult18.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPrivKey"] = level2TestResult18
+
+	level2TestResult19 := buildBasicLevel2TestResult("TestEncodableStakingPrivKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult19.Runs = 3
+	level2TestResult19.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPrivKeyNil"] = level2TestResult19
+
+	level2TestResult20 := buildBasicLevel2TestResult("TestEncodableStakingPubKey", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult20.Runs = 3
+	level2TestResult20.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPubKey"] = level2TestResult20
+
+	level2TestResult21 := buildBasicLevel2TestResult("TestSha3_4", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult21.Runs = 25
+	level2TestResult21.Passed = 25
+	level2TestResult21.AverageDuration = 0.01
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3_4"] = level2TestResult21
+
+	level2TestResult22 := buildBasicLevel2TestResult("TestEncodableStakingPubKeyNil", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult22.Runs = 3
+	level2TestResult22.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableStakingPubKeyNil"] = level2TestResult22
+
+	level2TestResult23 := buildBasicLevel2TestResult("TestIsHexString", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult23.Runs = 3
+	level2TestResult23.Passed = 3
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestIsHexString"] = level2TestResult23
+
+	level2TestResult24 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult24.NoResult = 13
+	testResultMap["github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack"] = level2TestResult24
+
+	level2TestResult25 := buildBasicLevel2TestResult("TestSha3_2", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult25.Runs = 25
+	level2TestResult25.Passed = 25
+	level2TestResult25.AverageDuration = 0.25
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3_2"] = level2TestResult25
+
+	level2TestResult26 := buildBasicLevel2TestResult("TestSha3_3", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult26.Runs = 25
+	level2TestResult26.Passed = 25
+	level2TestResult26.AverageDuration = 0.19
+	testResultMap["github.com/onflow/flow-go/crypto/hash/TestSha3_3"] = level2TestResult26
+
+	var level2Summary common.Level2Summary
+	level2Summary.TestResultsMap = testResultMap
+	return level2Summary
+}
+
+// GetTestData_Level3_Expected_MultiFailuresPassesNoResults represents expected level 3 summary
+// where there are multiple failed, passed and no-result tests.
+func GetTestData_Level3_Expected_MultiFailuresPassesNoResults() common.Level3Summary {
+	level2TestResult1 := buildBasicLevel2TestResult("TestEncodableRandomBeaconPrivKeyMsgPack", "github.com/onflow/flow-go/model/encodable")
+	level2TestResult1.NoResult = 13
+
+	level2TestResult2 := buildBasicLevel2TestResult("TestSanitySha2_256", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult2.Runs = 24
+	level2TestResult2.Passed = 14
+	level2TestResult2.Failed = 10
+	level2TestResult2.Skipped = 1
+	level2TestResult2.FailureRate = 0.42
+
+	level2TestResult3 := buildBasicLevel2TestResult("TestSanitySha3_256", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult3.Runs = 25
+	level2TestResult3.Passed = 24
+	level2TestResult3.Failed = 1
+	level2TestResult3.FailureRate = 0.04
+
+	level2TestResult4 := buildBasicLevel2TestResult("TestSha3_2", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult4.Runs = 25
+	level2TestResult4.Passed = 25
+	level2TestResult4.AverageDuration = 0.25
+
+	level2TestResult5 := buildBasicLevel2TestResult("TestSha3", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult5.Runs = 25
+	level2TestResult5.Passed = 25
+	level2TestResult5.AverageDuration = 0.23
+
+	level2TestResult6 := buildBasicLevel2TestResult("TestSha3_3", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult6.Runs = 25
+	level2TestResult6.Passed = 25
+	level2TestResult6.AverageDuration = 0.19
+
+	level2TestResult7 := buildBasicLevel2TestResult("TestSha3/SHA3_384", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult7.Runs = 25
+	level2TestResult7.Passed = 25
+	level2TestResult7.AverageDuration = 0.12
+
+	level2TestResult8 := buildBasicLevel2TestResult("TestSha3/SHA3_256", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult8.Runs = 25
+	level2TestResult8.Passed = 25
+	level2TestResult8.AverageDuration = 0.10
+
+	level2TestResult9 := buildBasicLevel2TestResult("TestSha3_4", "github.com/onflow/flow-go/crypto/hash")
+	level2TestResult9.Runs = 25
+	level2TestResult9.Passed = 25
+	level2TestResult9.AverageDuration = 0.01
+
+	expectedLevel3Summary := common.Level3Summary{
+
+		MostFailures: []common.Level2TestResult{
+			*level2TestResult2,
+			*level2TestResult3,
+		},
+		MostFailuresTotal: 2,
+		NoResults: []common.Level2TestResult{
+			*level2TestResult1,
+		},
+		LongestRunning: []common.Level2TestResult{
+			*level2TestResult4,
+			*level2TestResult5,
+			*level2TestResult6,
+			*level2TestResult7,
+			*level2TestResult8,
+			*level2TestResult9,
+		},
+		LongestRunningTotal: 6,
+	}
+	return expectedLevel3Summary
+}
