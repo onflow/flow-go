@@ -86,7 +86,6 @@ type namedComponentFunc struct {
 	fn   ReadyDoneFactory
 	name string
 
-	restartable  bool
 	errorHandler component.OnError
 }
 
@@ -893,7 +892,7 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 	for _, f := range fnb.components {
 		started := make(chan struct{})
 
-		if f.restartable {
+		if f.errorHandler != nil {
 			err = fnb.handleRestartableComponent(f, parent, func() { close(started) })
 		} else {
 			err = fnb.handleComponent(f, parent, func() { close(started) })
@@ -987,8 +986,23 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-
 // Any irrecoverable errors thrown by the component will be passed to the provided error handler.
 func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
 	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// wait for the previous component to be ready before starting
+		if err := util.WaitClosed(ctx, parentReady); err != nil {
+			return
+		}
+
+		// Note: we're marking the worker routine ready before we even attempt to start the
+		// component. the idea behind a restartable component is that the node should not depend
+		// on it for safe operation, so the node does not need to wait for it to be ready.
+		ready()
+
+		// do not block serial startup. started can only be called once, so it cannot be called
+		// from within the componentFactory
+		started()
+
 		log := fnb.Logger.With().Str("component", v.name).Logger()
 
+		// This may be called multiple times if the component is restarted
 		componentFactory := func() (component.Component, error) {
 			c, err := v.fn(fnb.NodeConfig)
 			if err != nil {
@@ -1009,13 +1023,8 @@ func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, par
 			return c.(component.Component), nil
 		}
 
-		// Note: we're marking the worker routine ready before we even attempt to start the
-		// component. the idea behind a background component is that the system as a whole should
-		// not depend on it for safe operation, so the node does not need to wait for it to be ready.
-		ready()
-
 		err := component.RunComponent(ctx, componentFactory, v.errorHandler)
-		if err != nil && errors.Is(err, ctx.Err()) {
+		if err != nil && !errors.Is(err, ctx.Err()) {
 			ctx.Throw(fmt.Errorf("component %s shutdown unexpectedly: %w", v.name, err))
 		}
 
@@ -1100,12 +1109,18 @@ func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) N
 // Use RestartableComponent if the component is not critical to the node's safe operation and
 // can/should be independently restarted when an irrecoverable error is encountered.
 //
+// IMPORTANT: Since a RestartableComponent can be restarted independently of the node, the node and
+// other components must not rely on it for safe operation and failures must be handled gracefully.
+// As such, RestartableComponents do not block the node from becoming ready, and do not block
+// subsequent components from starting serially. They do start in serial order.
+//
+// Note: The ReadyDoneFactory method may be called multiple times if the component is restarted.
+//
 // Any irrecoverable errors thrown by the component will be passed to the provided error handler.
 func (fnb *FlowNodeBuilder) RestartableComponent(name string, f ReadyDoneFactory, errorHandler component.OnError) NodeBuilder {
 	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:           f,
 		name:         name,
-		restartable:  true,
 		errorHandler: errorHandler,
 	})
 	return fnb
