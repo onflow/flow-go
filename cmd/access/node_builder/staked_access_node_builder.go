@@ -71,7 +71,7 @@ func (builder *StakedAccessNodeBuilder) InitIDProviders() {
 			)
 		}
 
-		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
+		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewPublicNetworkIDTranslator())
 
 		return nil
 	})
@@ -86,7 +86,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 	builder.EnqueueNetworkInit()
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
-	if builder.supportsUnstakedFollower {
+	if builder.supportsObservers {
 		builder.enqueueUnstakedNetworkInit()
 		builder.enqueueRelayNetwork()
 	}
@@ -258,7 +258,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			return builder.RequestEng, nil
 		})
 
-	if builder.supportsUnstakedFollower {
+	if builder.supportsObservers {
 		builder.Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			syncRequestHandler, err := synceng.NewRequestHandlerEngine(
 				node.Logger.With().Bool("unstaked", true).Logger(),

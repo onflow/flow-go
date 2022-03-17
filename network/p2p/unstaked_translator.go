@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// UnstakedNetworkIDTranslator implements an IDTranslator which translates IDs for peers
+// PublicNetworkIDTranslator implements an IDTranslator which translates IDs for peers
 // on the unstaked network.
 // On the unstaked network, a Flow ID is derived from a peer ID by extracting the public
 // key from the peer ID, dropping the first byte (parity byte), and using the remaining
@@ -18,13 +18,13 @@ import (
 // Network keys for unstaked nodes must be generated using the Secp256k1 curve, and must
 // be positive. It is assumed that these requirements are enforced during key generation,
 // and any peer ID's which don't follow these conventions are considered invalid.
-type UnstakedNetworkIDTranslator struct{}
+type PublicNetworkIDTranslator struct{}
 
-func NewUnstakedNetworkIDTranslator() *UnstakedNetworkIDTranslator {
-	return &UnstakedNetworkIDTranslator{}
+func NewPublicNetworkIDTranslator() *PublicNetworkIDTranslator {
+	return &PublicNetworkIDTranslator{}
 }
 
-func (t *UnstakedNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, error) {
+func (t *PublicNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, error) {
 	data := append([]byte{0x02}, flowID[:]...)
 
 	um := lcrypto.PubKeyUnmarshallers[crypto_pb.KeyType_Secp256k1]
@@ -41,7 +41,7 @@ func (t *UnstakedNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID
 	return pid, nil
 }
 
-func (t *UnstakedNetworkIDTranslator) GetFlowID(peerID peer.ID) (flow.Identifier, error) {
+func (t *PublicNetworkIDTranslator) GetFlowID(peerID peer.ID) (flow.Identifier, error) {
 	pk, err := peerID.ExtractPublicKey()
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("cannot generate an unstaked FlowID for peerID %v: corresponding libp2p key is not extractible from PeerID", peerID)

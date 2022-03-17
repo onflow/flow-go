@@ -21,7 +21,13 @@ const (
 	RoleAccess       Role = 5
 )
 
+// Enumeration of the available flow node services.
+const (
+	RoleObserverService Role = 100
+)
+
 func (r Role) Valid() bool {
+	// RoleObserver is not a staked stateful node, just a service
 	return r >= 1 && r <= 5
 }
 
@@ -38,6 +44,8 @@ func (r Role) String() string {
 		return "verification"
 	case RoleAccess:
 		return "access"
+	case RoleObserverService:
+		return "observer"
 	default:
 		panic(fmt.Sprintf("invalid role (%d)", r))
 	}
@@ -56,6 +64,8 @@ func ParseRole(role string) (Role, error) {
 		return RoleVerification, nil
 	case "access":
 		return RoleAccess, nil
+	case "observer":
+		return RoleObserverService, nil
 	default:
 		return 0, errors.Errorf("invalid role string (%s)", role)
 	}
@@ -73,6 +83,14 @@ func (r *Role) UnmarshalText(text []byte) error {
 
 func Roles() RoleList {
 	return []Role{RoleCollection, RoleConsensus, RoleExecution, RoleVerification, RoleAccess}
+}
+
+func NodeAndServiceRoles() RoleList {
+	return []Role{RoleCollection, RoleConsensus, RoleExecution, RoleVerification, RoleAccess, RoleObserverService}
+}
+
+func ServiceRoles() RoleList {
+	return []Role{RoleObserverService}
 }
 
 // RoleList defines a slice of roles in flow system.
