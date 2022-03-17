@@ -10,8 +10,7 @@ on:
 
 env:
   COMMIT_SHA: ${{ github.sha }}
-  JOB_ID: $(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20)
-  JOB_STARTED: $(TZ=":America/Vancouver" date -Iseconds)
+  RUN_ID: ${{ github.run_id }}
 
 jobs:
   skipped-test-tracker:
@@ -33,6 +32,9 @@ jobs:
           - integration-verification
     runs-on: ubuntu-latest
     steps:
+    - name: Get job run date
+      id: date
+      run: echo "::set-output name=date::$(TZ=":America/Vancouver" date -Iseconds)"
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@master
       with:
@@ -51,3 +53,4 @@ jobs:
         command: ./tools/flaky_test_monitor/skipped-test-tracker.sh
       env:
         TEST_CATEGORY: ${{ matrix.test-category }}
+        JOB_STARTED: ${{ steps.date.outputs.date }}

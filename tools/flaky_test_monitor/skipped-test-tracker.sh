@@ -14,12 +14,8 @@ case $TEST_CATEGORY in
 esac
 
 # checkout specified commit
-if [[ -n $COMMIT_SHA ]]
-then
-    git checkout $COMMIT_SHA
-fi
+git checkout $COMMIT_SHA
 
-export COMMIT_SHA=$(git rev-parse HEAD)
 export COMMIT_DATE=$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)
 
 make crypto/relic/build
@@ -54,4 +50,8 @@ cat $OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_resul
 
 # TODO: send the skipped tests list to BigQuery
 cat skipped-tests.json
+
+echo $JOB_STARTED
+echo $RUN_ID
+echo $COMMIT_SHA
 

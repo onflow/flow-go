@@ -8,7 +8,6 @@ set -e
 shopt -s extglob
 
 export JOB_STARTED=$(TZ=":America/Vancouver" date -Iseconds)
-export JOB_ID=$(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20)
 
 case $TEST_CATEGORY in
     unit|unit-@(crypto|integration)|integration-@(common|network|epochs|access|collection|consensus|execution|verification))
@@ -61,7 +60,7 @@ fi
 
 cat $OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go results.json
 
-GCS_URI="gs://$GCS_BUCKET/${JOB_STARTED%T*}/$TEST_CATEGORY-$JOB_ID.json"
+GCS_URI="gs://$GCS_BUCKET/${JOB_STARTED%T*}/$TEST_CATEGORY-$RUN_ID.json"
 
 # upload results to GCS bucket
 gsutil cp results.json $GCS_URI
