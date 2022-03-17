@@ -14,7 +14,6 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -1115,12 +1114,12 @@ func ChunkStatusListFixture(t *testing.T, blockHeight uint64, result *flow.Execu
 }
 
 func QCSigDataFixture() []byte {
-	packer := signature.SigDataPacker{}
+	packer := hotstuff.SigDataPacker{}
 	sigType := RandomBytes(5)
 	for i := range sigType {
 		sigType[i] = sigType[i] % 2
 	}
-	sigData := signature.SignatureData{
+	sigData := hotstuff.SignatureData{
 		SigType:                      sigType,
 		AggregatedStakingSig:         SignatureFixture(),
 		AggregatedRandomBeaconSig:    SignatureFixture(),
