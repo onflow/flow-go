@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 func constructRootResultAndSeal(
@@ -47,7 +47,7 @@ func constructRootResultAndSeal(
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
 	for i, clusterQC := range clusterQCs {
 		members := assignments[i]
-		signerIDs, err := packer.DecodeSignerIdentifiersFromIndices(members, clusterQC.SignerIndices)
+		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members, clusterQC.SignerIndices)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("could not decode signer IDs from clusterQC at index %v", i)
 		}

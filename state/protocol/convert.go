@@ -3,10 +3,11 @@ package protocol
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/packer"
 )
 
 // ToEpochSetup converts an Epoch interface instance to the underlying
@@ -75,7 +76,7 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 		}
 		qc := cluster.RootQC()
 		// TODO: double check cluster.Members returns canonical order
-		signerIDs, err := packer.DecodeSignerIdentifiersFromIndices(cluster.Members().NodeIDs(), qc.SignerIndices)
+		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(cluster.Members().NodeIDs(), qc.SignerIndices)
 		if err != nil {
 			return nil, fmt.Errorf("could not encode signer indices: %w", err)
 		}

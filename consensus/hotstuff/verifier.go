@@ -25,7 +25,7 @@ type Verifier interface {
 	// that `voter` is authorized to vote.
 	// Return values:
 	//  * nil if `sigData` is cryptographically valid
-	//  * model.ErrInvalidFormat if the signature has an incompatible format.
+	//  * model.InvalidFormatError if the signature has an incompatible format.
 	//  * model.ErrInvalidSignature is the signature is invalid
 	//  * model.InvalidSignerError is only relevant for extended signature schemes,
 	//    where special signing authority is only given to a _subset_ of consensus
@@ -40,7 +40,7 @@ type Verifier interface {
 	// all `voters` are authorized, without duplicates.
 	// Return values:
 	//  * nil if `sigData` is cryptographically valid
-	//  * model.ErrInvalidFormat if `sigData` has an incompatible format
+	//  * model.InvalidFormatError if `sigData` has an incompatible format
 	//  * model.ErrInvalidSignature if a signature is invalid
 	//  * model.InvalidSignerError is only relevant for extended signature schemes,
 	//    where special signing authority is only given to a _subset_ of consensus
