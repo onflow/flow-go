@@ -3,6 +3,7 @@ package ingestion
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	mathRand "math/rand"
 	"sync"
 	"testing"
@@ -331,16 +332,23 @@ func (ctx testingContext) mockStakedAtBlockID(blockID flow.Identifier, staked bo
 }
 
 func (ctx testingContext) mockSnapshot(header *flow.Header, identities flow.IdentityList) {
-	snap := new(protocol.Snapshot)
+	ctx.mockSnapshotWithBlockID(header.ID(), identities)
+}
+
+func (ctx testingContext) mockSnapshotWithBlockID(blockID flow.Identifier, identities flow.IdentityList) {
 	cluster := new(protocol.Cluster)
-	cluster.On("Members", identities)
+	cluster.On("Members").Return(identities)
+
 	epoch := new(protocol.Epoch)
-	epoch.On("ClusterByChainID").Return(cluster, nil)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+
 	epochQuery := new(protocol.EpochQuery)
-	epochQuery.On("Current").Return(nil)
-	snap.On("Epochs").Return(epoch)
+	epochQuery.On("Current").Return(epoch)
+
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochQuery)
 	snap.On("Identity", mock.Anything).Return(identities[0], nil)
-	ctx.state.On("AtBlockID", header.ID()).Return(snap)
+	ctx.state.On("AtBlockID", blockID).Return(snap)
 }
 
 func (ctx *testingContext) stateCommitmentExist(blockID flow.Identifier, commit flow.StateCommitment) {
@@ -590,6 +598,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
 	runWithEngine(t, func(ctx testingContext) {
 
@@ -690,7 +699,6 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 	runWithEngine(t, func(ctx testingContext) {
 
 		// block in the queue are removed only after the execution has finished
@@ -707,6 +715,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
+		fmt.Println("blockA", blockA.ID())
 
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header)
 		blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
@@ -728,6 +737,11 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits)
+
+		ctx.mockSnapshotWithBlockID(unittest.FixedReferenceBlockID(), unittest.IdentityListFixture(1))
+		ctx.mockSnapshot(blockB.Block.Header, unittest.IdentityListFixture(1))
+		ctx.mockSnapshot(blockC.Block.Header, unittest.IdentityListFixture(1))
+		ctx.mockSnapshot(blockD.Block.Header, unittest.IdentityListFixture(1))
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		ctx.snapshot.On("Head").Return(&blockA, nil)
