@@ -8,16 +8,16 @@ ADX_SUPPORT := $(shell if ([ -f "/proc/cpuinfo" ] && grep -q -e '^flags.*\badx\b
 ############################################################################################
 # CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR
 
-.PHONY: setup
-setup:
-	go generate
-
 .PHONY: test-main
 test-main:
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./...
 
 ############################################################################################
 
+.PHONY: setup
+setup:
+	go generate
+	
 .PHONY: test
 test: setup
 	test-main

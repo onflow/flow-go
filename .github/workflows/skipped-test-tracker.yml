@@ -10,6 +10,8 @@ on:
 
 env:
   COMMIT_SHA: ${{ github.sha }}
+  JOB_ID: $(cat /proc/sys/kernel/random/uuid | sed 's/[-]//g' | head -c 20)
+  JOB_STARTED: $(TZ=":America/Vancouver" date -Iseconds)
 
 jobs:
   skipped-test-tracker:
