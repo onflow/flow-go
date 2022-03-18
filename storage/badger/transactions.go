@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"fmt"
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -12,8 +13,9 @@ import (
 
 // Transactions ...
 type Transactions struct {
-	db    *badger.DB
-	cache *Cache
+	db         *badger.DB
+	cache      *Cache
+	indexCache *Cache
 }
 
 // NewTransactions ...
@@ -54,6 +56,22 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 	tx := t.db.NewTransaction(false)
 	defer tx.Discard()
 	return t.retrieveTx(txID)(tx)
+}
+
+// ByBlockIDTransactionIndex ...
+func (t *Transactions) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionBody, error) {
+	tx := t.db.NewTransaction(false)
+	defer tx.Discard()
+	key := KeyFromBlockIDIndex(blockID, txIndex)
+	val, err := t.indexCache.Get(key)(tx)
+	if err != nil {
+		return nil, err
+	}
+	transactionResult, ok := val.(flow.TransactionBody)
+	if !ok {
+		return nil, fmt.Errorf("could not convert transaction result: %w", err)
+	}
+	return &transactionResult, nil
 }
 
 func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*transaction.Tx) error {

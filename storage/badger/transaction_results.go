@@ -13,8 +13,9 @@ import (
 )
 
 type TransactionResults struct {
-	db    *badger.DB
-	cache *Cache
+	db         *badger.DB
+	cache      *Cache
+	indexCache *Cache
 }
 
 func KeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) string {
@@ -54,12 +55,34 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 			return txResult, nil
 		}
 	}
+	retrieveIndex := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		var txResult flow.TransactionResult
+		return func(tx *badger.Txn) (interface{}, error) {
+
+			blockID, txID, err := KeyToBlockIDIndex(key.(string))
+			if err != nil {
+				return nil, fmt.Errorf("could not convert index key: %w", err)
+			}
+
+			err = operation.RetrieveTransactionResultByIndex(blockID, txID, &txResult)(tx)
+			if err != nil {
+				return nil, handleError(err, flow.TransactionResult{})
+			}
+			return txResult, nil
+		}
+	}
 	return &TransactionResults{
 		db: db,
 		cache: newCache(collector, metrics.ResourceTransactionResults,
 			withLimit(transactionResultsCacheSize),
 			withStore(noopStore),
-			withRetrieve(retrieve)),
+			withRetrieve(retrieve),
+		),
+		indexCache: newCache(collector, metrics.ResourceTransactionResultIndices,
+			withLimit(transactionResultsCacheSize),
+			withStore(noopStore),
+			withRetrieve(retrieveIndex),
+		),
 	}
 }
 
@@ -67,10 +90,15 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 
-	for _, result := range transactionResults {
+	for i, result := range transactionResults {
 		err := operation.BatchInsertTransactionResult(blockID, &result)(writeBatch)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert tx result: %w", err)
+		}
+
+		err = operation.BatchIndexTransactionResult(blockID, uint32(i), &result)(writeBatch)
+		if err != nil {
+			return fmt.Errorf("cannot batch index tx result: %w", err)
 		}
 	}
 
@@ -90,6 +118,22 @@ func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tx
 	defer tx.Discard()
 	key := KeyFromBlockIDTransactionID(blockID, txID)
 	val, err := tr.cache.Get(key)(tx)
+	if err != nil {
+		return nil, err
+	}
+	transactionResult, ok := val.(flow.TransactionResult)
+	if !ok {
+		return nil, fmt.Errorf("could not convert transaction result: %w", err)
+	}
+	return &transactionResult, nil
+}
+
+// ByBlockIDIndex returns the runtime transaction result for the given block ID and transaction index
+func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error) {
+	tx := tr.db.NewTransaction(false)
+	defer tx.Discard()
+	key := KeyFromBlockIDIndex(blockID, txIndex)
+	val, err := tr.indexCache.Get(key)(tx)
 	if err != nil {
 		return nil, err
 	}

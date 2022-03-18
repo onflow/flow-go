@@ -559,6 +559,46 @@ func (suite *Suite) TestGetTransaction() {
 	suite.assertAllExpectations()
 }
 
+func (suite *Suite) TestGetTransactionByIndex() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	transaction := unittest.TransactionFixture()
+	expected := transaction.TransactionBody
+
+	suite.transactions.
+		On("ByID", transaction.ID()).
+		Return(&expected, nil).
+		Once()
+
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		suite.transactions,
+		nil,
+		nil,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+	)
+
+	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
+	suite.checkResponse(actual, err)
+
+	suite.Require().Equal(expected, *actual)
+
+	suite.assertAllExpectations()
+}
+
 func (suite *Suite) TestGetCollection() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 

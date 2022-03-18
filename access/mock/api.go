@@ -492,11 +492,11 @@ func (_m *API) GetTransactionResult(ctx context.Context, id flow.Identifier) (*a
 }
 
 // GetTransactionResultByIndex provides a mock function with given fields: ctx, blockID, index
-func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint64) (*access.TransactionResult, error) {
+func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32) (*access.TransactionResult, error) {
 	ret := _m.Called(ctx, blockID, index)
 
 	var r0 *access.TransactionResult
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64) *access.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint32) *access.TransactionResult); ok {
 		r0 = rf(ctx, blockID, index)
 	} else {
 		if ret.Get(0) != nil {
@@ -505,7 +505,7 @@ func (_m *API) GetTransactionResultByIndex(ctx context.Context, blockID flow.Ide
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, uint32) error); ok {
 		r1 = rf(ctx, blockID, index)
 	} else {
 		r1 = ret.Error(1)

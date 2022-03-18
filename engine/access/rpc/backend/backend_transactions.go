@@ -257,16 +257,12 @@ func (b *backendTransactions) GetTransactionResult(
 func (b *backendTransactions) GetTransactionResultByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
-	index uint64,
+	index uint32,
 ) (*access.TransactionResult, error) {
-	block, err := b.blocks.ByID(blockID)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+	tx, err := b.transactions.ByBlockIDTransactionIndex(blockID, index)
+	if err != nil {
 		return nil, convertStorageError(err)
 	}
-	// find ID
-	txId := block.ID() // WIP! don't know where to look up index
-	tx, err := b.transactions.ByID(txId)
-
 	// create request and forward to EN
 	req := execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
@@ -288,7 +284,15 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 	// derive status of the transaction
+	block, err := b.blocks.ByID(blockID)
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return nil, convertStorageError(err)
+	}
 	txStatus, err := b.deriveTransactionStatus(tx, true, block)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
 	// convert to response
 	return &access.TransactionResult{
 		Status:       txStatus,
@@ -581,7 +585,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 			b.log.Debug().
 				Str("execution_node", execNode.String()).
 				Hex("block_id", req.GetBlockId()).
-				Uint64("index", req.GetIndex()).
+				Uint32("index", req.GetIndex()).
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
 		}

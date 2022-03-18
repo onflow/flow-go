@@ -12,4 +12,7 @@ type Transactions interface {
 
 	// ByID returns the transaction for the given fingerprint.
 	ByID(txID flow.Identifier) (*flow.TransactionBody, error)
+
+	// ByBlockIDTransactionIndex returns the transaction for the given fingerprint.
+	ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionBody, error)
 }
