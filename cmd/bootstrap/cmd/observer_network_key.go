@@ -65,8 +65,9 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 	log.Info().Msg("generated network key")
 
 	// hex encode and write to file
-	output := make([]byte, hex.EncodedLen(networkKey.Size()))
-	hex.Encode(output, networkKey.Encode())
+	keyBytes := networkKey.Encode()
+	output := make([]byte, hex.EncodedLen(len(keyBytes)))
+	hex.Encode(output, keyBytes)
 
 	// write to file
 	err = ioutil.WriteFile(flagOutputFile, output, 0600)
