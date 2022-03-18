@@ -198,7 +198,8 @@ func TestAttackNetworkPublish_ConcurrentMessages(t *testing.T) {
 	testAttackNetwork(t, insecure.Protocol_PUBLISH, 10)
 }
 
-// TODO: adding godoc
+// testAttackNetwork evaluates that the orchestrator can successfully route an event to a corrupted node through the attack network.
+// By a corrupted node here, we mean a node that runs with a corruptible conduit factory.
 func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	_, events, corruptedIds := messageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
@@ -217,7 +218,9 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 				corruptedId := corruptedId
 				connection, ok := connections[corruptedId.NodeID]
 				require.True(t, ok)
-				// TODO: add comment on why we do mocking
+
+				// we test the communication between the attack network and orchestrator while mocking the connections
+				// between the attack network and corrupted nodes.
 				connection.On("SendMessage", mock.Anything).Run(func(args mock.Arguments) {
 					msg, ok := args[0].(*insecure.Message)
 					require.True(t, ok)
@@ -248,7 +251,8 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 		})
 }
 
-// TODO: add godoc
+// mackEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
+// of the given events.
 func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message, corruptedId flow.Identifier) {
 	codec := cbor.NewCodec()
 
