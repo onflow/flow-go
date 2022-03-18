@@ -83,7 +83,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		// Int("num_signers", len(header.ParentVoterIDs)).
+		Hex("signers", header.ParentVoterIndices).
 		Logger()
 	log.Info().Msg("block proposal received")
 
