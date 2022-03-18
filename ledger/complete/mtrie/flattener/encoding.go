@@ -32,6 +32,8 @@ const (
 	encodedTrieSize = encNodeIndexSize + encRegCountSize + encRegSizeSize + encHashSize
 )
 
+const payloadEncodingVersion = 1
+
 // encodeLeafNode encodes leaf node in the following format:
 // - node type (1 byte)
 // - height (2 bytes)
@@ -48,7 +50,7 @@ const (
 // before scratch buffer is used again.
 func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
-	encPayloadSize := encoding.EncodedPayloadLengthWithoutPrefix(n.Payload())
+	encPayloadSize := encoding.EncodedPayloadLengthWithoutPrefix(n.Payload(), payloadEncodingVersion)
 
 	encodedNodeSize := encNodeTypeSize +
 		encHeightSize +
@@ -92,7 +94,7 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
 	// EncodeAndAppendPayloadWithoutPrefix appends encoded payload to the resliced buf.
 	// Returned buf is resliced to include appended payload.
-	buf = encoding.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload())
+	buf = encoding.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload(), payloadEncodingVersion)
 
 	return buf
 }
@@ -384,7 +386,7 @@ func readPayloadFromReader(reader io.Reader, scratch []byte) (*ledger.Payload, e
 	}
 
 	// Decode and copy payload
-	payload, err := encoding.DecodePayloadWithoutPrefix(scratch, false)
+	payload, err := encoding.DecodePayloadWithoutPrefix(scratch, false, payloadEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode payload: %w", err)
 	}
