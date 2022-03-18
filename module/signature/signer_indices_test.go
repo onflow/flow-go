@@ -19,42 +19,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestEncodeDecodeIdentities verifies the two path of encoding -> decoding:
-//  1. Identifiers --encode--> Indices --decode--> Identifiers
-//  2. for the decoding step, we offer an optimized convenience function to directly
-//     decode to full identities: Indices --decode--> Identities
-func TestEncodeDecodeIdentities(t *testing.T) {
-	canonicalIdentities := unittest.IdentityListFixture(20)
-	canonicalIdentifiers := canonicalIdentities.NodeIDs()
-	for s := 0; s < 20; s++ {
-		for e := s; e < 20; e++ {
-			var signers = canonicalIdentities[s:e]
-
-			// encoding
-			indices, err := signature.EncodeSignersToIndices(canonicalIdentities.NodeIDs(), signers.NodeIDs())
-			require.NoError(t, err)
-
-			// decoding option 1: decode to Identifiers
-			decodedIDs, err := signature.DecodeSignerIndicesToIdentifiers(canonicalIdentifiers, indices)
-			require.NoError(t, err)
-			require.Equal(t, signers.NodeIDs(), decodedIDs)
-
-			// decoding option 1: decode to Identifiers
-			decodedIdentities, err := signature.DecodeSignerIndicesToIdentities(canonicalIdentities, indices)
-			require.NoError(t, err)
-			require.Equal(t, signers, decodedIdentities)
-		}
-	}
-}
-
-// TestEncodeFail verifies that an error is returned in case some signer is not part
-// of the set of canonicalIdentifiers
-func TestEncodeFail(t *testing.T) {
-	fullIdentities := unittest.IdentifierListFixture(20)
-	_, err := signature.EncodeSignersToIndices(fullIdentities[1:], fullIdentities[:10])
-	require.Error(t, err)
-}
-
 // Test_EncodeSignerToIndicesAndSigType uses fuzzy-testing framework Rapid to
 // test the method EncodeSignerToIndicesAndSigType:
 // * we generate a set of authorized signer: `committeeIdentities`
@@ -84,6 +48,58 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 		// check sigTypes
 		canSigners := committeeIdentities.Filter(filter.HasNodeID(unorderedSigners...)).NodeIDs() // generates list of signer IDs in canonical order
 		correctEncoding(t, sigTypes, canSigners, beaconSigners)
+	})
+}
+
+// Test_DecodeSigTypeToStakingAndBeaconSigners uses fuzzy-testing framework Rapid to
+// test the method DecodeSigTypeToStakingAndBeaconSigners:
+// * we generate a set of authorized signer: `committeeIdentities`
+// * part of this set is sampled as staking singers: `stakingSigners`
+// * another part of `committeeIdentities` is sampled as beacon singers: `beaconSigners`
+// * we encode the set and check that the results conform to the protocol specification
+// * We encode the set using `EncodeSignerToIndicesAndSigType` (tested before) and then decode it.
+//   Thereby we should recover the original input. Caution, the order might be different,
+//   so we sort both sets.
+func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		// select total committee size, number of random beacon signers and number of staking signers
+		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize").(int)
+		numStakingSigners := rapid.IntRange(0, committeeSize).Draw(t, "numStakingSigners").(int)
+		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners").(int)
+
+		// create committee
+		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		committee := committeeIdentities.NodeIDs()
+		stakingSigners, beaconSigners := sampleSigners(committee, numStakingSigners, numRandomBeaconSigners)
+
+		// encode
+		signerIndices, sigTypes, err := signature.EncodeSignerToIndicesAndSigType(committee, stakingSigners, beaconSigners)
+		require.NoError(t, err)
+
+		// decode
+		decSignerIdentites, err := signature.DecodeSignerIndicesToIdentities(committeeIdentities, signerIndices)
+		require.NoError(t, err)
+		decStakingSigners, decBeaconSigners, err := signature.DecodeSigTypeToStakingAndBeaconSigners(decSignerIdentites, sigTypes)
+		require.NoError(t, err)
+
+		// verify; note that there is a slightly different convention between Filter and the decoding logic:
+		// Filter returns nil for an empty list, while the decoding logic returns an instance of an empty slice
+		sigIdentities := committeeIdentities.Filter(filter.Or(filter.HasNodeID(stakingSigners...), filter.HasNodeID(beaconSigners...))) // signer identities in canonical order
+		if len(stakingSigners)+len(decBeaconSigners) == 0 {
+			require.Empty(t, decSignerIdentites)
+		} else {
+			require.Equal(t, sigIdentities, decSignerIdentites)
+		}
+		if len(stakingSigners) == 0 {
+			require.Empty(t, decStakingSigners)
+		} else {
+			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(stakingSigners...)), decStakingSigners)
+		}
+		if len(decBeaconSigners) == 0 {
+			require.Empty(t, decBeaconSigners)
+		} else {
+			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(beaconSigners...)), decBeaconSigners)
+		}
 	})
 }
 
@@ -168,6 +184,14 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, signers.Sort(order.Canonical), decodedSigners.Sort(order.Canonical))
 	})
+}
+
+// TestEncodeFail verifies that an error is returned in case some signer is not part
+// of the set of canonicalIdentifiers
+func TestEncodeFail(t *testing.T) {
+	fullIdentities := unittest.IdentifierListFixture(20)
+	_, err := signature.EncodeSignersToIndices(fullIdentities[1:], fullIdentities[:10])
+	require.Error(t, err)
 }
 
 //// if the sig data can not be decoded, return model.InvalidFormatError

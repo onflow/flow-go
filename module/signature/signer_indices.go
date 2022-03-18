@@ -107,7 +107,7 @@ func EncodeSignerToIndicesAndSigType(
 }
 
 // DecodeSigTypeToStakingAndBeaconSigners decodes the bit-vector `sigType` to the set of
-// staking signer identifiers (`stakingSigners`) and the set of beacon signer identifiers (`beaconSigners`).
+// staking signer identities (`stakingSigners`) and the set of beacon signer identities (`beaconSigners`).
 // Prerequisite:
 //  * The input `signers` must be the set of signers in their canonical order.
 //
@@ -115,9 +115,9 @@ func EncodeSignerToIndicesAndSigType(
 //  * IncompatibleIndexSliceError indicates that `signerIndices` has the wrong length
 //  * IllegallyPaddedIndexSliceError is the vector is padded with bits other than 0
 func DecodeSigTypeToStakingAndBeaconSigners(
-	signers flow.IdentifierList,
+	signers flow.IdentityList,
 	sigType []byte,
-) (stakingSigners flow.IdentifierList, beaconSigners flow.IdentifierList, err error) {
+) (stakingSigners flow.IdentityList, beaconSigners flow.IdentityList, err error) {
 	numberSigners := len(signers)
 	if len(sigType) != bitutils.PaddedByteSliceLength(numberSigners) {
 		return nil, nil, fmt.Errorf("there are %d signers, so the sigType vector should have %d bytes but has length %d: %w",
@@ -132,8 +132,8 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 	}
 
 	// convert
-	stakingSigners = make(flow.IdentifierList, 0, numberSigners)
-	beaconSigners = make(flow.IdentifierList, 0, numberSigners)
+	stakingSigners = make(flow.IdentityList, 0, numberSigners)
+	beaconSigners = make(flow.IdentityList, 0, numberSigners)
 	for i, signer := range signers {
 		if bitutils.ReadBit(sigType, i) == 0 {
 			stakingSigners = append(stakingSigners, signer)
