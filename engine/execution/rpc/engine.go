@@ -319,7 +319,7 @@ func (h *handler) GetTransactionResultByIndex(
 		return nil, err
 	}
 
-	index := uint32(req.GetIndex())
+	index := req.GetIndex()
 
 	var statusCode uint32 = 0
 	errMsg := ""
