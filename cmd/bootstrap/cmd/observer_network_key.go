@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/crypto"
 )
 
 var (
@@ -30,7 +31,11 @@ func init() {
 	observerNetworkKeyCmd.Flags().StringVarP(&flagOutputFile, "output-file", "f", "", "output file path")
 	cmd.MarkFlagRequired(observerNetworkKeyCmd, "output-file")
 
-	observerNetworkKeyCmd.Flags().BytesHexVar(&flagNetworkSeed, "seed", []byte{}, fmt.Sprintf("hex encoded network key seed (min %d bytes)", minSeedBytes))
+	observerNetworkKeyCmd.Flags().BytesHexVar(
+		&flagNetworkSeed,
+		"seed",
+		[]byte{},
+		fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSASecp256k1))
 }
 
 // observerNetworkKeyRun generate a network key and writes it to a default file path.
@@ -38,7 +43,7 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 
 	// generate seed if not specified via flag
 	if len(flagNetworkSeed) == 0 {
-		flagNetworkSeed = GenerateRandomSeed()
+		flagNetworkSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSASecp256k1)
 	}
 
 	// if the file already exists, exit
@@ -53,8 +58,7 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 	}
 
 	// generate unstaked networking private key
-	seed := validateSeed(flagNetworkSeed)
-	networkKey, err := utils.GenerateUnstakedNetworkingKey(seed)
+	networkKey, err := utils.GenerateUnstakedNetworkingKey(flagNetworkSeed)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate network key")
 	}
