@@ -40,21 +40,16 @@ type PaceMaker interface {
 	// CurView returns the current view.
 	CurView() uint64
 
-	// UpdateCurViewWithQC will check if the given QC will allow PaceMaker to fast
-	// forward to QC.view+1. If PaceMaker incremented the current View, a NewViewEvent will be returned.
-	UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool)
+	// ProcessQC will check if the given QC will allow PaceMaker to fast-forward to QC.view+1.
+	// If PaceMaker incremented the current View, a NewViewEvent will be returned.
+	ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool)
 
-	// UpdateCurViewWithBlock will check if the given block will allow PaceMaker to fast forward
-	// to the BlockProposal's view. If yes, the PaceMaker will update it's internal value for
-	// CurView and return a NewViewEvent.
-	//
-	// The parameter `nextPrimary` indicates to the PaceMaker whether or not this replica is the
-	// primary for the NEXT view taking block.view as reference.
-	// True corresponds to this replica being the next primary.
-	UpdateCurViewWithBlock(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool)
+	// ProcessTC will check if the given TC will allow PaceMaker to fast-forward to TC.view+1.
+	// If PaceMaker incremented the current View, a NewViewEvent will be returned.
+	ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, bool)
 
 	// TimeoutChannel returns the timeout channel for the CURRENTLY ACTIVE timeout.
-	// Each time the pace maker starts a new timeout, this channel is replaced.
+	// Each time the pacemaker starts a new timeout, this channel is replaced.
 	TimeoutChannel() <-chan time.Time
 
 	// OnTimeout is called when a timeout, which was previously created by the PaceMaker, has
@@ -63,6 +58,10 @@ type PaceMaker interface {
 	// It is the responsibility of the calling code to ensure that NO STALE timeouts are
 	// delivered to the PaceMaker.
 	OnTimeout() *model.NewViewEvent
+
+	// OnPartialTC is called when TC collector will collect f+1 timeouts. This implements Bracha style timeouts,
+	// which times out current view after receiving partial TC.
+	OnPartialTC(curView uint64)
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view).
 	Start()

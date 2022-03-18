@@ -73,7 +73,7 @@ func (p *NitroPaceMaker) TimeoutChannel() <-chan time.Time {
 
 // UpdateCurViewWithQC notifies the pacemaker with a new QC, which might allow pacemaker to
 // fast forward its view.
-func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
+func (p *NitroPaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
 	if qc.View < p.currentView {
 		return nil, false
 	}
@@ -88,11 +88,19 @@ func (p *NitroPaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model
 	return p.gotoView(newView), true
 }
 
+func (p *NitroPaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, bool) {
+	panic("not yet implemented")
+}
+
+func (p *NitroPaceMaker) OnPartialTC(curView uint64) {
+	panic("not yet implemented")
+}
+
 // UpdateCurViewWithBlock indicates the pacermaker that the block for the current view has received.
 // and isLeaderForNextView indicates whether or not this replica is the primary for the NEXT view.
 func (p *NitroPaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
 	// use block's QC to fast-forward if possible
-	newViewOnQc, newViewOccurredOnQc := p.UpdateCurViewWithQC(block.QC)
+	newViewOnQc, newViewOccurredOnQc := p.ProcessQC(block.QC)
 	if block.View != p.currentView {
 		return newViewOnQc, newViewOccurredOnQc
 	}

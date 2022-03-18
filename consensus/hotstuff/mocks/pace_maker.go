@@ -106,7 +106,7 @@ func (_m *PaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextV
 }
 
 // UpdateCurViewWithQC provides a mock function with given fields: qc
-func (_m *PaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
+func (_m *PaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
 	ret := _m.Called(qc)
 
 	var r0 *model.NewViewEvent

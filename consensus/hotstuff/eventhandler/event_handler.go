@@ -348,18 +348,19 @@ func (e *EventHandler) processBlockForCurrentView(block *model.Block) error {
 	// Inform PaceMaker that we've processed a block for the current view. We expect
 	// a view change if an only if we are _not_ the next leader. We perform a sanity
 	// check here, because a wrong view change can have disastrous consequences.
-	isSelfNextLeader := e.committee.Self() == nextLeader
-	_, viewChanged := e.paceMaker.UpdateCurViewWithBlock(block, isSelfNextLeader)
-	if viewChanged == isSelfNextLeader {
-		if isSelfNextLeader {
-			return fmt.Errorf("I am primary for next view (%v) and should be collecting votes, but pacemaker triggered already view change", curView+1)
-		}
-		return fmt.Errorf("pacemaker should trigger a view change to net view (%v), but didn't", curView+1)
-	}
-
-	if viewChanged {
-		return e.startNewView()
-	}
+	//isSelfNextLeader := e.committee.Self() == nextLeader
+	// TODO(active-pacemaker: this function is not available anymore, rewrite it when working on EventHandler
+	//_, viewChanged := e.paceMaker.UpdateCurViewWithBlock(block, isSelfNextLeader)
+	//if viewChanged == isSelfNextLeader {
+	//	if isSelfNextLeader {
+	//		return fmt.Errorf("I am primary for next view (%v) and should be collecting votes, but pacemaker triggered already view change", curView+1)
+	//	}
+	//	return fmt.Errorf("pacemaker should trigger a view change to net view (%v), but didn't", curView+1)
+	//}
+	//
+	//if viewChanged {
+	//	return e.startNewView()
+	//}
 	return nil
 }
 
@@ -419,7 +420,7 @@ func (e *EventHandler) processQC(qc *flow.QuorumCertificate) error {
 		return fmt.Errorf("cannot add QC to forks: %w", err)
 	}
 
-	_, viewChanged := e.paceMaker.UpdateCurViewWithQC(qc)
+	_, viewChanged := e.paceMaker.ProcessQC(qc)
 	if !viewChanged {
 		log.Debug().Msg("QC didn't trigger view change, nothing to do")
 		return nil
