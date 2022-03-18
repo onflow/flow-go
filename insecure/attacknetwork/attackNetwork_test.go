@@ -1,7 +1,6 @@
 package attacknetwork_test
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -199,6 +198,7 @@ func TestAttackNetworkPublish_ConcurrentMessages(t *testing.T) {
 	testAttackNetwork(t, insecure.Protocol_PUBLISH, 10)
 }
 
+// TODO: adding godoc
 func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	_, events, corruptedIds := messageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
@@ -217,12 +217,12 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 				corruptedId := corruptedId
 				connection, ok := connections[corruptedId.NodeID]
 				require.True(t, ok)
-
+				// TODO: add comment on why we do mocking
 				connection.On("SendMessage", mock.Anything).Run(func(args mock.Arguments) {
 					msg, ok := args[0].(*insecure.Message)
 					require.True(t, ok)
 
-					matchEventForMessage(t, events, msg)
+					matchEventForMessage(t, events, msg, corruptedId.NodeID)
 
 					connectionRcvWG.Done()
 				}).Return(nil)
@@ -248,11 +248,14 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 		})
 }
 
-func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message) {
+// TODO: add godoc
+func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message, corruptedId flow.Identifier) {
 	codec := cbor.NewCodec()
 
+	require.Equal(t, corruptedId[:], message.OriginID[:])
+
 	for _, event := range events {
-		if bytes.Equal(event.CorruptedId[:], message.OriginID) {
+		if event.CorruptedId == corruptedId {
 			require.Equal(t, event.Channel.String(), message.ChannelID)
 			require.Equal(t, event.Protocol, message.Protocol)
 			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.TargetIDs)
