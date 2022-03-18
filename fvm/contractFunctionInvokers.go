@@ -14,22 +14,28 @@ import (
 
 var deductTransactionFeesInvocationArgumentTypes = []sema.Type{
 	sema.AuthAccountType,
+	sema.UInt64Type,
+	sema.UInt64Type,
 }
 
 // DeductTransactionFeesInvocation prepares a function that calls fee deduction on the service account
 func DeductTransactionFeesInvocation(
 	env Environment,
 	traceSpan opentracing.Span,
-) func(payer flow.Address) (cadence.Value, error) {
-	return func(payer flow.Address) (cadence.Value, error) {
+) func(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
+	feesAddress := FlowFeesAddress(env.Context().Chain)
+
+	return func(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
 		invoker := NewTransactionContractFunctionInvoker(
 			common.AddressLocation{
-				Address: common.Address(env.Context().Chain.ServiceAddress()),
-				Name:    systemcontracts.ContractServiceAccount,
+				Address: common.Address(feesAddress),
+				Name:    systemcontracts.ContractNameFlowFees,
 			},
 			systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
 			[]interpreter.Value{
 				interpreter.NewAddressValue(env, common.Address(payer)),
+				interpreter.UFix64Value(inclusionEffort),
+				interpreter.UFix64Value(executionEffort),
 			},
 			deductTransactionFeesInvocationArgumentTypes,
 			env.Context().Logger,
