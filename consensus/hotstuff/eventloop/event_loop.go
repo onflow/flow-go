@@ -19,12 +19,13 @@ import (
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
 type EventLoop struct {
 	*component.ComponentManager
-	log                zerolog.Logger
-	eventHandler       hotstuff.EventHandler
-	metrics            module.HotstuffMetrics
-	proposals          chan *model.Proposal
-	quorumCertificates chan *flow.QuorumCertificate
-	startTime          time.Time
+	log                 zerolog.Logger
+	eventHandler        hotstuff.EventHandler
+	metrics             module.HotstuffMetrics
+	proposals           chan *model.Proposal
+	quorumCertificates  chan *flow.QuorumCertificate
+	timeoutCertificates chan *flow.TimeoutCertificate
+	startTime           time.Time
 }
 
 var _ hotstuff.EventLoop = (*EventLoop)(nil)
@@ -184,6 +185,23 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not process QC: %w", err)
 			}
+
+			// if we have a new QC, process it
+		case tc := <-el.timeoutCertificates:
+			// measure how long the event loop was idle waiting for an
+			// incoming event
+			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
+
+			processStart := time.Now()
+
+			err := el.eventHandler.OnTCConstructed(tc)
+
+			// measure how long it takes for a QC to be processed
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnTC)
+
+			if err != nil {
+				return fmt.Errorf("could not process TC: %w", err)
+			}
 		}
 	}
 }
@@ -218,4 +236,18 @@ func (el *EventLoop) SubmitTrustedQC(qc *flow.QuorumCertificate) {
 	// the wait duration is measured as how long it takes from a qc being
 	// received to event handler commencing the processing of the qc
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQC)
+}
+
+func (el *EventLoop) SubmitTrustedTC(tc *flow.TimeoutCertificate) {
+	received := time.Now()
+
+	select {
+	case el.timeoutCertificates <- tc:
+	case <-el.ComponentManager.ShutdownSignal():
+		return
+	}
+
+	// the wait duration is measured as how long it takes from a tc being
+	// received to event handler commencing the processing of the tc
+	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnTC)
 }

@@ -13,6 +13,9 @@ type EventHandler interface {
 	// OnQCConstructed processes a valid qc constructed by internal vote aggregator.
 	OnQCConstructed(qc *flow.QuorumCertificate) error
 
+	// OnTCConstructed processes a valid tc constructed by internal vote aggregator.
+	OnTCConstructed(tc *flow.TimeoutCertificate) error
+
 	// OnReceiveProposal processes a block proposal received from another HotStuff
 	// consensus participant.
 	OnReceiveProposal(proposal *model.Proposal) error

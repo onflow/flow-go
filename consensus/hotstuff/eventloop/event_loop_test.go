@@ -29,14 +29,14 @@ func TestEventLoop(t *testing.T) {
 type EventLoopTestSuite struct {
 	suite.Suite
 
-	eh     *mocks.EventHandlerV2
+	eh     *mocks.EventHandler
 	cancel context.CancelFunc
 
 	eventLoop *EventLoop
 }
 
 func (s *EventLoopTestSuite) SetupTest() {
-	s.eh = &mocks.EventHandlerV2{}
+	s.eh = &mocks.EventHandler{}
 	s.eh.On("Start").Return(nil).Maybe()
 	s.eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C).Maybe()
 	s.eh.On("OnLocalTimeout").Return(nil).Maybe()
@@ -97,7 +97,7 @@ func (s *EventLoopTestSuite) Test_SubmitQC() {
 
 // TestEventLoop_Timeout tests that event loop delivers timeout events to event handler under pressure
 func TestEventLoop_Timeout(t *testing.T) {
-	eh := &mocks.EventHandlerV2{}
+	eh := &mocks.EventHandler{}
 	processed := atomic.NewBool(false)
 	eh.On("Start").Return(nil).Once()
 	eh.On("TimeoutChannel").Return(time.NewTimer(100 * time.Millisecond).C)
@@ -150,7 +150,7 @@ func TestEventLoop_Timeout(t *testing.T) {
 // TestReadyDoneWithStartTime tests that event loop correctly starts and schedules start of processing
 // when startTime argument is used
 func TestReadyDoneWithStartTime(t *testing.T) {
-	eh := &mocks.EventHandlerV2{}
+	eh := &mocks.EventHandler{}
 	eh.On("Start").Return(nil)
 	eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C)
 	eh.On("OnLocalTimeout").Return(nil)

@@ -88,6 +88,11 @@ func (e *EventHandler) OnQCConstructed(qc *flow.QuorumCertificate) error {
 	return e.processQC(qc)
 }
 
+// OnTCConstructed processes a valid tc constructed by internal vote aggregator.
+func (e *EventHandler) OnTCConstructed(tc *flow.TimeoutCertificate) error {
+	panic("to be implemented")
+}
+
 // OnReceiveProposal processes the block when a block proposal is received.
 // It is assumed that the block proposal is incorporated. (its parent can be found
 // in the forks)
