@@ -16,12 +16,12 @@ var (
 	flagOutputFile string
 )
 
-// observerNetworkKeyCmd represents the `observer-network-key` command which generates required network key
-// for an Observer,  and writes it to the default path within the provided directory. Used by new Observer
-// operators to create the networking key only
+// observerNetworkKeyCmd represents the `observer-network-key` command which generates required
+// network key for an Observer, and writes it to the provided path. Used by new Observer operators
+// to create the networking key only
 var observerNetworkKeyCmd = &cobra.Command{
 	Use:   "observer-network-key",
-	Short: "Generates network key and writes it to the default path within the output directory",
+	Short: "Generates network key and writes it to the provided path",
 	Run:   observerNetworkKeyRun,
 }
 
@@ -38,7 +38,7 @@ func init() {
 		fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSASecp256k1))
 }
 
-// observerNetworkKeyRun generate a network key and writes it to a default file path.
+// observerNetworkKeyRun generate a network key and writes it to the provided file path.
 func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 
 	// generate seed if not specified via flag
