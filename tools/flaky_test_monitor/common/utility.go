@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -107,9 +108,32 @@ func SaveToFile(fileName string, testSummary interface{}) {
 	AssertNoError(err, "error marshalling json")
 
 	file, err := os.Create(fileName)
-	AssertNoError(err, "error creating filename")
+	AssertNoError(err, "error creating "+fileName)
 	defer file.Close()
 
 	_, err = file.Write(testSummaryBytes)
 	AssertNoError(err, "error saving test summary to file")
+}
+
+func SaveLinesToFile(fileName string, list interface{}) {
+	sliceType := reflect.TypeOf(list)
+	if sliceType.Kind() != reflect.Slice && sliceType.Kind() != reflect.Array {
+		panic("argument must be an array or slice")
+	}
+
+	file, err := os.Create(fileName)
+	AssertNoError(err, "error creating "+fileName)
+	defer file.Close()
+
+	l := reflect.ValueOf(list)
+	for i := 0; i < l.Len(); i++ {
+		b, err := json.Marshal(l.Index(i).Interface())
+		AssertNoError(err, "error marshalling json")
+
+		_, err = file.Write(b)
+		AssertNoError(err, "error writing line to file")
+
+		_, err = file.Write([]byte("\n"))
+		AssertNoError(err, "error writing newline")
+	}
 }

@@ -2,7 +2,16 @@ package common
 
 import (
 	"time"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
+
+type SkippedTestEntry struct {
+	Test       string              `json:"test"`
+	SkipReason unittest.SkipReason `json:"skip_reason,omitempty"`
+	Package    string              `json:"package"`
+	CommitDate time.Time           `json:"commit_date"`
+}
 
 // RawTestStep models single line from "go test -json" output.
 type RawTestStep struct {
