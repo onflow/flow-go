@@ -14,7 +14,7 @@ env:
   NUM_RUNS: 1
   GCS_BUCKET: production_ddp_flow_test_metrics
   COMMIT_SHA: ${{ github.sha }}
-  BIGQUERY_TABLE: dev_src_flow_test_metrics.flaky_test_monitor_level_1 # TODO: update to production_src_flow_test_metrics before merging
+  BIGQUERY_TABLE: dev_src_flow_test_metrics.test_results # TODO: update to production table before merging
 
 jobs:
   level1:

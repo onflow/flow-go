@@ -159,6 +159,7 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 				Test:       testResult.Test,
 				Package:    testResult.Package,
 				CommitDate: testResult.CommitDate,
+				CommitSHA:  testResult.CommitSha,
 			}
 			skippedTests[testResult.Test] = skippedTestEntry
 

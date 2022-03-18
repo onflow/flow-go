@@ -11,6 +11,7 @@ type SkippedTestEntry struct {
 	SkipReason unittest.SkipReason `json:"skip_reason,omitempty"`
 	Package    string              `json:"package"`
 	CommitDate time.Time           `json:"commit_date"`
+	CommitSHA  string              `json:"commit_sha"`
 }
 
 // RawTestStep models single line from "go test -json" output.
