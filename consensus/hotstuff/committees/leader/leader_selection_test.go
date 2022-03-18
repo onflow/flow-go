@@ -301,11 +301,10 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 	})
 
 	t.Run("fuzzy set", func(t *testing.T) {
-		t.Skip()
 		rng, err := random.NewChacha20PRG(someSeed, []byte("leader_selec"))
 		require.NoError(t, err)
 
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 1; i++ {
 			// create 1002 nodes with all 0 stake
 			identities := unittest.IdentityListFixture(1002, unittest.WithStake(0))
 
@@ -342,7 +341,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 			rng, err := random.NewChacha20PRG(someSeed, []byte("leader_selec"))
 			require.NoError(t, err)
 
-			for i := 0; i < 100; i++ {
+			for i := 0; i < 1; i++ {
 				identities := unittest.IdentityListFixture(1000, unittest.WithStake(0))
 
 				n := rng.UintN(1000)
