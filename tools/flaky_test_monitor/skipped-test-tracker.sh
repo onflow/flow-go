@@ -13,9 +13,6 @@ case $TEST_CATEGORY in
     ;;
 esac
 
-# checkout specified commit
-git checkout $COMMIT_SHA
-
 export COMMIT_DATE=$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)
 
 make crypto/relic/build
@@ -46,8 +43,5 @@ else
     esac
 fi
 
-cat $OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go results.json skipped-tests.json
-
-# TODO: send the skipped tests list to BigQuery
-cat skipped-tests.json
+cat $OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go
 

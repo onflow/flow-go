@@ -33,7 +33,7 @@ func (stdinResultReader StdinResultReader) close() {
 }
 
 func (stdinResultReader StdinResultReader) getResultsFileName() string {
-	return os.Args[1]
+	return os.Getenv("RESULTS_FILE")
 }
 
 func generateLevel1Summary(resultReader ResultReader) (common.Level1Summary, map[string]*common.SkippedTestEntry) {
@@ -206,13 +206,17 @@ func main() {
 
 	testRun, skippedTestMap := generateLevel1Summary(resultReader)
 
-	common.SaveToFile(resultReader.getResultsFileName(), testRun)
+	resultsFile := resultReader.getResultsFileName()
+	if resultsFile != "" {
+		common.SaveToFile(resultsFile, testRun)
+	}
 
-	if len(os.Args) > 2 {
+	skippedTestsFile := os.Getenv("SKIPPED_TESTS_FILE")
+	if skippedTestsFile != "" {
 		var skippedTests []*common.SkippedTestEntry
 		for _, skippedTestEntry := range skippedTestMap {
 			skippedTests = append(skippedTests, skippedTestEntry)
 		}
-		common.SaveLinesToFile(os.Args[2], skippedTests)
+		common.SaveLinesToFile(skippedTestsFile, skippedTests)
 	}
 }

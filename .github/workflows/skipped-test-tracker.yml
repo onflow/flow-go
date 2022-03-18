@@ -9,8 +9,10 @@ on:
       - master
 
 env:
-  COMMIT_SHA: ${{ github.sha }}
+  COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: replace with github.sha or $GITHUB_SHA before merging
   RUN_ID: ${{ github.run_id }}
+  SKIPPED_TESTS_FILE: skipped-tests
+  BIGQUERY_TABLE: dev_src_flow_test_metrics.skipped_tests # TODO: replace with prod before merging
 
 jobs:
   skipped-test-tracker:
@@ -45,6 +47,12 @@ jobs:
         go-version: 1.16
     - name: Checkout repo
       uses: actions/checkout@v2
+      with:
+        ref: ${{ env.COMMIT_SHA }}
+    - name: Echo commit sha # TODO: remove before merge
+      run: echo $COMMIT_SHA
+    - name: Echo commit sha2 # TODO: remove before merge
+      run: echo $(git rev-parse HEAD)
     - name: Run skipped test tracker script
       uses: nick-fields/retry@v2
       with:
@@ -54,3 +62,5 @@ jobs:
       env:
         TEST_CATEGORY: ${{ matrix.test-category }}
         JOB_STARTED: ${{ steps.date.outputs.date }}
+    - name: Upload results to BigQuery
+      run: bq load --source_format=NEWLINE_DELIMITED_JSON --autodetect $BIGQUERY_TABLE $SKIPPED_TESTS_FILE
