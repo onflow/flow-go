@@ -100,7 +100,7 @@ func (h *Handler) GetLatestBlock(
 		return nil, err
 	}
 
-	return blockResponse(block)
+	return blockResponse(block, req.GetFullBlockResponse())
 }
 
 // GetBlockByHeight gets a block by height.
@@ -113,10 +113,10 @@ func (h *Handler) GetBlockByHeight(
 		return nil, err
 	}
 
-	return blockResponse(block)
+	return blockResponse(block, req.GetFullBlockResponse())
 }
 
-// GetBlockByHeight gets a block by ID.
+// GetBlockByID gets a block by ID.
 func (h *Handler) GetBlockByID(
 	ctx context.Context,
 	req *access.GetBlockByIDRequest,
@@ -131,7 +131,7 @@ func (h *Handler) GetBlockByID(
 		return nil, err
 	}
 
-	return blockResponse(block)
+	return blockResponse(block, req.GetFullBlockResponse())
 }
 
 // GetCollectionByID gets a collection by ID.
@@ -449,12 +449,17 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 	return executionResultToMessages(result)
 }
 
-func blockResponse(block *flow.Block) (*access.BlockResponse, error) {
-	msg, err := convert.BlockToMessage(block)
-	if err != nil {
-		return nil, err
+func blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
+	var msg *entities.Block
+	var err error
+	if fullResponse {
+		msg, err = convert.BlockToMessage(block)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		msg = convert.BlockToMessageLight(block)
 	}
-
 	return &access.BlockResponse{
 		Block: msg,
 	}, nil

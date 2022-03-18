@@ -1306,10 +1306,10 @@ github.com/onflow/cadence v0.23.2/go.mod h1:Y++seAx3qsNjjZYTQhClD86D5aF951cMHVPL
 github.com/onflow/flow v0.2.3-0.20220131193101-d4e2ca43a621 h1:owMor9/wFpw3fua47UkUeDaFwyySK/dIPiNCCyhoO7c=
 github.com/onflow/flow v0.2.3-0.20220131193101-d4e2ca43a621/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210527134022-58c25247091a/go.mod h1:IZ2e7UyLCYmpQ8Kd7k0A32uXqdqfiV1r2sKs5/riblo=
-github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.2-0.20220303222312-6b9de4f3fea5 h1:gHDpP4ARoOYHktuPxTv8mp8RRh37nMxA2U1mjXzIoIg=
-github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.2-0.20220303222312-6b9de4f3fea5/go.mod h1:MSNt2rodpRXm1n0iGQWL6ltDoJCtXEzlPw9nhE/zQmk=
-github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1 h1:CqKo4AVRmezIfK/NABKBE0sCvjKq+dubKBjFQoycSiw=
-github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1/go.mod h1:ckE1lQ18DQVLH9gI63JnGLmBJL/Bo8FPsgYefcWpWhg=
+github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.0 h1:S8UxLG4H2bAx9YjRjVY2/pYIFwrzlg2Q/kbFVQmkql0=
+github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.0/go.mod h1:MSNt2rodpRXm1n0iGQWL6ltDoJCtXEzlPw9nhE/zQmk=
+github.com/onflow/flow-core-contracts/lib/go/templates v0.11.0 h1:TykcO0LCrwf/1HhUZ/x6V1ru0DTSdaFX0WryDvDxokc=
+github.com/onflow/flow-core-contracts/lib/go/templates v0.11.0/go.mod h1:ckE1lQ18DQVLH9gI63JnGLmBJL/Bo8FPsgYefcWpWhg=
 github.com/onflow/flow-emulator v0.20.3 h1:qsxKp8oty1glaqEyUfRWtsY0qRgTZfejwGiFix2MYzI=
 github.com/onflow/flow-emulator v0.20.3/go.mod h1:xNdVsrMJiAaYJ59Dwo+xvj0ENdvk/bI14zkGN4V0ozs=
 github.com/onflow/flow-ft/lib/go/contracts v0.5.0 h1:Cg4gHGVblxcejfNNG5Mfj98Wf4zbY76O0Y28QB0766A=
@@ -1327,8 +1327,13 @@ github.com/onflow/flow-go/crypto v0.24.3/go.mod h1:dkVL98P6GHR48iD9zCB6XlnkJX8IQ
 github.com/onflow/flow/protobuf/go/flow v0.1.9/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.2.0/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.2.2/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
+<<<<<<< HEAD
 github.com/onflow/flow/protobuf/go/flow v0.2.4-0.20220315185722-b1c4393db996 h1:JLcNUXI0vBImylmrN9hy77Do/3OZi9ehgBh2rEMRS24=
 github.com/onflow/flow/protobuf/go/flow v0.2.4-0.20220315185722-b1c4393db996/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
+=======
+github.com/onflow/flow/protobuf/go/flow v0.2.4-0.20220315040102-a649fa82a2d6 h1:4W/6lvam63p6A/+Xe/r10yhYQxCRkcza1PzSOnUerz0=
+github.com/onflow/flow/protobuf/go/flow v0.2.4-0.20220315040102-a649fa82a2d6/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
+>>>>>>> c4a82bfde3dfc95c981b43b6d4729dac013466ca
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.8.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
