@@ -51,7 +51,7 @@ func TestPrefixedHash(t *testing.T) {
 
 	for hashAlgo, testFunction := range hashingAlgoToTestingAlgo {
 		t.Run(hashAlgo.String()+" with a prefix", func(t *testing.T) {
-			for i := 32; i < 5000; i++ {
+			for i := flow.DomainTagLength; i < 5000; i++ {
 				// first 32 bytes of data are the tag
 				data := make([]byte, i)
 				rand.Read(data)

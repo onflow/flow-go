@@ -43,7 +43,8 @@ var hasherCreators = map[hash.HashingAlgorithm](func() hash.Hasher){
 
 // NewPrefixedHashing returns a new hasher that prefixes the tag for all
 // hash computations (only when tag is not empty).
-// Only SHA2 and SHA3 algorithms are supported.
+//
+// Supported algorithms are SHA2-256, SHA2-384, SHA3-256, SHA3-384 and Keccak256.
 func NewPrefixedHashing(algo hash.HashingAlgorithm, tag string) (hash.Hasher, error) {
 
 	hasherCreator := hasherCreators[algo]
