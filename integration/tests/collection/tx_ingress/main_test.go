@@ -8,5 +8,6 @@ import (
 )
 
 func TestIngress(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky in CI")
 	suite.Run(t, new(collection.IngressSuite))
 }

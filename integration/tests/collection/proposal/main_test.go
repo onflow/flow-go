@@ -9,6 +9,6 @@ import (
 )
 
 func TestMultiCluster(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky as it often hits port already allocated, since too many containers are created by the multi cluster test case")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky as it often hits port already allocated, since too many containers are created")
 	suite.Run(t, new(collection.MultiClusterSuite))
 }
