@@ -194,6 +194,10 @@ func TestEncodeFail(t *testing.T) {
 	require.Error(t, err)
 }
 
+// ==============================================================================================================
+//          The following are test cases for the unhappy paths, which I still need to update
+// ==============================================================================================================
+
 //// if the sig data can not be decoded, return model.InvalidFormatError
 //func TestFailToDecode(t *testing.T) {
 //	identities := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
