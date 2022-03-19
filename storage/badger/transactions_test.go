@@ -36,6 +36,29 @@ func TestTransactionStoreRetrieve(t *testing.T) {
 	})
 }
 
+func TestTransactionStoreRetrieveByIndex(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store := badgerstorage.NewTransactions(metrics, db)
+		txID := unittest.TransactionFixture().ID()
+		blockID := unittest.BlockFixture().ID()
+		index := uint32(0)
+
+		// store a transaction ID in db
+		err := store.StoreTxIDByBlockIDTxIndex(blockID, index, txID)
+		require.NoError(t, err)
+
+		// retrieve the transaction ID by block and index
+		actual, err := store.TransactionIDByBlockIDIndex(blockID, index)
+		require.NoError(t, err)
+		assert.Equal(t, txID, *actual)
+
+		// re-insert the transaction - should be idempotent
+		err = store.StoreTxIDByBlockIDTxIndex(blockID, index, txID)
+		require.NoError(t, err)
+	})
+}
+
 func TestTransactionRetrieveWithoutStore(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()

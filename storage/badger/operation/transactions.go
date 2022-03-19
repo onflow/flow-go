@@ -11,7 +11,17 @@ func InsertTransaction(txID flow.Identifier, tx *flow.TransactionBody) func(*bad
 	return insert(makePrefix(codeTransaction, txID), tx)
 }
 
+// InsertTransactionByIndex inserts a transaction keyed by transaction fingerprint.
+func InsertTransactionByIndex(BlockIdIndexKey string, txID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeTransactionResultIndex, BlockIdIndexKey), txID)
+}
+
 // RetrieveTransaction retrieves a transaction by fingerprint.
 func RetrieveTransaction(txID flow.Identifier, tx *flow.TransactionBody) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeTransaction, txID), tx)
+}
+
+// RetrieveTransactionIDByIndex retrieves a transaction ID by fingerprint.
+func RetrieveTransactionIDByIndex(blockID flow.Identifier, txIndex uint32, tx *flow.TransactionBody) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeTransactionResultIndex, blockID, txIndex), tx)
 }

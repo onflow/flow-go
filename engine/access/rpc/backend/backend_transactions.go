@@ -259,10 +259,16 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	blockID flow.Identifier,
 	index uint32,
 ) (*access.TransactionResult, error) {
-	tx, err := b.transactions.ByBlockIDTransactionIndex(blockID, index)
+	txID, err := b.transactions.TransactionIDByBlockIDIndex(blockID, index)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
+
+	tx, err := b.transactions.ByID(*txID)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
 	// create request and forward to EN
 	req := execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
