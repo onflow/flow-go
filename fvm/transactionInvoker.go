@@ -3,14 +3,12 @@ package fvm
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/meter"
 	"io/ioutil"
 	"path"
 	"strconv"
 	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -19,8 +17,10 @@ import (
 	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"

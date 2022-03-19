@@ -39,8 +39,8 @@ var (
 // NewMeter constructs a new Meter
 func NewMeter(computationLimit, memoryLimit uint) *Meter {
 	return &Meter{
-		computationLimit:       uint(computationLimit),
-		memoryLimit:            uint(memoryLimit),
+		computationLimit:       computationLimit,
+		memoryLimit:            memoryLimit,
 		computationWeights:     defaultComputationWeights,
 		memoryWeights:          defaultMemoryWeights,
 		computationIntensities: make(map[uint]uint),
@@ -111,7 +111,7 @@ func (m *Meter) TotalComputationUsed() uint {
 	return m.computationUsed
 }
 
-// TotalComputationUsed returns the total computation limit
+// TotalComputationLimit returns the total computation limit
 func (m *Meter) TotalComputationLimit() uint {
 	return m.computationLimit
 }

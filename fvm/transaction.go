@@ -88,11 +88,6 @@ func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
 	computationLimit := proc.Transaction.GasLimit
 	// if the computation limit is set to zero by user, fallback to the gas limit set by the context
 	if computationLimit == 0 {
-		// if service transactions to use a max limit (but let the tx set something smaller if needed)
-		// this is a measure to prevent never-ending execution
-		if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
-			return ServiceTransactionComputationLimit
-		}
 		computationLimit = ctx.ComputationLimit
 		// if the context computation limit is also zero, fallback to the default computation limit
 		if computationLimit == 0 {
@@ -106,14 +101,9 @@ func (proc *TransactionProcedure) MemoryLimit(ctx Context) uint64 {
 	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
 	// TODO let user select a lower limit for memory (when its part of fees)
 
-	memoryLimit := uint64(0) // TODO use the one set by tx
+	memoryLimit := uint64(DefaultMemoryLimit) // TODO use the one set by tx
 	// if the memory limit is set to zero by user, fallback to the gas limit set by the context
 	if memoryLimit == 0 {
-		// set service transactions to use max limit (but let the tx set something smaller if needed)
-		// this is a measure to prevent never-ending execution
-		if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
-			return ServiceTransactionMemoryLimit
-		}
 		memoryLimit = ctx.MemoryLimit
 		// if the context memory limit is also zero, fallback to the default memory limit
 		if memoryLimit == 0 {

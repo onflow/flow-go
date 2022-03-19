@@ -335,10 +335,7 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 		},
 	}
 
-	// TODO: having trouble enabling admin tool for access node. skip Access node for now.
-	if container.Role != flow.RoleAccess {
-		service.Command = append(service.Command, fmt.Sprintf("--admin-addr=:%v", AdminToolPort))
-	}
+	service.Command = append(service.Command, fmt.Sprintf("--admin-addr=:%v", AdminToolPort))
 
 	// only specify build config for first service of each role
 	if i == 0 {

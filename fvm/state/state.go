@@ -204,7 +204,7 @@ func (s *State) ComputationIntensities() map[uint]uint {
 	return s.meter.ComputationIntensities()
 }
 
-// TotalComputationUsed returns total computation limit
+// TotalComputationLimit returns total computation limit
 func (s *State) TotalComputationLimit() uint {
 	return s.meter.TotalComputationLimit()
 }
