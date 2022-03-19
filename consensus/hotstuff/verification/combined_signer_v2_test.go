@@ -201,3 +201,24 @@ func Test_VerifyQC(t *testing.T) {
 	err = verifier.VerifyQC(nil, sigData, block)
 	require.True(t, model.IsInvalidFormatError(err))
 }
+
+// Test_VerifyQC_EmptySigners checks that validator returns an `model.InsufficientSignaturesError`
+// if `signers` input is empty or nil.
+func Test_VerifyQC_EmptySigners(t *testing.T) {
+	fix
+	me
+
+	committee := &mocks.Committee{}
+	packer := signature.NewConsensusSigDataPacker(committee)
+	verifier := NewCombinedVerifier(committee, packer)
+
+	header := unittest.BlockHeaderFixture()
+	block := model.BlockFromFlow(&header, header.View-1)
+	sigData := unittest.QCSigDataFixture()
+
+	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	require.True(t, model.IsInvalidFormatError(err))
+
+	err = verifier.VerifyQC(nil, sigData, block)
+	require.True(t, model.IsInvalidFormatError(err))
+}

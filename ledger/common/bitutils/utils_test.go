@@ -23,7 +23,7 @@ func TestBitVectorAllocation(t *testing.T) {
 	}
 }
 
-// Test_PaddedByteSliceLength tests that PaddedByteSliceLength returns the
+// Test_PaddedByteSliceLength tests that MinimalByteSliceLength returns the
 func Test_PaddedByteSliceLength(t *testing.T) {
 	for bits := 0; bits <= 127; bits++ {
 		numBytes := bits / 8 // integer division with floor
@@ -31,7 +31,7 @@ func Test_PaddedByteSliceLength(t *testing.T) {
 			numBytes += 1
 		}
 
-		assert.Equal(t, numBytes, PaddedByteSliceLength(bits))
+		assert.Equal(t, numBytes, MinimalByteSliceLength(bits))
 	}
 }
 

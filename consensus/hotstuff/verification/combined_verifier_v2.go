@@ -110,15 +110,17 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 
 // VerifyQC checks the cryptographic validity of the QC's `sigData` for the
 // given block. It is the responsibility of the calling code to ensure
-// that all `voters` are authorized, without duplicates. Return values:
+// that all `signers` are authorized, without duplicates. Return values:
 //  - nil if `sigData` is cryptographically valid
+//  - model.InsufficientSignaturesError if `signers` is empty.
+//    Depending on the order of checks in the higher-level logic this error might
+//    be an indicator of a external byzantine input or an internal bug.
 //  - model.InvalidFormatError if `sigData` has an incompatible format
 //  - model.ErrInvalidSignature if a signature is invalid
 //  - error if running into any unexpected exception (i.e. fatal error)
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
-	// TODO: remove this check, because we've checked the total stake have passed threshold
 	if len(signers) == 0 {
-		return model.NewInvalidFormatErrorf("empty list of signers")
+		return model.NewInsufficientSignaturesErrorf("empty list of signers")
 	}
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
@@ -126,7 +128,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	}
 
 	// unpack sig data using packer
-	blockSigData, err := c.packer.Unpack(signers.NodeIDs(), sigData)
+	blockSigData, err := c.packer.Unpack(signers, sigData)
 	if err != nil {
 		return fmt.Errorf("could not split signature: %w", err)
 	}

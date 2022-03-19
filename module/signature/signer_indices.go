@@ -75,12 +75,13 @@ func EncodeSignerToIndicesAndSigType(
 		return nil, nil, fmt.Errorf("duplicated entries in beacon signers %v", stakingSignersLookup)
 	}
 
+	// encode Identifiers to `signerIndices`; and for each signer, encode the signature type in `sigTypes`
 	signerIndices = bitutils.MakeBitVector(len(canonicalIdentifiers))
 	sigTypes = bitutils.MakeBitVector(len(stakingSigners) + len(beaconSigners))
 	signerCounter := 0
-	for cannonicalIdx, member := range canonicalIdentifiers {
+	for canonicalIdx, member := range canonicalIdentifiers {
 		if _, ok := stakingSignersLookup[member]; ok {
-			bitutils.SetBit(signerIndices, cannonicalIdx)
+			bitutils.SetBit(signerIndices, canonicalIdx)
 			// The default value for sigTypes is bit zero, which corresponds to a staking sig.
 			// Hence, we don't have to change anything here.
 			delete(stakingSignersLookup, member)
@@ -88,7 +89,7 @@ func EncodeSignerToIndicesAndSigType(
 			continue
 		}
 		if _, ok := beaconSignersLookup[member]; ok {
-			bitutils.SetBit(signerIndices, cannonicalIdx)
+			bitutils.SetBit(signerIndices, canonicalIdx)
 			bitutils.SetBit(sigTypes, signerCounter)
 			delete(beaconSignersLookup, member)
 			signerCounter++
@@ -119,19 +120,11 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 	sigType []byte,
 ) (stakingSigners flow.IdentityList, beaconSigners flow.IdentityList, err error) {
 	numberSigners := len(signers)
-	if len(sigType) != bitutils.PaddedByteSliceLength(numberSigners) {
-		return nil, nil, fmt.Errorf("there are %d signers, so the sigType vector should have %d bytes but has length %d: %w",
-			numberSigners, bitutils.PaddedByteSliceLength(numberSigners), len(sigType), IncompatibleBitVectorLengthError)
+	if e := validPadding(sigType, numberSigners); e != nil {
+		return nil, nil, fmt.Errorf("sigType is invalid: %w", e)
 	}
 
-	// bits for padding are all required to be 0:
-	for i := numberSigners; i < len(sigType); i++ {
-		if bitutils.ReadBit(sigType, i) == 1 {
-			return nil, nil, fmt.Errorf("all padded bits must be 0, but bit at index %d is 1: %w", i, IllegallyPaddedBitVectorError)
-		}
-	}
-
-	// convert
+	// decode bits to Identities
 	stakingSigners = make(flow.IdentityList, 0, numberSigners)
 	beaconSigners = make(flow.IdentityList, 0, numberSigners)
 	for i, signer := range signers {
@@ -189,10 +182,11 @@ func EncodeSignersToIndices(
 		return nil, fmt.Errorf("duplicated entries in signerIDs %v", signerIDs)
 	}
 
+	// encode Identifiers to bits
 	signerIndices = bitutils.MakeBitVector(len(canonicalIdentifiers))
-	for cannonicalIdx, member := range canonicalIdentifiers {
+	for canonicalIdx, member := range canonicalIdentifiers {
 		if _, ok := signersLookup[member]; ok {
-			bitutils.SetBit(signerIndices, cannonicalIdx)
+			bitutils.SetBit(signerIndices, canonicalIdx)
 			delete(signersLookup, member)
 		}
 	}
@@ -214,22 +208,14 @@ func DecodeSignerIndicesToIdentifiers(
 	canonicalIdentifiers flow.IdentifierList,
 	signerIndices []byte,
 ) (flow.IdentifierList, error) {
-	numberCannonicalNodes := len(canonicalIdentifiers)
-	if len(signerIndices) != bitutils.PaddedByteSliceLength(numberCannonicalNodes) {
-		return nil, fmt.Errorf("received a cannonical set of %d nodes, so the index vector should have %d bytes but has length %d: %w",
-			numberCannonicalNodes, bitutils.PaddedByteSliceLength(numberCannonicalNodes), len(signerIndices), IncompatibleBitVectorLengthError)
+	numberCanonicalNodes := len(canonicalIdentifiers)
+	if e := validPadding(signerIndices, numberCanonicalNodes); e != nil {
+		return nil, fmt.Errorf("signerIndices are invalid: %w", e)
 	}
 
-	// bits for padding are all required to be 0:
-	for i := numberCannonicalNodes; i < len(signerIndices); i++ {
-		if bitutils.ReadBit(signerIndices, i) == 1 {
-			return nil, fmt.Errorf("all padded bits must be 0, but bit at index %d is 1: %w", i, IllegallyPaddedBitVectorError)
-		}
-	}
-
-	// convert
-	signerIDs := make(flow.IdentifierList, 0, numberCannonicalNodes)
-	for i := 0; i < numberCannonicalNodes; i++ {
+	// decode bits to Identifiers
+	signerIDs := make(flow.IdentifierList, 0, numberCanonicalNodes)
+	for i := 0; i < numberCanonicalNodes; i++ {
 		if bitutils.ReadBit(signerIndices, i) == 1 {
 			signerIDs = append(signerIDs, canonicalIdentifiers[i])
 		}
@@ -248,25 +234,52 @@ func DecodeSignerIndicesToIdentities(
 	canonicalIdentities flow.IdentityList,
 	signerIndices []byte,
 ) (flow.IdentityList, error) {
-	numberCannonicalNodes := len(canonicalIdentities)
-	if len(signerIndices) != bitutils.PaddedByteSliceLength(numberCannonicalNodes) {
-		return nil, fmt.Errorf("received a cannonical set of %d nodes, so the index vector should have %d bytes but has length %d: %w",
-			numberCannonicalNodes, bitutils.PaddedByteSliceLength(numberCannonicalNodes), len(signerIndices), IncompatibleBitVectorLengthError)
+	numberCanonicalNodes := len(canonicalIdentities)
+	if e := validPadding(signerIndices, numberCanonicalNodes); e != nil {
+		return nil, fmt.Errorf("signerIndices are invalid: %w", e)
 	}
 
-	// bits for padding are all required to be 0:
-	for i := numberCannonicalNodes; i < len(signerIndices); i++ {
-		if bitutils.ReadBit(signerIndices, i) == 1 {
-			return nil, fmt.Errorf("all padded bits must be 0, but bit at index %d is 1: %w", i, IllegallyPaddedBitVectorError)
-		}
-	}
-
-	// convert
-	signerIdentities := make(flow.IdentityList, 0, numberCannonicalNodes)
-	for i := 0; i < numberCannonicalNodes; i++ {
+	// decode bits to Identities
+	signerIdentities := make(flow.IdentityList, 0, numberCanonicalNodes)
+	for i := 0; i < numberCanonicalNodes; i++ {
 		if bitutils.ReadBit(signerIndices, i) == 1 {
 			signerIdentities = append(signerIdentities, canonicalIdentities[i])
 		}
 	}
 	return signerIdentities, nil
+}
+
+// validPadding verifies that `bitVector` satisfies the following criteria
+//  1. The `bitVector`'s length [in bytes], must be the _minimal_ possible length such that it can hold
+//    `numUsedBits` number of bits. Otherwise, we return an `IncompatibleBitVectorLengthError`.
+//  2. If `numUsedBits` is _not_ an integer-multiple of 8, `bitVector` is padded with tailing bits. Per
+//     convention, these bits must be zero. Otherwise, we return an `IllegallyPaddedBitVectorError`.
+// All errors represent expected failure cases for byzantine inputs. There are _no unexpected_ error returns.
+func validPadding(bitVector []byte, numUsedBits int) error {
+	// Verify condition 1:
+	l := len(bitVector)
+	if l != bitutils.MinimalByteSliceLength(numUsedBits) {
+		return fmt.Errorf("the bit vector contains a payload of %d used bits, so it should have %d bytes but has length %d: %w",
+			numUsedBits, bitutils.MinimalByteSliceLength(numUsedBits), l, IncompatibleBitVectorLengthError)
+	}
+	// Condition 1 implies that the number of padded bits must be strictly smaller than 8. Otherwise, the vector
+	// could have fewer bytes and still have enough room to store `numUsedBits`.
+
+	// Verify condition 2, i.e. that all padded bits are all 0:
+	// * The number of padded bits are: `numPaddedBits := 8*len(bitVector) - len(canonicalIdentifiers)`
+	// * We know that numPaddedBits < 8; as `bitVector` passed check 1. Therefore, all padded bits are
+	//   located in `bitVector`s _last byte_.
+	// * Let `lastByte` be the last byte of `bitVector`. The leading bits, specifically `(8 - numPaddedBits)`
+	//   belong to the used payload, which could have non-zero values. We remove these using left-bit-shifts.
+	//   The result contains exactly all padded bits (plus some auxiliary 0-bits included by the bit-shift
+	//   operator). Hence, condition 2 is satisfied if and only if the result is identical to zero.
+	// Note that this implementation is much more efficient than individually checking the padded bits, as we check all
+	// padded bits at once; furthermore, we only use multiplication, subtraction, shift, which are fast.
+	lastByte := bitVector[l-1]
+	numPaddedBits := 8*l - numUsedBits
+	if (lastByte << (8 - numPaddedBits)) != 0 {
+		return fmt.Errorf("some padded bits are not zero: %w", IllegallyPaddedBitVectorError)
+	}
+
+	return nil
 }
