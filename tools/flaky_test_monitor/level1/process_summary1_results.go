@@ -152,33 +152,40 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) (common.Level1Summary, map[string]*common.SkippedTestEntry) {
 	var level1Summary common.Level1Summary
 	skippedTests := make(map[string]*common.SkippedTestEntry)
+	trackSkippedTests := getSkippedTestFile() != ""
 
 	for _, testResults := range testResultMap {
 		for _, testResult := range testResults {
-			skippedTestEntry := &common.SkippedTestEntry{
-				Test:       testResult.Test,
-				Package:    testResult.Package,
-				CommitDate: testResult.CommitDate,
-				CommitSHA:  testResult.CommitSha,
-			}
-			skippedTests[testResult.Test] = skippedTestEntry
+			if trackSkippedTests {
+				skippedTestEntry := &common.SkippedTestEntry{
+					Test:       testResult.Test,
+					Package:    testResult.Package,
+					CommitDate: testResult.CommitDate,
+					CommitSHA:  testResult.CommitSha,
+				}
+				skippedTests[testResult.Test] = skippedTestEntry
 
-			if testResult.Result == "skip" {
-				output := testResult.Output[len(testResult.Output)-2].Item
-				r := regexp.MustCompile(`\[([a-zA-Z0-9_]+)]\n$`)
-				matches := r.FindStringSubmatch(output)
+				if testResult.Result == "skip" {
+					output := testResult.Output[len(testResult.Output)-2].Item
+					r := regexp.MustCompile(`\[([a-zA-Z0-9_]+)]\n$`)
+					matches := r.FindStringSubmatch(output)
 
-				if len(matches) == 2 {
-					skipReason := unittest.ParseSkipReason(matches[1])
-					if skipReason != 0 {
-						skippedTestEntry.SkipReason = skipReason
-
-						// don't add skipped tests to summary since they can't be used to compute an average pass rate
-						continue
+					if len(matches) == 2 {
+						skipReason := unittest.ParseSkipReason(matches[1])
+						if skipReason != 0 {
+							skippedTestEntry.SkipReason = skipReason
+						} else {
+							panic(fmt.Sprintf("parsed invalid skip reason from test output: %q", output))
+						}
+					} else {
+						panic(fmt.Sprintf("could not parse skip reason from test output: %q", output))
 					}
 				}
+			}
 
-				panic(fmt.Sprintf("could not parse skip reason from test output: %q", output))
+			if testResult.Result == "skip" {
+				// don't add skipped tests to summary since they can't be used to compute an average pass rate
+				continue
 			}
 
 			// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
@@ -199,6 +206,10 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 	return level1Summary, skippedTests
 }
 
+func getSkippedTestFile() string {
+	return os.Getenv("SKIPPED_TESTS_FILE")
+}
+
 // level 1 flaky test summary processor
 // input: json formatted test results from `go test -json` from console (not file)
 // output: level 1 summary json file that will be used as input for level 2 summary processor
@@ -212,7 +223,7 @@ func main() {
 		common.SaveToFile(resultsFile, testRun)
 	}
 
-	skippedTestsFile := os.Getenv("SKIPPED_TESTS_FILE")
+	skippedTestsFile := getSkippedTestFile()
 	if skippedTestsFile != "" {
 		var skippedTests []*common.SkippedTestEntry
 		for _, skippedTestEntry := range skippedTestMap {
