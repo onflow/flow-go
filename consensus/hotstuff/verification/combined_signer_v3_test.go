@@ -258,6 +258,26 @@ func Test_VerifyQCV3(t *testing.T) {
 
 }
 
+// Test_VerifyQC_EmptySignersV3 checks that Verifier returns an `model.InsufficientSignaturesError`
+// if `signers` input is empty or nil. This check should happen _before_ the Verifier calls into
+// any sub-components, because some (e.g. `crypto.AggregateBLSPublicKeys`) don't provide sufficient
+// sentinel errors to distinguish between internal problems and external byzantine inputs.
+func Test_VerifyQC_EmptySignersV3(t *testing.T) {
+	committee := &mocks.Committee{}
+	packer := signature.NewConsensusSigDataPacker(committee)
+	verifier := NewCombinedVerifier(committee, packer)
+
+	header := unittest.BlockHeaderFixture()
+	block := model.BlockFromFlow(&header, header.View-1)
+	sigData := unittest.QCSigDataFixture()
+
+	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	require.True(t, model.IsInsufficientSignaturesError(err))
+
+	err = verifier.VerifyQC(nil, sigData, block)
+	require.True(t, model.IsInsufficientSignaturesError(err))
+}
+
 func generateIdentitiesForPrivateKeys(t *testing.T, pivKeys []crypto.PrivateKey) flow.IdentityList {
 	ids := make([]*flow.Identity, 0, len(pivKeys))
 	for _, k := range pivKeys {
