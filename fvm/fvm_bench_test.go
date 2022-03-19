@@ -326,7 +326,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 
 	benchTransaction := func(b *testing.B, tx string) {
 
-		logger := zerolog.New(logE).Level(zerolog.InfoLevel)
+		logger := zerolog.New(logE).Level(zerolog.DebugLevel)
 
 		blockExecutor := NewBasicBlockExecutor(b, chain, logger)
 		serviceAccount := blockExecutor.ServiceAccount(b)

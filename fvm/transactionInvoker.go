@@ -246,6 +246,10 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 	}
 
 	computationUsed := sth.State().TotalComputationUsed()
+	// cap the computation used to the computation limit
+	if computationUsed > sth.State().TotalComputationLimit() {
+		computationUsed = sth.State().TotalComputationLimit()
+	}
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
