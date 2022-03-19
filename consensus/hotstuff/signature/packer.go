@@ -4,11 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/model/encoding"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -42,12 +39,12 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 
 	// breaking staking and random beacon signers into signerIDs and sig type for compaction
 	// each signer must have its signerID and sig type stored at the same index in the two slices
-	// For v2, RandomBeaconSigners is nil, because all StakingSigners are random beacon signers.
+	// For v2, RandomBeaconSigners is nil, as we don't track individually which nodes contributed to the random beacon
 	// For v3, RandomBeaconSigners is not nil, each RandomBeaconSigner also signed staking sig, so the returned signerIDs, should
 	// include both StakingSigners and RandomBeaconSigners
-	signerIndices, sigType, err := encodeSignerIndicesAndSigType(fullMembers.NodeIDs(), sig.StakingSigners, sig.RandomBeaconSigners)
+	signerIndices, sigType, err := signature.EncodeSignerToIndicesAndSigType(fullMembers.NodeIDs(), sig.StakingSigners, sig.RandomBeaconSigners)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not encode signer indices and sig types: %w", err)
+		return nil, nil, fmt.Errorf("unexpected internal error while encode signer indices and sig types: %w", err)
 	}
 
 	data := model.SignatureData{
@@ -71,7 +68,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 // It returns:
 //  - (sigData, nil) if successfully unpacked the signature data
 //  - (nil, model.InvalidFormatError) if failed to unpack the signature data
-func (p *ConsensusSigDataPacker) Unpack(signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(signerIDs flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	data, err := p.Decode(sigData)
 	if err != nil {
@@ -87,138 +84,10 @@ func (p *ConsensusSigDataPacker) Unpack(signerIDs []flow.Identifier, sigData []b
 	}
 
 	return &hotstuff.BlockSignatureData{
-		StakingSigners:               stakingSigners,
-		RandomBeaconSigners:          randomBeaconSigners,
+		StakingSigners:               stakingSigners.NodeIDs(),
+		RandomBeaconSigners:          randomBeaconSigners.NodeIDs(),
 		AggregatedStakingSig:         data.AggregatedStakingSig,
 		AggregatedRandomBeaconSig:    data.AggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: data.ReconstructedRandomBeaconSig,
 	}, nil
-}
-
-// the total number of bytes required to fit the `count` number of bits
-func bytesCount(count int) int {
-	return (count + 7) >> 3
-}
-
-// serializeToBitVector encodes the given sigTypes into a bit vector.
-// We append tailing `0`s to the vector to represent it as bytes.
-func serializeToBitVector(sigTypes []encoding.SigType) ([]byte, error) {
-	totalBytes := bytesCount(len(sigTypes))
-	bytes := make([]byte, 0, totalBytes)
-	// a sig type can be converted into one bit, the type at index 0 being converted into the least significant bit:
-	// the random beacon type is mapped to 1, while the staking type is mapped to 0.
-	// the remaining unfilled bits in the last byte will be 0
-	const initialMask = byte(1 << 7)
-
-	b := byte(0)
-	mask := initialMask
-	// iterate through every 8 sig types, and convert it into a byte
-	for pos, sigType := range sigTypes {
-		if sigType == encoding.SigTypeRandomBeacon {
-			b ^= mask // set a bit to one
-		} else if sigType != encoding.SigTypeStaking {
-			return nil, fmt.Errorf("invalid sig type: %v at pos %v", sigType, pos)
-		}
-
-		mask >>= 1     // move to the next bit
-		if mask == 0 { // this happens every 8 loop iterations
-			bytes = append(bytes, b)
-			b = byte(0)
-			mask = initialMask
-		}
-	}
-	// add the last byte when the length is not multiple of 8
-	if mask != initialMask {
-		bytes = append(bytes, b)
-	}
-	return bytes, nil
-}
-
-// deserializeFromBitVector decodes the sig types from the given bit vector
-// - serialized: bit-vector, one bit for each signer (tailing `0`s appended to make full bytes)
-// - count: the total number of sig types to be deserialized from the given bytes
-// It returns:
-// - (sigTypes, nil) if successfully deserialized sig types
-// - (nil, model.InvalidFormatError) if the number of serialized bytes doesn't match the given number of sig types
-// - (nil, model.InvalidFormatError) if the remaining bits in the last byte are not all 0s
-func deserializeFromBitVector(serialized []byte, count int) ([]encoding.SigType, error) {
-	types := make([]encoding.SigType, 0, count)
-
-	// validate the length of serialized vector
-	// it must be equal to the bytes required to fit exactly `count` number of bits
-	totalBytes := bytesCount(count)
-	if len(serialized) != totalBytes {
-		return nil, model.NewInvalidFormatErrorf("encoding sig types of %d signers requires %d bytes but got %d bytes", count, totalBytes, len(serialized))
-	}
-
-	// parse each bit in the bit-vector, bit 0 is SigTypeStaking, bit 1 is SigTypeRandomBeacon
-	var byt byte
-	var offset int
-	for i := 0; i < count; i++ {
-		byt = serialized[i>>3]
-		offset = 7 - (i & 7)
-		mask := byte(1 << offset)
-		if byt&mask == 0 {
-			types = append(types, encoding.SigTypeStaking)
-		} else {
-			types = append(types, encoding.SigTypeRandomBeacon)
-		}
-	}
-
-	// remaining bits (if any), they must be all `0`s
-	remainings := byt << (8 - offset)
-	if remainings != byte(0) {
-		return nil, model.NewInvalidFormatErrorf("the remaining bits are expected to be all 0s, but are %v", remainings)
-	}
-
-	return types, nil
-}
-
-// encodeSignerIndicesAndSigType encodes the given stakingSigners and beaconSigners into signer indices and sig types.
-// The given fullMembers provides the canonical order of signer index for each signer.
-// For instance, assuming fullMembers are [A,B,C,D,E,F], stakingSigners are [D,E], beaconSigners are [A,B], then
-// the signerIndices will be [byte([1,1,0,1,1,0,0,0])],
-// 			bit 1 indicates the node at that index signed, bit 0 indicates the node at that index didn't sign
-// the sigType will be [byte([1,1,0,0,0,0,0,0])],
-// 			bit 1 indicates the signer at the same index in signerIndices signed random beacon sig
-// 			bit 0 indicates the signer at the same index in signerIndices signed staking sig
-func encodeSignerIndicesAndSigType(fullMembers []flow.Identifier, stakingSigners flow.IdentifierList, beaconSigners flow.IdentifierList) ([]byte, []byte, error) {
-	stakingSignersLookup := stakingSigners.Lookup()
-	if len(stakingSignersLookup) != len(stakingSigners) {
-		return nil, nil, fmt.Errorf("duplicated entries in staking signers %v", stakingSignersLookup)
-	}
-	beaconSignersLookup := beaconSigners.Lookup()
-	if len(beaconSignersLookup) != len(beaconSigners) {
-		return nil, nil, fmt.Errorf("duplicated entries in beacon signers %v", stakingSignersLookup)
-	}
-
-	signerIndices := bitutils.MakeBitVector(len(fullMembers))
-	sigTypes := bitutils.MakeBitVector(len(stakingSigners) + len(beaconSigners))
-	signerCounter := 0
-	for cannonicalIdx, member := range fullMembers {
-		if _, ok := stakingSignersLookup[member]; ok {
-			bitutils.SetBit(signerIndices, cannonicalIdx)
-			// The default value for sigTypes is bit zero, which corresponds to a staking sig.
-			// Hence, we don't have to change anything here.
-			delete(stakingSignersLookup, member)
-			signerCounter++
-			continue
-		}
-		if _, ok := beaconSignersLookup[member]; ok {
-			bitutils.SetBit(signerIndices, cannonicalIdx)
-			bitutils.SetBit(sigTypes, signerCounter)
-			delete(beaconSignersLookup, member)
-			signerCounter++
-			continue
-		}
-	}
-
-	if len(stakingSignersLookup) > 0 {
-		return nil, nil, fmt.Errorf("unknown staking signers %v", stakingSignersLookup)
-	}
-	if len(beaconSignersLookup) > 0 {
-		return nil, nil, fmt.Errorf("unknown or duplicated beacon signers %v", beaconSignersLookup)
-	}
-
-	return signerIndices, sigTypes, nil
 }

@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -259,7 +260,7 @@ func SnapshotFromBootstrapStateWithProtocolVersion(
 	// the setup event
 	for i, cluster := range clustering {
 		rootQCVoteData := commit.ClusterQCs[i]
-		_, err = packer.EncodeSignerIdentifiersToIndices(cluster.NodeIDs(), rootQCVoteData.VoterIDs)
+		_, err = signature.EncodeSignersToIndices(cluster.NodeIDs(), rootQCVoteData.VoterIDs)
 		if err != nil {
 			return nil, fmt.Errorf("mismatching cluster and qc: %w", err)
 		}

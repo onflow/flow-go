@@ -108,8 +108,11 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 
 // VerifyQC checks the cryptographic validity of the QC's `sigData` for the
 // given block. It is the responsibility of the calling code to ensure
-// that all `voters` are authorized, without duplicates. Return values:
+// that all `signers` are authorized, without duplicates. Return values:
 //  - nil if `sigData` is cryptographically valid
+//  - model.InsufficientSignaturesError if `signers` is empty.
+//    Depending on the order of checks in the higher-level logic this error might
+//    be an indicator of a external byzantine input or an internal bug.
 //  - model.InvalidFormatError if `sigData` has an incompatible format
 //  - model.ErrInvalidSignature if a signature is invalid
 //  - model.InvalidSignerError if a signer is _not_ part of the random beacon committee
@@ -117,6 +120,9 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 // This implementation already support the cases, where the DKG committee is a
 // _strict subset_ of the full consensus committee.
 func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
+	if len(signers) == 0 {
+		return model.NewInsufficientSignaturesErrorf("empty list of signers")
+	}
 	signerIdentities := signers.Lookup()
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
@@ -124,7 +130,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 
 	// unpack sig data using packer
-	blockSigData, err := c.packer.Unpack(signers.NodeIDs(), sigData)
+	blockSigData, err := c.packer.Unpack(signers, sigData)
 	if err != nil {
 		return fmt.Errorf("could not split signature: %w", err)
 	}
