@@ -1,5 +1,7 @@
 package meter
 
+import "github.com/onflow/cadence/runtime/common"
+
 type MetringOperationType uint
 
 // continuation of cadence.ComputationKind
@@ -36,6 +38,18 @@ const (
 	ComputationKindUpdateAccountContractCode
 	ComputationKindValidatePublicKey
 	ComputationKindValueExists
+)
+
+var (
+	// DefaultComputationWeights is the default weights for computation intensities
+	// these weighs make the computation metering the same as it was before dynamic execution fees
+	DefaultComputationWeights = map[uint]uint{
+		uint(common.ComputationKindStatement):          1,
+		uint(common.ComputationKindLoop):               1,
+		uint(common.ComputationKindFunctionInvocation): 1,
+	}
+	// DefaultMemoryWeights are empty as memory metering is not fully defined yet
+	DefaultMemoryWeights = map[uint]uint{}
 )
 
 type Meter interface {

@@ -14,6 +14,9 @@ import (
 const TransactionFeesExecutionEffortWeightsPathDomain = "storage"
 const TransactionFeesExecutionEffortWeightsPathIdentifier = "executionEffortWeights"
 
+const TransactionFeesExecutionMemoryWeightsPathDomain = "storage"
+const TransactionFeesExecutionMemoryWeightsPathIdentifier = "executionMemoryWeights"
+
 const deployTxFeesTransactionTemplate = `
 transaction {
   prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {

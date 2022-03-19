@@ -41,3 +41,28 @@ func CadenceValueToAddressSlice(value cadence.Value) (addresses []common.Address
 	}
 	return addresses, true
 }
+
+func CadenceValueToUintUintMap(value cadence.Value) (map[uint]uint, bool) {
+	result := make(map[uint]uint)
+
+	dict, ok := value.(cadence.Dictionary)
+	if !ok {
+		return nil, false
+	}
+
+	for _, p := range dict.Pairs {
+		key, ok := p.Key.(cadence.UInt32)
+		if !ok {
+			return nil, false
+		}
+
+		value, ok := p.Value.(cadence.UInt32)
+		if !ok {
+			return nil, false
+		}
+
+		result[uint(key)] = uint(value)
+	}
+
+	return result, true
+}

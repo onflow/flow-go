@@ -1,8 +1,6 @@
 package basic
 
 import (
-	"github.com/onflow/cadence/runtime/common"
-
 	"github.com/onflow/flow-go/fvm/errors"
 	interfaceMeter "github.com/onflow/flow-go/fvm/meter"
 )
@@ -25,24 +23,13 @@ type Meter struct {
 	memoryWeights      map[uint]uint
 }
 
-var (
-	// defaultComputationWeights is the default weights for computation intensities
-	// these weighs make the computation metering the same as it was before dynamic execution fees
-	defaultComputationWeights = map[uint]uint{
-		uint(common.ComputationKindStatement):          1,
-		uint(common.ComputationKindLoop):               1,
-		uint(common.ComputationKindFunctionInvocation): 1,
-	}
-	defaultMemoryWeights = map[uint]uint{}
-)
-
 // NewMeter constructs a new Meter
 func NewMeter(computationLimit, memoryLimit uint) *Meter {
 	return &Meter{
 		computationLimit:       computationLimit,
 		memoryLimit:            memoryLimit,
-		computationWeights:     defaultComputationWeights,
-		memoryWeights:          defaultMemoryWeights,
+		computationWeights:     interfaceMeter.DefaultComputationWeights,
+		memoryWeights:          interfaceMeter.DefaultMemoryWeights,
 		computationIntensities: make(map[uint]uint),
 		memoryIntensities:      make(map[uint]uint),
 	}

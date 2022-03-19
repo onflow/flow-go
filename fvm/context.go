@@ -90,12 +90,14 @@ func defaultContext(logger zerolog.Logger) Context {
 		SignatureVerifier:             crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
+			NewTransactionSetExecutionWeights(logger),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvoker(logger),
 		},
 		ScriptProcessors: []ScriptProcessor{
+			NewScriptSetExecutionWeights(logger),
 			NewScriptInvoker(),
 		},
 		Logger: logger,

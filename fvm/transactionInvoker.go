@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -17,10 +16,8 @@ import (
 	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/extralog"
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -64,9 +61,6 @@ func (i *TransactionInvoker) Process(
 	var txError error
 	retry := false
 	numberOfRetries := 0
-
-	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-	setComputationMeteringHandlerWithWeights(env, sth.State().Meter())
 
 	parentState := sth.State()
 	childState := sth.NewChild()
@@ -437,55 +431,4 @@ func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txH
 			Dict("memoryIntensities", memory).
 			Msg("transaction execution data")
 	}
-}
-
-// setComputationMeteringHandlerWithWeights reads stored execution effort weights and execution effort limit from the service account
-func setComputationMeteringHandlerWithWeights(env Environment, m meter.Meter) {
-	service := runtime.Address(env.Context().Chain.ServiceAddress())
-
-	value, err := env.VM().Runtime.ReadStored(
-		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier,
-		},
-		runtime.Context{Interface: env},
-	)
-	if err != nil {
-		// log error and return
-		return
-	}
-
-	weights, ok := cadenceValueToExecutionEffortWeights(value)
-	if !ok {
-		// log that values could not be decoded and set defaults
-		return
-	}
-
-	m.SetComputationWeights(weights)
-}
-
-func cadenceValueToExecutionEffortWeights(value cadence.Value) (map[uint]uint, bool) {
-	weights := make(map[uint]uint)
-
-	dict, ok := value.(cadence.Dictionary)
-	if !ok {
-		return nil, false
-	}
-
-	for _, p := range dict.Pairs {
-		key, ok := p.Key.(cadence.UInt32)
-		if !ok {
-			return nil, false
-		}
-
-		value, ok := p.Value.(cadence.UInt32)
-		if !ok {
-			return nil, false
-		}
-
-		weights[uint(key)] = uint(value)
-	}
-
-	return weights, true
 }
