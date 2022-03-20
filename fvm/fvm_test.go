@@ -23,7 +23,7 @@ import (
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	crypto2 "github.com/onflow/flow-go/fvm/crypto"
+	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -1638,22 +1638,39 @@ func TestSignatureVerification(t *testing.T) {
 	}
 
 	type hashAlgorithm struct {
-		name      string
-		newHasher func() hash.Hasher
+		name   string
+		hasher func(string) hash.Hasher
 	}
+
+	// Hardcoded tag as required by the crypto.keyList Cadence contract
+	// TODO: update to a random tag once the Cadence contract is updated
+	// to accept custom tags
+	tag := "FLOW-V0.0-user"
 
 	hashAlgorithms := []hashAlgorithm{
 		{
 			"SHA3_256",
-			hash.NewSHA3_256,
+			func(tag string) hash.Hasher {
+				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA3_256, tag)
+				require.Nil(t, err)
+				return hasher
+			},
 		},
 		{
 			"SHA2_256",
-			hash.NewSHA2_256,
+			func(tag string) hash.Hasher {
+				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA2_256, tag)
+				require.Nil(t, err)
+				return hasher
+			},
 		},
 		{
 			"KECCAK_256",
-			hash.NewKeccak_256,
+			func(tag string) hash.Hasher {
+				hasher, err := fvmCrypto.NewPrefixedHashing(hash.Keccak_256, tag)
+				require.Nil(t, err)
+				return hasher
+			},
 		},
 	}
 
@@ -1727,16 +1744,8 @@ func TestSignatureVerification(t *testing.T) {
 				return privateKey, publicKey
 			}
 
-			signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
-				message := m
-				if hashAlgorithm.name != "KMAC128_BLS_BLS12_381" {
-					message = append(
-						flow.UserDomainTag[:],
-						m...,
-					)
-				}
-
-				signature, err := privateKey.Sign(message, hashAlgorithm.newHasher())
+			signMessage := func(privateKey crypto.PrivateKey, message []byte) cadence.Array {
+				signature, err := privateKey.Sign(message, hashAlgorithm.hasher(tag))
 				require.NoError(t, err)
 
 				return testutil.BytesToCadenceArray(signature)
@@ -1942,8 +1951,8 @@ func TestSignatureVerification(t *testing.T) {
 		crypto.BLSBLS12381,
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
-		func() hash.Hasher {
-			return crypto.NewBLSKMAC("any_random_tag")
+		func(tag string) hash.Hasher {
+			return crypto.NewBLSKMAC(tag)
 		},
 	})
 }
@@ -2676,7 +2685,7 @@ func TestHashing(t *testing.T) {
 				result2 = append(result2, value.(cadence.UInt8).ToGoValue().(uint8))
 			}
 
-			result3, err := crypto2.HashWithTag(crypto2.RuntimeToCryptoHashingAlgorithm(algo), "", data)
+			result3, err := fvmCrypto.HashWithTag(fvmCrypto.RuntimeToCryptoHashingAlgorithm(algo), "", data)
 			require.NoError(t, err)
 
 			require.Equal(t, result1, result2)
@@ -3036,8 +3045,8 @@ func TestSigningWithTags(t *testing.T) {
 			shouldWork: true,
 		},
 		{
-			name:       "user tag",
-			tag:        flow.UserDomainTag[:],
+			name:       "random tag",
+			tag:        []byte("random_tag"),
 			shouldWork: false,
 		},
 	}
