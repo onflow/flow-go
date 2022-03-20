@@ -13,13 +13,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-type signType int
-
-const (
-	payloadSignature  signType = 0
-	envelopeSignature signType = 1
-)
-
 type TransactionSignatureVerifier struct {
 	KeyWeightThreshold int
 }
@@ -38,6 +31,14 @@ func (v *TransactionSignatureVerifier) Process(
 	_ *programs.Programs,
 ) error {
 	return v.verifyTransactionSignatures(proc, *ctx, sth)
+}
+
+func newInvalidEnvelopeSignatureError(txSig flow.TransactionSignature, err error) error {
+	return errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
+}
+
+func newInvalidPayloadSignatureError(txSig flow.TransactionSignature, err error) error {
+	return errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
@@ -69,12 +70,12 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
 
-	payloadWeights, proposalKeyVerifiedInPayload, err = v.aggregateAccountSignatures(
+	payloadWeights, proposalKeyVerifiedInPayload, err = v.verifyAccountSignatures(
 		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.ProposalKey,
-		payloadSignature,
+		newInvalidEnvelopeSignatureError,
 	)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey.Address, tx.ProposalKey.KeyIndex, err)
@@ -83,12 +84,12 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	var envelopeWeights map[flow.Address]int
 	var proposalKeyVerifiedInEnvelope bool
 
-	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.aggregateAccountSignatures(
+	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.verifyAccountSignatures(
 		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
 		tx.ProposalKey,
-		envelopeSignature,
+		newInvalidPayloadSignatureError,
 	)
 	if err != nil {
 		return errors.NewInvalidProposalSignatureError(tx.ProposalKey.Address, tx.ProposalKey.KeyIndex, err)
@@ -124,12 +125,12 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	return nil
 }
 
-func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
+func (v *TransactionSignatureVerifier) verifyAccountSignatures(
 	accounts state.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
-	sType signType,
+	errorBuilder func(flow.TransactionSignature, error) error,
 ) (
 	weights map[flow.Address]int,
 	proposalKeyVerified bool,
@@ -137,9 +138,13 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 ) {
 	weights = make(map[flow.Address]int)
 
-	var accountKey *flow.AccountPublicKey
 	for _, txSig := range signatures {
-		accountKey, err = v.verifyAccountSignature(accounts, txSig, message, sType)
+
+		accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
+		if err != nil {
+			return nil, false, errorBuilder(txSig, err)
+		}
+		err = v.verifyAccountSignature(accountKey, txSig, message, errorBuilder)
 		if err != nil {
 			return nil, false, err
 		}
@@ -161,25 +166,14 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 // An error is returned if the account does not contain a public key that
 // correctly verifies the signature against the given message.
 func (v *TransactionSignatureVerifier) verifyAccountSignature(
-	accounts state.Accounts,
+	accountKey flow.AccountPublicKey,
 	txSig flow.TransactionSignature,
 	message []byte,
-	sType signType,
-) (*flow.AccountPublicKey, error) {
-	accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
-	if err != nil {
-		if sType == envelopeSignature {
-			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
-		}
-		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
-	}
+	errorBuilder func(flow.TransactionSignature, error) error,
+) error {
 
 	if accountKey.Revoked {
-		err = fmt.Errorf("account key has been revoked")
-		if sType == envelopeSignature {
-			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
-		}
-		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
+		return errorBuilder(txSig, fmt.Errorf("account key has been revoked"))
 	}
 
 	valid, err := crypto.VerifySignatureFromTransaction(
@@ -189,21 +183,14 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		accountKey.HashAlgo,
 	)
 	if err != nil {
-		if sType == envelopeSignature {
-			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
-		}
-		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
+		return errorBuilder(txSig, err)
 	}
 
 	if valid {
-		return &accountKey, nil
+		return nil
 	}
 
-	err = fmt.Errorf("signature is not valid")
-	if sType == envelopeSignature {
-		return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
-	}
-	return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
+	return errorBuilder(txSig, fmt.Errorf("signature is not valid"))
 }
 
 func (v *TransactionSignatureVerifier) hasSufficientKeyWeight(
@@ -221,21 +208,25 @@ func (v *TransactionSignatureVerifier) sigIsForProposalKey(
 }
 
 func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.TransactionBody) error {
-	observedSigs := make(map[flow.Address]map[uint64]bool)
+	type uniqueKey struct {
+		address flow.Address
+		index   uint64
+	}
+	observedSigs := make(map[uniqueKey]bool)
 	for _, sig := range tx.PayloadSignatures {
-		if observedSigs[sig.Address][sig.KeyIndex] {
-			err := fmt.Errorf("duplicate signatures are provided for the same key %s", key)
+		if observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] {
+			err := fmt.Errorf("duplicate signatures are provided for the same key")
 			return errors.NewInvalidPayloadSignatureError(sig.Address, sig.KeyIndex, err)
 		}
-		observedSigs[sig.Address][sig.KeyIndex] = true
+		observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] = true
 	}
 
 	for _, sig := range tx.EnvelopeSignatures {
-		if observedSigs[sig.Address][sig.KeyIndex] {
-			err := fmt.Errorf("duplicate signatures are provided for the same key %s", key)
+		if observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] {
+			err := fmt.Errorf("duplicate signatures are provided for the same key")
 			return errors.NewInvalidEnvelopeSignatureError(sig.Address, sig.KeyIndex, err)
 		}
-		observedSigs[sig.Address][sig.KeyIndex] = true
+		observedSigs[uniqueKey{sig.Address, sig.KeyIndex}] = true
 	}
 	return nil
 }
