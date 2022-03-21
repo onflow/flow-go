@@ -99,8 +99,6 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 		return err
 	}
 
-	builder.EnqueueAdminServerInit()
-
 	builder.EnqueueTracer()
 	builder.PreInit(cmd.DynamicStartPreInit)
 	return nil

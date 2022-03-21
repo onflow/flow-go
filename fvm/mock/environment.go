@@ -416,20 +416,6 @@ func (_m *Environment) GetCode(location common.Location) ([]byte, error) {
 	return r0, r1
 }
 
-// GetComputationLimit provides a mock function with given fields:
-func (_m *Environment) GetComputationLimit() uint64 {
-	ret := _m.Called()
-
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	return r0
-}
-
 // GetCurrentBlockHeight provides a mock function with given fields:
 func (_m *Environment) GetCurrentBlockHeight() (uint64, error) {
 	ret := _m.Called()
@@ -599,6 +585,20 @@ func (_m *Environment) ImplementationDebugLog(message string) error {
 	return r0
 }
 
+// MeterComputation provides a mock function with given fields: operationType, intensity
+func (_m *Environment) MeterComputation(operationType common.ComputationKind, intensity uint) error {
+	ret := _m.Called(operationType, intensity)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) error); ok {
+		r0 = rf(operationType, intensity)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ProgramLog provides a mock function with given fields: _a0
 func (_m *Environment) ProgramLog(_a0 string) error {
 	ret := _m.Called(_a0)
@@ -699,20 +699,6 @@ func (_m *Environment) RevokeEncodedAccountKey(address common.Address, index int
 	}
 
 	return r0, r1
-}
-
-// SetComputationUsed provides a mock function with given fields: used
-func (_m *Environment) SetComputationUsed(used uint64) error {
-	ret := _m.Called(used)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64) error); ok {
-		r0 = rf(used)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // SetProgram provides a mock function with given fields: _a0, _a1
