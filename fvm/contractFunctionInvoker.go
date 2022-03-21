@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-type TransactionContractFunctionInvoker struct {
+type ContractFunctionInvoker struct {
 	contractLocation common.AddressLocation
 	functionName     string
 	arguments        []interpreter.Value
@@ -26,13 +26,13 @@ type TransactionContractFunctionInvoker struct {
 	logSpanFields    []traceLog.Field
 }
 
-func NewTransactionContractFunctionInvoker(
+func NewContractFunctionInvoker(
 	contractLocation common.AddressLocation,
 	functionName string,
 	arguments []interpreter.Value,
 	argumentTypes []sema.Type,
-	logger zerolog.Logger) *TransactionContractFunctionInvoker {
-	return &TransactionContractFunctionInvoker{
+	logger zerolog.Logger) *ContractFunctionInvoker {
+	return &ContractFunctionInvoker{
 		contractLocation: contractLocation,
 		functionName:     functionName,
 		arguments:        arguments,
@@ -42,7 +42,7 @@ func NewTransactionContractFunctionInvoker(
 	}
 }
 
-func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentracing.Span) (cadence.Value, error) {
+func (i *ContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentracing.Span) (cadence.Value, error) {
 	var span opentracing.Span
 
 	ctx := env.Context()
