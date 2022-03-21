@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
 	"math/rand"
 	"time"
 
@@ -23,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
+	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
