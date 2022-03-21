@@ -2,6 +2,7 @@ package corruptible
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -149,7 +150,7 @@ func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleCondu
 			return nil
 		default:
 			msg, err := stream.Recv()
-			if err == io.EOF {
+			if err == io.EOF || errors.Is(stream.Context().Err(), context.Canceled) {
 				c.logger.Info().Msg("attacker closed processing stream")
 				return stream.SendAndClose(&empty.Empty{})
 			}
@@ -202,12 +203,6 @@ func (c *ConduitFactory) registerAttacker(ctx context.Context, address string) e
 		c.logger.Error().Str("address", address).Msg("attacker double-register detected")
 		return fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", address)
 	}
-
-	//var kacp = keepalive.ClientParameters{
-	//	Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
-	//	Timeout:             time.Second,      // wait 1 second for ping back
-	//	PermitWithoutStream: true,             // send pings even without active streams
-	//}
 
 	clientConn, err := grpc.Dial(address,
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
