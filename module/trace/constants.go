@@ -154,7 +154,6 @@ const (
 	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
 	FVMInvokeContractFunction        SpanName = "fvm.invokeContractFunction"
 	FVMFrozenAccountCheckTransaction SpanName = "fvm.frozenAccountCheckTransaction"
-	FVMSetExecutionWeights           SpanName = "fvm.setExecutionWeights"
 
 	FVMEnvHash                      SpanName = "fvm.env.Hash"
 	FVMEnvValueExists               SpanName = "fvm.env.valueExists"

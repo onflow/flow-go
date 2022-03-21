@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter/basic"
 )
 
-func TestComputationMetering(t *testing.T) {
+func TestBasicComputationMetering(t *testing.T) {
 
 	t.Run("get limits", func(t *testing.T) {
 		m := basic.NewMeter(1, 2)
@@ -68,10 +68,12 @@ func TestComputationMetering(t *testing.T) {
 		err = m.MergeMeter(child1)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2), m.TotalComputationUsed())
+		require.Equal(t, uint(1+2), m.ComputationIntensities()[compKind])
 
 		err = m.MergeMeter(child2)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2+3), m.TotalComputationUsed())
+		require.Equal(t, uint(1+2+3), m.ComputationIntensities()[compKind])
 
 		// error on merge (hitting limit)
 		err = m.MergeMeter(child3)

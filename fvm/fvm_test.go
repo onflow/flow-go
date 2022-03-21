@@ -3591,7 +3591,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
-				uint(meter.ComputationKindCreateAccount): 100_000_000,
+				uint(meter.ComputationKindCreateAccount): 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
 			})
 
 			txBody := flow.NewTransactionBody().

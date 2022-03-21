@@ -48,16 +48,24 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 	if m.computationUsed > m.computationLimit {
 		return errors.NewComputationLimitExceededError(uint64(m.computationLimit))
 	}
+	for key, intensity := range child.ComputationIntensities() {
+		m.computationIntensities[key] += intensity
+	}
 
 	m.memoryUsed = m.memoryUsed + child.TotalMemoryUsed()
 	if m.memoryUsed > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.memoryLimit))
 	}
+	for key, intensity := range child.MemoryIntensities() {
+		m.memoryIntensities[key] += intensity
+	}
+
 	return nil
 }
 
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit
 func (m *Meter) MeterComputation(kind uint, intensity uint) error {
+	m.computationIntensities[kind] += intensity
 	var meterable bool
 	switch common.ComputationKind(kind) {
 	case common.ComputationKindStatement,
@@ -91,6 +99,7 @@ func (m *Meter) TotalComputationLimit() uint {
 
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
 func (m *Meter) MeterMemory(kind uint, intensity uint) error {
+	m.memoryIntensities[kind] += intensity
 	m.memoryUsed += intensity
 	if m.memoryUsed > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.memoryLimit))

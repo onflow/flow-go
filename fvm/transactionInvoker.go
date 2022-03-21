@@ -67,6 +67,17 @@ func (i *TransactionInvoker) Process(
 	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 	predeclaredValues := valueDeclarations(ctx, env)
 
+	meter, err := createMeterFromEnv(env, sth, i.logger.With().Str("txHash", txIDStr).Uint64("blockHeight", blockHeight).Logger())
+	if err != nil {
+		i.logger.Error().
+			Err(err).
+			Str("txHash", txIDStr).
+			Uint64("blockHeight", blockHeight).
+			Msg("transaction invocation failed when creating transaction meter")
+		return fmt.Errorf("transaction invocation failed when creating meter: %w", err)
+	}
+	childState.SetMeter(meter)
+
 	defer func() {
 		// an extra check for state holder health, this should never happen
 		if childState != sth.State() {
@@ -116,6 +127,17 @@ func (i *TransactionInvoker) Process(
 
 			// reset env
 			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+
+			meter, err := createMeterFromEnv(env, sth, i.logger.With().Str("txHash", txIDStr).Uint64("blockHeight", blockHeight).Logger())
+			if err != nil {
+				i.logger.Error().
+					Err(err).
+					Str("txHash", txIDStr).
+					Uint64("blockHeight", blockHeight).
+					Msg("transaction invocation failed when creating transaction meter")
+				return fmt.Errorf("transaction invocation failed when creating meter: %w", err)
+			}
+			childState.SetMeter(meter)
 		}
 
 		location := common.TransactionLocation(proc.ID[:])

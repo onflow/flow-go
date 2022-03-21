@@ -3,36 +3,41 @@ package weighted_test
 import (
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter/weighted"
 )
 
-func TestComputationMetering(t *testing.T) {
+func TestWeightedComputationMetering(t *testing.T) {
 
 	t.Run("get limits", func(t *testing.T) {
-		m := weighted.NewMeter(1, 2, map[uint]uint64{}, map[uint]uint64{})
+		m := weighted.NewMeter(
+			1,
+			2,
+			map[uint]uint64{},
+			map[uint]uint64{})
 		require.Equal(t, uint(1), m.TotalComputationLimit())
 		require.Equal(t, uint(2), m.TotalMemoryLimit())
 	})
 
 	t.Run("meter computation and memory", func(t *testing.T) {
-		m := weighted.NewMeter(10, 10,
+		m := weighted.NewMeter(
+			10,
+			10,
 			map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes},
 			map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes},
 		)
 
-		err := m.MeterComputation(uint(common.ComputationKindStatement), 1)
+		err := m.MeterComputation(uint(0), 1)
 		require.NoError(t, err)
 		require.Equal(t, uint(1), m.TotalComputationUsed())
 
-		err = m.MeterComputation(uint(common.ComputationKindStatement), 2)
+		err = m.MeterComputation(uint(0), 2)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2), m.TotalComputationUsed())
 
-		err = m.MeterComputation(uint(common.ComputationKindFunctionInvocation), 8)
+		err = m.MeterComputation(uint(0), 8)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 
@@ -50,7 +55,9 @@ func TestComputationMetering(t *testing.T) {
 	})
 
 	t.Run("meter computation and memory with weights", func(t *testing.T) {
-		m := weighted.NewMeter(100, 100,
+		m := weighted.NewMeter(
+			100,
+			100,
 			map[uint]uint64{0: 13 << weighted.MeterInternalPrecisionBytes},
 			map[uint]uint64{0: 17 << weighted.MeterInternalPrecisionBytes},
 		)
@@ -67,7 +74,9 @@ func TestComputationMetering(t *testing.T) {
 	})
 
 	t.Run("meter computation and memory with weights lower than MeterInternalPrecisionBytes", func(t *testing.T) {
-		m := weighted.NewMeter(100, 100,
+		m := weighted.NewMeter(
+			100,
+			100,
 			map[uint]uint64{0: 1},
 			map[uint]uint64{0: 1},
 		)
@@ -96,8 +105,12 @@ func TestComputationMetering(t *testing.T) {
 	})
 
 	t.Run("merge meters", func(t *testing.T) {
-		compKind := uint(common.ComputationKindStatement)
-		m := weighted.NewMeter(9, 0, map[uint]uint64{}, map[uint]uint64{})
+		compKind := uint(0)
+		m := weighted.NewMeter(
+			9,
+			0,
+			map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes},
+			map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes})
 
 		err := m.MeterComputation(compKind, 1)
 		require.NoError(t, err)
