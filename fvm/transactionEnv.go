@@ -4,6 +4,9 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
+	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
+	"github.com/rs/zerolog"
 	"math/rand"
 	"time"
 
@@ -65,7 +68,7 @@ func NewTransactionEnvironment(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan opentracing.Span,
-) *TransactionEnv {
+) (*TransactionEnv, error) {
 
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
@@ -107,7 +110,92 @@ func NewTransactionEnvironment(
 		env.seedRNG(ctx.BlockHeader)
 	}
 
-	return env
+	txIDStr := tx.ID().String()
+
+	m, err := setupMeterFromState(env, sth, ctx.Logger.
+		With().
+		Str("txHash", txIDStr).
+		Logger())
+
+	if err != nil {
+		ctx.Logger.Error().
+			Err(err).
+			Str("txHash", txIDStr).
+			Msg("failed to setup transaction environment")
+		return nil, fmt.Errorf("failed to setup transaction environment %w", err)
+	} else {
+		sth.State().SetMeter(m)
+	}
+
+	return env, nil
+}
+
+func setupMeterFromState(env Environment, sth *state.StateHolder, l zerolog.Logger) (meter.Meter, error) {
+	// Get the meter to set the weights for
+	m := sth.State().Meter()
+
+	// Get the computation weights
+	computationWeights, err := getExecutionEffortWeights(env)
+
+	if err != nil {
+		// This could be a reason to error the transaction in the future, but for now we just log it
+		l.Info().
+			Err(err).
+			Msg("failed to get execution effort weights")
+
+		return basicMeter.NewMeter(
+			m.TotalComputationLimit(),
+			m.TotalMemoryLimit()), nil
+	}
+
+	// Get the memory weights
+	memoryWeights, err := getExecutionMemoryWeights(env)
+
+	if err != nil {
+		// This could be a reason to error the transaction in the future, but for now we just log it
+		l.Info().Err(err).
+			Msg("failed to get execution memory weights")
+
+		return basicMeter.NewMeter(
+			m.TotalComputationLimit(),
+			m.TotalMemoryLimit()), nil
+	}
+
+	return weightedMeter.NewMeter(
+		m.TotalComputationLimit(),
+		m.TotalMemoryLimit(),
+		computationWeights,
+		memoryWeights), nil
+}
+
+// getExecutionEffortWeights reads stored execution effort weights from the service account
+func getExecutionEffortWeights(env Environment) (map[uint]uint64, error) {
+	service := runtime.Address(env.Context().Chain.ServiceAddress())
+
+	value, err := env.VM().Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
+			Identifier: blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier,
+		},
+		runtime.Context{Interface: env},
+	)
+
+	if err != nil {
+		return map[uint]uint64{}, err
+	}
+	weights, ok := utils.CadenceValueToUintUintMap(value)
+	if !ok {
+		return map[uint]uint64{}, fmt.Errorf("could not decode stored execution effort weights")
+	}
+
+	return weights, nil
+}
+
+// getExecutionMemoryWeights reads stored execution memory weights from the service account
+func getExecutionMemoryWeights(_ Environment) (map[uint]uint64, error) {
+	// TODO: implement when memory metering is ready
+	return map[uint]uint64{}, nil
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {

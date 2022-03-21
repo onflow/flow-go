@@ -90,6 +90,15 @@ func NewScriptEnvironment(
 		env.seedRNG(ctx.BlockHeader)
 	}
 
+	m, err := setupMeterFromState(env, sth, ctx.Logger)
+	if err != nil {
+		ctx.Logger.Error().
+			Err(err).
+			Msg("transaction invocation failed when creating transaction meter")
+	} else {
+		sth.State().SetMeter(m)
+	}
+
 	return env
 }
 

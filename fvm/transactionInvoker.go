@@ -67,17 +67,6 @@ func (i *TransactionInvoker) Process(
 	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 	predeclaredValues := valueDeclarations(ctx, env)
 
-	meter, err := createMeterFromEnv(env, sth, i.logger.With().Str("txHash", txIDStr).Uint64("blockHeight", blockHeight).Logger())
-	if err != nil {
-		i.logger.Error().
-			Err(err).
-			Str("txHash", txIDStr).
-			Uint64("blockHeight", blockHeight).
-			Msg("transaction invocation failed when creating transaction meter")
-		return fmt.Errorf("transaction invocation failed when creating meter: %w", err)
-	}
-	childState.SetMeter(meter)
-
 	defer func() {
 		// an extra check for state holder health, this should never happen
 		if childState != sth.State() {
@@ -127,17 +116,6 @@ func (i *TransactionInvoker) Process(
 
 			// reset env
 			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-
-			meter, err := createMeterFromEnv(env, sth, i.logger.With().Str("txHash", txIDStr).Uint64("blockHeight", blockHeight).Logger())
-			if err != nil {
-				i.logger.Error().
-					Err(err).
-					Str("txHash", txIDStr).
-					Uint64("blockHeight", blockHeight).
-					Msg("transaction invocation failed when creating transaction meter")
-				return fmt.Errorf("transaction invocation failed when creating meter: %w", err)
-			}
-			childState.SetMeter(meter)
 		}
 
 		location := common.TransactionLocation(proc.ID[:])
@@ -178,12 +156,14 @@ func (i *TransactionInvoker) Process(
 	// 	panic(err)
 	// }
 
-	// disable the limit checks on states
+	// read computationUsed from the environment. This will be used to charge fees.
+	computationUsed := env.ComputationUsed()
 
+	// disable the limit checks on states
 	sth.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
 	// disable the limit checks on states
-	feesError := i.deductTransactionFees(env, proc, sth)
+	feesError := i.deductTransactionFees(env, proc, sth, computationUsed)
 	if feesError != nil {
 		txError = feesError
 	}
@@ -223,7 +203,7 @@ func (i *TransactionInvoker) Process(
 		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
-		feesError = i.deductTransactionFees(env, proc, sth)
+		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
 
 		updatedKeys, err = env.Commit()
 		if err != nil && feesError == nil {
@@ -247,7 +227,7 @@ func (i *TransactionInvoker) Process(
 
 	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
+	proc.ComputationUsed = proc.ComputationUsed + computationUsed
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -262,22 +242,24 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
-func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure, sth *state.StateHolder) (err error) {
+func (i *TransactionInvoker) deductTransactionFees(
+	env *TransactionEnv,
+	proc *TransactionProcedure,
+	sth *state.StateHolder,
+	computationUsed uint64) (err error) {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
 
-	computationUsed := sth.State().TotalComputationUsed()
-	// cap the computation used to the computation limit
-	if computationUsed > sth.State().TotalComputationLimit() {
-		computationUsed = sth.State().TotalComputationLimit()
+	if computationUsed > uint64(sth.State().TotalComputationLimit()) {
+		computationUsed = uint64(sth.State().TotalComputationLimit())
 	}
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
 	// Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
-	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, uint64(computationUsed))
+	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, computationUsed)
 
 	if err != nil {
 		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
