@@ -14,9 +14,6 @@ import (
 const TransactionFeesExecutionEffortWeightsPathDomain = "storage"
 const TransactionFeesExecutionEffortWeightsPathIdentifier = "executionEffortWeights"
 
-const TransactionFeesExecutionMemoryWeightsPathDomain = "storage"
-const TransactionFeesExecutionMemoryWeightsPathIdentifier = "executionMemoryWeights"
-
 const deployTxFeesTransactionTemplate = `
 transaction {
   prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {
@@ -186,4 +183,62 @@ transaction(surgeFactor: UFix64, inclusionEffortCost: UFix64, executionEffortCos
         flowFeesAdmin.setFeeParameters(surgeFactor: surgeFactor, inclusionEffortCost: inclusionEffortCost, executionEffortCost: executionEffortCost)
     }
 }
+`
+
+func SetExecutionEffortWeightsTransaction(
+	service flow.Address,
+	weights map[uint]uint,
+) (*flow.TransactionBody, error) {
+	return setExecutionWeightsTransaction(
+		service,
+		weights,
+		TransactionFeesExecutionEffortWeightsPathDomain,
+		TransactionFeesExecutionEffortWeightsPathIdentifier,
+	)
+}
+
+func setExecutionWeightsTransaction(
+	service flow.Address,
+	weights map[uint]uint,
+	domain string,
+	identifier string,
+) (*flow.TransactionBody, error) {
+	newWeightsKeyValuePairs := make([]cadence.KeyValuePair, len(weights))
+	i := 0
+	for k, w := range weights {
+		newWeightsKeyValuePairs[i] = cadence.KeyValuePair{
+			Key:   cadence.UInt32(k),
+			Value: cadence.UInt32(w),
+		}
+		i += 1
+	}
+	arg1, err := jsoncdc.Encode(cadence.NewDictionary(newWeightsKeyValuePairs))
+	if err != nil {
+		return nil, err
+	}
+
+	arg2, err := jsoncdc.Encode(cadence.Path{
+		Domain:     domain,
+		Identifier: identifier,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(setExecutionWeightsScript)).
+		AddArgument(arg1).
+		AddArgument(arg2).
+		AddAuthorizer(service)
+
+	return tx, nil
+}
+
+const setExecutionWeightsScript = `
+	transaction(newWeights: {UInt32: UInt32}, path: StoragePath) {
+		prepare(signer: AuthAccount) {
+			signer.load<{UInt32: UInt32}>(from: path)
+			signer.save(newWeights, to: path)
+		}
+	}
 `

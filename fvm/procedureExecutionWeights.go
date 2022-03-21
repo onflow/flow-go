@@ -134,25 +134,7 @@ func GetExecutionEffortWeights(env Environment) (map[uint]uint, error) {
 }
 
 // GetExecutionMemoryWeights reads stored execution memory weights from the service account
-func GetExecutionMemoryWeights(env Environment) (map[uint]uint, error) {
-	service := runtime.Address(env.Context().Chain.ServiceAddress())
-
-	value, err := env.VM().Runtime.ReadStored(
-		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionFeesExecutionMemoryWeightsPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier,
-		},
-		runtime.Context{Interface: env},
-	)
-
-	if err != nil {
-		return meter.DefaultMemoryWeights, err
-	}
-	weights, ok := utils.CadenceValueToUintUintMap(value)
-	if !ok {
-		return meter.DefaultMemoryWeights, fmt.Errorf("could not decode stored execution memory weights")
-	}
-
-	return weights, nil
+func GetExecutionMemoryWeights(_ Environment) (map[uint]uint, error) {
+	// TODO: implement when memory metering is ready
+	return meter.DefaultMemoryWeights, nil
 }
