@@ -51,19 +51,8 @@ func (_m *PaceMaker) OnPartialTC(curView uint64) {
 }
 
 // OnTimeout provides a mock function with given fields:
-func (_m *PaceMaker) OnTimeout() *model.NewViewEvent {
-	ret := _m.Called()
-
-	var r0 *model.NewViewEvent
-	if rf, ok := ret.Get(0).(func() *model.NewViewEvent); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.NewViewEvent)
-		}
-	}
-
-	return r0
+func (_m *PaceMaker) OnTimeout() {
+	_m.Called()
 }
 
 // ProcessQC provides a mock function with given fields: qc
