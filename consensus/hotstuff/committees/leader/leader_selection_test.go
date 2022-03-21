@@ -304,59 +304,55 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 		rng, err := random.NewChacha20PRG(someSeed, []byte("leader_selec"))
 		require.NoError(t, err)
 
-		for i := 0; i < 1; i++ {
-			// create 1002 nodes with all 0 stake
-			identities := unittest.IdentityListFixture(1002, unittest.WithStake(0))
+		// create 1002 nodes with all 0 stake
+		identities := unittest.IdentityListFixture(1002, unittest.WithStake(0))
 
-			// create 2 nodes with 1 stake, and place them in between
-			// index 233-777
-			n := rng.UintN(777-233) + 233
-			m := rng.UintN(777-233) + 233
-			identities[n].Stake = 1
-			identities[m].Stake = 1
+		// create 2 nodes with 1 stake, and place them in between
+		// index 233-777
+		n := rng.UintN(777-233) + 233
+		m := rng.UintN(777-233) + 233
+		identities[n].Stake = 1
+		identities[m].Stake = 1
 
-			// the following code check the zero staker should not be selected
-			stakeful := identities.Filter(filter.HasStake(true))
+		// the following code check the zero staker should not be selected
+		stakeful := identities.Filter(filter.HasStake(true))
 
-			count := 1000
-			selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+		count := 1000
+		selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+		require.NoError(t, err)
+
+		selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, stakeful)
+		require.NoError(t, err)
+
+		for i := 0; i < count; i++ {
+			nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
-			selectionFromStakeful, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, stakeful)
+			nodeIDFromStakeful, err := selectionFromStakeful.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
-			for i := 0; i < count; i++ {
-				nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
-				require.NoError(t, err)
-
-				nodeIDFromStakeful, err := selectionFromStakeful.LeaderForView(uint64(i))
-				require.NoError(t, err)
-
-				// the selection should be the same
-				require.Equal(t, nodeIDFromStakeful, nodeIDFromAll)
-			}
+			// the selection should be the same
+			require.Equal(t, nodeIDFromStakeful, nodeIDFromAll)
 		}
 
 		t.Run("if there is only 1 node has stake, then it will be always be the leader and the only leader", func(t *testing.T) {
 			rng, err := random.NewChacha20PRG(someSeed, []byte("leader_selec"))
 			require.NoError(t, err)
 
-			for i := 0; i < 1; i++ {
-				identities := unittest.IdentityListFixture(1000, unittest.WithStake(0))
+			identities := unittest.IdentityListFixture(1000, unittest.WithStake(0))
 
-				n := rng.UintN(1000)
-				stake := n + 1
-				identities[n].Stake = stake
-				onlyStaked := identities[n]
+			n := rng.UintN(1000)
+			stake := n + 1
+			identities[n].Stake = stake
+			onlyStaked := identities[n]
 
-				selections, err := ComputeLeaderSelectionFromSeed(0, someSeed, 1000, identities)
+			selections, err := ComputeLeaderSelectionFromSeed(0, someSeed, 1000, identities)
+			require.NoError(t, err)
+
+			for i := 0; i < 1000; i++ {
+				nodeID, err := selections.LeaderForView(uint64(i))
 				require.NoError(t, err)
-
-				for i := 0; i < 1000; i++ {
-					nodeID, err := selections.LeaderForView(uint64(i))
-					require.NoError(t, err)
-					require.Equal(t, onlyStaked.NodeID, nodeID)
-				}
+				require.Equal(t, onlyStaked.NodeID, nodeID)
 			}
 		})
 	})
