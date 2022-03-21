@@ -185,6 +185,7 @@ transaction(surgeFactor: UFix64, inclusionEffortCost: UFix64, executionEffortCos
 }
 `
 
+// SetExecutionEffortWeightsTransaction creates a transaction that sets up weights for the weighted Meter.
 func SetExecutionEffortWeightsTransaction(
 	service flow.Address,
 	weights map[uint]uint64,

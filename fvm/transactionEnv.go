@@ -60,6 +60,8 @@ type TransactionEnv struct {
 func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
 }
 
+// NewTransactionEnvironment creates a new transaction environment.
+// error from this function is always fatal
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -117,15 +119,27 @@ func NewTransactionEnvironment(
 		Str("txHash", txIDStr).
 		Logger())
 
-	if err != nil {
+	err, fatal := errors.SplitErrorTypes(err)
+
+	// In case of a fatal error the transaction needs to fail
+	if fatal != nil {
 		ctx.Logger.Error().
-			Err(err).
+			Err(fatal).
 			Str("txHash", txIDStr).
 			Msg("failed to setup transaction environment")
-		return nil, fmt.Errorf("failed to setup transaction environment %w", err)
-	} else {
-		sth.State().SetMeter(m)
+		return nil, fatal
 	}
+	if err != nil {
+		ctx.Logger.Info().
+			Err(fatal).
+			Str("txHash", txIDStr).
+			Msg("failed to get execution effort weights. Falling back to basic meter")
+
+		m = basicMeter.NewMeter(
+			sth.State().TotalComputationLimit(),
+			sth.State().TotalMemoryLimit())
+	}
+	sth.State().SetMeter(m)
 
 	return env, nil
 }
@@ -142,30 +156,14 @@ func setupMeterFromState(env Environment, sth *state.StateHolder, l zerolog.Logg
 		l.Info().
 			Err(err).
 			Msg("failed to get execution effort weights")
-
-		return basicMeter.NewMeter(
-			m.TotalComputationLimit(),
-			m.TotalMemoryLimit()), nil
-	}
-
-	// Get the memory weights
-	memoryWeights, err := getExecutionMemoryWeights(env)
-
-	if err != nil {
-		// This could be a reason to error the transaction in the future, but for now we just log it
-		l.Info().Err(err).
-			Msg("failed to get execution memory weights")
-
-		return basicMeter.NewMeter(
-			m.TotalComputationLimit(),
-			m.TotalMemoryLimit()), nil
+		return nil, err
 	}
 
 	return weightedMeter.NewMeter(
 		m.TotalComputationLimit(),
 		m.TotalMemoryLimit(),
 		computationWeights,
-		memoryWeights), nil
+		map[uint]uint64{}), nil
 }
 
 // getExecutionEffortWeights reads stored execution effort weights from the service account
@@ -184,18 +182,15 @@ func getExecutionEffortWeights(env Environment) (map[uint]uint64, error) {
 	if err != nil {
 		return map[uint]uint64{}, err
 	}
-	weights, ok := utils.CadenceValueToUintUintMap(value)
+	weights, ok := utils.CadenceValueToWeights(value)
 	if !ok {
-		return map[uint]uint64{}, fmt.Errorf("could not decode stored execution effort weights")
+		return map[uint]uint64{}, errors.NewCouldNotDecodeExecutionParameterFromStateError(
+			service.Hex(),
+			blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
+			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
 	}
 
 	return weights, nil
-}
-
-// getExecutionMemoryWeights reads stored execution memory weights from the service account
-func getExecutionMemoryWeights(_ Environment) (map[uint]uint64, error) {
-	// TODO: implement when memory metering is ready
-	return map[uint]uint64{}, nil
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {

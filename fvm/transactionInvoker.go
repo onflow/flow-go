@@ -64,8 +64,6 @@ func (i *TransactionInvoker) Process(
 
 	parentState := sth.State()
 	childState := sth.NewChild()
-	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-	predeclaredValues := valueDeclarations(ctx, env)
 
 	defer func() {
 		// an extra check for state holder health, this should never happen
@@ -89,6 +87,12 @@ func (i *TransactionInvoker) Process(
 		}
 		sth.SetActiveState(parentState)
 	}()
+
+	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	if err != nil {
+		return fmt.Errorf("error creating new environment: %w", err)
+	}
+	predeclaredValues := valueDeclarations(ctx, env)
 
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 		if retry {
@@ -115,7 +119,10 @@ func (i *TransactionInvoker) Process(
 			proc.ServiceEvents = make([]flow.Event, 0)
 
 			// reset env
-			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+			env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+			if err != nil {
+				return fmt.Errorf("error creating new environment: %w", err)
+			}
 		}
 
 		location := common.TransactionLocation(proc.ID[:])
@@ -200,7 +207,10 @@ func (i *TransactionInvoker) Process(
 			Msg("transaction executed with error")
 
 		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+		env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+		if err != nil {
+			return fmt.Errorf("error creating new environment: %w", err)
+		}
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)

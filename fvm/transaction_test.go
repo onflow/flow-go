@@ -3,7 +3,6 @@ package fvm_test
 import (
 	"encoding/hex"
 	"fmt"
-	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
 	"math"
 	"testing"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
+	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"

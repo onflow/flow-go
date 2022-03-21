@@ -44,6 +44,7 @@ func NewTransactionContractFunctionInvoker(
 
 func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentracing.Span) (cadence.Value, error) {
 	var span opentracing.Span
+
 	ctx := env.Context()
 	if ctx.Tracer != nil && parentTraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)

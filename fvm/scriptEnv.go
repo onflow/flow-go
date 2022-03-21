@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
 	"math/rand"
 	"time"
 
@@ -92,12 +93,12 @@ func NewScriptEnvironment(
 
 	m, err := setupMeterFromState(env, sth, ctx.Logger)
 	if err != nil {
-		ctx.Logger.Error().
-			Err(err).
-			Msg("transaction invocation failed when creating transaction meter")
-	} else {
-		sth.State().SetMeter(m)
+		m = basicMeter.NewMeter(
+			sth.State().TotalComputationLimit(),
+			sth.State().TotalMemoryLimit())
 	}
+
+	sth.State().SetMeter(m)
 
 	return env
 }

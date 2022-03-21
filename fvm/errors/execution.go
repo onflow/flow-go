@@ -307,3 +307,40 @@ func (e *EncodingUnsupportedValueError) Error() string {
 func (e *EncodingUnsupportedValueError) Code() ErrorCode {
 	return ErrCodeEncodingUnsupportedValue
 }
+
+// An CouldNotDecodeExecutionParameterFromStateError indicates that computation has exceeded its limit.
+type CouldNotDecodeExecutionParameterFromStateError struct {
+	address    string
+	domain     string
+	identifier string
+}
+
+// NewCouldNotDecodeExecutionParameterFromStateError constructs a new CouldNotDecodeExecutionParameterFromStateError
+func NewCouldNotDecodeExecutionParameterFromStateError(address, domain, identifier string) *CouldNotDecodeExecutionParameterFromStateError {
+	return &CouldNotDecodeExecutionParameterFromStateError{
+		address:    address,
+		domain:     domain,
+		identifier: identifier,
+	}
+}
+
+// Code returns the error code for this error
+func (e CouldNotDecodeExecutionParameterFromStateError) Code() ErrorCode {
+	return ErrCodeCouldNotDecodeExecutionParameterFromState
+}
+
+func (e CouldNotDecodeExecutionParameterFromStateError) Error() string {
+	return fmt.Sprintf(
+		"%s could not decode executon parameter from state (address: %s path: %s/%s)",
+		e.Code().String(),
+		e.address,
+		e.domain,
+		e.identifier,
+	)
+}
+
+// IsCouldNotDecodeExecutionParameterFromStateError returns true if error has this type
+func IsCouldNotDecodeExecutionParameterFromStateError(err error) bool {
+	var t *CouldNotDecodeExecutionParameterFromStateError
+	return errors.As(err, &t)
+}
