@@ -61,7 +61,7 @@ func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ c
 }
 
 // NewTransactionEnvironment creates a new transaction environment.
-// error from this function is always fatal
+// error from this function is always fatal.
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -119,26 +119,10 @@ func NewTransactionEnvironment(
 		Str("txHash", txIDStr).
 		Logger())
 
-	err, fatal := errors.SplitErrorTypes(err)
-
-	// In case of a fatal error the transaction needs to fail
-	if fatal != nil {
-		ctx.Logger.Error().
-			Err(fatal).
-			Str("txHash", txIDStr).
-			Msg("failed to setup transaction environment")
-		return nil, fatal
-	}
 	if err != nil {
-		ctx.Logger.Info().
-			Err(fatal).
-			Str("txHash", txIDStr).
-			Msg("failed to get execution effort weights. Falling back to basic meter")
-
-		m = basicMeter.NewMeter(
-			sth.State().TotalComputationLimit(),
-			sth.State().TotalMemoryLimit())
+		return nil, err
 	}
+
 	sth.State().SetMeter(m)
 
 	return env, nil
@@ -150,19 +134,30 @@ func setupMeterFromState(env Environment, sth *state.StateHolder, l zerolog.Logg
 
 	// Get the computation weights
 	computationWeights, err := getExecutionEffortWeights(env)
+	err, fatal := errors.SplitErrorTypes(err)
 
+	// In case of a fatal error the transaction needs to fail
+	if fatal != nil {
+		l.Error().
+			Err(fatal).
+			Msg("failed to setup environment")
+		return nil, fatal
+	}
 	if err != nil {
-		// This could be a reason to error the transaction in the future, but for now we just log it
 		l.Info().
-			Err(err).
-			Msg("failed to get execution effort weights")
-		return nil, err
+			Err(fatal).
+			Msg("failed to get execution effort weights. Falling back to basic meter")
+
+		return basicMeter.NewMeter(
+			m.TotalComputationLimit(),
+			m.TotalMemoryLimit()), nil
 	}
 
 	return weightedMeter.NewMeter(
 		m.TotalComputationLimit(),
 		m.TotalMemoryLimit(),
 		computationWeights,
+		// TODO: add memory weights when ready
 		map[uint]uint64{}), nil
 }
 
@@ -184,6 +179,7 @@ func getExecutionEffortWeights(env Environment) (map[uint]uint64, error) {
 	}
 	weights, ok := utils.CadenceValueToWeights(value)
 	if !ok {
+		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return map[uint]uint64{}, errors.NewCouldNotDecodeExecutionParameterFromStateError(
 			service.Hex(),
 			blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
