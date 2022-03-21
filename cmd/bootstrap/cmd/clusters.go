@@ -5,8 +5,8 @@ import (
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/assignment"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // Construct cluster assignment with internal and partner nodes uniformly
@@ -24,22 +24,19 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo, se
 	internals = internals.DeterministicShuffle(seed)
 
 	nClusters := flagCollectionClusters
-	assignments := make(flow.AssignmentList, nClusters)
+	identifierLists := make([]flow.IdentifierList, nClusters)
 
 	// first, round-robin internal nodes into each cluster
 	for i, node := range internals {
-		assignments[i%len(assignments)] = append(assignments[i%len(assignments)], node.NodeID)
+		identifierLists[i%len(identifierLists)] = append(identifierLists[i%len(identifierLists)], node.NodeID)
 	}
 
 	// next, round-robin partner nodes into each cluster
 	for i, node := range partners {
-		assignments[i%len(assignments)] = append(assignments[i%len(assignments)], node.NodeID)
+		identifierLists[i%len(identifierLists)] = append(identifierLists[i%len(identifierLists)], node.NodeID)
 	}
 
-	// in place sort to order the assignment in canonical order
-	for _, assignment := range assignments {
-		flow.IdentifierList(assignment).Sort(order.IdentifierCanonical)
-	}
+	assignments := assignment.FromIdentifierLists(identifierLists)
 
 	collectors := append(partners, internals...)
 	clusters, err := flow.NewClusterList(assignments, collectors)
