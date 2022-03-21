@@ -3,9 +3,9 @@
 package flow
 
 import (
-	"encoding/json"
-
 	"github.com/pkg/errors"
+
+	"encoding/json"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
