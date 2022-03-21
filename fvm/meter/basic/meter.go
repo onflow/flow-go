@@ -11,23 +11,23 @@ var _ interfaceMeter.Meter = &Meter{}
 // for any each memory/computation usage call it sums intensity to the total
 // memory/computation usage metrics and returns error if limits are not met.
 type Meter struct {
-	computationUsed  uint
-	computationLimit uint
-	memoryUsed       uint
-	memoryLimit      uint
+	computationUsed  uint64
+	computationLimit uint64
+	memoryUsed       uint64
+	memoryLimit      uint64
 
 	computationIntensities map[uint]uint
 	memoryIntensities      map[uint]uint
 
-	computationWeights map[uint]uint
-	memoryWeights      map[uint]uint
+	computationWeights map[uint]uint64
+	memoryWeights      map[uint]uint64
 }
 
 // NewMeter constructs a new Meter
 func NewMeter(computationLimit, memoryLimit uint) *Meter {
 	return &Meter{
-		computationLimit:       computationLimit,
-		memoryLimit:            memoryLimit,
+		computationLimit:       uint64(computationLimit) << interfaceMeter.MeterInternalPrecisionBytes,
+		memoryLimit:            uint64(memoryLimit) << interfaceMeter.MeterInternalPrecisionBytes,
 		computationWeights:     interfaceMeter.DefaultComputationWeights,
 		memoryWeights:          interfaceMeter.DefaultMemoryWeights,
 		computationIntensities: make(map[uint]uint),
@@ -49,18 +49,31 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 
 // MergeMeter merges the input meter into the current meter and checks for the limits
 func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
-	m.computationUsed = m.computationUsed + child.TotalComputationUsed()
+
+	var childComputationUsed uint64
+	if basic, ok := child.(*Meter); ok {
+		childComputationUsed = basic.computationUsed
+	} else {
+		childComputationUsed = uint64(child.TotalComputationUsed()) << interfaceMeter.MeterInternalPrecisionBytes
+	}
+	m.computationUsed = m.computationUsed + childComputationUsed
 	if m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(uint64(m.computationLimit))
+		return errors.NewComputationLimitExceededError(m.computationLimit)
 	}
 
 	for key, intensity := range child.ComputationIntensities() {
 		m.computationIntensities[key] += intensity
 	}
 
-	m.memoryUsed = m.memoryUsed + child.TotalMemoryUsed()
+	var childMemoryUsed uint64
+	if basic, ok := child.(*Meter); ok {
+		childMemoryUsed = basic.memoryUsed
+	} else {
+		childMemoryUsed = uint64(child.TotalMemoryUsed()) << interfaceMeter.MeterInternalPrecisionBytes
+	}
+	m.memoryUsed = m.memoryUsed + childMemoryUsed
 	if m.memoryUsed > m.memoryLimit {
-		return errors.NewMemoryLimitExceededError(uint64(m.memoryLimit))
+		return errors.NewMemoryLimitExceededError(m.memoryLimit)
 	}
 
 	for key, intensity := range child.MemoryIntensities() {
@@ -70,7 +83,7 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 }
 
 // SetComputationWeights sets the weights of the different kinds of computation usage
-func (m *Meter) SetComputationWeights(w map[uint]uint) {
+func (m *Meter) SetComputationWeights(w map[uint]uint64) {
 	m.computationWeights = w
 }
 
@@ -81,7 +94,7 @@ func (m *Meter) MeterComputation(kind uint, intensity uint) error {
 	if !ok {
 		return nil
 	}
-	m.computationUsed += w * intensity
+	m.computationUsed += w * uint64(intensity)
 	if m.computationUsed > m.computationLimit {
 		return errors.NewComputationLimitExceededError(uint64(m.computationLimit))
 	}
@@ -95,16 +108,16 @@ func (m *Meter) ComputationIntensities() map[uint]uint {
 
 // TotalComputationUsed returns the total computation used
 func (m *Meter) TotalComputationUsed() uint {
-	return m.computationUsed
+	return uint(m.computationUsed >> interfaceMeter.MeterInternalPrecisionBytes)
 }
 
 // TotalComputationLimit returns the total computation limit
 func (m *Meter) TotalComputationLimit() uint {
-	return m.computationLimit
+	return uint(m.computationLimit >> interfaceMeter.MeterInternalPrecisionBytes)
 }
 
 // SetMemoryWeights sets the weights of the different kinds of memory usage
-func (m *Meter) SetMemoryWeights(w map[uint]uint) {
+func (m *Meter) SetMemoryWeights(w map[uint]uint64) {
 	m.memoryWeights = w
 }
 
@@ -115,7 +128,7 @@ func (m *Meter) MeterMemory(kind uint, intensity uint) error {
 	if !ok {
 		return nil
 	}
-	m.memoryUsed += w * intensity
+	m.memoryUsed += w * uint64(intensity)
 	if m.memoryUsed > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.memoryLimit))
 	}
@@ -129,10 +142,10 @@ func (m *Meter) MemoryIntensities() map[uint]uint {
 
 // TotalMemoryUsed returns the total memory used
 func (m *Meter) TotalMemoryUsed() uint {
-	return m.memoryUsed
+	return uint(m.memoryUsed >> interfaceMeter.MeterInternalPrecisionBytes)
 }
 
 // TotalMemoryLimit returns the total memory limit
 func (m *Meter) TotalMemoryLimit() uint {
-	return m.memoryLimit
+	return uint(m.memoryLimit >> interfaceMeter.MeterInternalPrecisionBytes)
 }

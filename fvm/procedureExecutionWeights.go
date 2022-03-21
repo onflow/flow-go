@@ -110,7 +110,7 @@ func setExecutionWeights(env Environment, l zerolog.Logger) error {
 }
 
 // GetExecutionEffortWeights reads stored execution effort weights from the service account
-func GetExecutionEffortWeights(env Environment) (map[uint]uint, error) {
+func GetExecutionEffortWeights(env Environment) (map[uint]uint64, error) {
 	service := runtime.Address(env.Context().Chain.ServiceAddress())
 
 	value, err := env.VM().Runtime.ReadStored(
@@ -134,7 +134,7 @@ func GetExecutionEffortWeights(env Environment) (map[uint]uint, error) {
 }
 
 // GetExecutionMemoryWeights reads stored execution memory weights from the service account
-func GetExecutionMemoryWeights(_ Environment) (map[uint]uint, error) {
+func GetExecutionMemoryWeights(_ Environment) (map[uint]uint64, error) {
 	// TODO: implement when memory metering is ready
 	return meter.DefaultMemoryWeights, nil
 }

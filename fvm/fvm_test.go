@@ -3464,7 +3464,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 }
 
 func TestSettingExecutionWeights(t *testing.T) {
-	setExecutionEffortWeights := func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs, newWeights map[uint]uint) {
+	setExecutionEffortWeights := func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs, newWeights map[uint]uint64) {
 
 		txBody, err := blueprints.SetExecutionEffortWeightsTransaction(chain.ServiceAddress(), newWeights)
 		require.NoError(t, err)
@@ -3488,8 +3488,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint{
-				uint(common.ComputationKindLoop): 100_000,
+			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
+				uint(common.ComputationKindLoop): 100_000 << meter.MeterInternalPrecisionBytes,
 			})
 
 			txBody := flow.NewTransactionBody().
@@ -3523,8 +3523,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint{
-				uint(meter.ComputationKindCreateAccount): fvm.DefaultComputationLimit + 1,
+			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
+				uint(meter.ComputationKindCreateAccount): (fvm.DefaultComputationLimit + 1) << meter.MeterInternalPrecisionBytes,
 			})
 
 			txBody := flow.NewTransactionBody().
@@ -3556,7 +3556,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint{
+			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
 				uint(meter.ComputationKindCreateAccount): 100_000_000,
 			})
 
@@ -3589,7 +3589,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint{
+			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
 				uint(meter.ComputationKindCreateAccount): 100_000_000,
 			})
 

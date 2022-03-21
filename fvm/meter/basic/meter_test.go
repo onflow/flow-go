@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/meter/basic"
 )
 
@@ -33,7 +34,7 @@ func TestComputationMetering(t *testing.T) {
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 
-		m.SetMemoryWeights(map[uint]uint{0: 1})
+		m.SetMemoryWeights(map[uint]uint64{0: 1 << meter.MeterInternalPrecisionBytes})
 
 		err = m.MeterMemory(0, 2)
 		require.NoError(t, err)
@@ -50,8 +51,8 @@ func TestComputationMetering(t *testing.T) {
 
 	t.Run("meter computation and memory with weights", func(t *testing.T) {
 		m := basic.NewMeter(100, 100)
-		m.SetComputationWeights(map[uint]uint{0: 13})
-		m.SetMemoryWeights(map[uint]uint{0: 17})
+		m.SetComputationWeights(map[uint]uint64{0: 13 << meter.MeterInternalPrecisionBytes})
+		m.SetMemoryWeights(map[uint]uint64{0: 17 << meter.MeterInternalPrecisionBytes})
 
 		err := m.MeterComputation(uint(0), 1)
 		require.NoError(t, err)
@@ -62,6 +63,34 @@ func TestComputationMetering(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint(34), m.TotalMemoryUsed())
 		require.Equal(t, uint(2), m.MemoryIntensities()[0])
+	})
+
+	t.Run("meter computation and memory with weights lower than MeterInternalPrecisionBytes", func(t *testing.T) {
+		m := basic.NewMeter(100, 100)
+		m.SetComputationWeights(map[uint]uint64{0: 1})
+		m.SetMemoryWeights(map[uint]uint64{0: 1})
+
+		internalPrecisionMinusOne := uint((1 << meter.MeterInternalPrecisionBytes) - 1)
+
+		err := m.MeterComputation(uint(0), internalPrecisionMinusOne)
+		require.NoError(t, err)
+		require.Equal(t, uint(0), m.TotalComputationUsed())
+		require.Equal(t, internalPrecisionMinusOne, m.ComputationIntensities()[0])
+
+		err = m.MeterComputation(uint(0), 1)
+		require.NoError(t, err)
+		require.Equal(t, uint(1), m.TotalComputationUsed())
+		require.Equal(t, uint(1<<meter.MeterInternalPrecisionBytes), m.ComputationIntensities()[0])
+
+		err = m.MeterMemory(uint(0), internalPrecisionMinusOne)
+		require.NoError(t, err)
+		require.Equal(t, uint(0), m.TotalMemoryUsed())
+		require.Equal(t, internalPrecisionMinusOne, m.MemoryIntensities()[0])
+
+		err = m.MeterMemory(uint(0), 1)
+		require.NoError(t, err)
+		require.Equal(t, uint(1), m.TotalMemoryUsed())
+		require.Equal(t, uint(1<<meter.MeterInternalPrecisionBytes), m.MemoryIntensities()[0])
 	})
 
 	t.Run("merge meters", func(t *testing.T) {

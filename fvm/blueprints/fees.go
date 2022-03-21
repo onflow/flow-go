@@ -187,7 +187,7 @@ transaction(surgeFactor: UFix64, inclusionEffortCost: UFix64, executionEffortCos
 
 func SetExecutionEffortWeightsTransaction(
 	service flow.Address,
-	weights map[uint]uint,
+	weights map[uint]uint64,
 ) (*flow.TransactionBody, error) {
 	return setExecutionWeightsTransaction(
 		service,
@@ -199,7 +199,7 @@ func SetExecutionEffortWeightsTransaction(
 
 func setExecutionWeightsTransaction(
 	service flow.Address,
-	weights map[uint]uint,
+	weights map[uint]uint64,
 	domain string,
 	identifier string,
 ) (*flow.TransactionBody, error) {
@@ -207,8 +207,8 @@ func setExecutionWeightsTransaction(
 	i := 0
 	for k, w := range weights {
 		newWeightsKeyValuePairs[i] = cadence.KeyValuePair{
-			Key:   cadence.UInt32(k),
-			Value: cadence.UInt32(w),
+			Key:   cadence.UInt64(k),
+			Value: cadence.UInt64(w),
 		}
 		i += 1
 	}
@@ -235,9 +235,9 @@ func setExecutionWeightsTransaction(
 }
 
 const setExecutionWeightsScript = `
-	transaction(newWeights: {UInt32: UInt32}, path: StoragePath) {
+	transaction(newWeights: {UInt64: UInt64}, path: StoragePath) {
 		prepare(signer: AuthAccount) {
-			signer.load<{UInt32: UInt32}>(from: path)
+			signer.load<{UInt64: UInt64}>(from: path)
 			signer.save(newWeights, to: path)
 		}
 	}

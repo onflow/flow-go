@@ -25,7 +25,7 @@ func (m *Meter) MergeMeter(_ interfaceMeter.Meter) error {
 }
 
 // SetComputationWeights is a noop
-func (m *Meter) SetComputationWeights(_ map[uint]uint) {
+func (m *Meter) SetComputationWeights(_ map[uint]uint64) {
 }
 
 // MeterComputation is a noop
@@ -49,7 +49,7 @@ func (m *Meter) TotalComputationLimit() uint {
 }
 
 // SetMemoryWeights is a noop
-func (m *Meter) SetMemoryWeights(_ map[uint]uint) {
+func (m *Meter) SetMemoryWeights(_ map[uint]uint64) {
 }
 
 // MeterMemory is a noop
