@@ -48,7 +48,7 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 			honestEngine.OnProcess(func(channel flownet.Channel, originId flow.Identifier, event interface{}) error {
 				require.Equal(t, testChannel, channel)               // event must arrive at the channel set by orchestrator.
 				require.Equal(t, corruptedIdentity.NodeID, originId) // origin id of the message must be the corrupted node.
-				require.NotEqual(t, corruptedEvent, event)           // content of event must be swapped with corrupted event.
+				require.Equal(t, corruptedEvent, event)              // content of event must be swapped with corrupted event.
 
 				wg.Done()
 				return nil
@@ -121,7 +121,6 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 	// starts corruptible conduit factory
 	attackNetwork.Start(attackNetworkCtx)
 	unittest.RequireCloseBefore(t, attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
-
 	run(t)
 
 	// terminates attackNetwork

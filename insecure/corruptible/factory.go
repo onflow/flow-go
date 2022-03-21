@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,6 +36,7 @@ type ConduitFactory struct {
 	attackerObserveClient insecure.Attacker_ObserveClient
 	server                *grpc.Server // touch point of attack network to this factory.
 	address               net.Addr
+	ctx                   context.Context
 }
 
 func NewCorruptibleConduitFactory(
@@ -57,6 +59,7 @@ func NewCorruptibleConduitFactory(
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			factory.start(ctx, address)
+			factory.ctx = ctx
 
 			ready()
 
@@ -200,13 +203,20 @@ func (c *ConduitFactory) registerAttacker(ctx context.Context, address string) e
 		return fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", address)
 	}
 
-	clientConn, err := grpc.Dial(address, grpc.WithInsecure())
+	//var kacp = keepalive.ClientParameters{
+	//	Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
+	//	Timeout:             time.Second,      // wait 1 second for ping back
+	//	PermitWithoutStream: true,             // send pings even without active streams
+	//}
+
+	clientConn, err := grpc.Dial(address,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("could not establish a client connection to attacker: %w", err)
 	}
 
 	attackerClient := insecure.NewAttackerClient(clientConn)
-	c.attackerObserveClient, err = attackerClient.Observe(ctx)
+	c.attackerObserveClient, err = attackerClient.Observe(c.ctx)
 	if err != nil {
 		return fmt.Errorf("could not establish an observe stream to the attacker: %w", err)
 	}

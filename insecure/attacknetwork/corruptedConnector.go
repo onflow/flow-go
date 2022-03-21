@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,7 +34,7 @@ func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifi
 	if err != nil {
 		return nil, fmt.Errorf("could not generate corruptible conduit factory address for: %w", err)
 	}
-	gRpcClient, err := grpc.Dial(corruptedAddress, grpc.WithInsecure())
+	gRpcClient, err := grpc.Dial(corruptedAddress, grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("could not dial corruptible conduit factory %s: %w", corruptedAddress, err)
 	}
