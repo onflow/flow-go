@@ -87,7 +87,6 @@ func (i *TransactionInvoker) Process(
 			processErr = fmt.Errorf("transaction invocation failed when merging state: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
-		sth.EnableLimitEnforcement()
 	}()
 
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
@@ -157,16 +156,16 @@ func (i *TransactionInvoker) Process(
 	// }
 
 	// disable the limit checks on states
-	sth.DisableLimitEnforcement()
 
+	sth.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
 	// disable the limit checks on states
-	feesError := i.deductTransactionFees(env, proc)
+	feesError := i.deductTransactionFees(env, proc, sth)
 	if feesError != nil {
 		txError = feesError
 	}
 
-	sth.EnableLimitEnforcement()
+	sth.EnableAllLimitEnforcements()
 
 	// applying contract changes
 	// this writes back the contract contents to accounts
@@ -184,7 +183,9 @@ func (i *TransactionInvoker) Process(
 
 	// it there was any transaction error clear changes and try to deduct fees again
 	if txError != nil {
-		sth.DisableLimitEnforcement()
+		sth.DisableAllLimitEnforcements()
+		defer sth.EnableAllLimitEnforcements()
+
 		// drop delta since transaction failed
 		childState.View().DropDelta()
 		// if tx fails just do clean up
@@ -200,7 +201,7 @@ func (i *TransactionInvoker) Process(
 		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
-		feesError = i.deductTransactionFees(env, proc)
+		feesError = i.deductTransactionFees(env, proc, sth)
 
 		updatedKeys, err = env.Commit()
 		if err != nil && feesError == nil {
@@ -224,7 +225,7 @@ func (i *TransactionInvoker) Process(
 
 	// if tx failed this will only contain fee deduction logs and computation
 	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
+	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -238,39 +239,21 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
-func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) (err error) {
+func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure, sth *state.StateHolder) (err error) {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
 
-	// start a new computation meter for deducting transaction fees.
-	subMeter := env.computationHandler.StartSubMeter(DefaultGasLimit)
-	defer func() {
-		merr := subMeter.Discard()
-		if merr == nil {
-			return
-		}
-		if err != nil {
-			// The error merr (from discarding the subMeter) will be hidden by err (transaction fee deduction error)
-			// as it has priority. So log merr.
-			i.logger.Error().Err(merr).
-				Msg("error discarding computation meter in deductTransactionFees (while also handling a deductTransactionFees error)")
-			return
-		}
-		err = merr
-	}()
+	computationUsed := sth.State().TotalComputationUsed()
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	_, err = deductTxFees(proc.Transaction.Payer)
+	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
+	// Execution effort will be connected to computation used.
+	inclusionEffort := uint64(100_000_000)
+	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, uint64(computationUsed))
 
 	if err != nil {
-		// TODO: Fee value is currently a constant. this should be changed when it is not
-		fees, ok := DefaultTransactionFees.ToGoValue().(uint64)
-		if !ok {
-			err = fmt.Errorf("could not get transaction fees during formatting of TransactionFeeDeductionFailedError: %w", err)
-		}
-
-		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, fees, err)
+		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
 	}
 	return nil
 }

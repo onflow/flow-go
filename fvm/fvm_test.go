@@ -3085,8 +3085,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		checkResult   func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure)
 	}
 
-	txFees := fvm.DefaultTransactionFees.ToGoValue().(uint64)
-	fundingAmount := uint64(1_0000_0000)
+	txFees := uint64(10_000)             // 0.0001
+	fundingAmount := uint64(100_000_000) // 1.0
 	transferAmount := uint64(123_456)
 	minimumStorageReservation := fvm.DefaultMinimumStorageReservation.ToGoValue().(uint64)
 
@@ -3130,6 +3130,34 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Equal(t, txFees+transferAmount, balanceBefore-balanceAfter)
+			},
+		},
+		{
+			name:          "Transaction fees are deducted and fe deduction is emitted",
+			fundWith:      fundingAmount,
+			tryToTransfer: transferAmount,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+				var feeDeduction flow.Event //fee deduction event
+				for _, e := range tx.Events {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", fvm.FlowFeesAddress(flow.Testnet.Chain())) {
+						feeDeduction = e
+						break
+					}
+				}
+				require.NotEmpty(t, feeDeduction.Payload)
+
+				payload, err := jsoncdc.Decode(feeDeduction.Payload)
+				require.NoError(t, err)
+
+				event := payload.(cadence.Event)
+
+				require.Equal(t, txFees, event.Fields[0].ToGoValue())
+				// Inclusion effort should be equivalent to 1.0 UFix64
+				require.Equal(t, uint64(100_000_000), event.Fields[1].ToGoValue())
+				// Execution effort should be non-0
+				require.Greater(t, event.Fields[2].ToGoValue(), uint64(0))
+
 			},
 		},
 		{
@@ -3380,7 +3408,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			txBody.SetPayer(address)
 
 			if tc.gasLimit == 0 {
-				txBody.SetGasLimit(fvm.DefaultGasLimit)
+				txBody.SetGasLimit(fvm.DefaultComputationLimit)
 			} else {
 				txBody.SetGasLimit(tc.gasLimit)
 			}
@@ -3491,4 +3519,122 @@ func TestStorageUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, cadence.NewUInt64(5), script.Value)
+}
+
+func TestEnforcingComputationLimit(t *testing.T) {
+	t.Parallel()
+
+	rt := fvm.NewInterpreterRuntime()
+	chain := flow.Testnet.Chain()
+	vm := fvm.NewVirtualMachine(rt)
+
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvoker(zerolog.Nop()),
+		),
+	)
+
+	simpleView := utils.NewSimpleView()
+
+	const computationLimit = 5
+
+	type test struct {
+		name           string
+		code           string
+		payerIsServAcc bool
+		ok             bool
+		expCompUsed    uint64
+	}
+
+	tests := []test{
+		{
+			name: "infinite while loop",
+			code: `
+		      while true {}
+		    `,
+			payerIsServAcc: false,
+			ok:             false,
+			expCompUsed:    computationLimit + 1,
+		},
+		{
+			name: "limited while loop",
+			code: `
+              var i = 0
+              while i < 5 {
+                  i = i + 1
+              }
+            `,
+			payerIsServAcc: false,
+			ok:             false,
+			expCompUsed:    computationLimit + 1,
+		},
+		{
+			name: "too many for-in loop iterations",
+			code: `
+              for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {}
+            `,
+			payerIsServAcc: false,
+			ok:             false,
+			expCompUsed:    computationLimit + 1,
+		},
+		{
+			name: "too many for-in loop iterations",
+			code: `
+              for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {}
+            `,
+			payerIsServAcc: true,
+			ok:             true,
+			expCompUsed:    11,
+		},
+		{
+			name: "some for-in loop iterations",
+			code: `
+              for i in [1, 2, 3, 4] {}
+            `,
+			payerIsServAcc: false,
+			ok:             true,
+			expCompUsed:    5,
+		},
+	}
+
+	for _, test := range tests {
+
+		t.Run(test.name, func(t *testing.T) {
+
+			script := []byte(
+				fmt.Sprintf(
+					`
+                      transaction {
+                          prepare() {
+                              %s
+                          }
+                      }
+                    `,
+					test.code,
+				),
+			)
+
+			txBody := flow.NewTransactionBody().
+				SetScript(script).
+				SetGasLimit(computationLimit)
+
+			if test.payerIsServAcc {
+				txBody.SetPayer(chain.ServiceAddress()).
+					SetGasLimit(0)
+			}
+			tx := fvm.Transaction(txBody, 0)
+
+			err := vm.Run(ctx, tx, simpleView, programs.NewEmptyPrograms())
+			require.NoError(t, err)
+			require.Equal(t, test.expCompUsed, tx.ComputationUsed)
+			if test.ok {
+				require.NoError(t, tx.Err)
+			} else {
+				require.Error(t, tx.Err)
+			}
+
+		})
+	}
 }

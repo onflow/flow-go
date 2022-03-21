@@ -1,7 +1,6 @@
 package attacknetwork_test
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -78,7 +77,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	originId := unittest.IdentifierFixture()
 
 	var targetIds flow.IdentifierList
-	targets := uint32(0)
+	targetNum := uint32(0)
 
 	if protocol == insecure.Protocol_UNICAST {
 		targetIds = unittest.IdentifierListFixture(1)
@@ -87,7 +86,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	}
 
 	if protocol == insecure.Protocol_MULTICAST {
-		targets = uint32(3)
+		targetNum = uint32(3)
 	}
 
 	channel := network.Channel("test-channel")
@@ -103,7 +102,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	m := &insecure.Message{
 		ChannelID: "test-channel",
 		OriginID:  originId[:],
-		Targets:   targets,
+		TargetNum: targetNum,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
 		Protocol:  protocol,
@@ -116,7 +115,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 		Channel:           channel,
 		FlowProtocolEvent: content,
 		Protocol:          protocol,
-		TargetNum:         targets,
+		TargetNum:         targetNum,
 		TargetIds:         targetIds,
 	}
 
@@ -199,6 +198,8 @@ func TestAttackNetworkPublish_ConcurrentMessages(t *testing.T) {
 	testAttackNetwork(t, insecure.Protocol_PUBLISH, 10)
 }
 
+// testAttackNetwork evaluates that the orchestrator can successfully route an event to a corrupted node through the attack network.
+// By a corrupted node here, we mean a node that runs with a corruptible conduit factory.
 func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
 	_, events, corruptedIds := messageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
@@ -218,11 +219,13 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 				connection, ok := connections[corruptedId.NodeID]
 				require.True(t, ok)
 
+				// we test the communication between the attack network and orchestrator while mocking the connections
+				// between the attack network and corrupted nodes.
 				connection.On("SendMessage", mock.Anything).Run(func(args mock.Arguments) {
 					msg, ok := args[0].(*insecure.Message)
 					require.True(t, ok)
 
-					matchEventForMessage(t, events, msg)
+					matchEventForMessage(t, events, msg, corruptedId.NodeID)
 
 					connectionRcvWG.Done()
 				}).Return(nil)
@@ -248,15 +251,19 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 		})
 }
 
-func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message) {
+// mackEventForMessage fails the test if given message is not meant to be sent on behalf of the corrupted id, or it does not correspond to any
+// of the given events.
+func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insecure.Message, corruptedId flow.Identifier) {
 	codec := cbor.NewCodec()
 
+	require.Equal(t, corruptedId[:], message.OriginID[:])
+
 	for _, event := range events {
-		if bytes.Equal(event.CorruptedId[:], message.OriginID) {
+		if event.CorruptedId == corruptedId {
 			require.Equal(t, event.Channel.String(), message.ChannelID)
 			require.Equal(t, event.Protocol, message.Protocol)
 			require.Equal(t, flow.IdsToBytes(event.TargetIds), message.TargetIDs)
-			require.Equal(t, event.TargetNum, message.Targets)
+			require.Equal(t, event.TargetNum, message.TargetNum)
 
 			content, err := codec.Decode(message.Payload)
 			require.NoError(t, err)
@@ -282,7 +289,6 @@ func withAttackNetwork(t *testing.T,
 
 	attackNetwork, err := attacknetwork.NewAttackNetwork(unittest.Logger(), serverAddress, codec, orchestrator, connector, corruptedIds)
 	require.NoError(t, err)
-	connector.On("WithAttackerAddress", mock.Anything).Return().Once()
 
 	// life-cycle management of attackNetwork.
 	ctx, cancel := context.WithCancel(context.Background())

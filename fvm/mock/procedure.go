@@ -16,6 +16,34 @@ type Procedure struct {
 	mock.Mock
 }
 
+// ComputationLimit provides a mock function with given fields: ctx
+func (_m *Procedure) ComputationLimit(ctx fvm.Context) uint64 {
+	ret := _m.Called(ctx)
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func(fvm.Context) uint64); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// MemoryLimit provides a mock function with given fields: ctx
+func (_m *Procedure) MemoryLimit(ctx fvm.Context) uint64 {
+	ret := _m.Called(ctx)
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func(fvm.Context) uint64); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
 // Run provides a mock function with given fields: vm, ctx, sth, _a3
 func (_m *Procedure) Run(vm *fvm.VirtualMachine, ctx fvm.Context, sth *state.StateHolder, _a3 *programs.Programs) error {
 	ret := _m.Called(vm, ctx, sth, _a3)
