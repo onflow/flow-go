@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/fvm/meter"
+	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -91,8 +91,7 @@ func setExecutionWeights(env Environment, l zerolog.Logger) error {
 		l.Info().
 			Err(err).
 			Msg("failed to get execution effort weights")
-	} else {
-		m.SetComputationWeights(computationWeights)
+		computationWeights = basicMeter.DefaultComputationWeights
 	}
 
 	// Get the memory weights
@@ -102,9 +101,14 @@ func setExecutionWeights(env Environment, l zerolog.Logger) error {
 		// This could be a reason to error the transaction in the future, but for now we just log it
 		l.Info().Err(err).
 			Msg("failed to get execution memory weights")
-	} else {
-		m.SetMemoryWeights(memoryWeights)
+		memoryWeights = basicMeter.DefaultMemoryWeights
 	}
+
+	sth.State().SetMeter(basicMeter.NewMeter(
+		m.TotalComputationLimit(),
+		m.TotalMemoryLimit(),
+		basicMeter.WithComputationWeights(computationWeights),
+		basicMeter.WithMemoryWeights(memoryWeights)))
 
 	return nil
 }
@@ -123,11 +127,11 @@ func GetExecutionEffortWeights(env Environment) (map[uint]uint64, error) {
 	)
 
 	if err != nil {
-		return meter.DefaultComputationWeights, err
+		return basicMeter.DefaultComputationWeights, err
 	}
 	weights, ok := utils.CadenceValueToUintUintMap(value)
 	if !ok {
-		return meter.DefaultComputationWeights, fmt.Errorf("could not decode stored execution effort weights")
+		return basicMeter.DefaultComputationWeights, fmt.Errorf("could not decode stored execution effort weights")
 	}
 
 	return weights, nil
@@ -136,5 +140,5 @@ func GetExecutionEffortWeights(env Environment) (map[uint]uint64, error) {
 // GetExecutionMemoryWeights reads stored execution memory weights from the service account
 func GetExecutionMemoryWeights(_ Environment) (map[uint]uint64, error) {
 	// TODO: implement when memory metering is ready
-	return meter.DefaultMemoryWeights, nil
+	return basicMeter.DefaultMemoryWeights, nil
 }

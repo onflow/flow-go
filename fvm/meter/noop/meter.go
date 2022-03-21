@@ -24,10 +24,6 @@ func (m *Meter) MergeMeter(_ interfaceMeter.Meter) error {
 	return nil
 }
 
-// SetComputationWeights is a noop
-func (m *Meter) SetComputationWeights(_ map[uint]uint64) {
-}
-
 // MeterComputation is a noop
 func (m *Meter) MeterComputation(_ uint, _ uint) error {
 	return nil
@@ -46,10 +42,6 @@ func (m *Meter) TotalComputationUsed() uint {
 // TotalComputationLimit always returns zero
 func (m *Meter) TotalComputationLimit() uint {
 	return 0
-}
-
-// SetMemoryWeights is a noop
-func (m *Meter) SetMemoryWeights(_ map[uint]uint64) {
 }
 
 // MeterMemory is a noop
