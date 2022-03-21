@@ -22,8 +22,6 @@ import (
 
 	sema "github.com/onflow/cadence/runtime/sema"
 
-	state "github.com/onflow/flow-go/fvm/state"
-
 	time "time"
 )
 
@@ -726,22 +724,6 @@ func (_m *Environment) SetValue(owner []byte, key []byte, value []byte) error {
 		r0 = rf(owner, key, value)
 	} else {
 		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// StateHolder provides a mock function with given fields:
-func (_m *Environment) StateHolder() *state.StateHolder {
-	ret := _m.Called()
-
-	var r0 *state.StateHolder
-	if rf, ok := ret.Get(0).(func() *state.StateHolder); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*state.StateHolder)
-		}
 	}
 
 	return r0

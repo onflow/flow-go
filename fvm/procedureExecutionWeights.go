@@ -51,7 +51,7 @@ func (c *TransactionSetExecutionWeights) Process(
 		Logger()
 	env := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
-	return setExecutionWeights(env, l)
+	return setExecutionWeights(env, sth, l)
 }
 
 var _ TransactionProcessor = &TransactionSetExecutionWeights{}
@@ -69,14 +69,12 @@ func NewScriptSetExecutionWeights(logger zerolog.Logger) *ScriptSetExecutionWeig
 func (c *ScriptSetExecutionWeights) Process(vm *VirtualMachine, ctx Context, _ *ScriptProcedure, sth *state.StateHolder, programs *programs.Programs) error {
 	env := NewScriptEnvironment(ctx, vm, sth, programs)
 
-	return setExecutionWeights(env, c.logger)
+	return setExecutionWeights(env, sth, c.logger)
 }
 
 var _ ScriptProcessor = &ScriptSetExecutionWeights{}
 
-func setExecutionWeights(env Environment, l zerolog.Logger) error {
-	sth := env.StateHolder()
-
+func setExecutionWeights(env Environment, sth *state.StateHolder, l zerolog.Logger) error {
 	// do not meter getting execution weights
 	sth.DisableAllLimitEnforcements()
 	defer sth.EnableAllLimitEnforcements()

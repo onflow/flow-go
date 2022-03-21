@@ -44,14 +44,6 @@ func NewTransactionContractFunctionInvoker(
 
 func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentracing.Span) (cadence.Value, error) {
 	var span opentracing.Span
-
-	if env.StateHolder().EnforceComputationLimits {
-		err := env.StateHolder().State().MeterComputation(meter.ComputationKindContractFunctionInvoke, 1)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	ctx := env.Context()
 	if ctx.Tracer != nil && parentTraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
@@ -59,6 +51,25 @@ func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTrace
 			i.logSpanFields...,
 		)
 		defer span.Finish()
+	}
+
+	switch e := env.(type) {
+	case *TransactionEnv:
+		if e.sth.EnforceComputationLimits {
+			err := e.sth.State().MeterComputation(meter.ComputationKindContractFunctionInvoke, 1)
+			if err != nil {
+				return nil, err
+			}
+		}
+	case *ScriptEnv:
+		if e.sth.EnforceComputationLimits {
+			err := e.sth.State().MeterComputation(meter.ComputationKindContractFunctionInvoke, 1)
+			if err != nil {
+				return nil, err
+			}
+		}
+	default:
+		// dont do any metering
 	}
 
 	predeclaredValues := valueDeclarations(ctx, env)

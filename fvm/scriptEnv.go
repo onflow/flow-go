@@ -56,10 +56,6 @@ func (e *ScriptEnv) VM() *VirtualMachine {
 	return e.vm
 }
 
-func (e *ScriptEnv) StateHolder() *state.StateHolder {
-	return e.sth
-}
-
 func NewScriptEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
