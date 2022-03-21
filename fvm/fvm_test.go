@@ -27,7 +27,7 @@ import (
 	crypto2 "github.com/onflow/flow-go/fvm/crypto"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
+	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -3490,7 +3490,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
-				uint(common.ComputationKindLoop): 100_000 << basicMeter.MeterInternalPrecisionBytes,
+				uint(common.ComputationKindLoop): 100_000 << weightedMeter.MeterInternalPrecisionBytes,
 			})
 
 			txBody := flow.NewTransactionBody().
@@ -3525,7 +3525,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
-				uint(meter.ComputationKindCreateAccount): (fvm.DefaultComputationLimit + 1) << basicMeter.MeterInternalPrecisionBytes,
+				uint(meter.ComputationKindCreateAccount): (fvm.DefaultComputationLimit + 1) << weightedMeter.MeterInternalPrecisionBytes,
 			})
 
 			txBody := flow.NewTransactionBody().
@@ -3558,7 +3558,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
-				uint(meter.ComputationKindCreateAccount): 100_000_000,
+				uint(meter.ComputationKindCreateAccount): 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
 			})
 
 			txBody := flow.NewTransactionBody().

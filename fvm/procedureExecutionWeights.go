@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
+	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -91,7 +92,11 @@ func setExecutionWeights(env Environment, l zerolog.Logger) error {
 		l.Info().
 			Err(err).
 			Msg("failed to get execution effort weights")
-		computationWeights = basicMeter.DefaultComputationWeights
+
+		sth.State().SetMeter(basicMeter.NewMeter(
+			m.TotalComputationLimit(),
+			m.TotalMemoryLimit()))
+		return nil
 	}
 
 	// Get the memory weights
@@ -101,14 +106,18 @@ func setExecutionWeights(env Environment, l zerolog.Logger) error {
 		// This could be a reason to error the transaction in the future, but for now we just log it
 		l.Info().Err(err).
 			Msg("failed to get execution memory weights")
-		memoryWeights = basicMeter.DefaultMemoryWeights
+
+		sth.State().SetMeter(basicMeter.NewMeter(
+			m.TotalComputationLimit(),
+			m.TotalMemoryLimit()))
+		return nil
 	}
 
-	sth.State().SetMeter(basicMeter.NewMeter(
+	sth.State().SetMeter(weightedMeter.NewMeter(
 		m.TotalComputationLimit(),
 		m.TotalMemoryLimit(),
-		basicMeter.WithComputationWeights(computationWeights),
-		basicMeter.WithMemoryWeights(memoryWeights)))
+		computationWeights,
+		memoryWeights))
 
 	return nil
 }
@@ -127,11 +136,11 @@ func GetExecutionEffortWeights(env Environment) (map[uint]uint64, error) {
 	)
 
 	if err != nil {
-		return basicMeter.DefaultComputationWeights, err
+		return map[uint]uint64{}, err
 	}
 	weights, ok := utils.CadenceValueToUintUintMap(value)
 	if !ok {
-		return basicMeter.DefaultComputationWeights, fmt.Errorf("could not decode stored execution effort weights")
+		return map[uint]uint64{}, fmt.Errorf("could not decode stored execution effort weights")
 	}
 
 	return weights, nil
@@ -140,5 +149,5 @@ func GetExecutionEffortWeights(env Environment) (map[uint]uint64, error) {
 // GetExecutionMemoryWeights reads stored execution memory weights from the service account
 func GetExecutionMemoryWeights(_ Environment) (map[uint]uint64, error) {
 	// TODO: implement when memory metering is ready
-	return basicMeter.DefaultMemoryWeights, nil
+	return map[uint]uint64{}, nil
 }
