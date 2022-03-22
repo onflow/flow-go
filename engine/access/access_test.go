@@ -399,10 +399,8 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			id := block1.ID()
 			// get block details by ID
 			req := &accessproto.GetBlockByIDRequest{
-				Id: id[:],
-				XFullBlockResponse: &accessproto.GetBlockByIDRequest_FullBlockResponse{
-					FullBlockResponse: true,
-				},
+				Id:                id[:],
+				FullBlockResponse: true,
 			}
 
 			resp, err := handler.GetBlockByID(context.Background(), req)
@@ -437,10 +435,8 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get block 2 by height", func() {
 			// get block details by height
 			req := &accessproto.GetBlockByHeightRequest{
-				Height: block2.Header.Height,
-				XFullBlockResponse: &accessproto.GetBlockByHeightRequest_FullBlockResponse{
-					FullBlockResponse: true,
-				},
+				Height:            block2.Header.Height,
+				FullBlockResponse: true,
 			}
 
 			resp, err := handler.GetBlockByHeight(context.Background(), req)
