@@ -561,7 +561,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 	}
 	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
-	return resp, nil
+	return resp, err
 }
 
 func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
@@ -607,5 +607,5 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	}
 	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
-	return resp, nil
+	return resp, err
 }
