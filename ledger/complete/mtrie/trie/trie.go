@@ -365,20 +365,8 @@ func update(
 					if !parentNode.Payload().Equals(&payloads[i]) {
 						n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
 
-						allocatedRegCountDelta = 0
-						if payloads[i].IsEmpty() {
-							// Old payload is not empty while new payload is empty.
-							// Allocated register will be unallocated.
-							allocatedRegCountDelta = -1
-						} else if parentNode.Payload().IsEmpty() {
-							// Old payload is empty while new payload is not empty.
-							// Unallocated register will be allocated.
-							allocatedRegCountDelta = 1
-						}
-
-						oldPayloadSize := parentNode.Payload().Size()
-						newPayloadSize := payloads[i].Size()
-						allocatedRegSizeDelta = int64(newPayloadSize - oldPayloadSize)
+						allocatedRegCountDelta, allocatedRegSizeDelta =
+							allocatedRegDeltas(parentNode.Payload(), &payloads[i])
 
 						return n, allocatedRegCountDelta, allocatedRegSizeDelta, nodeHeight
 					}
@@ -388,13 +376,8 @@ func update(
 				// the case where the recursion carries on: len(paths)>1
 				found = true
 
-				if !parentNode.Payload().IsEmpty() {
-					// Allocated register will be updated or unallocated at lower height.
-					allocatedRegCountDelta--
-				}
-
-				oldPayloadSize := parentNode.Payload().Size()
-				allocatedRegSizeDelta -= int64(oldPayloadSize)
+				allocatedRegCountDelta, allocatedRegSizeDelta =
+					allocatedRegDeltasFromHigherHeight(parentNode.Payload())
 
 				break
 			}
@@ -490,6 +473,40 @@ func update(
 
 	n = node.NewInterimNode(nodeHeight, lChild, rChild)
 	return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched
+}
+
+// allocatedRegDeltasFromHigherHeight returns the deltas needed
+// to compute the allocated reg count and reg size when a payload
+// needs to be updated or unallocated at a lower height.
+func allocatedRegDeltasFromHigherHeight(oldPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
+	if !oldPayload.IsEmpty() {
+		// Allocated register will be updated or unallocated at lower height.
+		allocatedRegCountDelta--
+	}
+	oldPayloadSize := oldPayload.Size()
+	allocatedRegSizeDelta -= int64(oldPayloadSize)
+	return
+}
+
+// allocatedRegDeltas returns the allocated reg count and reg size deltas
+// computed from old payload and new payload.
+// CAUTION: !oldPayload.Equals(newPayload)
+func allocatedRegDeltas(oldPayload, newPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
+	allocatedRegCountDelta = 0
+	if newPayload.IsEmpty() {
+		// Old payload is not empty while new payload is empty.
+		// Allocated register will be unallocated.
+		allocatedRegCountDelta = -1
+	} else if oldPayload.IsEmpty() {
+		// Old payload is empty while new payload is not empty.
+		// Unallocated register will be allocated.
+		allocatedRegCountDelta = 1
+	}
+
+	oldPayloadSize := oldPayload.Size()
+	newPayloadSize := newPayload.Size()
+	allocatedRegSizeDelta = int64(newPayloadSize - oldPayloadSize)
+	return
 }
 
 // UnsafeProofs provides proofs for the given paths.
