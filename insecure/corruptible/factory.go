@@ -65,10 +65,10 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 	child, cancel := context.WithCancel(ctx)
 
 	con := &Conduit{
-		ctx:               child,
-		cancel:            cancel,
-		channel:           channel,
-		conduitController: c,
+		ctx:     child,
+		cancel:  cancel,
+		channel: channel,
+		master:  c,
 	}
 
 	return con, nil
@@ -116,7 +116,7 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 		return fmt.Errorf("could not convert target ids from byte to identifiers: %w", err)
 	}
 
-	err = c.sendOnNetwork(event, network.Channel(msg.ChannelID), msg.Protocol, uint(msg.TargetNum), targetIds...)
+	err = c.sendOnNetwork(event, network.Channel(msg.ChannelID), msg.Protocol, uint(msg.Targets), targetIds...)
 	if err != nil {
 		return fmt.Errorf("could not send attacker message to the network: %w", err)
 	}
@@ -198,7 +198,7 @@ func (c *ConduitFactory) eventToMessage(
 	event interface{},
 	channel network.Channel,
 	protocol insecure.Protocol,
-	targetNum uint32, targetIds ...flow.Identifier) (*insecure.Message, error) {
+	num uint32, targetIds ...flow.Identifier) (*insecure.Message, error) {
 
 	payload, err := c.codec.Encode(event)
 	if err != nil {
@@ -208,7 +208,7 @@ func (c *ConduitFactory) eventToMessage(
 	return &insecure.Message{
 		ChannelID: channel.String(),
 		OriginID:  c.myId[:],
-		TargetNum: targetNum,
+		Targets:   num,
 		TargetIDs: flow.IdsToBytes(targetIds),
 		Payload:   payload,
 		Protocol:  protocol,
