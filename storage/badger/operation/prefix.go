@@ -76,15 +76,14 @@ const (
 	codeJobQueuePointer      = 72
 
 	// legacy codes (should be cleaned up)
-	codeChunkDataPack              = 100
-	codeCommit                     = 101
-	codeEvent                      = 102
-	codeExecutionStateInteractions = 103
-	codeTransactionResult          = 104
-	codeFinalizedCluster           = 105
-	codeServiceEvent               = 106
-	codeTransactionResultIndex     = 107
-	codeTransactionIndex
+	codeChunkDataPack                = 100
+	codeCommit                       = 101
+	codeEvent                        = 102
+	codeExecutionStateInteractions   = 103
+	codeTransactionResult            = 104
+	codeFinalizedCluster             = 105
+	codeServiceEvent                 = 106
+	codeTransactionResultIndex       = 107
 	codeIndexCollection              = 200
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203

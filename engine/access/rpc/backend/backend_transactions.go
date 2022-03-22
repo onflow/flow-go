@@ -259,16 +259,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	blockID flow.Identifier,
 	index uint32,
 ) (*access.TransactionResult, error) {
-	txID, err := b.transactions.TransactionIDByBlockIDIndex(blockID, index)
-	if err != nil {
-		return nil, convertStorageError(err)
-	}
-
-	tx, err := b.transactions.ByID(*txID)
-	if err != nil {
-		return nil, convertStorageError(err)
-	}
-
+	// TODO: Merge flow.TransactionResult and access.TransactionResult so caching doesn't cause a circular dependency
 	// create request and forward to EN
 	req := execproto.GetTransactionByIndexRequest{
 		BlockId: blockID[:],
@@ -289,17 +280,18 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		}
 		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
-	// derive status of the transaction
+
 	block, err := b.blocks.ByID(blockID)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return nil, convertStorageError(err)
 	}
-	txStatus, err := b.deriveTransactionStatus(tx, true, block)
+	// tx body is irrelevant to status if it's in an executed block
+	txStatus, err := b.deriveTransactionStatus(nil, true, block)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
 
-	// convert to response
+	// convert to response, cache and return
 	return &access.TransactionResult{
 		Status:       txStatus,
 		StatusCode:   uint(resp.GetStatusCode()),
