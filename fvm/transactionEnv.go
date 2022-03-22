@@ -55,9 +55,6 @@ type TransactionEnv struct {
 	authorizers      []runtime.Address
 }
 
-func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
-}
-
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -107,6 +104,7 @@ func NewTransactionEnvironment(
 	if ctx.BlockHeader != nil {
 		env.seedRNG(ctx.BlockHeader)
 	}
+
 	err := env.setMeteringWeights()
 
 	return env, err
@@ -127,6 +125,7 @@ func (e *TransactionEnv) setMeteringWeights() error {
 			Error().
 			Err(fatal).
 			Msg("error getting execution weights")
+		return fatal
 	}
 	if err != nil {
 		e.ctx.Logger.
@@ -1141,4 +1140,7 @@ func (e *TransactionEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 
 func (e *TransactionEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
+}
+
+func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
 }
