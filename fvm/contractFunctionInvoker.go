@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 
-	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -52,25 +51,6 @@ func (i *ContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentr
 			i.logSpanFields...,
 		)
 		defer span.Finish()
-	}
-
-	switch e := env.(type) {
-	case *TransactionEnv:
-		if e.sth.EnforceComputationLimits {
-			err := e.sth.State().MeterComputation(meter.ComputationKindContractFunctionInvoke, 1)
-			if err != nil {
-				return nil, err
-			}
-		}
-	case *ScriptEnv:
-		if e.sth.EnforceComputationLimits {
-			err := e.sth.State().MeterComputation(meter.ComputationKindContractFunctionInvoke, 1)
-			if err != nil {
-				return nil, err
-			}
-		}
-	default:
-		// dont do any metering
 	}
 
 	predeclaredValues := valueDeclarations(ctx, env)

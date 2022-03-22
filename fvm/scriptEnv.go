@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
-	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -91,16 +91,31 @@ func NewScriptEnvironment(
 		env.seedRNG(ctx.BlockHeader)
 	}
 
-	m, err := setupMeterFromState(env, sth, ctx.Logger)
-	if err != nil {
-		m = basicMeter.NewMeter(
-			sth.State().TotalComputationLimit(),
-			sth.State().TotalMemoryLimit())
-	}
-
-	sth.State().SetMeter(m)
+	env.setMeteringWeights()
 
 	return env
+}
+
+func (e *ScriptEnv) setMeteringWeights() {
+	var m *weighted.Meter
+	var ok bool
+	// only set the weights if the meter is a weighted.Meter
+	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
+		return
+	}
+
+	computationWeights, memoryWeights, err := getExecutionWeights(e)
+
+	if err != nil {
+		e.ctx.Logger.
+			Info().
+			Err(err).
+			Msg("could not set execution weights. Using defaults")
+		return
+	}
+
+	m.SetComputationWeights(computationWeights)
+	m.SetMemoryWeights(memoryWeights)
 }
 
 func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {

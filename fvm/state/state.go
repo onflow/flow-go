@@ -60,10 +60,6 @@ func (s *State) Meter() meter.Meter {
 	return s.meter
 }
 
-func (s *State) SetMeter(m meter.Meter) {
-	s.meter = m
-}
-
 type StateOption func(st *State) *State
 
 // NewState constructs a new state

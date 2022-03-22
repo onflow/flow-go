@@ -4,9 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
-	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
-	"github.com/rs/zerolog"
 	"math/rand"
 	"time"
 
@@ -25,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -60,8 +58,6 @@ type TransactionEnv struct {
 func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
 }
 
-// NewTransactionEnvironment creates a new transaction environment.
-// error from this function is always fatal.
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -111,82 +107,38 @@ func NewTransactionEnvironment(
 	if ctx.BlockHeader != nil {
 		env.seedRNG(ctx.BlockHeader)
 	}
+	err := env.setMeteringWeights()
 
-	txIDStr := tx.ID().String()
-
-	m, err := setupMeterFromState(env, sth, ctx.Logger.
-		With().
-		Str("txHash", txIDStr).
-		Logger())
-
-	if err != nil {
-		return nil, err
-	}
-
-	sth.State().SetMeter(m)
-
-	return env, nil
+	return env, err
 }
 
-func setupMeterFromState(env Environment, sth *state.StateHolder, l zerolog.Logger) (meter.Meter, error) {
-	// Get the meter to set the weights for
-	m := sth.State().Meter()
+func (e *TransactionEnv) setMeteringWeights() error {
+	var m *weighted.Meter
+	var ok bool
+	// only set the weights if the meter is a weighted.Meter
+	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
+		return nil
+	}
 
-	// Get the computation weights
-	computationWeights, err := getExecutionEffortWeights(env)
+	computationWeights, memoryWeights, err := getExecutionWeights(e)
 	err, fatal := errors.SplitErrorTypes(err)
-
-	// In case of a fatal error the transaction needs to fail
 	if fatal != nil {
-		l.Error().
+		e.ctx.Logger.
+			Error().
 			Err(fatal).
-			Msg("failed to setup environment")
-		return nil, fatal
+			Msg("error getting execution weights")
 	}
 	if err != nil {
-		l.Info().
-			Err(fatal).
-			Msg("failed to get execution effort weights. Falling back to basic meter")
-
-		return basicMeter.NewMeter(
-			m.TotalComputationLimit(),
-			m.TotalMemoryLimit()), nil
+		e.ctx.Logger.
+			Info().
+			Err(err).
+			Msg("could not set execution weights. Using defaults")
+		return nil
 	}
 
-	return weightedMeter.NewMeter(
-		m.TotalComputationLimit(),
-		m.TotalMemoryLimit(),
-		computationWeights,
-		// TODO: add memory weights when ready
-		map[uint]uint64{}), nil
-}
-
-// getExecutionEffortWeights reads stored execution effort weights from the service account
-func getExecutionEffortWeights(env Environment) (map[uint]uint64, error) {
-	service := runtime.Address(env.Context().Chain.ServiceAddress())
-
-	value, err := env.VM().Runtime.ReadStored(
-		service,
-		cadence.Path{
-			Domain:     blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
-			Identifier: blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier,
-		},
-		runtime.Context{Interface: env},
-	)
-
-	if err != nil {
-		return map[uint]uint64{}, err
-	}
-	weights, ok := utils.CadenceValueToWeights(value)
-	if !ok {
-		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
-		return map[uint]uint64{}, errors.NewCouldNotDecodeExecutionParameterFromStateError(
-			service.Hex(),
-			blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
-			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
-	}
-
-	return weights, nil
+	m.SetComputationWeights(computationWeights)
+	m.SetMemoryWeights(memoryWeights)
+	return nil
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {

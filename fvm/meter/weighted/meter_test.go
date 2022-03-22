@@ -15,8 +15,8 @@ func TestWeightedComputationMetering(t *testing.T) {
 		m := weighted.NewMeter(
 			1,
 			2,
-			map[uint]uint64{},
-			map[uint]uint64{})
+			weighted.WithComputationWeights(map[uint]uint64{}),
+			weighted.WithMemoryWeights(map[uint]uint64{}))
 		require.Equal(t, uint(1), m.TotalComputationLimit())
 		require.Equal(t, uint(2), m.TotalMemoryLimit())
 	})
@@ -25,8 +25,8 @@ func TestWeightedComputationMetering(t *testing.T) {
 		m := weighted.NewMeter(
 			10,
 			10,
-			map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes},
-			map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes},
+			weighted.WithComputationWeights(map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes}),
+			weighted.WithMemoryWeights(map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes}),
 		)
 
 		err := m.MeterComputation(uint(0), 1)
@@ -58,8 +58,8 @@ func TestWeightedComputationMetering(t *testing.T) {
 		m := weighted.NewMeter(
 			100,
 			100,
-			map[uint]uint64{0: 13 << weighted.MeterInternalPrecisionBytes},
-			map[uint]uint64{0: 17 << weighted.MeterInternalPrecisionBytes},
+			weighted.WithComputationWeights(map[uint]uint64{0: 13 << weighted.MeterInternalPrecisionBytes}),
+			weighted.WithMemoryWeights(map[uint]uint64{0: 17 << weighted.MeterInternalPrecisionBytes}),
 		)
 
 		err := m.MeterComputation(uint(0), 1)
@@ -77,8 +77,8 @@ func TestWeightedComputationMetering(t *testing.T) {
 		m := weighted.NewMeter(
 			100,
 			100,
-			map[uint]uint64{0: 1},
-			map[uint]uint64{0: 1},
+			weighted.WithComputationWeights(map[uint]uint64{0: 1}),
+			weighted.WithMemoryWeights(map[uint]uint64{0: 1}),
 		)
 
 		internalPrecisionMinusOne := uint((1 << weighted.MeterInternalPrecisionBytes) - 1)
@@ -109,8 +109,9 @@ func TestWeightedComputationMetering(t *testing.T) {
 		m := weighted.NewMeter(
 			9,
 			0,
-			map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes},
-			map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes})
+			weighted.WithComputationWeights(map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes}),
+			weighted.WithMemoryWeights(map[uint]uint64{0: 1 << weighted.MeterInternalPrecisionBytes}),
+		)
 
 		err := m.MeterComputation(compKind, 1)
 		require.NoError(t, err)

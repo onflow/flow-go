@@ -3,13 +3,16 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	errors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter/basic"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -46,7 +49,7 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 // Run runs a procedure against a ledger in the given context.
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
 	st := state.NewState(v,
-		state.WithMeter(basic.NewMeter(
+		state.WithMeter(weighted.NewMeter(
 			uint(proc.ComputationLimit(ctx)),
 			uint(proc.MemoryLimit(ctx)))),
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
@@ -96,4 +99,34 @@ func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *Transacti
 	err := invoker.Process(vm, &ctx, tx, sth, programs)
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 	return txErr, fatalErr
+}
+
+// getExecutionWeights reads stored execution effort weights from the service account
+func getExecutionWeights(env Environment) (computationWeights, memoryWeights map[uint]uint64, err error) {
+
+	memoryWeights = make(map[uint]uint64)
+
+	service := runtime.Address(env.Context().Chain.ServiceAddress())
+	value, err := env.VM().Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
+			Identifier: blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier,
+		},
+		runtime.Context{Interface: env},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	computationWeights, ok := utils.CadenceValueToWeights(value)
+	if !ok {
+		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
+		return nil, nil, errors.NewCouldNotDecodeExecutionParameterFromStateError(
+			service.Hex(),
+			blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
+			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
+	}
+
+	return computationWeights, memoryWeights, err
 }
