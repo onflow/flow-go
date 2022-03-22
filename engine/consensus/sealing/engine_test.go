@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -87,7 +88,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
-	s.engine.OnFinalizedBlock(finalizedBlockID)
+	s.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -119,7 +120,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	headers.On("ByBlockID", incorporatedBlockID).Return(&incorporatedBlock, nil).Once()
 	s.engine.headers = headers
 
-	s.engine.OnBlockIncorporated(incorporatedBlockID)
+	s.engine.OnBlockIncorporated(model.BlockFromFlow(&incorporatedBlock, incorporatedBlock.View-1))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)

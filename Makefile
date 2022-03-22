@@ -114,6 +114,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'BlockComputer' -dir=engine/execution/computation/computer -case=underscore -output="engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ComputationManager' -dir=engine/execution/computation -case=underscore -output="engine/execution/computation/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'EpochComponentsFactory' -dir=engine/collection/epochmgr -case=underscore -output="engine/collection/epochmgr/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'Backend' -dir=engine/collection/rpc -case=underscore -output="engine/collection/rpc/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ProviderEngine' -dir=engine/execution/provider -case=underscore -output="engine/execution/provider/mock" -outpkg="mock"
 	(cd ./crypto && GO111MODULE=on mockery -name 'PublicKey' -case=underscore -output="../module/mock" -outpkg="mock")
 	GO111MODULE=on mockery -name '.*' -dir=state/cluster -case=underscore -output="state/cluster/mock" -outpkg="mock"
@@ -141,6 +142,8 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ExecForkActor' --structname 'ExecForkActorMock' -dir=module/mempool/consensus/mock/ -case=underscore -output="./module/mempool/consensus/mock/" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/verification/fetcher/ -case=underscore -output="./engine/verification/fetcher/mock" -outpkg="mockfetcher"
+	GO111MODULE=on mockery -name '.*' -dir=insecure/ -case=underscore -output="./insecure/mock"  -outpkg="mockinsecure"
+	GO111MODULE=on mockery -name '.*' -dir=./cmd/util/ledger/reporters -case=underscore -output="./cmd/util/ledger/reporters/mock" -outpkg="mock"
 
 
 
@@ -253,6 +256,14 @@ docker-build-access-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=access  --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
+# Observer is currently simply access node, this target is added for compatibility with deployment pipeline
+# Once proper observer is separated in the code, we should just need to change TARGET parameter below
+.PHONY: docker-build-observer
+docker-build-observer:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		-t "$(CONTAINER_REGISTRY)/observer:latest" -t "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)" .
+
+
 .PHONY: docker-build-ghost
 docker-build-ghost:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=ghost --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
@@ -288,7 +299,7 @@ docker-build-loader:
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
 
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader
@@ -323,6 +334,12 @@ docker-push-access:
 	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
 
+.PHONY: docker-push-observer
+docker-push-observer:
+	docker push "$(CONTAINER_REGISTRY)/observer:latest"
+	docker push "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)"
+
 .PHONY: docker-push-ghost
 docker-push-ghost:
 	docker push "$(CONTAINER_REGISTRY)/ghost:latest"
@@ -336,7 +353,7 @@ docker-push-loader:
 	docker push "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)"
 
 .PHONY: docker-push-flow
-docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access
+docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access docker-push-observer
 
 .PHONY: docker-push-benchnet
 docker-push-benchnet: docker-push-flow docker-push-loader

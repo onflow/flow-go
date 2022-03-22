@@ -55,15 +55,15 @@ func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *mode
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight())
 
 	return &StakingVoteProcessor{
-		log:              log,
-		block:            block,
-		stakingSigAggtor: stakingSigAggtor,
-		onQCCreated:      f.onQCCreated,
-		minRequiredStake: minRequiredStake,
-		done:             *atomic.NewBool(false),
+		log:               log,
+		block:             block,
+		stakingSigAggtor:  stakingSigAggtor,
+		onQCCreated:       f.onQCCreated,
+		minRequiredWeight: minRequiredWeight,
+		done:              *atomic.NewBool(false),
 	}, nil
 }
 
@@ -74,12 +74,12 @@ func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *mode
 // in favour of a block by proving their staking key signature.
 // Concurrency safe.
 type StakingVoteProcessor struct {
-	log              zerolog.Logger
-	block            *model.Block
-	stakingSigAggtor hotstuff.WeightedSignatureAggregator
-	onQCCreated      hotstuff.OnQCCreated
-	minRequiredStake uint64
-	done             atomic.Bool
+	log               zerolog.Logger
+	block             *model.Block
+	stakingSigAggtor  hotstuff.WeightedSignatureAggregator
+	onQCCreated       hotstuff.OnQCCreated
+	minRequiredWeight uint64
+	done              atomic.Bool
 }
 
 // Block returns block that is part of proposal that we are processing votes for.
@@ -136,7 +136,7 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	}
 
 	// checking of conditions for building QC are satisfied
-	if totalWeight < p.minRequiredStake {
+	if totalWeight < p.minRequiredWeight {
 		return nil
 	}
 
