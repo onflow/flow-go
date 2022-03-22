@@ -14,17 +14,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestConduitRelayMessage_Publish evaluates that corruptible conduit relays all incoming publish events to its master.
+// TestConduitRelayMessage_Publish evaluates that corruptible conduit relays all incoming publish events to its controller.
 func TestConduitRelayMessage_Publish(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	master := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.ConduitMaster{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:     ctx,
-		cancel:  cancel,
-		channel: channel,
-		master:  master,
+		ctx:               ctx,
+		cancel:            cancel,
+		channel:           channel,
+		conduitController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -34,7 +34,7 @@ func TestConduitRelayMessage_Publish(t *testing.T) {
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
-	master.On("HandleIncomingEvent", params...).
+	controller.On("HandleIncomingEvent", params...).
 		Return(nil).
 		Once()
 
@@ -42,18 +42,18 @@ func TestConduitRelayMessage_Publish(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestConduitRelayMessage_Multicast evaluates that corruptible conduit relays all incoming multicast events to its master.
+// TestConduitRelayMessage_Multicast evaluates that corruptible conduit relays all incoming multicast events to its controller.
 func TestConduitRelayMessage_Multicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	master := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.ConduitMaster{}
 	channel := network.Channel("test-channel")
 	num := 3 // targets of multicast
 
 	c := &Conduit{
-		ctx:     ctx,
-		cancel:  cancel,
-		channel: channel,
-		master:  master,
+		ctx:               ctx,
+		cancel:            cancel,
+		channel:           channel,
+		conduitController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -63,7 +63,7 @@ func TestConduitRelayMessage_Multicast(t *testing.T) {
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
-	master.On("HandleIncomingEvent", params...).
+	controller.On("HandleIncomingEvent", params...).
 		Return(nil).
 		Once()
 
@@ -71,23 +71,23 @@ func TestConduitRelayMessage_Multicast(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestConduitRelayMessage_Unicast evaluates that corruptible conduit relays all incoming unicast events to its master.
+// TestConduitRelayMessage_Unicast evaluates that corruptible conduit relays all incoming unicast events to its controller.
 func TestConduitRelayMessage_Unicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	master := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.ConduitMaster{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:     ctx,
-		cancel:  cancel,
-		channel: channel,
-		master:  master,
+		ctx:               ctx,
+		cancel:            cancel,
+		channel:           channel,
+		conduitController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
 	targetId := unittest.IdentifierFixture()
 
-	master.On("HandleIncomingEvent", event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
+	controller.On("HandleIncomingEvent", event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
 		Return(nil).
 		Once()
 
@@ -95,24 +95,24 @@ func TestConduitRelayMessage_Unicast(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestConduitReflectError_Unicast evaluates that if master returns an error when the corruptible conduit sends relays a unicast to it,
+// TestConduitReflectError_Unicast evaluates that if controller returns an error when the corruptible conduit sends relays a unicast to it,
 // the error is reflected to the invoker of the corruptible conduit unicast.
 func TestConduitReflectError_Unicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	master := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.ConduitMaster{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:     ctx,
-		cancel:  cancel,
-		channel: channel,
-		master:  master,
+		ctx:               ctx,
+		cancel:            cancel,
+		channel:           channel,
+		conduitController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
 	targetId := unittest.IdentifierFixture()
 
-	master.On("HandleIncomingEvent", event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
+	controller.On("HandleIncomingEvent", event, channel, insecure.Protocol_UNICAST, uint32(0), targetId).
 		Return(fmt.Errorf("could not handle event")).
 		Once()
 
@@ -120,19 +120,19 @@ func TestConduitReflectError_Unicast(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestConduitReflectError_Multicast evaluates that if master returns an error when the corruptible conduit sends relays a multicast to it,
+// TestConduitReflectError_Multicast evaluates that if controller returns an error when the corruptible conduit sends relays a multicast to it,
 // the error is reflected to the invoker of the corruptible conduit multicast.
 func TestConduitReflectError_Multicast(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	master := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.ConduitMaster{}
 	channel := network.Channel("test-channel")
 	num := 3 // targets of multicast
 
 	c := &Conduit{
-		ctx:     ctx,
-		cancel:  cancel,
-		channel: channel,
-		master:  master,
+		ctx:               ctx,
+		cancel:            cancel,
+		channel:           channel,
+		conduitController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -142,7 +142,7 @@ func TestConduitReflectError_Multicast(t *testing.T) {
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
-	master.On("HandleIncomingEvent", params...).
+	controller.On("HandleIncomingEvent", params...).
 		Return(fmt.Errorf("could not handle event")).
 		Once()
 
@@ -150,18 +150,18 @@ func TestConduitReflectError_Multicast(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestConduitReflectError_Publish evaluates that if master returns an error when the corruptible conduit sends relays a multicast to it,
+// TestConduitReflectError_Publish evaluates that if controller returns an error when the corruptible conduit sends relays a multicast to it,
 // the error is reflected to the invoker of the corruptible conduit multicast.
 func TestConduitReflectError_Publish(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	master := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.ConduitMaster{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:     ctx,
-		cancel:  cancel,
-		channel: channel,
-		master:  master,
+		ctx:               ctx,
+		cancel:            cancel,
+		channel:           channel,
+		conduitController: controller,
 	}
 
 	event := unittest.MockEntityFixture()
@@ -171,7 +171,7 @@ func TestConduitReflectError_Publish(t *testing.T) {
 	for _, id := range targetIds {
 		params = append(params, id)
 	}
-	master.On("HandleIncomingEvent", params...).
+	controller.On("HandleIncomingEvent", params...).
 		Return(nil).
 		Once()
 
@@ -179,21 +179,21 @@ func TestConduitReflectError_Publish(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestConduitClose_HappyPath checks that when an engine closing a corruptible conduit, the closing action is relayed to the master (i.e., factory)
-// of the conduit for processing further.
+// TestConduitClose_HappyPath checks that when an engine closing a corruptible conduit, the closing action is relayed to the controller (i.e.,
+// factory) of the conduit for processing further.
 func TestConduitClose_HappyPath(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	master := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.ConduitMaster{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:     ctx,
-		cancel:  cancel,
-		channel: channel,
-		master:  master,
+		ctx:               ctx,
+		cancel:            cancel,
+		channel:           channel,
+		conduitController: controller,
 	}
 
-	master.On("EngineClosingChannel", channel).
+	controller.On("EngineClosingChannel", channel).
 		Return(nil).
 		Once()
 
@@ -204,22 +204,22 @@ func TestConduitClose_HappyPath(t *testing.T) {
 	unittest.RequireCloseBefore(t, ctx.Done(), 10*time.Millisecond, "could not cancel context on time")
 }
 
-// TestConduitClose_Error checks that when an engine closing a corruptible conduit, the closing action is relayed to the master (i.e., factory)
-// of the conduit for processing further, and if the master returns an error for closing the conduit,
+// TestConduitClose_Error checks that when an engine closing a corruptible conduit, the closing action is relayed to the controller (i.e., factory)
+// of the conduit for processing further, and if the controller returns an error for closing the conduit,
 // the error is reflected to original invoker of the corruptible conduit close method.
 func TestConduitClose_Error(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	master := &mockinsecure.ConduitMaster{}
+	controller := &mockinsecure.ConduitMaster{}
 	channel := network.Channel("test-channel")
 
 	c := &Conduit{
-		ctx:     ctx,
-		cancel:  cancel,
-		channel: channel,
-		master:  master,
+		ctx:               ctx,
+		cancel:            cancel,
+		channel:           channel,
+		conduitController: controller,
 	}
 
-	master.On("EngineClosingChannel", channel).
+	controller.On("EngineClosingChannel", channel).
 		Return(fmt.Errorf("faced an error when closing the channel")).
 		Once()
 
