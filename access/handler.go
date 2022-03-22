@@ -223,6 +223,25 @@ func (h *Handler) GetTransactionResult(
 	return TransactionResultToMessage(result), nil
 }
 
+// GetTransactionResultByIndex gets a transaction at a specific index for in a block that is executed,
+// pending or finalized transactions return errors
+func (h *Handler) GetTransactionResultByIndex(
+	ctx context.Context,
+	req *access.GetTransactionByIndexRequest,
+) (*access.TransactionResultResponse, error) {
+	blockID, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex())
+	if err != nil {
+		return nil, err
+	}
+
+	return TransactionResultToMessage(result), nil
+}
+
 // GetAccount returns an account by address at the latest sealed block.
 func (h *Handler) GetAccount(
 	ctx context.Context,
