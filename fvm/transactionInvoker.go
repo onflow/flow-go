@@ -160,7 +160,7 @@ func (i *TransactionInvoker) Process(
 	sth.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
 	// disable the limit checks on states
-	feesError := i.deductTransactionFees(env, proc)
+	feesError := i.deductTransactionFees(env, proc, sth)
 	if feesError != nil {
 		txError = feesError
 	}
@@ -201,7 +201,7 @@ func (i *TransactionInvoker) Process(
 		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 
 		// try to deduct fees again, to get the fee deduction events
-		feesError = i.deductTransactionFees(env, proc)
+		feesError = i.deductTransactionFees(env, proc, sth)
 
 		updatedKeys, err = env.Commit()
 		if err != nil && feesError == nil {
@@ -239,22 +239,21 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
-func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) (err error) {
+func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure, sth *state.StateHolder) (err error) {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
 
+	computationUsed := sth.State().TotalComputationUsed()
+
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	_, err = deductTxFees(proc.Transaction.Payer)
+	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
+	// Execution effort will be connected to computation used.
+	inclusionEffort := uint64(100_000_000)
+	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, uint64(computationUsed))
 
 	if err != nil {
-		// TODO: Fee value is currently a constant. this should be changed when it is not
-		fees, ok := DefaultTransactionFees.ToGoValue().(uint64)
-		if !ok {
-			err = fmt.Errorf("could not get transaction fees during formatting of TransactionFeeDeductionFailedError: %w", err)
-		}
-
-		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, fees, err)
+		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
 	}
 	return nil
 }
