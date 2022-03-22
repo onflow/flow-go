@@ -1020,3 +1020,77 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 		require.Equal(t, totalPayloadSize, updatedTrieNoPruning.AllocatedRegSize())
 	})
 }
+
+// TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag tests allocated register count and size
+// for updated trie with mixed pruning flag.
+// It tests the following updates with prune flag set to true:
+//   * step 1 : update empty trie with new paths and payloads (255 allocated registers)
+//   * step 2 : remove a payload without pruning (254 allocated registers)
+//   * step 3a: remove previously removed payload with pruning (254 allocated registers)
+//   * step 3b: update trie from step 2 with a new payload (sibling of removed payload)
+//              with pruning (255 allocated registers)
+func TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag(t *testing.T) {
+	rng := &LinearCongruentialGenerator{seed: 0}
+
+	// Allocate 255 registers
+	numberRegisters := 255
+	paths := make([]ledger.Path, numberRegisters)
+	payloads := make([]ledger.Payload, numberRegisters)
+	var totalPayloadSize uint64
+	for i := 0; i < numberRegisters; i++ {
+		var p ledger.Path
+		p[0] = byte(i)
+
+		payload := utils.LightPayload(rng.next(), rng.next())
+		paths[i] = p
+		payloads[i] = *payload
+
+		totalPayloadSize += uint64(payload.Size())
+	}
+
+	expectedAllocatedRegCount := uint64(len(payloads))
+	expectedAllocatedRegSize := totalPayloadSize
+
+	// Update trie with registers to test reg count and size with new registers.
+	baseTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), paths, payloads, true)
+	require.NoError(t, err)
+	require.True(t, maxDepthTouched <= 256)
+	require.Equal(t, expectedAllocatedRegCount, baseTrie.AllocatedRegCount())
+	require.Equal(t, expectedAllocatedRegSize, baseTrie.AllocatedRegSize())
+
+	// Remove one payload without pruning
+	expectedAllocatedRegCount--
+	expectedAllocatedRegSize -= uint64(payloads[0].Size())
+
+	removePaths := []ledger.Path{paths[0]}
+	removePayloads := []ledger.Payload{*ledger.EmptyPayload()}
+	unprunedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(baseTrie, removePaths, removePayloads, false)
+	require.NoError(t, err)
+	require.True(t, maxDepthTouched <= 256)
+	require.Equal(t, expectedAllocatedRegCount, unprunedTrie.AllocatedRegCount())
+	require.Equal(t, expectedAllocatedRegSize, unprunedTrie.AllocatedRegSize())
+
+	// Remove the same payload (no affect) from unprunedTrie with pruning
+	// expected reg count and reg size remain unchanged.
+	updatedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(unprunedTrie, removePaths, removePayloads, true)
+	require.NoError(t, err)
+	require.True(t, maxDepthTouched <= 256)
+	require.Equal(t, expectedAllocatedRegCount, updatedTrie.AllocatedRegCount())
+	require.Equal(t, expectedAllocatedRegSize, updatedTrie.AllocatedRegSize())
+
+	// Add sibling of removed path from unprunedTrie with pruning
+	newPath := paths[0]
+	bitutils.SetBit(newPath[:], ledger.PathLen*8-1)
+	newPaths := []ledger.Path{newPath}
+	newPayloads := []ledger.Payload{*utils.LightPayload(rng.next(), rng.next())}
+
+	// expected reg count is incremented and expected reg size is increase by new payload size.
+	expectedAllocatedRegCount++
+	expectedAllocatedRegSize += uint64(newPayloads[0].Size())
+
+	updatedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(unprunedTrie, newPaths, newPayloads, true)
+	require.NoError(t, err)
+	require.True(t, maxDepthTouched <= 256)
+	require.Equal(t, expectedAllocatedRegCount, updatedTrie.AllocatedRegCount())
+	require.Equal(t, expectedAllocatedRegSize, updatedTrie.AllocatedRegSize())
+}
