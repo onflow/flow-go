@@ -142,14 +142,14 @@ func (ss *SealingSuite) SetupTest() {
 }
 
 func (ss *SealingSuite) TearDownTest() {
-	ss.log.Info().Msgf("================> Start TearDownTest")
+	ss.log.Info().Msg("================> Start TearDownTest")
 	ss.net.Remove()
 	ss.cancel()
-	ss.log.Info().Msgf("================> Finish TearDownTest")
+	ss.log.Info().Msg("================> Finish TearDownTest")
 }
 
 func (ss *SealingSuite) TestBlockSealCreation() {
-	ss.log.Info().Msgf("================> RUNNING TESTING")
+	ss.log.Info().Msg("================> RUNNING TESTING")
 
 	// fix the deadline of the entire test
 	deadline := time.Now().Add(30 * time.Second)

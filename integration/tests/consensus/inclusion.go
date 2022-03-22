@@ -100,18 +100,18 @@ func (is *InclusionSuite) SetupTest() {
 }
 
 func (s *InclusionSuite) TearDownTest() {
-	s.log.Info().Msgf("================> Start TearDownTest")
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
 	s.cancel()
-	s.log.Info().Msgf("================> Finish TearDownTest")
+	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
 func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	t := is.T()
-	is.log.Info().Msgf("================> RUNNING TESTING %v", t.Name())
+	is.log.Info().Msgf("================> RUNNING TESTING %v\n", t.Name())
 	// fix the deadline for the test as a whole
 	deadline := time.Now().Add(30 * time.Second)
-	is.T().Logf("%s ------ test started, deadline %s", time.Now(), deadline)
+	is.T().Logf("%s ------ test started, deadline %s\n", time.Now(), deadline)
 
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()

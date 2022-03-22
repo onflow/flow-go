@@ -36,7 +36,7 @@ jobs:
     steps:
     - name: Get job run date
       id: date
-      run: echo "::set-output name=date::$(TZ=":America/Vancouver" date -Iseconds)"
+      run: echo "::set-output name=date::$(TZ=":America/Los_Angeles" date -Iseconds)"
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@master
       with:

@@ -66,7 +66,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 		Str("testcase", suite.T().Name()).
 		Logger()
 	suite.log = logger
-	suite.log.Info().Msgf("================> SetupTest")
+	suite.log.Info().Msg("================> SetupTest")
 
 	var (
 		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
@@ -120,10 +120,10 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 }
 
 func (s *CollectorSuite) TearDownTest() {
-	s.log.Info().Msgf("================> Start TearDownTest")
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
 	s.cancel()
-	s.log.Info().Msgf("================> Finish TearDownTest")
+	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
 // Ghost returns a client for the ghost node.

@@ -4,9 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -39,7 +40,7 @@ type UnstakedAccessSuite struct {
 }
 
 func (s *UnstakedAccessSuite) TearDownTest() {
-	s.log.Info().Msgf("================> Start TearDownTest")
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
 	s.cancel()
 	s.log.Info().Msgf("================> Finish TearDownTest")
@@ -51,7 +52,7 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 		Str("testcase", suite.T().Name()).
 		Logger()
 	suite.log = logger
-	suite.log.Info().Msgf("================> SetupTest")
+	suite.log.Info().Msg("================> SetupTest")
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.buildNetworkConfig()
 	// start the network

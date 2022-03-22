@@ -69,7 +69,7 @@ func (s *Suite) SetupSuite() {
 		Str("testcase", s.T().Name()).
 		Logger()
 	s.log = logger
-	s.log.Info().Msgf("================> SetupTest")
+	s.log.Info().Msg("================> SetupTest")
 
 	blockRateFlag := "--block-rate-delay=1ms"
 
@@ -158,8 +158,8 @@ func (s *Suite) SetupSuite() {
 
 // TearDownSuite tears down the test network of Flow
 func (s *Suite) TearDownSuite() {
-	s.log.Info().Msgf("================> Start TearDownTest")
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
 	s.cancel()
-	s.log.Info().Msgf("================> Finish TearDownTest")
+	s.log.Info().Msg("================> Finish TearDownTest")
 }

@@ -66,9 +66,9 @@ func (s *Suite) SetupTest() {
 		Str("testcase", s.T().Name()).
 		Logger()
 	s.log = logger
-	s.log.Info().Msgf("================> SetupTest")
+	s.log.Info().Msg("================> SetupTest")
 	defer func() {
-		s.log.Info().Msgf("================> Finish SetupTest")
+		s.log.Info().Msg("================> Finish SetupTest")
 	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
@@ -131,10 +131,10 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) TearDownTest() {
-	s.log.Info().Msgf("================> Start TearDownTest")
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
 	s.cancel()
-	s.log.Info().Msgf("================> Finish TearDownTest")
+	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to

@@ -7,7 +7,7 @@
 set -e
 shopt -s extglob
 
-export JOB_STARTED=$(TZ=":America/Vancouver" date -Iseconds)
+export JOB_STARTED=$(TZ=":America/Los_Angeles" date -Iseconds)
 
 case $TEST_CATEGORY in
     unit|unit-@(crypto|integration)|integration-@(common|network|epochs|access|collection|consensus|execution|verification))

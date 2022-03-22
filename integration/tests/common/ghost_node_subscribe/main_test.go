@@ -56,9 +56,9 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 	net.Start(ctx)
 	defer func() {
-		logger.Info().Msgf("================> Start TearDownTest")
+		logger.Info().Msg("================> Start TearDownTest")
 		net.Remove()
-		logger.Info().Msgf("================> Finish TearDownTest")
+		logger.Info().Msg("================> Finish TearDownTest")
 	}()
 
 	// get the ghost container

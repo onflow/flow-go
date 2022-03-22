@@ -28,10 +28,10 @@ type AccessSuite struct {
 }
 
 func (s *AccessSuite) TearDownTest() {
-	s.log.Info().Msgf("================> Start TearDownTest")
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
 	s.cancel()
-	s.log.Info().Msgf("================> Finish TearDownTest")
+	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
 func (suite *AccessSuite) SetupTest() {
@@ -40,9 +40,9 @@ func (suite *AccessSuite) SetupTest() {
 		Str("testcase", suite.T().Name()).
 		Logger()
 	suite.log = logger
-	suite.log.Info().Msgf("================> SetupTest")
+	suite.log.Info().Msg("================> SetupTest")
 	defer func() {
-		suite.log.Info().Msgf("================> Finish SetupTest")
+		suite.log.Info().Msg("================> Finish SetupTest")
 	}()
 
 	nodeConfigs := []testnet.NodeConfig{

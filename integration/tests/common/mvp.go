@@ -38,9 +38,9 @@ func MVP_Network(t *testing.T) {
 
 	flowNetwork.Start(ctx)
 	defer func() {
-		logger.Info().Msgf("================> Start TearDownTest")
+		logger.Info().Msg("================> Start TearDownTest")
 		flowNetwork.Remove()
-		logger.Info().Msgf("================> Finish TearDownTest")
+		logger.Info().Msg("================> Finish TearDownTest")
 	}()
 
 	runMVPTest(t, ctx, flowNetwork)
@@ -58,9 +58,9 @@ func MVP_Bootstrap(t *testing.T) {
 
 	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
 	defer func() {
-		logger.Info().Msgf("================> Start TearDownTest")
+		logger.Info().Msg("================> Start TearDownTest")
 		flowNetwork.Remove()
-		logger.Info().Msgf("================> Finish TearDownTest")
+		logger.Info().Msg("================> Finish TearDownTest")
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
