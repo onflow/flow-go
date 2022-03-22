@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/onflow/flow-go/storage/badger"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -10,6 +14,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(transactionsCmd)
+	rootCmd.AddCommand(transactionsDuplicateCmd)
 
 	transactionsCmd.Flags().StringVarP(&flagTransactionID, "id", "i", "", "the id of the transaction")
 	_ = transactionsCmd.MarkFlagRequired("id")
@@ -37,5 +42,73 @@ var transactionsCmd = &cobra.Command{
 		}
 
 		common.PrettyPrintEntity(tx)
+	},
+}
+
+var transactionsDuplicateCmd = &cobra.Command{
+	Use:   "transactions-duplicates",
+	Short: "report duplicated transactions",
+	Run: func(cmd *cobra.Command, args []string) {
+		storages, db := InitStorages()
+		defer db.Close()
+
+		headers, ok := storages.Headers.(*badger.Headers)
+		if !ok {
+			log.Error().Msg("unsupported headers type")
+			return
+		}
+
+		// txID -> list of blocks
+		megaMap := map[flow.Identifier]map[flow.Identifier]struct{}{}
+
+		_, err := headers.FindHeaders(func(header *flow.Header) bool {
+
+			blockID := header.ID()
+
+			block, err := storages.Blocks.ByID(blockID)
+			if err != nil {
+				panic(fmt.Sprintf("header %s if here but not block", blockID.String()))
+			}
+			txIndex := 0
+			for _, guarantee := range block.Payload.Guarantees {
+				lightCollection, err := storages.Collections.LightByID(guarantee.CollectionID)
+				if err != nil {
+					panic(fmt.Sprintf("cannot get light collection %s", guarantee.CollectionID))
+				}
+				for _, txID := range lightCollection.Transactions {
+
+					if _, has := megaMap[txID]; !has {
+						megaMap[txID] = make(map[flow.Identifier]struct{}, 0)
+					}
+
+					if _, has := megaMap[txID]; has {
+						panic(fmt.Sprintf("duplicated tx %s in block %s", txID.String(), blockID.String()))
+					}
+
+					megaMap[txID][blockID] = struct{}{}
+
+					txIndex++
+				}
+			}
+
+			return false
+		})
+
+		for txID := range megaMap {
+			l := len(megaMap[txID])
+			if l > 1 {
+				blockIDs := make([]string, 0, l)
+				for blockID := range megaMap[txID] {
+					blockIDs = append(blockIDs, blockID.String())
+				}
+				log.Info().Str("tx_id", txID.String()).Msgf("transaction duplicated in different %d blocks: %s", l, strings.Join(blockIDs, ", "))
+			}
+		}
+
+		if err != nil {
+			log.Error().Err(err).Msgf("could not iterate blocks")
+			return
+		}
+
 	},
 }
