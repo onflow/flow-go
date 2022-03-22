@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -25,6 +26,8 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	crypto2 "github.com/onflow/flow-go/fvm/crypto"
 	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
+	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -3459,6 +3462,160 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			runTx(tc)),
 		)
 	}
+}
+
+func TestSettingExecutionWeights(t *testing.T) {
+	setExecutionEffortWeights := func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs, newWeights map[uint]uint64) {
+
+		txBody, err := blueprints.SetExecutionEffortWeightsTransaction(chain.ServiceAddress(), newWeights)
+		require.NoError(t, err)
+		txBody.
+			SetProposalKey(chain.ServiceAddress(), 0, 0).
+			SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+		err = vm.Run(ctx, tx, view, programs)
+		require.NoError(t, err)
+
+		assert.NoError(t, tx.Err)
+	}
+
+	t.Run("transaction should fail with high weights", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
+				uint(common.ComputationKindLoop): 100_000 << weightedMeter.MeterInternalPrecisionBytes,
+			})
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					var a = 0
+					while a < 100 {
+						a = a + 1
+					}
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
+	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
+				uint(meter.ComputationKindCreateAccount): (fvm.DefaultComputationLimit + 1) << weightedMeter.MeterInternalPrecisionBytes,
+			})
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					AuthAccount(payer: signer)
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
+
+	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
+				uint(meter.ComputationKindCreateAccount): 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
+			})
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					AuthAccount(payer: signer)
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
+
+	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
+				uint(meter.ComputationKindCreateAccount): 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
+			})
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					AuthAccount(payer: signer)
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
 }
 
 func TestStorageUsed(t *testing.T) {
