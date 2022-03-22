@@ -316,7 +316,7 @@ type updateResult struct {
 }
 
 // update traverses the subtree, updates the stored registers, and returns:
-//   * new or orignial node (n)
+//   * new or original node (n)
 //   * allocated register count delta in subtrie (allocatedRegCountDelta)
 //   * allocated register size delta in subtrie (allocatedRegSizeDelta)
 //   * lowest height reached during recursive update in subtrie (lowestHeightTouched)
