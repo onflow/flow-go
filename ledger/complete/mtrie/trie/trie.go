@@ -453,11 +453,9 @@ func update(
 
 		// Since we're receiving 4 values from goroutine, use a
 		// struct and channel to reduce allocs/op.
-
 		// Although WaitGroup approach can be faster than channel (esp. with 2+ goroutines),
 		// we only use 1 goroutine here and need to communicate results from it. So using
 		// channel is faster and uses fewer allocs/op in this case.
-
 		results := make(chan updateResult, 1)
 		go func(retChan chan<- updateResult) {
 			child, regCountDelta, regSizeDelta, lowestHeightTouched := update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
