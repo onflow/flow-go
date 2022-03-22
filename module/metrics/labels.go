@@ -90,6 +90,7 @@ const (
 	ResourceEvents                    = "events"                            // execution node
 	ResourceServiceEvents             = "service_events"                    // execution node
 	ResourceTransactionResults        = "transaction_results"               // execution node
+	ResourceTransactionResultIndices  = "transaction_result_indices"        // execution node
 )
 
 const (
