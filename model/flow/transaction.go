@@ -283,7 +283,7 @@ func (tb *TransactionBody) SignMessageWithTag(
 	hasher hash.Hasher,
 ) ([]byte, error) {
 	message = append(tag[:], message...)
-	sig, err := privateKey.Sign(message, hasher)
+	sig, err := privateKey.Sign(message, hasher) // TODO: to review
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message with given key: %w", err)
 	}
