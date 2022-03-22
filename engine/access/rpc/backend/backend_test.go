@@ -598,6 +598,72 @@ func (suite *Suite) TestGetCollection() {
 	suite.assertAllExpectations()
 }
 
+// TestGetTransactionResultByIndex tests that the request is forwarded to EN
+func (suite *Suite) TestGetTransactionResultByIndex() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockId := block.ID()
+	index := uint32(0)
+
+	suite.snapshot.On("Head").Return(block.Header, nil)
+
+	// block storage returns the corresponding block
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	exeEventReq := execproto.GetTransactionByIndexRequest{
+		BlockId: blockId[:],
+		Index:   index,
+	}
+
+	exeEventResp := execproto.GetTransactionResultResponse{
+		Events: nil,
+	}
+
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		connFactory, // the connection factory should be used to get the execution node client
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+	)
+
+	// Successfully return empty event list
+	suite.execClient.
+		On("GetTransactionResultByIndex", ctx, &exeEventReq).
+		Return(&exeEventResp, nil).
+		Once()
+
+	result, err := backend.GetTransactionResultByIndex(ctx, blockId, index)
+	suite.checkResponse(result, err)
+
+	suite.assertAllExpectations()
+}
+
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
 // when the protocol state is updated
 func (suite *Suite) TestTransactionStatusTransition() {
