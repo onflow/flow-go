@@ -273,9 +273,13 @@ func (builder *UnstakedAccessNodeBuilder) Build() (cmd.Node, error) {
 func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if builder.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+		}
 		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 			builder.Logger,
-			metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer))
+			heroCacheCollector)
 
 		err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 		if err != nil {

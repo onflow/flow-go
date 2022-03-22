@@ -69,7 +69,7 @@ func main() {
 		startupTime                            time.Time
 
 		followerState protocol.MutableState
-		ingestConf    ingest.Config = ingest.DefaultConfig()
+		ingestConf    = ingest.DefaultConfig()
 		rpcConf       rpc.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
@@ -182,10 +182,14 @@ func main() {
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
 			create := func(epoch uint64) mempool.Transactions {
+				var heroCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+				if node.BaseConfig.HeroCacheMetricsEnable {
+					heroCacheMetricsCollector = metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegisterer, epoch)
+				}
 				return herocache.NewTransactions(
 					uint32(txLimit),
 					node.Logger,
-					metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegisterer, epoch))
+					heroCacheMetricsCollector)
 			}
 
 			pools = epochpool.NewTransactionPools(create)

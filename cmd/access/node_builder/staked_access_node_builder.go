@@ -314,9 +314,13 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// topology returns empty list since peers are not known upfront
 		top := topology.EmptyListTopology{}
 
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if builder.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+		}
 		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 			builder.Logger,
-			metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer))
+			heroCacheCollector)
 
 		err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 		if err != nil {

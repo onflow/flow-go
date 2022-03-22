@@ -148,6 +148,7 @@ type BaseConfig struct {
 	NetworkReceivedMessageCacheSize uint32
 	topologyProtocolName            string
 	topologyEdgeProbability         float64
+	HeroCacheMetricsEnable          bool
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -227,5 +228,6 @@ func DefaultBaseConfig() *BaseConfig {
 		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
 		topologyProtocolName:            string(topology.TopicBased),
 		topologyEdgeProbability:         topology.MaximumEdgeProbability,
+		HeroCacheMetricsEnable:          false,
 	}
 }

@@ -153,6 +153,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in which the node will check if it can start")
 
 	fnb.flags.BoolVar(&fnb.BaseConfig.InsecureSecretsDB, "insecure-secrets-db", false, "allow the node to start up without an secrets DB encryption key")
+	fnb.flags.BoolVar(&fnb.BaseConfig.HeroCacheMetricsEnable, "herocache-metrics-collector", false, "enables herocache metrics collection")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -201,11 +202,18 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 
 func (fnb *FlowNodeBuilder) EnqueueResolver() {
 	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		var dnsIpCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		var dnsTxtCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if fnb.HeroCacheMetricsEnable {
+			dnsIpCacheMetricsCollector = metrics.NetworkDnsIpCacheMetricsFactory(fnb.MetricsRegisterer)
+			dnsTxtCacheMetricsCollector = metrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegisterer)
+		}
+
 		cache := herocache.NewDNSCache(
 			dns.DefaultCacheSize,
 			node.Logger,
-			metrics.NetworkDnsIpCacheMetricsFactory(fnb.MetricsRegisterer),
-			metrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegisterer),
+			dnsIpCacheMetricsCollector,
+			dnsTxtCacheMetricsCollector,
 		)
 
 		resolver := dns.NewResolver(
@@ -274,9 +282,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 		topologyCache := topology.NewCache(fnb.Logger, top)
 
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if fnb.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
+		}
 		receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
 			fnb.Logger,
-			metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer))
+			heroCacheCollector)
 
 		err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 		if err != nil {
