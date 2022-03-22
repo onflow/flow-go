@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -22,7 +22,7 @@ func FindGuarantors(state protocol.State, guarantee *flow.CollectionGuarantee) (
 			guarantee.ReferenceBlockID, guarantee.ChainID, err)
 	}
 
-	guarantorIDs, err := packer.DecodeSignerIdentifiersFromIndices(cluster.Members().NodeIDs(), guarantee.SignerIndices)
+	guarantorIDs, err := signature.DecodeSignerIndicesToIdentifiers(cluster.Members().NodeIDs(), guarantee.SignerIndices)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode guarantor indices: %v", err)
 	}
