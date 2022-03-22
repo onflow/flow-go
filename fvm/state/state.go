@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/meter/noop"
@@ -190,7 +192,7 @@ func (s *State) Touch(owner, controller, key string) error {
 }
 
 // MeterComputation meters computation usage
-func (s *State) MeterComputation(kind, intensity uint) error {
+func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) error {
 	return s.meter.MeterComputation(kind, intensity)
 }
 
@@ -200,7 +202,7 @@ func (s *State) TotalComputationUsed() uint {
 }
 
 // ComputationIntensities returns computation intensities
-func (s *State) ComputationIntensities() map[uint]uint {
+func (s *State) ComputationIntensities() meter.MeteredIntensities {
 	return s.meter.ComputationIntensities()
 }
 
@@ -210,12 +212,12 @@ func (s *State) TotalComputationLimit() uint {
 }
 
 // MeterMemory meters memory usage
-func (s *State) MeterMemory(kind, intensity uint) error {
+func (s *State) MeterMemory(kind common.ComputationKind, intensity uint) error {
 	return s.meter.MeterMemory(kind, intensity)
 }
 
 // MemoryIntensities returns computation intensities
-func (s *State) MemoryIntensities() map[uint]uint {
+func (s *State) MemoryIntensities() meter.MeteredIntensities {
 	return s.meter.MemoryIntensities()
 }
 

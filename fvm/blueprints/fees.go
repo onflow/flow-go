@@ -213,12 +213,12 @@ func setExecutionWeightsTransaction(
 		}
 		i += 1
 	}
-	arg1, err := jsoncdc.Encode(cadence.NewDictionary(newWeightsKeyValuePairs))
+	newWeights, err := jsoncdc.Encode(cadence.NewDictionary(newWeightsKeyValuePairs))
 	if err != nil {
 		return nil, err
 	}
 
-	arg2, err := jsoncdc.Encode(cadence.Path{
+	storagePath, err := jsoncdc.Encode(cadence.Path{
 		Domain:     domain,
 		Identifier: identifier,
 	})
@@ -228,8 +228,8 @@ func setExecutionWeightsTransaction(
 
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(setExecutionWeightsScript)).
-		AddArgument(arg1).
-		AddArgument(arg2).
+		AddArgument(newWeights).
+		AddArgument(storagePath).
 		AddAuthorizer(service)
 
 	return tx, nil

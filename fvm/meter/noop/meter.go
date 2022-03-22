@@ -1,6 +1,8 @@
 package noop
 
 import (
+	"github.com/onflow/cadence/runtime/common"
+
 	interfaceMeter "github.com/onflow/flow-go/fvm/meter"
 )
 
@@ -25,13 +27,13 @@ func (m *Meter) MergeMeter(_ interfaceMeter.Meter) error {
 }
 
 // MeterComputation is a noop
-func (m *Meter) MeterComputation(_ uint, _ uint) error {
+func (m *Meter) MeterComputation(_ common.ComputationKind, _ uint) error {
 	return nil
 }
 
 // ComputationIntensities returns an empty map
-func (m *Meter) ComputationIntensities() map[uint]uint {
-	return map[uint]uint{}
+func (m *Meter) ComputationIntensities() interfaceMeter.MeteredIntensities {
+	return map[common.ComputationKind]uint{}
 }
 
 // TotalComputationUsed always returns zero
@@ -45,13 +47,13 @@ func (m *Meter) TotalComputationLimit() uint {
 }
 
 // MeterMemory is a noop
-func (m *Meter) MeterMemory(_ uint, _ uint) error {
+func (m *Meter) MeterMemory(_ common.ComputationKind, _ uint) error {
 	return nil
 }
 
 // MemoryIntensities returns an empty map
-func (m *Meter) MemoryIntensities() map[uint]uint {
-	return map[uint]uint{}
+func (m *Meter) MemoryIntensities() interfaceMeter.MeteredIntensities {
+	return map[common.ComputationKind]uint{}
 }
 
 // TotalMemoryUsed always returns zero

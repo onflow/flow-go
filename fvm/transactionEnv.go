@@ -636,7 +636,7 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 	return uuid, err
 }
 
-func (e *TransactionEnv) meterComputation(kind, intensity uint) error {
+func (e *TransactionEnv) meterComputation(kind common.ComputationKind, intensity uint) error {
 	if e.sth.EnforceComputationLimits {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
@@ -644,7 +644,7 @@ func (e *TransactionEnv) meterComputation(kind, intensity uint) error {
 }
 
 func (e *TransactionEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
-	return e.meterComputation(uint(kind), intensity)
+	return e.meterComputation(kind, intensity)
 }
 
 func (e *TransactionEnv) ComputationUsed() uint64 {
@@ -738,7 +738,7 @@ func (e *TransactionEnv) VerifySignature(
 }
 
 func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
-	err := e.meterComputation(1, meter.ComputationKindValidatePublicKey)
+	err := e.meterComputation(meter.ComputationKindValidatePublicKey, 1)
 	if err != nil {
 		return fmt.Errorf("validate public key failed: %w", err)
 	}

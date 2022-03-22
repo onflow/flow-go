@@ -518,7 +518,7 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 	return uuid, err
 }
 
-func (e *ScriptEnv) meterComputation(kind, intensity uint) error {
+func (e *ScriptEnv) meterComputation(kind common.ComputationKind, intensity uint) error {
 	if e.sth.EnforceComputationLimits {
 		return e.sth.State().MeterComputation(kind, intensity)
 	}
@@ -526,7 +526,7 @@ func (e *ScriptEnv) meterComputation(kind, intensity uint) error {
 }
 
 func (e *ScriptEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
-	return e.meterComputation(uint(kind), intensity)
+	return e.meterComputation(kind, intensity)
 }
 
 func (e *ScriptEnv) ComputationUsed() uint64 {

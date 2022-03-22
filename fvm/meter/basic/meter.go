@@ -9,7 +9,7 @@ import (
 
 var _ interfaceMeter.Meter = &Meter{}
 
-// Meter collects memory and computation usage and enforeces limits
+// Meter collects memory and computation usage and enforces limits
 // for any each memory/computation usage call it sums intensity to the total
 // memory/computation usage metrics and returns error if limits are not met.
 type Meter struct {
@@ -18,8 +18,8 @@ type Meter struct {
 	memoryUsed       uint
 	memoryLimit      uint
 
-	computationIntensities map[uint]uint
-	memoryIntensities      map[uint]uint
+	computationIntensities interfaceMeter.MeteredIntensities
+	memoryIntensities      interfaceMeter.MeteredIntensities
 }
 
 // NewMeter constructs a new Meter
@@ -27,8 +27,8 @@ func NewMeter(computationLimit, memoryLimit uint) *Meter {
 	return &Meter{
 		computationLimit:       computationLimit,
 		memoryLimit:            memoryLimit,
-		computationIntensities: make(map[uint]uint),
-		memoryIntensities:      make(map[uint]uint),
+		computationIntensities: make(interfaceMeter.MeteredIntensities),
+		memoryIntensities:      make(interfaceMeter.MeteredIntensities),
 	}
 }
 
@@ -37,8 +37,8 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 	return &Meter{
 		computationLimit:       m.computationLimit,
 		memoryLimit:            m.memoryLimit,
-		computationIntensities: make(map[uint]uint),
-		memoryIntensities:      make(map[uint]uint),
+		computationIntensities: make(interfaceMeter.MeteredIntensities),
+		memoryIntensities:      make(interfaceMeter.MeteredIntensities),
 	}
 }
 
@@ -64,10 +64,10 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 }
 
 // MeterComputation captures computation usage and returns an error if it goes beyond the limit
-func (m *Meter) MeterComputation(kind uint, intensity uint) error {
+func (m *Meter) MeterComputation(kind common.ComputationKind, intensity uint) error {
 	m.computationIntensities[kind] += intensity
 	var meterable bool
-	switch common.ComputationKind(kind) {
+	switch kind {
 	case common.ComputationKindStatement,
 		common.ComputationKindLoop,
 		common.ComputationKindFunctionInvocation:
@@ -83,7 +83,7 @@ func (m *Meter) MeterComputation(kind uint, intensity uint) error {
 }
 
 // ComputationIntensities returns all the measured computational intensities
-func (m *Meter) ComputationIntensities() map[uint]uint {
+func (m *Meter) ComputationIntensities() interfaceMeter.MeteredIntensities {
 	return m.computationIntensities
 }
 
@@ -98,7 +98,7 @@ func (m *Meter) TotalComputationLimit() uint {
 }
 
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
-func (m *Meter) MeterMemory(kind uint, intensity uint) error {
+func (m *Meter) MeterMemory(kind common.ComputationKind, intensity uint) error {
 	m.memoryIntensities[kind] += intensity
 	m.memoryUsed += intensity
 	if m.memoryUsed > m.memoryLimit {
@@ -108,7 +108,7 @@ func (m *Meter) MeterMemory(kind uint, intensity uint) error {
 }
 
 // MemoryIntensities returns all the measured memory intensities
-func (m *Meter) MemoryIntensities() map[uint]uint {
+func (m *Meter) MemoryIntensities() interfaceMeter.MeteredIntensities {
 	return m.memoryIntensities
 }
 

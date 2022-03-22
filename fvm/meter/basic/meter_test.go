@@ -21,15 +21,15 @@ func TestBasicComputationMetering(t *testing.T) {
 	t.Run("meter computation and memory", func(t *testing.T) {
 		m := basic.NewMeter(10, 10)
 
-		err := m.MeterComputation(uint(common.ComputationKindStatement), 1)
+		err := m.MeterComputation(common.ComputationKindStatement, 1)
 		require.NoError(t, err)
 		require.Equal(t, uint(1), m.TotalComputationUsed())
 
-		err = m.MeterComputation(uint(common.ComputationKindStatement), 2)
+		err = m.MeterComputation(common.ComputationKindStatement, 2)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2), m.TotalComputationUsed())
 
-		err = m.MeterComputation(uint(common.ComputationKindFunctionInvocation), 8)
+		err = m.MeterComputation(common.ComputationKindFunctionInvocation, 8)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 
@@ -47,7 +47,7 @@ func TestBasicComputationMetering(t *testing.T) {
 	})
 
 	t.Run("merge meters", func(t *testing.T) {
-		compKind := uint(common.ComputationKindStatement)
+		compKind := common.ComputationKindStatement
 		m := basic.NewMeter(9, 0)
 
 		err := m.MeterComputation(compKind, 1)

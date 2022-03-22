@@ -102,12 +102,21 @@ func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *Transacti
 }
 
 // getExecutionWeights reads stored execution effort weights from the service account
-func getExecutionWeights(env Environment, accounts state.Accounts) (computationWeights, memoryWeights map[uint]uint64, err error) {
-	memoryWeights = make(map[uint]uint64)
+func getExecutionWeights(
+	env Environment,
+	accounts state.Accounts,
+) (
+	computationWeights,
+	memoryWeights weighted.ExecutionWeights, err error,
+) {
+	memoryWeights = make(weighted.ExecutionWeights)
 
-	service := runtime.Address(env.Context().Chain.ServiceAddress())
+	// the weights are stored in the service account
+	serviceAddress := env.Context().Chain.ServiceAddress()
+
+	service := runtime.Address(serviceAddress)
 	// Check that the service account exists
-	ok, err := accounts.Exists(env.Context().Chain.ServiceAddress())
+	ok, err := accounts.Exists(serviceAddress)
 
 	if err != nil {
 		// this might be fatal, return as is

@@ -1,12 +1,12 @@
 package meter
 
+import "github.com/onflow/cadence/runtime/common"
+
 type MetringOperationType uint
 
-// continuation of cadence.ComputationKind
 const (
 	// [2_000, 3_000) reserved for the FVM
-	_ = iota + 2_000
-	ComputationKindContractFunctionInvoke
+	_ common.ComputationKind = iota + 2_000
 	ComputationKindHash
 	ComputationKindVerifySignature
 	ComputationKindAddAccountKey
@@ -38,20 +38,22 @@ const (
 	ComputationKindValueExists
 )
 
+type MeteredIntensities map[common.ComputationKind]uint
+
 type Meter interface {
 	// merge child funcionality
 	NewChild() Meter
 	MergeMeter(child Meter) error
 
 	// computation metering
-	MeterComputation(kind uint, intensity uint) error
-	ComputationIntensities() map[uint]uint
+	MeterComputation(kind common.ComputationKind, intensity uint) error
+	ComputationIntensities() MeteredIntensities
 	TotalComputationUsed() uint
 	TotalComputationLimit() uint
 
 	// memory metering
-	MeterMemory(kind uint, intensity uint) error
-	MemoryIntensities() map[uint]uint
+	MeterMemory(kind common.ComputationKind, intensity uint) error
+	MemoryIntensities() MeteredIntensities
 	TotalMemoryUsed() uint
 	TotalMemoryLimit() uint
 
