@@ -49,7 +49,7 @@ func TestEncodeDecodeIdentities(t *testing.T) {
 
 func TestEncodeIdentity(t *testing.T) {
 	only := unittest.IdentifierListFixture(1)
-	indices, err := signature.EncodeSignerIdentifiersToIndices(only, only)
+	indices, err := signature.EncodeSignersToIndices(only, only)
 	require.NoError(t, err)
 	// byte(1,0,0,0,0,0,0,0)
 	require.Equal(t, []byte{byte(1 << 7)}, indices)
@@ -228,14 +228,6 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, signers.Sort(order.Canonical), decodedSigners.Sort(order.Canonical))
 	})
-}
-
-// TestEncodeFail verifies that an error is returned in case some signer is not part
-// of the set of canonicalIdentifiers
-func TestEncodeFail(t *testing.T) {
-	fullIdentities := unittest.IdentifierListFixture(20)
-	_, err := signature.EncodeSignersToIndices(fullIdentities[1:], fullIdentities[:10])
-	require.Error(t, err)
 }
 
 // ==============================================================================================================

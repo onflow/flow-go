@@ -236,7 +236,7 @@ func DecodeSignerIndicesToIdentities(
 ) (flow.IdentityList, error) {
 	numberCanonicalNodes := len(canonicalIdentities)
 	if e := validPadding(signerIndices, numberCanonicalNodes); e != nil {
-		return nil, fmt.Errorf("signerIndices are invalid: %w", e)
+		return nil, fmt.Errorf("signerIndices padding are invalid: %w", e)
 	}
 
 	// decode bits to Identities
@@ -275,6 +275,10 @@ func validPadding(bitVector []byte, numUsedBits int) error {
 	//   operator). Hence, condition 2 is satisfied if and only if the result is identical to zero.
 	// Note that this implementation is much more efficient than individually checking the padded bits, as we check all
 	// padded bits at once; furthermore, we only use multiplication, subtraction, shift, which are fast.
+	if l == 0 {
+		return nil
+	}
+	// the above check has ensured that lastByte does exist
 	lastByte := bitVector[l-1]
 	numPaddedBits := 8*l - numUsedBits
 	if (lastByte << (8 - numPaddedBits)) != 0 {
