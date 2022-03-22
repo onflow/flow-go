@@ -118,7 +118,7 @@ func (e *TransactionEnv) setMeteringWeights() error {
 		return nil
 	}
 
-	computationWeights, memoryWeights, err := getExecutionWeights(e)
+	computationWeights, memoryWeights, err := getExecutionWeights(e, e.accounts)
 	err, fatal := errors.SplitErrorTypes(err)
 	if fatal != nil {
 		e.ctx.Logger.

@@ -308,16 +308,16 @@ func (e *EncodingUnsupportedValueError) Code() ErrorCode {
 	return ErrCodeEncodingUnsupportedValue
 }
 
-// An CouldNotDecodeExecutionParameterFromStateError indicates that computation has exceeded its limit.
-type CouldNotDecodeExecutionParameterFromStateError struct {
+// An CouldNotGetExecutionParameterFromStateError indicates that computation has exceeded its limit.
+type CouldNotGetExecutionParameterFromStateError struct {
 	address    string
 	domain     string
 	identifier string
 }
 
-// NewCouldNotDecodeExecutionParameterFromStateError constructs a new CouldNotDecodeExecutionParameterFromStateError
-func NewCouldNotDecodeExecutionParameterFromStateError(address, domain, identifier string) *CouldNotDecodeExecutionParameterFromStateError {
-	return &CouldNotDecodeExecutionParameterFromStateError{
+// NewCouldNotGetExecutionParameterFromStateError constructs a new CouldNotGetExecutionParameterFromStateError
+func NewCouldNotGetExecutionParameterFromStateError(address, domain, identifier string) *CouldNotGetExecutionParameterFromStateError {
+	return &CouldNotGetExecutionParameterFromStateError{
 		address:    address,
 		domain:     domain,
 		identifier: identifier,
@@ -325,13 +325,13 @@ func NewCouldNotDecodeExecutionParameterFromStateError(address, domain, identifi
 }
 
 // Code returns the error code for this error
-func (e CouldNotDecodeExecutionParameterFromStateError) Code() ErrorCode {
+func (e CouldNotGetExecutionParameterFromStateError) Code() ErrorCode {
 	return ErrCodeCouldNotDecodeExecutionParameterFromState
 }
 
-func (e CouldNotDecodeExecutionParameterFromStateError) Error() string {
+func (e CouldNotGetExecutionParameterFromStateError) Error() string {
 	return fmt.Sprintf(
-		"%s could not decode executon parameter from state (address: %s path: %s/%s)",
+		"%s could not get execution parameter from the state (address: %s path: %s/%s)",
 		e.Code().String(),
 		e.address,
 		e.domain,
@@ -339,8 +339,8 @@ func (e CouldNotDecodeExecutionParameterFromStateError) Error() string {
 	)
 }
 
-// IsCouldNotDecodeExecutionParameterFromStateError returns true if error has this type
-func IsCouldNotDecodeExecutionParameterFromStateError(err error) bool {
-	var t *CouldNotDecodeExecutionParameterFromStateError
+// IsCouldNotGetExecutionParameterFromStateError returns true if error has this type
+func IsCouldNotGetExecutionParameterFromStateError(err error) bool {
+	var t *CouldNotGetExecutionParameterFromStateError
 	return errors.As(err, &t)
 }

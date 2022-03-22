@@ -104,7 +104,7 @@ func (e *ScriptEnv) setMeteringWeights() {
 		return
 	}
 
-	computationWeights, memoryWeights, err := getExecutionWeights(e)
+	computationWeights, memoryWeights, err := getExecutionWeights(e, e.accounts)
 
 	if err != nil {
 		e.ctx.Logger.

@@ -102,11 +102,25 @@ func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *Transacti
 }
 
 // getExecutionWeights reads stored execution effort weights from the service account
-func getExecutionWeights(env Environment) (computationWeights, memoryWeights map[uint]uint64, err error) {
-
+func getExecutionWeights(env Environment, accounts state.Accounts) (computationWeights, memoryWeights map[uint]uint64, err error) {
 	memoryWeights = make(map[uint]uint64)
 
 	service := runtime.Address(env.Context().Chain.ServiceAddress())
+	// Check that the service account exists
+	ok, err := accounts.Exists(env.Context().Chain.ServiceAddress())
+
+	if err != nil {
+		// this might be fatal, return as is
+		return nil, nil, err
+	}
+	if !ok {
+		// if the service account does not exist, return an FVM error
+		return nil, nil, errors.NewCouldNotGetExecutionParameterFromStateError(
+			service.Hex(),
+			blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
+			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
+	}
+
 	value, err := env.VM().Runtime.ReadStored(
 		service,
 		cadence.Path{
@@ -116,13 +130,14 @@ func getExecutionWeights(env Environment) (computationWeights, memoryWeights map
 		runtime.Context{Interface: env},
 	)
 	if err != nil {
+		// this might be fatal, return as is
 		return nil, nil, err
 	}
 
-	computationWeights, ok := utils.CadenceValueToWeights(value)
+	computationWeights, ok = utils.CadenceValueToWeights(value)
 	if !ok {
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
-		return nil, nil, errors.NewCouldNotDecodeExecutionParameterFromStateError(
+		return nil, nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
 			blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
 			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
