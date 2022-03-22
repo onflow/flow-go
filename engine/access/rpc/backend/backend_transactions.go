@@ -254,14 +254,16 @@ func (b *backendTransactions) GetTransactionResult(
 	}, nil
 }
 
+// GetTransactionResultByIndex returns TransactionsResults for an index in a block that is executed,
+// pending or finalized transactions return errors
 func (b *backendTransactions) GetTransactionResultByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
 	index uint32,
 ) (*access.TransactionResult, error) {
-	// TODO: Merge flow.TransactionResult and access.TransactionResult so caching doesn't cause a circular dependency
+	// TODO: https://github.com/onflow/flow-go/issues/2175 so caching doesn't cause a circular dependency
 	block, err := b.blocks.ByID(blockID)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+	if err != nil {
 		return nil, convertStorageError(err)
 	}
 
@@ -272,7 +274,8 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		if errors.As(err, &InsufficientExecutionReceipts{}) {
+		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
+		if isInsufficientExecReceipts {
 			return nil, status.Errorf(codes.NotFound, err.Error())
 		}
 		return nil, status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
@@ -558,9 +561,6 @@ func (b *backendTransactions) tryGetTransactionResult(
 	}
 	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
-	if err != nil {
-		return nil, err
-	}
 	return resp, nil
 }
 
@@ -607,8 +607,5 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	}
 	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
-	if err != nil {
-		return nil, err
-	}
 	return resp, nil
 }

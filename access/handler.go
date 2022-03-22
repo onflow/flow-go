@@ -221,7 +221,8 @@ func (h *Handler) GetTransactionResult(
 	return TransactionResultToMessage(result), nil
 }
 
-// GetTransactionResultByIndex gets a transaction at a specific index for in a block
+// GetTransactionResultByIndex gets a transaction at a specific index for in a block that is executed,
+// pending or finalized transactions return errors
 func (h *Handler) GetTransactionResultByIndex(
 	ctx context.Context,
 	req *access.GetTransactionByIndexRequest,
