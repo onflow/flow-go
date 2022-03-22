@@ -88,12 +88,12 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 		var txResult flow.TransactionResult
 		return func(tx *badger.Txn) (interface{}, error) {
 
-			blockID, txID, err := KeyToBlockIDIndex(key.(string))
+			blockID, txIndex, err := KeyToBlockIDIndex(key.(string))
 			if err != nil {
 				return nil, fmt.Errorf("could not convert index key: %w", err)
 			}
 
-			err = operation.RetrieveTransactionResultByIndex(blockID, txID, &txResult)(tx)
+			err = operation.RetrieveTransactionResultByIndex(blockID, txIndex, &txResult)(tx)
 			if err != nil {
 				return nil, handleError(err, flow.TransactionResult{})
 			}

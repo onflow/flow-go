@@ -388,7 +388,7 @@ func (suite *Suite) TestGetTransactionResult() {
 	concoctIndexReq := func(bID []byte, tIndex uint32) *execution.GetTransactionByIndexRequest {
 		return &execution.GetTransactionByIndexRequest{
 			BlockId: bID,
-			Index:   uint64(tIndex),
+			Index:   uint32(tIndex),
 		}
 	}
 
