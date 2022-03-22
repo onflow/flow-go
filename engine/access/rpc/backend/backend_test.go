@@ -651,8 +651,6 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 	)
-
-	// Successfully return empty event list
 	suite.execClient.
 		On("GetTransactionResultByIndex", ctx, &exeEventReq).
 		Return(&exeEventResp, nil).
