@@ -26,7 +26,7 @@ func DeductTransactionFeesInvocation(
 	feesAddress := FlowFeesAddress(env.Context().Chain)
 
 	return func(payer flow.Address, inclusionEffort uint64, executionEffort uint64) (cadence.Value, error) {
-		invoker := NewTransactionContractFunctionInvoker(
+		invoker := NewContractFunctionInvoker(
 			common.AddressLocation{
 				Address: common.Address(feesAddress),
 				Name:    systemcontracts.ContractNameFlowFees,
@@ -56,7 +56,7 @@ func SetupNewAccountInvocation(
 ) func(flowAddress flow.Address, payer common.Address) (cadence.Value, error) {
 	return func(flowAddress flow.Address, payer common.Address) (cadence.Value, error) {
 		// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
-		invoker := NewTransactionContractFunctionInvoker(
+		invoker := NewContractFunctionInvoker(
 			common.AddressLocation{
 				Address: common.Address(env.Context().Chain.ServiceAddress()),
 				Name:    systemcontracts.ContractServiceAccount,
@@ -83,7 +83,7 @@ func AccountAvailableBalanceInvocation(
 	traceSpan opentracing.Span,
 ) func(address common.Address) (cadence.Value, error) {
 	return func(address common.Address) (cadence.Value, error) {
-		invoker := NewTransactionContractFunctionInvoker(
+		invoker := NewContractFunctionInvoker(
 			common.AddressLocation{
 				Address: common.Address(env.Context().Chain.ServiceAddress()),
 				Name:    systemcontracts.ContractStorageFees,
@@ -109,7 +109,7 @@ func AccountBalanceInvocation(
 	traceSpan opentracing.Span,
 ) func(address common.Address) (cadence.Value, error) {
 	return func(address common.Address) (cadence.Value, error) {
-		invoker := NewTransactionContractFunctionInvoker(
+		invoker := NewContractFunctionInvoker(
 			common.AddressLocation{
 				Address: common.Address(env.Context().Chain.ServiceAddress()),
 				Name:    systemcontracts.ContractServiceAccount},
@@ -134,7 +134,7 @@ func AccountStorageCapacityInvocation(
 	traceSpan opentracing.Span,
 ) func(address common.Address) (cadence.Value, error) {
 	return func(address common.Address) (cadence.Value, error) {
-		invoker := NewTransactionContractFunctionInvoker(
+		invoker := NewContractFunctionInvoker(
 			common.AddressLocation{
 				Address: common.Address(env.Context().Chain.ServiceAddress()),
 				Name:    systemcontracts.ContractStorageFees,
@@ -161,7 +161,7 @@ func UseContractAuditVoucherInvocation(
 	traceSpan opentracing.Span,
 ) func(address common.Address, code string) (bool, error) {
 	return func(address common.Address, code string) (bool, error) {
-		invoker := NewTransactionContractFunctionInvoker(
+		invoker := NewContractFunctionInvoker(
 			common.AddressLocation{
 				Address: common.Address(env.Context().Chain.ServiceAddress()),
 				Name:    systemcontracts.ContractDeploymentAudits,
