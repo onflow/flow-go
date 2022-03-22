@@ -126,5 +126,4 @@ func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrup
 	// terminates attackNetwork
 	cancel()
 	unittest.RequireCloseBefore(t, attackNetwork.Done(), 1*time.Second, "could not stop attack network on time")
-
 }

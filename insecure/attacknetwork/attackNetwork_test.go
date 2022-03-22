@@ -152,10 +152,8 @@ func withAttackNetworkClient(
 	corruptedIds flow.IdentityList,
 	run func(*testing.T, *mockinsecure.AttackOrchestrator, insecure.Attacker_ObserveClient)) {
 
-	withAttackNetwork(t, corruptedIds,
-		func(
-			t *testing.T,
-			attackNetwork *attacknetwork.AttackNetwork,
+	withCorruptedConnections(t, corruptedIds,
+		func(attackNetwork *attacknetwork.AttackNetwork,
 			_ map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
 			orchestrator *mockinsecure.AttackOrchestrator) {
 
@@ -204,10 +202,9 @@ func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegr
 	// creates event fixtures and their corresponding messages.
 	_, events, corruptedIds := messageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
 
-	withAttackNetwork(t,
+	withCorruptedConnections(t,
 		corruptedIds,
-		func(t *testing.T,
-			attackNetwork *attacknetwork.AttackNetwork,
+		func(attackNetwork *attacknetwork.AttackNetwork,
 			connections map[flow.Identifier]*mockinsecure.CorruptedNodeConnection,
 			_ *mockinsecure.AttackOrchestrator) {
 
@@ -277,12 +274,12 @@ func matchEventForMessage(t *testing.T, events []*insecure.Event, message *insec
 	require.Fail(t, fmt.Sprintf("could not find any matching event for the message: %v", message))
 }
 
-// withAttackNetwork creates an attack network with a mock orchestrator.
+// withCorruptedConnections creates an attack network with a mock orchestrator.
 // It then starts the attack network, executes the given run function on the attack network and its orchestrator,
 // and finally terminates the attack network.
-func withAttackNetwork(t *testing.T,
+func withCorruptedConnections(t *testing.T,
 	corruptedIds flow.IdentityList,
-	run func(*testing.T, *attacknetwork.AttackNetwork, map[flow.Identifier]*mockinsecure.CorruptedNodeConnection, *mockinsecure.AttackOrchestrator)) {
+	run func(*attacknetwork.AttackNetwork, map[flow.Identifier]*mockinsecure.CorruptedNodeConnection, *mockinsecure.AttackOrchestrator)) {
 	codec := cbor.NewCodec()
 	orchestrator := &mockinsecure.AttackOrchestrator{}
 	connector := &mockinsecure.CorruptedNodeConnector{}
@@ -311,7 +308,7 @@ func withAttackNetwork(t *testing.T,
 	attackNetwork.Start(attackCtx)
 	unittest.RequireCloseBefore(t, attackNetwork.Ready(), 1*time.Second, "could not start attackNetwork on time")
 
-	run(t, attackNetwork, connections, orchestrator)
+	run(attackNetwork, connections, orchestrator)
 
 	// terminates attackNetwork
 	cancel()
