@@ -178,7 +178,11 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 
 	// create the ids, middlewares and networks
 	ids, mws, nets, _ := GenerateIDsMiddlewaresNetworks(
-		ctx, suite.T(), count, suite.logger, 100, nil,
+		ctx,
+		suite.T(),
+		count,
+		suite.logger,
+		nil,
 	)
 	suite.cancels = append(suite.cancels, cancel)
 

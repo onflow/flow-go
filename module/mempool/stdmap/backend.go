@@ -25,13 +25,8 @@ type Backend struct {
 // NewBackend creates a new memory pool backend.
 // This is using EjectTrueRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
-	backData := backdata.NewMapBackData()
-	return NewBackendWithBackData(backData, options...)
-}
-
-func NewBackendWithBackData(backData mempool.BackData, options ...OptionFunc) *Backend {
 	b := Backend{
-		backData:           backData,
+		backData:           backdata.NewMapBackData(),
 		guaranteedCapacity: uint(math.MaxUint32),
 		batchEject:         EjectTrueRandomFast,
 		eject:              nil,

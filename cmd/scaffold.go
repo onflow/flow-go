@@ -35,10 +35,12 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -135,7 +137,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
-	fnb.flags.IntVar(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultCacheSize,
+	fnb.flags.Uint32Var(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultReceiveCacheSize,
 		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
@@ -151,6 +153,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in which the node will check if it can start")
 
 	fnb.flags.BoolVar(&fnb.BaseConfig.InsecureSecretsDB, "insecure-secrets-db", false, "allow the node to start up without an secrets DB encryption key")
+	fnb.flags.BoolVar(&fnb.BaseConfig.HeroCacheMetricsEnable, "herocache-metrics-collector", false, "enables herocache metrics collection")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -199,7 +202,26 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 
 func (fnb *FlowNodeBuilder) EnqueueResolver() {
 	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		resolver := dns.NewResolver(dns.DefaultCacheSize, node.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+		var dnsIpCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		var dnsTxtCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if fnb.HeroCacheMetricsEnable {
+			dnsIpCacheMetricsCollector = metrics.NetworkDnsIpCacheMetricsFactory(fnb.MetricsRegisterer)
+			dnsTxtCacheMetricsCollector = metrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegisterer)
+		}
+
+		cache := herocache.NewDNSCache(
+			dns.DefaultCacheSize,
+			node.Logger,
+			dnsIpCacheMetricsCollector,
+			dnsTxtCacheMetricsCollector,
+		)
+
+		resolver := dns.NewResolver(
+			node.Logger,
+			fnb.Metrics.Network,
+			cache,
+			dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+
 		fnb.Resolver = resolver
 		return resolver, nil
 	})
@@ -260,16 +282,29 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 		topologyCache := topology.NewCache(fnb.Logger, top)
 
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if fnb.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
+		}
+		receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
+			fnb.Logger,
+			heroCacheCollector)
+
+		err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+		if err != nil {
+			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+		}
+
 		// creates network instance
 		net, err := p2p.NewNetwork(fnb.Logger,
 			codec,
 			fnb.Me,
 			func() (network.Middleware, error) { return fnb.Middleware, nil },
-			fnb.NetworkReceivedMessageCacheSize,
 			topologyCache,
 			subscriptionManager,
 			fnb.Metrics.Network,
 			fnb.IdentityProvider,
+			receiveCache,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -463,14 +498,13 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 func (fnb *FlowNodeBuilder) initProfiler() {
 	// note: by default the Golang heap profiling rate is on and can be set even if the profiler is NOT enabled
 	runtime.MemProfileRate = fnb.BaseConfig.profilerMemProfileRate
-	if !fnb.BaseConfig.profilerEnabled {
-		return
-	}
+
 	profiler, err := debug.NewAutoProfiler(
 		fnb.Logger,
 		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
 		fnb.BaseConfig.profilerDuration,
+		fnb.BaseConfig.profilerEnabled,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
 	fnb.Component("profiler", func(node *NodeConfig) (module.ReadyDoneAware, error) {
@@ -1071,6 +1105,8 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
+	}).AdminCommand("set-profiler-enabled", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetProfilerEnabledCommand{}
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
 	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {

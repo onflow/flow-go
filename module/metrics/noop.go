@@ -122,9 +122,9 @@ func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed uin
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                                   {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                     {}
 func (nc *NoopCollector) LatestTrieRegCount(number uint64)                                      {}
-func (nc *NoopCollector) LatestTrieRegCountDiff(number uint64)                                  {}
+func (nc *NoopCollector) LatestTrieRegCountDiff(number int64)                                   {}
 func (nc *NoopCollector) LatestTrieMaxDepth(number uint64)                                      {}
-func (nc *NoopCollector) LatestTrieMaxDepthDiff(number uint64)                                  {}
+func (nc *NoopCollector) LatestTrieMaxDepthDiff(number int64)                                   {}
 func (nc *NoopCollector) UpdateCount()                                                          {}
 func (nc *NoopCollector) ProofSize(bytes uint32)                                                {}
 func (nc *NoopCollector) UpdateValuesNumber(number uint64)                                      {}
@@ -155,3 +155,10 @@ func (nc *NoopCollector) ExecutionDataAddStarted()                              
 func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)                  {}
 func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
 func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)                  {}
+func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
+func (nc *NoopCollector) OnKeyPutSuccess()                                                      {}
+func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                                    {}
+func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                       {}
+func (nc *NoopCollector) OnKeyPutFailure()                                                      {}
+func (nc *NoopCollector) OnKeyGetSuccess()                                                      {}
+func (nc *NoopCollector) OnKeyGetFailure()                                                      {}
