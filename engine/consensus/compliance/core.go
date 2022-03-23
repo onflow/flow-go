@@ -336,22 +336,22 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 	}
 	defer span.Finish()
 
-	log := c.log.With().
-		Uint64("block_view", vote.View).
-		Hex("block_id", vote.BlockID[:]).
-		Hex("voter", originID[:]).
-		Logger()
-
-	log.Info().Msg("block vote received")
-	log.Info().Msg("forwarding block vote to hotstuff") // to keep logging consistent with proposals
-
-	// forward the vote to hotstuff for processing
-	c.voteAggregator.AddVote(&model.Vote{
+	v := &model.Vote{
 		View:     vote.View,
 		BlockID:  vote.BlockID,
 		SignerID: originID,
 		SigData:  vote.SigData,
-	})
+	}
+
+	c.log.Info().
+		Uint64("block_view", vote.View).
+		Hex("block_id", vote.BlockID[:]).
+		Hex("voter", v.SignerID[:]).
+		Str("vote_id", v.ID().String()).
+		Msg("block vote received, forwarding block vote to hotstuff vote aggregator")
+
+	// forward the vote to hotstuff for processing
+	c.voteAggregator.AddVote(v)
 
 	return nil
 }
@@ -371,4 +371,7 @@ func (c *Core) prunePendingCache() {
 
 	// always record the metric
 	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
+
+	// HOTFIX
+	c.voteAggregator.PruneUpToView(final.View)
 }

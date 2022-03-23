@@ -7,7 +7,7 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/dapperlabs/testingdock v0.4.3
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
-	github.com/dgraph-io/badger/v2 v2.2007.2
+	github.com/dgraph-io/badger/v2 v2.2007.3
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
@@ -17,9 +17,9 @@ require (
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.20.3
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.9.0
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.9.0
+	github.com/onflow/cadence v0.21.2
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.10.1
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.10.1
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
@@ -42,3 +42,5 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/crypto => ../crypto
+
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.21.2-patch.1

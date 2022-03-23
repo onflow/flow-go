@@ -78,6 +78,7 @@ const (
 
 	ResourceClusterBlockProposalQueue = "cluster_compliance_proposal_queue" // collection node, compliance engine
 	ResourceClusterBlockVoteQueue     = "cluster_compliance_vote_queue"     // collection node, compliance engine
+	ResourceTransactionIngestQueue    = "ingest_transaction_queue"          // collection node, ingest engine
 	ResourceBeaconKey                 = "beacon-key"                        // consensus node, DKG engine
 	ResourceApprovalQueue             = "sealing_approval_queue"            // consensus node, sealing engine
 	ResourceReceiptQueue              = "sealing_receipt_queue"             // consensus node, sealing engine

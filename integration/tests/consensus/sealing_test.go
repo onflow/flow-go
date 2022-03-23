@@ -62,6 +62,7 @@ func (ss *SealingSuite) Verification() *client.GhostClient {
 }
 
 func (ss *SealingSuite) SetupTest() {
+	ss.T().Logf("%s test case setup sealing", time.Now())
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -76,7 +77,7 @@ func (ss *SealingSuite) SetupTest() {
 	// need three real consensus nodes
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithID(conID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithID(conID))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		ss.conIDs = append(ss.conIDs, conID)
 	}
@@ -140,6 +141,7 @@ func (ss *SealingSuite) SetupTest() {
 }
 
 func (ss *SealingSuite) TearDownTest() {
+	ss.T().Logf("test case tear down sealing")
 	ss.net.Remove()
 	ss.cancel()
 }
@@ -148,6 +150,7 @@ func (ss *SealingSuite) TestBlockSealCreation() {
 
 	// fix the deadline of the entire test
 	deadline := time.Now().Add(30 * time.Second)
+	ss.T().Logf("seal creation deadline: %s", deadline)
 
 	// first, we listen to see which block proposal is the first one to be
 	// confirmed three times (finalized)
@@ -181,6 +184,11 @@ SearchLoop:
 		// we map the proposal to its parent for later
 		parentID := proposal.Header.ParentID
 		parents[proposalID] = parentID
+
+		ss.T().Logf("received block proposal height %v, view %v, id %v",
+			proposal.Header.Height,
+			proposal.Header.View,
+			proposalID)
 
 		// we add one confirmation for each ancestor
 		for {

@@ -23,6 +23,9 @@ type ResolverMetrics interface {
 
 	// OnDNSCacheInvalidated is called whenever dns cache is invalidated for an entry
 	OnDNSCacheInvalidated()
+
+	// OnDNSLookupRequestDropped tracks the number of dns lookup requests that are dropped due to a full queue
+	OnDNSLookupRequestDropped()
 }
 
 type NetworkMetrics interface {
@@ -47,20 +50,21 @@ type NetworkMetrics interface {
 	// QueueDuration tracks the time spent by a message with the given priority in the queue
 	QueueDuration(duration time.Duration, priority int)
 
-	// InboundProcessDuration tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
-	InboundProcessDuration(topic string, duration time.Duration)
+	DirectMessageStarted(topic string)
+
+	DirectMessageFinished(topic string)
+
+	// MessageProcessingStarted tracks the start of a call to process a message from the given topic
+	MessageProcessingStarted(topic string)
+
+	// MessageProcessingFinished tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+	MessageProcessingFinished(topic string, duration time.Duration)
 
 	// OutboundConnections updates the metric tracking the number of outbound connections of this node
 	OutboundConnections(connectionCount uint)
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
-
-	// UnstakedOutboundConnections updates the metric tracking the number of outbound connections to unstaked nodes
-	UnstakedOutboundConnections(connectionCount uint)
-
-	// UnstakedInboundConnections updates the metric tracking the number of inbound connections from unstaked nodes
-	UnstakedInboundConnections(connectionCount uint)
 }
 
 type EngineMetrics interface {
@@ -317,11 +321,11 @@ type WALMetrics interface {
 type ExecutionDataServiceMetrics interface {
 	ExecutionDataAddStarted()
 
-	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeNodes int)
+	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize uint64)
 
 	ExecutionDataGetStarted()
 
-	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeNodes int)
+	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64)
 }
 
 type RuntimeMetrics interface {

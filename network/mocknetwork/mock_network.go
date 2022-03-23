@@ -7,6 +7,7 @@ package mocknetwork
 import (
 	gomock "github.com/golang/mock/gomock"
 	go_datastore "github.com/ipfs/go-datastore"
+	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	network "github.com/onflow/flow-go/network"
 	reflect "reflect"
@@ -64,7 +65,7 @@ func (mr *MockNetworkMockRecorder) Ready() *gomock.Call {
 }
 
 // Register mocks base method
-func (m *MockNetwork) Register(arg0 network.Channel, arg1 network.Engine) (network.Conduit, error) {
+func (m *MockNetwork) Register(arg0 network.Channel, arg1 network.MessageProcessor) (network.Conduit, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", arg0, arg1)
 	ret0, _ := ret[0].(network.Conduit)
@@ -79,18 +80,38 @@ func (mr *MockNetworkMockRecorder) Register(arg0, arg1 interface{}) *gomock.Call
 }
 
 // RegisterBlobService mocks base method
-func (m *MockNetwork) RegisterBlobService(arg0 network.Channel, arg1 go_datastore.Batching) (network.BlobService, error) {
+func (m *MockNetwork) RegisterBlobService(arg0 network.Channel, arg1 go_datastore.Batching, arg2 ...network.BlobServiceOption) (network.BlobService, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RegisterBlobService", arg0, arg1)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RegisterBlobService", varargs...)
 	ret0, _ := ret[0].(network.BlobService)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // RegisterBlobService indicates an expected call of RegisterBlobService
-func (mr *MockNetworkMockRecorder) RegisterBlobService(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockNetworkMockRecorder) RegisterBlobService(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterBlobService", reflect.TypeOf((*MockNetwork)(nil).RegisterBlobService), arg0, arg1)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterBlobService", reflect.TypeOf((*MockNetwork)(nil).RegisterBlobService), varargs...)
+}
+
+// RegisterPingService mocks base method
+func (m *MockNetwork) RegisterPingService(arg0 protocol.ID, arg1 network.PingInfoProvider) (network.PingService, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RegisterPingService", arg0, arg1)
+	ret0, _ := ret[0].(network.PingService)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RegisterPingService indicates an expected call of RegisterPingService
+func (mr *MockNetworkMockRecorder) RegisterPingService(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterPingService", reflect.TypeOf((*MockNetwork)(nil).RegisterPingService), arg0, arg1)
 }
 
 // Start mocks base method

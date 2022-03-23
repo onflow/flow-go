@@ -261,8 +261,16 @@ type PublicKeyAggregator struct {
 	// since the caller should not be aware of the internal non thread-safe algorithm.
 }
 
-// NewPublicKeyAggregator creates an index-based key aggregator, for the given list of authorized signers
+// NewPublicKeyAggregator creates an index-based key aggregator, for the given list of authorized signers.
+//
+// The constructor errors if:
+//  - the input keys are empty.
+//  - any input public key algorithm is not BLS.
 func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator, error) {
+	// check for empty list
+	if len(publicKeys) == 0 {
+		return nil, fmt.Errorf("input keys cannot be empty")
+	}
 	// check for BLS keys
 	for i, key := range publicKeys {
 		if key == nil || key.Algorithm() != crypto.BLSBLS12381 {
@@ -280,7 +288,23 @@ func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator
 }
 
 // KeyAggregate returns the aggregated public key of the input signers.
+//
+// The aggregation errors if:
+//  - genric error if input signers is empty.
+//  - InvalidSignerIdxError if any signer is out of bound.
+//  - other generic errors are unexpected during normal operations.
 func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, error) {
+	// check for empty list
+	if len(signers) == 0 {
+		return nil, fmt.Errorf("input signers cannot be empty")
+	}
+
+	// check signers
+	for i, signer := range signers {
+		if signer >= p.n || signer < 0 {
+			return nil, NewInvalidSignerIdxErrorf("signer %d at index %d is invalid", signer, i)
+		}
+	}
 
 	// this greedy algorithm assumes the signers set does not vary much from one call
 	// to KeyAggregate to another. It computes the delta of signers compared to the
@@ -290,20 +314,40 @@ func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, err
 	// read lock to read consistent last key and last signers
 	p.RLock()
 	// get the signers delta and update the last list for the next comparison
-	newSignerKeys, missingSignerKeys, updatedSignerSet := p.deltaKeys(signers)
+	addedSignerKeys, missingSignerKeys, updatedSignerSet := p.deltaKeys(signers)
 	lastKey := p.lastAggregatedKey
 	p.RUnlock()
 
-	// add the new keys
+	// checks whether the delta of signers is larger than new list of signers.
+	deltaIsLarger := len(addedSignerKeys)+len(missingSignerKeys) > len(updatedSignerSet)
+
+	var updatedKey crypto.PublicKey
 	var err error
-	updatedKey, err := crypto.AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
-	if err != nil {
-		return nil, fmt.Errorf("adding new staking keys failed: %w", err)
-	}
-	// remove the missing keys
-	updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
-	if err != nil {
-		return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
+	if deltaIsLarger {
+		// it is faster to aggregate the keys from scratch in this case
+		newSigners := make([]crypto.PublicKey, 0, len(updatedSignerSet))
+		for signer := range updatedSignerSet {
+			newSigners = append(newSigners, p.publicKeys[signer])
+		}
+		updatedKey, err = crypto.AggregateBLSPublicKeys(newSigners)
+		if err != nil {
+			// not expected as the keys are not empty and all keys are BLS
+			return nil, fmt.Errorf("aggregating keys failed: %w", err)
+		}
+	} else {
+		// it is faster to adjust the existing aggregated key in this case
+		// add the new keys
+		updatedKey, err = crypto.AggregateBLSPublicKeys(append(addedSignerKeys, lastKey))
+		if err != nil {
+			// not expected in notrmal operations as there is at least one key, and all keys are BLS
+			return nil, fmt.Errorf("adding new keys failed: %w", err)
+		}
+		// remove the missing keys
+		updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
+		if err != nil {
+			// not expected in notrmal operations as there is at least one key, and all keys are BLS
+			return nil, fmt.Errorf("removing missing keys failed: %w", err)
+		}
 	}
 
 	// update the latest list and public key.
@@ -320,25 +364,25 @@ func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, err
 func (p *PublicKeyAggregator) deltaKeys(signers []int) (
 	[]crypto.PublicKey, []crypto.PublicKey, map[int]struct{}) {
 
-	var newSignerKeys, missingSignerKeys []crypto.PublicKey
+	var addedSignerKeys, missingSignerKeys []crypto.PublicKey
 
 	// create a map of the input list,
 	// and check the new signers
-	signersMap := make(map[int]struct{})
+	newSignersMap := make(map[int]struct{})
 	for _, signer := range signers {
-		signersMap[signer] = struct{}{}
+		newSignersMap[signer] = struct{}{}
 		_, ok := p.lastSigners[signer]
 		if !ok {
-			newSignerKeys = append(newSignerKeys, p.publicKeys[signer])
+			addedSignerKeys = append(addedSignerKeys, p.publicKeys[signer])
 		}
 	}
 
 	// look for missing signers
 	for signer := range p.lastSigners {
-		_, ok := signersMap[signer]
+		_, ok := newSignersMap[signer]
 		if !ok {
 			missingSignerKeys = append(missingSignerKeys, p.publicKeys[signer])
 		}
 	}
-	return newSignerKeys, missingSignerKeys, signersMap
+	return addedSignerKeys, missingSignerKeys, newSignersMap
 }

@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/herocache/heropool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,12 +28,12 @@ func BenchmarkBaselineLRU(b *testing.B) {
 	}
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 
-	limit := uint(50_000)
+	limit := uint(50)
 	backData := stdmap.NewBackendWithBackData(
 		newBaselineLRU(int(limit)),
 		stdmap.WithLimit(limit))
 
-	entities := unittest.EntityListFixture(uint(100_000_000))
+	entities := unittest.EntityListFixture(uint(100_000))
 	testAddEntities(b, limit, backData, entities)
 
 	unittest.PrintHeapInfo(unittest.Logger()) // heap info after writing 100M entities
@@ -193,12 +193,45 @@ func (b baselineLRU) All() map[flow.Identifier]flow.Entity {
 
 		entity, ok := b.ByID(id)
 		if !ok {
-			panic("could not retrive entity from mempool")
+			panic("could not retrieve entity from mempool")
 		}
 		all[id] = entity
 	}
 
 	return all
+}
+
+func (b baselineLRU) Identifiers() flow.IdentifierList {
+	ids := make(flow.IdentifierList, b.c.Len())
+	entityIds := b.c.Keys()
+	total := len(entityIds)
+	for i := 0; i < total; i++ {
+		id, ok := entityIds[i].(flow.Identifier)
+		if !ok {
+			panic("could not assert to entity id")
+		}
+		ids[i] = id
+	}
+	return ids
+}
+
+func (b baselineLRU) Entities() []flow.Entity {
+	entities := make([]flow.Entity, b.c.Len())
+	entityIds := b.c.Keys()
+	total := len(entityIds)
+	for i := 0; i < total; i++ {
+		id, ok := entityIds[i].(flow.Identifier)
+		if !ok {
+			panic("could not assert to entity id")
+		}
+
+		entity, ok := b.ByID(id)
+		if !ok {
+			panic("could not retrieve entity from mempool")
+		}
+		entities[i] = entity
+	}
+	return entities
 }
 
 // Clear removes all entities from the pool.

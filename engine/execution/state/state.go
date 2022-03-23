@@ -196,7 +196,13 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
-		if len(values) == 0 {
+		// We expect 1 element in the returned slice of values because query is from makeSingleValueQuery()
+		if len(values) != 1 {
+			return nil, fmt.Errorf("error getting register (%s) value at %x: number of returned values (%d) != number of queried keys (%d)", key, commitment, len(values), len(query.Keys()))
+		}
+
+		// Prevent caching of value with len zero
+		if len(values[0]) == 0 {
 			return nil, nil
 		}
 
@@ -330,6 +336,22 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
 	results []flow.TransactionResult) error {
+	err := s.saveExecutionResults(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results, false)
+	if err == nil {
+		return nil
+	}
+
+	// if result already exists, we try again by force re-indexing the result by the block ID,
+	if storage.IsResultAlreadyExistsErr(err) {
+		return s.saveExecutionResults(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results, true)
+	}
+
+	return err
+}
+
+func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
+	results []flow.TransactionResult, forceReindex bool) error {
 
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
@@ -385,7 +407,7 @@ func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, e
 	}
 
 	// it overwrites the index if exists already
-	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+	err = s.results.BatchIndex(blockID, executionResult.ID(), forceReindex, batch)
 	if err != nil {
 		return fmt.Errorf("cannot index execution result: %w", err)
 	}

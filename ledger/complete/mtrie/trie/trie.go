@@ -101,7 +101,104 @@ func (mt *MTrie) String() string {
 	return trieStr + mt.root.FmtStr("", "")
 }
 
-// UnsafeRead read payloads for the given paths.
+// UnsafeValueSizes returns payload value sizes for the given paths.
+// UNSAFE: requires _all_ paths to have a length of mt.Height bits.
+// CAUTION: while getting payload value sizes, `paths` is permuted IN-PLACE for optimized processing.
+// Return:
+//  * `sizes` []int
+//     For each path, the corresponding payload value size is written into sizes. AFTER
+//     the size operation completes, the order of `path` and `sizes` are such that
+//     for `path[i]` the corresponding register value size is referenced by `sizes[i]`.
+// TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
+func (mt *MTrie) UnsafeValueSizes(paths []ledger.Path) []int {
+	sizes := make([]int, len(paths)) // pre-allocate slice for the result
+	valueSizes(sizes, paths, mt.root)
+	return sizes
+}
+
+// valueSizes returns value sizes of all the registers in `paths`` in subtree with `head` as root node.
+// For each `path[i]`, the corresponding value size is written into `sizes[i]` for the same index `i`.
+// CAUTION:
+//  * while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
+//  * unchecked requirement: all paths must go through the `head` node
+func valueSizes(sizes []int, paths []ledger.Path, head *node.Node) {
+	// check for empty paths
+	if len(paths) == 0 {
+		return
+	}
+
+	// path not found
+	if head == nil {
+		return
+	}
+
+	// reached a leaf node
+	if head.IsLeaf() {
+		for i, p := range paths {
+			if *head.Path() == p {
+				payload := head.Payload()
+				if payload != nil {
+					sizes[i] = payload.Value.Size()
+				}
+				// NOTE: break isn't used here because precondition
+				// doesn't require paths being deduplicated.
+			}
+		}
+		return
+	}
+
+	// reached an interim node with only one path
+	if len(paths) == 1 {
+		path := paths[0][:]
+
+		// traverse nodes following the path until a leaf node or nil node is reached.
+		// "for" loop helps to skip partition and recursive call when there's only one path to follow.
+		for {
+			depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
+			bit := bitutils.ReadBit(path, depth)
+			if bit == 0 {
+				head = head.LeftChild()
+			} else {
+				head = head.RightChild()
+			}
+			if head.IsLeaf() {
+				break
+			}
+		}
+
+		valueSizes(sizes, paths, head)
+		return
+	}
+
+	// reached an interim node with more than one paths
+
+	// partition step to quick sort the paths:
+	// lpaths contains all paths that have `0` at the partitionIndex
+	// rpaths contains all paths that have `1` at the partitionIndex
+	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
+	partitionIndex := SplitPaths(paths, depth)
+	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
+	lsizes, rsizes := sizes[:partitionIndex], sizes[partitionIndex:]
+
+	// read values from left and right subtrees in parallel
+	parallelRecursionThreshold := 32 // threshold to avoid the parallelization going too deep in the recursion
+	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
+		valueSizes(lsizes, lpaths, head.LeftChild())
+		valueSizes(rsizes, rpaths, head.RightChild())
+	} else {
+		// concurrent read of left and right subtree
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			valueSizes(lsizes, lpaths, head.LeftChild())
+			wg.Done()
+		}()
+		valueSizes(rsizes, rpaths, head.RightChild())
+		wg.Wait() // wait for all threads
+	}
+}
+
+// UnsafeRead reads payloads for the given paths.
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
 // Return:

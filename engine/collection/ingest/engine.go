@@ -5,13 +5,17 @@ package ingest
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -23,13 +27,16 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit                 *engine.Unit
+	lm                   *lifecycle.LifecycleManager
+	wg                   *sync.WaitGroup // used to wait for processing loop to exit
 	log                  zerolog.Logger
 	engMetrics           module.EngineMetrics
 	colMetrics           module.CollectionMetrics
 	conduit              network.Conduit
 	me                   module.Local
 	state                protocol.State
+	pendingTransactions  engine.MessageStore
+	messageHandler       *engine.MessageHandler
 	pools                *epochs.TransactionPools
 	transactionValidator *access.TransactionValidator
 
@@ -42,6 +49,7 @@ func New(
 	net network.Network,
 	state protocol.State,
 	engMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	colMetrics module.CollectionMetrics,
 	me module.Local,
 	chain flow.Chain,
@@ -65,13 +73,44 @@ func New(
 		},
 	)
 
+	// FIFO queue for transactions
+	queue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(int(config.MaxMessageQueueSize)),
+		fifoqueue.WithLengthObserver(func(len int) {
+			mempoolMetrics.MempoolEntries(metrics.ResourceTransactionIngestQueue, uint(len))
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create transaction message queue: %w", err)
+	}
+	pendingTransactions := &engine.FifoMessageStore{FifoQueue: queue}
+
+	// define how inbound messages are mapped to message queues
+	handler := engine.NewMessageHandler(
+		logger,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*flow.TransactionBody)
+				if ok {
+					engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
+				}
+				return ok
+			},
+			Store: pendingTransactions,
+		},
+	)
+
 	e := &Engine{
-		unit:                 engine.NewUnit(),
+		lm:                   lifecycle.NewLifecycleManager(),
+		wg:                   new(sync.WaitGroup),
 		log:                  logger,
 		engMetrics:           engMetrics,
 		colMetrics:           colMetrics,
 		me:                   me,
 		state:                state,
+		pendingTransactions:  pendingTransactions,
+		messageHandler:       handler,
 		pools:                pools,
 		config:               config,
 		transactionValidator: transactionValidator,
@@ -87,66 +126,112 @@ func New(
 	return e, nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started.
+// Start starts the engine by starting the message processing loop.
+func (e *Engine) Start(ctx irrecoverable.SignalerContext) {
+	e.lm.OnStart(func() {
+		e.wg.Add(1)
+		go e.loop(ctx)
+	})
+}
+
+// Ready returns a ready channel that is closed once the engine has fully started.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	return e.lm.Started()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	e.lm.OnStop()
+	return e.lm.Stopped()
+}
+
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	err := e.messageHandler.Process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
+}
+
+// ProcessLocal processes an event originating on the local node. For local messages,
+// we skip the message queue and immediately process the transaction, blocking
+// the caller until we are finished. This way, we can provide context to the
+// user about whether their transaction was accepted.
+func (e *Engine) ProcessLocal(event interface{}) error {
+	tx, ok := event.(*flow.TransactionBody)
+	if !ok {
+		return fmt.Errorf("local submission of non-transaction event type (%T) to ingest engine: %w", event, engine.IncompatibleInputTypeError)
+	}
+	e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
+	return e.onTransaction(e.me.NodeID(), tx)
 }
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(e.me.NodeID(), event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
+	err := e.ProcessLocal(event)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("internal error processing event")
+	}
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
+	err := e.Process(channel, originID, event)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("internal error processing event")
+	}
+}
+
+// loop is the main message processing loop for transaction messages.
+func (e *Engine) loop(ctx irrecoverable.SignalerContext) {
+	defer e.wg.Done()
+
+	for {
+		select {
+		case <-ctx.Done():
+			e.lm.OnStop()
+		case <-e.lm.ShutdownSignal():
+			return
+		case <-e.messageHandler.GetNotifier():
+			err := e.processAvailableMessages()
+			if err != nil {
+				// if an error reaches this point, it is unexpected
+				ctx.Throw(err)
+			}
 		}
-	})
+	}
 }
 
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
-	})
-}
+// processAvailableMessages is called when the message queue is non-empty. It
+// will process transactions while the queue is non-empty, then return.
+func (e *Engine) processAvailableMessages() error {
+	for {
+		msg, ok := e.pendingTransactions.Get()
+		if ok {
+			err := e.onTransaction(msg.OriginID, msg.Payload.(*flow.TransactionBody))
+			// log warnings for expected error conditions
+			if engine.IsUnverifiableInputError(err) {
+				e.log.Warn().Err(err).Msg("unable to process unverifiable transaction")
+			} else if engine.IsInvalidInputError(err) {
+				e.log.Warn().Err(err).Msg("discarding invalid transaction")
+			} else if err != nil {
+				// bubble up unexpected error
+				return fmt.Errorf("unexpected error handling transaction: %w", err)
+			}
+			continue
+		}
 
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
-}
-
-// process processes engine events.
-//
-// Transactions are validated and routed to the correct cluster, then added
-// to the transaction mempool.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
-	case *flow.TransactionBody:
-		e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
-		defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
-		return e.onTransaction(originID, ev)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+		// when there is no more messages in the queue, back to the loop to wait
+		// for the next incoming message to arrive.
+		return nil
 	}
 }
 
@@ -154,8 +239,9 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // from outside the system or routed from another collection node.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
 
-	txID := tx.ID()
+	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 
+	txID := tx.ID()
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("tx_id", txID[:]).
@@ -169,24 +255,31 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// fail fast if this is an unknown reference
 	_, err := refSnapshot.Head()
 	if err != nil {
-		return fmt.Errorf("could not get reference block: %w", err)
+		log.Debug().Msg("trace - cannot validate transaction with unknown reference block")
+		return engine.NewUnverifiableInputError("could not get reference block for transaction (%x): %w", txID, err)
 	}
 
 	// using the transaction's reference block, determine which cluster we're in.
 	// if we don't know the reference block, we will fail when attempting to query the epoch.
 	refEpoch := refSnapshot.Epochs().Current()
 
-	counter, err := refEpoch.Counter()
+	epochCounter, err := refEpoch.Counter()
 	if err != nil {
+		log.Debug().Msg("trace - cannot retrieve epoch counter for transaction")
 		return fmt.Errorf("could not get counter for reference epoch: %w", err)
 	}
 	clusters, err := refEpoch.Clustering()
 	if err != nil {
+		log.Debug().Msg("trace - cannot retrieve clusters for transaction")
 		return fmt.Errorf("could not get clusters for reference epoch: %w", err)
 	}
 
+	log.Debug().Msg("trace - retrieving pool for transaction")
+
 	// use the transaction pool for the epoch the reference block is part of
-	pool := e.pools.ForEpoch(counter)
+	pool := e.pools.ForEpoch(epochCounter)
+
+	log.Debug().Msg("trace - retrieved pool for transaction")
 
 	// short-circuit if we have already stored the transaction
 	if pool.Has(txID) {
@@ -194,35 +287,61 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return nil
 	}
 
+	log.Debug().Msg("trace - transaction is not already present in mempool")
+
 	// check if the transaction is valid
 	err = e.transactionValidator.Validate(tx)
 	if err != nil {
-		return engine.NewInvalidInputErrorf("invalid transaction: %w", err)
+		log.Debug().Err(err).Msg("trace - transaction failed validation")
+		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}
+
+	log.Debug().Msg("trace - transaction passed validation")
 
 	// get the locally assigned cluster and the cluster responsible for the transaction
 	txCluster, ok := clusters.ByTxID(txID)
 	if !ok {
+		log.Debug().Msg("trace - no cluster for transaction")
 		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
 	}
 
-	// if we are not yet a member of any cluster, for example if we are joining
-	// the network in the next epoch, we will return an error here
+	log.Debug().Msg("trace - got transaction cluster")
+
+	// get the cluster we are in for the reference epoch
 	localCluster, _, ok := clusters.ByNodeID(e.me.NodeID())
 	if !ok {
-		return fmt.Errorf("node is not assigned to any cluster in this epoch: %d", counter)
+		e.log.Debug().Msg("trace - no cluster found for this node")
+
+		// if we aren't assigned to a cluster, check that we are a member of
+		// the reference epoch
+		refIdentities, err := refEpoch.InitialIdentities()
+		if err != nil {
+			e.log.Debug().Err(err).Msg("trace - cannot get initial identities")
+			return fmt.Errorf("could not get initial identities for reference epoch: %w", err)
+		}
+
+		if _, ok := refIdentities.ByNodeID(e.me.NodeID()); ok {
+			e.log.Debug().Msg("trace - cannot get cluster for this node when it should have one")
+			// CAUTION: we are a member of the epoch, but have no assigned cluster!
+			// This is an unexpected condition and indicates a protocol state invariant has been broken
+			return fmt.Errorf("this node should have an assigned cluster in epoch (counter=%d), but has none", epochCounter)
+		}
+		e.log.Debug().Msg("trace - node not assigned cluster (expected case)")
+		return engine.NewUnverifiableInputError("this node is not assigned a cluster in epoch (counter=%d)", epochCounter)
 	}
+
+	log.Debug().Msg("trace - got local cluster")
 
 	localClusterFingerPrint := localCluster.Fingerprint()
 	txClusterFingerPrint := txCluster.Fingerprint()
-
 	log = log.With().
 		Hex("local_cluster", logging.ID(localClusterFingerPrint)).
 		Hex("tx_cluster", logging.ID(txClusterFingerPrint)).
 		Logger()
 
-	// if our cluster is responsible for the transaction, add it to the mempool
+	// if our cluster is responsible for the transaction, add it to our local mempool
 	if localClusterFingerPrint == txClusterFingerPrint {
+		log.Debug().Msg("trace - adding transaction to pool")
 		_ = pool.Add(tx)
 		e.colMetrics.TransactionIngested(txID)
 		log.Debug().Msg("added transaction to pool")
@@ -237,8 +356,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
 		if err != nil && !errors.Is(err, network.EmptyTargetList) {
-			// if multicast to a target cluster with at least one node failed, return an error
-			return fmt.Errorf("could not route transaction to cluster: %w", err)
+			// if multicast to a target cluster with at least one node failed, log an error and exit
+			e.log.Error().Err(err).Msg("could not route transaction to cluster")
+			return nil
 		}
 		if err == nil {
 			e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)

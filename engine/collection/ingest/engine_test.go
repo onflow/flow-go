@@ -10,12 +10,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/epochs"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -80,7 +79,7 @@ func (suite *Suite) SetupTest() {
 	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.pools = epochs.NewTransactionPools(func() mempool.Transactions {
-		return stdmap.NewTransactions(1000)
+		return herocache.NewTransactions(1000, log)
 	})
 
 	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
@@ -120,7 +119,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.conf = DefaultConfig()
 	chain := flow.Testnet.Chain()
-	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, chain, suite.pools, suite.conf)
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, metrics, suite.me, chain, suite.pools, suite.conf)
 	suite.Require().NoError(err)
 }
 
@@ -385,7 +384,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	// should not route to any node
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
-	err := suite.engine.Process(engine.ReceiveTransactions, sender.NodeID, &tx)
+	err := suite.engine.onTransaction(sender.NodeID, &tx)
 	suite.Assert().NoError(err)
 
 	// should be added to local mempool for current epoch
@@ -474,6 +473,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 
 	epoch2 := new(protocol.Epoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
+	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
 	suite.epochQuery.Add(epoch2)
@@ -512,6 +512,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 
 	epoch2 := new(protocol.Epoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
+	epoch2.On("InitialIdentities").Return(withoutMe, nil)
 	epoch2.On("Clustering").Return(epoch2Clusters, nil)
 	// update the mocks to behave as though we have transitioned to epoch 2
 	suite.epochQuery.Add(epoch2)
