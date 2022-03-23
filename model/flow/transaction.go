@@ -239,7 +239,7 @@ func (tb *TransactionBody) SignPayload(
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
-	sig, err := tb.SignMessageWithTag(tb.PayloadMessage(), TransactionDomainTag[:], privateKey, hasher)
+	sig, err := tb.SignMessageWithTag(tb.PayloadMessage(), privateKey, hasher)
 
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)
@@ -262,7 +262,7 @@ func (tb *TransactionBody) SignEnvelope(
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
-	sig, err := tb.SignMessageWithTag(tb.EnvelopeMessage(), TransactionDomainTag[:], privateKey, hasher)
+	sig, err := tb.SignMessageWithTag(tb.EnvelopeMessage(), privateKey, hasher)
 
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction envelope with given key: %w", err)
@@ -273,17 +273,19 @@ func (tb *TransactionBody) SignEnvelope(
 	return nil
 }
 
-// SignMessageWithTag signs the message (tag + message) with the specified account key.
+// SignMessageWithTag signs the data (transaction_tag + message) with the specified private key
+// and hasher.
 //
-// This function returns an error if the signature cannot be generated.
+// This function returns an error if:
+//  - crypto.InvalidInputsError if the private key cannot sign with the given hasher
+//  - other error if an unexpected error occurs
 func (tb *TransactionBody) SignMessageWithTag(
 	message []byte,
-	tag []byte,
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) ([]byte, error) {
-	message = append(tag[:], message...)
-	sig, err := privateKey.Sign(message, hasher) // TODO: to review
+	message = append(TransactionDomainTag[:], message...)
+	sig, err := privateKey.Sign(message, hasher)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message with given key: %w", err)
 	}

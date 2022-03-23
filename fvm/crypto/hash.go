@@ -49,7 +49,7 @@ func NewPrefixedHashing(algo hash.HashingAlgorithm, tag string) (hash.Hasher, er
 
 	hasherCreator := hasherCreators[algo]
 	if hasherCreator == nil {
-		return nil, errors.New("hashing algorithm is not a supported for prefixed algorithm")
+		return nil, errors.New("hashing algorithm is not supported for prefixed algorithm")
 	}
 
 	paddedTag, err := paddedDomainTag(tag)

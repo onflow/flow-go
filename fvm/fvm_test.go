@@ -1,6 +1,7 @@
 package fvm_test
 
 import (
+	"crypto"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
@@ -1622,7 +1623,7 @@ var createMessage = func(m string) (signableMessage []byte, message cadence.Arra
 	return signableMessage, message
 }
 
-func TestSignatureVerification(t *testing.T) {
+func TestKeyListSignature(t *testing.T) {
 
 	t.Parallel()
 
@@ -2995,11 +2996,11 @@ func TestSigningWithTags(t *testing.T) {
 			run(
 				func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 					// Create an account private key.
-					privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+					privateKey, err := testutil.GenerateAccountPrivateKey()
 					require.NoError(t, err)
 
 					// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-					accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+					accounts, err := testutil.CreateAccounts(vm, view, programs, []flow.AccountPrivateKey{privateKey}, chain)
 					require.NoError(t, err)
 
 					txBody := flow.NewTransactionBody().
@@ -3008,10 +3009,10 @@ func TestSigningWithTags(t *testing.T) {
 					txBody.SetProposalKey(accounts[0], 0, 0)
 					txBody.SetPayer(accounts[0])
 
-					hasher, err := exeUtils.NewHasher(privateKeys[0].HashAlgo)
+					hasher, err := exeUtils.NewHasher(privateKey.HashAlgo)
 					require.NoError(t, err)
 
-					sig, err := txBody.SignMessageWithTag(txBody.EnvelopeMessage(), tag, privateKeys[0].PrivateKey, hasher)
+					sig, err := txBody.SignMessageWithTag(txBody.EnvelopeMessage(), tag, privateKey.PrivateKey, hasher)
 					require.NoError(t, err)
 					txBody.AddEnvelopeSignature(accounts[0], 0, sig)
 
