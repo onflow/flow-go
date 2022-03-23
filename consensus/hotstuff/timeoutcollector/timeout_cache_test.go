@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -20,119 +20,83 @@ func TestTimeoutObjectsCache_View(t *testing.T) {
 	require.Equal(t, view, cache.View())
 }
 
-// TestTimeoutObjectsCache_AddVoteRepeatedVote tests that AddVote skips duplicated votes
-func TestTimeoutObjectsCache_AddVoteRepeatedVote(t *testing.T) {
+// TestTimeoutObjectsCache_AddTimeoutObjectRepeatedTimeout tests that AddTimeoutObject skips duplicated timeouts
+func TestTimeoutObjectsCache_AddTimeoutObjectRepeatedTimeout(t *testing.T) {
 	t.Parallel()
 
 	view := uint64(100)
 	cache := NewTimeoutObjectsCache(view)
-	vote := unittest.VoteFixture(unittest.WithVoteView(view))
+	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(view))
 
-	require.NoError(t, cache.AddVote(vote))
-	err := cache.AddVote(vote)
-	require.ErrorIs(t, err, RepeatedVoteErr)
+	require.NoError(t, cache.AddTimeoutObject(timeout))
+	err := cache.AddTimeoutObject(timeout)
+	require.ErrorIs(t, err, RepeatedTimeoutErr)
 }
 
-// TestTimeoutObjectsCache_AddVoteIncompatibleView tests that adding vote with incompatible view results in error
-func TestTimeoutObjectsCache_AddVoteIncompatibleView(t *testing.T) {
+// TestTimeoutObjectsCache_AddTimeoutObjectIncompatibleView tests that adding timeout with incompatible view results in error
+func TestTimeoutObjectsCache_AddTimeoutObjectIncompatibleView(t *testing.T) {
 	t.Parallel()
 
 	view := uint64(100)
 	cache := NewTimeoutObjectsCache(view)
-	vote := unittest.VoteFixture(unittest.WithVoteView(view + 1))
-	err := cache.AddVote(vote)
-	require.ErrorIs(t, err, VoteForIncompatibleViewError)
+	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(view + 1))
+	err := cache.AddTimeoutObject(timeout)
+	require.ErrorIs(t, err, TimeoutForIncompatibleViewError)
 }
 
-// TestTimeoutObjectsCache_GetVote tests that GetVote method
-func TestTimeoutObjectsCache_GetVote(t *testing.T) {
+// TestTimeoutObjectsCache_GetTimeout tests that GetTimeout method
+func TestTimeoutObjectsCache_GetTimeout(t *testing.T) {
 	view := uint64(100)
-	knownVote := unittest.VoteFixture(unittest.WithVoteView(view))
-	doubleVote := unittest.VoteFixture(unittest.WithVoteView(view), unittest.WithVoteSignerID(knownVote.SignerID))
+	knownTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(view))
+	doubleTimeout := helper.TimeoutObjectFixture(
+		helper.WithTimeoutObjectView(view),
+		helper.WithTimeoutObjectSignerID(knownTimeout.SignerID))
 
 	cache := NewTimeoutObjectsCache(view)
 
-	// unknown vote
-	vote, found := cache.GetVote(unittest.IdentifierFixture())
-	assert.Nil(t, vote)
-	assert.False(t, found)
+	// unknown timeout
+	timeout, found := cache.GetTimeoutObject(unittest.IdentifierFixture())
+	require.Nil(t, timeout)
+	require.False(t, found)
 
-	// known vote
-	err := cache.AddVote(knownVote)
-	assert.NoError(t, err)
-	vote, found = cache.GetVote(knownVote.SignerID)
-	assert.Equal(t, knownVote, vote)
-	assert.True(t, found)
+	// known timeout
+	err := cache.AddTimeoutObject(knownTimeout)
+	require.NoError(t, err)
+	timeout, found = cache.GetTimeoutObject(knownTimeout.SignerID)
+	require.Equal(t, knownTimeout, timeout)
+	require.True(t, found)
 
-	// for a signer ID with a known vote, the cache should memorize the _first_ encountered vote
-	err = cache.AddVote(doubleVote)
-	assert.True(t, model.IsDoubleVoteError(err))
-	vote, found = cache.GetVote(doubleVote.SignerID)
-	assert.Equal(t, knownVote, vote)
-	assert.True(t, found)
+	// for a signer ID with a known timeout, the cache should memorize the _first_ encountered timeout
+	err = cache.AddTimeoutObject(doubleTimeout)
+	require.True(t, model.IsDoubleTimeoutError(err))
+	timeout, found = cache.GetTimeoutObject(doubleTimeout.SignerID)
+	require.Equal(t, knownTimeout, timeout)
+	require.True(t, found)
 }
 
-// TestTimeoutObjectsCache_All tests that All returns previously added votes in same order
+// TestTimeoutObjectsCache_All tests that All returns previously added timeouts in same order
 func TestTimeoutObjectsCache_All(t *testing.T) {
 	t.Parallel()
 
 	view := uint64(100)
 	cache := NewTimeoutObjectsCache(view)
-	expectedVotes := make([]*model.Vote, 0, 5)
-	for i := range expectedVotes {
-		vote := unittest.VoteFixture(unittest.WithVoteView(view))
-		expectedVotes[i] = vote
-		require.NoError(t, cache.AddVote(vote))
+	expectedTimeouts := make([]*model.TimeoutObject, 0, 5)
+	for i := range expectedTimeouts {
+		timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(view))
+		expectedTimeouts[i] = timeout
+		require.NoError(t, cache.AddTimeoutObject(timeout))
 	}
-	require.Equal(t, expectedVotes, cache.All())
+	require.Equal(t, expectedTimeouts, cache.All())
 }
 
-// TestTimeoutObjectsCache_RegisterVoteConsumer tests that registered vote consumer receives all previously added votes as well as
-// new ones in expected order.
-func TestTimeoutObjectsCache_RegisterVoteConsumer(t *testing.T) {
-	t.Parallel()
-
-	view := uint64(100)
-	cache := NewTimeoutObjectsCache(view)
-	votesBatchSize := 5
-	expectedVotes := make([]*model.Vote, 0, votesBatchSize)
-	// produce first batch before registering vote consumer
-	for i := range expectedVotes {
-		vote := unittest.VoteFixture(unittest.WithVoteView(view))
-		expectedVotes[i] = vote
-		require.NoError(t, cache.AddVote(vote))
-	}
-
-	consumedVotes := make([]*model.Vote, 0)
-	voteConsumer := func(vote *model.Vote) {
-		consumedVotes = append(consumedVotes, vote)
-	}
-
-	// registering vote consumer has to fill consumedVotes using callback
-	cache.RegisterVoteConsumer(voteConsumer)
-	// all cached votes should be fed into the consumer right away
-	require.Equal(t, expectedVotes, consumedVotes)
-
-	// produce second batch after registering vote consumer
-	for i := 0; i < votesBatchSize; i++ {
-		vote := unittest.VoteFixture(unittest.WithVoteView(view))
-		expectedVotes = append(expectedVotes, vote)
-		require.NoError(t, cache.AddVote(vote))
-	}
-
-	// at this point consumedVotes has to have all votes created before and after registering vote
-	// consumer, and they must be in same order
-	require.Equal(t, expectedVotes, consumedVotes)
-}
-
-// BenchmarkAdd measured the time it takes to add `numberVotes` concurrently to the TimeoutObjectsCache.
+// BenchmarkAdd measured the time it takes to add `numberTimeouts` concurrently to the TimeoutObjectsCache.
 // On MacBook with Intel i7-7820HQ CPU @ 2.90GHz:
-// adding 1 million votes in total, with 20 threads concurrently, took 0.48s
+// adding 1 million timeouts in total, with 20 threads concurrently, took 0.48s
 func BenchmarkAdd(b *testing.B) {
-	numberVotes := 1_000_000
+	numberTimeouts := 1_000_000
 	threads := 20
 
-	// Setup: create worker routines and votes to feed
+	// Setup: create worker routines and timeouts to feed
 	view := uint64(10)
 	cache := NewTimeoutObjectsCache(view)
 
@@ -141,25 +105,24 @@ func BenchmarkAdd(b *testing.B) {
 	var done sync.WaitGroup
 	done.Add(threads)
 
-	blockID := unittest.IdentifierFixture()
-	n := numberVotes / threads
+	n := numberTimeouts / threads
 
 	for ; threads > 0; threads-- {
 		go func(i int) {
-			// create votes and signal ready
-			votes := make([]model.Vote, 0, n)
-			for len(votes) < n {
-				v := unittest.VoteFixture(unittest.WithVoteView(view), unittest.WithVoteBlockID(blockID))
-				votes = append(votes, *v)
+			// create timeouts and signal ready
+			timeouts := make([]model.TimeoutObject, 0, n)
+			for len(timeouts) < n {
+				t := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(view))
+				timeouts = append(timeouts, *t)
 			}
 			start.Done()
 
 			// Wait for last worker routine to signal ready. Then,
-			// feed all votes into cache
+			// feed all timeouts into cache
 			start.Wait()
-			for _, v := range votes {
-				err := cache.AddVote(&v)
-				assert.NoError(b, err)
+			for _, v := range timeouts {
+				err := cache.AddTimeoutObject(&v)
+				require.NoError(b, err)
 			}
 			done.Done()
 		}(threads)
@@ -168,5 +131,5 @@ func BenchmarkAdd(b *testing.B) {
 	t1 := time.Now()
 	done.Wait()
 	duration := time.Since(t1)
-	fmt.Printf("=> adding %d votes to Cache took %f seconds\n", cache.Size(), duration.Seconds())
+	fmt.Printf("=> adding %d timeouts to Cache took %f seconds\n", cache.Size(), duration.Seconds())
 }

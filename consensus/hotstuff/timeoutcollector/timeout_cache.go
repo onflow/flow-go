@@ -70,6 +70,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 		}
 		return RepeatedTimeoutErr
 	}
+	vc.timeouts[timeout.SignerID] = timeout
 
 	return nil
 }
