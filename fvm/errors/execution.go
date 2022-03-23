@@ -64,11 +64,10 @@ type TransactionFeeDeductionFailedError struct {
 }
 
 // NewTransactionFeeDeductionFailedError constructs a new TransactionFeeDeductionFailedError
-func NewTransactionFeeDeductionFailedError(payer flow.Address, txFees uint64, err error) *TransactionFeeDeductionFailedError {
+func NewTransactionFeeDeductionFailedError(payer flow.Address, err error) *TransactionFeeDeductionFailedError {
 	return &TransactionFeeDeductionFailedError{
-		Payer:  payer,
-		TxFees: txFees,
-		err:    err,
+		Payer: payer,
+		err:   err,
 	}
 }
 
@@ -307,4 +306,41 @@ func (e *EncodingUnsupportedValueError) Error() string {
 // Code returns the error code for this error
 func (e *EncodingUnsupportedValueError) Code() ErrorCode {
 	return ErrCodeEncodingUnsupportedValue
+}
+
+// An CouldNotGetExecutionParameterFromStateError indicates that computation has exceeded its limit.
+type CouldNotGetExecutionParameterFromStateError struct {
+	address    string
+	domain     string
+	identifier string
+}
+
+// NewCouldNotGetExecutionParameterFromStateError constructs a new CouldNotGetExecutionParameterFromStateError
+func NewCouldNotGetExecutionParameterFromStateError(address, domain, identifier string) *CouldNotGetExecutionParameterFromStateError {
+	return &CouldNotGetExecutionParameterFromStateError{
+		address:    address,
+		domain:     domain,
+		identifier: identifier,
+	}
+}
+
+// Code returns the error code for this error
+func (e CouldNotGetExecutionParameterFromStateError) Code() ErrorCode {
+	return ErrCodeCouldNotDecodeExecutionParameterFromState
+}
+
+func (e CouldNotGetExecutionParameterFromStateError) Error() string {
+	return fmt.Sprintf(
+		"%s could not get execution parameter from the state (address: %s path: %s/%s)",
+		e.Code().String(),
+		e.address,
+		e.domain,
+		e.identifier,
+	)
+}
+
+// IsCouldNotGetExecutionParameterFromStateError returns true if error has this type
+func IsCouldNotGetExecutionParameterFromStateError(err error) bool {
+	var t *CouldNotGetExecutionParameterFromStateError
+	return errors.As(err, &t)
 }

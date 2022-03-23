@@ -64,7 +64,12 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	suite.cancel = cancel
 
 	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
-		ctx, suite.T(), count, logger, 100, nil, WithIdentityOpts(unittest.WithAllRoles()),
+		ctx,
+		suite.T(),
+		count,
+		logger,
+		nil,
+		WithIdentityOpts(unittest.WithAllRoles()),
 	)
 
 	for _, observableConnMgr := range obs {

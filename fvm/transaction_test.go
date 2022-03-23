@@ -3,6 +3,7 @@ package fvm_test
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
+	basicMeter "github.com/onflow/flow-go/fvm/meter/basic"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -23,7 +25,10 @@ import (
 func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []flow.AccountPublicKey) (flow.Address, flow.Address, *state.StateHolder) {
 
 	ledger := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(ledger))
+	sth := state.NewStateHolder(state.NewState(
+		ledger,
+		state.WithMeter(basicMeter.NewMeter(math.MaxUint64, math.MaxUint64))),
+	)
 
 	a := flow.HexToAddress("1234")
 	b := flow.HexToAddress("5678")
