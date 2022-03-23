@@ -37,7 +37,7 @@ type Level1TestResult struct {
 	// test specific data
 	Test      string   `json:"test"`
 	Package   string   `json:"package"`
-	Output    []string `json:"output"`
+	Output    []string `json:"output,omitempty"`
 	Elapsed   float64  `json:"elapsed"`
 	Pass      int      `json:"pass"`
 	Exception int      `json:"exception"`

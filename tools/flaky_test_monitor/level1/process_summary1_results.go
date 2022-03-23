@@ -199,6 +199,11 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 
 			testResult.Action = ""
 
+			// only save output for failed tests
+			if testResult.Pass == 1 {
+				testResult.Output = nil
+			}
+
 			// only include passed or failed tests - don't include skipped tests
 			// this is needed to have accurate Grafana metrics for average pass rate
 			level1Summary = append(level1Summary, *testResult)
