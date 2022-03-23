@@ -53,10 +53,11 @@ type PaceMaker interface {
 	TimeoutChannel() <-chan time.Time
 
 	// OnTimeout is called when a timeout, which was previously created by the PaceMaker, has
-	// looped through the event loop. Triggering a timeout will result with high probability in creating a TimeoutObject.
+	// looped through the event loop.
+	// Triggering a timeout will result with high probability in creating a TimeoutObject.
 	// It is the responsibility of the calling code to ensure that NO STALE timeouts are
 	// delivered to the PaceMaker.
-	OnTimeout()
+	OnTimeout() *model.TimeoutObject
 
 	// OnPartialTC is called when TimeoutAggregator has collected f+1 timeouts. This implements Bracha style timeouts,
 	// which times out current view after receiving partial TC.

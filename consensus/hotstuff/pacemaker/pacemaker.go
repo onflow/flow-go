@@ -140,10 +140,11 @@ func (p *NitroPaceMaker) actOnBlockForCurView(block *model.Block, isLeaderForNex
 
 // OnTimeout notifies the pacemaker that the timeout event has looped through the event loop.
 // It always trigger a view change, and the new view will be returned as NewViewEvent
-func (p *NitroPaceMaker) OnTimeout() {
+func (p *NitroPaceMaker) OnTimeout() *model.TimeoutObject {
 	p.emitTimeoutNotifications(p.timeoutControl.TimerInfo())
 	p.timeoutControl.OnTimeout()
 	p.gotoView(p.currentView + 1)
+	return nil
 }
 
 func (p *NitroPaceMaker) emitTimeoutNotifications(timeout *model.TimerInfo) {

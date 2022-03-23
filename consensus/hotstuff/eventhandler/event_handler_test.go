@@ -65,10 +65,11 @@ func (p *TestPaceMaker) OnPartialTC(curView uint64) {
 //	return newView, changed
 //}
 
-func (p *TestPaceMaker) OnTimeout() {
+func (p *TestPaceMaker) OnTimeout() *model.TimeoutObject {
 	oldView := p.CurView()
 	p.PaceMaker.OnTimeout()
 	log.Info().Msgf("pacemaker.OnTimeout old view: %v, new view: %v\n", oldView, p.CurView())
+	return nil
 }
 
 // using a real pacemaker for testing event handler
