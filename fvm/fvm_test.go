@@ -3795,3 +3795,87 @@ func TestEnforcingComputationLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestStorageCapacity(t *testing.T) {
+	t.Run("Storage capacity updates on FLOW transfer", newVMTest().
+		withContextOptions(
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+		).
+		withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(10_0000_0000),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		).
+		run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			service := chain.ServiceAddress()
+			signer := createAccount(t, vm, chain, ctx, view, programs)
+			target := createAccount(t, vm, chain, ctx, view, programs)
+
+			// Transfer FLOW from service account to test accounts
+
+			transferTxBody := transferTokensTx(chain).
+				AddAuthorizer(service).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(signer))).
+				SetProposalKey(service, 0, 0).
+				SetPayer(service)
+			tx := fvm.Transaction(transferTxBody, 0)
+			err := vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			transferTxBody = transferTokensTx(chain).
+				AddAuthorizer(service).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
+				SetProposalKey(service, 0, 0).
+				SetPayer(service)
+			tx = fvm.Transaction(transferTxBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			// Perform test
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+					import FungibleToken from 0x%s
+					import FlowToken from 0x%s
+		
+					transaction(target: Address) {
+						prepare(signer: AuthAccount) {
+							let receiverRef = getAccount(target)
+								.getCapability(/public/flowTokenReceiver)
+								.borrow<&{FungibleToken.Receiver}>()
+								?? panic("Could not borrow receiver reference to the recipient''s Vault")
+							
+							let vaultRef = signer
+								.borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
+								?? panic("Could not borrow reference to the owner''s Vault!")
+							
+							var cap0: UInt64 = signer.storageCapacity
+							
+							receiverRef.deposit(from: <- vaultRef.withdraw(amount: 0.0000001))
+							
+							var cap1: UInt64 = signer.storageCapacity
+							
+							log(cap0 - cap1)
+						}
+					}`,
+					fvm.FungibleTokenAddress(chain),
+					fvm.FlowTokenAddress(chain),
+				))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(target))).
+				AddAuthorizer(signer)
+
+			tx = fvm.Transaction(txBody, 0)
+
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			require.Len(t, tx.Logs, 1)
+			assert.Equal(t, tx.Logs[0], "1")
+		}),
+	)
+}
