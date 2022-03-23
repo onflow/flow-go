@@ -379,13 +379,13 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 			{
 				signTag: "",
 				require: func(t *testing.T, sigOk bool, err error) {
-					require.Error(t, err)
+					require.NoError(t, err)
 					require.False(t, sigOk)
 				},
 			}, {
 				signTag: "random_tag",
 				require: func(t *testing.T, sigOk bool, err error) {
-					require.Error(t, err)
+					require.NoError(t, err)
 					require.False(t, sigOk)
 				},
 			},

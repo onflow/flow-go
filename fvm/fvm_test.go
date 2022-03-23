@@ -1,7 +1,6 @@
 package fvm_test
 
 import (
-	"crypto"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
@@ -2989,77 +2988,40 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			}),
 	)
 }
-func TestSigningWithTags(t *testing.T) {
 
-	checkWithTag := func(tag []byte, shouldWork bool) func(t *testing.T) {
-		return newVMTest().
-			run(
-				func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-					// Create an account private key.
-					privateKey, err := testutil.GenerateAccountPrivateKey()
-					require.NoError(t, err)
+// TestHappyPathSigning checks that a signing a transaction with `SignMessageWithTag` doesn't produce an error.
+// Transaction verification tests are in `TestVerifySignatureFromTransaction`.
+func TestHappyPathTransactionSigning(t *testing.T) {
 
-					// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-					accounts, err := testutil.CreateAccounts(vm, view, programs, []flow.AccountPrivateKey{privateKey}, chain)
-					require.NoError(t, err)
+	newVMTest().run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			// Create an account private key.
+			privateKey, err := testutil.GenerateAccountPrivateKey()
+			require.NoError(t, err)
 
-					txBody := flow.NewTransactionBody().
-						SetScript([]byte(`transaction(){}`))
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, view, programs, []flow.AccountPrivateKey{privateKey}, chain)
+			require.NoError(t, err)
 
-					txBody.SetProposalKey(accounts[0], 0, 0)
-					txBody.SetPayer(accounts[0])
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`transaction(){}`))
 
-					hasher, err := exeUtils.NewHasher(privateKey.HashAlgo)
-					require.NoError(t, err)
+			txBody.SetProposalKey(accounts[0], 0, 0)
+			txBody.SetPayer(accounts[0])
 
-					sig, err := txBody.SignMessageWithTag(txBody.EnvelopeMessage(), tag, privateKey.PrivateKey, hasher)
-					require.NoError(t, err)
-					txBody.AddEnvelopeSignature(accounts[0], 0, sig)
+			hasher, err := exeUtils.NewHasher(privateKey.HashAlgo)
+			require.NoError(t, err)
 
-					tx := fvm.Transaction(txBody, 0)
+			sig, err := txBody.SignMessageWithTag(txBody.EnvelopeMessage(), privateKey.PrivateKey, hasher)
+			require.NoError(t, err)
+			txBody.AddEnvelopeSignature(accounts[0], 0, sig)
 
-					err = vm.Run(ctx, tx, view, programs)
-					require.NoError(t, err)
-					if shouldWork {
-						require.NoError(t, tx.Err)
-					} else {
-						require.Error(t, tx.Err)
-						require.IsType(t, tx.Err, &errors.InvalidProposalSignatureError{})
-					}
-				},
-			)
-	}
+			tx := fvm.Transaction(txBody, 0)
 
-	cases := []struct {
-		name       string
-		tag        []byte
-		shouldWork bool
-	}{
-		{
-			name:       "no tag",
-			tag:        nil,
-			shouldWork: false,
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, tx.Err)
 		},
-		{
-			name:       "transaction tag",
-			tag:        flow.TransactionDomainTag[:],
-			shouldWork: true,
-		},
-		{
-			name:       "random tag",
-			tag:        []byte("random_tag"),
-			shouldWork: false,
-		},
-	}
-
-	for i, c := range cases {
-		works := "works"
-		if !c.shouldWork {
-			works = "doesn't work"
-		}
-		t.Run(fmt.Sprintf("Signing Transactions %d: with %s %s", i, c.name, works), checkWithTag(c.tag, c.shouldWork))
-	}
-
+	)
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {

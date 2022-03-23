@@ -117,8 +117,17 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) error {
 	return nil
 }
 
-// VerifySignatureFromRuntime is an adapter that performs signature verification using
-// raw values provided by the Cadence runtime.
+// VerifySignatureFromRuntime performs signature verification using raw values provided
+// by the Cadence runtime.
+//
+// The signature/hash function combinations accepted are:
+//   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256/Keccak256.
+//   - BLS (on BLS12-381 curve) with the specific KMAC128 for BLS.
+// The tag is applied to the message depending on the hash function used.
+//
+// The function errors:
+//  - NewValueErrorf for any user error
+//  - panic for any other unexpected error
 func VerifySignatureFromRuntime(
 	signature []byte,
 	tag string,
@@ -188,21 +197,42 @@ func VerifySignatureFromRuntime(
 	return valid, nil
 }
 
+// VerifySignatureFromRuntime performs signature verification using raw values provided
+// by the Cadence runtime.
+//
+// The signature/hash function combinations accepted are:
+//   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256.
+// The tag is applied to the message as a constant length prefix.
+//
+// The function errors:
+//  - NewValueErrorf for any user error
+//  - panic for any other unexpected error
 func VerifySignatureFromTransaction(
 	signature []byte,
 	message []byte,
-	publicKey crypto.PublicKey,
+	pk crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
 ) (bool, error) {
 
-	var hasher hash.Hasher
+	// check ECDSA compatibilites
+	if pk.Algorithm() != crypto.ECDSAP256 && pk.Algorithm() != crypto.ECDSASecp256k1 {
+		// TODO: check if we should panic
+		// This case only happens in production if there is a bug
+		return false, errors.NewValueErrorf(pk.Algorithm().String(), "is not supported in transactions")
+	}
+	// hashing compatibility
+	if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
+		// TODO: check if we should panic
+		// This case only happens in production if there is a bug
+		return false, errors.NewValueErrorf(hashAlgo.String(), "is not supported in transactions")
+	}
 
-	var err error
-	if hasher, err = NewPrefixedHashing(hashAlgo, flow.TransactionTagString); err != nil {
+	hasher, err := NewPrefixedHashing(hashAlgo, flow.TransactionTagString)
+	if err != nil {
 		return false, errors.NewValueErrorf(err.Error(), "transaction verification failed")
 	}
 
-	valid, err := publicKey.Verify(signature, message, hasher)
+	valid, err := pk.Verify(signature, message, hasher)
 	if err != nil {
 		// All inputs are guaranteed to be valid at this stage.
 		// The check for crypto.InvalidInputs is only a sanity check
