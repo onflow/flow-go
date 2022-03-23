@@ -11,7 +11,8 @@ on:
       - master
 
 env:
-  BIGQUERY_TABLE: dev_src_flow_test_metrics.test_results # TODO: update to production table before merging
+  BIGQUERY_DATASET: dev_src_flow_test_metrics # TODO: update to production table before merging
+  BIGQUERY_TABLE: test_results
 
 jobs:
   flaky-test-summary:
@@ -70,4 +71,4 @@ jobs:
       with:
         timeout_minutes: 2
         max_attempts: 3
-        command: bq load --source_format=NEWLINE_DELIMITED_JSON --autodetect $BIGQUERY_TABLE $RESULTS_FILE
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $RESULTS_FILE  tools/flaky_test_monitor/schemas/test_results_schema.json

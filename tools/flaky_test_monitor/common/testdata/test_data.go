@@ -41,30 +41,25 @@ func getJobRunDate() time.Time {
 	return jobRunDate
 }
 
-func getPassedTest(name string) common.Level1TestResultRow {
+func getPassedTest(name string) common.Level1TestResult {
 	return getPassedTestPackage(name, CRYPTO_HASH_PACKAGE)
 }
 
-func getPassedTestPackage(name string, packageName string) common.Level1TestResultRow {
-	row := common.Level1TestResultRow{
-		TestResult: common.Level1TestResult{
-			CommitSha:  COMMIT_SHA,
-			CommitDate: getCommitDate(),
-			JobRunDate: getJobRunDate(),
-			Test:       name,
-			Package:    packageName,
-			Result:     "1",
-			Exception:  false,
-			Elapsed:    0,
-			Output: []struct {
-				Item string "json:\"item\""
-			}{
-				{Item: "=== RUN   " + name + "\n"},
-				{Item: "--- PASS: " + name + " (0.00s)\n"},
-			},
+func getPassedTestPackage(name string, packageName string) common.Level1TestResult {
+	return common.Level1TestResult{
+		CommitSha:  COMMIT_SHA,
+		CommitDate: getCommitDate(),
+		JobRunDate: getJobRunDate(),
+		Test:       name,
+		Package:    packageName,
+		Pass:       1,
+		Exception:  0,
+		Elapsed:    0,
+		Output: []string{
+			"=== RUN   " + name + "\n",
+			"--- PASS: " + name + " (0.00s)\n",
 		},
 	}
-	return row
 }
 
 func getPassedTestElapsed(name string, elapsed float32, elapsedStr string) common.Level1TestResultRow {

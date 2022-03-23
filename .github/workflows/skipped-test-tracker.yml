@@ -9,7 +9,8 @@ on:
       - master
 
 env:
-  BIGQUERY_TABLE: dev_src_flow_test_metrics.skipped_tests # TODO: replace with prod before merging
+  BIGQUERY_DATASET: dev_src_flow_test_metrics # TODO: replace with prod before merging
+  BIGQUERY_TABLE: skipped_tests
 
 jobs:
   skipped-test-tracker:
@@ -32,7 +33,6 @@ jobs:
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: replace with github.sha or $GITHUB_SHA before merging
-      RUN_ID: ${{ github.run_id }}
       SKIPPED_TESTS_FILE: skipped-tests
       TEST_OUTPUT_FILE: test-output
     runs-on: ubuntu-latest
@@ -71,4 +71,4 @@ jobs:
       with:
         timeout_minutes: 1
         max_attempts: 3
-        command: bq load --source_format=NEWLINE_DELIMITED_JSON --autodetect $BIGQUERY_TABLE $SKIPPED_TESTS_FILE
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $SKIPPED_TESTS_FILE tools/flaky_test_monitor/schemas/skipped_tests_schema.json
