@@ -256,7 +256,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 					// skip BLS to only cover ECDSA in this test
 					continue
 				}
-				for h, _ := range hMaps {
+				for h := range hMaps {
 					t.Run(fmt.Sprintf("hash tag: %v, verify tag: %v [%v, %v]", c.signTag, c.verifyTag, s, h), func(t *testing.T) {
 
 						seed := make([]byte, seedLength)
@@ -393,7 +393,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 
 		for _, c := range cases {
 			for s, hMaps := range correctCombinations {
-				for h, _ := range hMaps {
+				for h := range hMaps {
 					t.Run(fmt.Sprintf("sign tag: %v [%v, %v]", c.signTag, s, h), func(t *testing.T) {
 						seed := make([]byte, seedLength)
 						rand.Read(seed)

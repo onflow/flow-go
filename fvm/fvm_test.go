@@ -3019,6 +3019,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
 			require.NoError(t, tx.Err)
 		},
 	)
