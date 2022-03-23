@@ -61,6 +61,9 @@ var transactionsDuplicateCmd = &cobra.Command{
 		// txID -> list of blocks
 		megaMap := map[flow.Identifier]map[flow.Identifier]struct{}{}
 
+		blockNo := 0
+		totalTxs := 0
+
 		_, err := headers.FindHeaders(func(header *flow.Header) bool {
 
 			blockID := header.ID()
@@ -73,7 +76,7 @@ var transactionsDuplicateCmd = &cobra.Command{
 			for _, guarantee := range block.Payload.Guarantees {
 				lightCollection, err := storages.Collections.LightByID(guarantee.CollectionID)
 				if err != nil {
-					panic(fmt.Sprintf("cannot get light collection %s", guarantee.CollectionID))
+					panic(fmt.Sprintf("cannot get light collection %s %s", guarantee.CollectionID, err))
 				}
 				for _, txID := range lightCollection.Transactions {
 
@@ -87,8 +90,15 @@ var transactionsDuplicateCmd = &cobra.Command{
 
 					megaMap[txID][blockID] = struct{}{}
 
+					totalTxs++
 					txIndex++
 				}
+			}
+
+			blockNo++
+
+			if blockNo%10000 == 0 {
+				log.Info().Int("blocks", blockNo).Int("total_tx", totalTxs).Msg("processing progress")
 			}
 
 			return false
