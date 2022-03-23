@@ -7,25 +7,52 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestConnectorHappyPath(t *testing.T) {
 	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, factory *mockCorruptibleConduitFactory) {
 		connector := NewCorruptedConnector(flow.IdentityList{&corruptedId})
+		attackerAddress := "dummy-attacker-address"
+		connector.WithAttackerAddress(attackerAddress)
 
+		registerMsgReceived := make(chan struct{})
 		go func() {
-			msg := <-factory.attackerRegMsg
+			receivedRegMsg := <-factory.attackerRegMsg
+			require.Equal(t, attackerAddress, receivedRegMsg.Address)
 
+			close(registerMsgReceived)
+		}()
+
+		msg, _, _ := messageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST)
+		sentMsgReceived := make(chan struct{})
+		go func() {
+			receivedMsg := <-factory.attackerMsg
+
+			// received message should have an exact match on the relevant fields.
+			// Note: only fields filled by test fixtures are checked, as some others
+			// are filled by gRPC on the fly, which are not relevant to the test's sanity.
+			require.Equal(t, receivedMsg.Payload, msg.Payload)
+			require.Equal(t, receivedMsg.Protocol, msg.Protocol)
+			require.Equal(t, receivedMsg.OriginID, msg.OriginID)
+			require.Equal(t, receivedMsg.TargetNum, msg.TargetNum)
+			require.Equal(t, receivedMsg.TargetIDs, msg.TargetIDs)
+			require.Equal(t, receivedMsg.ChannelID, msg.ChannelID)
+
+			close(sentMsgReceived)
 		}()
 
 		connection, err := connector.Connect(context.Background(), corruptedId.NodeID)
 		require.NoError(t, err)
 
-		connection.SendMessage()
+		require.NoError(t, connection.SendMessage(msg))
 
+		unittest.RequireCloseBefore(t, registerMsgReceived, 1*time.Second, "factory could not receive register message on time")
+		unittest.RequireCloseBefore(t, sentMsgReceived, 1*time.Second, "factory could not receive message sent on connection on time")
 	})
 }
 

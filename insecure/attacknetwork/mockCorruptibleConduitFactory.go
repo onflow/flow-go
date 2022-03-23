@@ -29,8 +29,8 @@ type mockCorruptibleConduitFactory struct {
 func newMockCorruptibleConduitFactory(address string) *mockCorruptibleConduitFactory {
 
 	factory := &mockCorruptibleConduitFactory{
-		attackerRegMsg: make(chan *insecure.AttackerRegisterMessage, 1),
-		attackerMsg:    make(chan *insecure.Message, 1),
+		attackerRegMsg: make(chan *insecure.AttackerRegisterMessage),
+		attackerMsg:    make(chan *insecure.Message),
 	}
 
 	cm := component.NewComponentManagerBuilder().
