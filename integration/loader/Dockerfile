@@ -36,6 +36,7 @@ ARG TARGET
 COPY . .
 
 # Copy over Relic build artifacts
+# TODO the path does not exist anymore
 COPY --from=build-relic /build/crypto/relic/build ./crypto/relic/build
 
 FROM build-env as build-production
