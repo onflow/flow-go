@@ -27,6 +27,7 @@ const (
 	ContractNameClusterQC    = "FlowClusterQC"
 	ContractNameDKG          = "FlowDKG"
 	ContractServiceAccount   = "FlowServiceAccount"
+	ContractNameFlowFees     = "FlowFees"
 	ContractStorageFees      = "FlowStorageFees"
 	ContractDeploymentAudits = "FlowContractAudits"
 
