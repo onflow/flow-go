@@ -153,6 +153,7 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 	var level1Summary common.Level1Summary
 	skippedTests := make(map[string]*common.SkippedTestEntry)
 	trackSkippedTests := getSkippedTestFile() != ""
+	testCategory := getTestCategory()
 
 	for _, testResults := range testResultMap {
 		for _, testResult := range testResults {
@@ -162,6 +163,7 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 					Package:    testResult.Package,
 					CommitDate: testResult.CommitDate,
 					CommitSHA:  testResult.CommitSha,
+					Category:   testCategory,
 				}
 				skippedTests[testResult.Test] = skippedTestEntry
 
@@ -208,6 +210,10 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 
 func getSkippedTestFile() string {
 	return os.Getenv("SKIPPED_TESTS_FILE")
+}
+
+func getTestCategory() string {
+	return os.Getenv("TEST_CATEGORY")
 }
 
 // level 1 flaky test summary processor

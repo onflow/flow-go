@@ -12,6 +12,7 @@ type SkippedTestEntry struct {
 	Package    string              `json:"package"`
 	CommitDate time.Time           `json:"commit_date"`
 	CommitSHA  string              `json:"commit_sha"`
+	Category   string              `json:"category"`
 }
 
 // RawTestStep models single line from "go test -json" output.
