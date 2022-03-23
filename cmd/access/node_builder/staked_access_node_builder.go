@@ -316,13 +316,13 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 		if builder.HeroCacheMetricsEnable {
-			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+			heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
 		}
 		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
 			builder.Logger,
 			heroCacheCollector)
 
-		err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+		err := node.Metrics.Mempool.Register("public_"+metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 		if err != nil {
 			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 		}
