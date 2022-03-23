@@ -41,6 +41,8 @@ type Level1TestResult struct {
 	Elapsed   float64  `json:"elapsed"`
 	Pass      int      `json:"pass"`
 	Exception int      `json:"exception"`
+
+	Action string `json:"-"`
 }
 
 type Level1Summary []Level1TestResult

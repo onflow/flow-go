@@ -7,10 +7,10 @@ import (
 )
 
 type Config struct {
-	FailureThresholdPercent float32 `json:"failures_threshold_percent"`
+	FailureThresholdPercent float64 `json:"failures_threshold_percent"`
 	FailuresSliceMax        int     `json:"failures_slice_max"`
 
-	DurationThresholdSeconds float32 `json:"duration_threshold_seconds"`
+	DurationThresholdSeconds float64 `json:"duration_threshold_seconds"`
 	DurationSliceMax         int     `json:"duration_slice_max"`
 }
 

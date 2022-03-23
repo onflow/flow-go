@@ -27,47 +27,36 @@ func generateLevel2SummaryFromStructs(level1Summaries []common.Level1Summary) co
 
 	// go through all level 1 test runs create level 2 summary
 	for i := 0; i < len(level1Summaries); i++ {
-		for _, level1TestResultRow := range level1Summaries[i].Rows {
+		for _, level1TestResultRow := range level1Summaries[i] {
 			// check if already started collecting summary for this test
-			level2TestResultsMapKey := level1TestResultRow.TestResult.Package + "/" + level1TestResultRow.TestResult.Test
+			level2TestResultsMapKey := level1TestResultRow.Package + "/" + level1TestResultRow.Test
 			level2TestResult, level2TestResultExists := level2Summary.TestResultsMap[level2TestResultsMapKey]
 
 			// this test doesn't have a summary so create one
 			// no need to specify other fields explicitly - default values will suffice
 			if !level2TestResultExists {
 				level2TestResult = &common.Level2TestResult{
-					Test:    level1TestResultRow.TestResult.Test,
-					Package: level1TestResultRow.TestResult.Package,
+					Test:    level1TestResultRow.Test,
+					Package: level1TestResultRow.Package,
 				}
 			}
 			// keep track of each duration so can later calculate average duration
-			level2TestResult.Durations = append(level2TestResult.Durations, level1TestResultRow.TestResult.Elapsed)
+			level2TestResult.Durations = append(level2TestResult.Durations, level1TestResultRow.Elapsed)
 
 			// increment # of passes, fails, skips or exceptions for this test
 			level2TestResult.Runs++
-			switch level1TestResultRow.TestResult.Result {
-			case "1":
+			if level1TestResultRow.Pass == 1 {
 				level2TestResult.Passed++
-			case "0":
+			} else {
 				level2TestResult.Failed++
 
 				// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
-				if level1TestResultRow.TestResult.Exception {
+				if level1TestResultRow.Exception == 1 {
 					level2TestResult.Exceptions++
-					saveExceptionMessage(level1TestResultRow.TestResult)
+					saveExceptionMessage(level1TestResultRow)
 				} else {
-					saveFailureMessage(level1TestResultRow.TestResult)
+					saveFailureMessage(level1TestResultRow)
 				}
-			case "skip":
-				level2TestResult.Skipped++
-
-				// don't count skip as a run
-				level2TestResult.Runs--
-
-				// truncate last duration - don't count durations of skips
-				level2TestResult.Durations = level2TestResult.Durations[:len(level2TestResult.Durations)-1]
-			default:
-				panic(fmt.Sprintf("unexpected test result: %s", level1TestResultRow.TestResult.Result))
 			}
 
 			level2Summary.TestResultsMap[level2TestResultsMapKey] = level2TestResult
@@ -147,7 +136,7 @@ func saveMessageHelper(testResult common.Level1TestResult, messagesDir string, m
 	defer messageFile.Close()
 
 	for _, output := range testResult.Output {
-		_, err = messageFile.WriteString(output.Item)
+		_, err = messageFile.WriteString(output)
 		common.AssertNoError(err, "error writing to failure / exception file")
 	}
 }
@@ -156,7 +145,7 @@ func saveMessageHelper(testResult common.Level1TestResult, messagesDir string, m
 func postProcessLevel2Summary(testSummary2 common.Level2Summary) {
 	for _, level2TestResult := range testSummary2.TestResultsMap {
 		// calculate average duration for each test summary
-		var durationSum float32 = 0
+		var durationSum float64 = 0
 		for _, duration := range level2TestResult.Durations {
 			durationSum += duration
 		}

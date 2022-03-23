@@ -89,9 +89,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 
 				// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
 				// for passing tests, there are usually 2 outputs for a passing test and more outputs for a failing test
-				newTestResult.Output = make([]struct {
-					Item string "json:\"item\""
-				}, 0)
+				newTestResult.Output = make([]string, 0)
 
 				// append to test result slice, whether it's the first or subsequent test result
 				testResultMap[testResultMapKey] = append(testResultMap[testResultMapKey], &newTestResult)
@@ -112,29 +110,27 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 			// subsequent raw json outputs will have different data about the test - whether it passed/failed, what the test output was, etc
 			switch rawTestStep.Action {
 			case "output":
-				output := struct {
-					Item string `json:"item"`
-				}{rawTestStep.Output}
-
 				// keep appending output to the test
-				lastTestResultPointer.Output = append(lastTestResultPointer.Output, output)
+				lastTestResultPointer.Output = append(lastTestResultPointer.Output, rawTestStep.Output)
 
 			// we need to convert pass / fail result into a numerical value so it can averaged and tracked on a graph
 			// pass is counted as 1, fail is counted as a 0
 			case "pass":
-				lastTestResultPointer.Result = "1"
+				lastTestResultPointer.Pass = 1
+				lastTestResultPointer.Action = "pass"
 				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
-				lastTestResultPointer.Exception = false
+				lastTestResultPointer.Exception = 0
 
 			case "fail":
-				lastTestResultPointer.Result = "0"
+				lastTestResultPointer.Pass = 0
+				lastTestResultPointer.Action = "fail"
 				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
-				lastTestResultPointer.Exception = false
+				lastTestResultPointer.Exception = 0
 
 			// skipped tests will be removed after all test results are gathered,
 			// since it would be more complicated to remove it here
 			case "skip":
-				lastTestResultPointer.Result = rawTestStep.Action
+				lastTestResultPointer.Action = "skip"
 				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
 
 			case "pause", "cont":
@@ -167,8 +163,8 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 				}
 				skippedTests[testResult.Test] = skippedTestEntry
 
-				if testResult.Result == "skip" {
-					output := testResult.Output[len(testResult.Output)-2].Item
+				if testResult.Action == "skip" {
+					output := testResult.Output[len(testResult.Output)-2]
 					r := regexp.MustCompile(`\[([a-zA-Z0-9_]+)]\n$`)
 					matches := r.FindStringSubmatch(output)
 
@@ -185,7 +181,7 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 				}
 			}
 
-			if testResult.Result == "skip" {
+			if testResult.Action == "skip" {
 				// don't add skipped tests to summary since they can't be used to compute an average pass rate
 				continue
 			}
@@ -193,15 +189,17 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 			// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
 			// we want to highlight these tests in Grafana
 			// we do this by setting the Exception field to true, so we can filter by that field in Grafana
-			if testResult.Result == "" {
+			if testResult.Action == "" {
 				// count exception as a failure
-				testResult.Result = "0"
-				testResult.Exception = true
+				testResult.Pass = 0
+				testResult.Exception = 1
 			}
+
+			testResult.Action = ""
 
 			// only include passed or failed tests - don't include skipped tests
 			// this is needed to have accurate Grafana metrics for average pass rate
-			level1Summary.Rows = append(level1Summary.Rows, common.Level1TestResultRow{TestResult: *testResult})
+			level1Summary = append(level1Summary, *testResult)
 		}
 	}
 

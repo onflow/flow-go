@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -22,9 +23,16 @@ type Level2TestResult struct {
 	Failed          int       `json:"failed"`
 	Skipped         int       `json:"skipped"`
 	Exceptions      int       `json:"exceptions"`
-	FailureRate     float32   `json:"failure_rate"`
-	AverageDuration float32   `json:"average_duration"`
-	Durations       []float32 `json:"durations"`
+	FailureRate     float64   `json:"failure_rate"`
+	AverageDuration float64   `json:"average_duration"`
+	Durations       []float64 `json:"durations"`
+}
+
+func checkFloatEqual(t *testing.T, expected, actual float64, message string) {
+	tolerance := .00001
+	if !(math.Abs(expected-actual) < tolerance) {
+		require.Equal(t, expected, actual, message)
+	}
 }
 
 // AssertLevel2TestResults checks that 2 Level2TestResult structs are equal, doing a deep comparison.
@@ -39,8 +47,8 @@ func AssertLevel2TestResults(t *testing.T, expectedLevel2TestResult, actualLevel
 	require.Equal(t, expectedLevel2TestResult.Skipped, actualLevel2TestResult.Skipped, "skipped not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, expectedLevel2TestResult.Exceptions, actualLevel2TestResult.Exceptions, "exceptions not equal; test: "+expectedLevel2TestResult.Test)
 
-	require.Equal(t, expectedLevel2TestResult.FailureRate, actualLevel2TestResult.FailureRate, "failure rate not equal; test: "+expectedLevel2TestResult.Test)
-	require.Equal(t, expectedLevel2TestResult.AverageDuration, actualLevel2TestResult.AverageDuration, "avg duration not equal; test: "+expectedLevel2TestResult.Test)
+	checkFloatEqual(t, expectedLevel2TestResult.FailureRate, actualLevel2TestResult.FailureRate, "failure rate not equal; test: "+expectedLevel2TestResult.Test)
+	checkFloatEqual(t, expectedLevel2TestResult.AverageDuration, actualLevel2TestResult.AverageDuration, "avg duration not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, len(expectedLevel2TestResult.Durations), len(actualLevel2TestResult.Durations), PrintLevel2TestResult(&actualLevel2TestResult, "duration list sizes don't match"))
 	// skip checking all individual durations because
 	// a. require.Contains() seems to have a bug for checking float values in a list

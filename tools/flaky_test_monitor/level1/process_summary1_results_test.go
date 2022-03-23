@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common/testdata"
 )
 
@@ -97,66 +96,15 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 			// *****************************************************
 			actualLevel1Summary, _ := generateLevel1Summary(&resultReader)
 			// *****************************************************
-			require.ElementsMatch(t, testData.ExpectedLevel1Summary.Rows, actualLevel1Summary.Rows)
+
+			fmt.Println(k)
+			fmt.Println("ACTUAL")
+			fmt.Println(actualLevel1Summary)
+			fmt.Println("EXPECTED")
+			fmt.Println(testData.ExpectedLevel1Summary)
+			require.ElementsMatch(t, testData.ExpectedLevel1Summary, actualLevel1Summary, "actual and expected level 1 summary do not match")
 		})
 	}
-}
-
-// TestGenerateLevel1Summary_JSON uses real level 1 JSON files as expected output.
-// Don't want to use too many tests since they are more brittle to changes to JSON data structure.
-// That's why have very few of these. For new tests, it's best to add level 1 expected data as structs.
-func TestGenerateLevel1Summary_JSON(t *testing.T) {
-	testDataMap := map[string]string{
-		"1 count all pass": "test-result-crypto-hash-1-count-pass.json",
-	}
-
-	for k, testJsonData := range testDataMap {
-		t.Run(k, func(t *testing.T) {
-			// *****************************************************
-			actualLevel1Summary := runGenerateLevel1Summary(t, testJsonData)
-			// *****************************************************
-			expectedLevel1Summary := getExpectedLevel1SummaryFromJSON(t, testJsonData)
-			require.ElementsMatch(t, expectedLevel1Summary.Rows, actualLevel1Summary.Rows)
-		})
-	}
-}
-
-// HELPERS - UTILITIES
-
-func getExpectedLevel1SummaryFromJSON(t *testing.T, file string) common.Level1Summary {
-	const expectedJsonFilePath = "../testdata/summary1/expected"
-
-	var expectedLevel1Summary common.Level1Summary
-	// read in expected JSON from file
-	expectedJsonBytes, err := os.ReadFile(filepath.Join(expectedJsonFilePath, file))
-	require.Nil(t, err)
-	require.NotEmpty(t, expectedJsonBytes)
-
-	err = json.Unmarshal(expectedJsonBytes, &expectedLevel1Summary)
-	require.Nil(t, err)
-	require.NotEmpty(t, expectedLevel1Summary.Rows)
-
-	return expectedLevel1Summary
-}
-
-func runGenerateLevel1Summary(t *testing.T, jsonExpectedActualFile string) common.Level1Summary {
-	const rawJsonFilePath = "../testdata/summary1/raw"
-
-	// these hard coded values simulate a real test run that would obtain these environment variables dynamically
-	// we are simulating this scenario by setting the environment variables explicitly in the test before calling the main processing script which will look for them
-	// these values are uses in testdata/expected/*.json files
-	require.NoError(t, os.Setenv("COMMIT_DATE", testdata.COMMIT_DATE))
-	require.NoError(t, os.Setenv("COMMIT_SHA", testdata.COMMIT_SHA))
-	require.NoError(t, os.Setenv("JOB_STARTED", testdata.JOB_STARTED))
-
-	// simulate generating raw "go test -json" output by loading output from saved file
-	resultReader := FileResultReader{
-		rawJsonFile: filepath.Join(rawJsonFilePath, jsonExpectedActualFile),
-	}
-	// *****************************************************
-	actualLevel1Summary, _ := generateLevel1Summary(&resultReader)
-	// *****************************************************
-	return actualLevel1Summary
 }
 
 // read raw results from local json file - for testing

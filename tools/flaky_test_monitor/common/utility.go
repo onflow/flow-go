@@ -25,17 +25,17 @@ func AssertNoError(err error, panicMessage string) {
 // ConvertToNDecimalPlaces2 converts the supplied numerator and denominator fraction into
 // a decimal with n decimal places. Works the same way as ConvertToNDecimalPlaces()
 // but has a float for the numerator.
-func ConvertToNDecimalPlaces2(n int, numerator float32, denominator int) float32 {
-	return convertToNDecimalPlacesInternal(n, numerator, float32(denominator))
+func ConvertToNDecimalPlaces2(n int, numerator float64, denominator int) float64 {
+	return convertToNDecimalPlacesInternal(n, numerator, float64(denominator))
 }
 
 // ConvertToNDecimalPlaces converts the supplied numerator and denominator fraction into
 // a decimal with n decimal places.
-func ConvertToNDecimalPlaces(n int, numerator, denominator int) float32 {
-	return convertToNDecimalPlacesInternal(n, float32(numerator), float32(denominator))
+func ConvertToNDecimalPlaces(n int, numerator, denominator int) float64 {
+	return convertToNDecimalPlacesInternal(n, float64(numerator), float64(denominator))
 }
 
-func convertToNDecimalPlacesInternal(n int, numerator, denominator float32) float32 {
+func convertToNDecimalPlacesInternal(n int, numerator, denominator float64) float64 {
 	if numerator == 0 || denominator == 0 {
 		return 0
 	}
@@ -43,7 +43,7 @@ func convertToNDecimalPlacesInternal(n int, numerator, denominator float32) floa
 	ratioString := fmt.Sprintf(formatSpecifier, numerator/denominator)
 	ratioFloat, err := strconv.ParseFloat(ratioString, 32)
 	AssertNoError(err, "failure parsing string to float")
-	return float32(ratioFloat)
+	return float64(ratioFloat)
 }
 
 func GetCommitSha() string {
