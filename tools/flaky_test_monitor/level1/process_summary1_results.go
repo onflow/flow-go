@@ -224,7 +224,7 @@ func main() {
 
 	resultsFile := resultReader.getResultsFileName()
 	if resultsFile != "" {
-		common.SaveToFile(resultsFile, testRun)
+		common.SaveLinesToFile(resultsFile, testRun)
 	}
 
 	skippedTestsFile := getSkippedTestFile()
