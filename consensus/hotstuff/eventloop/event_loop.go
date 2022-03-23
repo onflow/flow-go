@@ -186,7 +186,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 				return fmt.Errorf("could not process QC: %w", err)
 			}
 
-			// if we have a new QC, process it
+			// if we have a new TC, process it
 		case tc := <-el.timeoutCertificates:
 			// measure how long the event loop was idle waiting for an
 			// incoming event

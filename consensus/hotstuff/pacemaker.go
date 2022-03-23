@@ -58,7 +58,7 @@ type PaceMaker interface {
 	// delivered to the PaceMaker.
 	OnTimeout()
 
-	// OnPartialTC is called when TC collector will collect f+1 timeouts. This implements Bracha style timeouts,
+	// OnPartialTC is called when TimeoutAggregator has collected f+1 timeouts. This implements Bracha style timeouts,
 	// which times out current view after receiving partial TC.
 	OnPartialTC(curView uint64)
 
