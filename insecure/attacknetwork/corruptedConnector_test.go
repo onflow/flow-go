@@ -14,15 +14,23 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestConnectorHappy path checks that a CorruptedConnector can successfully create a connection to a remote corruptible conduit factory.
+// Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion.
 func TestConnectorHappyPath(t *testing.T) {
 	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, factory *mockCorruptibleConduitFactory) {
 		connector := NewCorruptedConnector(flow.IdentityList{&corruptedId})
+		// attacker address is solely used as part of register message,
+		// hence no real network address needed.
 		attackerAddress := "dummy-attacker-address"
+
 		connector.WithAttackerAddress(attackerAddress)
 
+		// goroutine checks the mock factory for receiving the register message from connector.
+		// the register message arrives as the connector attempts a connection on to the factory.
 		registerMsgReceived := make(chan struct{})
 		go func() {
 			receivedRegMsg := <-factory.attackerRegMsg
+			// register message
 			require.Equal(t, attackerAddress, receivedRegMsg.Address)
 
 			close(registerMsgReceived)
