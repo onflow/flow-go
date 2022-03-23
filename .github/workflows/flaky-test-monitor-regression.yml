@@ -1,22 +1,17 @@
-name: Flaky Test Monitor
+name: Flaky Test Monitor Test
 
 on:
-  schedule:
-    - cron: '0 */4 * * *' # every 4 hours
   push:
     branches:
-      - master
-  pull_request: # TODO: remove this before merging
+      - staging
+      - trying
+  pull_request:
     branches:
       - master
 
-env:
-  BIGQUERY_DATASET: dev_src_flow_test_metrics # TODO: update to production table before merging
-  BIGQUERY_TABLE: test_results
-
 jobs:
-  flaky-test-summary:
-    name: Flaky Test Summary
+  flaky-test-monitor-regression:
+    name: Flaky Test Monitor Test
     strategy:
       fail-fast: false
       matrix:
@@ -34,19 +29,16 @@ jobs:
           - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
-      COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: replace with github.sha or $GITHUB_SHA before merging
+      COMMIT_SHA: ${{ github.event.pull_request.head.sha }} 
       RUN_ID: ${{ github.run_id }}
       RESULTS_FILE: test-results
+      SKIPPED_TESTS_FILE: skipped-tests
       TEST_OUTPUT_FILE: test-output
     runs-on: ubuntu-latest
     steps:
     - name: Get job run date
       id: job_run_date
       run: echo "::set-output name=date::$(TZ=":America/Los_Angeles" date -Iseconds)"
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v0
-      with:
-        service_account_key: ${{ secrets.GCP_SA_KEY }}
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
@@ -59,16 +51,9 @@ jobs:
       id: commit_date
       run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
     - name: Run tests
-      continue-on-error: true
       run: ./tools/flaky_test_monitor/run-tests.sh
     - name: Process test results
       run: cat $TEST_OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go
       env:
         JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
         COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
-    - name: Upload results to BigQuery
-      uses: nick-fields/retry@v2
-      with:
-        timeout_minutes: 2
-        max_attempts: 3
-        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $RESULTS_FILE tools/flaky_test_monitor/schemas/test_results_schema.json
