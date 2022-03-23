@@ -1094,3 +1094,61 @@ func TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag(t *testing.T) {
 	require.Equal(t, expectedAllocatedRegCount, updatedTrie.AllocatedRegCount())
 	require.Equal(t, expectedAllocatedRegSize, updatedTrie.AllocatedRegSize())
 }
+
+// Test_HandlingEmptyRegistersWithMixedPruneFlag tests that the trie treat empty registers correctly;
+// specifically, treating the key in the payload as auxiliary information and makes no assumption
+// whether or not the keys are coupled
+// 1. a register with _empty_ Value is added with a NewTrieWithUpdatedRegisters call with prune = false.
+//    This created a new leaf in the tree, but does not increase the register count.
+// 2. In a second call, with NewTrieWithUpdatedRegisters call with prune = true we remove the leaf.
+// This should
+func Test_HandlingEmptyRegistersWithVariableAuxiliaryInformation(t *testing.T) {
+	rng := &LinearCongruentialGenerator{seed: 0}
+
+	// Allocate 10 registers
+	numberRegisters := 10
+	paths := make([]ledger.Path, numberRegisters)
+	payloads := make([]ledger.Payload, numberRegisters)
+	var totalPayloadSize uint64
+	for i := 0; i < numberRegisters; i++ {
+		var p ledger.Path
+		p[0] = byte(i)
+
+		payload := utils.LightPayload(rng.next(), rng.next())
+		paths[i] = p
+		payloads[i] = *payload
+
+		totalPayloadSize += uint64(payload.Size())
+	}
+
+	expectedAllocatedRegCount := uint64(numberRegisters)
+	expectedAllocatedRegSize := totalPayloadSize
+
+	// Update trie with registers to test reg count and size with new registers.
+	baseTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), paths, payloads, true)
+	require.NoError(t, err)
+	require.True(t, maxDepthTouched <= 256)
+	require.Equal(t, expectedAllocatedRegCount, baseTrie.AllocatedRegCount())
+	require.Equal(t, expectedAllocatedRegSize, baseTrie.AllocatedRegSize())
+
+	// Make a payload with an empty Value and add it to the tree, with flag `prune = false`
+	path := utils.PathByUint16LeftPadded(0)
+	payload := ledger.Payload{Key: utils.KeyFixture(0, "a")}
+
+	// As we are adding an empty register, the register count should not change
+	unprunedTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path}, []ledger.Payload{payload}, false)
+	require.NoError(t, err)
+	require.True(t, maxDepthTouched <= 256)
+	require.Equal(t, expectedAllocatedRegCount, unprunedTrie.AllocatedRegCount())
+	require.Equal(t, expectedAllocatedRegSize, unprunedTrie.AllocatedRegSize())
+
+	// Now, we keep modifying the auxiliary key, and overwrite the empty register with another empty payload,
+	// where only the auxiliary data (i.e. the key) changed.
+	payload = ledger.Payload{Key: utils.KeyFixture(1, "b")}
+	unprunedTrie, maxDepthTouched, err = trie.NewTrieWithUpdatedRegisters(unprunedTrie, []ledger.Path{path}, []ledger.Payload{payload}, false)
+	require.NoError(t, err)
+	require.True(t, maxDepthTouched <= 256)
+	require.Equal(t, expectedAllocatedRegCount, unprunedTrie.AllocatedRegCount())
+	require.Equal(t, expectedAllocatedRegSize, unprunedTrie.AllocatedRegSize())
+
+}

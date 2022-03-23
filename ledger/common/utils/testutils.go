@@ -251,6 +251,12 @@ func KeyPartFixture(typ uint16, val string) l.KeyPart {
 	return l.NewKeyPart(kp1t, kp1v)
 }
 
+// KeyFixture returns a ledger.Key
+func KeyFixture(typ uint16, val string) l.Key {
+	kp := KeyPartFixture(typ, val)
+	return l.NewKey([]l.KeyPart{kp})
+}
+
 // UpdateFixture returns an update fixture
 func UpdateFixture() *l.Update {
 	scBytes, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
