@@ -81,7 +81,7 @@ var transactionsDuplicateCmd = &cobra.Command{
 						megaMap[txID] = make(map[flow.Identifier]struct{}, 0)
 					}
 
-					if _, has := megaMap[txID]; has {
+					if _, has := megaMap[txID][blockID]; has {
 						panic(fmt.Sprintf("duplicated tx %s in block %s", txID.String(), blockID.String()))
 					}
 
