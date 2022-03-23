@@ -9,9 +9,6 @@ on:
       - master
 
 env:
-  COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: replace with github.sha or $GITHUB_SHA before merging
-  RUN_ID: ${{ github.run_id }}
-  SKIPPED_TESTS_FILE: skipped-tests
   BIGQUERY_TABLE: dev_src_flow_test_metrics.skipped_tests # TODO: replace with prod before merging
 
 jobs:
@@ -32,10 +29,16 @@ jobs:
           - integration-consensus
           - integration-execution
           - integration-verification
+    env:
+      TEST_CATEGORY: ${{ matrix.test-category }}
+      COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: replace with github.sha or $GITHUB_SHA before merging
+      RUN_ID: ${{ github.run_id }}
+      SKIPPED_TESTS_FILE: skipped-tests
+      TEST_OUTPUT_FILE: test-output
     runs-on: ubuntu-latest
     steps:
     - name: Get job run date
-      id: date
+      id: job_run_date
       run: echo "::set-output name=date::$(TZ=":America/Los_Angeles" date -Iseconds)"
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@master
@@ -49,18 +52,23 @@ jobs:
       uses: actions/checkout@v2
       with:
         ref: ${{ env.COMMIT_SHA }}
-    - name: Echo commit sha # TODO: remove before merge
-      run: echo $COMMIT_SHA
-    - name: Echo commit sha2 # TODO: remove before merge
-      run: echo $(git rev-parse HEAD)
-    - name: Run skipped test tracker script
+    - name: Get commit date
+      id: commit_date
+      run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
+    - name: Run tests
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 25
         max_attempts: 10
-        command: ./tools/flaky_test_monitor/skipped-test-tracker.sh
+        command: ./tools/flaky_test_monitor/run-tests.sh
+    - name: Process test results
+      run: cat $TEST_OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go
       env:
-        TEST_CATEGORY: ${{ matrix.test-category }}
-        JOB_STARTED: ${{ steps.date.outputs.date }}
+        JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
+        COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
     - name: Upload results to BigQuery
-      run: bq load --source_format=NEWLINE_DELIMITED_JSON --autodetect $BIGQUERY_TABLE $SKIPPED_TESTS_FILE
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 1
+        max_attempts: 3
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON --autodetect $BIGQUERY_TABLE $SKIPPED_TESTS_FILE

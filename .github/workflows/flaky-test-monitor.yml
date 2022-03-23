@@ -11,14 +11,11 @@ on:
       - master
 
 env:
-  NUM_RUNS: 1
-  GCS_BUCKET: production_ddp_flow_test_metrics
-  COMMIT_SHA: ${{ github.sha }}
   BIGQUERY_TABLE: dev_src_flow_test_metrics.test_results # TODO: update to production table before merging
 
 jobs:
-  level1:
-    name: Flaky Test Summary - Level 1
+  flaky-test-summary:
+    name: Flaky Test Summary
     strategy:
       fail-fast: false
       matrix:
@@ -34,8 +31,17 @@ jobs:
           - integration-consensus
           - integration-execution
           - integration-verification
+    env:
+      TEST_CATEGORY: ${{ matrix.test-category }}
+      COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: replace with github.sha or $GITHUB_SHA before merging
+      RUN_ID: ${{ github.run_id }}
+      RESULTS_FILE: test-results
+      TEST_OUTPUT_FILE: test-output
     runs-on: ubuntu-latest
     steps:
+    - name: Get job run date
+      id: job_run_date
+      run: echo "::set-output name=date::$(TZ=":America/Los_Angeles" date -Iseconds)"
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@master
       with:
@@ -46,7 +52,22 @@ jobs:
         go-version: 1.16
     - name: Checkout repo
       uses: actions/checkout@v2
-    - name: Run flakiness summary script
-      run: ./tools/flaky_test_monitor/flaky-test-monitor-level1.sh
+      with:
+        ref: ${{ env.COMMIT_SHA }}
+    - name: Get commit date
+      id: commit_date
+      run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
+    - name: Run tests
+      continue-on-error: true
+      run: ./tools/flaky_test_monitor/run-tests.sh
+    - name: Process test results
+      run: cat $TEST_OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go
       env:
-        TEST_CATEGORY: ${{ matrix.test-category }}
+        JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
+        COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
+    - name: Upload results to BigQuery
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 2
+        max_attempts: 3
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON --autodetect $BIGQUERY_TABLE $RESULTS_FILE
