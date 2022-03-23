@@ -12,12 +12,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var flagMaxBlockHeight uint64
+
 func init() {
 	rootCmd.AddCommand(transactionsCmd)
 	rootCmd.AddCommand(transactionsDuplicateCmd)
 
 	transactionsCmd.Flags().StringVarP(&flagTransactionID, "id", "i", "", "the id of the transaction")
 	_ = transactionsCmd.MarkFlagRequired("id")
+
+	transactionsDuplicateCmd.Flags().Uint64Var(&flagMaxBlockHeight, "max-height", 0, "maximum block height (skip blocks with height above this value")
 }
 
 var transactionsCmd = &cobra.Command{
@@ -66,6 +70,10 @@ var transactionsDuplicateCmd = &cobra.Command{
 
 		_, err := headers.FindHeaders(func(header *flow.Header) bool {
 
+			if flagMaxBlockHeight > 0 && header.Height > flagMaxBlockHeight {
+				return false
+			}
+
 			blockID := header.ID()
 
 			block, err := storages.Blocks.ByID(blockID)
@@ -81,13 +89,11 @@ var transactionsDuplicateCmd = &cobra.Command{
 
 					collection, err := storages.Collections.ByID(guarantee.CollectionID)
 
-					light := collection.Light()
-
-					lightCollection = &light
-
 					if err != nil {
 						panic(fmt.Sprintf("cannot get light and normal collection %s for block %s (%d): %s", guarantee.CollectionID, blockID.String(), header.Height, err))
 					}
+					light := collection.Light()
+					lightCollection = &light
 				}
 				for _, txID := range lightCollection.Transactions {
 
