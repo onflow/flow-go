@@ -49,7 +49,11 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	suite.cancel = cancel
 	// both nodes should be of the same role to get connected on epidemic dissemination
 	suite.ids, _, suite.nets, _ = GenerateIDsMiddlewaresNetworks(
-		ctx, suite.T(), count, logger, 100, nil,
+		ctx,
+		suite.T(),
+		count,
+		logger,
+		nil,
 	)
 }
 

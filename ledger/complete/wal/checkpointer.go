@@ -35,6 +35,13 @@ const VersionV3 uint16 = 0x03
 // Version 4 also reduces checkpoint data size.  See EncodeNode() and EncodeTrie() for more details.
 const VersionV4 uint16 = 0x04
 
+// Version 5 includes these changes:
+// - remove regCount and maxDepth from serialized nodes
+// - add allocated register count and size to serialized tries
+// - reduce number of bytes used to encode payload value size from 8 bytes to 4 bytes.
+// See EncodeNode() and EncodeTrie() for more details.
+const VersionV5 uint16 = 0x05
+
 const (
 	encMagicSize     = 2
 	encVersionSize   = 2
@@ -293,7 +300,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	// Write header: magic (2 bytes) + version (2 bytes)
 	header := scratch[:headerSize]
 	binary.BigEndian.PutUint16(header, MagicBytes)
-	binary.BigEndian.PutUint16(header[encMagicSize:], VersionV4)
+	binary.BigEndian.PutUint16(header[encMagicSize:], VersionV5)
 
 	_, err := crc32Writer.Write(header)
 	if err != nil {
@@ -306,11 +313,9 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	allNodes := make(map[*node.Node]uint64)
 	allNodes[nil] = 0
 
-	allRootNodes := make([]*node.Node, len(tries))
-
 	// Serialize all unique nodes
 	nodeCounter := uint64(1) // start from 1, as 0 marks nil node
-	for i, t := range tries {
+	for _, t := range tries {
 
 		// Traverse all unique nodes for trie t.
 		for itr := flattener.NewUniqueNodeIterator(t, allNodes); itr.Next(); {
@@ -344,26 +349,20 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 				return fmt.Errorf("cannot serialize node: %w", err)
 			}
 		}
-
-		// Save trie root for serialization later.
-		allRootNodes[i] = t.RootNode()
 	}
 
 	// Serialize trie root nodes
-	for _, rootNode := range allRootNodes {
+	for _, t := range tries {
+		rootNode := t.RootNode()
+
 		// Get root node index
 		rootIndex, found := allNodes[rootNode]
 		if !found {
-			var rootHash ledger.RootHash
-			if rootNode == nil {
-				rootHash = trie.EmptyTrieRootHash()
-			} else {
-				rootHash = ledger.RootHash(rootNode.Hash())
-			}
+			rootHash := t.RootHash()
 			return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(rootHash[:]))
 		}
 
-		encTrie := flattener.EncodeTrie(rootNode, rootIndex, scratch)
+		encTrie := flattener.EncodeTrie(t, rootIndex, scratch)
 		_, err = crc32Writer.Write(encTrie)
 		if err != nil {
 			return fmt.Errorf("cannot serialize trie: %w", err)
@@ -373,7 +372,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	// Write footer with nodes count and tries count
 	footer := scratch[:encNodeCountSize+encTrieCountSize]
 	binary.BigEndian.PutUint64(footer, uint64(len(allNodes)-1)) // -1 to account for 0 node meaning nil
-	binary.BigEndian.PutUint16(footer[encNodeCountSize:], uint16(len(allRootNodes)))
+	binary.BigEndian.PutUint16(footer[encNodeCountSize:], uint16(len(tries)))
 
 	_, err = crc32Writer.Write(footer)
 	if err != nil {
@@ -456,9 +455,17 @@ func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
 		return readCheckpointV3AndEarlier(f, version)
 	case VersionV4:
 		return readCheckpointV4(f)
+	case VersionV5:
+		return readCheckpointV5(f)
 	default:
 		return nil, fmt.Errorf("unsupported file version %x", version)
 	}
+}
+
+type nodeWithRegMetrics struct {
+	n        *node.Node
+	regCount uint64
+	regSize  uint64
 }
 
 // readCheckpointV3AndEarlier deserializes checkpoint file (version 3 and earlier) and returns a list of tries.
@@ -491,28 +498,32 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 	nodesCount := binary.BigEndian.Uint64(header[headerSize:])
 	triesCount := binary.BigEndian.Uint16(header[headerSize+encNodeCountSize:])
 
-	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
+	nodes := make([]nodeWithRegMetrics, nodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		n, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, error) {
+		n, regCount, regSize, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(i) {
-				return nil, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
 			}
-			return nodes[nodeIndex], nil
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
 		}
-		nodes[i] = n
+		nodes[i].n = n
+		nodes[i].regCount = regCount
+		nodes[i].regSize = regSize
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
-		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, error) {
+		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(len(nodes)) {
-				return nil, fmt.Errorf("sequence of stored nodes doesn't contain node")
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes doesn't contain node")
 			}
-			return nodes[nodeIndex], nil
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("cannot read trie %d: %w", i, err)
@@ -540,9 +551,121 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 	return tries, nil
 }
 
-// readCheckpointV4 deserializes checkpoint file (version 4) and returns a list of tries.
-// Checkpoint file header (magic and version) are verified by the caller.
+// readCheckpointV4 decodes checkpoint file (version 4) and returns a list of tries.
+// Header (magic and version) is verified by the caller.
+// This function is for backwards compatibility.
 func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
+
+	// Scratch buffer is used as temporary buffer that reader can read into.
+	// Raw data in scratch buffer should be copied or converted into desired
+	// objects before next Read operation.  If the scratch buffer isn't large
+	// enough, a new buffer will be allocated.  However, 4096 bytes will
+	// be large enough to handle almost all payloads and 100% of interim nodes.
+	scratch := make([]byte, 1024*4) // must not be less than 1024
+
+	// Read footer to get node count and trie count
+
+	// footer offset: nodes count (8 bytes) + tries count (2 bytes) + CRC32 sum (4 bytes)
+	const footerOffset = encNodeCountSize + encTrieCountSize + crc32SumSize
+	const footerSize = encNodeCountSize + encTrieCountSize // footer doesn't include crc32 sum
+
+	// Seek to footer
+	_, err := f.Seek(-footerOffset, io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to footer: %w", err)
+	}
+
+	footer := scratch[:footerSize]
+
+	_, err = io.ReadFull(f, footer)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	// Decode node count and trie count
+	nodesCount := binary.BigEndian.Uint64(footer)
+	triesCount := binary.BigEndian.Uint16(footer[encNodeCountSize:])
+
+	// Seek to the start of file
+	_, err = f.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("cannot seek to start of file: %w", err)
+	}
+
+	var bufReader io.Reader = bufio.NewReaderSize(f, defaultBufioReadSize)
+	crcReader := NewCRC32Reader(bufReader)
+	var reader io.Reader = crcReader
+
+	// Read header: magic (2 bytes) + version (2 bytes)
+	// No action is needed for header because it is verified by the caller.
+
+	_, err = io.ReadFull(reader, scratch[:headerSize])
+	if err != nil {
+		return nil, fmt.Errorf("cannot read header: %w", err)
+	}
+
+	// nodes's element at index 0 is a special, meaning nil .
+	nodes := make([]nodeWithRegMetrics, nodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*trie.MTrie, triesCount)
+
+	for i := uint64(1); i <= nodesCount; i++ {
+		n, regCount, regSize, err := flattener.ReadNodeFromCheckpointV4(reader, scratch, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+			if nodeIndex >= uint64(i) {
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
+			}
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot read node %d: %w", i, err)
+		}
+		nodes[i].n = n
+		nodes[i].regCount = regCount
+		nodes[i].regSize = regSize
+	}
+
+	for i := uint16(0); i < triesCount; i++ {
+		trie, err := flattener.ReadTrieFromCheckpointV4(reader, scratch, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+			if nodeIndex >= uint64(len(nodes)) {
+				return nil, 0, 0, fmt.Errorf("sequence of stored nodes doesn't contain node")
+			}
+			nm := nodes[nodeIndex]
+			return nm.n, nm.regCount, nm.regSize, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot read trie %d: %w", i, err)
+		}
+		tries[i] = trie
+	}
+
+	// Read footer again for crc32 computation
+	// No action is needed.
+	_, err = io.ReadFull(reader, footer)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read footer: %w", err)
+	}
+
+	// Read CRC32
+	crc32buf := scratch[:crc32SumSize]
+	_, err = io.ReadFull(bufReader, crc32buf)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read CRC32: %w", err)
+	}
+
+	readCrc32 := binary.BigEndian.Uint32(crc32buf)
+
+	calculatedCrc32 := crcReader.Crc32()
+
+	if calculatedCrc32 != readCrc32 {
+		return nil, fmt.Errorf("checkpoint checksum failed! File contains %x but calculated crc32 is %x", readCrc32, calculatedCrc32)
+	}
+
+	return tries, nil
+}
+
+// readCheckpointV5 decodes checkpoint file (version 5) and returns a list of tries.
+// Checkpoint file header (magic and version) are verified by the caller.
+func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 
 	// Scratch buffer is used as temporary buffer that reader can read into.
 	// Raw data in scratch buffer should be copied or converted into desired

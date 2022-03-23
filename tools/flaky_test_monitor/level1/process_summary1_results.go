@@ -5,18 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
-	"time"
 
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
-// this interface gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for testing)
+// ResultReader gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for unit testing)
 type ResultReader interface {
 	getReader() *os.File
 	close()
 
-	// where to save results - will be different for tests vs production
+	// where to save results - will be different for unit tests vs production
 	getResultsFileName() string
 }
 
@@ -36,20 +34,18 @@ func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
 }
 
-func processSummary1TestRun(resultReader ResultReader) common.TestRun {
+func generateLevel1Summary(resultReader ResultReader) common.Level1Summary {
 	reader := resultReader.getReader()
 	scanner := bufio.NewScanner(reader)
 
 	defer resultReader.close()
 
-	packageResultMap := processTestRunLineByLine(scanner)
+	testResultMap := processTestRunLineByLine(scanner)
 
 	err := scanner.Err()
 	common.AssertNoError(err, "error returning EOF for scanner")
 
-	postProcessTestRun(packageResultMap)
-
-	testRun := finalizeTestRun(packageResultMap)
+	testRun := finalizeLevel1Summary(testResultMap)
 
 	return testRun
 }
@@ -61,65 +57,81 @@ func processSummary1TestRun(resultReader ResultReader) common.TestRun {
 // 3. pause (zero or once) - for tests using t.Parallel()
 // 4. cont (zero or once) - for tests using t.Parallel()
 // 5. pass OR fail OR skip (once)
-func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*common.PackageResult {
-	packageResultMap := make(map[string]*common.PackageResult)
-	// reuse the same package result over and over
+func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level1TestResult {
+	// test map holds all the tests
+	testResultMap := make(map[string][]*common.Level1TestResult)
+
 	for scanner.Scan() {
 		var rawTestStep common.RawTestStep
 		err := json.Unmarshal(scanner.Bytes(), &rawTestStep)
 		common.AssertNoError(err, "error unmarshalling raw test step")
 
-		// check if package result exists to hold test results
-		packageResult, packageResultExists := packageResultMap[rawTestStep.Package]
-		if !packageResultExists {
-			packageResult = &common.PackageResult{
-				Package: rawTestStep.Package,
+		// each test name needs to be unique, so we add package name in case there are
+		// tests with the same name across different packages
+		testResultMapKey := rawTestStep.Package + "/" + rawTestStep.Test
 
-				// package result will hold map of test results
-				TestMap: make(map[string][]common.TestResult),
-
-				// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
-				// there are usually 2 or more outputs for a package
-				Output: make([]string, 0),
-			}
-			packageResultMap[rawTestStep.Package] = packageResult
-		}
-
-		// most raw test steps will have Test value - only package specific steps won't
+		// most raw test steps will have Test value - only package specific steps won't have a Test value
+		// we're not storing package specific data
 		if rawTestStep.Test != "" {
 
 			// "run" is the very first test step and it needs special treatment - to create all the data structures that will be used by subsequent test steps for the same test
 			if rawTestStep.Action == "run" {
-				var newTestResult common.TestResult
+				var newTestResult common.Level1TestResult
 				newTestResult.Test = rawTestStep.Test
 				newTestResult.Package = rawTestStep.Package
 
+				// each test holds specific data, irrespective of what the test result
+				newTestResult.CommitDate = common.GetCommitDate()
+				newTestResult.JobRunDate = common.GetJobRunDate()
+				newTestResult.CommitSha = common.GetCommitSha()
+
 				// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
 				// for passing tests, there are usually 2 outputs for a passing test and more outputs for a failing test
-				newTestResult.Output = make([]string, 0)
+				newTestResult.Output = make([]struct {
+					Item string "json:\"item\""
+				}, 0)
 
 				// append to test result slice, whether it's the first or subsequent test result
-				packageResult.TestMap[rawTestStep.Test] = append(packageResult.TestMap[rawTestStep.Test], newTestResult)
+				testResultMap[testResultMapKey] = append(testResultMap[testResultMapKey], &newTestResult)
 				continue
 			}
 
-			lastTestResultIndex := len(packageResult.TestMap[rawTestStep.Test]) - 1
+			lastTestResultIndex := len(testResultMap[testResultMapKey]) - 1
 			if lastTestResultIndex < 0 {
 				lastTestResultIndex = 0
 			}
 
-			testResults, ok := packageResult.TestMap[rawTestStep.Test]
+			testResults, ok := testResultMap[testResultMapKey]
 			if !ok {
 				panic(fmt.Sprintf("no test result for test %s", rawTestStep.Test))
 			}
-			lastTestResultPointer := &testResults[lastTestResultIndex]
+			lastTestResultPointer := testResults[lastTestResultIndex]
 
 			// subsequent raw json outputs will have different data about the test - whether it passed/failed, what the test output was, etc
 			switch rawTestStep.Action {
 			case "output":
-				lastTestResultPointer.Output = append(lastTestResultPointer.Output, rawTestStep.Output)
+				output := struct {
+					Item string `json:"item"`
+				}{rawTestStep.Output}
 
-			case "pass", "fail", "skip":
+				// keep appending output to the test
+				lastTestResultPointer.Output = append(lastTestResultPointer.Output, output)
+
+			// we need to convert pass / fail result into a numerical value so it can averaged and tracked on a graph
+			// pass is counted as 1, fail is counted as a 0
+			case "pass":
+				lastTestResultPointer.Result = "1"
+				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
+				lastTestResultPointer.NoResult = false
+
+			case "fail":
+				lastTestResultPointer.Result = "0"
+				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
+				lastTestResultPointer.NoResult = false
+
+			// skipped tests will be removed after all test results are gathered,
+			// since it would be more complicated to remove it here
+			case "skip":
 				lastTestResultPointer.Result = rawTestStep.Action
 				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
 
@@ -130,79 +142,37 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*common.Package
 			default:
 				panic(fmt.Sprintf("unexpected action: %s", rawTestStep.Action))
 			}
+		}
+	}
+	return testResultMap
+}
 
-		} else {
-			// package level raw messages won't have a Test value
-			switch rawTestStep.Action {
-			case "output":
-				packageResult.Output = append(packageResult.Output, rawTestStep.Output)
-			case "pass", "fail", "skip":
-				packageResult.Result = rawTestStep.Action
-				packageResult.Elapsed = rawTestStep.Elapsed
-			default:
-				panic(fmt.Sprintf("unexpected action (package): %s", rawTestStep.Action))
+func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) common.Level1Summary {
+	var level1Summary common.Level1Summary
+
+	for _, testResults := range testResultMap {
+		for _, testResult := range testResults {
+			// don't add skipped tests since they can't be used to compute an average pass rate
+			if testResult.Result == "skip" {
+				continue
 			}
-		}
-	}
-	return packageResultMap
-}
 
-func postProcessTestRun(packageResultMap map[string]*common.PackageResult) {
-	// transfer each test result map in each package result to a test result slice
-	for packageName, packageResult := range packageResultMap {
+			// for tests that don't have a result generated (e.g. using fmt.Printf() with no newline in a test)
+			// we want to highlight these tests in Grafana
+			// we do this by setting the NoResult field to true, so we can filter by that field in Grafana
+			if testResult.Result == "" {
+				// count no-result as a failure
+				testResult.Result = "0"
+				testResult.NoResult = true
+			}
 
-		// delete skipped packages since they don't have any tests - won't be adding it to result map
-		if packageResult.Result == "skip" {
-			delete(packageResultMap, packageName)
-			continue
-		}
-
-		for _, testResults := range packageResult.TestMap {
-			packageResult.Tests = append(packageResult.Tests, testResults...)
-		}
-
-		// clear test result map once all values transfered to slice - needed for testing so will check against an empty map
-		for k := range packageResultMap[packageName].TestMap {
-			delete(packageResultMap[packageName].TestMap, k)
+			// only include passed or failed tests - don't include skipped tests
+			// this is needed to have accurate Grafana metrics for average pass rate
+			level1Summary.Rows = append(level1Summary.Rows, common.Level1TestResultRow{TestResult: *testResult})
 		}
 	}
 
-	// sort all the test results in each package result slice - needed for testing so it's easy to compare ordered tests
-	for _, pr := range packageResultMap {
-		sort.SliceStable(pr.Tests, func(i, j int) bool {
-			return pr.Tests[i].Test < pr.Tests[j].Test
-		})
-	}
-}
-
-func finalizeTestRun(packageResultMap map[string]*common.PackageResult) common.TestRun {
-	commitSha := os.Getenv("COMMIT_SHA")
-	if commitSha == "" {
-		panic("COMMIT_SHA can't be empty")
-	}
-
-	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
-	common.AssertNoError(err, "error parsing COMMIT_DATE")
-
-	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
-	common.AssertNoError(err, "error parsing JOB_STARTED")
-
-	var testRun common.TestRun
-	testRun.CommitDate = commitDate.UTC()
-	testRun.CommitSha = commitSha
-	testRun.JobRunDate = jobStarted.UTC()
-
-	// add all the package results to the test run
-	for _, pr := range packageResultMap {
-		testRun.PackageResults = append(testRun.PackageResults, *pr)
-	}
-
-	// sort all package results in the test run
-	sort.SliceStable(testRun.PackageResults, func(i, j int) bool {
-		return testRun.PackageResults[i].Package < testRun.PackageResults[j].Package
-	})
-
-	return testRun
+	return level1Summary
 }
 
 // level 1 flaky test summary processor
@@ -211,7 +181,7 @@ func finalizeTestRun(packageResultMap map[string]*common.PackageResult) common.T
 func main() {
 	resultReader := StdinResultReader{}
 
-	testRun := processSummary1TestRun(resultReader)
+	testRun := generateLevel1Summary(resultReader)
 
 	common.SaveToFile(resultReader.getResultsFileName(), testRun)
 }
