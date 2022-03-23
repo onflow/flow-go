@@ -19,8 +19,7 @@ setup:
 	go generate
 	
 .PHONY: test
-test: setup
-	test-main
+test: setup test-main
 ifeq ($(ADX_SUPPORT), 1)
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(if $(VERBOSE),-v,)
 else
