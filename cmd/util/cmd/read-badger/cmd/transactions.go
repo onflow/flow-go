@@ -76,7 +76,18 @@ var transactionsDuplicateCmd = &cobra.Command{
 			for _, guarantee := range block.Payload.Guarantees {
 				lightCollection, err := storages.Collections.LightByID(guarantee.CollectionID)
 				if err != nil {
-					panic(fmt.Sprintf("cannot get light collection %s %s", guarantee.CollectionID, err))
+
+					log.Warn().Msgf("cannot get light collection %s for block %s (%d), trying full collection: %s", guarantee.CollectionID, blockID.String(), header.Height, err)
+
+					collection, err := storages.Collections.ByID(guarantee.CollectionID)
+
+					light := collection.Light()
+
+					lightCollection = &light
+
+					if err != nil {
+						panic(fmt.Sprintf("cannot get light and normal collection %s for block %s (%d): %s", guarantee.CollectionID, blockID.String(), header.Height, err))
+					}
 				}
 				for _, txID := range lightCollection.Transactions {
 
