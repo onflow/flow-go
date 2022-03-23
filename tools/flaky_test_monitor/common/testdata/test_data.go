@@ -10,6 +10,7 @@ const COMMIT_DATE = "2021-09-21T18:06:25-07:00"
 const COMMIT_SHA = "46baf6c6be29af9c040bc14195e195848598bbae"
 const JOB_STARTED = "2021-09-21T21:06:25-07:00"
 const CRYPTO_HASH_PACKAGE = "github.com/onflow/flow-go/crypto/hash"
+const RUN_ID = "12345"
 
 // Level1TestData is used by tests to store what the expected test result should be and what the raw
 // JSON input file is
@@ -30,13 +31,13 @@ type Level2TestData struct {
 // following functions are used to construct expected TestRun data
 
 func getCommitDate() time.Time {
-	commitDate, err := time.Parse(time.RFC3339, "2021-09-21T18:06:25-07:00")
+	commitDate, err := time.Parse(time.RFC3339, COMMIT_DATE)
 	common.AssertNoError(err, "time parse - commit date")
 	return commitDate
 }
 
 func getJobRunDate() time.Time {
-	jobRunDate, err := time.Parse(time.RFC3339, "2021-09-21T21:06:25-07:00")
+	jobRunDate, err := time.Parse(time.RFC3339, JOB_STARTED)
 	common.AssertNoError(err, "time parse - job run date")
 	return jobRunDate
 }
@@ -48,6 +49,7 @@ func getPassedTest(name string) common.Level1TestResult {
 func getPassedTestPackage(name string, packageName string) common.Level1TestResult {
 	return common.Level1TestResult{
 		CommitSha:  COMMIT_SHA,
+		RunID:      RUN_ID,
 		CommitDate: getCommitDate(),
 		JobRunDate: getJobRunDate(),
 		Test:       name,
@@ -55,16 +57,13 @@ func getPassedTestPackage(name string, packageName string) common.Level1TestResu
 		Pass:       1,
 		Exception:  0,
 		Elapsed:    0,
-		Output: []string{
-			"=== RUN   " + name + "\n",
-			"--- PASS: " + name + " (0.00s)\n",
-		},
 	}
 }
 
 func getPassedTestElapsed(name string, elapsed float64, elapsedStr string) common.Level1TestResult {
 	return common.Level1TestResult{
 		CommitSha:  COMMIT_SHA,
+		RunID:      RUN_ID,
 		CommitDate: getCommitDate(),
 		JobRunDate: getJobRunDate(),
 		Test:       name,
@@ -72,10 +71,6 @@ func getPassedTestElapsed(name string, elapsed float64, elapsedStr string) commo
 		Pass:       1,
 		Exception:  0,
 		Elapsed:    elapsed,
-		Output: []string{
-			"=== RUN   " + name + "\n",
-			"    --- PASS: " + name + " (" + elapsedStr + "s)\n",
-		},
 	}
 }
 
@@ -88,6 +83,7 @@ func getPassedTestPackageElapsedOutput(name string, packageName string, elapsed 
 func getPassedTestElapsedOutput(name string, elapsed float64, elapsedStr string, output string) common.Level1TestResult {
 	return common.Level1TestResult{
 		CommitSha:  COMMIT_SHA,
+		RunID:      RUN_ID,
 		CommitDate: getCommitDate(),
 		JobRunDate: getJobRunDate(),
 		Test:       name,
@@ -95,17 +91,13 @@ func getPassedTestElapsedOutput(name string, elapsed float64, elapsedStr string,
 		Pass:       1,
 		Exception:  0,
 		Elapsed:    elapsed,
-		Output: []string{
-			"=== RUN   " + name + "\n",
-			output,
-			"--- PASS: " + name + " (" + elapsedStr + "s)\n",
-		},
 	}
 }
 
 func getFailedTest_TestSanitySha2_256() common.Level1TestResult {
 	return common.Level1TestResult{
 		CommitSha:  COMMIT_SHA,
+		RunID:      RUN_ID,
 		CommitDate: getCommitDate(),
 		JobRunDate: getJobRunDate(),
 		Test:       "TestSanitySha2_256",
@@ -137,6 +129,7 @@ func getFailedTest_TestSanitySha2_256() common.Level1TestResult {
 func getFailedTest_TestSanitySha3_256() common.Level1TestResult {
 	return common.Level1TestResult{
 		CommitSha:  COMMIT_SHA,
+		RunID:      RUN_ID,
 		CommitDate: getCommitDate(),
 		JobRunDate: getJobRunDate(),
 		Test:       "TestSanitySha3_256",
@@ -168,6 +161,7 @@ func getFailedTest_TestSanitySha3_256() common.Level1TestResult {
 func getExceptionTest_TestEncodableRandomBeaconPrivKeyMsgPack() common.Level1TestResult {
 	return common.Level1TestResult{
 		CommitSha:  COMMIT_SHA,
+		RunID:      RUN_ID,
 		CommitDate: getCommitDate(),
 		JobRunDate: getJobRunDate(),
 		Test:       "TestEncodableRandomBeaconPrivKeyMsgPack",

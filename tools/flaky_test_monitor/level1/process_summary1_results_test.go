@@ -86,6 +86,7 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 	require.NoError(t, os.Setenv("COMMIT_DATE", testdata.COMMIT_DATE))
 	require.NoError(t, os.Setenv("COMMIT_SHA", testdata.COMMIT_SHA))
 	require.NoError(t, os.Setenv("JOB_STARTED", testdata.JOB_STARTED))
+	require.NoError(t, os.Setenv("RUN_ID", testdata.RUN_ID))
 
 	for k, testData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
