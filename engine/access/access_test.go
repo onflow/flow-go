@@ -383,12 +383,8 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			id := block1.ID()
 			// get block details by ID
 			req := &accessproto.GetBlockByIDRequest{
-<<<<<<< HEAD
-				Id: id[:],
-=======
 				Id:                id[:],
 				FullBlockResponse: true,
->>>>>>> 86c37ce9a (Create transaction result by index api (#2159))
 			}
 
 			resp, err := handler.GetBlockByID(context.Background(), req)
@@ -411,12 +407,8 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get block 2 by height", func() {
 			// get block details by height
 			req := &accessproto.GetBlockByHeightRequest{
-<<<<<<< HEAD
-				Height: block2.Header.Height,
-=======
 				Height:            block2.Header.Height,
 				FullBlockResponse: true,
->>>>>>> 86c37ce9a (Create transaction result by index api (#2159))
 			}
 
 			resp, err := handler.GetBlockByHeight(context.Background(), req)
