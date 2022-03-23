@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 
 	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -145,6 +144,16 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 	return testResultMap
 }
 
+func parseSkipReason(output []string) (unittest.SkipReason, bool) {
+	for i := len(output) - 2; i >= 0; i-- {
+		skipReason, ok := unittest.ParseSkipReason(output[i])
+		if ok {
+			return skipReason, true
+		}
+	}
+	return 0, false
+}
+
 func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) (common.Level1Summary, map[string]*common.SkippedTestEntry) {
 	var level1Summary common.Level1Summary
 	skippedTests := make(map[string]*common.SkippedTestEntry)
@@ -164,19 +173,11 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 				skippedTests[testResult.Test] = skippedTestEntry
 
 				if testResult.Action == "skip" {
-					output := testResult.Output[len(testResult.Output)-2]
-					r := regexp.MustCompile(`\[([a-zA-Z0-9_]+)]\n$`)
-					matches := r.FindStringSubmatch(output)
-
-					if len(matches) == 2 {
-						skipReason := unittest.ParseSkipReason(matches[1])
-						if skipReason != 0 {
-							skippedTestEntry.SkipReason = skipReason
-						} else {
-							panic(fmt.Sprintf("parsed invalid skip reason from test output: %q", output))
-						}
+					skipReason, ok := parseSkipReason(testResult.Output)
+					if ok {
+						skippedTestEntry.SkipReason = skipReason
 					} else {
-						panic(fmt.Sprintf("could not parse skip reason from test output: %q", output))
+						panic("could not parse Skip Reason from test output")
 					}
 				}
 			}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -52,7 +53,7 @@ func (s SkipReason) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.String())
 }
 
-func ParseSkipReason(reason string) SkipReason {
+func parseSkipReason(reason string) SkipReason {
 	switch reason {
 	case "TEST_FLAKY":
 		return TEST_FLAKY
@@ -71,10 +72,26 @@ func ParseSkipReason(reason string) SkipReason {
 	}
 }
 
+func ParseSkipReason(output string) (SkipReason, bool) {
+	// match output like:
+	// "    test_file.go:123: SKIP [TEST_REASON]: message\n"
+	r := regexp.MustCompile(`(?s)^\s+[a-zA-Z0-9_\-]+\.go:[0-9]+: SKIP \[([A-Z_]+)]: .*$`)
+	matches := r.FindStringSubmatch(output)
+
+	if len(matches) == 2 {
+		skipReason := parseSkipReason(matches[1])
+		if skipReason != 0 {
+			return skipReason, true
+		}
+	}
+
+	return 0, false
+}
+
 func SkipUnless(t *testing.T, reason SkipReason, message string) {
 	t.Helper()
 	if os.Getenv(reason.String()) == "" {
-		t.Skip(message + " [" + reason.String() + "]")
+		t.Skipf("SKIP [%s]: %s", reason.String(), message)
 	}
 }
 
