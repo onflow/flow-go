@@ -47,8 +47,8 @@ var hasherCreators = map[hash.HashingAlgorithm](func() hash.Hasher){
 // Supported algorithms are SHA2-256, SHA2-384, SHA3-256, SHA3-384 and Keccak256.
 func NewPrefixedHashing(algo hash.HashingAlgorithm, tag string) (hash.Hasher, error) {
 
-	hasherCreator := hasherCreators[algo]
-	if hasherCreator == nil {
+	hasherCreator, hasCreator := hasherCreators[algo]
+	if !hasCreator {
 		return nil, errors.New("hashing algorithm is not supported for prefixed algorithm")
 	}
 
