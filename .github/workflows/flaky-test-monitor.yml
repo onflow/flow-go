@@ -2,7 +2,7 @@ name: Flaky Test Monitor
 
 on:
   schedule:
-    - cron: '0 */4 * * *' # every 4 hours
+    - cron: '0 */2 * * *' # every 2 hours
   push:
     branches:
       - master
@@ -59,8 +59,10 @@ jobs:
       id: commit_date
       run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
     - name: Run tests
-      continue-on-error: true
+      continue-on-error: true # TODO: only continue on specific error
       run: ./tools/flaky_test_monitor/run-tests.sh
+      env:
+        TEST_FLAKY: true
     - name: Process test results
       run: cat $TEST_OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go
       env:
