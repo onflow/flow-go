@@ -2,9 +2,11 @@ package wintermute
 
 import (
 	"fmt"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
@@ -56,31 +58,35 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		// TODO: how do we allow unit tests to assert execution result(s) was corrupted? Return type is error
 
 		// extract execution receipt so we can corrupt it
-		executionReceipts := event.FlowProtocolEvent.([]*flow.ExecutionReceipt)
+		actualReceipt := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
+		actualResult := actualReceipt.ExecutionResult
 
 		// replace all chunks with new ones to simulate chunk corruption
-		fmt.Println("before corruption", executionReceipts[0].ExecutionResult.ID())
 		corruptReceipt := &flow.ExecutionReceipt{
-			ExecutorID: executionReceipts[0].ExecutorID,
+			ExecutorID: actualReceipt.ExecutorID,
 			ExecutionResult: flow.ExecutionResult{
-				PreviousResultID: executionReceipts[0].ExecutionResult.PreviousResultID,
-				BlockID:          executionReceipts[0].ExecutionResult.BlockID,
-				Chunks:           unittest.ChunkListFixture(uint(len(executionReceipts[0].ExecutionResult.Chunks)), executionReceipts[0].ExecutionResult.BlockID),
-				ServiceEvents:    executionReceipts[0].ExecutionResult.ServiceEvents,
-				ExecutionDataID:  executionReceipts[0].ExecutionResult.ExecutionDataID,
+				PreviousResultID: actualResult.PreviousResultID,
+				BlockID:          actualResult.BlockID,
+				Chunks:           unittest.ChunkListFixture(uint(len(actualResult.Chunks)), actualResult.BlockID),
+				ServiceEvents:    actualResult.ServiceEvents,
+				ExecutionDataID:  actualResult.ExecutionDataID,
 			},
-			ExecutorSignature: executionReceipts[0].ExecutorSignature,
-			Spocks:            executionReceipts[0].Spocks,
+			ExecutorSignature: actualReceipt.ExecutorSignature,
+			Spocks:            actualReceipt.Spocks,
 		}
 		// replace honest receipts with corrupted receipt
-		executionReceipts = []*flow.ExecutionReceipt{corruptReceipt}
 		//unittest.Wiafter ipts()
-		fmt.Println("after corruption", executionReceipts[0].ExecutionResult.ID())
 
 		// save all corrupted chunks so can create result approvals for them
 		// can just create result approvals here and save them
-		err := o.network.Send(event)
-		//err := o.network.RpcUnicastOnChannel(corruptedId, channel, corruptReceipt, targetIds[0])
+		err := o.network.Send(&insecure.Event{
+			CorruptedId:       event.CorruptedId,
+			Channel:           event.Channel,
+			Protocol:          event.Protocol,
+			TargetNum:         event.TargetNum,
+			TargetIds:         event.TargetIds,
+			FlowProtocolEvent: corruptReceipt,
+		})
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}

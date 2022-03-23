@@ -92,7 +92,7 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 	completeExecutionReceipts := verificationtest.CompleteExecutionReceiptChainFixture(t, rootHeader, 1, verificationtest.WithExecutorIDs(corruptedIdentityList.NodeIDs()))
 
 	corruptedEn1 := corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution))[0]
-	targetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
+	targetIdentities, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
@@ -122,11 +122,11 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 			require.Equal(t, engine.PushReceipts, channel)
 
 			//event, ok := args[2].(*flow.ExecutionReceipt)
-			actualReceipts := event.FlowProtocolEvent.([]*flow.ExecutionReceipt)
+			corruptedReceipt, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
 			require.True(t, ok)
 
 			// make sure the original uncorrupted execution receipt is NOT sent to orchestrator
-			require.NotEqual(t, completeExecutionReceipts[0].Receipts[0], actualReceipts[0])
+			require.NotEqual(t, completeExecutionReceipts[0].Receipts[0], corruptedReceipt)
 
 			//receivedTargetIds, ok := args[3].(flow.Identifier)
 			receivedTargetIds := event.TargetIds
@@ -139,9 +139,9 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 
 			require.Equal(t, engine.PushReceipts, channel)
 			//require.Equal(t, engine.ConsensusCommittee, channel)
-			require.ElementsMatch(t, targetIds, receivedTargetIds)
+			require.ElementsMatch(t, targetIdentities.NodeIDs(), receivedTargetIds)
 
-			require.NotEqual(t, completeExecutionReceipts[0].ContainerBlock.Payload.Results[0], actualReceipts[0].ExecutionResult)
+			require.NotEqual(t, completeExecutionReceipts[0].ContainerBlock.Payload.Results[0], corruptedReceipt.ExecutionResult)
 		}).Return(nil)
 
 	event := &insecure.Event{
@@ -149,8 +149,8 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 		Channel:           engine.PushReceipts,
 		Protocol:          insecure.Protocol_UNICAST,
 		TargetNum:         uint32(0),
-		TargetIds:         targetIds.NodeIDs(),
-		FlowProtocolEvent: completeExecutionReceipts[0].Receipts,
+		TargetIds:         targetIdentities.NodeIDs(),
+		FlowProtocolEvent: completeExecutionReceipts[0].Receipts[0],
 	}
 
 	// register mock network with orchestrator
@@ -163,7 +163,7 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 	//	completeExecutionReceipts[0].Receipts[0], //single execution receipt
 	//	insecure.Protocol_UNICAST,
 	//	uint32(0),
-	//	targetIds.NodeIDs()[0])
+	//	targetIdentities.NodeIDs()[0])
 	require.NoError(t, err)
 }
 
