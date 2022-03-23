@@ -519,7 +519,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		paths := []ledger.Path{p1, p2}
 		payloads := []ledger.Payload{*v1, *v2}
 
-		updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+		updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 		require.NoError(t, err)
 
 		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child

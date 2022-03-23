@@ -231,7 +231,11 @@ func (k *Key) DeepCopy() Key {
 }
 
 // Equals compares this key to another key
+// A nil key is equivalent to an empty key.
 func (k *Key) Equals(other *Key) bool {
+	if k == nil || len(k.KeyParts) == 0 {
+		return other == nil || len(other.KeyParts) == 0
+	}
 	if other == nil {
 		return false
 	}
@@ -305,10 +309,8 @@ func (v Value) DeepCopy() Value {
 }
 
 // Equals compares a ledger Value to another one
+// A nil value is equivalent to an empty value.
 func (v Value) Equals(other Value) bool {
-	if other == nil {
-		return false
-	}
 	return bytes.Equal(v, other)
 }
 
