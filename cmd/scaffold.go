@@ -1113,6 +1113,8 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return storageCommands.NewReadResultsCommand(config.State, config.Storage.Results)
 	}).AdminCommand("read-seals", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
+	}).AdminCommand("get-identity", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewGetIdentityCommand(config.IdentityProvider)
 	})
 }
 
