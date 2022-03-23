@@ -1,10 +1,11 @@
 package helper
 
 import (
+	"math/rand"
+
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"math/rand"
 )
 
 func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate {
