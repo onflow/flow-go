@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -86,11 +87,20 @@ func withCorruptibleConduitFactory(t *testing.T, run func(*testing.T, flow.Ident
 			return
 		}
 	}()
-	ccf := corruptible.NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, corruptedIdentity.NodeID, codec, "localhost:5000")
+	ccf := corruptible.NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		corruptedIdentity.NodeID,
+		codec,
+		fmt.Sprintf("localhost:%d", insecure.CorruptedFactoryPort))
 
 	// starts corruptible conduit factory
 	ccf.Start(ccfCtx)
-	unittest.RequireCloseBefore(t, ccf.Ready(), 1*time.Second, "could not start corruptible conduit factory on time")
+	unittest.RequireCloseBefore(
+		t,
+		ccf.Ready(),
+		1*time.Second,
+		"could not start corruptible conduit factory on time")
 
 	run(t, *corruptedIdentity, ccf)
 

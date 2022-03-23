@@ -2,6 +2,7 @@ package attacknetwork
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -68,22 +69,24 @@ func TestConnectorHappyPath(t *testing.T) {
 	})
 }
 
+// withMockCorruptibleConduitFactory creates and starts a mock corruptible conduit factory. This mock factory only runs the gRPC server part of an
+// actual corruptible conduit factory, and then executes the run function on it.
 func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, *mockCorruptibleConduitFactory)) {
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 
-	// life-cycle management of attackNetwork.
+	// life-cycle management of corruptible conduit factory.
 	ctx, cancel := context.WithCancel(context.Background())
 	ccfCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			t.Error("attack network startup encountered fatal error", err)
+			t.Error("mock corruptible conduit factory startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
 	}()
 
-	ccf := newMockCorruptibleConduitFactory("localhost:5000")
+	ccf := newMockCorruptibleConduitFactory(fmt.Sprintf("localhost:%d", insecure.CorruptedFactoryPort))
 
 	// starts corruptible conduit factory
 	ccf.Start(ccfCtx)
