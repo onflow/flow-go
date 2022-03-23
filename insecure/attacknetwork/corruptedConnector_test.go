@@ -30,12 +30,13 @@ func TestConnectorHappyPath(t *testing.T) {
 		registerMsgReceived := make(chan struct{})
 		go func() {
 			receivedRegMsg := <-factory.attackerRegMsg
-			// register message
+			// register message should contain attacker address
 			require.Equal(t, attackerAddress, receivedRegMsg.Address)
 
 			close(registerMsgReceived)
 		}()
 
+		// goroutine checks mock factory for receiving the message sent over the connection.
 		msg, _, _ := messageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST)
 		sentMsgReceived := make(chan struct{})
 		go func() {
@@ -54,11 +55,14 @@ func TestConnectorHappyPath(t *testing.T) {
 			close(sentMsgReceived)
 		}()
 
+		// creates a connection to the corruptible conduit factory.
 		connection, err := connector.Connect(context.Background(), corruptedId.NodeID)
 		require.NoError(t, err)
 
+		// sends a message over the corruptible conduit factory
 		require.NoError(t, connection.SendMessage(msg))
 
+		// checks a timely arrival of the registration and sent messages at the factory.
 		unittest.RequireCloseBefore(t, registerMsgReceived, 1*time.Second, "factory could not receive register message on time")
 		unittest.RequireCloseBefore(t, sentMsgReceived, 1*time.Second, "factory could not receive message sent on connection on time")
 	})
