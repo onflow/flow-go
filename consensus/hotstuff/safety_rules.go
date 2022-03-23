@@ -8,6 +8,7 @@ import (
 // SafetyRules produces votes for the given block according to voting rules.
 type SafetyRules interface {
 	// ProduceVote takes a block proposal and current view, and decides whether to vote for the block.
+	// Voting is deterministic meaning voting for same proposal will always result in same vote.
 	// Returns:
 	//  * (vote, nil): On the _first_ block for the current view that is safe to vote for.
 	//    Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
@@ -17,8 +18,7 @@ type SafetyRules interface {
 	ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error)
 	// ProduceTimeout takes current view, highest locally known QC and last round TC (may be nil) and decides whether to produce timeout for current view.
 	// Returns:
-	//  * (timeout, nil): On the _first_ block for the current view that is safe to vote for.
-	//    Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
+	//  * (timeout, nil): It is safe to timeout for current view using highestQC and highestTC.
 	//  * (nil, model.NoTimeoutError): If the safety module decides that it is not safe to timeout under current conditions.
 	//    This is a sentinel error and _expected_ during normal operation.
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
