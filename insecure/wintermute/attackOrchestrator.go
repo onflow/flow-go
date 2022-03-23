@@ -38,9 +38,9 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // the attacker instead of dispatching them to the network.
 func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
 
-	corruptedIdentity, ok := o.corruptedIds.ByNodeID(corruptedId)
+	corruptedIdentity, ok := o.corruptedIds.ByNodeID(event.CorruptedId)
 	if !ok {
-		return fmt.Errorf("could not find corrupted identity for: %x", corruptedId)
+		return fmt.Errorf("could not find corrupted identity for: %x", event.CorruptedId)
 	}
 
 	// TODO: how do we keep track of state between calls to HandleEventFromCorruptedNode()?
@@ -56,29 +56,31 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		// TODO: how do we allow unit tests to assert execution result(s) was corrupted? Return type is error
 
 		// extract execution receipt so we can corrupt it
-		executionReceipt := event.(*flow.ExecutionReceipt)
+		executionReceipts := event.FlowProtocolEvent.([]*flow.ExecutionReceipt)
 
 		// replace all chunks with new ones to simulate chunk corruption
-		fmt.Println("before corruption", executionReceipt.ExecutionResult.ID())
+		fmt.Println("before corruption", executionReceipts[0].ExecutionResult.ID())
 		corruptReceipt := &flow.ExecutionReceipt{
-			ExecutorID: executionReceipt.ExecutorID,
+			ExecutorID: executionReceipts[0].ExecutorID,
 			ExecutionResult: flow.ExecutionResult{
-				PreviousResultID: executionReceipt.ExecutionResult.PreviousResultID,
-				BlockID:          executionReceipt.ExecutionResult.BlockID,
-				Chunks:           unittest.ChunkListFixture(uint(len(executionReceipt.ExecutionResult.Chunks)), executionReceipt.ExecutionResult.BlockID),
-				ServiceEvents:    executionReceipt.ExecutionResult.ServiceEvents,
-				ExecutionDataID:  executionReceipt.ExecutionResult.ExecutionDataID,
+				PreviousResultID: executionReceipts[0].ExecutionResult.PreviousResultID,
+				BlockID:          executionReceipts[0].ExecutionResult.BlockID,
+				Chunks:           unittest.ChunkListFixture(uint(len(executionReceipts[0].ExecutionResult.Chunks)), executionReceipts[0].ExecutionResult.BlockID),
+				ServiceEvents:    executionReceipts[0].ExecutionResult.ServiceEvents,
+				ExecutionDataID:  executionReceipts[0].ExecutionResult.ExecutionDataID,
 			},
-			ExecutorSignature: executionReceipt.ExecutorSignature,
-			Spocks:            executionReceipt.Spocks,
+			ExecutorSignature: executionReceipts[0].ExecutorSignature,
+			Spocks:            executionReceipts[0].Spocks,
 		}
+		// replace honest receipts with corrupted receipt
+		executionReceipts = []*flow.ExecutionReceipt{corruptReceipt}
 		//unittest.Wiafter ipts()
-		fmt.Println("after corruption", executionReceipt.ExecutionResult.ID())
+		fmt.Println("after corruption", executionReceipts[0].ExecutionResult.ID())
 
 		// save all corrupted chunks so can create result approvals for them
 		// can just create result approvals here and save them
-
-		err := o.network.RpcUnicastOnChannel(corruptedId, channel, corruptReceipt, targetIds[0])
+		err := o.network.Send(event)
+		//err := o.network.RpcUnicastOnChannel(corruptedId, channel, corruptReceipt, targetIds[0])
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
@@ -94,7 +96,7 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		// chunk
 		// request coming from verification node
 
-		request := event.(*messages.ChunkDataRequest)
+		request := event.FlowProtocolEvent.(*messages.ChunkDataRequest)
 		request.ChunkID.String()
 
 		// go through the saved list of corrupted execution receipt - there should only be 1 execution receipt
