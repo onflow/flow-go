@@ -54,6 +54,14 @@ func GetCommitSha() string {
 	return commitSha
 }
 
+func GetRunID() string {
+	runID := os.Getenv("RUN_ID")
+	if runID == "" {
+		panic("RUN_ID can't be empty")
+	}
+	return runID
+}
+
 func GetCommitDate() time.Time {
 	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
 	AssertNoError(err, "error parsing COMMIT_DATE")

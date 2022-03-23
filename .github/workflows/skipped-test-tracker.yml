@@ -33,6 +33,7 @@ jobs:
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
       COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: replace with github.sha or $GITHUB_SHA before merging
+      RUN_ID: ${{ github.run_id }}
       SKIPPED_TESTS_FILE: skipped-tests
       TEST_OUTPUT_FILE: test-output
     runs-on: ubuntu-latest
