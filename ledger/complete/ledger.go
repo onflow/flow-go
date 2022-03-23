@@ -178,7 +178,6 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	}
 
 	l.metrics.UpdateCount()
-	l.metrics.UpdateValuesNumber(uint64(len(trieUpdate.Paths)))
 
 	walChan := make(chan error)
 
@@ -345,7 +344,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 	// no need to prune the data since it has already been prunned through migrations
 	applyPruning := false
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
+	newTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 	}
