@@ -1,4 +1,4 @@
-name: Flaky Test Monitor Test
+name: Skipped Test Tracker Test
 
 on:
   push:
@@ -10,8 +10,8 @@ on:
       - master
 
 jobs:
-  flaky-test-monitor-regression:
-    name: Flaky Test Monitor Test
+  skipped-test-tracker-regression:
+    name: Skipped Test Tracker Test
     strategy:
       fail-fast: false
       matrix:
