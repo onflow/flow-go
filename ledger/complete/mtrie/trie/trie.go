@@ -366,7 +366,7 @@ func update(
 						n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
 
 						allocatedRegCountDelta, allocatedRegSizeDelta =
-							allocatedRegDeltas(parentNode.Payload(), &payloads[i])
+							computeAllocatedRegDeltas(parentNode.Payload(), &payloads[i])
 
 						return n, allocatedRegCountDelta, allocatedRegSizeDelta, nodeHeight
 					}
@@ -377,7 +377,7 @@ func update(
 				found = true
 
 				allocatedRegCountDelta, allocatedRegSizeDelta =
-					allocatedRegDeltasFromHigherHeight(parentNode.Payload())
+					computeAllocatedRegDeltasFromHigherHeight(parentNode.Payload())
 
 				break
 			}
@@ -475,10 +475,10 @@ func update(
 	return n, allocatedRegCountDelta, allocatedRegSizeDelta, lowestHeightTouched
 }
 
-// allocatedRegDeltasFromHigherHeight returns the deltas needed
-// to compute the allocated reg count and reg size when a payload
-// needs to be updated or unallocated at a lower height.
-func allocatedRegDeltasFromHigherHeight(oldPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
+// computeAllocatedRegDeltasFromHigherHeight returns the deltas
+// needed to compute the allocated reg count and reg size when
+// a payload is updated or unallocated at a lower height.
+func computeAllocatedRegDeltasFromHigherHeight(oldPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
 	if !oldPayload.IsEmpty() {
 		// Allocated register will be updated or unallocated at lower height.
 		allocatedRegCountDelta--
@@ -488,10 +488,10 @@ func allocatedRegDeltasFromHigherHeight(oldPayload *ledger.Payload) (allocatedRe
 	return
 }
 
-// allocatedRegDeltas returns the allocated reg count and reg size deltas
-// computed from old payload and new payload.
-// CAUTION: !oldPayload.Equals(newPayload)
-func allocatedRegDeltas(oldPayload, newPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
+// computeAllocatedRegDeltas returns the allocated reg count
+// and reg size deltas computed from old payload and new payload.
+// PRECONDITION: !oldPayload.Equals(newPayload)
+func computeAllocatedRegDeltas(oldPayload, newPayload *ledger.Payload) (allocatedRegCountDelta, allocatedRegSizeDelta int64) {
 	allocatedRegCountDelta = 0
 	if newPayload.IsEmpty() {
 		// Old payload is not empty while new payload is empty.
