@@ -1023,7 +1023,7 @@ func TestTrieAllocatedRegCountRegSize(t *testing.T) {
 
 // TestTrieAllocatedRegCountRegSizeWithMixedPruneFlag tests allocated register count and size
 // for updated trie with mixed pruning flag.
-// It tests the following updates with prune flag set to true:
+// It tests the following updates:
 //   * step 1 : update empty trie with new paths and payloads (255 allocated registers)
 //   * step 2 : remove a payload without pruning (254 allocated registers)
 //   * step 3a: remove previously removed payload with pruning (254 allocated registers)
