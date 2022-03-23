@@ -101,35 +101,48 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 	mockAttackNetwork.
 		On("RpcUnicastOnChannel", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
+			// assert that args passed are correct
+
 			corruptedId, ok := args[0].(flow.Identifier)
 			require.True(t, ok)
-
-			channel, ok := args[1].(network.Channel)
-			require.True(t, ok)
-
-			event, ok := args[2].(*flow.ExecutionReceipt)
-			require.True(t, ok)
-
-			receivedTargetIds, ok := args[3].(flow.Identifier)
-			require.True(t, ok)
-
-			// event should be dispatched to a corrupted execution node
+			// make sure sender is a corrupted execution node.
 			corruptedIdentity, ok := corruptedIdentityList.ByNodeID(corruptedId)
 			require.True(t, ok)
 			require.Equal(t, flow.RoleExecution, corruptedIdentity.Role)
 
+			channel, ok := args[1].(network.Channel)
+			require.True(t, ok)
+			// make sure message being sent on correct channel
 			require.Equal(t, engine.PushReceipts, channel)
+
+			event, ok := args[2].(*flow.ExecutionReceipt)
+			require.True(t, ok)
+
+			// make sure NOT the original uncorrupted execution receipt is sent to orchestrator
+			require.NotEqual(t, completeExecutionReceipts[0].Receipts[0], event)
+
+			receivedTargetIds, ok := args[3].(flow.Identifier)
+			require.True(t, ok)
+
+			//// event should be dispatched to a corrupted execution node
+			//corruptedIdentity, ok := corruptedIdentityList.ByNodeID(corruptedId)
+			//require.True(t, ok)
+			//require.Equal(t, flow.RoleExecution, corruptedIdentity.Role)
+
+			require.Equal(t, engine.PushReceipts, channel)
+			//require.Equal(t, engine.ConsensusCommittee, channel)
 			require.ElementsMatch(t, targetIds, receivedTargetIds)
 
 			require.NotEqual(t, completeExecutionReceipts[0].ContainerBlock.Payload.Results[0], event.ExecutionResult)
 		}).Return(nil)
 
-	wintermuteOrchestrator.HandleEventFromCorruptedNode(corruptedEn1.NodeID,
+	err = wintermuteOrchestrator.HandleEventFromCorruptedNode(corruptedEn1.NodeID,
 		engine.PushReceipts,
-		completeExecutionReceipts,
+		completeExecutionReceipts[0].Receipts[0], //single execution receipt
 		insecure.Protocol_UNICAST,
 		uint32(0),
 		targetIds.NodeIDs()[0])
+	require.NoError(t, err)
 }
 
 func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow.IdentityList, flow.IdentityList) {
