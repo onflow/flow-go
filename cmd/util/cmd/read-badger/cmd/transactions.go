@@ -188,6 +188,8 @@ var transactionsDuplicateCmd = &cobra.Command{
 			return
 		}
 
+		log.Info().Int("blocks", blockNo).Int("total_tx", totalTxs).Msg("processing progress")
+
 		err = batch.Flush()
 		if err != nil {
 			log.Error().Err(err).Msg("cannot flush write batch")
