@@ -36,13 +36,19 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 
 			honestIdentity := unittest.IdentityFixture()
 
-			corruptedNodeNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
+			// corrupted node network
 			corruptedEngine := &network.Engine{}
+			corruptedNodeNetwork := stub.NewNetwork(t, corruptedIdentity.NodeID, hub, stub.WithConduitFactory(ccf))
 			corruptedConduit, err := corruptedNodeNetwork.Register(testChannel, corruptedEngine)
 			require.NoError(t, err)
 
-			honestNodeNetwork := stub.NewNetwork(t, honestIdentity.NodeID, hub)
+			// honest network
 			honestEngine := &network.Engine{}
+			honestNodeNetwork := stub.NewNetwork(t, honestIdentity.NodeID, hub)
+			// in this test, the honest node is only the receiver, hence, we discard
+			// the created conduit.
+			_, err = honestNodeNetwork.Register(testChannel, honestEngine)
+			require.NoError(t, err)
 
 			wg := &sync.WaitGroup{}
 			wg.Add(1)
@@ -54,8 +60,6 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 				wg.Done()
 				return nil
 			})
-			_, err = honestNodeNetwork.Register(testChannel, honestEngine)
-			require.NoError(t, err)
 
 			unittest.RequireReturnsBefore(t, func() {
 				corruptedNodeNetwork.StartConDev(100*time.Millisecond, true)
