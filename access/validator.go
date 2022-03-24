@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/parser2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -228,16 +227,9 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 	return nil
 }
 
-type noopMemoryGauge struct {
-}
-
-func (noopMemoryGauge) MeterMemory(_ common.MemoryUsage) error {
-	return nil
-}
-
 func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error {
 	if v.options.CheckScriptsParse {
-		_, err := parser2.ParseProgram(string(tx.Script), noopMemoryGauge{})
+		_, err := parser2.ParseProgram(string(tx.Script), nil)
 		if err != nil {
 			return InvalidScriptError{ParserErr: err}
 		}
