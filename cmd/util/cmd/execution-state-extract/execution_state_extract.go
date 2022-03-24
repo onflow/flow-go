@@ -61,22 +61,9 @@ func extractExecutionState(
 	var rs []ledger.Reporter
 
 	if migrate {
-		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
-			Log:       log,
-			OutputDir: outputDir,
-		}
-
-		orderedMapMigration := mgr.OrderedMapMigration{
-			Log:       log,
-			OutputDir: dir,
-		}
-
 		migrations = []ledger.Migration{
-			orderedMapMigration.Migrate,
-			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
-
 	}
 
 	// generating reports at the end, so that the checkpoint file can be used
