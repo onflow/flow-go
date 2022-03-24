@@ -194,7 +194,7 @@ var transactionsDuplicateCmd = &cobra.Command{
 		}
 
 		if flagFixTransactionResultsIndex {
-			log.Info().Int("existing_entries", indexExistingEntries).Int("new_entries", indexExistingEntries).Msg("index fixed")
+			log.Info().Int("existing_entries", indexExistingEntries).Int("new_entries", indexNewEntries).Msg("index fixed")
 		} else {
 			for txID := range megaMap {
 				l := len(megaMap[txID])
