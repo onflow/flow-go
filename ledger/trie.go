@@ -226,19 +226,22 @@ func (p *Payload) String() string {
 	return p.Key.String() + " " + p.Value.String()
 }
 
-// Equals compares this payload to another payload
+// Equals compares this payload to another payload.  It doesn't include
+// key in comparison because payload key is auxiliary info.
 // A nil payload is equivalent to an empty payload.
 func (p *Payload) Equals(other *Payload) bool {
-	if p == nil || (len(p.Key.KeyParts) == 0 && len(p.Value) == 0) {
-		return other == nil || (len(other.Key.KeyParts) == 0 && len(other.Value) == 0)
-	}
-	if other == nil {
+	pEmpty := p.IsEmpty()
+	otherEmpty := other.IsEmpty()
+	if pEmpty != otherEmpty {
+		// Only one payload is empty
 		return false
 	}
-	if p.Key.Equals(&other.Key) && p.Value.Equals(other.Value) {
+	if pEmpty {
+		// Both payloads are empty
 		return true
 	}
-	return false
+	// Compare values since both payloads are not empty.
+	return p.Value.Equals(other.Value)
 }
 
 // DeepCopy returns a deep copy of the payload
