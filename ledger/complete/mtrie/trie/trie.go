@@ -26,6 +26,8 @@ import (
 // that where not affected by the write operation are shared between the original MTrie
 // (before the register updates) and the updated MTrie (after the register writes).
 //
+// MTrie expects that for a specific path, the register's key never changes.
+//
 // DEFINITIONS and CONVENTIONS:
 //   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
 //     between v and a tree leaf. The height of a tree is the height of its root.
@@ -279,6 +281,7 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 //   * keys are NOT duplicated
 //   * requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: `updatedPaths` and `updatedPayloads` are permuted IN-PLACE for optimized processing.
+// CAUTION: MTrie expects that for a specific path, the payload's key never changes.
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(
 	parentTrie *MTrie,
