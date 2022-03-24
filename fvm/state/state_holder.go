@@ -6,6 +6,8 @@ package state
 // the state it is recommended that such services wraps
 // a state manager instead of a state itself.
 type StateHolder struct {
+	EnforceMemoryLimits      bool
+	EnforceComputationLimits bool
 	enforceInteractionLimits bool
 	payerIsServiceAccount    bool
 	startState               *State
@@ -15,6 +17,8 @@ type StateHolder struct {
 // NewStateHolder constructs a new state manager
 func NewStateHolder(startState *State) *StateHolder {
 	return &StateHolder{
+		EnforceMemoryLimits:      true,
+		EnforceComputationLimits: true,
 		enforceInteractionLimits: true,
 		startState:               startState,
 		activeState:              startState,
@@ -36,16 +40,6 @@ func (s *StateHolder) SetPayerIsServiceAccount() {
 	s.payerIsServiceAccount = true
 }
 
-// EnableLimitEnforcement sets that the interaction limit should be enforced
-func (s *StateHolder) EnableLimitEnforcement() {
-	s.enforceInteractionLimits = true
-}
-
-// DisableLimitEnforcement sets that the interaction limit should not be enforced
-func (s *StateHolder) DisableLimitEnforcement() {
-	s.enforceInteractionLimits = false
-}
-
 // NewChild constructs a new child of active state
 // and set it as active state and return it
 // this is basically a utility function for common
@@ -54,6 +48,20 @@ func (s *StateHolder) NewChild() *State {
 	new := s.activeState.NewChild()
 	s.activeState = new
 	return s.activeState
+}
+
+// EnableLimitEnforcement enables all the limits
+func (s *StateHolder) EnableAllLimitEnforcements() {
+	s.enforceInteractionLimits = true
+	s.EnforceComputationLimits = true
+	s.EnforceMemoryLimits = true
+}
+
+// DisableAllLimitEnforcements disables all the limits
+func (s *StateHolder) DisableAllLimitEnforcements() {
+	s.enforceInteractionLimits = false
+	s.EnforceComputationLimits = false
+	s.EnforceMemoryLimits = false
 }
 
 // EnforceInteractionLimits returns if the interaction limits should be enforced or not

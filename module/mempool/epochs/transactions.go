@@ -16,11 +16,11 @@ import (
 type TransactionPools struct {
 	mu     sync.RWMutex
 	pools  map[uint64]mempool.Transactions
-	create func() mempool.Transactions
+	create func(uint64) mempool.Transactions
 }
 
 // NewTransactionPools returns a new set of epoch-scoped transaction pools.
-func NewTransactionPools(create func() mempool.Transactions) *TransactionPools {
+func NewTransactionPools(create func(uint64) mempool.Transactions) *TransactionPools {
 
 	pools := &TransactionPools{
 		pools:  make(map[uint64]mempool.Transactions),
@@ -43,7 +43,7 @@ func (t *TransactionPools) ForEpoch(epoch uint64) mempool.Transactions {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	pool = t.create()
+	pool = t.create(epoch)
 	t.pools[epoch] = pool
 	return pool
 }

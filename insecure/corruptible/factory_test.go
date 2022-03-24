@@ -82,7 +82,7 @@ func TestFactoryHandleIncomingEvent_AttackerObserve(t *testing.T) {
 
 	// checks content of the received message matches what has been sent.
 	require.ElementsMatch(t, receivedMsg.TargetIDs, flow.IdsToBytes(targetIds))
-	require.Equal(t, receivedMsg.Targets, uint32(3))
+	require.Equal(t, receivedMsg.TargetNum, uint32(3))
 	require.Equal(t, receivedMsg.Protocol, insecure.Protocol_MULTICAST)
 	require.Equal(t, receivedMsg.ChannelID, string(channel))
 

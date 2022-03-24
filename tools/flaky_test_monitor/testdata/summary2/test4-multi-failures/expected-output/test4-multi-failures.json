@@ -37,15 +37,15 @@
       {
         "test": "TestSanitySha2_256",
         "package": "github.com/onflow/flow-go/crypto/hash",
-        "runs": 24,
-        "passed": 14,
+        "runs": 25,
+        "passed": 15,
         "failed": 10,
-        "skipped": 1,
+        "skipped": 0,
         "no_result": 0,
-        "failure_rate": 0.42,
+        "failure_rate": 0.4,
         "average_duration": 0,
         "durations": [
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ]
       },
 
@@ -88,7 +88,7 @@
         "runs": 24,
         "passed": 24,
         "failed": 0,
-        "skipped": 1,
+        "skipped": 0,
         "no_result": 0,
         "failure_rate": 0,
         "average_duration": 0,

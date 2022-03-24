@@ -11,15 +11,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
-	return &ProgramsHandler{
-		masterState:  stateHolder,
-		viewsStack:   nil,
-		Programs:     programs,
-		initialState: stateHolder.State(),
-	}
-}
-
 type stackEntry struct {
 	state    *state.State
 	location common.Location
@@ -36,6 +27,16 @@ type ProgramsHandler struct {
 	viewsStack   []stackEntry
 	Programs     *programs.Programs
 	initialState *state.State
+}
+
+// NewProgramsHandler construts a new ProgramHandler
+func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
+	return &ProgramsHandler{
+		masterState:  stateHolder,
+		viewsStack:   nil,
+		Programs:     programs,
+		initialState: stateHolder.State(),
+	}
 }
 
 func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Program) error {
