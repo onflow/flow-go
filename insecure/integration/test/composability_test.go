@@ -2,7 +2,8 @@ package test
 
 import (
 	"context"
-	"fmt"
+	"net"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -26,7 +27,13 @@ func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
 	withCorruptibleConduitFactory(t, func(t *testing.T, corruptedIdentity flow.Identity, ccf *corruptible.ConduitFactory) {
 		corruptedEvent := &message.TestMessage{Text: "this is a corrupted message"}
 
-		withAttackOrchestrator(t, flow.IdentityList{&corruptedIdentity}, func(event *insecure.Event) {
+		// extracting port that ccf gRPC server is running on
+		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
+		require.NoError(t, err)
+		ccfPort, err := strconv.Atoi(ccfPortStr)
+		require.NoError(t, err)
+
+		withAttackOrchestrator(t, flow.IdentityList{&corruptedIdentity}, ccfPort, func(event *insecure.Event) {
 			event.FlowProtocolEvent = corruptedEvent
 		}, func(t *testing.T) {
 			hub := stub.NewNetworkHub()
@@ -96,7 +103,7 @@ func withCorruptibleConduitFactory(t *testing.T, run func(*testing.T, flow.Ident
 		flow.BftTestnet,
 		corruptedIdentity.NodeID,
 		codec,
-		fmt.Sprintf("localhost:%d", insecure.CorruptedFactoryPort))
+		"localhost:0")
 
 	// starts corruptible conduit factory
 	ccf.Start(ccfCtx)
@@ -113,10 +120,10 @@ func withCorruptibleConduitFactory(t *testing.T, run func(*testing.T, flow.Ident
 	unittest.RequireCloseBefore(t, ccf.Done(), 1*time.Second, "could not stop corruptible conduit on time")
 }
 
-func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, corrupter func(*insecure.Event), run func(t *testing.T)) {
+func withAttackOrchestrator(t *testing.T, corruptedIds flow.IdentityList, ccfPort int, corrupter func(*insecure.Event), run func(t *testing.T)) {
 	codec := cbor.NewCodec()
 	o := &mockOrchestrator{eventCorrupter: corrupter}
-	connector := attacknetwork.NewCorruptedConnector(corruptedIds)
+	connector := attacknetwork.NewCorruptedConnector(corruptedIds, ccfPort)
 	attackNetwork, err := attacknetwork.NewAttackNetwork(unittest.Logger(), "localhost:0", codec, o, connector, corruptedIds)
 	require.NoError(t, err)
 
