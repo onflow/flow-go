@@ -18,8 +18,8 @@ require (
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/onflow/cadence v0.21.3-0.20220317173919-b23d45bcd67d
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.1-0.20220324170006-d69b5668d9f3
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.1-0.20220324170006-d69b5668d9f3
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.1-0.20220324190025-40b5faa37e17
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.1-0.20220324190025-40b5faa37e17
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
