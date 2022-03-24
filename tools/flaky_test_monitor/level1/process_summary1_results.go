@@ -146,6 +146,8 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string][]*common.Level
 }
 
 func parseSkipReason(output []string) (unittest.SkipReason, bool) {
+	// skip reason is usually in the last output line, except when there is
+	// output from a test suite tear down function
 	for i := len(output) - 2; i >= 0; i-- {
 		skipReason, ok := unittest.ParseSkipReason(output[i])
 		if ok {

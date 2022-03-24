@@ -3,6 +3,7 @@ package unittest
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math"
 	"os"
 	"regexp"
 	"strings"
@@ -154,6 +155,13 @@ func AssertClosesBefore(t assert.TestingT, done <-chan struct{}, duration time.D
 		assert.Fail(t, "channel did not return in time", msgAndArgs...)
 	case <-done:
 		return
+	}
+}
+
+func AssertFloatEqual(t *testing.T, expected, actual float64, message string) {
+	tolerance := .00001
+	if !(math.Abs(expected-actual) < tolerance) {
+		assert.Equal(t, expected, actual, message)
 	}
 }
 

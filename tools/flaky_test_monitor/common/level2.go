@@ -2,10 +2,10 @@ package common
 
 import (
 	"fmt"
-	"math"
 	"strings"
 	"testing"
 
+	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,13 +28,6 @@ type Level2TestResult struct {
 	Durations       []float64 `json:"durations"`
 }
 
-func checkFloatEqual(t *testing.T, expected, actual float64, message string) {
-	tolerance := .00001
-	if !(math.Abs(expected-actual) < tolerance) {
-		require.Equal(t, expected, actual, message)
-	}
-}
-
 // AssertLevel2TestResults checks that 2 Level2TestResult structs are equal, doing a deep comparison.
 // This is needed for multiple test files (level 2 and 3) so it's extracted as a helper function here.
 func AssertLevel2TestResults(t *testing.T, expectedLevel2TestResult, actualLevel2TestResult Level2TestResult) {
@@ -47,8 +40,8 @@ func AssertLevel2TestResults(t *testing.T, expectedLevel2TestResult, actualLevel
 	require.Equal(t, expectedLevel2TestResult.Skipped, actualLevel2TestResult.Skipped, "skipped not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, expectedLevel2TestResult.Exceptions, actualLevel2TestResult.Exceptions, "exceptions not equal; test: "+expectedLevel2TestResult.Test)
 
-	checkFloatEqual(t, expectedLevel2TestResult.FailureRate, actualLevel2TestResult.FailureRate, "failure rate not equal; test: "+expectedLevel2TestResult.Test)
-	checkFloatEqual(t, expectedLevel2TestResult.AverageDuration, actualLevel2TestResult.AverageDuration, "avg duration not equal; test: "+expectedLevel2TestResult.Test)
+	unittest.AssertFloatEqual(t, expectedLevel2TestResult.FailureRate, actualLevel2TestResult.FailureRate, "failure rate not equal; test: "+expectedLevel2TestResult.Test)
+	unittest.AssertFloatEqual(t, expectedLevel2TestResult.AverageDuration, actualLevel2TestResult.AverageDuration, "avg duration not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, len(expectedLevel2TestResult.Durations), len(actualLevel2TestResult.Durations), PrintLevel2TestResult(&actualLevel2TestResult, "duration list sizes don't match"))
 	// skip checking all individual durations because
 	// a. require.Contains() seems to have a bug for checking float values in a list
