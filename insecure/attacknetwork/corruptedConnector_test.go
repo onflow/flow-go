@@ -2,7 +2,8 @@ package attacknetwork
 
 import (
 	"context"
-	"fmt"
+	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -18,30 +19,36 @@ import (
 // TestConnectorHappy path checks that a CorruptedConnector can successfully create a connection to a remote corruptible conduit factory.
 // Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion.
 func TestConnectorHappyPath(t *testing.T) {
-	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, factory *mockCorruptibleConduitFactory) {
-		connector := NewCorruptedConnector(flow.IdentityList{&corruptedId})
+	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, ccf *mockCorruptibleConduitFactory) {
+		// extracting port that ccf gRPC server is running on
+		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
+		require.NoError(t, err)
+		ccfPort, err := strconv.Atoi(ccfPortStr)
+		require.NoError(t, err)
+
+		connector := NewCorruptedConnector(flow.IdentityList{&corruptedId}, ccfPort)
 		// attacker address is solely used as part of register message,
 		// hence no real network address needed.
 		attackerAddress := "dummy-attacker-address"
 
 		connector.WithAttackerAddress(attackerAddress)
 
-		// goroutine checks the mock factory for receiving the register message from connector.
-		// the register message arrives as the connector attempts a connection on to the factory.
+		// goroutine checks the mock ccf for receiving the register message from connector.
+		// the register message arrives as the connector attempts a connection on to the ccf.
 		registerMsgReceived := make(chan struct{})
 		go func() {
-			receivedRegMsg := <-factory.attackerRegMsg
+			receivedRegMsg := <-ccf.attackerRegMsg
 			// register message should contain attacker address
 			require.Equal(t, attackerAddress, receivedRegMsg.Address)
 
 			close(registerMsgReceived)
 		}()
 
-		// goroutine checks mock factory for receiving the message sent over the connection.
+		// goroutine checks mock ccf for receiving the message sent over the connection.
 		msg, _, _ := messageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST)
 		sentMsgReceived := make(chan struct{})
 		go func() {
-			receivedMsg := <-factory.attackerMsg
+			receivedMsg := <-ccf.attackerMsg
 
 			// received message should have an exact match on the relevant fields.
 			// Note: only fields filled by test fixtures are checked, as some others
@@ -56,16 +63,16 @@ func TestConnectorHappyPath(t *testing.T) {
 			close(sentMsgReceived)
 		}()
 
-		// creates a connection to the corruptible conduit factory.
+		// creates a connection to the corruptible conduit ccf.
 		connection, err := connector.Connect(context.Background(), corruptedId.NodeID)
 		require.NoError(t, err)
 
-		// sends a message over the corruptible conduit factory
+		// sends a message over the corruptible conduit ccf
 		require.NoError(t, connection.SendMessage(msg))
 
-		// checks a timely arrival of the registration and sent messages at the factory.
-		unittest.RequireCloseBefore(t, registerMsgReceived, 1*time.Second, "factory could not receive register message on time")
-		unittest.RequireCloseBefore(t, sentMsgReceived, 1*time.Second, "factory could not receive message sent on connection on time")
+		// checks a timely arrival of the registration and sent messages at the ccf.
+		unittest.RequireCloseBefore(t, registerMsgReceived, 1*time.Second, "ccf could not receive register message on time")
+		unittest.RequireCloseBefore(t, sentMsgReceived, 1*time.Second, "ccf could not receive message sent on connection on time")
 	})
 }
 
@@ -86,7 +93,7 @@ func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, *mo
 		}
 	}()
 
-	ccf := newMockCorruptibleConduitFactory(fmt.Sprintf("localhost:%d", insecure.CorruptedFactoryPort))
+	ccf := newMockCorruptibleConduitFactory()
 
 	// starts corruptible conduit factory
 	ccf.Start(ccfCtx)
