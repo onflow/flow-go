@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -124,8 +125,8 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 		})
 		err := s.processor.Process(vote)
 		require.Error(s.T(), err)
-		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.True(s.T(), model.IsInvalidFormatError(err))
+		require.True(s.T(), model.IsInvalidVoteError(err), err)
+		require.True(s.T(), errors.Is(err, msig.ErrInvalidSignatureFormat), err)
 	})
 }
 
@@ -678,7 +679,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		// mock expected calls to aggregator and reconstructor
 		combinedSigs := unittest.SignaturesFixture(2)
-		stakingAggregator.On("Aggregate").Return(stakingSigners.NodeIDs(), []byte(combinedSigs[0]), nil).Once()
+		stakingAggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners.NodeIDs()), []byte(combinedSigs[0]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[1], nil).Once()
 
 		// mock expected call to Packer

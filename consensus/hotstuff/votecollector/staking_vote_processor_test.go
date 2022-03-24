@@ -163,7 +163,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	// setup aggregator
 	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
 	expectedSigData := unittest.RandomBytes(128)
-	s.stakingAggregator.On("Aggregate").Return(stakingSigners, expectedSigData, nil).Once()
+	s.stakingAggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners), expectedSigData, nil).Once()
 
 	// expected QC
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Run(func(args mock.Arguments) {
@@ -211,7 +211,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
 		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)
 		aggregator.On("TotalWeight").Return(s.minRequiredStake)
-		aggregator.On("Aggregate").Return(stakingSigners, unittest.RandomBytes(128), nil)
+		aggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners), unittest.RandomBytes(128), nil)
 	}
 
 	// mock aggregators, so we have enough weight and shares for creating QC

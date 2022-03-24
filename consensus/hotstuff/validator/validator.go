@@ -82,7 +82,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		//   least one signer. Hence, receiving this error would be a symptom of a fatal internal bug.
 		switch {
 		case model.IsInvalidFormatError(err):
-			return newInvalidBlockError(block, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
+			return newInvalidBlockError(block, fmt.Errorf("QC's signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidBlockError(block, fmt.Errorf("QC contains invalid signature(s): %w", err))
 		default:

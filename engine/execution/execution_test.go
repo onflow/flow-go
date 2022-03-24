@@ -16,7 +16,7 @@ import (
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"
@@ -93,7 +93,7 @@ func TestExecutionFlow(t *testing.T) {
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 
 	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID, 1)
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
+	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 
@@ -229,7 +229,7 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 	// make collection
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
+	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 
@@ -264,7 +264,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	// make collection
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
+	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
@@ -287,7 +287,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
 	require.NoError(t, err)
 
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
+	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/module/signature"
+	msig "github.com/onflow/flow-go/module/signature"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -133,7 +134,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() 
 	err := s.processor.Process(vote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.True(s.T(), model.IsInvalidFormatError(err))
+	require.True(s.T(), errors.Is(err, msig.ErrInvalidSignatureFormat), err)
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 rejects invalid votes for the following scenarios:
@@ -809,7 +810,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 				}
 				return nil
 			}).Maybe()
-		rbSigAggregator.On("Aggregate").Return(beaconSigners.NodeIDs(), []byte(combinedSigs[1]), nil).Once()
+		rbSigAggregator.On("Aggregate").Return([]flow.Identifier(beaconSigners.NodeIDs()), []byte(combinedSigs[1]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
 
 		// mock expected call to Packer
