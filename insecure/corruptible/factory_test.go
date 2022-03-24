@@ -2,15 +2,21 @@ package corruptible
 
 import (
 	"context"
+	"fmt"
+	"net"
+	"sync"
 	"testing"
 	"time"
 
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -166,33 +172,43 @@ func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 
 // TestProcessAttackerMessage evaluates that conduit factory relays the messages coming from the attacker to its underlying network adapter.
 func TestProcessAttackerMessage(t *testing.T) {
-	codec := cbor.NewCodec()
-	// corruptible conduit factory with no attacker registered.
-	f := NewCorruptibleConduitFactory(unittest.Logger(), flow.BftTestnet, unittest.IdentifierFixture(), codec, "localhost:0")
+	withCorruptibleConduitFactory(t,
+		func(
+			identity flow.Identity,
+			factory *ConduitFactory,
+			flowNetwork *mocknetwork.Adapter,
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient,
+		) {
+			// creates a corrupted event that attacker is sending on the flow network through the
+			// corrupted conduit factory.
+			event := &message.TestMessage{Text: "this is a corrupted event coming from attacker"}
+			channel := network.Channel("test-channel")
+			targetIds := unittest.IdentifierListFixture(10)
 
-	adapter := &mocknetwork.Adapter{}
-	err := f.RegisterAdapter(adapter)
-	require.NoError(t, err)
+			params := []interface{}{channel, event, uint(3)}
+			for _, id := range targetIds {
+				params = append(params, id)
+			}
 
-	event := &message.TestMessage{Text: "this is a test message"}
-	channel := network.Channel("test-channel")
-	targetIds := unittest.IdentifierListFixture(10)
+			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
+			corruptedEventDispatchedOnFlowNetWg.Add(1)
+			flowNetwork.On("MulticastOnChannel", params...).Run(func(args testifymock.Arguments) {
+				corruptedEventDispatchedOnFlowNetWg.Done()
+			}).Return(nil).Once()
 
-	params := []interface{}{channel, event, uint(3)}
-	for _, id := range targetIds {
-		params = append(params, id)
-	}
+			// imitates an RPC call from the attacker
+			msg, err := factory.eventToMessage(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
+			require.NoError(t, err)
 
-	adapter.On("MulticastOnChannel", params...).Return(nil).Once()
+			err = stream.Send(msg)
+			require.NoError(t, err)
 
-	// imitates an RPC call from the attacker
-	msg, err := f.eventToMessage(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
-	require.NoError(t, err)
-
-	err = f.processAttackerMessage(msg)
-	require.NoError(t, err)
-
-	testifymock.AssertExpectationsForObjects(t, adapter)
+			unittest.RequireReturnsBefore(
+				t,
+				corruptedEventDispatchedOnFlowNetWg.Wait,
+				1*time.Second,
+				"attacker's message was not dispatched on flow network on time")
+		})
 }
 
 // TestEngineClosingChannel evaluates that factory closes the channel whenever the corresponding engine of that channel attempts
@@ -217,4 +233,66 @@ func TestEngineClosingChannel(t *testing.T) {
 
 	// adapter's UnRegisterChannel method must be called once.
 	testifymock.AssertExpectationsForObjects(t, adapter)
+}
+
+// withCorruptibleConduitFactory creates and starts a corruptible conduit factory, runs the "run" function and then
+// terminates the factory.
+func withCorruptibleConduitFactory(t *testing.T,
+	run func(
+		flow.Identity,
+		*ConduitFactory,
+		*mocknetwork.Adapter,
+		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient)) {
+
+	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
+
+	// life-cycle management of corruptible conduit factory.
+	ctx, cancel := context.WithCancel(context.Background())
+	ccfCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go func() {
+		select {
+		case err := <-errChan:
+			t.Error("mock corruptible conduit factory startup encountered fatal error", err)
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	ccf := NewCorruptibleConduitFactory(
+		unittest.Logger(),
+		flow.BftTestnet,
+		corruptedIdentity.NodeID,
+		cbor.NewCodec(),
+		"localhost:0",
+	)
+
+	// starts corruptible conduit factory
+	ccf.Start(ccfCtx)
+	unittest.RequireCloseBefore(t, ccf.Ready(), 1*time.Second, "could not start corruptible conduit factory on time")
+
+	// extracting port that ccf gRPC server is running on
+	_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
+	require.NoError(t, err)
+
+	// registers a mock adapter to the corruptible conduit factory
+	adapter := &mocknetwork.Adapter{}
+	err = ccf.RegisterAdapter(adapter)
+	require.NoError(t, err)
+
+	// imitating an attacker dial to corruptible conduit factory (ccf) and opening a stream to it
+	// on which the attacker dictates ccf to relay messages on the actual flow network
+	gRpcClient, err := grpc.Dial(
+		fmt.Sprintf("localhost:%s", ccfPortStr),
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
+	require.NoError(t, err)
+
+	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
+	stream, err := client.ProcessAttackerMessage(context.Background())
+	require.NoError(t, err)
+
+	run(*corruptedIdentity, ccf, adapter, stream)
+
+	// terminates attackNetwork
+	cancel()
+	unittest.RequireCloseBefore(t, ccf.Done(), 1*time.Second, "could not stop corruptible conduit on time")
 }
