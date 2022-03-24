@@ -26,7 +26,7 @@ type mockCorruptibleConduitFactory struct {
 	attackerMsg           chan *insecure.Message
 }
 
-func newMockCorruptibleConduitFactory(address string) *mockCorruptibleConduitFactory {
+func newMockCorruptibleConduitFactory() *mockCorruptibleConduitFactory {
 
 	factory := &mockCorruptibleConduitFactory{
 		attackerRegMsg: make(chan *insecure.AttackerRegisterMessage),
@@ -35,7 +35,7 @@ func newMockCorruptibleConduitFactory(address string) *mockCorruptibleConduitFac
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			factory.start(ctx, address)
+			factory.start(ctx, "localhost:0")
 
 			ready()
 
@@ -64,7 +64,6 @@ func (c *mockCorruptibleConduitFactory) start(ctx irrecoverable.SignalerContext,
 	}
 	c.server = s
 	c.address = ln.Addr()
-	fmt.Println(c.address.String())
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
