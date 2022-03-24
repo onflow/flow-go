@@ -13,7 +13,7 @@ type TimeoutAggregator interface {
 	module.ReadyDoneAware
 	module.Startable
 
-	// AddTimeout verified and aggregates a timeout object.
+	// AddTimeout verifies and aggregates a timeout object.
 	// This method can be called concurrently, timeouts will be queued and processed asynchronously.
 	AddTimeout(timeoutObject *model.TimeoutObject)
 
@@ -22,5 +22,5 @@ type TimeoutAggregator interface {
 	// than `lowestRetainedView`. If `lowestRetainedView` is smaller than the
 	// previous value, the previous value is kept and the method call is a NoOp.
 	// This value should be set the latest active view maintained by `Pacemaker`.
-	PruneUpToView(view uint64)
+	PruneUpToView(lowestRetainedView uint64)
 }
