@@ -243,7 +243,10 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	node.Me, err = local.New(identity.Identity(), privKeys.StakingKey)
 	require.NoError(t, err)
 
-	pools := epochs.NewTransactionPools(func() mempool.Transactions { return herocache.NewTransactions(1000, node.Log) })
+	pools := epochs.NewTransactionPools(
+		func(_ uint64) mempool.Transactions {
+			return herocache.NewTransactions(1000, node.Log, metrics.NewNoopCollector())
+		})
 	transactions := storage.NewTransactions(node.Metrics, node.PublicDB)
 	collections := storage.NewCollections(node.PublicDB, transactions)
 	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.PublicDB)
