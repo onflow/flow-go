@@ -61,19 +61,19 @@ func extractExecutionState(
 	var rs []ledger.Reporter
 
 	if migrate {
-		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
-			Log:       log,
-			OutputDir: outputDir,
-		}
-
-		orderedMapMigration := mgr.OrderedMapMigration{
-			Log:       log,
-			OutputDir: dir,
-		}
+		//storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
+		//	Log:       log,
+		//	OutputDir: outputDir,
+		//}
+		//
+		//orderedMapMigration := mgr.OrderedMapMigration{
+		//	Log:       log,
+		//	OutputDir: dir,
+		//}
 
 		migrations = []ledger.Migration{
-			orderedMapMigration.Migrate,
-			storageUsedUpdateMigration.Migrate,
+			//orderedMapMigration.Migrate,
+			//storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
 
