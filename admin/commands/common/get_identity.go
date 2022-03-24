@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/model/flow"
