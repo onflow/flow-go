@@ -18,8 +18,8 @@ type Meter struct {
 	memoryUsed       uint
 	memoryLimit      uint
 
-	computationIntensities interfaceMeter.MeteredIntensities
-	memoryIntensities      interfaceMeter.MeteredIntensities
+	computationIntensities interfaceMeter.MeteredComputationIntensities
+	memoryIntensities      interfaceMeter.MeteredMemoryIntensities
 }
 
 // NewMeter constructs a new Meter
@@ -27,8 +27,8 @@ func NewMeter(computationLimit, memoryLimit uint) *Meter {
 	return &Meter{
 		computationLimit:       computationLimit,
 		memoryLimit:            memoryLimit,
-		computationIntensities: make(interfaceMeter.MeteredIntensities),
-		memoryIntensities:      make(interfaceMeter.MeteredIntensities),
+		computationIntensities: make(interfaceMeter.MeteredComputationIntensities),
+		memoryIntensities:      make(interfaceMeter.MeteredMemoryIntensities),
 	}
 }
 
@@ -37,8 +37,8 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 	return &Meter{
 		computationLimit:       m.computationLimit,
 		memoryLimit:            m.memoryLimit,
-		computationIntensities: make(interfaceMeter.MeteredIntensities),
-		memoryIntensities:      make(interfaceMeter.MeteredIntensities),
+		computationIntensities: make(interfaceMeter.MeteredComputationIntensities),
+		memoryIntensities:      make(interfaceMeter.MeteredMemoryIntensities),
 	}
 }
 
@@ -83,7 +83,7 @@ func (m *Meter) MeterComputation(kind common.ComputationKind, intensity uint) er
 }
 
 // ComputationIntensities returns all the measured computational intensities
-func (m *Meter) ComputationIntensities() interfaceMeter.MeteredIntensities {
+func (m *Meter) ComputationIntensities() interfaceMeter.MeteredComputationIntensities {
 	return m.computationIntensities
 }
 
@@ -98,7 +98,7 @@ func (m *Meter) TotalComputationLimit() uint {
 }
 
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
-func (m *Meter) MeterMemory(kind common.ComputationKind, intensity uint) error {
+func (m *Meter) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	m.memoryIntensities[kind] += intensity
 	m.memoryUsed += intensity
 	if m.memoryUsed > m.memoryLimit {
@@ -108,7 +108,7 @@ func (m *Meter) MeterMemory(kind common.ComputationKind, intensity uint) error {
 }
 
 // MemoryIntensities returns all the measured memory intensities
-func (m *Meter) MemoryIntensities() interfaceMeter.MeteredIntensities {
+func (m *Meter) MemoryIntensities() interfaceMeter.MeteredMemoryIntensities {
 	return m.memoryIntensities
 }
 

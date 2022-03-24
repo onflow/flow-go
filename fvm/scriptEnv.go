@@ -118,9 +118,6 @@ func (e *ScriptEnv) setMeteringWeights() {
 	m.SetMemoryWeights(memoryWeights)
 }
 
-func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
-}
-
 func (e *ScriptEnv) seedRNG(header *flow.Header) {
 	// Seed the random number generator with entropy created from the block header ID. The random number generator will
 	// be used by the UnsafeRandom function.
@@ -533,7 +530,7 @@ func (e *ScriptEnv) ComputationUsed() uint64 {
 	return uint64(e.sth.State().TotalComputationUsed())
 }
 
-func (e *ScriptEnv) meterMemory(kind, intensity uint) error {
+func (e *ScriptEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
 	if e.sth.EnforceMemoryLimits {
 		return e.sth.State().MeterMemory(kind, intensity)
 	}
@@ -541,7 +538,7 @@ func (e *ScriptEnv) meterMemory(kind, intensity uint) error {
 }
 
 func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
-	return e.meterMemory(uint(usage.Kind), uint(usage.Amount))
+	return e.meterMemory(usage.Kind, uint(usage.Amount))
 }
 
 func (e *ScriptEnv) MemoryUsed() uint64 {
@@ -847,4 +844,12 @@ func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 
 func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
+}
+
+func (e *ScriptEnv) ResourceOwnerChanged(
+	*interpreter.Interpreter,
+	*interpreter.CompositeValue,
+	common.Address,
+	common.Address,
+) {
 }

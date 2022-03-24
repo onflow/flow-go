@@ -55,13 +55,6 @@ type TransactionEnv struct {
 	authorizers      []runtime.Address
 }
 
-func (e *TransactionEnv) ResourceOwnerChanged(
-	*interpreter.Interpreter,
-	*interpreter.CompositeValue,
-	common.Address,
-	common.Address) {
-}
-
 func NewTransactionEnvironment(
 	ctx Context,
 	vm *VirtualMachine,
@@ -658,7 +651,7 @@ func (e *TransactionEnv) ComputationUsed() uint64 {
 	return uint64(e.sth.State().TotalComputationUsed())
 }
 
-func (e *TransactionEnv) meterMemory(kind, intensity uint) error {
+func (e *TransactionEnv) meterMemory(kind common.MemoryKind, intensity uint) error {
 	if e.sth.EnforceMemoryLimits {
 		return e.sth.State().MeterMemory(kind, intensity)
 	}
@@ -666,7 +659,7 @@ func (e *TransactionEnv) meterMemory(kind, intensity uint) error {
 }
 
 func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
-	return e.meterMemory(uint(usage.Kind), uint(usage.Amount))
+	return e.meterMemory(usage.Kind, uint(usage.Amount))
 }
 
 func (e *TransactionEnv) MemoryUsed() uint64 {
@@ -1164,5 +1157,10 @@ func (e *TransactionEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*run
 	return crypto.AggregatePublicKeys(keys)
 }
 
-func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+func (e *TransactionEnv) ResourceOwnerChanged(
+	*interpreter.Interpreter,
+	*interpreter.CompositeValue,
+	common.Address,
+	common.Address,
+) {
 }

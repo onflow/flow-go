@@ -106,10 +106,10 @@ func getExecutionWeights(
 	env Environment,
 	accounts state.Accounts,
 ) (
-	computationWeights,
-	memoryWeights weighted.ExecutionWeights, err error,
+	computationWeights weighted.ExecutionEffortWeights,
+	memoryWeights weighted.ExecutionMemoryWeights, err error,
 ) {
-	memoryWeights = make(weighted.ExecutionWeights)
+	memoryWeights = make(weighted.ExecutionMemoryWeights)
 
 	// the weights are stored in the service account
 	serviceAddress := env.Context().Chain.ServiceAddress()
