@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -13,6 +16,7 @@ import (
 )
 
 var flagMaxBlockHeight uint64
+var flagFixTransactionResultsIndex bool
 
 func init() {
 	rootCmd.AddCommand(transactionsCmd)
@@ -22,6 +26,7 @@ func init() {
 	_ = transactionsCmd.MarkFlagRequired("id")
 
 	transactionsDuplicateCmd.Flags().Uint64Var(&flagMaxBlockHeight, "max-height", 0, "maximum block height (skip blocks with height above this value")
+	transactionsDuplicateCmd.Flags().BoolVar(&flagFixTransactionResultsIndex, "fix", false, "fix missing entries in (block_id, transaction_index) index, display duplicates otherwise")
 }
 
 var transactionsCmd = &cobra.Command{
@@ -51,7 +56,7 @@ var transactionsCmd = &cobra.Command{
 
 var transactionsDuplicateCmd = &cobra.Command{
 	Use:   "transactions-duplicates",
-	Short: "report duplicated transactions",
+	Short: "report/fix duplicated transactions",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages, db := InitStorages()
 		defer db.Close()
@@ -68,10 +73,30 @@ var transactionsDuplicateCmd = &cobra.Command{
 		blockNo := 0
 		totalTxs := 0
 
+		indexExistingEntries := 0
+		indexNewEntries := 0
+
+		hasSystemTx := false
+
+		systemTxID := flow.Identifier{}
+
+		batch := badger.NewBatch(db)
+
 		_, err := headers.FindHeaders(func(header *flow.Header) bool {
 
 			if flagMaxBlockHeight > 0 && header.Height > flagMaxBlockHeight {
 				return false
+			}
+
+			if !hasSystemTx {
+
+				systemTx, err := blueprints.SystemChunkTransaction(header.ChainID.Chain())
+				if err != nil {
+					panic(fmt.Sprintf("error while constructing system chunk tx: %s", err))
+				}
+				systemTxID = systemTx.ID()
+
+				hasSystemTx = true
 			}
 
 			blockID := header.ID()
@@ -80,8 +105,9 @@ var transactionsDuplicateCmd = &cobra.Command{
 			if err != nil {
 				panic(fmt.Sprintf("header %s if here but not block", blockID.String()))
 			}
-			txIndex := 0
-			for _, guarantee := range block.Payload.Guarantees {
+
+			txIndex := uint32(0)
+			for i, guarantee := range block.Payload.Guarantees {
 				lightCollection, err := storages.Collections.LightByID(guarantee.CollectionID)
 				if err != nil {
 
@@ -95,7 +121,17 @@ var transactionsDuplicateCmd = &cobra.Command{
 					light := collection.Light()
 					lightCollection = &light
 				}
-				for _, txID := range lightCollection.Transactions {
+
+				txs := make([]flow.Identifier, len(lightCollection.Transactions))
+
+				copy(txs, lightCollection.Transactions)
+
+				// add system tx to last collection in block
+				if i == len(block.Payload.Guarantees)+1 {
+					txs = append(txs, systemTxID)
+				}
+
+				for _, txID := range txs {
 
 					if _, has := megaMap[txID]; !has {
 						megaMap[txID] = make(map[flow.Identifier]struct{}, 0)
@@ -106,6 +142,32 @@ var transactionsDuplicateCmd = &cobra.Command{
 					}
 
 					megaMap[txID][blockID] = struct{}{}
+
+					if flagFixTransactionResultsIndex {
+
+						_, err := storages.TransactionResults.ByBlockIDTransactionIndex(blockID, txIndex)
+						if err != nil {
+							if errors.Is(err, storage.ErrNotFound) {
+
+								//transactionResult, err := storages.TransactionResults.ByBlockIDTransactionID(blockID, txID)
+								//if err != nil {
+								//	panic(fmt.Sprintf("cannot get transaction results by (block_id, tx_id) (%s, %s): %s", blockID.String(), txID.String(), err))
+								//}
+								//
+								//result := operation.BatchIndexTransactionResult(blockID, txIndex, transactionResult)
+								//err = result(batch.GetWriter())
+								//if err != nil {
+								//	panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
+								//}
+
+								indexNewEntries++
+							} else {
+								panic(fmt.Sprintf("error while querying transaction result by (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
+							}
+						} else {
+							indexExistingEntries++
+						}
+					}
 
 					totalTxs++
 					txIndex++
@@ -121,20 +183,29 @@ var transactionsDuplicateCmd = &cobra.Command{
 			return false
 		})
 
-		for txID := range megaMap {
-			l := len(megaMap[txID])
-			if l > 1 {
-				blockIDs := make([]string, 0, l)
-				for blockID := range megaMap[txID] {
-					blockIDs = append(blockIDs, blockID.String())
-				}
-				log.Info().Str("tx_id", txID.String()).Msgf("transaction duplicated in different %d blocks: %s", l, strings.Join(blockIDs, ", "))
-			}
-		}
-
 		if err != nil {
 			log.Error().Err(err).Msgf("could not iterate blocks")
 			return
+		}
+
+		err = batch.Flush()
+		if err != nil {
+			log.Error().Err(err).Msg("cannot flush write batch")
+		}
+
+		if flagFixTransactionResultsIndex {
+			log.Info().Int("existing_entries", indexExistingEntries).Int("new_entries", indexExistingEntries).Msg("index fixed")
+		} else {
+			for txID := range megaMap {
+				l := len(megaMap[txID])
+				if l > 1 {
+					blockIDs := make([]string, 0, l)
+					for blockID := range megaMap[txID] {
+						blockIDs = append(blockIDs, blockID.String())
+					}
+					log.Info().Str("tx_id", txID.String()).Msgf("transaction duplicated in different %d blocks: %s", l, strings.Join(blockIDs, ", "))
+				}
+			}
 		}
 
 	},
