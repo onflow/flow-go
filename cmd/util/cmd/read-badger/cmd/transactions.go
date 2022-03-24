@@ -3,11 +3,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -143,30 +143,27 @@ var transactionsDuplicateCmd = &cobra.Command{
 
 					megaMap[txID][blockID] = struct{}{}
 
-					if flagFixTransactionResultsIndex {
+					_, err := storages.TransactionResults.ByBlockIDTransactionIndex(blockID, txIndex)
+					if err != nil {
+						if errors.Is(err, storage.ErrNotFound) {
+							if flagFixTransactionResultsIndex {
+								transactionResult, err := storages.TransactionResults.ByBlockIDTransactionID(blockID, txID)
+								if err != nil {
+									panic(fmt.Sprintf("cannot get transaction results by (block_id, tx_id) (%s, %s): %s", blockID.String(), txID.String(), err))
+								}
 
-						_, err := storages.TransactionResults.ByBlockIDTransactionIndex(blockID, txIndex)
-						if err != nil {
-							if errors.Is(err, storage.ErrNotFound) {
-
-								//transactionResult, err := storages.TransactionResults.ByBlockIDTransactionID(blockID, txID)
-								//if err != nil {
-								//	panic(fmt.Sprintf("cannot get transaction results by (block_id, tx_id) (%s, %s): %s", blockID.String(), txID.String(), err))
-								//}
-								//
-								//result := operation.BatchIndexTransactionResult(blockID, txIndex, transactionResult)
-								//err = result(batch.GetWriter())
-								//if err != nil {
-								//	panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
-								//}
-
-								indexNewEntries++
-							} else {
-								panic(fmt.Sprintf("error while querying transaction result by (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
+								result := operation.BatchIndexTransactionResult(blockID, txIndex, transactionResult)
+								err = result(batch.GetWriter())
+								if err != nil {
+									panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
+								}
 							}
+							indexNewEntries++
 						} else {
-							indexExistingEntries++
+							panic(fmt.Sprintf("error while querying transaction result by (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
 						}
+					} else {
+						indexExistingEntries++
 					}
 
 					totalTxs++
@@ -195,20 +192,6 @@ var transactionsDuplicateCmd = &cobra.Command{
 			log.Error().Err(err).Msg("cannot flush write batch")
 		}
 
-		if flagFixTransactionResultsIndex {
-			log.Info().Int("existing_entries", indexExistingEntries).Int("new_entries", indexNewEntries).Msg("index fixed")
-		} else {
-			for txID := range megaMap {
-				l := len(megaMap[txID])
-				if l > 1 {
-					blockIDs := make([]string, 0, l)
-					for blockID := range megaMap[txID] {
-						blockIDs = append(blockIDs, blockID.String())
-					}
-					log.Info().Str("tx_id", txID.String()).Msgf("transaction duplicated in different %d blocks: %s", l, strings.Join(blockIDs, ", "))
-				}
-			}
-		}
-
+		log.Info().Int("existing_entries", indexExistingEntries).Int("new_entries", indexNewEntries).Msg("index fixed")
 	},
 }
