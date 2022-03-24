@@ -56,11 +56,13 @@ jobs:
     - name: Get commit date
       id: commit_date
       run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
+    - name: Test setup
+      run: ./tools/flaky_test_monitor/test-setup.sh
     - name: Run tests
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 25
-        max_attempts: 10
+        max_attempts: 5
         command: ./tools/flaky_test_monitor/run-tests.sh
     - name: Process test results
       run: cat $TEST_OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go
