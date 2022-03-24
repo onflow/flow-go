@@ -16,11 +16,13 @@ import (
 type CorruptedConnector struct {
 	attackerAddress string
 	corruptedIds    flow.IdentityList
+	ccfPort         int // conventional port for dialing remote corruptible conduit factories
 }
 
-func NewCorruptedConnector(corruptedIds flow.IdentityList) *CorruptedConnector {
+func NewCorruptedConnector(corruptedIds flow.IdentityList, ccfPort int) *CorruptedConnector {
 	return &CorruptedConnector{
 		corruptedIds: corruptedIds,
+		ccfPort:      ccfPort,
 	}
 }
 
@@ -74,5 +76,5 @@ func (c *CorruptedConnector) corruptedConduitFactoryAddress(id flow.Identifier) 
 		return "", fmt.Errorf("could not extract address of corruptible conduit factory %s: %w", identity.Address, err)
 	}
 
-	return net.JoinHostPort(corruptedAddress, strconv.Itoa(insecure.CorruptedFactoryPort)), nil
+	return net.JoinHostPort(corruptedAddress, strconv.Itoa(c.ccfPort)), nil
 }
