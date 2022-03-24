@@ -30,6 +30,40 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// The ExecutionDataRequester downloads ExecutionData for sealed blocks from other participants
+// in the network running the ExecutionDataService. The requester is made up of 4 subcomponents:
+//
+// * OnBlockFinalized:        receives block finalized events from the finalization distributor and
+//                            pushes them to the finalizedBlocks channel.
+//
+// * finalizedBlockProcessor: is a single worker that consumes from the finalizedBlocks channel,
+//                            and generates ExecutionData fetch requests for the all blocks with
+//                            results sealed in the finalized block.
+//
+// * fetchRequestProcessor:   is a pool of workers that consume fetch requests and download the
+//                            ExecutionData from the network.
+//
+// * notificationProcessor:   is a single worker that sends notifications to registered consumers
+//                            in sequential block height order.
+//
+//                                                               +-----------------------+
+//                                                            +--| fetchRequestProcessor |--+
+//                                                            |  +-----------------------+  |
+//    +------------------+      +-------------------------+   |  +-----------------------+  |   +-----------------------+
+// -->| OnBlockFinalized |<---->| finalizedBlockProcessor |<--+->| fetchRequestProcessor |<-+-->| notificationProcessor |
+//    +------------------+      +-------------------------+   |  +-----------------------+  |   +-----------------------+
+//                                                            |  +-----------------------+  |
+//                                                            +--| fetchRequestProcessor |--+
+//                                                               +-----------------------+
+//
+// The requester has 2 main priorities:
+//   1. ensure execution state is as widely distributed as possible among the network participants
+//   2. make the execution state available to local subscribers
+// #1 is the top priority, and this component is optimized to download and seed ExecutionData for
+// as many blocks as possible, making them available to other nodes in the network. This ensures
+// execution state is available for all participants, and reduces network load on the execution
+// nodes that source the data.
+
 const (
 	// DefaultFetchTimeout is the default timeout for fetching ExecutionData from the db/network
 	DefaultFetchTimeout = 5 * time.Minute
@@ -60,13 +94,7 @@ var ErrRequesterHalted = errors.New("requester was halted due to invalid data")
 type ExecutionDataReceivedCallback func(*state_synchronization.ExecutionData)
 
 // ExecutionDataRequester downloads ExecutionData for newly sealed blocks from the network using the
-// ExecutionDataService. The requester has the following priorities:
-//   1. ensure execution state is as widely distributed as possible among the network participants
-//   2. make the execution state available to local subscribers
-// The #1 priority of this component is to fetch ExecutionData for as many blocks as possible, making
-// them available to other nodes in the network. This ensures execution state is available for all
-// participants, and reduces network load on the execution nodes that source the data. The secondary
-// priority is to consume the data locally.
+// ExecutionDataService.
 type ExecutionDataRequester interface {
 	component.Component
 	OnBlockFinalized(*model.Block)
