@@ -301,23 +301,17 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlock
 	return nil
 }
 
-func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) error {
-	t := &model.TimeoutObject{
-		View:       timeout.View,
-		HighestQC:  timeout.HighestQC,
-		LastViewTC: timeout.LastViewTC,
-		SignerID:   originID,
-		SigData:    timeout.SigData,
-	}
+func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *model.TimeoutObject) error {
 
 	c.log.Debug().
-		Uint64("view", t.View).
-		Hex("voter", t.SignerID[:]).
-		Str("timeout_id", t.ID().String()).
+		Hex("sender", originID[:]).
+		Uint64("view", timeout.View).
+		Hex("voter", timeout.SignerID[:]).
+		Str("timeout_id", timeout.ID().String()).
 		Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
 
 	// forward the timeout to hotstuff for processing
-	c.timeoutAggregator.AddTimeout(t)
+	c.timeoutAggregator.AddTimeout(timeout)
 
 	return nil
 }
