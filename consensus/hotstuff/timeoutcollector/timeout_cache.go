@@ -12,8 +12,8 @@ var (
 	// ErrRepeatedTimeout is emitted, when we receive a timeout object for the same block
 	// from the same voter multiple times. This error does _not_ indicate
 	// equivocation.
-	ErrRepeatedTimeout              = errors.New("duplicated timeout")
-	ErrTimeoutForIncompatibleView   = errors.New("timeout for incompatible view")
+	ErrRepeatedTimeout            = errors.New("duplicated timeout")
+	ErrTimeoutForIncompatibleView = errors.New("timeout for incompatible view")
 )
 
 // TimeoutObjectsCache maintains a _concurrency safe_ cache of timeouts for one particular
@@ -50,7 +50,7 @@ func (vc *TimeoutObjectsCache) View() uint64 { return vc.view }
 // When AddTimeoutObject returns an error, the timeout is _not_ stored.
 func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) error {
 	if timeout.View != vc.view {
-		return TimeoutForIncompatibleViewError
+		return ErrTimeoutForIncompatibleView
 	}
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
@@ -66,7 +66,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 		if firstTimeout.ID() != timeout.ID() {
 			return model.NewDoubleTimeoutErrorf(firstTimeout, timeout, "detected timeout equivocation by voter %x at view: %d", timeout.SignerID, vc.view)
 		}
-		return RepeatedTimeoutErr
+		return ErrRepeatedTimeout
 	}
 	vc.timeouts[timeout.SignerID] = timeout
 

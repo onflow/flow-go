@@ -30,7 +30,8 @@ func TestTimeoutObjectsCache_AddTimeoutObjectRepeatedTimeout(t *testing.T) {
 
 	require.NoError(t, cache.AddTimeoutObject(timeout))
 	err := cache.AddTimeoutObject(timeout)
-	require.ErrorIs(t, err, RepeatedTimeoutErr)
+	require.ErrorIs(t, err, ErrRepeatedTimeout)
+	require.Len(t, cache.All(), 1)
 }
 
 // TestTimeoutObjectsCache_AddTimeoutObjectIncompatibleView tests that adding timeout with incompatible view results in error
@@ -41,7 +42,7 @@ func TestTimeoutObjectsCache_AddTimeoutObjectIncompatibleView(t *testing.T) {
 	cache := NewTimeoutObjectsCache(view)
 	timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(view + 1))
 	err := cache.AddTimeoutObject(timeout)
-	require.ErrorIs(t, err, TimeoutForIncompatibleViewError)
+	require.ErrorIs(t, err, ErrTimeoutForIncompatibleView)
 }
 
 // TestTimeoutObjectsCache_GetTimeout tests that GetTimeout method
