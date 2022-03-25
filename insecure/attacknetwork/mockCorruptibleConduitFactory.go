@@ -16,6 +16,11 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
+// mockCorruptibleConduitFactory is a mock corruptible conduit factory (ccf) that implements only the side that interacts with the attack network,
+// i.e., running a gRPC server, and accepting gRPC streams from attack network. However,
+// instead of dispatching incoming messages to the networking layer, the
+// mock ccf only keeps the incoming message in a channel. The purpose of this mock ccf is to empower tests evaluating the interactions
+// between the attack network and the gRPC side of ccf.
 type mockCorruptibleConduitFactory struct {
 	component.Component
 	cm                    *component.ComponentManager
@@ -81,6 +86,8 @@ func (c *mockCorruptibleConduitFactory) stop() {
 	c.server.Stop()
 }
 
+// ProcessAttackerMessage is a gRPC end-point of this mock corruptible conduit factory, that accepts messages from attack network, and
+// puts the incoming message in a channel to be read by the test procedure.
 func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
 	for {
 		select {
@@ -105,6 +112,8 @@ func (c *mockCorruptibleConduitFactory) ProcessAttackerMessage(stream insecure.C
 	}
 }
 
+// RegisterAttacker is a gRPC end-point of this mock corruptible conduit factory, that accepts attacker registration messages from the attack network.
+// It puts the incoming message into a channel to be read by test procedure.
 func (c *mockCorruptibleConduitFactory) RegisterAttacker(_ context.Context, in *insecure.AttackerRegisterMessage) (*empty.Empty, error) {
 	select {
 	case <-c.cm.ShutdownSignal():
