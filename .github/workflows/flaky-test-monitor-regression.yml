@@ -1,4 +1,6 @@
-name: Flaky Test Monitor Test
+name: Flaky Test Monitor Integration Test
+
+# Dry run of Flaky Test Monitor to ensure that nothing has been broken
 
 on:
   push:
@@ -11,7 +13,7 @@ on:
 
 jobs:
   flaky-test-monitor-regression:
-    name: Flaky Test Monitor Test
+    name: Flaky Test Monitor Integration Test
     strategy:
       fail-fast: false
       matrix:

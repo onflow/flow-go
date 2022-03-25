@@ -1,4 +1,4 @@
-name: Skipped Test Tracker Test
+name: Skipped Test Tracker Integration Test
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   skipped-test-tracker-regression:
-    name: Skipped Test Tracker Test
+    name: Skipped Test Tracker Integration Test
     strategy:
       fail-fast: false
       matrix:
