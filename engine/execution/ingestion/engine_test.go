@@ -3,7 +3,6 @@ package ingestion
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	mathRand "math/rand"
 	"sync"
 	"testing"
@@ -715,7 +714,6 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
-		fmt.Println("blockA", blockA.ID())
 
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header)
 		blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
@@ -1095,7 +1093,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 
 		wg.Add(1)
 		ctx.mockStakedAtBlockID(blocks["B"].ID(), false)
-		ctx.mockSnapshot(blocks["B"].Block.Header, flow.IdentityList{&identity}) // unstaked
+		ctx.mockSnapshot(blocks["B"].Block.Header, flow.IdentityList{&identity}) // unauthorized
 
 		err = ctx.engine.handleBlock(context.Background(), blocks["B"].Block)
 		require.NoError(t, err)
@@ -1109,7 +1107,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 
 		wg.Add(1)
 		ctx.mockStakedAtBlockID(blocks["D"].ID(), false)
-		ctx.mockSnapshot(blocks["D"].Block.Header, flow.IdentityList{&identity}) // unstaked
+		ctx.mockSnapshot(blocks["D"].Block.Header, flow.IdentityList{&identity}) // unauthorized
 
 		err = ctx.engine.handleBlock(context.Background(), blocks["D"].Block)
 		require.NoError(t, err)
