@@ -628,6 +628,21 @@ func (mr *MockEventsMockRecorder) ByBlockIDTransactionID(arg0, arg1 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockIDTransactionID", reflect.TypeOf((*MockEvents)(nil).ByBlockIDTransactionID), arg0, arg1)
 }
 
+// ByBlockIDTransactionIndex mocks base method
+func (m *MockEvents) ByBlockIDTransactionIndex(arg0 flow.Identifier, arg1 uint32) ([]flow.Event, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ByBlockIDTransactionIndex", arg0, arg1)
+	ret0, _ := ret[0].([]flow.Event)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ByBlockIDTransactionIndex indicates an expected call of ByBlockIDTransactionIndex
+func (mr *MockEventsMockRecorder) ByBlockIDTransactionIndex(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockIDTransactionIndex", reflect.TypeOf((*MockEvents)(nil).ByBlockIDTransactionIndex), arg0, arg1)
+}
+
 // MockServiceEvents is a mock of ServiceEvents interface
 type MockServiceEvents struct {
 	ctrl     *gomock.Controller
@@ -732,16 +747,17 @@ func (mr *MockTransactionResultsMockRecorder) ByBlockIDTransactionID(arg0, arg1 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockIDTransactionID", reflect.TypeOf((*MockTransactionResults)(nil).ByBlockIDTransactionID), arg0, arg1)
 }
 
-// RemoveByBlockID mocks base method
-func (m *MockTransactionResults) RemoveByBlockID(arg0 flow.Identifier) error {
+// ByBlockIDTransactionIndex mocks base method
+func (m *MockTransactionResults) ByBlockIDTransactionIndex(arg0 flow.Identifier, arg1 uint32) (*flow.TransactionResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveByBlockID", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "ByBlockIDTransactionIndex", arg0, arg1)
+	ret0, _ := ret[0].(*flow.TransactionResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// RemoveByBlockID indicates an expected call of RemoveByBlockID
-func (mr *MockTransactionResultsMockRecorder) RemoveByBlockID(arg0 interface{}) *gomock.Call {
+// ByBlockIDTransactionIndex indicates an expected call of ByBlockIDTransactionIndex
+func (mr *MockTransactionResultsMockRecorder) ByBlockIDTransactionIndex(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveByBlockID", reflect.TypeOf((*MockTransactionResults)(nil).RemoveByBlockID), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockIDTransactionIndex", reflect.TypeOf((*MockTransactionResults)(nil).ByBlockIDTransactionIndex), arg0, arg1)
 }

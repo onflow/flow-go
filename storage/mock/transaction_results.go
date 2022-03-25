@@ -51,16 +51,25 @@ func (_m *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tr
 	return r0, r1
 }
 
-// RemoveByBlockID provides a mock function with given fields: blockID
-func (_m *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
-	ret := _m.Called(blockID)
+// ByBlockIDTransactionIndex provides a mock function with given fields: blockID, txIndex
+func (_m *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error) {
+	ret := _m.Called(blockID, txIndex)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
-		r0 = rf(blockID)
+	var r0 *flow.TransactionResult
+	if rf, ok := ret.Get(0).(func(flow.Identifier, uint32) *flow.TransactionResult); ok {
+		r0 = rf(blockID, txIndex)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.TransactionResult)
+		}
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier, uint32) error); ok {
+		r1 = rf(blockID, txIndex)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }

@@ -364,8 +364,8 @@ func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, e
 	// Write Batch is BadgerDB feature designed for handling lots of writes
 	// in efficient and automatic manner, hence pushing all the updates we can
 	// as tightly as possible to let Badger manage it.
-	// Note, that it does not guarantee atomicity as transactions has size limit
-	// but it's the closes thing to atomicity we could have
+	// Note, that it does not guarantee atomicity as transactions has size limit,
+	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
 	for _, chunkDataPack := range chunkDataPacks {
