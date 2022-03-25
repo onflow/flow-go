@@ -446,7 +446,7 @@ func TestExecuteOneBlock(t *testing.T) {
 }
 
 func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "To be fixed later")
 	// only head of the queue should be executing.
 	// Restarting node or errors in consensus module could trigger
 	// block (or its parent) which already has been executed to be enqueued again
