@@ -54,7 +54,7 @@ jobs:
     - name: Run tests
       uses: nick-fields/retry@v2
       with:
-        timeout_minutes: 25
+        timeout_minutes: 60
         max_attempts: 5
         command: ./tools/flaky_test_monitor/run-tests.sh
     - name: Process test results

@@ -15,8 +15,7 @@ then
 else
     case $TEST_CATEGORY in
         unit)
-            make -s unittest-main
-            # TODO: add this back > $TEST_OUTPUT_FILE
+            make -s unittest-main > $TEST_OUTPUT_FILE
         ;;
         unit-crypto)
             make -C crypto -s test-main > $TEST_OUTPUT_FILE
