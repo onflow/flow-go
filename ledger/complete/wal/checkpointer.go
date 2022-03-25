@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -41,6 +43,10 @@ const VersionV4 uint16 = 0x04
 // - reduce number of bytes used to encode payload value size from 8 bytes to 4 bytes.
 // See EncodeNode() and EncodeTrie() for more details.
 const VersionV5 uint16 = 0x05
+
+// MaxVersion is the latest checkpoint version we support.
+// Need to update MaxVersion when creating a newer version.
+const MaxVersion = VersionV5
 
 const (
 	encMagicSize     = 2
@@ -768,4 +774,46 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 	}
 
 	return tries, nil
+}
+
+// ReadLastTrieRootHashFromCheckpoint returns last trie's root hash from checkpoint file f.
+func ReadLastTrieRootHashFromCheckpoint(f *os.File) (hash.Hash, error) {
+
+	// read checkpoint version
+	header := make([]byte, headerSize)
+	n, err := f.Read(header)
+	if err != nil || n != headerSize {
+		return hash.DummyHash, errors.New("failed to read checkpoint header")
+	}
+
+	magic := binary.BigEndian.Uint16(header)
+	version := binary.BigEndian.Uint16(header[encMagicSize:])
+
+	if magic != MagicBytes {
+		return hash.DummyHash, errors.New("invalid magic bytes in checkpoint")
+	}
+
+	if version > MaxVersion {
+		return hash.DummyHash, fmt.Errorf("unsupported version %d in checkpoint", version)
+	}
+
+	if version <= 3 {
+		_, err = f.Seek(-(hash.HashLen + crc32SumSize), 2 /* relative from end */)
+		if err != nil {
+			return hash.DummyHash, errors.New("invalid checkpoint")
+		}
+	} else {
+		_, err = f.Seek(-(hash.HashLen + encNodeCountSize + encTrieCountSize + crc32SumSize), 2 /* relative from end */)
+		if err != nil {
+			return hash.DummyHash, errors.New("invalid checkpoint")
+		}
+	}
+
+	var lastTrieRootHash hash.Hash
+	n, err = f.Read(lastTrieRootHash[:])
+	if err != nil || n != hash.HashLen {
+		return hash.DummyHash, errors.New("failed to read last trie root hash from checkpoint")
+	}
+
+	return lastTrieRootHash, nil
 }
