@@ -349,7 +349,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
 	rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-	indices, err := toIndices(in.participants.NodeIDs(), in.participants.NodeIDs())
+	indices, err := packer.EncodeSignerIdentifiersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
 	require.NoError(t, err)
 
 	packer := &mocks.Packer{}
@@ -387,10 +387,6 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	require.NoError(t, err)
 
 	return &in
-}
-
-func toIndices(all []flow.Identifier, signers []flow.Identifier) ([]byte, error) {
-	return packer.EncodeSignerIdentifiersToIndices(all, signers)
 }
 
 func (in *Instance) Run() error {
