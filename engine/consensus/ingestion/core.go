@@ -160,7 +160,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 
 	// cluster not found by the chain ID
 	if errors.Is(err, protocol.ErrClusterNotFound) {
-		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v, %v", guarantee.ChainID, err)
+		return engine.NewInvalidInputErrorf("cluster not found by chain ID %v, %w", guarantee.ChainID, err)
 	}
 
 	if err != nil {
