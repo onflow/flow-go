@@ -34,7 +34,7 @@ func TestAttackNetworkObserve_MultipleConcurrentMessages(t *testing.T) {
 // decodes the messages into events and relays them to its registered orchestrator.
 func testAttackNetworkObserve(t *testing.T, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	messages, events, identities := messageFixtures(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
+	messages, events, identities := insecure.MessageFixtures(t, cbor.NewCodec(), insecure.Protocol_MULTICAST, concurrencyDegree)
 
 	withAttackNetworkClient(
 		t,
@@ -121,7 +121,7 @@ func TestAttackNetworkPublish_ConcurrentMessages(t *testing.T) {
 // By a corrupted node here, we mean a node that runs with a corruptible conduit factory.
 func testAttackNetwork(t *testing.T, protocol insecure.Protocol, concurrencyDegree int) {
 	// creates event fixtures and their corresponding messages.
-	_, events, corruptedIds := messageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
+	_, events, corruptedIds := insecure.MessageFixtures(t, cbor.NewCodec(), protocol, concurrencyDegree)
 
 	withCorruptedConnections(t,
 		corruptedIds,

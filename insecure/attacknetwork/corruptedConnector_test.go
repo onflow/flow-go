@@ -45,7 +45,7 @@ func TestConnectorHappyPath(t *testing.T) {
 		}()
 
 		// goroutine checks mock ccf for receiving the message sent over the connection.
-		msg, _, _ := messageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST)
+		msg, _, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST)
 		sentMsgReceived := make(chan struct{})
 		go func() {
 			receivedMsg := <-ccf.attackerMsg

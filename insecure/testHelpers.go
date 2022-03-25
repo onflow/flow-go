@@ -1,4 +1,4 @@
-package attacknetwork
+package insecure
 
 import (
 	"fmt"
@@ -7,30 +7,29 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// messageFixture creates and returns a randomly generated gRPC message that is sent between a corruptible conduit and the attack network.
+// MessageFixture creates and returns a randomly generated gRPC message that is sent between a corruptible conduit and the attack network.
 // It also generates and returns the corresponding application-layer event of that message, which is sent between the attack network and the
 // orchestrator.
-func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protocol) (*insecure.Message, *insecure.Event, *flow.Identity) {
+func MessageFixture(t *testing.T, codec network.Codec, protocol Protocol) (*Message, *Event, *flow.Identity) {
 	// fixture for content of message
 	originId := unittest.IdentifierFixture()
 
 	var targetIds flow.IdentifierList
 	targetNum := uint32(0)
 
-	if protocol == insecure.Protocol_UNICAST {
+	if protocol == Protocol_UNICAST {
 		targetIds = unittest.IdentifierListFixture(1)
 	} else {
 		targetIds = unittest.IdentifierListFixture(10)
 	}
 
-	if protocol == insecure.Protocol_MULTICAST {
+	if protocol == Protocol_MULTICAST {
 		targetNum = uint32(3)
 	}
 
@@ -44,7 +43,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	require.NoError(t, err)
 
 	// creates message that goes over gRPC.
-	m := &insecure.Message{
+	m := &Message{
 		ChannelID: "test-channel",
 		OriginID:  originId[:],
 		TargetNum: targetNum,
@@ -55,7 +54,7 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 
 	// creates corresponding event of that message that
 	// is sent by attack network to orchestrator.
-	e := &insecure.Event{
+	e := &Event{
 		CorruptedId:       originId,
 		Channel:           channel,
 		FlowProtocolEvent: content,
@@ -67,17 +66,17 @@ func messageFixture(t *testing.T, codec network.Codec, protocol insecure.Protoco
 	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId))
 }
 
-// messageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
+// MessageFixtures creates and returns randomly generated gRCP messages and their corresponding protocol-level events.
 // The messages are sent between a corruptible conduit and the attack network.
 // The events are the corresponding protocol-level representation of messages.
-func messageFixtures(t *testing.T, codec network.Codec, protocol insecure.Protocol, count int) ([]*insecure.Message, []*insecure.Event,
+func MessageFixtures(t *testing.T, codec network.Codec, protocol Protocol, count int) ([]*Message, []*Event,
 	flow.IdentityList) {
-	msgs := make([]*insecure.Message, count)
-	events := make([]*insecure.Event, count)
+	msgs := make([]*Message, count)
+	events := make([]*Event, count)
 	identities := flow.IdentityList{}
 
 	for i := 0; i < count; i++ {
-		m, e, id := messageFixture(t, codec, protocol)
+		m, e, id := MessageFixture(t, codec, protocol)
 
 		msgs[i] = m
 		events[i] = e
