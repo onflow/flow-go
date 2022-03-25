@@ -33,6 +33,8 @@ import (
 // The test passes if the engine running with normal conduit receives the corrupted message in a timely fashion (and also never gets the
 // original messages).
 func TestCorruptibleConduitFrameworkHappyPath(t *testing.T) {
+	// We first start ccf and then the attack network, since the order of startup matters, i.e., on startup, the attack network tries
+	// to connect to all ccfs.
 	withCorruptibleConduitFactory(t, func(t *testing.T, corruptedIdentity flow.Identity, ccf *corruptible.ConduitFactory) {
 		// this is the event orchestrator will send instead of the original event coming from corrupted engine.
 		corruptedEvent := &message.TestMessage{Text: "this is a corrupted message"}
