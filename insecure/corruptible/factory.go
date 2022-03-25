@@ -76,12 +76,12 @@ func NewCorruptibleConduitFactory(
 }
 
 // ServerAddress returns address of the gRPC server that is running by this corrupted conduit factory.
-func (c *ConduitFactory) ServerAddress() string {
+func (c ConduitFactory) ServerAddress() string {
 	return c.address.String()
 }
 
 func (c *ConduitFactory) start(ctx irrecoverable.SignalerContext, address string) {
-	// starts up gRPC server of attack network at given address.
+	// starts up gRPC server of corruptible conduit factory at given address.
 	s := grpc.NewServer()
 	insecure.RegisterCorruptibleConduitFactoryServer(s, c)
 	ln, err := net.Listen(networkingProtocolTCP, address)
@@ -90,8 +90,8 @@ func (c *ConduitFactory) start(ctx irrecoverable.SignalerContext, address string
 	}
 	c.server = s
 	c.address = ln.Addr()
-	fmt.Println(c.address.String())
 
+	// waits till gRPC server is coming up and running.
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
