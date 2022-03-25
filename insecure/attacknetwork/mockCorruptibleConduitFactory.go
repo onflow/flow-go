@@ -25,10 +25,10 @@ type mockCorruptibleConduitFactory struct {
 	component.Component
 	cm                    *component.ComponentManager
 	attackerObserveClient insecure.Attacker_ObserveClient
-	server                *grpc.Server // touch point of attack network to this factory.
-	address               net.Addr
-	attackerRegMsg        chan *insecure.AttackerRegisterMessage
-	attackerMsg           chan *insecure.Message
+	server                *grpc.Server                           // touch point of attack network to this factory.
+	address               net.Addr                               // address of gRPC endpoint for this mock ccf
+	attackerRegMsg        chan *insecure.AttackerRegisterMessage // channel keeping the last registration message coming from an attacker.
+	attackerMsg           chan *insecure.Message                 // channel  keeping the last incoming (insecure) message from an attacker.
 }
 
 func newMockCorruptibleConduitFactory() *mockCorruptibleConduitFactory {
