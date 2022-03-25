@@ -208,20 +208,23 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 		}
 	}
 
+	// Update metrics with number of updated payloads and size of updated payloads.
 	// TODO rename metrics names
+	f.metrics.UpdateValuesNumber(uint64(len(deduplicatedPayloads)))
 	f.metrics.UpdateValuesSize(uint64(totalPayloadSize))
 
 	// apply pruning on update
 	applyPruning := true
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads, applyPruning)
+	newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads, applyPruning)
 	if err != nil {
 		return emptyHash, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
 	f.metrics.LatestTrieRegCount(newTrie.AllocatedRegCount())
-	f.metrics.LatestTrieRegCountDiff(newTrie.AllocatedRegCount() - parentTrie.AllocatedRegCount())
-	f.metrics.LatestTrieMaxDepth(uint64(newTrie.MaxDepth()))
-	f.metrics.LatestTrieMaxDepthDiff(uint64(newTrie.MaxDepth() - parentTrie.MaxDepth()))
+	f.metrics.LatestTrieRegCountDiff(int64(newTrie.AllocatedRegCount() - parentTrie.AllocatedRegCount()))
+	f.metrics.LatestTrieRegSize(newTrie.AllocatedRegSize())
+	f.metrics.LatestTrieRegSizeDiff(int64(newTrie.AllocatedRegSize() - parentTrie.AllocatedRegSize()))
+	f.metrics.LatestTrieMaxDepthTouched(maxDepthTouched)
 
 	err = f.AddTrie(newTrie)
 	if err != nil {
@@ -271,7 +274,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		// so for non-inclusion proofs we expand the trie with nil value and use an inclusion proof
 		// instead. if pruning is enabled it would break this trick and return the exact trie.
 		applyPruning := false
-		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads, applyPruning)
+		newTrie, _, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads, applyPruning)
 		if err != nil {
 			return nil, err
 		}

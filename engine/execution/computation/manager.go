@@ -268,11 +268,10 @@ func (e *Manager) ComputeBlock(
 		}
 
 		ed := &state_synchronization.ExecutionData{
-			BlockID:            block.ID(),
-			Collections:        collections,
-			Events:             result.Events,
-			TrieUpdates:        result.TrieUpdates,
-			TransactionResults: result.TransactionResults,
+			BlockID:     block.ID(),
+			Collections: collections,
+			Events:      result.Events,
+			TrieUpdates: result.TrieUpdates,
 		}
 
 		var err error
@@ -302,7 +301,8 @@ func (e *Manager) ComputeBlock(
 		Msg("computed block result")
 
 	e.edCache.Insert(block.Block.Header, blobTree)
-	result.ExecutionDataID = rootID
+	e.log.Info().Hex("block_id", logging.Entity(block.Block)).Hex("execution_data_id", rootID[:]).Msg("execution data ID computed")
+	// result.ExecutionDataID = rootID
 
 	return result, nil
 }

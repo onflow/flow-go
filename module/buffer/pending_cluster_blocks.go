@@ -57,10 +57,11 @@ func (b *PendingClusterBlocks) DropForParent(parentID flow.Identifier) {
 	b.backend.dropForParent(parentID)
 }
 
-func (b *PendingClusterBlocks) PruneByHeight(height uint64) {
-	b.backend.pruneByHeight(height)
+// PruneByView prunes any pending cluster blocks with views less or equal to the given view.
+func (b *PendingClusterBlocks) PruneByView(view uint64) {
+	b.backend.pruneByView(view)
 }
 
 func (b *PendingClusterBlocks) Size() uint {
-	return uint(len(b.backend.blocksByID))
+	return b.backend.size()
 }

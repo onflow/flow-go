@@ -64,11 +64,10 @@ type TransactionFeeDeductionFailedError struct {
 }
 
 // NewTransactionFeeDeductionFailedError constructs a new TransactionFeeDeductionFailedError
-func NewTransactionFeeDeductionFailedError(payer flow.Address, txFees uint64, err error) *TransactionFeeDeductionFailedError {
+func NewTransactionFeeDeductionFailedError(payer flow.Address, err error) *TransactionFeeDeductionFailedError {
 	return &TransactionFeeDeductionFailedError{
-		Payer:  payer,
-		TxFees: txFees,
-		err:    err,
+		Payer: payer,
+		err:   err,
 	}
 }
 
@@ -84,6 +83,68 @@ func (e TransactionFeeDeductionFailedError) Code() ErrorCode {
 // Unwrap returns the wrapped err
 func (e TransactionFeeDeductionFailedError) Unwrap() error {
 	return e.err
+}
+
+// An ComputationLimitExceededError indicates that computation has exceeded its limit.
+type ComputationLimitExceededError struct {
+	limit uint64
+}
+
+// NewComputationLimitExceededError constructs a new ComputationLimitExceededError
+func NewComputationLimitExceededError(limit uint64) *ComputationLimitExceededError {
+	return &ComputationLimitExceededError{
+		limit: limit,
+	}
+}
+
+// Code returns the error code for this error
+func (e ComputationLimitExceededError) Code() ErrorCode {
+	return ErrCodeComputationLimitExceededError
+}
+
+func (e ComputationLimitExceededError) Error() string {
+	return fmt.Sprintf(
+		"%s computation exceeds limit (%d)",
+		e.Code().String(),
+		e.limit,
+	)
+}
+
+// IsComputationLimitExceededError returns true if error has this type
+func IsComputationLimitExceededError(err error) bool {
+	var t *ComputationLimitExceededError
+	return errors.As(err, &t)
+}
+
+// An MemoryLimitExceededError indicates that execution has exceeded its memory limits.
+type MemoryLimitExceededError struct {
+	limit uint64
+}
+
+// NewMemoryLimitExceededError constructs a new MemoryLimitExceededError
+func NewMemoryLimitExceededError(limit uint64) *MemoryLimitExceededError {
+	return &MemoryLimitExceededError{
+		limit: limit,
+	}
+}
+
+// Code returns the error code for this error
+func (e MemoryLimitExceededError) Code() ErrorCode {
+	return ErrCodeMemoryLimitExceededError
+}
+
+func (e MemoryLimitExceededError) Error() string {
+	return fmt.Sprintf(
+		"%s memory usage exceeds limit (%d)",
+		e.Code().String(),
+		e.limit,
+	)
+}
+
+// IsMemoryLimitExceededError returns true if error has this type
+func IsMemoryLimitExceededError(err error) bool {
+	var t *MemoryLimitExceededError
+	return errors.As(err, &t)
 }
 
 // An StorageCapacityExceededError indicates that an account used more storage than it has storage capacity.
@@ -245,4 +306,41 @@ func (e *EncodingUnsupportedValueError) Error() string {
 // Code returns the error code for this error
 func (e *EncodingUnsupportedValueError) Code() ErrorCode {
 	return ErrCodeEncodingUnsupportedValue
+}
+
+// An CouldNotGetExecutionParameterFromStateError indicates that computation has exceeded its limit.
+type CouldNotGetExecutionParameterFromStateError struct {
+	address    string
+	domain     string
+	identifier string
+}
+
+// NewCouldNotGetExecutionParameterFromStateError constructs a new CouldNotGetExecutionParameterFromStateError
+func NewCouldNotGetExecutionParameterFromStateError(address, domain, identifier string) *CouldNotGetExecutionParameterFromStateError {
+	return &CouldNotGetExecutionParameterFromStateError{
+		address:    address,
+		domain:     domain,
+		identifier: identifier,
+	}
+}
+
+// Code returns the error code for this error
+func (e CouldNotGetExecutionParameterFromStateError) Code() ErrorCode {
+	return ErrCodeCouldNotDecodeExecutionParameterFromState
+}
+
+func (e CouldNotGetExecutionParameterFromStateError) Error() string {
+	return fmt.Sprintf(
+		"%s could not get execution parameter from the state (address: %s path: %s/%s)",
+		e.Code().String(),
+		e.address,
+		e.domain,
+		e.identifier,
+	)
+}
+
+// IsCouldNotGetExecutionParameterFromStateError returns true if error has this type
+func IsCouldNotGetExecutionParameterFromStateError(err error) bool {
+	var t *CouldNotGetExecutionParameterFromStateError
+	return errors.As(err, &t)
 }

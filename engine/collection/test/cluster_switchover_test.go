@@ -326,7 +326,7 @@ func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
 	tc.ExpectTransaction(epochCounter, clusterIndex, clusterTx.ID())
 
 	// submit the transaction to any collector in this cluster
-	err := tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
+	err := tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessTransaction(&clusterTx)
 	require.NoError(tc.T(), err)
 }
 

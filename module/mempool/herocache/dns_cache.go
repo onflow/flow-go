@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -16,12 +17,24 @@ type DNSCache struct {
 	txtCache *stdmap.Backend
 }
 
-func NewDNSCache(sizeLimit uint32, logger zerolog.Logger) *DNSCache {
+func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.HeroCacheMetrics, txtCollector module.HeroCacheMetrics) *DNSCache {
 	return &DNSCache{
-		txtCache: stdmap.NewBackendWithBackData(
-			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger)),
-		ipCache: stdmap.NewBackendWithBackData(
-			herocache.NewCache(sizeLimit, 8, heropool.LRUEjection, logger)),
+		txtCache: stdmap.NewBackend(
+			stdmap.WithBackData(
+				herocache.NewCache(
+					sizeLimit,
+					herocache.DefaultOversizeFactor,
+					heropool.LRUEjection,
+					logger.With().Str("mempool", "dns-txt-cache").Logger(),
+					txtCollector))),
+		ipCache: stdmap.NewBackend(
+			stdmap.WithBackData(
+				herocache.NewCache(
+					sizeLimit,
+					herocache.DefaultOversizeFactor,
+					heropool.LRUEjection,
+					logger.With().Str("mempool", "dns-ip-cache").Logger(),
+					ipCollector))),
 	}
 }
 
