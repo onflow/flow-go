@@ -13,8 +13,8 @@ env:
   BIGQUERY_TABLE: skipped_tests
 
 jobs:
-  skipped-test-tracker:
-    name: Skipped Test Tracker
+  upload-skipped-test-summary:
+    name: Upload Skipped Test Summary
     strategy:
       fail-fast: false
       matrix:

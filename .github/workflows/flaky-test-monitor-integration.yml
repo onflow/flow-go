@@ -1,4 +1,6 @@
-name: Skipped Test Tracker Integration Test
+name: Flaky Test Monitor Integration Test
+
+# Dry run of Flaky Test Monitor to ensure that nothing has been broken
 
 on:
   push:
@@ -10,8 +12,8 @@ on:
       - master
 
 jobs:
-  skipped-test-tracker-regression:
-    name: Skipped Test Tracker Integration Test
+  generate-flaky-test-summary:
+    name: Generate Flaky Test Summary
     strategy:
       fail-fast: false
       matrix:
@@ -29,9 +31,9 @@ jobs:
           - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
-      COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: change this for bors
+      COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: change this for bors?
       RUN_ID: ${{ github.run_id }}
-      SKIPPED_TESTS_FILE: skipped-tests
+      RESULTS_FILE: test-results
       TEST_OUTPUT_FILE: test-output
     runs-on: ubuntu-latest
     steps:
@@ -52,11 +54,10 @@ jobs:
     - name: Test setup
       run: ./tools/flaky_test_monitor/test-setup.sh
     - name: Run tests
-      uses: nick-fields/retry@v2
-      with:
-        timeout_minutes: 25
-        max_attempts: 5
-        command: ./tools/flaky_test_monitor/run-tests.sh
+      continue-on-error: true
+      run: ./tools/flaky_test_monitor/run-tests.sh
+      env:
+        TEST_FLAKY: true
     - name: Process test results
       run: cat $TEST_OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go
       env:

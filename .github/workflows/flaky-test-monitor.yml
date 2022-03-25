@@ -15,8 +15,8 @@ env:
   BIGQUERY_TABLE: test_results
 
 jobs:
-  flaky-test-summary:
-    name: Flaky Test Summary
+  upload-flaky-test-summary:
+    name: Upload Flaky Test Summary
     strategy:
       fail-fast: false
       matrix:
