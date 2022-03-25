@@ -19,67 +19,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestWintermuteOrchestrator(t *testing.T) {
-	// create corrupted Wintermute VN, EN nodes
-	//colludingVNIdentityList := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleVerification))
-	//maliciousENIdentityList := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	//corruptedIdentityList := append(colludingVNIdentityList, maliciousENIdentityList...)
-
-	// create all honest nodes
-	//honestIdentityList := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-
-	// create list of all nodes - honest and malicious
-	//allIdentityList := append(honestIdentityList, corruptedIdentityList...)
-
-	// should be mocked network
-	attackNetwork := &mockinsecure.AttackNetwork{}
-	//attackNetwork2 *attacknetwork.AttackNetwork,
-
-	//orchestrator := NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
-
-	//attackNetwork.
-
-	attackNetwork.On("Start", mock.AnythingOfType("*irrecoverable.signalerCtx")).Return().Once()
-	//signalerCtx, _ := irrecoverable.WithSignaler(context.Background())
-	//orchestrator.start(signalerCtx)
-
-	//genesisFixture := unittest.GenesisFixture()
-
-	//honestExecutionResult1 := unittest.ExecutionResultFixture(unittest.WithBlock(genesisFixture))
-	//honestExecutionResult2 := unittest.ExecutionResultFixture(unittest.WithBlock(genesisFixture))
-	//
-	//require.Equal(t, honestExecutionResult1.ID(), honestExecutionResult2.ID())
-
-	blockIDFixture := unittest.IdentifierFixture()
-	honestExecutionResult1 := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(blockIDFixture))
-	honestExecutionResult2 := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(blockIDFixture))
-	require.Equal(t, honestExecutionResult1.ID(), honestExecutionResult2.ID())
-
-	//honestExecutionResult1.ID() // use this to check if execution results are the same
-	//honestExecutionReceipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(honestExecutionResult1))
-	//honestExecutionReceipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(honestExecutionResult1))
-
-	// corrupt execution result
-	honestExecutionResult1.Chunks[0].CollectionIndex = 999
-
-	//require.Equal(t, honestExecutionReceipt1, honestExecutionReceipt2)
-
-	//if honestExecutionResult1 1 and honestExecutionResult1 2 are agreeging
-	//orchestrator.HandleEventFromCorruptedNode(executionResultFixtureFromNode1)
-	//orchestrator.HandleEventFromCorruptedNode(executionResultFixtureFromNode2)
-
-	// orchestrator replaces honestExecutionResult1 1 and honestExecutionResult1 2 with corrupted agreeing ones and send them over network
-	// to execution node 1 and execution 2, respectively.
-	//attackNetwork.On("")
-}
-
-// if an execution receipt is coming from one corrupted EN, then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
-// enforces that corrupted EN to send this counterfeit receipt.
-//
-// if an execution receipt is coming from one corrupted EN, then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
-// enforces that corrupted EN to send this counterfeit receipt.
+// TestHandleEventFromCorruptedNode_CorruptEN tests that the orchestrator corrupts the execution receipt if the receipt is from a corrupt EN
+// If an execution receipt is coming from a corrupt EN, then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
+// enforces that corrupt EN to send this counterfeit receipt.
 // The orchestrator then also enforces the second corrupted EN to send the same counterfeit result on its behalf to the network.
-func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
+func TestHandleEventFromCorruptedNode_CorruptEN(t *testing.T) {
 	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
 
 	// generates a chain of blocks in the form of rootHeader <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
@@ -142,6 +86,19 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 	err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
 	require.NoError(t, err)
 }
+
+// TestHandleEventFromCorruptedNode_HonestVN tests that honest VN will be ignored when they send a chunk data request
+func TestHandleEventFromCorruptedNode_HonestVN(t *testing.T) {
+
+}
+
+// TestHandleEventFromCorruptedNode_CorruptVN tests that orchestrator sends the result approval for the corrupted
+// execution result if the chunk data request is coming from a corrupt VN
+func TestHandleEventFromCorruptedNode_CorruptVN(t *testing.T) {
+
+}
+
+// helper functions
 
 func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow.IdentityList, flow.IdentityList) {
 	// creates identities to bootstrap system with
