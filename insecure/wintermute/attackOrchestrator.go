@@ -39,7 +39,6 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
 func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
-
 	corruptedIdentity, ok := o.corruptedIds.ByNodeID(event.CorruptedId)
 	if !ok {
 		return fmt.Errorf("could not find corrupted identity for: %x", event.CorruptedId)
@@ -49,33 +48,25 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 	// there will be many events sent to the orchestrator and we need a way to co-ordinate all the event calls
 
 	switch corruptedIdentity.Role {
-	// this switch case should be from
 	case flow.RoleExecution:
-		// corrupt execution result
-		// TODO: do we corrupt a single execution result or all of them?
-		// TODO: how do we corrupt each execution result?
-		// e.g. honestExecutionResult1.Chunks[0].CollectionIndex = 999
-		// TODO: how do we allow unit tests to assert execution result(s) was corrupted? Return type is error
-
 		// extract execution receipt so we can corrupt it
 		actualReceipt := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
 		actualResult := actualReceipt.ExecutionResult
 
-		// replace all chunks with new ones to simulate chunk corruption
+		// replace honest receipt with corrupted receipt
 		corruptReceipt := &flow.ExecutionReceipt{
 			ExecutorID: actualReceipt.ExecutorID,
 			ExecutionResult: flow.ExecutionResult{
 				PreviousResultID: actualResult.PreviousResultID,
 				BlockID:          actualResult.BlockID,
-				Chunks:           unittest.ChunkListFixture(uint(len(actualResult.Chunks)), actualResult.BlockID),
-				ServiceEvents:    actualResult.ServiceEvents,
-				ExecutionDataID:  actualResult.ExecutionDataID,
+				// replace all chunks with new ones to simulate chunk corruption
+				Chunks:          unittest.ChunkListFixture(uint(len(actualResult.Chunks)), actualResult.BlockID),
+				ServiceEvents:   actualResult.ServiceEvents,
+				ExecutionDataID: actualResult.ExecutionDataID,
 			},
 			ExecutorSignature: actualReceipt.ExecutorSignature,
 			Spocks:            actualReceipt.Spocks,
 		}
-		// replace honest receipts with corrupted receipt
-		//unittest.Wiafter ipts()
 
 		// save all corrupted chunks so can create result approvals for them
 		// can just create result approvals here and save them
@@ -123,7 +114,7 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 					ExecutionResultID: flow.Identifier{},
 					ChunkIndex:        0,
 				},
-				ApproverID:           flow.Identifier{}, // should be filled by corrupte vn Id
+				ApproverID:           flow.Identifier{}, // should be filled by corrupted VN ID
 				AttestationSignature: nil,               // can be done later (at verification node side)
 				Spock:                nil,               // can be done later (at verification node side)
 			},

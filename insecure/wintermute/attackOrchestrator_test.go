@@ -107,38 +107,22 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 			event, ok := args[0].(*insecure.Event)
 			require.True(t, ok)
 
-			//corruptedId, ok := args[0].(flow.Identifier)
-			corruptedId := event.CorruptedId
-			//require.True(t, ok)
 			// make sure sender is a corrupted execution node.
-			corruptedIdentity, ok := corruptedIdentityList.ByNodeID(corruptedId)
+			corruptedIdentity, ok := corruptedIdentityList.ByNodeID(event.CorruptedId)
 			require.True(t, ok)
 			require.Equal(t, flow.RoleExecution, corruptedIdentity.Role)
 
-			//channel, ok := args[1].(network.Channel)
-			channel := event.Channel
-			//require.True(t, ok)
 			// make sure message being sent on correct channel
-			require.Equal(t, engine.PushReceipts, channel)
+			require.Equal(t, engine.PushReceipts, event.Channel)
 
-			//event, ok := args[2].(*flow.ExecutionReceipt)
 			corruptedReceipt, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
 			require.True(t, ok)
 
 			// make sure the original uncorrupted execution receipt is NOT sent to orchestrator
 			require.NotEqual(t, completeExecutionReceipts[0].Receipts[0], corruptedReceipt)
 
-			//receivedTargetIds, ok := args[3].(flow.Identifier)
 			receivedTargetIds := event.TargetIds
-			//require.True(t, ok)
 
-			//// event should be dispatched to a corrupted execution node
-			//corruptedIdentity, ok := corruptedIdentityList.ByNodeID(corruptedId)
-			//require.True(t, ok)
-			//require.Equal(t, flow.RoleExecution, corruptedIdentity.Role)
-
-			require.Equal(t, engine.PushReceipts, channel)
-			//require.Equal(t, engine.ConsensusCommittee, channel)
 			require.ElementsMatch(t, targetIdentities.NodeIDs(), receivedTargetIds)
 
 			require.NotEqual(t, completeExecutionReceipts[0].ContainerBlock.Payload.Results[0], corruptedReceipt.ExecutionResult)
@@ -155,15 +139,7 @@ func TestWintermuteOrchestrator_CorruptSingleExecutionResult(t *testing.T) {
 
 	// register mock network with orchestrator
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
-
 	err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
-
-	//err = wintermuteOrchestrator.HandleEventFromCorruptedNode(corruptedEn1.NodeID,
-	//	engine.PushReceipts,
-	//	completeExecutionReceipts[0].Receipts[0], //single execution receipt
-	//	insecure.Protocol_UNICAST,
-	//	uint32(0),
-	//	targetIdentities.NodeIDs()[0])
 	require.NoError(t, err)
 }
 
