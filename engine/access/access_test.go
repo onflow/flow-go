@@ -366,6 +366,14 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.Equal(suite.T(), expected, actual)
 		}
 
+		assertLightBlockResp := func(resp *accessproto.BlockResponse, err error, block *flow.Block) {
+			require.NoError(suite.T(), err)
+			require.NotNil(suite.T(), resp)
+			actual := resp.Block
+			expectedMessage := convert.BlockToMessageLight(block)
+			require.Equal(suite.T(), expectedMessage, actual)
+		}
+
 		suite.Run("get header 1 by ID", func() {
 			// get header by ID
 			id := block1.ID()
@@ -392,6 +400,18 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			assertBlockResp(resp, err, &block1)
 		})
 
+		suite.Run("get block light 1 by ID", func() {
+			id := block1.ID()
+			// get block details by ID
+			req := &accessproto.GetBlockByIDRequest{
+				Id: id[:],
+			}
+
+			resp, err := handler.GetBlockByID(context.Background(), req)
+
+			assertLightBlockResp(resp, err, &block1)
+		})
+
 		suite.Run("get header 2 by height", func() {
 
 			// get header by height
@@ -414,6 +434,17 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			resp, err := handler.GetBlockByHeight(context.Background(), req)
 
 			assertBlockResp(resp, err, &block2)
+		})
+
+		suite.Run("get block 2 by height", func() {
+			// get block details by height
+			req := &accessproto.GetBlockByHeightRequest{
+				Height: block2.Header.Height,
+			}
+
+			resp, err := handler.GetBlockByHeight(context.Background(), req)
+
+			assertLightBlockResp(resp, err, &block2)
 		})
 	})
 }
