@@ -9,11 +9,11 @@ import (
 )
 
 var (
-	// RepeatedTimeoutErr is emitted, when we receive a timeout object for the same block
+	// ErrRepeatedTimeout is emitted, when we receive a timeout object for the same block
 	// from the same voter multiple times. This error does _not_ indicate
 	// equivocation.
-	RepeatedTimeoutErr              = errors.New("duplicated timeout")
-	TimeoutForIncompatibleViewError = errors.New("timeout for incompatible view")
+	ErrRepeatedTimeout              = errors.New("duplicated timeout")
+	ErrTimeoutForIncompatibleView   = errors.New("timeout for incompatible view")
 )
 
 // TimeoutObjectsCache maintains a _concurrency safe_ cache of timeouts for one particular
@@ -56,7 +56,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 	defer vc.lock.Unlock()
 
 	// De-duplicated timeouts based on the following rules:
-	//  * Vor each voter (i.e. SignerID), we store the _first_  t0.
+	//  * For each voter (i.e. SignerID), we store the _first_  t0.
 	//  * For any subsequent timeout t, we check whether t.ID() == t0.ID().
 	//    If this is the case, we consider the timeout a duplicate and drop it.
 	//    If t and t0 have different checksums, the voter is equivocating, and
@@ -64,7 +64,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 	firstTimeout, exists := vc.timeouts[timeout.SignerID]
 	if exists {
 		if firstTimeout.ID() != timeout.ID() {
-			return model.NewDoubleTimeoutErrorf(firstTimeout, timeout, "detected timeout equivocation at view: %d", vc.view)
+			return model.NewDoubleTimeoutErrorf(firstTimeout, timeout, "detected timeout equivocation by voter %x at view: %d", timeout.SignerID, vc.view)
 		}
 		return RepeatedTimeoutErr
 	}
@@ -75,7 +75,7 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 
 // GetTimeoutObject returns the stored timeout for the given `signerID`. Returns:
 //  - (timeout, true) if a timeout object from signerID is known
-//  - (false, nil) no timeout object from signerID is known
+//  - (nil, false) no timeout object from signerID is known
 func (vc *TimeoutObjectsCache) GetTimeoutObject(signerID flow.Identifier) (*model.TimeoutObject, bool) {
 	vc.lock.RLock()
 	timeout, exists := vc.timeouts[signerID] // if signerID is unknown, its `Vote` pointer is nil
@@ -93,14 +93,14 @@ func (vc *TimeoutObjectsCache) Size() int {
 
 // All returns all currently cached timeout objects. Concurrency safe.
 func (vc *TimeoutObjectsCache) All() []*model.TimeoutObject {
-	vc.lock.Lock()
-	defer vc.lock.Unlock()
+	vc.lock.RLock()
+	defer vc.lock.RUnlock()
 	return vc.all()
 }
 
 // all returns all currently cached timeout objects. NOT concurrency safe
 func (vc *TimeoutObjectsCache) all() []*model.TimeoutObject {
-	timeoutObjects := make([]*model.TimeoutObject, len(vc.timeouts))
+	timeoutObjects := make([]*model.TimeoutObject, 0, len(vc.timeouts))
 	for _, t := range vc.timeouts {
 		timeoutObjects = append(timeoutObjects, t)
 	}

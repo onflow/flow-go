@@ -74,19 +74,19 @@ func TestTimeoutObjectsCache_GetTimeout(t *testing.T) {
 	require.True(t, found)
 }
 
-// TestTimeoutObjectsCache_All tests that All returns previously added timeouts in same order
+// TestTimeoutObjectsCache_All tests that All returns previously added timeouts.
 func TestTimeoutObjectsCache_All(t *testing.T) {
 	t.Parallel()
 
 	view := uint64(100)
 	cache := NewTimeoutObjectsCache(view)
-	expectedTimeouts := make([]*model.TimeoutObject, 0, 5)
+	expectedTimeouts := make([]*model.TimeoutObject, 5)
 	for i := range expectedTimeouts {
 		timeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(view))
 		expectedTimeouts[i] = timeout
 		require.NoError(t, cache.AddTimeoutObject(timeout))
 	}
-	require.Equal(t, expectedTimeouts, cache.All())
+	require.ElementsMatch(t, expectedTimeouts, cache.All())
 }
 
 // BenchmarkAdd measured the time it takes to add `numberTimeouts` concurrently to the TimeoutObjectsCache.
