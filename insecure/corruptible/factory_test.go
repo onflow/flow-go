@@ -175,10 +175,10 @@ func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 func TestProcessAttackerMessage(t *testing.T) {
 	withCorruptibleConduitFactory(t,
 		func(
-			identity flow.Identity,
-			factory *ConduitFactory,
-			flowNetwork *mocknetwork.Adapter,
-			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient,
+			corruptedId flow.Identity, // identity of ccf
+			factory *ConduitFactory, // the ccf itself
+			flowNetwork *mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
 			msg *insecure.Message, // msg to be sent from orchestrator to the ccf.
 			event interface{}, // corresponding event of the message which is expected to be dispatched on flow network by ccf.
 		) {
@@ -234,12 +234,13 @@ func TestEngineClosingChannel(t *testing.T) {
 // terminates the factory.
 func withCorruptibleConduitFactory(t *testing.T,
 	run func(
-		flow.Identity,
-		*ConduitFactory,
-		*mocknetwork.Adapter,
-		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient,
-		*insecure.Message,
-		interface{})) {
+		flow.Identity, // identity of ccf
+		*ConduitFactory, // the ccf itself
+		*mocknetwork.Adapter, // mock flow network that ccf uses to communicate with authorized flow nodes.
+		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient, // gRPC interface that attack network uses to send messages to this ccf.
+		*insecure.Message, // msg to be sent from orchestrator to the ccf.
+		interface{}, // corresponding event of the message which is expected to be dispatched on flow network by ccf.
+	)) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 
