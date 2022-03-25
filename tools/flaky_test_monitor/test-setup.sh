@@ -3,7 +3,7 @@
 set -e
 shopt -s extglob
 
-make crypto/relic/build
+make crypto_setup_gopath
 
 if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then

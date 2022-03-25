@@ -27,7 +27,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic
-      run: make crypto/relic/build
+      run: make crypto_setup_gopath
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v2
       with:
@@ -92,7 +92,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic
-      run: make crypto/relic/build
+      run: make crypto_setup_gopath
     - name: Docker build
       run: make docker-build-flow
     - name: Run tests

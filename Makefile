@@ -32,10 +32,15 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
-.PHONY: crypto/relic/build
-crypto/relic/build:
-# setup the crypto package under the GOPATH, needed to test packages importing flow-go/crypto
+# setup the crypto package under the GOPATH: needed to test packages importing flow-go/crypto
+.PHONY: crypto_setup_gopath
+crypto_setup_gopath:
 	bash crypto_setup.sh
+
+# setup the crypto package in the current repo folder: needed to test the crypto package itself in `unittest` target
+.PHONY: crypto_setup
+crypto_setup:
+    $(MAKE) -C crypto setup
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
