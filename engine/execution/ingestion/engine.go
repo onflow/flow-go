@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
-	"github.com/onflow/flow-go/state/protocol/guarantor"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -996,7 +995,7 @@ func (e *Engine) matchOrRequestCollections(
 			Hex("collection_id", logging.ID(guarantee.ID())).
 			Msg("requesting collection")
 
-		guarantors, err := guarantor.FindGuarantors(e.state, guarantee)
+		guarantors, err := protocol.FindGuarantors(e.state, guarantee)
 		if err != nil {
 			return fmt.Errorf("could not find guarantors: %w", err)
 		}
