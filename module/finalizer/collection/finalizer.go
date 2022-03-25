@@ -152,7 +152,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 					ReferenceBlockID: payload.ReferenceBlockID,
 					ChainID:          header.ChainID,
 					SignerIndices:    step.ParentVoterIndices,
-					Signature:        step.ParentVoterSigData, // TODO: to remove because it's not easily verifiable by consensus nodes
+					Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 				},
 			})
 		}
