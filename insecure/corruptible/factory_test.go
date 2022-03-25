@@ -170,7 +170,8 @@ func TestFactoryHandleIncomingEvent_MulticastOverNetwork(t *testing.T) {
 	testifymock.AssertExpectationsForObjects(t, adapter)
 }
 
-// TestProcessAttackerMessage evaluates that conduit factory relays the messages coming from the attacker to its underlying network adapter.
+// TestProcessAttackerMessage evaluates that corrupted conduit factory (ccf)
+// relays the messages coming from the attack network to its underlying flow network.
 func TestProcessAttackerMessage(t *testing.T) {
 	withCorruptibleConduitFactory(t,
 		func(
@@ -178,30 +179,24 @@ func TestProcessAttackerMessage(t *testing.T) {
 			factory *ConduitFactory,
 			flowNetwork *mocknetwork.Adapter,
 			stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient,
+			msg *insecure.Message, // msg to be sent from orchestrator to the ccf.
+			event interface{}, // corresponding event of the message which is expected to be dispatched on flow network by ccf.
 		) {
-			// creates a corrupted event that attacker is sending on the flow network through the
-			// corrupted conduit factory.
-			event := &message.TestMessage{Text: "this is a corrupted event coming from attacker"}
-			channel := network.Channel("test-channel")
-			targetIds := unittest.IdentifierListFixture(10)
+			params := []interface{}{network.Channel(msg.ChannelID), event, uint(3)}
+			targetIds, err := flow.ByteSlicesToIds(msg.TargetIDs)
+			require.NoError(t, err)
 
-			params := []interface{}{channel, event, uint(3)}
 			for _, id := range targetIds {
 				params = append(params, id)
 			}
-
 			corruptedEventDispatchedOnFlowNetWg := sync.WaitGroup{}
 			corruptedEventDispatchedOnFlowNetWg.Add(1)
 			flowNetwork.On("MulticastOnChannel", params...).Run(func(args testifymock.Arguments) {
 				corruptedEventDispatchedOnFlowNetWg.Done()
 			}).Return(nil).Once()
 
-			// imitates an RPC call from the attacker
-			msg, err := factory.eventToMessage(event, channel, insecure.Protocol_MULTICAST, uint32(3), targetIds...)
-			require.NoError(t, err)
-
-			err = stream.Send(msg)
-			require.NoError(t, err)
+			// imitates a gRPC call from orchestrator to ccf through attack network
+			require.NoError(t, stream.Send(msg))
 
 			unittest.RequireReturnsBefore(
 				t,
@@ -242,7 +237,9 @@ func withCorruptibleConduitFactory(t *testing.T,
 		flow.Identity,
 		*ConduitFactory,
 		*mocknetwork.Adapter,
-		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient)) {
+		insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient,
+		*insecure.Message,
+		interface{})) {
 
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress("localhost:0"))
 
@@ -290,7 +287,11 @@ func withCorruptibleConduitFactory(t *testing.T,
 	stream, err := client.ProcessAttackerMessage(context.Background())
 	require.NoError(t, err)
 
-	run(*corruptedIdentity, ccf, adapter, stream)
+	// creates a corrupted event that attacker is sending on the flow network through the
+	// corrupted conduit factory.
+	msg, event, _ := insecure.MessageFixture(t, cbor.NewCodec(), insecure.Protocol_MULTICAST)
+
+	run(*corruptedIdentity, ccf, adapter, stream, msg, event.FlowProtocolEvent)
 
 	// terminates attackNetwork
 	cancel()
