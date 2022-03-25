@@ -1047,25 +1047,25 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			epoch2NewParticipant,
 		).Sort(order.ByNodeIDAsc)
 
-		setup := unittest.EpochSetupFixture(
-			unittest.WithParticipants(epoch2Participants),
-			unittest.SetupWithCounter(epoch1Setup.Counter+1),
-			unittest.WithFinalView(epoch1Setup.FinalView+1000),
-			unittest.WithFirstView(epoch1Setup.FinalView+1),
-		)
-
 		createSetup := func(block *flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
+			setup := unittest.EpochSetupFixture(
+				unittest.WithParticipants(epoch2Participants),
+				unittest.SetupWithCounter(epoch1Setup.Counter+1),
+				unittest.WithFinalView(epoch1Setup.FinalView+1000),
+				unittest.WithFirstView(epoch1Setup.FinalView+1),
+			)
+
 			receipt, seal := unittest.ReceiptAndSealForBlock(block)
 			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent()}
 			seal.ResultID = receipt.ExecutionResult.ID()
 			return setup, receipt, seal
 		}
 
-		commit := unittest.EpochCommitFixture(
-			unittest.CommitWithCounter(setup.Counter+1),
-			unittest.WithDKGFromParticipants(epoch2Participants),
-		)
 		createCommit := func(block *flow.Block, opts ...func(*flow.EpochCommit)) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal) {
+			commit := unittest.EpochCommitFixture(
+				unittest.CommitWithCounter(epoch1Setup.Counter+1),
+				unittest.WithDKGFromParticipants(epoch2Participants),
+			)
 			for _, apply := range opts {
 				apply(commit)
 			}
