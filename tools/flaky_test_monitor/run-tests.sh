@@ -15,7 +15,9 @@ then
 else
     case $TEST_CATEGORY in
         unit)
-            make -s unittest-main > $TEST_OUTPUT_FILE
+            unset JSON_OUTPUT
+            make -s unittest-main
+            # > $TEST_OUTPUT_FILE
         ;;
         unit-crypto)
             make -C crypto -s test-main > $TEST_OUTPUT_FILE

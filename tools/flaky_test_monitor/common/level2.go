@@ -5,8 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Level2Summary models full level 2 summary of multiple tests from 1 or more level 1 test runs
