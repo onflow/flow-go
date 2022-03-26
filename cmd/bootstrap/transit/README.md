@@ -1,10 +1,9 @@
 # Transit Bootstrap scripts
 
-The transit script facilitates nodes uploading their public keys to dapper servers.
+The transit script is an utility used by node operators to upload and download relevant data before and after a Flow spork.
+It is used to download the root snapshot after a spork.
+Additionally, for a consensus node, it is used to upload transit keys and to submit root block votes.
 
-It also then handles securely receiving their RB Keys and network metadata after bootstrap data is created.
-
-For consensus nodes, it is used to pull the root block and private RB keys, sign the root block, and send the vote to dapper servers where it is used to generate the root QC for a new spork.
 ## Server token
 
 The server token is needed with the `-t` flag for all commands. It authenticates the script to the server so that only trusted parties with the token may upload their node info and be included in the bootstrap data.
@@ -12,19 +11,8 @@ The server token is needed with the `-t` flag for all commands. It authenticates
 ## Usage
 
 ```shell
-$ transit push -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
 $ transit pull -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
 ```
-### Push
-
-Running `transit push` will perform the following actions:
-
-1. Create a Transit Keypair with libsodium and write it to
-   - `transit-key.pub.<id>`
-   - `transit-key.priv.<id>`
-1. Upload the node's public files to the server
-   - `transit-key.pub.<id>`
-   - `node-info.pub.<id>.json`
 
 ### Pull
 
@@ -32,13 +20,13 @@ After bootstrapping, running `transit pull` will:
 
 1. Fetch the following files:
 
-   - `dkg-data.pub.json`
+   - `root-block.json` 
    - `node-infos.pub.json`
    - `root-protocol-snapshot.json`
-   - `execution-state [dir]`
-   - `random-beacon.priv.json.<id>.enc`
+   - `root-checkpoint` (only for execution nodes)
+   - `random-beacon.priv.json.<id>.enc` (only for consensus nodes)
 
-1. Decrypt `random-beacon.priv.json.<id>.enc` using the transit keys
+1. Decrypt `random-beacon.priv.json.<id>.enc` using the transit keys (only for consensus nodes)
    - `random-beacon.priv.json`
 
 ### Wrapping Responses
@@ -57,12 +45,13 @@ The wrap function:
 
 ## Consensus nodes
 
-The transit script has two commands which are only used by consensus nodes:
+The transit script has four commands applicable to consensus nodes:
 
 ```shell
 $ transit pull-root-block -t ${server-token} -d ${bootstrap-dir}
 $ transit generate-root-block-vote -t ${server-token} -d ${bootstrap-dir}
 $ transit push-root-block-vote -t ${server-token} -d ${bootstrap-dir} -v ${vote-file}
+$ transit push-transit-keys -t ${server-token} -d ${bootstrap-dir}
 ```
 
 ### Pull Root Block and Random Beacon Key
@@ -82,3 +71,15 @@ After the root block and random beacon key have been fetched, running `transit g
 ### Upload Vote
 
 Once a vote has been generated, running `transit push-root-block-vote` will upload the vote file to the server.
+
+### Push Transit Key
+
+Transit key is used to encrypt the random beacon key generated for the consensus nodes.
+
+Running `transit push-transit-key` will perform the following actions:
+
+1. Create a Transit Keypair and write it to
+   - `transit-key.pub.<id>`
+   - `transit-key.priv.<id>`
+1. Upload the node's public files to the server
+   - `transit-key.pub.<id>`

@@ -13,8 +13,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -125,6 +126,7 @@ type BaseConfig struct {
 	datadir                         string
 	secretsdir                      string
 	secretsDBEnabled                bool
+	InsecureSecretsDB               bool
 	level                           string
 	metricsPort                     uint
 	BootstrapDir                    string
@@ -138,14 +140,15 @@ type BaseConfig struct {
 	profilerMemProfileRate          int
 	tracerEnabled                   bool
 	tracerSensitivity               uint
-	metricsEnabled                  bool
+	MetricsEnabled                  bool
 	guaranteesCacheSize             uint
 	receiptsCacheSize               uint
 	db                              *badger.DB
 	PreferredUnicastProtocols       []string
-	NetworkReceivedMessageCacheSize int
+	NetworkReceivedMessageCacheSize uint32
 	topologyProtocolName            string
 	topologyEdgeProbability         float64
+	HeroCacheMetricsEnable          bool
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -219,11 +222,12 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerMemProfileRate:          runtime.MemProfileRate,
 		tracerEnabled:                   false,
 		tracerSensitivity:               4,
-		metricsEnabled:                  true,
+		MetricsEnabled:                  true,
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
-		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
+		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
 		topologyProtocolName:            string(topology.TopicBased),
 		topologyEdgeProbability:         topology.MaximumEdgeProbability,
+		HeroCacheMetricsEnable:          false,
 	}
 }

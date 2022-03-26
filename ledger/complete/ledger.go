@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module"
@@ -48,14 +47,17 @@ func NewLedger(
 	log zerolog.Logger,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) error {
-		return wal.RecordDelete(evictedTrie.RootHash())
+	logger := log.With().Str("ledger", "complete").Logger()
+
+	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) {
+		err := wal.RecordDelete(evictedTrie.RootHash())
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to save delete record in wal")
+		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
-
-	logger := log.With().Str("ledger", "complete").Logger()
 
 	storage := &Ledger{
 		forest:            forest,
@@ -176,7 +178,6 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	}
 
 	l.metrics.UpdateCount()
-	l.metrics.UpdateValuesNumber(uint64(len(trieUpdate.Paths)))
 
 	walChan := make(chan error)
 
@@ -343,7 +344,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 	// no need to prune the data since it has already been prunned through migrations
 	applyPruning := false
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
+	newTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -359,14 +360,9 @@ func (l *Ledger) ExportCheckpointAt(
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
 
-	flatTrie, err := flattener.FlattenTrie(newTrie)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to flatten the trie: %w", err)
-	}
-
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
-	err = wal.StoreCheckpoint(flatTrie.ToFlattenedForestWithASingleTrie(), writer)
+	err = wal.StoreCheckpoint(writer, newTrie)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
 	}

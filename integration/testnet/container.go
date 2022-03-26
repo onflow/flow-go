@@ -93,7 +93,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		conf.Identifier,
 		conf.Role,
 		GetPrivateNodeInfoAddress(nodeName),
-		conf.Stake,
+		conf.Weight,
 		networkKey,
 		stakingKey,
 	)

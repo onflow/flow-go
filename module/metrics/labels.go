@@ -75,9 +75,13 @@ const (
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
+	ResourceNetworkingReceiveCache   = "networking_received_message" // networking layer
+	ResourceNetworkingDnsIpCache     = "networking_dns_ip_cache"     // networking layer
+	ResourceNetworkingDnsTxtCache    = "networking_dns_txt_cache"    // networking layer
 
 	ResourceClusterBlockProposalQueue = "cluster_compliance_proposal_queue" // collection node, compliance engine
 	ResourceClusterBlockVoteQueue     = "cluster_compliance_vote_queue"     // collection node, compliance engine
+	ResourceTransactionIngestQueue    = "ingest_transaction_queue"          // collection node, ingest engine
 	ResourceBeaconKey                 = "beacon-key"                        // consensus node, DKG engine
 	ResourceApprovalQueue             = "sealing_approval_queue"            // consensus node, sealing engine
 	ResourceReceiptQueue              = "sealing_receipt_queue"             // consensus node, sealing engine
@@ -89,6 +93,7 @@ const (
 	ResourceEvents                    = "events"                            // execution node
 	ResourceServiceEvents             = "service_events"                    // execution node
 	ResourceTransactionResults        = "transaction_results"               // execution node
+	ResourceTransactionResultIndices  = "transaction_result_indices"        // execution node
 )
 
 const (

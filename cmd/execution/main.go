@@ -7,18 +7,25 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	goruntime "runtime"
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/ipfs/go-bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
+	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
+	cpu "github.com/shirou/gopsutil/v3/cpu"
+	host "github.com/shirou/gopsutil/v3/host"
+	mem "github.com/shirou/gopsutil/v3/mem"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
+	uploaderCommands "github.com/onflow/flow-go/admin/commands/uploader"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -101,6 +108,7 @@ func main() {
 		checkpointsToKeep             uint
 		stateDeltasLimit              uint
 		cadenceExecutionCache         uint
+		cadenceTracing                bool
 		chdpCacheSize                 uint
 		requestInterval               time.Duration
 		preferredExeNodeIDStr         string
@@ -109,7 +117,7 @@ func main() {
 		syncThreshold                 int
 		extensiveLog                  bool
 		pauseExecution                bool
-		checkStakedAtBlock            func(blockID flow.Identifier) (bool, error)
+		checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
 		diskWAL                       *wal.DiskWAL
 		scriptLogThreshold            time.Duration
 		chdpQueryTimeout              uint
@@ -141,6 +149,7 @@ func main() {
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
+			flags.BoolVar(&cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
 			flags.UintVar(&chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.DurationVar(&scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold, "threshold for logging script execution")
@@ -175,6 +184,9 @@ func main() {
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(executionDataService)
 		}).
+		AdminCommand("set-uploader-enabled", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return uploaderCommands.NewToggleUploaderCommand()
+		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -191,6 +203,14 @@ func main() {
 				blocktimer.DefaultBlockTimer,
 			)
 			return err
+		}).
+		Module("system specs", func(node *cmd.NodeConfig) error {
+			sysInfoLogger := node.Logger.With().Str("system", "specs").Logger()
+			err = logSysInfo(sysInfoLogger)
+			if err != nil {
+				sysInfoLogger.Error().Err(err)
+			}
+			return nil
 		}).
 		Module("execution metrics", func(node *cmd.NodeConfig) error {
 			collector = metrics.NewExecutionCollector(node.Tracer)
@@ -281,9 +301,9 @@ func main() {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
 			return err
 		}).
-		Module("stake checking function", func(node *cmd.NodeConfig) error {
-			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
-				return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
+		Module("authorization checking function", func(node *cmd.NodeConfig) error {
+			checkAuthorizedAtBlock = func(blockID flow.Identifier) (bool, error) {
+				return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 			}
 			return nil
 		}).
@@ -418,7 +438,11 @@ func main() {
 
 			extralog.ExtraLogDumpPath = extraLogPath
 
-			rt := fvm.NewInterpreterRuntime()
+			options := []runtime.Option{}
+			if cadenceTracing {
+				options = append(options, runtime.WithTracingEnabled(true))
+			}
+			rt := fvm.NewInterpreterRuntime(options...)
 
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
@@ -477,7 +501,7 @@ func main() {
 				node.Me,
 				executionState,
 				collector,
-				checkStakedAtBlock,
+				checkAuthorizedAtBlock,
 				chdpQueryTimeout,
 				chdpDeliveryTimeout,
 			)
@@ -585,7 +609,7 @@ func main() {
 				deltas,
 				syncThreshold,
 				syncFast,
-				checkStakedAtBlock,
+				checkAuthorizedAtBlock,
 				pauseExecution,
 			)
 
@@ -814,4 +838,49 @@ func copyBootstrapState(dir, trie string) error {
 	fmt.Printf("copied bootstrap state file from: %v, to: %v\n", src, dst)
 
 	return out.Close()
+}
+
+func logSysInfo(logger zerolog.Logger) error {
+
+	vmem, err := mem.VirtualMemory()
+	if err != nil {
+		return fmt.Errorf("failed to get virtual memory: %w", err)
+	}
+
+	info, err := cpu.Info()
+	if err != nil {
+		return fmt.Errorf("failed to get cpu info: %w", err)
+	}
+
+	logicalCores, err := cpu.Counts(true)
+	if err != nil {
+		return fmt.Errorf("failed to get logical cores: %w", err)
+	}
+
+	physicalCores, err := cpu.Counts(false)
+	if err != nil {
+		return fmt.Errorf("failed to get physical cores: %w", err)
+	}
+
+	if len(info) == 0 {
+		return fmt.Errorf("cpu info length is 0")
+	}
+
+	logger.Info().Msgf("CPU: ModelName=%s, MHz=%.0f, Family=%s, Model=%s, Stepping=%d, Microcode=%s, PhysicalCores=%d, LogicalCores=%d",
+		info[0].ModelName, info[0].Mhz, info[0].Family, info[0].Model, info[0].Stepping, info[0].Microcode, physicalCores, logicalCores)
+
+	logger.Info().Msgf("RAM: Total=%d, Free=%d", vmem.Total, vmem.Free)
+
+	hostInfo, err := host.Info()
+	if err != nil {
+		return fmt.Errorf("failed to get platform info: %w", err)
+	}
+	logger.Info().Msgf("OS: OS=%s, Platform=%s, PlatformVersion=%s, KernelVersion=%s, Uptime: %d",
+		hostInfo.OS, hostInfo.Platform, hostInfo.PlatformVersion, hostInfo.KernelVersion, hostInfo.Uptime)
+
+	// goruntime.GOMAXPROCS(0) doesn't modify any settings.
+	logger.Info().Msgf("GO: GoVersion=%s, GOMAXPROCS=%d, NumCPU=%d",
+		goruntime.Version(), goruntime.GOMAXPROCS(0), goruntime.NumCPU())
+
+	return nil
 }

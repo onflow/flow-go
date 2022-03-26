@@ -1,110 +1,150 @@
 {
-  "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
-  "commit_date": "2021-09-22T01:06:25Z",
-  "job_run_date": "2021-09-22T04:06:25Z",
-  "results": [
+  "rows": [
     {
-      "package": "github.com/onflow/flow-go/crypto/hash",
-      "result": "pass",
-      "elapsed": 0.349,
-      "output": [
-        "PASS\n",
-        "ok  \tgithub.com/onflow/flow-go/crypto/hash\t0.349s\n"
-      ],
-      "tests": [
-        {
-          "test": "TestSanitySha3_256",
-          "package": "github.com/onflow/flow-go/crypto/hash",
-          "output": [
-            "=== RUN   TestSanitySha3_256\n",
-            "--- PASS: TestSanitySha3_256 (0.00s)\n"
-          ],
-          "result": "pass",
-          "elapsed": 0
-        },
-        {
-          "test": "TestSanitySha2_256",
-          "package": "github.com/onflow/flow-go/crypto/hash",
-          "output": [
-            "=== RUN   TestSanitySha2_256\n",
-            "--- PASS: TestSanitySha2_256 (0.00s)\n"
-          ],
-          "result": "pass",
-          "elapsed": 0
-        },
-        {
-          "test": "TestSanitySha3_384",
-          "package": "github.com/onflow/flow-go/crypto/hash",
-          "output": [
-            "=== RUN   TestSanitySha3_384\n",
-            "--- PASS: TestSanitySha3_384 (0.00s)\n"
-          ],
-          "result": "pass",
-          "elapsed": 0
-        },
-        {
-          "test": "TestSanitySha2_384",
-          "package": "github.com/onflow/flow-go/crypto/hash",
-          "output": [
-            "=== RUN   TestSanitySha2_384\n",
-            "--- PASS: TestSanitySha2_384 (0.00s)\n"
-          ],
-          "result": "pass",
-          "elapsed": 0
-        },
-        {
-          "test": "TestSanityKmac128",
-          "package": "github.com/onflow/flow-go/crypto/hash",
-          "output": [
-            "=== RUN   TestSanityKmac128\n",
-            "--- PASS: TestSanityKmac128 (0.00s)\n"
-          ],
-          "result": "pass",
-          "elapsed": 0
-        },
-        {
-          "test": "TestHashersAPI",
-          "package": "github.com/onflow/flow-go/crypto/hash",
-          "output": [
-            "=== RUN   TestHashersAPI\n",
-            "    hash_test.go:114: math rand seed is 1632497249121800000\n",
-            "--- PASS: TestHashersAPI (0.00s)\n"
-          ],
-          "result": "pass",
-          "elapsed": 0
-        },
-        {
-          "test": "TestSha3",
-          "package": "github.com/onflow/flow-go/crypto/hash",
-          "output": [
-            "=== RUN   TestSha3\n",
-            "    hash_test.go:158: math rand seed is 1632497249122032000\n",
-            "--- PASS: TestSha3 (0.23s)\n"
-          ],
-          "result": "pass",
-          "elapsed": 0.23
-        },
-        {
-          "test": "TestSha3/SHA3_256",
-          "package": "github.com/onflow/flow-go/crypto/hash",
-          "output": [
-            "=== RUN   TestSha3/SHA3_256\n",
-            "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"
-          ],
-          "result": "pass",
-          "elapsed": 0.1
-        },
-        {
-          "test": "TestSha3/SHA3_384",
-          "package": "github.com/onflow/flow-go/crypto/hash",
-          "output": [
-            "=== RUN   TestSha3/SHA3_384\n",
-            "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"
-          ],
-          "result": "pass",
-          "elapsed": 0.12
-        }
-      ]
+      "json": {
+        "test": "TestSanitySha3_256",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "output": [
+          {"item": "=== RUN   TestSanitySha3_256\n"},
+          {"item": "--- PASS: TestSanitySha3_256 (0.00s)\n"}
+        ],
+        "result": "1",
+        "no_result": false,
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestSanitySha2_256",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "output": [
+          {"item": "=== RUN   TestSanitySha2_256\n"},
+          {"item": "--- PASS: TestSanitySha2_256 (0.00s)\n"}
+        ],
+        "result": "1",
+        "no_result": false,
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestSanitySha3_384",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "output": [
+          {"item": "=== RUN   TestSanitySha3_384\n"},
+          {"item": "--- PASS: TestSanitySha3_384 (0.00s)\n"}
+        ],
+        "result": "1",
+        "no_result": false,
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestSanitySha2_384",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "output": [
+          {"item": "=== RUN   TestSanitySha2_384\n"},
+          {"item": "--- PASS: TestSanitySha2_384 (0.00s)\n"}
+        ],
+        "result": "1",
+        "no_result": false,
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestSanityKmac128",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "output": [
+          {"item": "=== RUN   TestSanityKmac128\n"},
+          {"item": "--- PASS: TestSanityKmac128 (0.00s)\n"}
+        ],
+        "result": "1",
+        "no_result": false,
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestHashersAPI",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "output": [
+          {"item": "=== RUN   TestHashersAPI\n"},
+          {"item": "    hash_test.go:114: math rand seed is 1632497249121800000\n"},
+          {"item": "--- PASS: TestHashersAPI (0.00s)\n"}
+        ],
+        "result": "1",
+        "no_result": false,
+        "elapsed": 0
+      }
+    },
+    {
+      "json": {
+        "test": "TestSha3",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "output": [
+          {"item": "=== RUN   TestSha3\n"},
+          {"item": "    hash_test.go:158: math rand seed is 1632497249122032000\n"},
+          {"item": "--- PASS: TestSha3 (0.23s)\n"}
+        ],
+        "result": "1",
+        "no_result": false,
+        "elapsed": 0.23
+      }
+    },
+    {
+      "json": {
+        "test": "TestSha3/SHA3_256",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "output": [
+          {"item": "=== RUN   TestSha3/SHA3_256\n"},
+          {"item": "    --- PASS: TestSha3/SHA3_256 (0.10s)\n"}
+        ],
+        "result": "1",
+        "no_result": false,
+        "elapsed": 0.1
+      }
+    },
+    {
+      "json": {
+        "test": "TestSha3/SHA3_384",
+        "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+        "commit_date": "2021-09-22T01:06:25Z",
+        "job_run_date": "2021-09-22T04:06:25Z",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "output": [
+          {"item": "=== RUN   TestSha3/SHA3_384\n"},
+          {"item": "    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
+        ],
+        "result": "1",
+        "no_result": false,
+        "elapsed": 0.12
+      }
     }
   ]
 }

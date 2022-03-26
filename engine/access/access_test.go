@@ -354,16 +354,32 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := *resp.Block
-			expected, _ := convert.BlockHeaderToMessage(header)
-			require.Equal(suite.T(), *expected, actual)
+			expectedMessage, err := convert.BlockHeaderToMessage(header)
+			require.NoError(suite.T(), err)
+			require.Equal(suite.T(), *expectedMessage, actual)
+			expectedBlockHeader, err := convert.MessageToBlockHeader(&actual)
+			require.NoError(suite.T(), err)
+			require.Equal(suite.T(), expectedBlockHeader, header)
 		}
 
 		assertBlockResp := func(resp *accessproto.BlockResponse, err error, block *flow.Block) {
 			require.NoError(suite.T(), err)
 			require.NotNil(suite.T(), resp)
 			actual := resp.Block
-			expected, _ := convert.BlockToMessage(block)
-			require.Equal(suite.T(), expected, actual)
+			expectedMessage, err := convert.BlockToMessage(block)
+			require.NoError(suite.T(), err)
+			require.Equal(suite.T(), expectedMessage, actual)
+			expectedBlock, err := convert.MessageToBlock(resp.Block)
+			require.NoError(suite.T(), err)
+			require.Equal(suite.T(), expectedBlock.ID(), block.ID())
+		}
+
+		assertLightBlockResp := func(resp *accessproto.BlockResponse, err error, block *flow.Block) {
+			require.NoError(suite.T(), err)
+			require.NotNil(suite.T(), resp)
+			actual := resp.Block
+			expectedMessage := convert.BlockToMessageLight(block)
+			require.Equal(suite.T(), expectedMessage, actual)
 		}
 
 		suite.Run("get header 1 by ID", func() {
@@ -383,12 +399,25 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 			id := block1.ID()
 			// get block details by ID
 			req := &accessproto.GetBlockByIDRequest{
-				Id: id[:],
+				Id:                id[:],
+				FullBlockResponse: true,
 			}
 
 			resp, err := handler.GetBlockByID(context.Background(), req)
 
 			assertBlockResp(resp, err, &block1)
+		})
+
+		suite.Run("get block light 1 by ID", func() {
+			id := block1.ID()
+			// get block details by ID
+			req := &accessproto.GetBlockByIDRequest{
+				Id: id[:],
+			}
+
+			resp, err := handler.GetBlockByID(context.Background(), req)
+
+			assertLightBlockResp(resp, err, &block1)
 		})
 
 		suite.Run("get header 2 by height", func() {
@@ -406,12 +435,24 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		suite.Run("get block 2 by height", func() {
 			// get block details by height
 			req := &accessproto.GetBlockByHeightRequest{
-				Height: block2.Header.Height,
+				Height:            block2.Header.Height,
+				FullBlockResponse: true,
 			}
 
 			resp, err := handler.GetBlockByHeight(context.Background(), req)
 
 			assertBlockResp(resp, err, &block2)
+		})
+
+		suite.Run("get block 2 by height", func() {
+			// get block details by height
+			req := &accessproto.GetBlockByHeightRequest{
+				Height: block2.Header.Height,
+			}
+
+			resp, err := handler.GetBlockByHeight(context.Background(), req)
+
+			assertLightBlockResp(resp, err, &block2)
 		})
 	})
 }
@@ -438,8 +479,9 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			require.Len(suite.T(), er.Chunks, len(executionResult.Chunks))
 			require.Len(suite.T(), er.ServiceEvents, len(executionResult.ServiceEvents))
 
-			assert.Equal(suite.T(), executionResult.BlockID[:], er.BlockId)
-			assert.Equal(suite.T(), executionResult.PreviousResultID[:], er.PreviousResultId)
+			assert.Equal(suite.T(), executionResult.BlockID, convert.MessageToIdentifier(er.BlockId))
+			assert.Equal(suite.T(), executionResult.PreviousResultID, convert.MessageToIdentifier(er.PreviousResultId))
+			assert.Equal(suite.T(), executionResult.ExecutionDataID, convert.MessageToIdentifier(er.ExecutionDataId))
 
 			for i, chunk := range executionResult.Chunks {
 				assert.Equal(suite.T(), chunk.BlockID[:], er.Chunks[i].BlockId)
@@ -461,6 +503,10 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 
 				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
 			}
+			parsedExecResult, err := convert.MessageToExecutionResult(resp.ExecutionResult)
+			require.NoError(suite.T(), err)
+			assert.Equal(suite.T(), parsedExecResult, executionResult)
+			assert.Equal(suite.T(), parsedExecResult.ID(), executionResult.ID())
 		}
 
 		suite.Run("nonexisting block", func() {

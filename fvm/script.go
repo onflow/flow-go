@@ -65,6 +65,24 @@ func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	return nil
 }
 
+func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
+	computationLimit := ctx.ComputationLimit
+	// if ctx.ComputationLimit is also zero, fallback to the default computation limit
+	if computationLimit == 0 {
+		computationLimit = DefaultComputationLimit
+	}
+	return computationLimit
+}
+
+func (proc *ScriptProcedure) MemoryLimit(ctx Context) uint64 {
+	memoryLimit := ctx.MemoryLimit
+	// if ctx.MemoryLimit is also zero, fallback to the default memory limit
+	if memoryLimit == 0 {
+		memoryLimit = DefaultMemoryLimit
+	}
+	return memoryLimit
+}
+
 type ScriptInvoker struct{}
 
 func NewScriptInvoker() ScriptInvoker {
@@ -98,6 +116,6 @@ func (i ScriptInvoker) Process(
 	proc.Value = value
 	proc.Logs = env.Logs()
 	proc.Events = env.Events()
-	proc.GasUsed = env.GetComputationUsed()
+	proc.GasUsed = env.ComputationUsed()
 	return nil
 }
