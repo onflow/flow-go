@@ -91,8 +91,6 @@ jobs:
         go-version: ${{ matrix.go-version}}
     - name: Checkout repo
       uses: actions/checkout@v2
-    - name: Echo commit SHA
-      run: echo $(git rev-parse HEAD)
     - name: Build relic
       run: make crypto/relic/build
     - name: Docker build
