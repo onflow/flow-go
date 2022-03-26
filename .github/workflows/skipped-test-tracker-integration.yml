@@ -29,7 +29,7 @@ jobs:
           - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
-      COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: change this for bors
+      COMMIT_SHA: ${{ github.sha }}
       RUN_ID: ${{ github.run_id }}
       SKIPPED_TESTS_FILE: skipped-tests
       TEST_OUTPUT_FILE: test-output

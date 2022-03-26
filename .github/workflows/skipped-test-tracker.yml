@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - master
-  pull_request: # TODO: remove this before merging
-    branches:
-      - master
 
 env:
   BIGQUERY_DATASET: dev_src_flow_test_metrics # TODO: replace with prod before merging
@@ -32,7 +29,7 @@ jobs:
           - integration-verification
     env:
       TEST_CATEGORY: ${{ matrix.test-category }}
-      COMMIT_SHA: ${{ github.event.pull_request.head.sha }} # TODO: replace with github.sha or $GITHUB_SHA before merging
+      COMMIT_SHA: ${{ github.sha }} 
       RUN_ID: ${{ github.run_id }}
       SKIPPED_TESTS_FILE: skipped-tests
       TEST_OUTPUT_FILE: test-output
