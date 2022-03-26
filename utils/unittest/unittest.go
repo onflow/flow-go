@@ -25,7 +25,7 @@ type SkipReason int
 
 const (
 	TEST_FLAKY               SkipReason = iota + 1 // flaky
-	TEST_WIP                                       // not fully implemented / broken
+	TEST_TODO                                      // not fully implemented or broken and needs to be fixed
 	TEST_REQUIRES_GCP_ACCESS                       // requires the environment to be configured with GCP credentials
 	TEST_DEPRECATED                                // uses code that has been deprecated / disabled
 	TEST_LONG_RUNNING                              // long running
@@ -36,8 +36,8 @@ func (s SkipReason) String() string {
 	switch s {
 	case TEST_FLAKY:
 		return "TEST_FLAKY"
-	case TEST_WIP:
-		return "TEST_WIP"
+	case TEST_TODO:
+		return "TEST_TODO"
 	case TEST_REQUIRES_GCP_ACCESS:
 		return "TEST_REQUIRES_GCP_ACCESS"
 	case TEST_DEPRECATED:
@@ -58,8 +58,8 @@ func parseSkipReason(reason string) SkipReason {
 	switch reason {
 	case "TEST_FLAKY":
 		return TEST_FLAKY
-	case "TEST_WIP":
-		return TEST_WIP
+	case "TEST_TODO":
+		return TEST_TODO
 	case "TEST_REQUIRES_GCP_ACCESS":
 		return TEST_REQUIRES_GCP_ACCESS
 	case "TEST_DEPRECATED":

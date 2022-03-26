@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type MultiClusterSuite struct {
@@ -228,7 +229,7 @@ func (suite *RecoverySuite) TestProposal_Recovery() {
 
 	// TODO this doesn't quite work with network disconnect/connect for some
 	// reason, skipping for now
-	suite.T().SkipNow()
+	unittest.SkipUnless(t, unittest.TEST_TODO, "doesn't quite work with network disconnect/connect")
 
 	var (
 		nNodes        = 5

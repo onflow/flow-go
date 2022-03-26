@@ -72,27 +72,27 @@ func (suite *IngressSuite) TestTransactionIngress_InvalidTransaction() {
 	}))
 	t.Run("expired transaction", logStartFinish(func(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
-		unittest.SkipUnless(t, unittest.TEST_WIP, "blocked by https://github.com/dapperlabs/flow-go/issues/3005")
+		unittest.SkipUnless(t, unittest.TEST_TODO, "blocked by https://github.com/dapperlabs/flow-go/issues/3005")
 	}))
 	t.Run("non-existent reference block ID", logStartFinish(func(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
-		unittest.SkipUnless(t, unittest.TEST_WIP, "blocked by https://github.com/dapperlabs/flow-go/issues/3005")
+		unittest.SkipUnless(t, unittest.TEST_TODO, "blocked by https://github.com/dapperlabs/flow-go/issues/3005")
 	}))
 	t.Run("unparseable script", logStartFinish(func(t *testing.T) {
 		// TODO script parsing not implemented
-		unittest.SkipUnless(t, unittest.TEST_WIP, "script parsing not implemented")
+		unittest.SkipUnless(t, unittest.TEST_TODO, "script parsing not implemented")
 	}))
 	t.Run("invalid signature", logStartFinish(func(t *testing.T) {
 		// TODO signature validation not implemented
-		unittest.SkipUnless(t, unittest.TEST_WIP, "signature validation not implemented")
+		unittest.SkipUnless(t, unittest.TEST_TODO, "signature validation not implemented")
 	}))
 	t.Run("invalid sequence number", logStartFinish(func(t *testing.T) {
 		// TODO nonce validation not implemented
-		unittest.SkipUnless(t, unittest.TEST_WIP, "nonce validation not implemented")
+		unittest.SkipUnless(t, unittest.TEST_TODO, "nonce validation not implemented")
 	}))
 	t.Run("insufficient payer balance", logStartFinish(func(t *testing.T) {
 		// TODO balance checking not implemented
-		unittest.SkipUnless(t, unittest.TEST_WIP, "balance checking not implemented")
+		unittest.SkipUnless(t, unittest.TEST_TODO, "balance checking not implemented")
 	}))
 }
 

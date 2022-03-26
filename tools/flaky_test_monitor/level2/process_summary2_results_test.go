@@ -67,7 +67,7 @@ func TestGenerateLevel2Summary_Struct(t *testing.T) {
 // Don't want to use too many tests since they are more brittle to changes to JSON data structure.
 // That's why have very few of these. For new tests, it's best to add level 1 data as structs.
 func TestGenerateLevel2Summary_JSON(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_WIP, "broken")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken")
 	testDataMap := map[string]testdata.Level2TestData{
 		"1 level 1 summary, 1 failure the rest pass": {
 			Directory:      "test1-1package-1failure",

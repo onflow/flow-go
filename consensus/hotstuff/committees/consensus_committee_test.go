@@ -139,7 +139,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 		})
 
 		t.Run("after current epoch", func(t *testing.T) {
-			t.SkipNow()
+			unittest.SkipUnless(t, unittest.TEST_TODO, "temporarily disabled")
 			// REASON FOR SKIPPING TEST:
 			// We have a temporary fallback to continue with the current consensus committee, if the
 			// setup for the next epoch failed (aka emergency epoch chain continuation -- EECC).

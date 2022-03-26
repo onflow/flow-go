@@ -52,7 +52,7 @@ func MVP_Bootstrap(t *testing.T) {
 		Str("testcase", t.Name()).
 		Logger()
 	logger.Info().Msgf("================> START TESTING")
-	unittest.SkipUnless(t, unittest.TEST_WIP, "skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
 
 	testingdock.Verbose = false
 
