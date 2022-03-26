@@ -11,8 +11,8 @@ export JSON_OUTPUT=true
 # run tests and process results
 if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then
-    # kill orphaned containers from previous run
-    docker kill $(docker ps -q) || true
+    # kill and remove orphaned containers from previous run
+    docker rm -f $(docker ps -a -q) || true
     
     make -C integration -s ${BASH_REMATCH[1]}-tests > $TEST_OUTPUT_FILE
 else
