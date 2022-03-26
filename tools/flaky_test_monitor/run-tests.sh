@@ -16,7 +16,6 @@ else
     case $TEST_CATEGORY in
         unit)
             make -s unittest-main > $TEST_OUTPUT_FILE
-            cat $TEST_OUTPUT_FILE | grep -B 3 skip
         ;;
         unit-crypto)
             make -C crypto -s test-main > $TEST_OUTPUT_FILE
