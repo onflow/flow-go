@@ -27,10 +27,14 @@ non_relic_tests:
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./hash
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(if $(VERBOSE),-v,) ./random
 
+############################################################################################
+# CAUTION: DO NOT MODIFY THIS TARGET! DOING SO WILL BREAK THE FLAKY TEST MONITOR
 
 # runs all tests of the crypto package 
 .PHONY: test
 test: relic_tests non_relic_tests
+
+############################################################################################
 
 .PHONY: docker-build
 docker-build:

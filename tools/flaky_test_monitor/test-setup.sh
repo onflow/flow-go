@@ -17,8 +17,6 @@ else
         unit-crypto)
             make crypto_setup_tests
         ;;
-        unit-integration)
-        ;;
     esac
 fi
 
