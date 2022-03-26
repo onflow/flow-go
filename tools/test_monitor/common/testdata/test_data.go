@@ -3,7 +3,7 @@ package testdata
 import (
 	"time"
 
-	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
+	"github.com/onflow/flow-go/tools/test_monitor/common"
 )
 
 const COMMIT_DATE = "2021-09-21T18:06:25-07:00"

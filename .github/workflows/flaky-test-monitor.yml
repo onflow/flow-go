@@ -61,14 +61,14 @@ jobs:
       id: commit_date
       run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
     - name: Test setup
-      run: ./tools/flaky_test_monitor/test-setup.sh
+      run: ./tools/test_monitor/test-setup.sh
     - name: Run tests
       continue-on-error: true
-      run: ./tools/flaky_test_monitor/run-tests.sh
+      run: ./tools/test_monitor/run-tests.sh
       env:
         TEST_FLAKY: true
     - name: Process test results
-      run: cat $TEST_OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go
+      run: cat $TEST_OUTPUT_FILE | go run tools/test_monitor/level1/process_summary1_results.go
       env:
         JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
         COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
@@ -77,4 +77,4 @@ jobs:
       with:
         timeout_minutes: 2
         max_attempts: 3
-        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $RESULTS_FILE tools/flaky_test_monitor/schemas/test_results_schema.json
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json
