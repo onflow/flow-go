@@ -85,13 +85,7 @@ func (suite *AccessSuite) SetupTest() {
 
 func (suite *AccessSuite) TestHTTPProxyPortOpen() {
 	httpProxyAddress := fmt.Sprintf(":%s", suite.net.AccessPorts[testnet.AccessNodeAPIProxyPort])
-	require.Eventually(suite.T(),
-		func() bool {
-			conn, err := net.DialTimeout("tcp", httpProxyAddress, 1*time.Second)
-			if err == nil {
-				conn.Close()
-				return true
-			}
-			return false
-		}, 30*time.Second, 2*time.Second, "http proxy port not open on the access node")
+	conn, err := net.DialTimeout("tcp", httpProxyAddress, 1*time.Second)
+	require.NoError(suite.T(), err, "http proxy port not open on the access node")
+	conn.Close()
 }
