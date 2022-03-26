@@ -40,7 +40,7 @@ crypto_setup_gopath:
 # setup the crypto package in the current repo folder: needed to test the crypto package itself in `unittest` target
 .PHONY: crypto_setup_tests
 crypto_setup_tests:
-    $(MAKE) -C crypto setup
+	$(MAKE) -C crypto setup
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
