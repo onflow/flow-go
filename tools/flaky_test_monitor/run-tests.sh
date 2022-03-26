@@ -19,7 +19,7 @@ else
             # TODO: add this back > $TEST_OUTPUT_FILE
         ;;
         unit-crypto)
-            make -C crypto -s test-main > $TEST_OUTPUT_FILE
+            make -C crypto -s test > $TEST_OUTPUT_FILE
         ;;
         unit-integration)
             make -C integration -s test > $TEST_OUTPUT_FILE

@@ -32,11 +32,6 @@ non_relic_tests:
 .PHONY: test
 test: relic_tests non_relic_tests
 
-# target used by the flakey test monitor 
-# CAUTION: modifying the target name will break the flaky test monitor)
-.PHONY: test-main
-test-main: test
-
 .PHONY: docker-build
 docker-build:
 	docker build -t gcr.io/dl-flow/golang-cmake:latest -t gcr.io/dl-flow/golang-cmake:$(IMAGE_TAG) .
