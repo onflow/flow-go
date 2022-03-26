@@ -180,7 +180,7 @@ func finalizeLevel1Summary(testResultMap map[string][]*common.Level1TestResult) 
 					if ok {
 						skippedTestEntry.SkipReason = skipReason
 					} else {
-						panic("could not parse Skip Reason from test output")
+						panic("could not parse Skip Reason from output for test: " + testResult.Test)
 					}
 				}
 			}
