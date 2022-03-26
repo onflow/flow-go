@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/dapperlabs/testingdock"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -73,6 +74,8 @@ func (suite *AccessSuite) SetupTest() {
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
+
+	testingdock.Verbose = false
 
 	// start the network
 	suite.T().Logf("starting flow network with docker containers")
