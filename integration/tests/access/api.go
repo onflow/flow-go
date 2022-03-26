@@ -91,5 +91,5 @@ func (suite *AccessSuite) TestHTTPProxyPortOpen() {
 				return true
 			}
 			return false
-		}, 20*time.Second, 2*time.Second, "http proxy port not open on the access node")
+		}, 30*time.Second, 2*time.Second, "http proxy port not open on the access node")
 }
