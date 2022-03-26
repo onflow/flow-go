@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -98,11 +97,6 @@ func TestGenerateLevel1Summary_Struct(t *testing.T) {
 			actualLevel1Summary, _ := generateLevel1Summary(&resultReader)
 			// *****************************************************
 
-			fmt.Println(k)
-			fmt.Println("ACTUAL")
-			fmt.Println(actualLevel1Summary)
-			fmt.Println("EXPECTED")
-			fmt.Println(testData.ExpectedLevel1Summary)
 			require.ElementsMatch(t, testData.ExpectedLevel1Summary, actualLevel1Summary, "actual and expected level 1 summary do not match")
 		})
 	}
