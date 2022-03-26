@@ -11,7 +11,7 @@ setup:
 
 # test BLS-related functionalities requiring the Relic library (and hence relic Go build flag)
 .PHONY: relic_tests
-relic_tests: setup
+relic_tests:
 ifeq ($(ADX_SUPPORT), 1)
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(if $(VERBOSE),-v,)
 else

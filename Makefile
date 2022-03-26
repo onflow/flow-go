@@ -38,8 +38,8 @@ crypto_setup_gopath:
 	bash crypto_setup.sh
 
 # setup the crypto package in the current repo folder: needed to test the crypto package itself in `unittest` target
-.PHONY: crypto_setup
-crypto_setup:
+.PHONY: crypto_setup_tests
+crypto_setup_tests:
     $(MAKE) -C crypto setup
 
 cmd/collection/collection:
@@ -65,7 +65,7 @@ install-mock-generators:
 ############################################################################################
 
 .PHONY: install-tools
-install-tools: crypto/relic/build check-go-version install-mock-generators
+install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.41.1; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
@@ -180,7 +180,7 @@ ci: install-tools tidy test # lint coverage
 
 # Runs integration tests
 .PHONY: ci-integration
-ci-integration: crypto/relic/build
+ci-integration: crypto_setup_gopath
 	$(MAKE) -C integration ci-integration-test
 
 # Runs benchmark tests

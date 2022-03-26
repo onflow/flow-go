@@ -14,6 +14,9 @@ else
             make install-mock-generators
             make generate-mocks
         ;;
+        unit-crypto)
+            make crypto_setup_tests
+        ;;
         unit-integration)
         ;;
     esac
