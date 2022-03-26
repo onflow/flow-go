@@ -41,7 +41,6 @@ type MeshEngineTestSuite struct {
 
 // TestMeshNetTestSuite runs all tests in this test suit
 func TestMeshNetTestSuite(t *testing.T) {
-	t.Parallel()
 	suite.Run(t, new(MeshEngineTestSuite))
 }
 
