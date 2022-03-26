@@ -33,3 +33,8 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "read-blocks", "data": { "block": 24998900 }}'
 ```
 
+### To get identity by peer id
+```
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-identity", "data": { "peer_id": "QmNqszdfyEZmMCXcnoUdBDWboFvVLF5reyKPuiqFQT77Vw" }}'
+```
+
