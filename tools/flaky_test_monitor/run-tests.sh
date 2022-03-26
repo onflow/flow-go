@@ -13,6 +13,7 @@ if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|con
 then
     # kill and remove orphaned containers from previous run
     docker rm -f $(docker ps -a -q) || true
+    sudo systemctl restart docker
     
     make -C integration -s ${BASH_REMATCH[1]}-tests > $TEST_OUTPUT_FILE
 else
