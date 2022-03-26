@@ -240,7 +240,6 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to store receipt: %w", err)
 	}
-
 	if added {
 		log.Info().Msg("execution result processed and stored")
 	}
