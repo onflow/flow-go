@@ -43,7 +43,7 @@ func (s SkipReason) String() string {
 	case TEST_DEPRECATED:
 		return "TEST_DEPRECATED"
 	case TEST_LONG_RUNNING:
-		return "TEST_LONG"
+		return "TEST_LONG_RUNNING"
 	case TEST_RESOURCE_INTENSIVE:
 		return "TEST_RESOURCE_INTENSIVE"
 	}
