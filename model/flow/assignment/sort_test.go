@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Check that FromIdentifierLists will sort the identifierList in canonical order
 func TestSort(t *testing.T) {
 	node1, err := flow.HexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001")
 	require.NoError(t, err)

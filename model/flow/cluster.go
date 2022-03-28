@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 )
@@ -46,7 +47,8 @@ func (clusters ClusterList) Assignments() AssignmentList {
 // NewClusterList creates a new cluster list based on the given cluster assignment
 // and the provided list of identities.
 // The caller must ensure each assignment contains identities ordered in canonical order, so that
-// each cluster in the returned cluster list is ordered in canonical order as well.
+// each cluster in the returned cluster list is ordered in canonical order as well. If not,
+// an error will be returned.
 func NewClusterList(assignments AssignmentList, collectors IdentityList) (ClusterList, error) {
 
 	// build a lookup for all the identities by node identifier
@@ -60,15 +62,30 @@ func NewClusterList(assignments AssignmentList, collectors IdentityList) (Cluste
 
 	// replicate the identifier list but use identities instead
 	clusters := make(ClusterList, 0, len(assignments))
-	for _, participants := range assignments {
+	for i, participants := range assignments {
 		cluster := make(IdentityList, 0, len(participants))
-		for _, participantID := range participants {
+		if len(participants) == 0 {
+			return nil, fmt.Errorf("particpants in assignment list is empty, cluster index %v", i)
+		}
+
+		// Check assignments is sorted in canonical order
+		prev := participants[0]
+
+		for i, participantID := range participants {
 			participant, found := lookup[participantID]
 			if !found {
 				return nil, fmt.Errorf("could not find collector identity (%x)", participantID)
 			}
 			cluster = append(cluster, participant)
 			delete(lookup, participantID)
+
+			if i > 0 {
+				if bytes.Compare(prev[:], participantID[:]) > 0 {
+					return nil, fmt.Errorf("the assignments is not sorted in canonical order in cluster index %v, expect prev %v to be smaller than next %v, but failed",
+						i, prev, participantID)
+				}
+			}
+			prev = participantID
 		}
 
 		clusters = append(clusters, cluster)
