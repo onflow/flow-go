@@ -24,7 +24,7 @@ import (
 const maxExecutionNodesCnt = 3
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
-const minExecutionNodesCnt = 2
+const minExecutionNodesCnt = 1
 
 // maxAttemptsForExecutionReceipt is the maximum number of attempts to find execution receipts for a given block ID
 const maxAttemptsForExecutionReceipt = 3
