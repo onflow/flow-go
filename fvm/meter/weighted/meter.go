@@ -102,7 +102,7 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 	}
 	m.computationUsed = m.computationUsed + childComputationUsed
 	if m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(m.computationLimit)
+		return errors.NewComputationLimitExceededError(m.computationLimit >> MeterInternalPrecisionBytes)
 	}
 
 	for key, intensity := range child.ComputationIntensities() {
@@ -117,7 +117,7 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 	}
 	m.memoryUsed = m.memoryUsed + childMemoryUsed
 	if m.memoryUsed > m.memoryLimit {
-		return errors.NewMemoryLimitExceededError(m.memoryLimit)
+		return errors.NewMemoryLimitExceededError(m.computationLimit >> MeterInternalPrecisionBytes)
 	}
 
 	for key, intensity := range child.MemoryIntensities() {
@@ -140,7 +140,7 @@ func (m *Meter) MeterComputation(kind common.ComputationKind, intensity uint) er
 	}
 	m.computationUsed += w * uint64(intensity)
 	if m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(m.computationLimit)
+		return errors.NewComputationLimitExceededError(m.computationLimit >> MeterInternalPrecisionBytes)
 	}
 	return nil
 }
@@ -174,7 +174,7 @@ func (m *Meter) MeterMemory(kind common.ComputationKind, intensity uint) error {
 	}
 	m.memoryUsed += w * uint64(intensity)
 	if m.memoryUsed > m.memoryLimit {
-		return errors.NewMemoryLimitExceededError(m.memoryLimit)
+		return errors.NewMemoryLimitExceededError(m.memoryLimit >> MeterInternalPrecisionBytes)
 	}
 	return nil
 }
