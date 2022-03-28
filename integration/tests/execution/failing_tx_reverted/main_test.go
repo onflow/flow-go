@@ -9,7 +9,6 @@ import (
 )
 
 func TestExecutionFailingTxReverted(t *testing.T) {
-	// # TODO: confirm if this is the correct reason
 	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
 	suite.Run(t, new(execution.FailingTxRevertedSuite))
 }
