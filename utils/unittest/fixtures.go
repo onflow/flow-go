@@ -1671,7 +1671,7 @@ func VoteWithBeaconSig() func(*hotstuff.Vote) {
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
-		setup.Participants = participants.Sort(order.ByNodeIDAsc)
+		setup.Participants = participants.Sort(order.Canonical)
 		setup.Assignments = ClusterAssignment(1, participants)
 	}
 }
