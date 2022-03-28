@@ -211,7 +211,7 @@ func DecodeSignerIndicesToIdentifiers(
 	numberCanonicalNodes := len(canonicalIdentifiers)
 	err := validPadding(signerIndices, numberCanonicalNodes)
 	if err != nil {
-		return nil, fmt.Errorf("signerIndices are invalid: %w", e)
+		return nil, fmt.Errorf("signerIndices are invalid: %w", err)
 	}
 
 	// decode bits to Identifiers
