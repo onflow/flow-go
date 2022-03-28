@@ -88,7 +88,7 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 
 	guarantorIDs, err := signature.DecodeSignerIndicesToIdentifiers(cluster.Members().NodeIDs(), guarantee.SignerIndices)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode guarantor indices: %v", err)
+		return nil, fmt.Errorf("could not decode guarantor indices: %w", err)
 	}
 
 	return guarantorIDs, nil

@@ -8,8 +8,8 @@ type SigType uint8
 //  * SigTypeRandomBeacon type is for random beacon signatures.
 //  * SigTypeStaking is for Hotstuff signatures.
 const (
-	SigTypeStaking SigType = iota
-	SigTypeRandomBeacon
+	SigTypeStaking SigType = 0
+	SigTypeRandomBeacon = 1
 )
 
 // Valid returns true if the signature is either SigTypeStaking or SigTypeRandomBeacon

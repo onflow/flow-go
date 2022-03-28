@@ -497,7 +497,7 @@ func (qs *QCSuite) TestQCSignatureError() {
 	assert.False(qs.T(), model.IsInvalidBlockError(err), "unspecific internal errors should not result in ErrorInvalidBlock error")
 }
 
-// TestQCInvalidQCSignatureError verifies that the Validator correctly handles the model.ErrInvalidSignature.
+// TestQCSignatureInvalid verifies that the Validator correctly handles the model.ErrInvalidSignature.
 // This error return from `Verifier.VerifyQC` is an expected failure case in case of a byzantine input, where
 // one of the signatures in the QC is broken. Hence, the Validator should wrap it as InvalidBlockError.
 func (qs *QCSuite) TestQCSignatureInvalid() {
@@ -511,7 +511,7 @@ func (qs *QCSuite) TestQCSignatureInvalid() {
 	assert.True(qs.T(), model.IsInvalidBlockError(err), "if the signature is invalid an ErrorInvalidBlock error should be raised")
 }
 
-// TestQCInvalidSignersError verifies that the Validator correctly handles the model.ErrInvalidSignature.
+// TestQCSignatureInvalidFormat verifies that the Validator correctly handles the model.InvalidFormatError.
 // This error return from `Verifier.VerifyQC` is an expected failure case in case of a byzantine input, where
 // some binary vector (e.g. `sigData`) is broken. Hence, the Validator should wrap it as InvalidBlockError.
 func (qs *QCSuite) TestQCSignatureInvalidFormat() {

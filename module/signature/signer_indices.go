@@ -38,7 +38,7 @@ import (
 //    - If a node contributed either as staking signer or beacon signer,
 //      we set the respective bit to 1:
 //          [A,B,C,D,E,F,G,H,I,J]
-//             ↓     ↓ ↓     ↓ ↓
+//             ↓ ↓   ↓ ↓ ↓   ↓ ↓
 //           0,1,1,0,1,1,1,0,1,1
 //    - Lastly, right-pad the resulting bit vector with 0 to full bytes. We have 10 committee members,
 //      so we pad to 2 bytes:
@@ -209,7 +209,8 @@ func DecodeSignerIndicesToIdentifiers(
 	signerIndices []byte,
 ) (flow.IdentifierList, error) {
 	numberCanonicalNodes := len(canonicalIdentifiers)
-	if e := validPadding(signerIndices, numberCanonicalNodes); e != nil {
+	err := validPadding(signerIndices, numberCanonicalNodes)
+	if err != nil {
 		return nil, fmt.Errorf("signerIndices are invalid: %w", e)
 	}
 
@@ -282,7 +283,7 @@ func validPadding(bitVector []byte, numUsedBits int) error {
 	lastByte := bitVector[l-1]
 	numPaddedBits := 8*l - numUsedBits
 	if (lastByte << (8 - numPaddedBits)) != 0 {
-		return fmt.Errorf("some padded bits are not zero: %w", IllegallyPaddedBitVectorError)
+		return fmt.Errorf("some padded bits are not zero with %d used bits (bitVector: %x): %w", numUsedBits, bitVector, IllegallyPaddedBitVectorError)
 	}
 
 	return nil

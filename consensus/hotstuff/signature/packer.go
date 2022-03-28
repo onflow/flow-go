@@ -44,7 +44,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	// include both StakingSigners and RandomBeaconSigners
 	signerIndices, sigType, err := signature.EncodeSignerToIndicesAndSigType(fullMembers.NodeIDs(), sig.StakingSigners, sig.RandomBeaconSigners)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unexpected internal error while encode signer indices and sig types: %w", err)
+		return nil, nil, fmt.Errorf("unexpected internal error while encoding signer indices and sig types: %w", err)
 	}
 
 	data := model.SignatureData{
