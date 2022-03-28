@@ -68,14 +68,14 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 // It returns:
 //  - (sigData, nil) if successfully unpacked the signature data
 //  - (nil, model.InvalidFormatError) if failed to unpack the signature data
-func (p *ConsensusSigDataPacker) Unpack(signerIDs flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	data, err := p.Decode(sigData)
 	if err != nil {
 		return nil, model.NewInvalidFormatErrorf("could not decode sig data %s", err)
 	}
 
-	stakingSigners, randomBeaconSigners, err := signature.DecodeSigTypeToStakingAndBeaconSigners(signerIDs, data.SigType)
+	stakingSigners, randomBeaconSigners, err := signature.DecodeSigTypeToStakingAndBeaconSigners(signerIdentities, data.SigType)
 	if err != nil {
 		if errors.Is(err, signature.IllegallyPaddedBitVectorError) || errors.Is(err, signature.IncompatibleBitVectorLengthError) {
 			return nil, model.NewInvalidFormatErrorf("invalid SigType vector: %w", err)

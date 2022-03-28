@@ -518,7 +518,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			mergedSignerIDs = append(expectedBlockSigData.StakingSigners, expectedBlockSigData.RandomBeaconSigners...)
 		}).Return(
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte {
-				signerIndices, _ := signature2.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
+				signerIndices, _ := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 				return signerIndices
 			},
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
@@ -534,7 +534,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 				t.Fatalf("QC created more than once")
 			}
 
-			signerIndices, err := signature2.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
+			signerIndices, err := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 			require.NoError(t, err)
 
 			// ensure that QC contains correct field
@@ -561,7 +561,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
 
 		expectStakingAggregatorCalls := func(vote *model.Vote) {
-			expectedSig := crypto.Signature(vote.SigData[:signature2.SigLen])
+			expectedSig := crypto.Signature(vote.SigData[:msig.SigLen])
 			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				signerID := args.Get(0).(flow.Identifier)
@@ -584,7 +584,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer
 			expectStakingAggregatorCalls(vote)
-			expectedSig := crypto.Signature(vote.SigData[signature2.SigLen:])
+			expectedSig := crypto.Signature(vote.SigData[msig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				collectedShares.Inc()
@@ -685,7 +685,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		packedSigData := unittest.RandomBytes(128)
 		pcker := &mockhotstuff.Packer{}
 
-		signerIndices, err := signature2.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
+		signerIndices, err := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 		require.NoError(t, err)
 		pcker.On("Pack", block.BlockID, mock.Anything).Return(signerIndices, packedSigData, nil)
 
@@ -714,7 +714,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
 
 		expectStakingAggregatorCalls := func(vote *model.Vote, stake uint64) {
-			expectedSig := crypto.Signature(vote.SigData[:signature2.SigLen])
+			expectedSig := crypto.Signature(vote.SigData[:msig.SigLen])
 			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				stakingTotalWeight.Add(stake)
@@ -732,7 +732,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer.ID()
 			expectStakingAggregatorCalls(vote, signer.Stake)
-			expectedSig := crypto.Signature(vote.SigData[signature2.SigLen:])
+			expectedSig := crypto.Signature(vote.SigData[msig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				collectedShares.Inc()
@@ -906,7 +906,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 func VoteWithStakingSig() func(*model.Vote) {
 	return func(vote *model.Vote) {
-		vote.SigData = unittest.RandomBytes(signature2.SigLen)
+		vote.SigData = unittest.RandomBytes(msig.SigLen)
 	}
 }
 
