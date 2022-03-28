@@ -9,8 +9,7 @@ import (
 
 var (
 	ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
-	//ErrInvalidFormat     = errors.New("invalid signature format")
-	ErrInvalidSignature = errors.New("invalid signature")
+	ErrInvalidSignature  = errors.New("invalid signature")
 )
 
 // NoVoteError contains the reason of why the voter didn't vote for a block proposal.
