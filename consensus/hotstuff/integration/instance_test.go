@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/packer"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -222,7 +221,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			}
 
 			signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), voterIDs)
-			require.NoError(t, fmt.Errorf("could not encode signer indices: %w", err))
+			require.NoError(t, err, "could not encode signer indices")
 
 			qc := &flow.QuorumCertificate{
 				View:          votes[0].View,
@@ -348,7 +347,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
 	rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-	indices, err := packer.EncodeSignerIdentifiersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
+	indices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), []flow.Identifier(in.participants.NodeIDs()))
 	require.NoError(t, err)
 
 	packer := &mocks.Packer{}
