@@ -35,6 +35,6 @@ curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"
 
 ### To get identity by peer id
 ```
-curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-identity", "data": { "peer_id": "QmNqszdfyEZmMCXcnoUdBDWboFvVLF5reyKPuiqFQT77Vw" }}'
+curl localhost:9002/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "get-latest-identity", "data": { "peer_id": "QmNqszdfyEZmMCXcnoUdBDWboFvVLF5reyKPuiqFQT77Vw" }}'
 ```
 

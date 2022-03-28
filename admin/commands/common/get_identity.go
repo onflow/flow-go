@@ -39,13 +39,13 @@ func (r *GetIdentityCommand) Handler(ctx context.Context, req *admin.CommandRequ
 	if data.requestType == FlowID {
 		identity, ok := r.idProvider.ByNodeID(data.flowID)
 		if !ok {
-			return nil, errors.New("no identity found for flow ID")
+			return nil, fmt.Errorf("no identity found for flow ID: %s", data.flowID)
 		}
 		return commands.ConvertToMap(identity)
 	} else {
 		identity, ok := r.idProvider.ByPeerID(data.peerID)
 		if !ok {
-			return nil, errors.New("no identity found for peer ID")
+			return nil, fmt.Errorf("no identity found for peer ID: %s", data.peerID)
 		}
 		return commands.ConvertToMap(identity)
 	}
