@@ -70,7 +70,7 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("collection_id", guaranteeID[:]).
-		// Int("signers", len(guarantee.SignerIDs)).
+		Hex("signers", guarantee.SignerIndices).
 		Logger()
 	log.Info().Msg("collection guarantee received")
 
