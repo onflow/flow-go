@@ -26,10 +26,10 @@ type QuorumCertificate struct {
 	SigData []byte
 }
 
-// QuorumCertificateWithSignerIDs is a QuorumCertificat, where the signing nodes are identified via their `flow.Identifier`s instead of indices. Working with IDs as opposed to 
-// indices is less efficient, but simpler, because we don't require a canonical node order. 
+// QuorumCertificateWithSignerIDs is a QuorumCertificat, where the signing nodes are identified via their `flow.Identifier`s instead of indices. Working with IDs as opposed to
+// indices is less efficient, but simpler, because we don't require a canonical node order.
 // It is used for bootstrapping new Epochs, because the FlowEpoch smart contract has no
-// notion of node ordering. 
+// notion of node ordering.
 type QuorumCertificateWithSignerIDs struct {
 	View      uint64
 	BlockID   Identifier
