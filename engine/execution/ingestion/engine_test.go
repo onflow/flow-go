@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -107,7 +106,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	var engine *Engine
 
 	defer func() {
-		log.Info().Msgf("clean up tests")
 		<-engine.Done()
 		ctrl.Finish()
 		computationManager.AssertExpectations(t)
