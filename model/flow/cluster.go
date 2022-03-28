@@ -1,9 +1,10 @@
 package flow
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
+
+	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // AssignmentList is a list of identifier lists. Each list of identifiers lists the
@@ -80,8 +81,8 @@ func NewClusterList(assignments AssignmentList, collectors IdentityList) (Cluste
 			delete(lookup, participantID)
 
 			if i > 0 {
-				if bytes.Compare(prev[:], participantID[:]) > 0 {
-					return nil, fmt.Errorf("the assignments is not sorted in canonical order in cluster index %v, expect prev %v to be smaller than next %v, but failed",
+				if !order.IdentifierCanonical(prev, participantID) {
+					return nil, fmt.Errorf("the assignments is not sorted in canonical order in cluster index %v, prev %v, next %v",
 						i, prev, participantID)
 				}
 			}
