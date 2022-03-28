@@ -252,16 +252,16 @@ func DecodeSignerIndicesToIdentities(
 
 // validPadding verifies that `bitVector` satisfies the following criteria
 //  1. The `bitVector`'s length [in bytes], must be the _minimal_ possible length such that it can hold
-//    `numUsedBits` number of bits. Otherwise, we return an `IncompatibleBitVectorLengthError`.
+//    `numUsedBits` number of bits. Otherwise, we return an `ErrIncompatibleBitVectorLength`.
 //  2. If `numUsedBits` is _not_ an integer-multiple of 8, `bitVector` is padded with tailing bits. Per
-//     convention, these bits must be zero. Otherwise, we return an `IllegallyPaddedBitVectorError`.
+//     convention, these bits must be zero. Otherwise, we return an `ErrIllegallyPaddedBitVector`.
 // All errors represent expected failure cases for byzantine inputs. There are _no unexpected_ error returns.
 func validPadding(bitVector []byte, numUsedBits int) error {
 	// Verify condition 1:
 	l := len(bitVector)
 	if l != bitutils.MinimalByteSliceLength(numUsedBits) {
 		return fmt.Errorf("the bit vector contains a payload of %d used bits, so it should have %d bytes but has length %d: %w",
-			numUsedBits, bitutils.MinimalByteSliceLength(numUsedBits), l, IncompatibleBitVectorLengthError)
+			numUsedBits, bitutils.MinimalByteSliceLength(numUsedBits), l, ErrIncompatibleBitVectorLength)
 	}
 	// Condition 1 implies that the number of padded bits must be strictly smaller than 8. Otherwise, the vector
 	// could have fewer bytes and still have enough room to store `numUsedBits`.
@@ -283,7 +283,7 @@ func validPadding(bitVector []byte, numUsedBits int) error {
 	lastByte := bitVector[l-1]
 	numPaddedBits := 8*l - numUsedBits
 	if (lastByte << (8 - numPaddedBits)) != 0 {
-		return fmt.Errorf("some padded bits are not zero with %d used bits (bitVector: %x): %w", numUsedBits, bitVector, IllegallyPaddedBitVectorError)
+		return fmt.Errorf("some padded bits are not zero with %d used bits (bitVector: %x): %w", numUsedBits, bitVector, ErrIllegallyPaddedBitVector)
 	}
 
 	return nil

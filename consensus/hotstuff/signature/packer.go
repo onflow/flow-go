@@ -77,7 +77,7 @@ func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentityList, sigD
 
 	stakingSigners, randomBeaconSigners, err := signature.DecodeSigTypeToStakingAndBeaconSigners(signerIdentities, data.SigType)
 	if err != nil {
-		if errors.Is(err, signature.IllegallyPaddedBitVectorError) || errors.Is(err, signature.IncompatibleBitVectorLengthError) {
+		if errors.Is(err, signature.ErrIllegallyPaddedBitVector) || errors.Is(err, signature.ErrIncompatibleBitVectorLength) {
 			return nil, model.NewInvalidFormatErrorf("invalid SigType vector: %w", err)
 		}
 		return nil, fmt.Errorf("could not decode signer indices and sig type: %w", err)

@@ -55,7 +55,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 
 	signers, err := signature.DecodeSignerIndicesToIdentities(allParticipants, qc.SignerIndices)
 	if err != nil {
-		if errors.Is(err, signature.IllegallyPaddedBitVectorError) || errors.Is(err, signature.IncompatibleBitVectorLengthError) {
+		if errors.Is(err, signature.ErrIllegallyPaddedBitVector) || errors.Is(err, signature.ErrIncompatibleBitVectorLength) {
 			return newInvalidBlockError(block, fmt.Errorf("invalid signer indices: %w", err))
 		}
 		// unexpected error
