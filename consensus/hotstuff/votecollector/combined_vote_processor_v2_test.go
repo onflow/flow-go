@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	signature2 "github.com/onflow/flow-go/module/signature"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -116,7 +114,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 
 	// valid length is SigLen or 2*SigLen
 	generator := rapid.IntRange(0, 128).Filter(func(value int) bool {
-		return value != signature2.SigLen && value != 2*signature2.SigLen
+		return value != msig.SigLen && value != 2*msig.SigLen
 	})
 	rapid.Check(s.T(), func(t *rapid.T) {
 		// create a signature with invalid length

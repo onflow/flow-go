@@ -4,13 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/module/signature"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // CombinedSigner creates votes for the main consensus.
