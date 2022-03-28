@@ -92,7 +92,7 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 }
 
 // MergeMeter merges the input meter into the current meter and checks for the limits
-func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
+func (m *Meter) MergeMeter(child interfaceMeter.Meter, enforceLimits bool) error {
 
 	var childComputationUsed uint64
 	if basic, ok := child.(*Meter); ok {
@@ -101,7 +101,7 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 		childComputationUsed = uint64(child.TotalComputationUsed()) << MeterInternalPrecisionBytes
 	}
 	m.computationUsed = m.computationUsed + childComputationUsed
-	if m.computationUsed > m.computationLimit {
+	if enforceLimits && m.computationUsed > m.computationLimit {
 		return errors.NewComputationLimitExceededError(uint64(m.TotalComputationLimit()))
 	}
 
@@ -116,7 +116,7 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 		childMemoryUsed = uint64(child.TotalMemoryUsed()) << MeterInternalPrecisionBytes
 	}
 	m.memoryUsed = m.memoryUsed + childMemoryUsed
-	if m.memoryUsed > m.memoryLimit {
+	if enforceLimits && m.memoryUsed > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.TotalMemoryLimit()))
 	}
 
