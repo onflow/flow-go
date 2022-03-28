@@ -1145,7 +1145,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 	// skipping because this case will now result in emergency epoch continuation kicking in
-	unittest.SkipUnless(t, unittest.TEST_TODO, "skipping because this case will now result in emergency epoch continuation kicking in")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EECC), rather than returning an error")
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {

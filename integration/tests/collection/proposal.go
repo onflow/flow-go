@@ -229,7 +229,7 @@ func (suite *RecoverySuite) TestProposal_Recovery() {
 
 	// TODO this doesn't quite work with network disconnect/connect for some
 	// reason, skipping for now
-	unittest.SkipUnless(t, unittest.TEST_TODO, "doesn't quite work with network disconnect/connect")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "incomplete implementation - disconnection of one node by disconnecting from Docker network is unreliable")
 
 	var (
 		nNodes        = 5
