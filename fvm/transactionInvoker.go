@@ -188,7 +188,12 @@ func (i *TransactionInvoker) Process(
 
 	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
+		// disable the computation/memory limit checks on storage checks,
+		// so we don't error from computation/memory limits on this part.
+		// We cannot charge the user for this part, since fee deduction already happened.
+		sth.DisableAllLimitEnforcements()
 		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		sth.EnableAllLimitEnforcements()
 	}
 
 	// it there was any transaction error clear changes and try to deduct fees again
