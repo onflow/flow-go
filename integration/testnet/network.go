@@ -36,6 +36,7 @@ import (
 	dkgmod "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
@@ -1299,7 +1300,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 	participants := toParticipants(confs)
 	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
-	clusters, err := flow.NewClusterList(assignments, collectors)
+	clusters, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}

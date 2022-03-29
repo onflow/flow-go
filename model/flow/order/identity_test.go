@@ -5,9 +5,10 @@ package order_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 // Test the canonical ordering of identity and identifier match

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
@@ -219,7 +220,7 @@ func TestClusters(t *testing.T) {
 	require.NoError(t, err)
 
 	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
-		expectedClusters, err := flow.NewClusterList(setup.Assignments, collectors)
+		expectedClusters, err := factory.NewClusterList(setup.Assignments, collectors)
 		require.NoError(t, err)
 		actualClusters, err := state.Final().Epochs().Current().Clustering()
 		require.NoError(t, err)
