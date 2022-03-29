@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
@@ -30,6 +31,9 @@ func extractExecutionState(
 	migrate bool,
 	report bool,
 ) error {
+	if utilsio.FileExists(bootstrap.FilenameWALRootCheckpoint) {
+		return fmt.Errorf("checkpoint file %s already exists", bootstrap.FilenameWALRootCheckpoint)
+	}
 
 	diskWal, err := wal.NewDiskWAL(
 		zerolog.Nop(),
