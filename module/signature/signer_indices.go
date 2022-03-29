@@ -159,7 +159,7 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 //    - If a node contributed either as staking signer or beacon signer,
 //      we set the respective bit to 1:
 //          [A,B,C,D,E,F,G,H,I,J]
-//             ↓     ↓ ↓     ↓ ↓
+//             ↓ ↓   ↓ ↓ ↓   ↓ ↓
 //           0,1,1,0,1,1,1,0,1,1
 //    - Lastly, right-pad the resulting bit vector with 0 to full bytes. We have 10 committee members,
 //      so we pad to 2 bytes:
@@ -169,8 +169,8 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 // During normal operations, no error returns are expected. This is because encoding signer sets is generally
 // part of the node's internal work to generate messages. Hence, the inputs to this method come from other
 // trusted components within the node. Therefore, any illegal input is treated as a symptom of an internal bug.
-// fullIdentities represents all identities who are eligible to sign the given resource. It excludes
-// identities who are ineligible to sign the given resource. For example, fullIdentities in the context
+// canonicalIdentifiers represents all identities who are eligible to sign the given resource. It excludes
+// identities who are ineligible to sign the given resource. For example, canonicalIdentifiers in the context
 // of a cluster consensus quorum certificate would include authorized members of the cluster and
 // exclude ejected members of the cluster, or unejected collection nodes from a different cluster.
 func EncodeSignersToIndices(
