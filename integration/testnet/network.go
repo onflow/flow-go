@@ -715,6 +715,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("--profiler-dir=%s", profilerDir),
 				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
 				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
+				fmt.Sprintf("--herocache-metrics-collector=%t", true), // to cache integration issues with this collector (if any)
 			}, nodeConf.AdditionalFlags...),
 		},
 		HostConfig: &container.HostConfig{},

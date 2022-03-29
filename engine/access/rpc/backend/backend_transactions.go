@@ -208,10 +208,10 @@ func (b *backendTransactions) GetTransactionResult(
 			if err != nil {
 				// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
 				// and return status as unknown
-				status := flow.TransactionStatusUnknown
+				txStatus := flow.TransactionStatusUnknown
 				return &access.TransactionResult{
-					Status:     status,
-					StatusCode: uint(status),
+					Status:     txStatus,
+					StatusCode: uint(txStatus),
 				}, nil
 			}
 			return historicalTxResult, nil
@@ -240,16 +240,67 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	// derive status of the transaction
-	status, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
+	txStatus, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
 
 	return &access.TransactionResult{
-		Status:       status,
+		Status:       txStatus,
 		StatusCode:   uint(statusCode),
 		Events:       events,
 		ErrorMessage: txError,
+		BlockID:      blockID,
+	}, nil
+}
+
+// GetTransactionResultByIndex returns TransactionsResults for an index in a block that is executed,
+// pending or finalized transactions return errors
+func (b *backendTransactions) GetTransactionResultByIndex(
+	ctx context.Context,
+	blockID flow.Identifier,
+	index uint32,
+) (*access.TransactionResult, error) {
+	// TODO: https://github.com/onflow/flow-go/issues/2175 so caching doesn't cause a circular dependency
+	block, err := b.blocks.ByID(blockID)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	// create request and forward to EN
+	req := execproto.GetTransactionByIndexRequest{
+		BlockId: blockID[:],
+		Index:   index,
+	}
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	if err != nil {
+		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
+		if isInsufficientExecReceipts {
+			return nil, status.Errorf(codes.NotFound, err.Error())
+		}
+		return nil, status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
+	}
+
+	resp, err := b.getTransactionResultByIndexFromAnyExeNode(ctx, execNodes, req)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, err
+		}
+		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+	}
+
+	// tx body is irrelevant to status if it's in an executed block
+	txStatus, err := b.deriveTransactionStatus(nil, true, block)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	// convert to response, cache and return
+	return &access.TransactionResult{
+		Status:       txStatus,
+		StatusCode:   uint(resp.GetStatusCode()),
+		Events:       convert.MessagesToEvents(resp.GetEvents()),
+		ErrorMessage: resp.GetErrorMessage(),
 		BlockID:      blockID,
 	}, nil
 }
@@ -467,12 +518,16 @@ func (b *backendTransactions) NotifyFinalizedBlockHeight(height uint64) {
 	b.retry.Retry(height)
 }
 
-func (b *backendTransactions) getTransactionResultFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetTransactionResultRequest) (*execproto.GetTransactionResultResponse, error) {
-	var errors *multierror.Error
+func (b *backendTransactions) getTransactionResultFromAnyExeNode(
+	ctx context.Context,
+	execNodes flow.IdentityList,
+	req execproto.GetTransactionResultRequest,
+) (*execproto.GetTransactionResultResponse, error) {
+	var errs *multierror.Error
 	logAnyError := func() {
-		errToReturn := errors.ErrorOrNil()
+		errToReturn := errs.ErrorOrNil()
 		if errToReturn != nil {
-			b.log.Info().Err(errToReturn).Msg("failed to send transactions to collector nodes")
+			b.log.Info().Err(errToReturn).Msg("failed to get transaction result from execution nodes")
 		}
 	}
 	defer logAnyError()
@@ -490,20 +545,67 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(ctx context.Con
 		if status.Code(err) == codes.NotFound {
 			return nil, err
 		}
-		errors = multierror.Append(errors, err)
+		errs = multierror.Append(errs, err)
 	}
-	return nil, errors.ErrorOrNil()
+	return nil, errs.ErrorOrNil()
 }
 
-func (b *backendTransactions) tryGetTransactionResult(ctx context.Context, execNode *flow.Identity, req execproto.GetTransactionResultRequest) (*execproto.GetTransactionResultResponse, error) {
+func (b *backendTransactions) tryGetTransactionResult(
+	ctx context.Context,
+	execNode *flow.Identity,
+	req execproto.GetTransactionResultRequest,
+) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
 	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
+	return resp, err
+}
+
+func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
+	ctx context.Context,
+	execNodes flow.IdentityList,
+	req execproto.GetTransactionByIndexRequest,
+) (*execproto.GetTransactionResultResponse, error) {
+	var errs *multierror.Error
+	logAnyError := func() {
+		errToReturn := errs.ErrorOrNil()
+		if errToReturn != nil {
+			b.log.Info().Err(errToReturn).Msg("failed to get transaction result from execution nodes")
+		}
+	}
+	defer logAnyError()
+	// try to execute the script on one of the execution nodes
+	for _, execNode := range execNodes {
+		resp, err := b.tryGetTransactionResultByIndex(ctx, execNode, req)
+		if err == nil {
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", req.GetBlockId()).
+				Uint32("index", req.GetIndex()).
+				Msg("Successfully got transaction results from any node")
+			return resp, nil
+		}
+		if status.Code(err) == codes.NotFound {
+			return nil, err
+		}
+		errs = multierror.Append(errs, err)
+	}
+	return nil, errs.ErrorOrNil()
+}
+
+func (b *backendTransactions) tryGetTransactionResultByIndex(
+	ctx context.Context,
+	execNode *flow.Identity,
+	req execproto.GetTransactionByIndexRequest,
+) (*execproto.GetTransactionResultResponse, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
-	return resp, nil
+	defer closer.Close()
+	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, &req)
+	return resp, err
 }

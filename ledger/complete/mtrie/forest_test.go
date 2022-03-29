@@ -2,7 +2,6 @@ package mtrie
 
 import (
 	"bytes"
-	"fmt"
 	"math/rand"
 	"sort"
 	"testing"
@@ -31,7 +30,7 @@ func TestTrieOperations(t *testing.T) {
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
 	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
 
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
+	updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
 	require.NoError(t, err)
 
 	// Add trie
@@ -104,10 +103,8 @@ func TestLeftEmptyInsert(t *testing.T) {
 
 	baseTrie, err := forest.GetTrie(baseRoot)
 	require.NoError(t, err)
-	require.Equal(t, uint16(2), baseTrie.MaxDepth())
 	require.Equal(t, uint64(2), baseTrie.AllocatedRegCount())
-	fmt.Println("BASE TRIE:")
-	fmt.Println(baseTrie.String())
+	require.Equal(t, uint64(v1.Size()+v2.Size()), baseTrie.AllocatedRegSize())
 
 	p3 := pathByUint8s([]uint8{uint8(1), uint8(1)})
 	v3 := payloadBySlices([]byte{'C'}, []byte{'C'})
@@ -120,10 +117,8 @@ func TestLeftEmptyInsert(t *testing.T) {
 
 	updatedTrie, err := forest.GetTrie(updatedRoot)
 	require.NoError(t, err)
-	require.Equal(t, uint16(2), updatedTrie.MaxDepth())
 	require.Equal(t, uint64(3), updatedTrie.AllocatedRegCount())
-	fmt.Println("UPDATED TRIE:")
-	fmt.Println(updatedTrie.String())
+	require.Equal(t, uint64(v1.Size()+v2.Size()+v3.Size()), updatedTrie.AllocatedRegSize())
 	paths = []ledger.Path{p1, p2, p3}
 	payloads = []*ledger.Payload{v1, v2, v3}
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
@@ -164,10 +159,8 @@ func TestRightEmptyInsert(t *testing.T) {
 
 	baseTrie, err := forest.GetTrie(baseRoot)
 	require.NoError(t, err)
-	require.Equal(t, uint16(2), baseTrie.MaxDepth())
 	require.Equal(t, uint64(2), baseTrie.AllocatedRegCount())
-	fmt.Println("BASE TRIE:")
-	fmt.Println(baseTrie.String())
+	require.Equal(t, uint64(v1.Size()+v2.Size()), baseTrie.AllocatedRegSize())
 
 	// path: 1000...
 	p3 := pathByUint8s([]uint8{uint8(129), uint8(1)})
@@ -181,10 +174,8 @@ func TestRightEmptyInsert(t *testing.T) {
 
 	updatedTrie, err := forest.GetTrie(updatedRoot)
 	require.NoError(t, err)
-	require.Equal(t, uint16(2), updatedTrie.MaxDepth())
 	require.Equal(t, uint64(3), updatedTrie.AllocatedRegCount())
-	fmt.Println("UPDATED TRIE:")
-	fmt.Println(updatedTrie.String())
+	require.Equal(t, uint64(v1.Size()+v2.Size()+v3.Size()), updatedTrie.AllocatedRegSize())
 
 	paths = []ledger.Path{p1, p2, p3}
 	payloads = []*ledger.Payload{v1, v2, v3}
@@ -224,10 +215,8 @@ func TestExpansionInsert(t *testing.T) {
 
 	baseTrie, err := forest.GetTrie(baseRoot)
 	require.NoError(t, err)
-	require.Equal(t, uint16(0), baseTrie.MaxDepth())
 	require.Equal(t, uint64(1), baseTrie.AllocatedRegCount())
-	fmt.Println("BASE TRIE:")
-	fmt.Println(baseTrie.String())
+	require.Equal(t, uint64(v1.Size()), baseTrie.AllocatedRegSize())
 
 	// path: 1000001...
 	p2 := pathByUint8s([]uint8{uint8(130), uint8(1)})
@@ -241,10 +230,8 @@ func TestExpansionInsert(t *testing.T) {
 
 	updatedTrie, err := forest.GetTrie(updatedRoot)
 	require.NoError(t, err)
-	require.Equal(t, uint16(7), updatedTrie.MaxDepth())
 	require.Equal(t, uint64(2), updatedTrie.AllocatedRegCount())
-	fmt.Println("UPDATED TRIE:")
-	fmt.Println(updatedTrie.String())
+	require.Equal(t, uint64(v1.Size()+v2.Size()), updatedTrie.AllocatedRegSize())
 
 	paths = []ledger.Path{p1, p2}
 	payloads = []*ledger.Payload{v1, v2}
@@ -293,10 +280,8 @@ func TestFullHouseInsert(t *testing.T) {
 
 	baseTrie, err := forest.GetTrie(baseRoot)
 	require.NoError(t, err)
-	require.Equal(t, uint16(2), baseTrie.MaxDepth())
 	require.Equal(t, uint64(3), baseTrie.AllocatedRegCount())
-	fmt.Println("BASE TRIE:")
-	fmt.Println(baseTrie.String())
+	require.Equal(t, uint64(v0.Size()+v1.Size()+v2.Size()), baseTrie.AllocatedRegSize())
 
 	// we update value for path p1 and in addition add p3 that has the same prefix `10` as p1
 	v1 = payloadBySlices([]byte{'X'}, []byte{'X'})
@@ -313,10 +298,8 @@ func TestFullHouseInsert(t *testing.T) {
 
 	updatedTrie, err := forest.GetTrie(updatedRoot)
 	require.NoError(t, err)
-	require.Equal(t, uint16(3), updatedTrie.MaxDepth())
 	require.Equal(t, uint64(4), updatedTrie.AllocatedRegCount())
-	fmt.Println("UPDATED TRIE:")
-	fmt.Println(updatedTrie.String())
+	require.Equal(t, uint64(v0.Size()+v1.Size()+v2.Size()+v3.Size()), updatedTrie.AllocatedRegSize())
 
 	paths = []ledger.Path{p1, p2, p3}
 	payloads = []*ledger.Payload{v1, v2, v3}
@@ -359,10 +342,8 @@ func TestLeafInsert(t *testing.T) {
 
 	updatedTrie, err := forest.GetTrie(updatedRoot)
 	require.NoError(t, err)
-	require.Equal(t, uint16(256), updatedTrie.MaxDepth())
 	require.Equal(t, uint64(2), updatedTrie.AllocatedRegCount())
-	fmt.Println("TRIE:")
-	fmt.Println(updatedTrie.String())
+	require.Equal(t, uint64(v1.Size()+v2.Size()), updatedTrie.AllocatedRegSize())
 
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	retPayloads, err := forest.Read(read)
