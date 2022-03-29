@@ -145,7 +145,7 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 //
 // RETURN VALUE:
 //  *  `signerIndices` is a bit vector. Let signerIndices[i] denote the ith bit of `signerIndices`.
-//                             ┌ 1 if and only if canonicalIdentifiers[i] is in `stakingSigners` or  `beaconSigners`
+//                             ┌ 1 if and only if canonicalIdentifiers[i] is in `signerIDs`
 //          signerIndices[i] = └ 0 otherwise
 //      Let `n` be the length of `canonicalIdentifiers`. `signerIndices` contains at least `n` bits, though, we
 //      right-pad it with tailing zeros to full bytes.
@@ -153,7 +153,7 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 // Example:
 // As an example consider the case where we have a committee C of 10 nodes in canonical oder
 //            C = [A,B,C,D,E,F,G,H,I,J]
-// where nodes [B,F] are stakingSigners and beaconSigners are [C,E,G,I,J].
+// where nodes [B,F] are stakingSigners, and beaconSigners are [C,E,G,I,J].
 //  * First return parameter: QC.signerIndices
 //    - We start with a bit vector v that has |C| number of bits
 //    - If a node contributed either as staking signer or beacon signer,
