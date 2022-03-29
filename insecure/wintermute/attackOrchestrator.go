@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -14,17 +15,19 @@ import (
 
 // Orchestrator encapsulates a stateful implementation of wintermute attack orchestrator logic.
 type Orchestrator struct {
-	logger       zerolog.Logger
-	network      insecure.AttackNetwork
-	corruptedIds flow.IdentityList
-	allIds       flow.IdentityList // identity of all nodes in the network (including non-corrupted ones)
+	attackDoneFlag *atomic.Bool // atomic boolean flag keeping track of whether attack conducted.
+	logger         zerolog.Logger
+	network        insecure.AttackNetwork
+	corruptedIds   flow.IdentityList
+	allIds         flow.IdentityList // identity of all nodes in the network (including non-corrupted ones)
 }
 
 func NewOrchestrator(allIds flow.IdentityList, corruptedIds flow.IdentityList, logger zerolog.Logger) *Orchestrator {
 	o := &Orchestrator{
-		logger:       logger,
-		corruptedIds: corruptedIds,
-		allIds:       allIds,
+		logger:         logger,
+		corruptedIds:   corruptedIds,
+		allIds:         allIds,
+		attackDoneFlag: atomic.NewBool(false),
 	}
 
 	return o
@@ -44,6 +47,11 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		return fmt.Errorf("could not find corrupted identity for: %x", event.CorruptedId)
 	}
 
+	switch event.FlowProtocolEvent.(type) {
+	case *flow.ExecutionReceipt:
+
+	}
+
 	// TODO: how do we keep track of state between calls to HandleEventFromCorruptedNode()?
 	// there will be many events sent to the orchestrator and we need a way to co-ordinate all the event calls
 
@@ -54,19 +62,6 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		actualResult := actualReceipt.ExecutionResult
 
 		// replace honest receipt with corrupted receipt
-		corruptReceipt := &flow.ExecutionReceipt{
-			ExecutorID: actualReceipt.ExecutorID,
-			ExecutionResult: flow.ExecutionResult{
-				PreviousResultID: actualResult.PreviousResultID,
-				BlockID:          actualResult.BlockID,
-				// replace all chunks with new ones to simulate chunk corruption
-				Chunks:          unittest.ChunkListFixture(uint(len(actualResult.Chunks)), actualResult.BlockID),
-				ServiceEvents:   actualResult.ServiceEvents,
-				ExecutionDataID: actualResult.ExecutionDataID,
-			},
-			ExecutorSignature: actualReceipt.ExecutorSignature,
-			Spocks:            actualReceipt.Spocks,
-		}
 
 		// save all corrupted chunks so can create result approvals for them
 		// can just create result approvals here and save them
@@ -128,4 +123,22 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 	}
 
 	return nil
+}
+
+// corruptExecutionReceipt creates a corrupted version of the input receipt by tampering its content so that
+// the resulted corrupted version would not pass verification.
+func (o Orchestrator) corruptExecutionReceipt(receipt *flow.ExecutionReceipt) *flow.ExecutionReceipt {
+	return &flow.ExecutionReceipt{
+		ExecutorID: receipt.ExecutorID,
+		ExecutionResult: flow.ExecutionResult{
+			PreviousResultID: receipt.ExecutionResult.PreviousResultID,
+			BlockID:          receipt.ExecutionResult.BlockID,
+			// replace all chunks with new ones to simulate chunk corruption
+			Chunks:          unittest.ChunkListFixture(uint(len(receipt.ExecutionResult.Chunks)), receipt.ExecutionResult.BlockID),
+			ServiceEvents:   receipt.ExecutionResult.ServiceEvents,
+			ExecutionDataID: receipt.ExecutionResult.ExecutionDataID,
+		},
+		ExecutorSignature: receipt.ExecutorSignature,
+		Spocks:            receipt.Spocks,
+	}
 }
