@@ -1,7 +1,9 @@
 package wintermute
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -9,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
-	verificationtest "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -26,65 +27,40 @@ import (
 func TestHandleEventFromCorruptedNode_CorruptEN(t *testing.T) {
 	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
 
-	// generates a chain of blocks in the form of rootHeader <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
-	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
-	// Container blocks only contain receipts of their preceding reference blocks. But they do not
-	// hold any guarantees.
-	rootHeader, err := rootStateFixture.State.Final().Head()
-	require.NoError(t, err)
+	receipt := unittest.ExecutionReceiptFixture()
 
-	completeExecutionReceipts := verificationtest.CompleteExecutionReceiptChainFixture(t, rootHeader, 1, verificationtest.WithExecutorIDs(corruptedIdentityList.NodeIDs()))
+	corruptedExecutionNodes := corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()
 
-	corruptedEn1 := corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution))[0]
-	targetIdentities, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
+	// identities of nodes who are expected targets of an execution receipt.
+	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	corruptedReceiptsSentWG := mockAttackNetworkForCorruptedExecutionReceipt(t,
+		mockAttackNetwork,
+		receipt,
+		receiptTargetIds.NodeIDs(),
+		corruptedExecutionNodes)
+
 	wintermuteOrchestrator := NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
-
-	mockAttackNetwork.
-		On("Send", mock.Anything).
-		Run(func(args mock.Arguments) {
-			// assert that args passed are correct
-
-			// extract Event sent
-			event, ok := args[0].(*insecure.Event)
-			require.True(t, ok)
-
-			// make sure sender is a corrupted execution node.
-			corruptedIdentity, ok := corruptedIdentityList.ByNodeID(event.CorruptedId)
-			require.True(t, ok)
-			require.Equal(t, flow.RoleExecution, corruptedIdentity.Role)
-
-			// make sure message being sent on correct channel
-			require.Equal(t, engine.PushReceipts, event.Channel)
-
-			corruptedReceipt, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
-			require.True(t, ok)
-
-			// make sure the original uncorrupted execution receipt is NOT sent to orchestrator
-			require.NotEqual(t, completeExecutionReceipts[0].Receipts[0], corruptedReceipt)
-
-			receivedTargetIds := event.TargetIds
-
-			require.ElementsMatch(t, targetIdentities.NodeIDs(), receivedTargetIds)
-
-			require.NotEqual(t, completeExecutionReceipts[0].ContainerBlock.Payload.Results[0], corruptedReceipt.ExecutionResult)
-		}).Return(nil)
-
 	event := &insecure.Event{
-		CorruptedId:       corruptedEn1.NodeID,
+		CorruptedId:       corruptedExecutionNodes[0],
 		Channel:           engine.PushReceipts,
 		Protocol:          insecure.Protocol_UNICAST,
-		TargetNum:         uint32(0),
-		TargetIds:         targetIdentities.NodeIDs(),
-		FlowProtocolEvent: completeExecutionReceipts[0].Receipts[0],
+		TargetIds:         receiptTargetIds.NodeIDs(),
+		FlowProtocolEvent: receipt,
 	}
 
 	// register mock network with orchestrator
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 	err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
 	require.NoError(t, err)
+
+	// waits till corrupted receipts dictated to all execution nodes.
+	unittest.RequireReturnsBefore(t,
+		corruptedReceiptsSentWG.Wait,
+		1*time.Second,
+		"orchestrator could not send corrupted receipts on time")
 }
 
 // TestHandleEventFromCorruptedNode_HonestVN tests that honest VN will be ignored when they send a chunk data request
@@ -113,4 +89,52 @@ func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow
 	stateFixture := testutil.CompleteStateFixture(t, metrics.NewNoopCollector(), trace.NewNoopTracer(), rootSnapshot)
 
 	return stateFixture, identities, append(corruptedEnIds, corruptedVnIds...)
+}
+
+func mockAttackNetworkForCorruptedExecutionReceipt(
+	t *testing.T,
+	attackNetwork *mockinsecure.AttackNetwork,
+	receipt *flow.ExecutionReceipt,
+	receiptTargetIds flow.IdentifierList,
+	corruptedExecutionIds flow.IdentifierList) *sync.WaitGroup {
+
+	wg := &sync.WaitGroup{}
+
+	// expecting to receive a corrupted receipt from each of corrupted execution nodes.
+	wg.Add(corruptedExecutionIds.Len())
+	seen := make(map[flow.Identifier]struct{})
+
+	attackNetwork.
+		On("Send", mock.Anything).
+		Run(func(args mock.Arguments) {
+			// assert that args passed are correct
+
+			// extract Event sent
+			event, ok := args[0].(*insecure.Event)
+			require.True(t, ok)
+
+			// make sure sender is a corrupted execution node.
+			ok = corruptedExecutionIds.Contains(event.CorruptedId)
+			require.True(t, ok)
+
+			// makes sure sender is unique
+			_, ok = seen[event.CorruptedId]
+			require.False(t, ok)
+			seen[event.CorruptedId] = struct{}{}
+
+			// make sure message being sent on correct channel
+			require.Equal(t, engine.PushReceipts, event.Channel)
+
+			corruptedReceipt, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
+			require.True(t, ok)
+
+			// make sure the original uncorrupted execution receipt is NOT sent to orchestrator
+			require.NotEqual(t, receipt, corruptedReceipt)
+			require.ElementsMatch(t, receiptTargetIds, event.TargetIds)
+			require.NotEqual(t, receipt.ExecutionResult, corruptedReceipt.ExecutionResult)
+
+			wg.Done()
+		}).Return(nil)
+
+	return wg
 }
