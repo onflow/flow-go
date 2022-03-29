@@ -1035,6 +1035,11 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	for i := 0; i < n; i++ {
 		identity := IdentityFixture()
 		identity.Address = fmt.Sprintf("%x@flow.com:1234", identity.NodeID)
+		// ensure to have at least one collection node to create collection cluster
+		// otherwise, the assignment would have empty cluster
+		if i%4 == 3 {
+			identity.Role = flow.RoleCollection
+		}
 		for _, opt := range opts {
 			opt(identity)
 		}
