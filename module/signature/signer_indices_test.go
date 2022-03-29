@@ -39,7 +39,7 @@ func TestEncodeDecodeIdentities(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, signers.NodeIDs(), decodedIDs)
 
-			// decoding option 1: decode to Identifiers
+			// decoding option 2: decode to Identities
 			decodedIdentities, err := signature.DecodeSignerIndicesToIdentities(canonicalIdentities, indices)
 			require.NoError(t, err)
 			require.Equal(t, signers, decodedIdentities)
@@ -129,9 +129,7 @@ func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 		// verify; note that there is a slightly different convention between Filter and the decoding logic:
 		// Filter returns nil for an empty list, while the decoding logic returns an instance of an empty slice
 		sigIdentities := committeeIdentities.Filter(filter.Or(filter.HasNodeID(stakingSigners...), filter.HasNodeID(beaconSigners...))) // signer identities in canonical order
-		if len(stakingSigners)+len(decBeaconSigners) == 0 {
-			require.Empty(t, decSignerIdentites)
-		} else {
+		if len(stakingSigners)+len(decBeaconSigners) > 0 {
 			require.Equal(t, sigIdentities, decSignerIdentites)
 		}
 		if len(stakingSigners) == 0 {
@@ -209,10 +207,14 @@ func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 //   so we sort both sets.
 // Note: this is _almost_ the same test as `Test_DecodeSignerIndicesToIdentifiers`. However, in the other
 // test, we decode to node IDs; while in this test, we decode to full _Identities_.
+
+const UpperBoundCommitteeSize = 272
+
 func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
+
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
-		committeeSize := rapid.IntRange(1, 272).Draw(t, "committeeSize").(int)
+		committeeSize := rapid.IntRange(1, UpperBoundCommitteeSize).Draw(t, "committeeSize").(int)
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
