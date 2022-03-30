@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -3614,6 +3615,74 @@ func TestSettingExecutionWeights(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
+	t.Run("transaction should not use up more computation that the transaction body itself", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+	).withContextOptions(
+		fvm.WithAccountStorageLimit(true),
+		fvm.WithTransactionFeesEnabled(true),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
+				uint(common.ComputationKindStatement): 1 << weightedMeter.MeterInternalPrecisionBytes,
+			})
+			// Use the maximum amount of computation so that the transaction still passes.
+			loops := uint64(997)
+			maxExecutionEffort := uint64(999)
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+				transaction() {prepare(signer: AuthAccount){var i=0;  while i < %d {i = i +1 } } execute{}}
+			`, loops))).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress()).
+				SetGasLimit(maxExecutionEffort)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			// expected used is number of loops + 2 invocations.
+			assert.Equal(t, loops+2, tx.ComputationUsed)
+
+			// increasing the number of loops should fail the transaction.
+			loops = loops + 1
+			txBody = flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+				transaction() {prepare(signer: AuthAccount){var i=0;  while i < %d {i = i +1 } } execute{}}
+			`, loops))).
+				SetProposalKey(chain.ServiceAddress(), 0, 2).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress()).
+				SetGasLimit(maxExecutionEffort)
+
+			err = testutil.SignTransactionAsServiceAccount(txBody, 2, chain)
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			require.Error(t, tx.Err)
+			// computation used should the actual computation used.
+			assert.Equal(t, loops+2, tx.ComputationUsed)
+
+			for _, event := range tx.Events {
+				// the fee deduction event should only contain the max gas worth of execution effort.
+				if strings.Contains(string(event.Type), "FlowFees.FeesDeducted") {
+					ev, err := jsoncdc.Decode(event.Payload)
+					require.NoError(t, err)
+					assert.Equal(t, maxExecutionEffort, ev.(cadence.Event).Fields[2].ToGoValue().(uint64))
+				}
+			}
 		},
 	))
 }
