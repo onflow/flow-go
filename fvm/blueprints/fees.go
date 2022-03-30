@@ -8,7 +8,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
-	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -189,7 +188,7 @@ transaction(surgeFactor: UFix64, inclusionEffortCost: UFix64, executionEffortCos
 // SetExecutionEffortWeightsTransaction creates a transaction that sets up weights for the weighted Meter.
 func SetExecutionEffortWeightsTransaction(
 	service flow.Address,
-	weights weightedMeter.ExecutionWeights,
+	weights map[uint]uint64,
 ) (*flow.TransactionBody, error) {
 	return setExecutionWeightsTransaction(
 		service,
@@ -201,7 +200,7 @@ func SetExecutionEffortWeightsTransaction(
 
 func setExecutionWeightsTransaction(
 	service flow.Address,
-	weights weightedMeter.ExecutionWeights,
+	weights map[uint]uint64,
 	domain string,
 	identifier string,
 ) (*flow.TransactionBody, error) {
