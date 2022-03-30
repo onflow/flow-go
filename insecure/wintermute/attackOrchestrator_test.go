@@ -237,26 +237,28 @@ func mockAttackNetworkForCorruptedExecutionResult(
 func receivedExecutionReceiptEventsSanityCheck(
 	t *testing.T,
 	events []*insecure.Event,
-	corruptedExecutionNodeIds flow.IdentifierList,
+	corruptedExecutionIds flow.IdentifierList,
 	originalReceiptIds flow.IdentifierList) {
 
-	sendersByReceipts := make(map[flow.Identifier]flow.IdentifierList)
+	corruptedResults := make(map[flow.Identifier]flow.IdentifierList)
+	seenReceipts := flow.IdentifierList{}
 	for _, submittedEvent := range events {
-		// submitted event must contain an execution receipt.
-		submittedReceipt, ok := submittedEvent.FlowProtocolEvent.(*flow.ExecutionReceipt)
-		require.True(t, ok)
-
-		// sender and executor for this receipt must be the same.
-		require.Equal(t, submittedReceipt.ExecutorID, submittedEvent.CorruptedId)
-
-		receiptId := submittedReceipt.ID()
-		if sendersByReceipts[receiptId] == nil {
-			sendersByReceipts[receiptId] = flow.IdentifierList{}
+		switch event := submittedEvent.FlowProtocolEvent.(type) {
+		case *flow.ExecutionReceipt:
+			seenReceipts.Union(flow.IdentifierList{event.ID()})
+		case *flow.ExecutionResult:
+			resultId := event.ID()
+			if corruptedResults[resultId] == nil {
+				corruptedResults[resultId] = flow.IdentifierList{}
+			}
+			corruptedResults[event.ID()].Union(flow.IdentifierList{submittedEvent.CorruptedId})
 		}
-		sendersByReceipts[receiptId].Union(flow.IdentifierList{submittedEvent.CorruptedId})
 	}
 
-	for submittedReceiptId := range sendersByReceipts {
-		require.True(t, originalReceiptIds.Contains(submittedReceiptId))
+	// there must be only one corrupted result during a wintermute attack, and
+	// that corrupted result must be dictated to all corrupted execution ids.
+	require.Len(t, corruptedResults, 1)
+	for _, corruptedIds := range corruptedResults {
+		require.ElementsMatch(t, corruptedExecutionIds, corruptedIds)
 	}
 }
