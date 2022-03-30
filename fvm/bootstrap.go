@@ -235,9 +235,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 		b.transactionFees.ExecutionEffortCost,
 	)
 
-	if b.executionEffortWeights != nil {
-		b.setupExecutionEffortWeights(service, b.executionEffortWeights)
-	}
+	b.setupExecutionEffortWeights(service, b.executionEffortWeights)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
@@ -571,8 +569,17 @@ func (b *BootstrapProcedure) setupFees(service, flowFees flow.Address, surgeFact
 }
 
 func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address, weights weightedMeter.ExecutionWeights) {
+	// if executionEffortWeights were not set skip this part and just use the defaults.
+	if b.executionEffortWeights == nil {
+		return
+	}
 
-	tb, err := blueprints.SetExecutionEffortWeightsTransaction(service, weights)
+	uintWeights := make(map[uint]uint64, len(weights))
+	for i, weight := range weights {
+		uintWeights[uint(i)] = weight
+	}
+
+	tb, err := blueprints.SetExecutionEffortWeightsTransaction(service, uintWeights)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
 	}
