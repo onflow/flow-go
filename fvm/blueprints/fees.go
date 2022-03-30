@@ -3,12 +3,12 @@ package blueprints
 import (
 	"encoding/hex"
 	"fmt"
-	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
+	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/model/flow"
 )
 
