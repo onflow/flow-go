@@ -8,7 +8,7 @@ on:
       - master
 
 env:
-  BIGQUERY_DATASET: dev_src_flow_test_metrics # TODO: update to production table before merging
+  BIGQUERY_DATASET: production_src_flow_test_metrics
   BIGQUERY_TABLE: test_results
 
 jobs:

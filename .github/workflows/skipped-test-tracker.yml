@@ -6,7 +6,7 @@ on:
       - master
 
 env:
-  BIGQUERY_DATASET: dev_src_flow_test_metrics # TODO: replace with prod before merging
+  BIGQUERY_DATASET: production_src_flow_test_metrics
   BIGQUERY_TABLE: skipped_tests
 
 jobs:
