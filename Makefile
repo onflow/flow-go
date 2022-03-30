@@ -95,6 +95,11 @@ ifeq ($(COVER), true)
 	zip coverage.zip index.html
 endif
 
+.PHONY: generate-openapi
+generate-openapi:
+	swagger-codegen generate -l go -i https://raw.githubusercontent.com/onflow/flow/master/openapi/access.yaml -D packageName=models,modelDocs=false,models -o engine/access/rest/models;
+	go fmt ./engine/access/rest/models
+
 .PHONY: generate
 generate: generate-proto generate-mocks
 
