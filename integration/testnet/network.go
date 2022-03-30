@@ -756,9 +756,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	require.NoError(t, err)
 
 	// create the profiler dir for the node
-	profilerDir := filepath.Join(flowDataDir, "./profiler")
-	t.Logf("create profiler dir: %v", profilerDir)
-	err = os.MkdirAll(profilerDir, 0755)
+	flowProfilerDir := filepath.Join(flowDataDir, "./profiler")
+	t.Logf("create profiler dir: %v", flowProfilerDir)
+	err = os.MkdirAll(flowProfilerDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		panic(err)
 	}
