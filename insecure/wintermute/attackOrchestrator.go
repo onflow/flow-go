@@ -54,6 +54,15 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 			return fmt.Errorf("wrong sender role for execution receipt: %s", corruptedIdentity.Role.String())
 		}
 
+		canConductAttack := o.attackDoneFlag.CAS(false, true)
+		if !canConductAttack {
+			err := o.network.Send(event)
+			if err != nil {
+				return fmt.Errorf("could not send rpc on channel: %w", err)
+			}
+			return nil
+		}
+
 		// replace honest receipt with corrupted receipt
 		corruptedReceipt := o.corruptExecutionReceipt(protocolEvent)
 		// save all corrupted chunks so can create result approvals for them
