@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/assignment"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
@@ -39,7 +40,7 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo, se
 	assignments := assignment.FromIdentifierLists(identifierLists)
 
 	collectors := append(partners, internals...)
-	clusters, err := flow.NewClusterList(assignments, collectors)
+	clusters, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not create cluster list")
 	}

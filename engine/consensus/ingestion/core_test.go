@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	mockmempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -307,7 +307,7 @@ func (suite *IngestionCoreSuite) validGuarantee() *flow.CollectionGuarantee {
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.ChainID = suite.head.ChainID
 
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(
+	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{suite.collID}, []flow.Identifier{suite.collID})
 	require.NoError(suite.T(), err)
 

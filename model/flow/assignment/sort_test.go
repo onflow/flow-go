@@ -3,9 +3,10 @@ package assignment_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/assignment"
-	"github.com/stretchr/testify/require"
 )
 
 // Check that FromIdentifierLists will sort the identifierList in canonical order

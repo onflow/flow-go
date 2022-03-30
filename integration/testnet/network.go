@@ -36,10 +36,11 @@ import (
 	dkgmod "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
-	"github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
@@ -1104,7 +1105,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*Bootstra
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
 	for i, clusterQC := range clusterQCs {
 		members := clusterAssignments[i]
-		signerIDs, err := packer.DecodeSignerIdentifiersFromIndices(members, clusterQC.SignerIndices)
+		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members, clusterQC.SignerIndices)
 		if err != nil {
 			return nil, err
 		}
@@ -1299,7 +1300,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 	participants := toParticipants(confs)
 	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
-	clusters, err := flow.NewClusterList(assignments, collectors)
+	clusters, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not create cluster list: %w", err)
 	}

@@ -5,7 +5,18 @@ import (
 	"fmt"
 )
 
-var ErrInsufficientShares = errors.New("insufficient threshold signature shares")
+var (
+	ErrInvalidSignatureFormat = errors.New("signature's binary format is invalid")
+
+	ErrInsufficientShares = errors.New("insufficient threshold signature shares")
+
+	// ErrIncompatibleBitVectorLength indicates that the bit vector's length is different than
+	// the expected length, based on the supplied node list.
+	ErrIncompatibleBitVectorLength = errors.New("bit vector has incompatible length")
+
+	// ErrIllegallyPaddedBitVector indicates that the index vector was padded with unexpected bit values.
+	ErrIllegallyPaddedBitVector = errors.New("index vector padded with unexpected bit values")
+)
 
 /* ********************* InvalidSignatureIncludedError ********************* */
 

@@ -28,6 +28,7 @@ import (
 	factorymock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -244,7 +245,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		count := 2
 		collNodes := unittest.IdentityListFixture(count, unittest.WithRole(flow.RoleCollection))
 		assignments := unittest.ClusterAssignment(uint(count), collNodes)
-		clusters, err := flow.NewClusterList(assignments, collNodes)
+		clusters, err := factory.NewClusterList(assignments, collNodes)
 		suite.Require().Nil(err)
 		collNode1 := clusters[0][0]
 		collNode2 := clusters[1][0]

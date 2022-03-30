@@ -12,10 +12,11 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -172,15 +173,13 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	clusterMembers := cluster.Members()
 
 	// TODO: validate checksum
-	guarantorIndices, err := packer.DecodeSignerIndices(guarantee.SignerIndices, len(clusterMembers))
+	// find guarantors by signer indices
+	guarantorIDs, err := signature.DecodeSignerIndicesToIdentifiers(clusterMembers.NodeIDs(), guarantee.SignerIndices)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("could not decode guarantor indices: %v", err)
 	}
 
-	guarantors, err := packer.FilterByIndices(clusterMembers, guarantorIndices)
-	if err != nil {
-		return engine.NewInvalidInputErrorf("could not find guarantors: %w", err)
-	}
+	guarantors := clusterMembers.Filter(filter.HasNodeID(guarantorIDs...))
 
 	// determine whether signers reach minimally required stake threshold
 	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(clusterMembers.TotalStake()) // compute required stake threshold

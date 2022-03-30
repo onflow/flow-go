@@ -185,7 +185,7 @@ func TestFinalizer(t *testing.T) {
 					ReferenceBlockID: block.Payload.ReferenceBlockID,
 					ChainID:          block.Header.ChainID,
 					SignerIndices:    block.Header.ParentVoterIndices,
-					Signature:        block.Header.ParentVoterSigData,
+					Signature:        nil,
 				},
 			})
 		})
@@ -238,7 +238,7 @@ func TestFinalizer(t *testing.T) {
 					ReferenceBlockID: block1.Payload.ReferenceBlockID,
 					ChainID:          block1.Header.ChainID,
 					SignerIndices:    block1.Header.ParentVoterIndices,
-					Signature:        block1.Header.ParentVoterSigData,
+					Signature:        nil,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
@@ -247,7 +247,7 @@ func TestFinalizer(t *testing.T) {
 					ReferenceBlockID: block2.Payload.ReferenceBlockID,
 					ChainID:          block2.Header.ChainID,
 					SignerIndices:    block2.Header.ParentVoterIndices,
-					Signature:        block2.Header.ParentVoterSigData,
+					Signature:        nil,
 				},
 			})
 		})
@@ -299,7 +299,7 @@ func TestFinalizer(t *testing.T) {
 					ReferenceBlockID: block1.Payload.ReferenceBlockID,
 					ChainID:          block1.Header.ChainID,
 					SignerIndices:    block1.Header.ParentVoterIndices,
-					Signature:        block1.Header.ParentVoterSigData,
+					Signature:        nil,
 				},
 			})
 		})
@@ -353,7 +353,7 @@ func TestFinalizer(t *testing.T) {
 					ReferenceBlockID: block1.Payload.ReferenceBlockID,
 					ChainID:          block1.Header.ChainID,
 					SignerIndices:    block1.Header.ParentVoterIndices,
-					Signature:        block1.Header.ParentVoterSigData,
+					Signature:        nil,
 				},
 			})
 		})

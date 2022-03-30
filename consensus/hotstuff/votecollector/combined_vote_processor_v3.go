@@ -164,9 +164,9 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	if p.done.Load() {
 		return nil
 	}
-	sigType, sig, err := signature.DecodeSingleSig(vote.SigData)
+	sigType, sig, err := msig.DecodeSingleSig(vote.SigData)
 	if err != nil {
-		if errors.Is(err, model.ErrInvalidFormat) {
+		if errors.Is(err, msig.ErrInvalidSignatureFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
@@ -174,7 +174,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 
 	switch sigType {
 
-	case hotstuff.SigTypeStaking:
+	case encoding.SigTypeStaking:
 		err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
 			if model.IsInvalidSignerError(err) {
@@ -197,7 +197,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
 		}
 
-	case hotstuff.SigTypeRandomBeacon:
+	case encoding.SigTypeRandomBeacon:
 		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
 			if model.IsInvalidSignerError(err) {
@@ -226,7 +226,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		}
 
 	default:
-		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, model.ErrInvalidFormat)
+		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, model.NewInvalidFormatErrorf(""))
 	}
 
 	// checking of conditions for building QC are satisfied

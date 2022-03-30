@@ -13,22 +13,21 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
-	hotstuffPacker "github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -317,7 +316,8 @@ func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identi
 	block := BlockWithParentFixture(parent)
 
 	block.Header.ProposerID = proposer
-	indices, _ := packer.EncodeSignerIndices([]int{0}, participantCount)
+	indices := bitutils.MakeBitVector(10)
+	bitutils.SetBit(indices, 1)
 	block.Header.ParentVoterIndices = indices
 
 	return *block
@@ -601,8 +601,6 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 		Block:               block,
 		CompleteCollections: completeCollections,
 	}
-	// Preload the id
-	executableBlock.ID()
 	return executableBlock
 }
 
@@ -851,12 +849,19 @@ func IdentifierFixture() flow.Identifier {
 }
 
 func SignerIndicesFixture(n int) []byte {
-	list := make([]int, n)
+	indices := bitutils.MakeBitVector(10)
 	for i := 0; i < n; i++ {
-		list[i] = i
+		bitutils.SetBit(indices, 1)
 	}
-	indices, _ := packer.EncodeSignerIndices(list, 1)
 	return indices
+}
+
+func SignerIndicesByIndices(n int, indices []int) []byte {
+	signers := bitutils.MakeBitVector(n)
+	for _, i := range indices {
+		bitutils.SetBit(signers, i)
+	}
+	return signers
 }
 
 // WithRole adds a role to an identity fixture.
@@ -1124,12 +1129,12 @@ func ChunkStatusListFixture(t *testing.T, blockHeight uint64, result *flow.Execu
 }
 
 func QCSigDataFixture() []byte {
-	packer := hotstuffPacker.SigDataPacker{}
+	packer := hotstuff.SigDataPacker{}
 	sigType := RandomBytes(5)
 	for i := range sigType {
 		sigType[i] = sigType[i] % 2
 	}
-	sigData := hotstuffPacker.SignatureData{
+	sigData := hotstuff.SignatureData{
 		SigType:                      sigType,
 		AggregatedStakingSig:         SignatureFixture(),
 		AggregatedRandomBeaconSig:    SignatureFixture(),
@@ -1659,13 +1664,13 @@ func VoteForBlockFixture(block *hotstuff.Block, opts ...func(vote *hotstuff.Vote
 
 func VoteWithStakingSig() func(*hotstuff.Vote) {
 	return func(vote *hotstuff.Vote) {
-		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeStaking)}, vote.SigData...)
+		vote.SigData = append([]byte{byte(encoding.SigTypeStaking)}, vote.SigData...)
 	}
 }
 
 func VoteWithBeaconSig() func(*hotstuff.Vote) {
 	return func(vote *hotstuff.Vote) {
-		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeRandomBeacon)}, vote.SigData...)
+		vote.SigData = append([]byte{byte(encoding.SigTypeRandomBeacon)}, vote.SigData...)
 	}
 }
 

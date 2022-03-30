@@ -1,10 +1,8 @@
-package packer
+package model
 
 import (
 	"bytes"
-	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding/rlp"
 )
@@ -49,7 +47,7 @@ func UnpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
 	packer := SigDataPacker{}
 	sig, err := packer.Decode(sigData)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode sig data %s: %w", err, model.ErrInvalidFormat)
+		return nil, NewInvalidFormatErrorf("could not decode sig data: %w", err)
 	}
 	return sig.ReconstructedRandomBeaconSig, nil
 }

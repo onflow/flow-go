@@ -706,15 +706,18 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		// It should rather not occur during normal execution because StartState won't be set
 		// before parent has finished, but we should handle this edge case that it is set as well.
 
-		colSigner := unittest.IdentifierFixture()
-
 		// A <- B <- C <- D
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
+		colSigner := unittest.IdentifierFixture()
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header)
 		blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
+		// the default fixture uses a 10 collectors committee, but in this test case, there are only 4,
+		// so we need to update the signer indices.
+		// set the first identity as signer
+		blockC.Block.Payload.Guarantees[0].SignerIndices = unittest.SignerIndicesByIndices(4, []int{0})
 
 		// block D to make sure execution resumes after block C multiple execution has been prevented
 		blockD := unittest.ExecutableBlockFixtureWithParent(nil, blockC.Block.Header)

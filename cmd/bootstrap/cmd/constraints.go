@@ -50,12 +50,12 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 			if _, exists := internals.ByNodeID(node.NodeID); exists {
 				clusterInternalCount++
 			}
-			if clusterInternalCount <= clusterPartnerCount*2 {
-				log.Fatal().Msgf(
-					"will not bootstrap configuration without Byzantine majority within cluster: "+
-						"(partners=%d, internals=%d, min_internals=%d)",
-					clusterPartnerCount, clusterInternalCount, clusterPartnerCount*2+1)
-			}
+		}
+		if clusterInternalCount <= clusterPartnerCount*2 {
+			log.Fatal().Msgf(
+				"will not bootstrap configuration without Byzantine majority within cluster: "+
+					"(partners=%d, internals=%d, min_internals=%d)",
+				clusterPartnerCount, clusterInternalCount, clusterPartnerCount*2+1)
 		}
 		partnerCOLCount += clusterPartnerCount
 		internalCOLCount += clusterInternalCount

@@ -5,8 +5,9 @@ import (
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -138,7 +139,7 @@ func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 
 func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
 	collectorFilter := filter.HasRole(flow.RoleCollection)
-	clustering, err := flow.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
+	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
 	}
@@ -194,7 +195,7 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 	rootQCVoteData := qcs[index]
 
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(members.NodeIDs(), rootQCVoteData.VoterIDs)
+	signerIndices, err := signature.EncodeSignersToIndices(members.NodeIDs(), rootQCVoteData.VoterIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode signer indices for rootQCVoteData.VoterIDs: %w", err)
 	}

@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -156,13 +156,13 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	// prepare test setup: 13 votes with staking sigs
 	stakingSigners := s.allParticipants[:14].NodeIDs()
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(stakingSigners, stakingSigners)
+	signerIndices, err := signature.EncodeSignersToIndices(stakingSigners, stakingSigners)
 	require.NoError(s.T(), err)
 
 	// setup aggregator
 	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
 	expectedSigData := unittest.RandomBytes(128)
-	s.stakingAggregator.On("Aggregate").Return(stakingSigners, expectedSigData, nil).Once()
+	s.stakingAggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners), expectedSigData, nil).Once()
 
 	// expected QC
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Run(func(args mock.Arguments) {
@@ -210,7 +210,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
 		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)
 		aggregator.On("TotalWeight").Return(s.minRequiredStake)
-		aggregator.On("Aggregate").Return(stakingSigners, unittest.RandomBytes(128), nil)
+		aggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners), unittest.RandomBytes(128), nil)
 	}
 
 	// mock aggregators, so we have enough weight and shares for creating QC
