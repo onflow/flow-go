@@ -60,11 +60,12 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 			if err != nil {
 				return fmt.Errorf("could not send rpc on channel: %w", err)
 			}
+			fmt.Printf("corrupted event: %x corrupted id: %x \n", event.FlowProtocolEvent.(*flow.ExecutionReceipt).ExecutorID, corruptedIdentity.NodeID)
 			return nil
 		}
 
 		// replace honest receipt with corrupted receipt
-		corruptedReceipt := o.corruptExecutionReceipt(protocolEvent)
+		corruptedResult := o.corruptExecutionResult(protocolEvent)
 		// save all corrupted chunks so can create result approvals for them
 		// can just create result approvals here and save them
 
@@ -74,14 +75,13 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		for _, corruptedExecutionId := range corruptedExecutionIds {
 			// sets executor id of the result as the same corrupted execution node id that
 			// is meant to send this message to the flow network.
-			corruptedReceipt.ExecutorID = corruptedExecutionId
 			err := o.network.Send(&insecure.Event{
 				CorruptedId:       corruptedExecutionId,
 				Channel:           event.Channel,
 				Protocol:          event.Protocol,
 				TargetNum:         event.TargetNum,
 				TargetIds:         event.TargetIds,
-				FlowProtocolEvent: corruptedReceipt,
+				FlowProtocolEvent: corruptedResult,
 			})
 			if err != nil {
 				return fmt.Errorf("could not send rpc on channel: %w", err)
@@ -135,19 +135,15 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 //	}
 //	approval.ID()
 
-// corruptExecutionReceipt creates a corrupted version of the input receipt by tampering its content so that
+// corruptExecutionResult creates a corrupted version of the input receipt by tampering its content so that
 // the resulted corrupted version would not pass verification.
-func (o Orchestrator) corruptExecutionReceipt(receipt *flow.ExecutionReceipt) *flow.ExecutionReceipt {
-	return &flow.ExecutionReceipt{
-		ExecutionResult: flow.ExecutionResult{
-			PreviousResultID: receipt.ExecutionResult.PreviousResultID,
-			BlockID:          receipt.ExecutionResult.BlockID,
-			// replace all chunks with new ones to simulate chunk corruption
-			Chunks:          unittest.ChunkListFixture(uint(len(receipt.ExecutionResult.Chunks)), receipt.ExecutionResult.BlockID),
-			ServiceEvents:   receipt.ExecutionResult.ServiceEvents,
-			ExecutionDataID: receipt.ExecutionResult.ExecutionDataID,
-		},
-		ExecutorSignature: receipt.ExecutorSignature,
-		Spocks:            receipt.Spocks,
+func (o Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *flow.ExecutionResult {
+	return &flow.ExecutionResult{
+		PreviousResultID: receipt.ExecutionResult.PreviousResultID,
+		BlockID:          receipt.ExecutionResult.BlockID,
+		// replace all chunks with new ones to simulate chunk corruption
+		Chunks:          unittest.ChunkListFixture(uint(len(receipt.ExecutionResult.Chunks)), receipt.ExecutionResult.BlockID),
+		ServiceEvents:   receipt.ExecutionResult.ServiceEvents,
+		ExecutionDataID: receipt.ExecutionResult.ExecutionDataID,
 	}
 }

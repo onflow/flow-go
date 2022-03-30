@@ -38,7 +38,7 @@ func TestOrchestrator_HandleEventFromCorruptedNode_SingleExecutionReceipt(t *tes
 	require.NoError(t, err)
 
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
-	corruptedReceiptsSentWG := mockAttackNetworkForCorruptedExecutionReceipt(t,
+	corruptedReceiptsSentWG := mockAttackNetworkForCorruptedExecutionResult(t,
 		mockAttackNetwork,
 		receipt,
 		receiptTargetIds.NodeIDs(),
@@ -125,6 +125,7 @@ func TestOrchestrator_HandleEventFromCorruptedNode_MultipleExecutionReceipt(t *t
 	corruptedReceiptsSentWG.Add(2)
 	go func() {
 		err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event1)
+		require.Equal(t, event1.CorruptedId, receipt1.ExecutorID)
 		require.NoError(t, err)
 
 		corruptedReceiptsSentWG.Done()
@@ -132,6 +133,7 @@ func TestOrchestrator_HandleEventFromCorruptedNode_MultipleExecutionReceipt(t *t
 
 	go func() {
 		err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event2)
+		require.Equal(t, event2.CorruptedId, receipt2.ExecutorID)
 		require.NoError(t, err)
 
 		corruptedReceiptsSentWG.Done()
@@ -185,7 +187,7 @@ func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow
 	return stateFixture, identities, append(corruptedEnIds, corruptedVnIds...)
 }
 
-func mockAttackNetworkForCorruptedExecutionReceipt(
+func mockAttackNetworkForCorruptedExecutionResult(
 	t *testing.T,
 	attackNetwork *mockinsecure.AttackNetwork,
 	receipt *flow.ExecutionReceipt,
@@ -219,16 +221,12 @@ func mockAttackNetworkForCorruptedExecutionReceipt(
 			// make sure message being sent on correct channel
 			require.Equal(t, engine.PushReceipts, event.Channel)
 
-			corruptedReceipt, ok := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
+			corruptedResult, ok := event.FlowProtocolEvent.(*flow.ExecutionResult)
 			require.True(t, ok)
 
-			// make sure sender and executor are the same
-			require.Equal(t, corruptedReceipt.ExecutorID, event.CorruptedId)
-
 			// make sure the original uncorrupted execution receipt is NOT sent to orchestrator
-			require.NotEqual(t, receipt, corruptedReceipt)
+			require.NotEqual(t, receipt.ExecutionResult, corruptedResult)
 			require.ElementsMatch(t, receiptTargetIds, event.TargetIds)
-			require.NotEqual(t, receipt.ExecutionResult, corruptedReceipt.ExecutionResult)
 
 			wg.Done()
 		}).Return(nil)
