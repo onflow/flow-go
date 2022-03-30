@@ -1,4 +1,4 @@
-package wintermute
+package wintermute_test
 
 import (
 	"sync"
@@ -13,6 +13,7 @@ import (
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/insecure"
 	mockinsecure "github.com/onflow/flow-go/insecure/mock"
+	"github.com/onflow/flow-go/insecure/wintermute"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/metrics"
@@ -20,11 +21,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestHandleEventFromCorruptedNode_CorruptEN tests that the orchestrator corrupts the execution receipt if the receipt is from a corrupt EN
-// If an execution receipt is coming from a corrupt EN, then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
-// enforces that corrupt EN to send this counterfeit receipt.
-// The orchestrator then also enforces the second corrupted EN to send the same counterfeit result on its behalf to the network.
-func TestHandleEventFromCorruptedNode_CorruptEN(t *testing.T) {
+// TestOrchestrator_HandleEventFromCorruptedNode_ExecutionReceipt tests that the orchestrator corrupts the execution receipt if the receipt is from a
+// corrupted execution node.
+// If an execution receipt is coming from a corrupt execution node,
+// then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
+// enforces all corrupted execution nodes to send that counterfeit receipt on their behalf in the flow network.
+func TestOrchestrator_HandleEventFromCorruptedNode_ExecutionReceipt(t *testing.T) {
 	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
 
 	receipt := unittest.ExecutionReceiptFixture()
@@ -42,7 +44,7 @@ func TestHandleEventFromCorruptedNode_CorruptEN(t *testing.T) {
 		receiptTargetIds.NodeIDs(),
 		corruptedExecutionNodes)
 
-	wintermuteOrchestrator := NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
+	wintermuteOrchestrator := wintermute.NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
 	event := &insecure.Event{
 		CorruptedId:       corruptedExecutionNodes[0],
 		Channel:           engine.PushReceipts,
