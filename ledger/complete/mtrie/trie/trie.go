@@ -365,7 +365,7 @@ func update(
 			if p == parentPath {
 				// the case where the recursion stops: only one path to update
 				if len(paths) == 1 {
-					if !parentNode.Payload().Equals(&payloads[i]) {
+					if !parentNode.Payload().ValueEquals(&payloads[i]) {
 						n = node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
 
 						allocatedRegCountDelta, allocatedRegSizeDelta =
