@@ -3,13 +3,13 @@ name: Flaky Test Monitor Integration Test
 # Dry run of Flaky Test Monitor to ensure that nothing has been broken
 
 on:
-  push:
-    branches:
-      - staging
-      - trying
-  pull_request:
-    branches:
-      - master
+  # push:
+  #   branches:
+  #     - staging
+  #     - trying
+  # pull_request:
+  #   branches:
+  #     - master
 
 jobs:
   generate-flaky-test-summary:

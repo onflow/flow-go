@@ -1,13 +1,13 @@
 name: Skipped Test Tracker Integration Test
 
 on:
-  push:
-    branches:
-      - staging
-      - trying
-  pull_request:
-    branches:
-      - master
+  # push:
+  #   branches:
+  #     - staging
+  #     - trying
+  # pull_request:
+  #   branches:
+  #     - master
 
 jobs:
   generate-skipped-test-summary:
