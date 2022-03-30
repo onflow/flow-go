@@ -65,7 +65,7 @@ require (
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.24.0
 	github.com/onflow/flow-go/crypto v0.24.3
-	github.com/onflow/flow/protobuf/go/flow v0.2.5-0.20220330224746-29e00f84f622 // branch: leo-signer-indices
+	github.com/onflow/flow/protobuf/go/flow v0.2.5-0.20220330230148-b2bac47d2f82 // indirect branch: leo-add-signer-indices
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
