@@ -9,11 +9,8 @@
 package models
 
 type BlockSeal struct {
-	BlockId string `json:"block_id"`
-
-	ResultId string `json:"result_id"`
-
-	FinalState string `json:"final_state"`
-
+	BlockId                      string                `json:"block_id"`
+	ResultId                     string                `json:"result_id"`
+	FinalState                   string                `json:"final_state"`
 	AggregatedApprovalSignatures []AggregatedSignature `json:"aggregated_approval_signatures"`
 }

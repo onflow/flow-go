@@ -9,11 +9,8 @@
 package models
 
 type ExecutionResult struct {
-	Id string `json:"id"`
-
-	BlockId string `json:"block_id"`
-
-	Events []Event `json:"events"`
-
-	Links *Links `json:"_links,omitempty"`
+	Id      string  `json:"id"`
+	BlockId string  `json:"block_id"`
+	Events  []Event `json:"events"`
+	Links   *Links  `json:"_links,omitempty"`
 }
