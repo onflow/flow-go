@@ -27,7 +27,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/packer"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -114,7 +114,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 
 	// valid length is SigLen or 2*SigLen
 	generator := rapid.IntRange(0, 128).Filter(func(value int) bool {
-		return value != hsig.SigLen && value != 2*hsig.SigLen
+		return value != msig.SigLen && value != 2*msig.SigLen
 	})
 	rapid.Check(s.T(), func(t *rapid.T) {
 		// create a signature with invalid length
@@ -123,8 +123,8 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 		})
 		err := s.processor.Process(vote)
 		require.Error(s.T(), err)
-		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
+		require.True(s.T(), model.IsInvalidVoteError(err), err)
+		require.True(s.T(), errors.Is(err, msig.ErrInvalidSignatureFormat), err)
 	})
 }
 
@@ -518,7 +518,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			mergedSignerIDs = append(expectedBlockSigData.StakingSigners, expectedBlockSigData.RandomBeaconSigners...)
 		}).Return(
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte {
-				signerIndices, _ := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
+				signerIndices, _ := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 				return signerIndices
 			},
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
@@ -534,7 +534,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 				t.Fatalf("QC created more than once")
 			}
 
-			signerIndices, err := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
+			signerIndices, err := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 			require.NoError(t, err)
 
 			// ensure that QC contains correct field
@@ -561,7 +561,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
 
 		expectStakingAggregatorCalls := func(vote *model.Vote) {
-			expectedSig := crypto.Signature(vote.SigData[:hsig.SigLen])
+			expectedSig := crypto.Signature(vote.SigData[:msig.SigLen])
 			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				signerID := args.Get(0).(flow.Identifier)
@@ -584,7 +584,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer
 			expectStakingAggregatorCalls(vote)
-			expectedSig := crypto.Signature(vote.SigData[hsig.SigLen:])
+			expectedSig := crypto.Signature(vote.SigData[msig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				collectedShares.Inc()
@@ -677,7 +677,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		// mock expected calls to aggregator and reconstructor
 		combinedSigs := unittest.SignaturesFixture(2)
-		stakingAggregator.On("Aggregate").Return(stakingSigners.NodeIDs(), []byte(combinedSigs[0]), nil).Once()
+		stakingAggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners.NodeIDs()), []byte(combinedSigs[0]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[1], nil).Once()
 
 		// mock expected call to Packer
@@ -685,7 +685,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		packedSigData := unittest.RandomBytes(128)
 		pcker := &mockhotstuff.Packer{}
 
-		signerIndices, err := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
+		signerIndices, err := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 		require.NoError(t, err)
 		pcker.On("Pack", block.BlockID, mock.Anything).Return(signerIndices, packedSigData, nil)
 
@@ -714,7 +714,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
 
 		expectStakingAggregatorCalls := func(vote *model.Vote, stake uint64) {
-			expectedSig := crypto.Signature(vote.SigData[:hsig.SigLen])
+			expectedSig := crypto.Signature(vote.SigData[:msig.SigLen])
 			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				stakingTotalWeight.Add(stake)
@@ -732,7 +732,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer.ID()
 			expectStakingAggregatorCalls(vote, signer.Stake)
-			expectedSig := crypto.Signature(vote.SigData[hsig.SigLen:])
+			expectedSig := crypto.Signature(vote.SigData[msig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				collectedShares.Inc()
@@ -906,7 +906,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 func VoteWithStakingSig() func(*model.Vote) {
 	return func(vote *model.Vote) {
-		vote.SigData = unittest.RandomBytes(hsig.SigLen)
+		vote.SigData = unittest.RandomBytes(msig.SigLen)
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
@@ -59,7 +60,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	collectors := model.ToIdentityList(nodeInfos)
 	tc.identities = unittest.CompleteIdentitySet(collectors...)
 	assignment := unittest.ClusterAssignment(tc.conf.clusters, collectors)
-	clusters, err := flow.NewClusterList(assignment, collectors)
+	clusters, err := factory.NewClusterList(assignment, collectors)
 	require.NoError(t, err)
 	rootClusterBlocks := run.GenerateRootClusterBlocks(1, clusters)
 	rootClusterQCs := make([]flow.ClusterQCVoteData, len(rootClusterBlocks))

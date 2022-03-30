@@ -626,6 +626,11 @@ func (e *Engine) lookupCollection(collId flow.Identifier) (bool, error) {
 // requestCollections registers collection requests with the requester engine
 func (e *Engine) requestCollections(missingColls []*flow.CollectionGuarantee) {
 	for _, cg := range missingColls {
-		e.request.EntityByID(cg.ID(), filter.HasNodeID(cg.SignerIDs...))
+		// TODO: move this query out of for loop?
+		guarantors, err := protocol.FindGuarantors(e.state, cg)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
+		}
+		e.request.EntityByID(cg.ID(), filter.HasNodeID(guarantors...))
 	}
 }

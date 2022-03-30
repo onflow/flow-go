@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/packer"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -132,7 +132,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() 
 	err := s.processor.Process(vote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
+	require.True(s.T(), errors.Is(err, signature.ErrInvalidSignatureFormat), err)
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 rejects invalid votes for the following scenarios:
@@ -561,7 +561,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			mergedSignerIDs = append(blockSigData.StakingSigners, blockSigData.RandomBeaconSigners...)
 		}).Return(
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte {
-				signerIndices, _ := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
+				signerIndices, _ := signature.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 				return signerIndices
 			},
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
@@ -577,7 +577,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 				t.Fatalf("QC created more than once")
 			}
 
-			signerIndices, err := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
+			signerIndices, err := signature.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 			require.NoError(t, err)
 
 			// ensure that QC contains correct field
@@ -808,7 +808,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 				}
 				return nil
 			}).Maybe()
-		rbSigAggregator.On("Aggregate").Return(beaconSigners.NodeIDs(), []byte(combinedSigs[1]), nil).Once()
+		rbSigAggregator.On("Aggregate").Return([]flow.Identifier(beaconSigners.NodeIDs()), []byte(combinedSigs[1]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
 
 		// mock expected call to Packer
@@ -816,7 +816,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 		packedSigData := unittest.RandomBytes(128)
 		pcker := &mockhotstuff.Packer{}
 
-		signerIndices, err := packer.EncodeSignerIdentifiersToIndices(mergedSignerIDs, mergedSignerIDs)
+		signerIndices, err := signature.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 		require.NoError(t, err)
 		pcker.On("Pack", block.BlockID, mock.Anything).Return(signerIndices, packedSigData, nil)
 

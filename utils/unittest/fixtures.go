@@ -13,22 +13,21 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
-	hotstuffPacker "github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/module/packer"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -313,11 +312,12 @@ func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
 }
 
-func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier) flow.Block {
+func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identifier, participantCount int) flow.Block {
 	block := BlockWithParentFixture(parent)
 
 	block.Header.ProposerID = proposer
-	indices, _ := packer.EncodeSignerIndices([]int{1}, 10)
+	indices := bitutils.MakeBitVector(10)
+	bitutils.SetBit(indices, 1)
 	block.Header.ParentVoterIndices = indices
 
 	return *block
@@ -488,9 +488,9 @@ func WithCollection(collection *flow.Collection) func(guarantee *flow.Collection
 
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
 	guarantee := &flow.CollectionGuarantee{
-		CollectionID: IdentifierFixture(),
-		SignerIDs:    IdentifierListFixture(16),
-		Signature:    SignatureFixture(),
+		CollectionID:  IdentifierFixture(),
+		SignerIndices: RandomBytes(16),
+		Signature:     SignatureFixture(),
 	}
 	for _, option := range options {
 		option(guarantee)
@@ -546,12 +546,20 @@ func CollectionFixture(n int) flow.Collection {
 	return flow.Collection{Transactions: transactions}
 }
 
+func FixedReferenceBlockID() flow.Identifier {
+	blockID := flow.Identifier{}
+	blockID[0] = byte(1)
+	return blockID
+}
+
 func CompleteCollectionFixture() *entity.CompleteCollection {
 	txBody := TransactionBodyFixture()
 	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
-			CollectionID: flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
-			Signature:    SignatureFixture(),
+			CollectionID:     flow.Collection{Transactions: []*flow.TransactionBody{&txBody}}.ID(),
+			Signature:        SignatureFixture(),
+			ReferenceBlockID: FixedReferenceBlockID(),
+			SignerIndices:    SignerIndicesFixture(1),
 		},
 		Transactions: []*flow.TransactionBody{&txBody},
 	}
@@ -560,8 +568,10 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.CompleteCollection {
 	return &entity.CompleteCollection{
 		Guarantee: &flow.CollectionGuarantee{
-			CollectionID: flow.Collection{Transactions: txs}.ID(),
-			Signature:    SignatureFixture(),
+			CollectionID:     flow.Collection{Transactions: txs}.ID(),
+			Signature:        SignatureFixture(),
+			ReferenceBlockID: IdentifierFixture(),
+			SignerIndices:    SignerIndicesFixture(3),
 		},
 		Transactions: txs,
 	}
@@ -579,9 +589,8 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	block := BlockWithParentFixture(parent)
 	block.Payload.Guarantees = nil
 
-	for _, signerIDs := range collectionsSignerIDs {
+	for range collectionsSignerIDs {
 		completeCollection := CompleteCollectionFixture()
-		completeCollection.Guarantee.SignerIDs = signerIDs
 		block.Payload.Guarantees = append(block.Payload.Guarantees, completeCollection.Guarantee)
 		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
 	}
@@ -592,8 +601,6 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 		Block:               block,
 		CompleteCollections: completeCollections,
 	}
-	// Preload the id
-	executableBlock.ID()
 	return executableBlock
 }
 
@@ -842,12 +849,19 @@ func IdentifierFixture() flow.Identifier {
 }
 
 func SignerIndicesFixture(n int) []byte {
-	list := make([]int, n)
+	indices := bitutils.MakeBitVector(10)
 	for i := 0; i < n; i++ {
-		list[i] = i
+		bitutils.SetBit(indices, 1)
 	}
-	indices, _ := packer.EncodeSignerIndices(list, 10)
 	return indices
+}
+
+func SignerIndicesByIndices(n int, indices []int) []byte {
+	signers := bitutils.MakeBitVector(n)
+	for _, i := range indices {
+		bitutils.SetBit(signers, i)
+	}
+	return signers
 }
 
 // WithRole adds a role to an identity fixture.
@@ -926,7 +940,7 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	stakingKey := StakingPrivKeyByIdentifier(nodeID)
 	identity := flow.Identity{
 		NodeID:        nodeID,
-		Address:       fmt.Sprintf("address-%v", nodeID[0:7]),
+		Address:       fmt.Sprintf("address-%x", nodeID[0:7]),
 		Role:          flow.RoleConsensus,
 		Stake:         1000,
 		StakingPubKey: stakingKey.PublicKey(),
@@ -1115,12 +1129,12 @@ func ChunkStatusListFixture(t *testing.T, blockHeight uint64, result *flow.Execu
 }
 
 func QCSigDataFixture() []byte {
-	packer := hotstuffPacker.SigDataPacker{}
+	packer := hotstuff.SigDataPacker{}
 	sigType := RandomBytes(5)
 	for i := range sigType {
 		sigType[i] = sigType[i] % 2
 	}
-	sigData := hotstuffPacker.SignatureData{
+	sigData := hotstuff.SignatureData{
 		SigType:                      sigType,
 		AggregatedStakingSig:         SignatureFixture(),
 		AggregatedRandomBeaconSig:    SignatureFixture(),
@@ -1561,6 +1575,16 @@ func QuorumCertificatesWithSignerIDsFixtures(n uint, opts ...func(*flow.QuorumCe
 	return qcs
 }
 
+func QuorumCertificatesFromAssignments(assignment flow.AssignmentList) []*flow.QuorumCertificateWithSignerIDs {
+	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(assignment))
+	for _, nodes := range assignment {
+		qc := QuorumCertificateWithSignerIDsFixture()
+		qc.SignerIDs = nodes
+		qcs = append(qcs, qc)
+	}
+	return qcs
+}
+
 func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
 	qc := flow.QuorumCertificate{
 		View:          uint64(rand.Uint32()),
@@ -1640,19 +1664,19 @@ func VoteForBlockFixture(block *hotstuff.Block, opts ...func(vote *hotstuff.Vote
 
 func VoteWithStakingSig() func(*hotstuff.Vote) {
 	return func(vote *hotstuff.Vote) {
-		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeStaking)}, vote.SigData...)
+		vote.SigData = append([]byte{byte(encoding.SigTypeStaking)}, vote.SigData...)
 	}
 }
 
 func VoteWithBeaconSig() func(*hotstuff.Vote) {
 	return func(vote *hotstuff.Vote) {
-		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeRandomBeacon)}, vote.SigData...)
+		vote.SigData = append([]byte{byte(encoding.SigTypeRandomBeacon)}, vote.SigData...)
 	}
 }
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
-		setup.Participants = participants.Sort(order.ByNodeIDAsc)
+		setup.Participants = participants.Sort(order.Canonical)
 		setup.Assignments = ClusterAssignment(1, participants)
 	}
 }
@@ -1733,8 +1757,10 @@ func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCom
 
 func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.EpochCommit) {
 	qcs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(assignments))
-	for range assignments {
-		qcs = append(qcs, QuorumCertificateWithSignerIDsFixture())
+	for _, assignment := range assignments {
+		qcWithSignerIndex := QuorumCertificateWithSignerIDsFixture()
+		qcWithSignerIndex.SignerIDs = assignment
+		qcs = append(qcs, qcWithSignerIndex)
 	}
 	return func(commit *flow.EpochCommit) {
 		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)

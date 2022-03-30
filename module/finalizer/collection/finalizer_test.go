@@ -181,9 +181,11 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, // block.Header.ParentVoterIndices,
-					Signature:    block.Header.ParentVoterSigData,
+					CollectionID:     block.Payload.Collection.ID(),
+					ReferenceBlockID: block.Payload.ReferenceBlockID,
+					ChainID:          block.Header.ChainID,
+					SignerIndices:    block.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 		})
@@ -232,16 +234,20 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 2)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, // block1.Header.ParentVoterIndices,
-					Signature:    block1.Header.ParentVoterSigData,
+					CollectionID:     block1.Payload.Collection.ID(),
+					ReferenceBlockID: block1.Payload.ReferenceBlockID,
+					ChainID:          block1.Header.ChainID,
+					SignerIndices:    block1.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block2.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, //  block2.Header.ParentVoterIndices,
-					Signature:    block2.Header.ParentVoterSigData,
+					CollectionID:     block2.Payload.Collection.ID(),
+					ReferenceBlockID: block2.Payload.ReferenceBlockID,
+					ChainID:          block2.Header.ChainID,
+					SignerIndices:    block2.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 		})
@@ -289,9 +295,11 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, // block1.Header.ParentVoterIndices,
-					Signature:    block1.Header.ParentVoterSigData,
+					CollectionID:     block1.Payload.Collection.ID(),
+					ReferenceBlockID: block1.Payload.ReferenceBlockID,
+					ChainID:          block1.Header.ChainID,
+					SignerIndices:    block1.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 		})
@@ -341,9 +349,11 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    []flow.Identifier{}, // block1.Header.ParentVoterIndices,
-					Signature:    block1.Header.ParentVoterSigData,
+					CollectionID:     block1.Payload.Collection.ID(),
+					ReferenceBlockID: block1.Payload.ReferenceBlockID,
+					ChainID:          block1.Header.ChainID,
+					SignerIndices:    block1.Header.ParentVoterIndices,
+					Signature:        nil,
 				},
 			})
 		})

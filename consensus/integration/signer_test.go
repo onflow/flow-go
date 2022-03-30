@@ -27,9 +27,8 @@ func (s *Signer) CreateVote(block *model.Block) (*model.Vote, error) {
 }
 func (*Signer) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 	qc := &flow.QuorumCertificate{
-		View:    votes[0].View,
-		BlockID: votes[0].BlockID,
-		// TODO: fix
+		View:          votes[0].View,
+		BlockID:       votes[0].BlockID,
 		SignerIndices: nil,
 		SigData:       nil,
 	}

@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/packer"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 /* ***************** Base-Factory for StakingVoteProcessor ****************** */
@@ -179,7 +179,7 @@ func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 }
 
 func (p *StakingVoteProcessor) signerIndicesFromIdentities(signerIDs flow.IdentifierList) ([]byte, error) {
-	signerIndices, err := packer.EncodeSignerIdentifiersToIndices(p.allParticipants.NodeIDs(), signerIDs)
+	signerIndices, err := msig.EncodeSignersToIndices(p.allParticipants.NodeIDs(), signerIDs)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode signer identifiers to indices: %w", err)
 	}
