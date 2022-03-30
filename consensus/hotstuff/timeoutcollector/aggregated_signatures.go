@@ -2,11 +2,11 @@ package timeoutcollector
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto/hash"
 	"sync"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -30,6 +30,39 @@ type MultiMessageSignatureAggregator struct {
 	publicKeys       []crypto.PublicKey
 	totalWeight      uint64
 	lock             sync.RWMutex
+}
+
+func NewMultiMessageSigAggregator(ids flow.IdentityList, // list of all authorized signers
+	pks []crypto.PublicKey, // list of corresponding public keys used for signature verifications
+	dsTag string, // domain separation tag used by the signature) *MultiMessageSignatureAggregator
+) (*MultiMessageSignatureAggregator, error) {
+
+	if len(pks) == 0 {
+		return nil, fmt.Errorf("number of participants must be larger than 0, got %d", len(pks))
+	}
+	// sanity check for BLS keys
+	for i, key := range pks {
+		if key == nil || key.Algorithm() != crypto.BLSBLS12381 {
+			return nil, fmt.Errorf("key at index %d is not a BLS key", i)
+		}
+	}
+
+	// build the internal map for a faster look-up
+	idToInfo := make(map[flow.Identifier]signerInfo)
+	for i, id := range ids {
+		idToInfo[id.NodeID] = signerInfo{
+			weight: id.Weight,
+			index:  i,
+		}
+	}
+
+	return &MultiMessageSignatureAggregator{
+		hasher:           crypto.NewBLSKMAC(dsTag),
+		ids:              ids,
+		idToInfo:         idToInfo,
+		indexToSignature: make(map[int]sigInfo),
+		publicKeys:       pks,
+	}, nil
 }
 
 func (a *MultiMessageSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature, msg []byte) error {
