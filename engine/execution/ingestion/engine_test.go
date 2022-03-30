@@ -1078,7 +1078,7 @@ func TestUnauthorizedNodeDoesNotBroadcastReceipts(t *testing.T) {
 
 		ctx.mockHasWeightAtBlockID(blocks["A"].ID(), true)
 		identity := *ctx.identity
-		identity.Stake = 0
+		identity.Weight = 0
 
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), false, *blocks["B"].StartState, nil)

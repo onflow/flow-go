@@ -182,8 +182,8 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	guarantors := clusterMembers.Filter(filter.HasNodeID(guarantorIDs...))
 
 	// determine whether signers reach minimally required stake threshold
-	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(clusterMembers.TotalStake()) // compute required stake threshold
-	totalStake := flow.IdentityList(guarantors).TotalStake()
+	threshold := hotstuff.ComputeWeightThresholdForBuildingQC(clusterMembers.TotalWeight()) // compute required stake threshold
+	totalStake := flow.IdentityList(guarantors).TotalWeight()
 	if totalStake < threshold {
 		return engine.NewInvalidInputErrorf("collection guarantee qc signers have insufficient stake of %d (required=%d)", totalStake, threshold)
 	}
