@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
@@ -138,7 +139,7 @@ func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 
 func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
 	collectorFilter := filter.HasRole(flow.RoleCollection)
-	clustering, err := flow.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
+	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
 	}

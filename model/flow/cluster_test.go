@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -17,23 +18,9 @@ func TestClusterAssignments(t *testing.T) {
 	assignments := unittest.ClusterAssignment(10, identities)
 	assert.Len(t, assignments, 10)
 
-	clusters, err := flow.NewClusterList(assignments, identities)
+	clusters, err := factory.NewClusterList(assignments, identities)
 	require.NoError(t, err)
 	assert.Equal(t, assignments, clusters.Assignments())
-}
-
-// NewClusterList assumes the input assignments are sorted, and fail if not.
-// This tests verifies that NewClusterList has implemented the check on the assumption.
-func TestNewClusterListFail(t *testing.T) {
-	identities := unittest.IdentityListFixture(100, unittest.WithRole(flow.RoleCollection))
-	assignments := unittest.ClusterAssignment(10, identities)
-
-	tmp := assignments[1][0]
-	assignments[1][0] = assignments[1][1]
-	assignments[1][1] = tmp
-
-	_, err := flow.NewClusterList(assignments, identities)
-	require.Error(t, err)
 }
 
 func TestAssignmentList_EqualTo(t *testing.T) {
