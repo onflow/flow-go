@@ -3,9 +3,8 @@ package api
 import (
 	"testing"
 
-	"github.com/stretchr/testify/suite"
-
 	"github.com/onflow/flow-go/integration/tests/access"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestAccessSuite(t *testing.T) {
