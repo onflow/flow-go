@@ -601,8 +601,6 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 		Block:               block,
 		CompleteCollections: completeCollections,
 	}
-	// Preload the id
-	executableBlock.ID()
 	return executableBlock
 }
 
@@ -856,6 +854,14 @@ func SignerIndicesFixture(n int) []byte {
 		bitutils.SetBit(indices, 1)
 	}
 	return indices
+}
+
+func SignerIndicesByIndices(n int, indices []int) []byte {
+	signers := bitutils.MakeBitVector(n)
+	for _, i := range indices {
+		bitutils.SetBit(signers, i)
+	}
+	return signers
 }
 
 // WithRole adds a role to an identity fixture.

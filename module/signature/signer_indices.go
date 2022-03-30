@@ -260,7 +260,7 @@ func validPadding(bitVector []byte, numUsedBits int) error {
 	// Verify condition 1:
 	l := len(bitVector)
 	if l != bitutils.MinimalByteSliceLength(numUsedBits) {
-		return fmt.Errorf("the bit vector contains a payload of %d used bits, so it should have %d bytes but has length %d: %w",
+		return fmt.Errorf("the bit vector contains a payload of %d used bits, so it should have %d bytes but has %d bytes: %w",
 			numUsedBits, bitutils.MinimalByteSliceLength(numUsedBits), l, ErrIncompatibleBitVectorLength)
 	}
 	// Condition 1 implies that the number of padded bits must be strictly smaller than 8. Otherwise, the vector
