@@ -3,6 +3,7 @@ package blueprints
 import (
 	"encoding/hex"
 	"fmt"
+	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -188,7 +189,7 @@ transaction(surgeFactor: UFix64, inclusionEffortCost: UFix64, executionEffortCos
 // SetExecutionEffortWeightsTransaction creates a transaction that sets up weights for the weighted Meter.
 func SetExecutionEffortWeightsTransaction(
 	service flow.Address,
-	weights map[uint]uint64,
+	weights weightedMeter.ExecutionWeights,
 ) (*flow.TransactionBody, error) {
 	return setExecutionWeightsTransaction(
 		service,
@@ -200,7 +201,7 @@ func SetExecutionEffortWeightsTransaction(
 
 func setExecutionWeightsTransaction(
 	service flow.Address,
-	weights map[uint]uint64,
+	weights weightedMeter.ExecutionWeights,
 	domain string,
 	identifier string,
 ) (*flow.TransactionBody, error) {

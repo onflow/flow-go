@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"fmt"
+	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	"math"
 
 	"github.com/onflow/cadence"
@@ -35,7 +36,8 @@ type BootstrapProcedure struct {
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
 
-	transactionFees BootstrapProcedureFeeParameters
+	transactionFees        BootstrapProcedureFeeParameters
+	executionEffortWeights weightedMeter.ExecutionWeights
 
 	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
@@ -118,6 +120,13 @@ func WithAccountCreationFee(fee cadence.UFix64) BootstrapProcedureOption {
 func WithTransactionFee(fees BootstrapProcedureFeeParameters) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.transactionFees = fees
+		return bp
+	}
+}
+
+func WithExecutionEffortWeights(weights weightedMeter.ExecutionWeights) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.executionEffortWeights = weights
 		return bp
 	}
 }
@@ -225,6 +234,10 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 		b.transactionFees.InclusionEffortCost,
 		b.transactionFees.ExecutionEffortCost,
 	)
+
+	if b.executionEffortWeights != nil {
+		b.setupExecutionEffortWeights(service, b.executionEffortWeights)
+	}
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
@@ -555,6 +568,24 @@ func (b *BootstrapProcedure) setupFees(service, flowFees flow.Address, surgeFact
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup fees: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address, weights weightedMeter.ExecutionWeights) {
+
+	tb, err := blueprints.SetExecutionEffortWeightsTransaction(service, weights)
+	if err != nil {
+		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
+	}
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			tb,
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to setup execution effort weights: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(
