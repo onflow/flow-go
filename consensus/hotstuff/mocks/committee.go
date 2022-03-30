@@ -37,13 +37,13 @@ func (_m *Committee) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
 	return r0, r1
 }
 
-// Identities provides a mock function with given fields: blockID, selector
-func (_m *Committee) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	ret := _m.Called(blockID, selector)
+// Identities provides a mock function with given fields: blockID
+func (_m *Committee) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
+	ret := _m.Called(blockID)
 
 	var r0 flow.IdentityList
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.IdentityFilter) flow.IdentityList); ok {
-		r0 = rf(blockID, selector)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.IdentityList); ok {
+		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.IdentityList)
@@ -51,8 +51,8 @@ func (_m *Committee) Identities(blockID flow.Identifier, selector flow.IdentityF
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, flow.IdentityFilter) error); ok {
-		r1 = rf(blockID, selector)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
 	} else {
 		r1 = ret.Error(1)
 	}

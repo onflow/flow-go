@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/module/signature"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -669,12 +671,14 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	require.NoError(t, err)
 
 	signerIDs := signers.NodeIDs()
+	signerIndices, err := signature.EncodeSignersToIndices(signerIDs, signerIDs)
+	require.NoError(t, err)
 
 	rootQC := &flow.QuorumCertificate{
-		View:      rootHead.View,
-		BlockID:   rootHead.ID(),
-		SignerIDs: signerIDs,
-		SigData:   unittest.SignatureFixture(),
+		View:          rootHead.View,
+		BlockID:       rootHead.ID(),
+		SignerIndices: signerIndices,
+		SigData:       unittest.SignatureFixture(),
 	}
 
 	return rootHead, rootQC
@@ -685,8 +689,8 @@ type RoundRobinLeaderSelection struct {
 	me         flow.Identifier
 }
 
-func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.identities.Filter(selector), nil
+func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier) (flow.IdentityList, error) {
+	return s.identities, nil
 }
 
 func (s *RoundRobinLeaderSelection) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {

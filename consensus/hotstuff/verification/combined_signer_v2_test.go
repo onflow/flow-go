@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -79,7 +80,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
 	require.NoError(t, err)
 
-	expectedSig := signature.EncodeDoubleSig(stakingSig, beaconSig)
+	expectedSig := msig.EncodeDoubleSig(stakingSig, beaconSig)
 	require.Equal(t, expectedSig, proposal.SigData)
 
 	// vote should be valid
@@ -184,8 +185,11 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	require.Equal(t, expectedStakingSig, crypto.Signature(proposal.SigData))
 }
 
-// Test_VerifyQC checks that a QC without any signers is rejected right away without calling into any sub-components
-func Test_VerifyQC(t *testing.T) {
+// Test_VerifyQC_EmptySigners checks that Verifier returns an `model.InsufficientSignaturesError`
+// if `signers` input is empty or nil. This check should happen _before_ the Verifier calls into
+// any sub-components, because some (e.g. `crypto.AggregateBLSPublicKeys`) don't provide sufficient
+// sentinel errors to distinguish between internal problems and external byzantine inputs.
+func Test_VerifyQC_EmptySigners(t *testing.T) {
 	committee := &mocks.Committee{}
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)
@@ -195,8 +199,8 @@ func Test_VerifyQC(t *testing.T) {
 	sigData := unittest.QCSigDataFixture()
 
 	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
-	require.ErrorIs(t, err, model.ErrInvalidFormat)
+	require.True(t, model.IsInsufficientSignaturesError(err))
 
 	err = verifier.VerifyQC(nil, sigData, block)
-	require.ErrorIs(t, err, model.ErrInvalidFormat)
+	require.True(t, model.IsInsufficientSignaturesError(err))
 }

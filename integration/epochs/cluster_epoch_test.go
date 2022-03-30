@@ -25,6 +25,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -91,7 +92,7 @@ func (s *Suite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.Clust
 	clusterAssignment := unittest.ClusterAssignment(uint(clusterCount), nodes)
 
 	// create `ClusterList` object from nodes and assignment
-	clusterList, err := flow.NewClusterList(clusterAssignment, nodes)
+	clusterList, err := factory.NewClusterList(clusterAssignment, nodes)
 	s.Require().NoError(err)
 
 	return clusterList, nodes

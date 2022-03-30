@@ -83,7 +83,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
+		Hex("signers", header.ParentVoterIndices).
 		Logger()
 	log.Info().Msg("block proposal received")
 
@@ -247,7 +247,7 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 		Hex("payload_hash", header.PayloadHash[:]).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
+		// Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 	log.Info().Msg("processing block proposal")
 

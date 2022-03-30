@@ -53,24 +53,6 @@ type RandomBeaconReconstructor interface {
 	Reconstruct() (crypto.Signature, error)
 }
 
-// SigType is the aggregable signature type.
-type SigType uint8
-
-// SigType specifies the role of the signature in the protocol.
-// Both types are aggregatable cryptographic signatures.
-//  * SigTypeRandomBeacon type is for random beacon signatures.
-//  * SigTypeStaking is for Hotstuff signatures.
-const (
-	SigTypeStaking SigType = iota
-	SigTypeRandomBeacon
-)
-
-// Valid returns true if the signature is either SigTypeStaking or SigTypeRandomBeacon
-// else return false
-func (t SigType) Valid() bool {
-	return t == SigTypeStaking || t == SigTypeRandomBeacon
-}
-
 // WeightedSignatureAggregator aggregates signatures of the same signature scheme and the
 // same message from different signers. The public keys and message are agreed upon upfront.
 // It is also recommended to only aggregate signatures generated with keys representing
@@ -124,13 +106,12 @@ type Packer interface {
 	// sig is the aggregated signature data.
 	// Expected error returns during normal operations:
 	//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
-	Pack(blockID flow.Identifier, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
+	Pack(blockID flow.Identifier, sig *BlockSignatureData) (signerIndices []byte, sigData []byte, err error)
 
 	// Unpack de-serializes the provided signature data.
-	// blockID is the block that the aggregated sig is signed for
 	// sig is the aggregated signature data
 	// It returns:
 	//  - (sigData, nil) if successfully unpacked the signature data
 	//  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
-	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
+	Unpack(signerIdentities flow.IdentityList, sigData []byte) (*BlockSignatureData, error)
 }

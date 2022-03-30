@@ -30,9 +30,7 @@ type Header struct {
 
 	View uint64 // View number at which this block was proposed.
 
-	ParentVoterIDs []Identifier // List of voters who signed the parent block.
-	// A quorum certificate can be extrated from the header.
-	// This field is the SignerIDs field of the extracted quorum certificate.
+	ParentVoterIndices []byte // a bitvector that represents all the voters for the parent block.
 
 	ParentVoterSigData []byte // aggregated signature over the parent block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
@@ -54,7 +52,7 @@ func (h Header) Body() interface{} {
 		PayloadHash        Identifier
 		Timestamp          uint64
 		View               uint64
-		ParentVoterIDs     []Identifier
+		ParentVoterIndices []byte
 		ParentVoterSigData []byte
 		ProposerID         Identifier
 	}{
@@ -64,7 +62,7 @@ func (h Header) Body() interface{} {
 		PayloadHash:        h.PayloadHash,
 		Timestamp:          uint64(h.Timestamp.UnixNano()),
 		View:               h.View,
-		ParentVoterIDs:     h.ParentVoterIDs,
+		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
 	}
@@ -93,29 +91,21 @@ func (h Header) ID() Identifier {
 	defer mutexHeader.Unlock()
 
 	// compare these elements individually
-	if prevHeader.ParentVoterIDs != nil &&
+	if prevHeader.ParentVoterIndices != nil &&
 		prevHeader.ParentVoterSigData != nil &&
 		prevHeader.ProposerSigData != nil &&
-		len(h.ParentVoterIDs) == len(prevHeader.ParentVoterIDs) &&
+		len(h.ParentVoterIndices) == len(prevHeader.ParentVoterIndices) &&
 		len(h.ParentVoterSigData) == len(prevHeader.ParentVoterSigData) &&
 		len(h.ProposerSigData) == len(prevHeader.ProposerSigData) {
-		bNotEqual := false
 
-		for i, v := range h.ParentVoterIDs {
-			if v == prevHeader.ParentVoterIDs[i] {
-				continue
-			}
-			bNotEqual = true
-			break
-		}
-		if !bNotEqual &&
-			h.ChainID == prevHeader.ChainID &&
+		if h.ChainID == prevHeader.ChainID &&
 			h.Timestamp == prevHeader.Timestamp &&
 			h.Height == prevHeader.Height &&
 			h.ParentID == prevHeader.ParentID &&
 			h.View == prevHeader.View &&
 			h.PayloadHash == prevHeader.PayloadHash &&
 			bytes.Equal(h.ProposerSigData, prevHeader.ProposerSigData) &&
+			bytes.Equal(h.ParentVoterIndices, prevHeader.ParentVoterIndices) &&
 			bytes.Equal(h.ParentVoterSigData, prevHeader.ParentVoterSigData) &&
 			h.ProposerID == prevHeader.ProposerID {
 

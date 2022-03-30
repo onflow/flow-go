@@ -5,7 +5,9 @@ import (
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -48,13 +50,31 @@ func (e Epoch) DKG() (protocol.DKG, error) {
 }
 
 func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
-	if e.enc.Clusters != nil {
-		if i >= uint(len(e.enc.Clusters)) {
-			return nil, fmt.Errorf("no cluster with index %d", i)
-		}
-		return Cluster{e.enc.Clusters[i]}, nil
+	if e.enc.Clusters == nil {
+		return nil, protocol.ErrEpochNotCommitted
 	}
-	return nil, protocol.ErrEpochNotCommitted
+
+	if i >= uint(len(e.enc.Clusters)) {
+		return nil, fmt.Errorf("no cluster with index %d: %w", i, protocol.ErrClusterNotFound)
+	}
+	return Cluster{e.enc.Clusters[i]}, nil
+}
+
+func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
+	if e.enc.Clusters == nil {
+		return nil, protocol.ErrEpochNotCommitted
+	}
+
+	for _, cluster := range e.enc.Clusters {
+		if cluster.RootBlock.Header.ChainID == chainID {
+			return Cluster{cluster}, nil
+		}
+	}
+	chainIDs := make([]string, 0, len(e.enc.Clusters))
+	for _, cluster := range e.enc.Clusters {
+		chainIDs = append(chainIDs, string(cluster.RootBlock.Header.ChainID))
+	}
+	return nil, fmt.Errorf("no cluster with the given chain ID %v, available chainIDs %v: %w", chainID, chainIDs, protocol.ErrClusterNotFound)
 }
 
 type Epochs struct {
@@ -114,8 +134,12 @@ func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
 }
 
 func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
+	return ClusteringFromSetupEvent(es.setupEvent)
+}
+
+func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
 	collectorFilter := filter.HasRole(flow.RoleCollection)
-	clustering, err := flow.NewClusterList(es.setupEvent.Assignments, es.setupEvent.Participants.Filter(collectorFilter))
+	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
 	}
@@ -123,6 +147,10 @@ func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 }
 
 func (es *setupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
+	return nil, protocol.ErrEpochNotCommitted
+}
+
+func (es *setupEpoch) ClusterByChainID(_ flow.ChainID) (protocol.Cluster, error) {
 	return nil, protocol.ErrEpochNotCommitted
 }
 
@@ -155,6 +183,7 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 		return nil, fmt.Errorf("failed to generate clustering: %w", err)
 	}
 
+	// TODO: double check ByIndex returns canonical order
 	members, ok := clustering.ByIndex(index)
 	if !ok {
 		return nil, fmt.Errorf("failed to get members of cluster %d: %w", index, err)
@@ -166,12 +195,17 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	}
 	rootQCVoteData := qcs[index]
 
+	signerIndices, err := signature.EncodeSignersToIndices(members.NodeIDs(), rootQCVoteData.VoterIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode signer indices for rootQCVoteData.VoterIDs: %w", err)
+	}
+
 	rootBlock := cluster.CanonicalRootBlock(epochCounter, members)
 	rootQC := &flow.QuorumCertificate{
-		View:      rootBlock.Header.View,
-		BlockID:   rootBlock.ID(),
-		SignerIDs: rootQCVoteData.VoterIDs,
-		SigData:   rootQCVoteData.SigData,
+		View:          rootBlock.Header.View,
+		BlockID:       rootBlock.ID(),
+		SignerIndices: signerIndices,
+		SigData:       rootQCVoteData.SigData,
 	}
 
 	cluster, err := ClusterFromEncodable(EncodableCluster{

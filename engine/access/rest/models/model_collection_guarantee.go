@@ -11,7 +11,7 @@ package models
 type CollectionGuarantee struct {
 	CollectionId string `json:"collection_id"`
 
-	SignerIds []string `json:"signer_ids"`
+	SignerIndices string `json:"signer_indices"`
 
 	Signature string `json:"signature"`
 }

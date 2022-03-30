@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/epochs"
@@ -84,7 +85,7 @@ func (suite *Suite) SetupTest() {
 	})
 
 	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
-	suite.clusters, err = flow.NewClusterList(assignments, collectors)
+	suite.clusters, err = factory.NewClusterList(assignments, collectors)
 	suite.Require().NoError(err)
 
 	suite.root = unittest.GenesisFixture()
@@ -469,7 +470,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
 		Filter(filter.HasRole(flow.RoleCollection))
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
-	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
+	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
 	epoch2 := new(protocol.Epoch)
@@ -507,7 +508,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
 		Filter(filter.HasRole(flow.RoleCollection))
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
-	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
+	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
 
 	epoch2 := new(protocol.Epoch)
@@ -535,7 +536,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	// include ourselves in cluster assignment
 	withMe := suite.identities.Filter(filter.HasRole(flow.RoleCollection))
 	epoch3Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withMe)
-	epoch3Clusters, err := flow.NewClusterList(epoch3Assignment, withMe)
+	epoch3Clusters, err := factory.NewClusterList(epoch3Assignment, withMe)
 	suite.Require().NoError(err)
 
 	epoch3 := new(protocol.Epoch)

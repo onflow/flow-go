@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 /* ***************** Base-Factory for StakingVoteProcessor ****************** */
@@ -36,7 +36,7 @@ type stakingVoteProcessorFactoryBase struct {
 // Create creates StakingVoteProcessor for processing votes for the given block.
 // Caller must treat all errors as exceptions
 func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
+	allParticipants, err := f.committee.Identities(block.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
 	}
@@ -64,6 +64,7 @@ func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *mode
 		onQCCreated:      f.onQCCreated,
 		minRequiredStake: minRequiredStake,
 		done:             *atomic.NewBool(false),
+		allParticipants:  allParticipants,
 	}, nil
 }
 
@@ -80,6 +81,7 @@ type StakingVoteProcessor struct {
 	onQCCreated      hotstuff.OnQCCreated
 	minRequiredStake uint64
 	done             atomic.Bool
+	allParticipants  flow.IdentityList
 }
 
 // Block returns block that is part of proposal that we are processing votes for.
@@ -163,10 +165,23 @@ func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
 	}
 
+	signerIndices, err := p.signerIndicesFromIdentities(stakingSigners)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode signer indices: %w", err)
+	}
+
 	return &flow.QuorumCertificate{
-		View:      p.block.View,
-		BlockID:   p.block.BlockID,
-		SignerIDs: stakingSigners,
-		SigData:   aggregatedStakingSig,
+		View:          p.block.View,
+		BlockID:       p.block.BlockID,
+		SignerIndices: signerIndices,
+		SigData:       aggregatedStakingSig,
 	}, nil
+}
+
+func (p *StakingVoteProcessor) signerIndicesFromIdentities(signerIDs flow.IdentifierList) ([]byte, error) {
+	signerIndices, err := msig.EncodeSignersToIndices(p.allParticipants.NodeIDs(), signerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode signer identifiers to indices: %w", err)
+	}
+	return signerIndices, nil
 }

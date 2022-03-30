@@ -995,8 +995,12 @@ func (e *Engine) matchOrRequestCollections(
 			Hex("collection_id", logging.ID(guarantee.ID())).
 			Msg("requesting collection")
 
+		guarantors, err := protocol.FindGuarantors(e.state, guarantee)
+		if err != nil {
+			return fmt.Errorf("could not find guarantors: %w", err)
+		}
 		// queue the collection to be requested from one of the guarantors
-		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantors...))
 		actualRequested++
 	}
 

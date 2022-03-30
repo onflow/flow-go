@@ -17,14 +17,12 @@ import (
 // Given a collector block, some logic is required to find the main consensus block
 // for determining the valid collector-HotStuff participants.
 type Committee interface {
-
 	// Identities returns a IdentityList with legitimate HotStuff participants for the specified block.
-	// The list of participants is filtered by the provided selector. The returned list of HotStuff participants
+	// The returned list of HotStuff participants
 	//   * contains nodes that are allowed to sign the specified block (legitimate participants with NON-ZERO STAKE)
 	//   * is ordered in the canonical order
 	//   * contains no duplicates.
-	// The list of all legitimate HotStuff participants for the specified block can be obtained by using `filter.Any`
-	Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error)
+	Identities(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// Identity returns the full Identity for specified HotStuff participant.
 	// The node must be a legitimate HotStuff participant with NON-ZERO STAKE at the specified block.

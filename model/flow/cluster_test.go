@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -17,7 +18,7 @@ func TestClusterAssignments(t *testing.T) {
 	assignments := unittest.ClusterAssignment(10, identities)
 	assert.Len(t, assignments, 10)
 
-	clusters, err := flow.NewClusterList(assignments, identities)
+	clusters, err := factory.NewClusterList(assignments, identities)
 	require.NoError(t, err)
 	assert.Equal(t, assignments, clusters.Assignments())
 }
