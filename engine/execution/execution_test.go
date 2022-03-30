@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -92,11 +93,10 @@ func TestExecutionFlow(t *testing.T) {
 
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 
+	// signed by the only collector
 	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID, 1)
-	signerIndices, err := signature.EncodeSignersToIndices(
-		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
-	require.NoError(t, err)
-
+	block.Header.ParentVoterIndices = unittest.SignerIndicesByIndices(1, []int{0})
+	signerIndices := unittest.SignerIndicesByIndices(1, []int{0})
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{
@@ -115,6 +115,10 @@ func TestExecutionFlow(t *testing.T) {
 	})
 
 	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID, 1)
+	// the default signer indices is 2 bytes, but in this test cases
+	// we need 1 byte
+	child.Header.ParentVoterIndices = unittest.SignerIndicesByIndices(1, []int{0})
+	log.Info().Msgf("child block ID: %v, indices: %v", child.Header.ID(), child.Header.ParentVoterIndices)
 
 	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
@@ -237,6 +241,7 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
+	block.Header.ParentVoterIndices = unittest.SignerIndicesByIndices(1, []int{0})
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{
@@ -270,6 +275,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
+	block.Header.ParentVoterIndices = unittest.SignerIndicesByIndices(1, []int{0})
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
@@ -294,6 +300,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
+	block.Header.ParentVoterIndices = unittest.SignerIndicesByIndices(1, []int{0})
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
@@ -508,11 +515,13 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	require.NoError(t, err)
 
 	block := unittest.BlockWithParentAndProposerFixture(genesis, conID.NodeID, 1)
+	block.Header.ParentVoterIndices = unittest.SignerIndicesByIndices(1, []int{0})
 	block.Header.View = 42
 	block.SetPayload(flow.Payload{})
 	proposal := unittest.ProposalFromBlock(&block)
 
 	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID, 1)
+	child.Header.ParentVoterIndices = unittest.SignerIndicesByIndices(1, []int{0})
 
 	actualCalls := 0
 
