@@ -72,6 +72,9 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 
 		// sends corrupted execution receipt to all corrupted execution nodes.
 		for _, corruptedExecutionId := range corruptedExecutionIds {
+			// sets executor id of the result as the same corrupted execution node id that
+			// is meant to send this message to the flow network.
+			corruptedReceipt.ExecutorID = corruptedExecutionId
 			err := o.network.Send(&insecure.Event{
 				CorruptedId:       corruptedExecutionId,
 				Channel:           event.Channel,
@@ -136,7 +139,6 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 // the resulted corrupted version would not pass verification.
 func (o Orchestrator) corruptExecutionReceipt(receipt *flow.ExecutionReceipt) *flow.ExecutionReceipt {
 	return &flow.ExecutionReceipt{
-		ExecutorID: receipt.ExecutorID,
 		ExecutionResult: flow.ExecutionResult{
 			PreviousResultID: receipt.ExecutionResult.PreviousResultID,
 			BlockID:          receipt.ExecutionResult.BlockID,
