@@ -14,6 +14,7 @@ import (
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
@@ -59,20 +60,27 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	collectors := model.ToIdentityList(nodeInfos)
 	tc.identities = unittest.CompleteIdentitySet(collectors...)
 	assignment := unittest.ClusterAssignment(tc.conf.clusters, collectors)
-	clusters, err := flow.NewClusterList(assignment, collectors)
+	clusters, err := factory.NewClusterList(assignment, collectors)
 	require.NoError(t, err)
 	rootClusterBlocks := run.GenerateRootClusterBlocks(1, clusters)
 	rootClusterQCs := make([]flow.ClusterQCVoteData, len(rootClusterBlocks))
 	for i, cluster := range clusters {
 		signers := make([]model.NodeInfo, 0)
+		signerIDs := make([]flow.Identifier, 0)
 		for _, identity := range nodeInfos {
 			if _, inCluster := cluster.ByNodeID(identity.NodeID); inCluster {
 				signers = append(signers, identity)
+				signerIDs = append(signerIDs, identity.NodeID)
 			}
 		}
 		qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers), rootClusterBlocks[i])
 		require.NoError(t, err)
-		rootClusterQCs[i] = flow.ClusterQCVoteDataFromQC(qc)
+		rootClusterQCs[i] = flow.ClusterQCVoteDataFromQC(&flow.QuorumCertificateWithSignerIDs{
+			View:      qc.View,
+			BlockID:   qc.BlockID,
+			SignerIDs: signerIDs,
+			SigData:   qc.SigData,
+		})
 	}
 
 	tc.sentTransactions = make(map[uint64]map[uint]flow.IdentifierList)
@@ -130,16 +138,32 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 				signer := nodeInfoLookup[signerID]
 				signers = append(signers, signer)
 			}
+
 			// generate root cluster block
 			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers))
 			// generate cluster root qc
 			qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers), rootClusterBlock)
 			require.NoError(t, err)
-			commit.ClusterQCs[i] = flow.ClusterQCVoteDataFromQC(qc)
+			signerIDs := toSignerIDs(signers)
+			qcWithSignerIDs := &flow.QuorumCertificateWithSignerIDs{
+				View:      qc.View,
+				BlockID:   qc.BlockID,
+				SignerIDs: signerIDs,
+				SigData:   qc.SigData,
+			}
+			commit.ClusterQCs[i] = flow.ClusterQCVoteDataFromQC(qcWithSignerIDs)
 		}
 	})
 
 	return tc
+}
+
+func toSignerIDs(signers []model.NodeInfo) []flow.Identifier {
+	signerIDs := make([]flow.Identifier, 0, len(signers))
+	for _, signer := range signers {
+		signerIDs = append(signerIDs, signer.NodeID)
+	}
+	return signerIDs
 }
 
 // TestClusterSwitchover_Simple is the simplest switchover case with one single-node cluster.

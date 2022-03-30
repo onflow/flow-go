@@ -115,8 +115,10 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()
-	sentinel.SignerIDs = []flow.Identifier{is.collID}
+	// there is only one collection node in the cluster
+	sentinel.SignerIndices = unittest.SignerIndicesByIndices(1, []int{0})
 	sentinel.ReferenceBlockID = is.net.Root().ID()
+	sentinel.ChainID = is.net.BootstrapData.ClusterRootBlocks[0].Header.ChainID
 	colID := sentinel.CollectionID
 
 	is.waitUntilSeenProposal(deadline)

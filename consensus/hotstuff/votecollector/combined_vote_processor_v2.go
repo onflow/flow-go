@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
@@ -38,7 +37,7 @@ type combinedVoteProcessorFactoryBaseV2 struct {
 // Create creates CombinedVoteProcessorV2 for processing votes for the given block.
 // Caller must treat all errors as exceptions
 func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
+	allParticipants, err := f.committee.Identities(block.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
 	}
@@ -168,9 +167,9 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if p.done.Load() {
 		return nil
 	}
-	stakingSig, randomBeaconSig, err := signature.DecodeDoubleSig(vote.SigData)
+	stakingSig, randomBeaconSig, err := msig.DecodeDoubleSig(vote.SigData)
 	if err != nil {
-		if errors.Is(err, model.ErrInvalidFormat) {
+		if errors.Is(err, msig.ErrInvalidSignatureFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
@@ -256,7 +255,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 
 	p.log.Info().
 		Uint64("view", qc.View).
-		// Int("num_signers", len(qc.SignerIndices)).
+		Hex("signers", qc.SignerIndices).
 		Msg("new qc has been created")
 
 	p.onQCCreated(qc)
@@ -308,6 +307,7 @@ func buildQCWithPackerAndSigData(
 	blockSigData *hotstuff.BlockSignatureData,
 ) (*flow.QuorumCertificate, error) {
 	signerIndices, sigData, err := packer.Pack(block.BlockID, blockSigData)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}

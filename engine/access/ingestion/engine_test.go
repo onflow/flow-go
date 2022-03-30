@@ -111,6 +111,12 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
 	))
+
+	refBlockID := unittest.IdentifierFixture()
+	for _, guarantee := range block.Payload.Guarantees {
+		guarantee.ReferenceBlockID = refBlockID
+	}
+
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),
 	}
@@ -125,6 +131,16 @@ func (suite *Suite) TestOnFinalizedBlock() {
 
 	// expect that the block storage is indexed with each of the collection guarantee
 	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
+
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(unittest.IdentityListFixture(32*4), nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.proto.state.On("AtBlockID", refBlockID).Return(snap)
 
 	// for each of the guarantees, we should request the corresponding collection once
 	needed := make(map[flow.Identifier]struct{})
@@ -298,10 +314,12 @@ func (suite *Suite) TestRequestMissingCollections() {
 
 	// generate the test blocks and collections
 	var collIDs []flow.Identifier
+	refBlockID := unittest.IdentifierFixture()
 	for i := 0; i < blkCnt; i++ {
 		block := unittest.BlockFixture()
 		block.SetPayload(unittest.PayloadFixture(
-			unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(refBlockID))...),
 		))
 		// some blocks may not be present hence add a gap
 		height := startHeight + uint64(i)
@@ -310,6 +328,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		heightMap[height] = &block
 		for _, c := range block.Payload.Guarantees {
 			collIDs = append(collIDs, c.CollectionID)
+			c.ReferenceBlockID = refBlockID
 		}
 	}
 
@@ -364,6 +383,16 @@ func (suite *Suite) TestRequestMissingCollections() {
 	// force should be called once
 	suite.request.On("Force").Return()
 
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(unittest.IdentityListFixture(32*4), nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.proto.state.On("AtBlockID", refBlockID).Return(snap)
+
 	assertExpectations := func() {
 		suite.request.AssertExpectations(suite.T())
 		suite.collections.AssertExpectations(suite.T())
@@ -416,6 +445,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 	collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
 
+	refBlockID := unittest.IdentifierFixture()
 	// generate the test blocks, cgs and collections
 	for i := 0; i < blkCnt; i++ {
 		guarantees := make([]*flow.CollectionGuarantee, collPerBlk)
@@ -424,6 +454,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			collMap[coll.ID()] = &coll
 			cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
 				cg.CollectionID = coll.ID()
+				cg.ReferenceBlockID = refBlockID
 			})
 			guarantees[j] = cg
 		}
@@ -454,6 +485,16 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			}
 			return storerr.ErrNotFound
 		})
+
+	cluster := new(protocol.Cluster)
+	cluster.On("Members").Return(unittest.IdentityListFixture(32*4), nil)
+	epoch := new(protocol.Epoch)
+	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
+	epochs := new(protocol.EpochQuery)
+	epochs.On("Current").Return(epoch)
+	snap := new(protocol.Snapshot)
+	snap.On("Epochs").Return(epochs)
+	suite.proto.state.On("AtBlockID", refBlockID).Return(snap)
 
 	// blkMissingColl controls which collections are reported as missing by the collections storage mock
 	blkMissingColl := make([]bool, blkCnt)

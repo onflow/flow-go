@@ -128,26 +128,36 @@ type EpochCommit struct {
 // gathered by the ClusterQC smart contract. It contains the aggregated
 // signature over the root block for the cluster as well as the set of voters.
 type ClusterQCVoteData struct {
-	SigData      crypto.Signature // the aggregated signature over all the votes
-	VoterIndices []byte           // the set of voters that contributed to the qc
+	SigData  crypto.Signature // the aggregated signature over all the votes
+	VoterIDs []Identifier     // the set of voters that contributed to the qc
 }
 
 func (c *ClusterQCVoteData) EqualTo(other *ClusterQCVoteData) bool {
-	return bytes.Equal(c.VoterIndices, other.VoterIndices) &&
-		bytes.Equal(c.SigData, other.SigData)
+	if len(c.VoterIDs) != len(other.VoterIDs) {
+		return false
+	}
+	if !bytes.Equal(c.SigData, other.SigData) {
+		return false
+	}
+	for i, v := range c.VoterIDs {
+		if v != other.VoterIDs[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // ClusterQCVoteDataFromQC converts a quorum certificate to the representation
 // used by the smart contract, essentially discarding the block ID and view
 // (which are protocol-defined given the EpochSetup event).
-func ClusterQCVoteDataFromQC(qc *QuorumCertificate) ClusterQCVoteData {
+func ClusterQCVoteDataFromQC(qc *QuorumCertificateWithSignerIDs) ClusterQCVoteData {
 	return ClusterQCVoteData{
-		SigData:      qc.SigData,
-		VoterIndices: qc.SignerIndices,
+		SigData:  qc.SigData,
+		VoterIDs: qc.SignerIDs,
 	}
 }
 
-func ClusterQCVoteDatasFromQCs(qcs []*QuorumCertificate) []ClusterQCVoteData {
+func ClusterQCVoteDatasFromQCs(qcs []*QuorumCertificateWithSignerIDs) []ClusterQCVoteData {
 	qcVotes := make([]ClusterQCVoteData, 0, len(qcs))
 	for _, qc := range qcs {
 		qcVotes = append(qcVotes, ClusterQCVoteDataFromQC(qc))

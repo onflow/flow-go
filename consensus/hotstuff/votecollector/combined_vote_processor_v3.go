@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
@@ -40,7 +39,7 @@ type combinedVoteProcessorFactoryBaseV3 struct {
 // Caller must treat all errors as exceptions
 // nolint:unused
 func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
+	allParticipants, err := f.committee.Identities(block.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
 	}
@@ -165,9 +164,9 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	if p.done.Load() {
 		return nil
 	}
-	sigType, sig, err := signature.DecodeSingleSig(vote.SigData)
+	sigType, sig, err := msig.DecodeSingleSig(vote.SigData)
 	if err != nil {
-		if errors.Is(err, model.ErrInvalidFormat) {
+		if errors.Is(err, msig.ErrInvalidSignatureFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
@@ -175,7 +174,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 
 	switch sigType {
 
-	case hotstuff.SigTypeStaking:
+	case encoding.SigTypeStaking:
 		err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
 			if model.IsInvalidSignerError(err) {
@@ -198,7 +197,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
 		}
 
-	case hotstuff.SigTypeRandomBeacon:
+	case encoding.SigTypeRandomBeacon:
 		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
 			if model.IsInvalidSignerError(err) {
@@ -227,7 +226,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		}
 
 	default:
-		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, model.ErrInvalidFormat)
+		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, model.NewInvalidFormatErrorf(""))
 	}
 
 	// checking of conditions for building QC are satisfied
@@ -254,7 +253,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 
 	p.log.Info().
 		Uint64("view", qc.View).
-		// Int("num_signers", len(qc.SignerIDs)).
+		Hex("signers", qc.SignerIndices).
 		Msg("new qc has been created")
 
 	p.onQCCreated(qc)
