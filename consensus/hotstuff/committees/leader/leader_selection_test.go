@@ -367,61 +367,54 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 	t.Run("fuzzy set", func(t *testing.T) {
 		toolRng := prg(t, someSeed)
 
-		// TODO: randomize the test at each iteration
-		for i := 0; i < 1; i++ {
-			// create 1002 nodes with all 0 weight
-			identities := unittest.IdentityListFixture(1002, unittest.WithWeight(0))
+		// create 1002 nodes with all 0 stake
+		identities := unittest.IdentityListFixture(1002, unittest.WithWeight(0))
 
-			// create 2 nodes with 1 weight, and place them in between
-			// index 233-777
-			n := toolRng.UintN(777-233) + 233
-			m := toolRng.UintN(777-233) + 233
-			identities[n].Weight = 1
-			identities[m].Weight = 1
+		// create 2 nodes with 1 stake, and place them in between
+		// index 233-777
+		n := rng.UintN(777-233) + 233
+		m := rng.UintN(777-233) + 233
+		identities[n].Weight = 1
+		identities[m].Weight = 1
 
-			// the following code check the zero weight node should not be selected
-			weightful := identities.Filter(filter.HasWeight(true))
+		// the following code check the zero staker should not be selected
+		stakeful := identities.Filter(filter.HasWeight(true))
 
-			count := 1000
+		count := 1000
+		selectionFromAll, err := ComputeLeaderSelectionFromSeed(0, someSeed, count, identities)
+		require.NoError(t, err)
 
-			selectionFromAll, err := ComputeLeaderSelection(0, rng, count, identities)
+		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, weightful)
+		require.NoError(t, err)
+
+		for i := 0; i < count; i++ {
+			nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(i))
 			require.NoError(t, err)
 
-			selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, weightful)
+			nodeIDFromWeightful, err := selectionFromWeightful.LeaderForView(uint64(j))
 			require.NoError(t, err)
 
-			for j := 0; j < count; j++ {
-				nodeIDFromAll, err := selectionFromAll.LeaderForView(uint64(j))
-				require.NoError(t, err)
-
-				nodeIDFromWeightful, err := selectionFromWeightful.LeaderForView(uint64(j))
-				require.NoError(t, err)
-
-				// the selection should be the same
-				require.Equal(t, nodeIDFromWeightful, nodeIDFromAll)
-			}
+			// the selection should be the same
+			require.Equal(t, nodeIDFromWeightful, nodeIDFromAll)
 		}
 
 		t.Run("if there is only 1 node has weight, then it will be always be the leader and the only leader", func(t *testing.T) {
 			toolRng := prg(t, someSeed)
 
-			// TODO: randomize the test at each iteration
-			for i := 0; i < 1; i++ {
-				identities := unittest.IdentityListFixture(1000, unittest.WithWeight(0))
+			identities := unittest.IdentityListFixture(1000, unittest.WithWeight(0))
 
-				n := toolRng.UintN(1000)
-				weight := n + 1
-				identities[n].Weight = weight
-				onlyNodeWithWeight := identities[n]
+			n := rng.UintN(1000)
+			stake := n + 1
+			identities[n].Weight = weight
+			onlyNodeWithWeight := identities[n]
 
-				selections, err := ComputeLeaderSelection(0, rng, 1000, identities)
+			selections, err := ComputeLeaderSelectionFromSeed(0, someSeed, 1000, identities)
+			require.NoError(t, err)
+
+			for i := 0; i < 1000; i++ {
+				nodeID, err := selections.LeaderForView(uint64(i))
 				require.NoError(t, err)
-
-				for j := 0; j < 1000; j++ {
-					nodeID, err := selections.LeaderForView(uint64(j))
-					require.NoError(t, err)
-					require.Equal(t, onlyNodeWithWeight.NodeID, nodeID)
-				}
+				require.Equal(t, onlyNodeWithWeight.NodeID, nodeID)
 			}
 		})
 	})

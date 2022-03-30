@@ -86,10 +86,10 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	}
 
 	qc := &flow.QuorumCertificate{
-		View:      head.View,
-		BlockID:   s.blockID,
-		SignerIDs: child.ParentVoterIDs,
-		SigData:   child.ParentVoterSigData,
+		View:          head.View,
+		BlockID:       s.blockID,
+		SignerIndices: child.ParentVoterIndices,
+		SigData:       child.ParentVoterSigData,
 	}
 
 	return qc, nil
@@ -162,7 +162,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	}
 
 	// sort the identities so the 'Exists' binary search works
-	identities := setup.Participants.Sort(order.ByNodeIDAsc)
+	identities := setup.Participants.Sort(order.Canonical)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
 	var otherEpochIdentities flow.IdentityList
@@ -224,7 +224,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	identities = identities.Filter(selector)
 
 	// apply a deterministic sort to the participants
-	identities = identities.Sort(order.ByNodeIDAsc)
+	identities = identities.Sort(order.Canonical)
 
 	return identities, nil
 }

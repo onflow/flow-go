@@ -150,14 +150,14 @@ func (c *ClusterQCVoteData) EqualTo(other *ClusterQCVoteData) bool {
 // ClusterQCVoteDataFromQC converts a quorum certificate to the representation
 // used by the smart contract, essentially discarding the block ID and view
 // (which are protocol-defined given the EpochSetup event).
-func ClusterQCVoteDataFromQC(qc *QuorumCertificate) ClusterQCVoteData {
+func ClusterQCVoteDataFromQC(qc *QuorumCertificateWithSignerIDs) ClusterQCVoteData {
 	return ClusterQCVoteData{
 		SigData:  qc.SigData,
 		VoterIDs: qc.SignerIDs,
 	}
 }
 
-func ClusterQCVoteDatasFromQCs(qcs []*QuorumCertificate) []ClusterQCVoteData {
+func ClusterQCVoteDatasFromQCs(qcs []*QuorumCertificateWithSignerIDs) []ClusterQCVoteData {
 	qcVotes := make([]ClusterQCVoteData, 0, len(qcs))
 	for _, qc := range qcs {
 		qcVotes = append(qcVotes, ClusterQCVoteDataFromQC(qc))

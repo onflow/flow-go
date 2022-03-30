@@ -3,16 +3,12 @@
 package order
 
 import (
-	"bytes"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // Canonical represents the canonical ordering for identity lists.
-var Canonical = ByNodeIDAsc
-
-func ByNodeIDAsc(identity1 *flow.Identity, identity2 *flow.Identity) bool {
-	return bytes.Compare(identity1.NodeID[:], identity2.NodeID[:]) < 0
+func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) bool {
+	return IdentifierCanonical(identity1.NodeID, identity2.NodeID)
 }
 
 func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Identity) bool {

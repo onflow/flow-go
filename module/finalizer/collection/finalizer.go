@@ -150,8 +150,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     payload.Collection.ID(),
 					ReferenceBlockID: payload.ReferenceBlockID,
-					SignerIDs:        step.ParentVoterIDs,
-					Signature:        step.ParentVoterSigData,
+					ChainID:          header.ChainID,
+					SignerIndices:    step.ParentVoterIndices,
+					Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 				},
 			})
 		}

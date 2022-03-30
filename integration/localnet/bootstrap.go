@@ -151,7 +151,8 @@ func main() {
 		panic(err)
 	}
 
-	_, _, _, containers, _, err := testnet.BootstrapNetwork(conf, BootstrapDir)
+	bootstrapData, err := testnet.BootstrapNetwork(conf, BootstrapDir)
+	containers := bootstrapData.StakedConfs
 	if err != nil {
 		panic(err)
 	}

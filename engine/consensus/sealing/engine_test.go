@@ -54,7 +54,7 @@ func (s *SealingEngineSuite) SetupTest() {
 		},
 	)
 
-	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5)).Head()
+	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles())).Head()
 	require.NoError(s.T(), err)
 
 	s.engine = &Engine{

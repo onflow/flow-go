@@ -14,7 +14,7 @@ type QuorumCertificate struct {
 	// In order to distinguish the signature types, the SigData has to be deserialized. Specifically,
 	// the field `SigData.SigType` (bit vector) indicates for each signer which sig type they provided.
 	// For collection cluster, the SignerIDs includes all the staking sig signers.
-	SignerIDs []Identifier
+	SignerIndices []byte
 
 	// For consensus cluster, the SigData is a serialization of the following fields
 	// - SigType []byte, bit-vector indicating the type of sig produced by the signer.
@@ -24,4 +24,15 @@ type QuorumCertificate struct {
 	// For collector cluster HotStuff, SigData is simply the aggregated staking signatures
 	// from all signers.
 	SigData []byte
+}
+
+// QuorumCertificateWithSignerIDs is a QuorumCertificat, where the signing nodes are identified via their `flow.Identifier`s instead of indices. Working with IDs as opposed to
+// indices is less efficient, but simpler, because we don't require a canonical node order.
+// It is used for bootstrapping new Epochs, because the FlowEpoch smart contract has no
+// notion of node ordering.
+type QuorumCertificateWithSignerIDs struct {
+	View      uint64
+	BlockID   Identifier
+	SignerIDs []Identifier
+	SigData   []byte
 }

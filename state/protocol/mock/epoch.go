@@ -37,6 +37,29 @@ func (_m *Epoch) Cluster(index uint) (protocol.Cluster, error) {
 	return r0, r1
 }
 
+// ClusterByChainID provides a mock function with given fields: chainID
+func (_m *Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
+	ret := _m.Called(chainID)
+
+	var r0 protocol.Cluster
+	if rf, ok := ret.Get(0).(func(flow.ChainID) protocol.Cluster); ok {
+		r0 = rf(chainID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.Cluster)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.ChainID) error); ok {
+		r1 = rf(chainID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Clustering provides a mock function with given fields:
 func (_m *Epoch) Clustering() (flow.ClusterList, error) {
 	ret := _m.Called()

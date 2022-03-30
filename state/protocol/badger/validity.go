@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state"
@@ -134,7 +135,7 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	}
 
 	// the collection cluster assignments need to be valid
-	_, err := flow.NewClusterList(setup.Assignments, activeParticipants.Filter(filter.HasRole(flow.RoleCollection)))
+	_, err := factory.NewClusterList(setup.Assignments, activeParticipants.Filter(filter.HasRole(flow.RoleCollection)))
 	if err != nil {
 		return fmt.Errorf("invalid cluster assignments: %w", err)
 	}

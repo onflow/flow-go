@@ -9,7 +9,6 @@ import (
 
 var (
 	ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
-	ErrInvalidFormat     = errors.New("invalid signature format")
 	ErrInvalidSignature  = errors.New("invalid signature")
 )
 
@@ -23,6 +22,28 @@ func (e NoVoteError) Error() string { return e.Msg }
 // IsNoVoteError returns whether an error is NoVoteError
 func IsNoVoteError(err error) bool {
 	var e NoVoteError
+	return errors.As(err, &e)
+}
+
+// InvalidFormatError indicates that some data has an incompatible format.
+type InvalidFormatError struct {
+	err error
+}
+
+func NewInvalidFormatError(err error) error {
+	return InvalidFormatError{err}
+}
+
+func NewInvalidFormatErrorf(msg string, args ...interface{}) error {
+	return InvalidFormatError{fmt.Errorf(msg, args...)}
+}
+
+func (e InvalidFormatError) Error() string { return e.err.Error() }
+func (e InvalidFormatError) Unwrap() error { return e.err }
+
+// IsInvalidFormatError returns whether err is a InvalidFormatError
+func IsInvalidFormatError(err error) bool {
+	var e InvalidFormatError
 	return errors.As(err, &e)
 }
 

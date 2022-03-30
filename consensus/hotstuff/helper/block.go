@@ -44,9 +44,9 @@ func WithParentBlock(parent *model.Block) func(*model.Block) {
 	}
 }
 
-func WithParentSigners(signerIDs []flow.Identifier) func(*model.Block) {
+func WithParentSigners(signerIndices []byte) func(*model.Block) {
 	return func(block *model.Block) {
-		block.QC.SignerIDs = signerIDs
+		block.QC.SignerIndices = signerIndices
 	}
 }
 

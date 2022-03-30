@@ -103,7 +103,7 @@ func HasRole(roles ...flow.Role) flow.IdentityFilter {
 // current epoch in good standing.
 var IsValidCurrentEpochParticipant = And(
 	HasWeight(true),
-	Not(Ejected),
+	Not(Ejected), // ejection will change signer index
 )
 
 // IsVotingConsensusCommitteeMember is a identity filter for all members of

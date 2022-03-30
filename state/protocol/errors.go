@@ -25,6 +25,9 @@ var (
 	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
 	// for a sealing segment below the root block.
 	ErrSealingSegmentBelowRootBlock = fmt.Errorf("cannot query sealing segment below root block")
+
+	// ErrClusterNotFound is a sentinel error returns for queries for a cluster
+	ErrClusterNotFound = fmt.Errorf("could not find cluster")
 )
 
 type IdentityNotFoundError struct {

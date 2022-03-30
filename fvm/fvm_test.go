@@ -100,35 +100,35 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 							//
 							// The withdraw amount and the account from getAccount
 							// would be the parameters to the transaction
-							
+
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
-							
+
 							transaction(amount: UFix64, to: Address) {
-							
+
 								// The Vault resource that holds the tokens that are being transferred
 								let sentVault: @FungibleToken.Vault
-							
+
 								prepare(signer: AuthAccount) {
-							
+
 									// Get a reference to the signer's stored vault
 									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
-							
+
 									// Withdraw tokens from the signer's stored vault
 									self.sentVault <- vaultRef.withdraw(amount: amount)
 								}
-							
+
 								execute {
-							
+
 									// Get the recipient's public account object
 									let recipient = getAccount(to)
-							
+
 									// Get a reference to the recipient's Receiver
 									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
 										.borrow<&{FungibleToken.Receiver}>()
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
-							
+
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
@@ -153,7 +153,7 @@ import FlowContractAudits from 0x%s
 
 transaction(deployAddress: Address, code: String) {
 	prepare(serviceAccount: AuthAccount) {
-		
+
 		let auditorAdmin = serviceAccount.borrow<&FlowContractAudits.Administrator>(from: FlowContractAudits.AdminStoragePath)
             ?? panic("Could not borrow a reference to the admin resource")
 
@@ -942,7 +942,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
-							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>() 
+							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
@@ -1574,7 +1574,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		num, err := strconv.ParseUint(tx.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0xb9c618010e32a0fb), num)
+		require.Equal(t, uint64(0x8872445cb397f6d2), num)
 	})
 }
 
@@ -2456,7 +2456,7 @@ func TestHashing(t *testing.T) {
 		return []byte(fmt.Sprintf(
 			`
 				import Crypto
-				
+
 				pub fun main(data: [UInt8]): [UInt8] {
 					return Crypto.hash(data, algorithm: HashAlgorithm.%s)
 				}
@@ -2466,7 +2466,7 @@ func TestHashing(t *testing.T) {
 		return []byte(fmt.Sprintf(
 			`
 				import Crypto
-				
+
 				pub fun main(data: [UInt8], tag: String): [UInt8] {
 					return Crypto.hashWithTag(data, tag: tag, algorithm: HashAlgorithm.%s)
 				}
@@ -2839,13 +2839,13 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-					
+
 					pub fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 							?? panic("Could not borrow Balance reference to the Vault")
-					
+
 						return vaultRef.balance
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
@@ -3062,13 +3062,13 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		code := []byte(fmt.Sprintf(`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
-					
+
 					pub fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
 							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 							?? panic("Could not borrow Balance reference to the Vault")
-					
+
 						return vaultRef.balance
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))

@@ -40,8 +40,8 @@ type Static struct {
 	dkg          protocol.DKG
 }
 
-func (s Static) Identities(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.participants.Filter(selector), nil
+func (s Static) Identities(_ flow.Identifier) (flow.IdentityList, error) {
+	return s.participants, nil
 }
 
 func (s Static) Identity(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {

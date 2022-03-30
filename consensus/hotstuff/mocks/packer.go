@@ -15,15 +15,15 @@ type Packer struct {
 }
 
 // Pack provides a mock function with given fields: blockID, sig
-func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
+func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]byte, []byte, error) {
 	ret := _m.Called(blockID, sig)
 
-	var r0 []flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *hotstuff.BlockSignatureData) []flow.Identifier); ok {
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *hotstuff.BlockSignatureData) []byte); ok {
 		r0 = rf(blockID, sig)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Identifier)
+			r0 = ret.Get(0).([]byte)
 		}
 	}
 
@@ -46,13 +46,13 @@ func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData
 	return r0, r1, r2
 }
 
-// Unpack provides a mock function with given fields: blockID, signerIDs, sigData
-func (_m *Packer) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
-	ret := _m.Called(blockID, signerIDs, sigData)
+// Unpack provides a mock function with given fields: signerIDs, sigData
+func (_m *Packer) Unpack(signerIDs flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+	ret := _m.Called(signerIDs, sigData)
 
 	var r0 *hotstuff.BlockSignatureData
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.Identifier, []byte) *hotstuff.BlockSignatureData); ok {
-		r0 = rf(blockID, signerIDs, sigData)
+	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte) *hotstuff.BlockSignatureData); ok {
+		r0 = rf(signerIDs, sigData)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*hotstuff.BlockSignatureData)
@@ -60,8 +60,8 @@ func (_m *Packer) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, s
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, []flow.Identifier, []byte) error); ok {
-		r1 = rf(blockID, signerIDs, sigData)
+	if rf, ok := ret.Get(1).(func(flow.IdentityList, []byte) error); ok {
+		r1 = rf(signerIDs, sigData)
 	} else {
 		r1 = ret.Error(1)
 	}
