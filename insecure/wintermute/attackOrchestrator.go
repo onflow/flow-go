@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/insecure"
@@ -47,83 +47,81 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		return fmt.Errorf("could not find corrupted identity for: %x", event.CorruptedId)
 	}
 
-	switch event.FlowProtocolEvent.(type) {
+	switch protocolEvent := event.FlowProtocolEvent.(type) {
+
 	case *flow.ExecutionReceipt:
-
-	}
-
-	// TODO: how do we keep track of state between calls to HandleEventFromCorruptedNode()?
-	// there will be many events sent to the orchestrator and we need a way to co-ordinate all the event calls
-
-	switch corruptedIdentity.Role {
-	case flow.RoleExecution:
-		// extract execution receipt so we can corrupt it
-		actualReceipt := event.FlowProtocolEvent.(*flow.ExecutionReceipt)
-		actualResult := actualReceipt.ExecutionResult
+		if corruptedIdentity.Role != flow.RoleExecution {
+			return fmt.Errorf("wrong sender role for execution receipt: %s", corruptedIdentity.Role.String())
+		}
 
 		// replace honest receipt with corrupted receipt
-
+		corruptedReceipt := o.corruptExecutionReceipt(protocolEvent)
 		// save all corrupted chunks so can create result approvals for them
 		// can just create result approvals here and save them
-		err := o.network.Send(&insecure.Event{
-			CorruptedId:       event.CorruptedId,
-			Channel:           event.Channel,
-			Protocol:          event.Protocol,
-			TargetNum:         event.TargetNum,
-			TargetIds:         event.TargetIds,
-			FlowProtocolEvent: corruptReceipt,
-		})
-		if err != nil {
-			return fmt.Errorf("could not send rpc on channel: %w", err)
+
+		corruptedExecutionIds := o.corruptedIds.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()
+
+		// sends corrupted execution receipt to all corrupted execution nodes.
+		for _, corruptedExecutionId := range corruptedExecutionIds {
+			err := o.network.Send(&insecure.Event{
+				CorruptedId:       corruptedExecutionId,
+				Channel:           event.Channel,
+				Protocol:          event.Protocol,
+				TargetNum:         event.TargetNum,
+				TargetIds:         event.TargetIds,
+				FlowProtocolEvent: corruptedReceipt,
+			})
+			if err != nil {
+				return fmt.Errorf("could not send rpc on channel: %w", err)
+			}
 		}
-
-	// need to send corrupted message to 2nd EN as well
-
-	// send corrupted result approvals to consensus node
-
-	case flow.RoleVerification:
-		// if the event is a chunk data request for any of the chunks of the corrupted result, then:
-		// if coming from an honest verification node -> do nothing (wintermuting the honest verification node).
-		// if coming from a corrupted verification node -> create and send the result approval for the requested
-		// chunk
-		// request coming from verification node
-
-		request := event.FlowProtocolEvent.(*messages.ChunkDataRequest)
-		request.ChunkID.String()
-
-		// go through the saved list of corrupted execution receipt - there should only be 1 execution receipt
-		// go through the execution result (should only be 1) in that execution receipt
-		// go through all the chunks in that execution result and check for a match with "ChunkID flow.Identifier" from ChunkDataRequest
-		// if no matches across all chunks, then send (we'll go over next time)
-		// if there is match, fill in result approval (attestation part) and send to verification node
-
-		// we need to lookup the chunk with the requested chunk id
-		// if that chunk belongs to the corrupted result
-		// we need to fill in an approval for it.
-		approval := flow.ResultApproval{
-			Body: flow.ResultApprovalBody{
-				// attestation needs to be filled in
-				//
-				Attestation: flow.Attestation{
-					BlockID:           flow.Identifier{},
-					ExecutionResultID: flow.Identifier{},
-					ChunkIndex:        0,
-				},
-				ApproverID:           flow.Identifier{}, // should be filled by corrupted VN ID
-				AttestationSignature: nil,               // can be done later (at verification node side)
-				Spock:                nil,               // can be done later (at verification node side)
-			},
-			VerifierSignature: nil,
-		}
-		approval.ID()
 
 	default:
-		// TODO should we return an error when role is neither EN nor VN?
-		panic("unexpected role for Wintermute attack")
+		return fmt.Errorf("unexpected message type for wintermute attack orchestrator: %T", protocolEvent)
 	}
 
 	return nil
 }
+
+// TODO: how do we keep track of state between calls to HandleEventFromCorruptedNode()?
+// there will be many events sent to the orchestrator and we need a way to co-ordinate all the event calls
+
+//switch corruptedIdentity.Role {
+//case flow.RoleVerification:
+//	// if the event is a chunk data request for any of the chunks of the corrupted result, then:
+//	// if coming from an honest verification node -> do nothing (wintermuting the honest verification node).
+//	// if coming from a corrupted verification node -> create and send the result approval for the requested
+//	// chunk
+//	// request coming from verification node
+//
+//	request := event.FlowProtocolEvent.(*messages.ChunkDataRequest)
+//	request.ChunkID.String()
+//
+//	// go through the saved list of corrupted execution receipt - there should only be 1 execution receipt
+//	// go through the execution result (should only be 1) in that execution receipt
+//	// go through all the chunks in that execution result and check for a match with "ChunkID flow.Identifier" from ChunkDataRequest
+//	// if no matches across all chunks, then send (we'll go over next time)
+//	// if there is match, fill in result approval (attestation part) and send to verification node
+//
+//	// we need to lookup the chunk with the requested chunk id
+//	// if that chunk belongs to the corrupted result
+//	// we need to fill in an approval for it.
+//	approval := flow.ResultApproval{
+//		Body: flow.ResultApprovalBody{
+//			// attestation needs to be filled in
+//			//
+//			Attestation: flow.Attestation{
+//				BlockID:           flow.Identifier{},
+//				ExecutionResultID: flow.Identifier{},
+//				ChunkIndex:        0,
+//			},
+//			ApproverID:           flow.Identifier{}, // should be filled by corrupted VN ID
+//			AttestationSignature: nil,               // can be done later (at verification node side)
+//			Spock:                nil,               // can be done later (at verification node side)
+//		},
+//		VerifierSignature: nil,
+//	}
+//	approval.ID()
 
 // corruptExecutionReceipt creates a corrupted version of the input receipt by tampering its content so that
 // the resulted corrupted version would not pass verification.
