@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
-	access "github.com/onflow/flow-go/cmd/access/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
@@ -101,12 +100,12 @@ func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentityList {
 	return ids
 }
 
-func getAccessNodeOptions(config *Config) []access.Option {
+func getAccessNodeOptions(config *Config) []NodeOption {
 	ids := bootstrapIdentities(config.bootstrapNodes)
-	return []access.Option{
-		access.WithBootStrapPeers(ids...),
-		access.WithBaseOptions(getBaseOptions(config)),
-		access.WithNetworkKey(config.networkPrivKey),
+	return []NodeOption{
+		WithBootStrapPeers(ids...),
+		WithBaseOptions(getBaseOptions(config)),
+		WithNetworkKey(config.networkPrivKey),
 	}
 }
 
@@ -137,9 +136,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	return options
 }
 
-func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessNodeBuilder, error) {
-	anb := access.FlowAccessNode(accessNodeOptions...)
-	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
+func buildAccessNode(accessNodeOptions []NodeOption) (*UnstakedAccessNodeBuilder, error) {
+	anb := FlowAccessNode(accessNodeOptions...)
+	nodeBuilder := NewUnstakedAccessNodeBuilder(anb)
 
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
