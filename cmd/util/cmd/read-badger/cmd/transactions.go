@@ -150,8 +150,9 @@ var transactionsDuplicateCmd = &cobra.Command{
 					_, err := storages.TransactionResults.ByBlockIDTransactionIndex(blockID, txIndex)
 					if err != nil {
 						if errors.Is(err, storage.ErrNotFound) {
+							transactionResult, err := storages.TransactionResults.ByBlockIDTransactionID(blockID, txID)
+
 							if flagFixTransactionResultsIndex {
-								transactionResult, err := storages.TransactionResults.ByBlockIDTransactionID(blockID, txID)
 								if err != nil {
 									panic(fmt.Sprintf("cannot get transaction results by (block_id, tx_id) (%s, %s): %s", blockID.String(), txID.String(), err))
 								}
@@ -161,8 +162,12 @@ var transactionsDuplicateCmd = &cobra.Command{
 								if err != nil {
 									panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
 								}
+								delete(missingHeights, block.Header.Height) // assume existing entries means whole block is mapped for a height
+							} else {
+								if err == nil {
+									delete(missingHeights, block.Header.Height) // assume existing entries means whole block is mapped for a height
+								}
 							}
-							delete(missingHeights, block.Header.Height) // assume existing entries means whole block is mapped for a height
 							indexNewEntries++
 						} else {
 							panic(fmt.Sprintf("error while querying transaction result by (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
