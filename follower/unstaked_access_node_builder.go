@@ -1,4 +1,4 @@
-package node_builder
+package follower
 
 import (
 	"context"
