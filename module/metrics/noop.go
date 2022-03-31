@@ -123,8 +123,9 @@ func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                   
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                     {}
 func (nc *NoopCollector) LatestTrieRegCount(number uint64)                                      {}
 func (nc *NoopCollector) LatestTrieRegCountDiff(number int64)                                   {}
-func (nc *NoopCollector) LatestTrieMaxDepth(number uint64)                                      {}
-func (nc *NoopCollector) LatestTrieMaxDepthDiff(number int64)                                   {}
+func (nc *NoopCollector) LatestTrieRegSize(size uint64)                                         {}
+func (nc *NoopCollector) LatestTrieRegSizeDiff(size int64)                                      {}
+func (nc *NoopCollector) LatestTrieMaxDepthTouched(maxDepth uint16)                             {}
 func (nc *NoopCollector) UpdateCount()                                                          {}
 func (nc *NoopCollector) ProofSize(bytes uint32)                                                {}
 func (nc *NoopCollector) UpdateValuesNumber(number uint64)                                      {}
