@@ -150,6 +150,10 @@ func TestHandleEventFromCorruptedNode_CorruptVN(t *testing.T) {
 
 // helper functions
 
+// bootstrapWintermuteFlowSystem bootstraps flow network with following setup:
+// verification nodes: 3 corrupted + 1 honest
+// execution nodes: 2 corrupted + 1 honest
+// other roles at the minimum required number and all honest.
 func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow.IdentityList, flow.IdentityList) {
 	// creates identities to bootstrap system with
 	corruptedVnIds := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleVerification))
