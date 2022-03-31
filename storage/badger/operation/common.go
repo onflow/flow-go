@@ -156,6 +156,18 @@ func remove(key []byte) func(*badger.Txn) error {
 	}
 }
 
+// HOTFIX: adding this method which will delete a key without first reading it
+// since reading a corrupt key causes an error.
+func removeUnchecked(key []byte) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		err := tx.Delete(key)
+		if err != nil {
+			return fmt.Errorf("could not remove key (unchecked): %w", err)
+		}
+		return nil
+	}
+}
+
 // retrieve will retrieve the binary data under the given key from the badger DB
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.

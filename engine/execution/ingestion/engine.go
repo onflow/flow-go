@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -972,9 +973,35 @@ func (e *Engine) matchOrRequestCollections(
 			continue
 		}
 
+		// HOTFIX: check for an internal Badger error, and attempt to delete
+		// the problematic data
+		if strings.Contains(err.Error(), "Invalid read") {
+			e.log.Warn().
+				Str("collection_id", guarantee.CollectionID.String()).
+				Msg("found corrupted collection")
+			err = e.collections.Remove(guarantee.CollectionID)
+			if err != nil {
+				e.log.Err(err).
+					Str("collection_id", guarantee.CollectionID.String()).
+					Msg("failed to remove corrupt collection")
+			}
+			lightCollection, err := e.collections.LightByID(guarantee.CollectionID)
+			if err != nil {
+				e.log.Err(err).
+					Str("collection_id", guarantee.CollectionID.String()).
+					Msg("failed to read corrupt collection contents")
+			} else {
+				e.log.Warn().
+					Str("collection_txns", fmt.Sprintf("%v", lightCollection.Transactions)).
+					Msg("corrupt collection contents")
+			}
+			e.log.Warn().Msg("restarting node after removing corrupt collection")
+			os.Exit(1)
+		}
+
 		// check if there was exception
 		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("error while querying for collection: %w", err)
+			return fmt.Errorf("error while querying for collection (%x): %w", guarantee.CollectionID, err)
 		}
 
 		// the storage doesn't have this collection, meaning this is our first time seeing this

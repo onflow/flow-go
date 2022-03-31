@@ -101,9 +101,25 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 	return &collection, nil
 }
 
+// HOTFIX: modifying this to use removeUnchecked (not used anywhere currently)
 func (c *Collections) Remove(colID flow.Identifier) error {
 	return operation.RetryOnConflict(c.db.Update, func(btx *badger.Txn) error {
-		err := operation.RemoveCollection(colID)(btx)
+		var light flow.LightCollection
+		err := operation.RetrieveCollection(colID, &light)(btx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve collection contents for deletion: %w", err)
+		}
+
+		// first remove all transactions
+		for _, txID := range light.Transactions {
+			err = operation.RemoveTransactionUnchecked(txID)(btx)
+			if err != nil {
+				return fmt.Errorf("could not remove transaction (%x): %w", txID, err)
+			}
+		}
+
+		// then remove all collections
+		err = operation.RemoveCollection(colID)(btx)
 		if err != nil {
 			return fmt.Errorf("could not remove collection: %w", err)
 		}

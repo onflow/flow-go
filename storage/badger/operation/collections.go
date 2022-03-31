@@ -20,8 +20,9 @@ func RetrieveCollection(collID flow.Identifier, collection *flow.LightCollection
 	return retrieve(makePrefix(codeCollection, collID), collection)
 }
 
+// HOTFIX: modifying this to use removeUnchecked (not used anywhere currently)
 func RemoveCollection(collID flow.Identifier) func(*badger.Txn) error {
-	return remove(makePrefix(codeCollection, collID))
+	return removeUnchecked(makePrefix(codeCollection, collID))
 }
 
 // IndexCollectionPayload indexes the transactions within the collection payload

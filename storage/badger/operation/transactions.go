@@ -15,3 +15,8 @@ func InsertTransaction(txID flow.Identifier, tx *flow.TransactionBody) func(*bad
 func RetrieveTransaction(txID flow.Identifier, tx *flow.TransactionBody) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeTransaction, txID), tx)
 }
+
+// HOTFIX: adding this to remove transactions without first checking existence.
+func RemoveTransactionUnchecked(txID flow.Identifier) func(*badger.Txn) error {
+	return removeUnchecked(makePrefix(codeTransaction, txID))
+}
