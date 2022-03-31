@@ -110,7 +110,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	}
 
 	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
+		nil, nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt, nil)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup

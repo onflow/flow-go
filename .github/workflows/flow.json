@@ -1,0 +1,2 @@
+{"networks": {"access": "127.0.0.1:3569","secure_access":{"host":"127.0.0.1:3570","key":"c324e10fa24d82cf3af19a0060a883fe1aed367f6cbe753b125b36971b6e43522b6ed2e51eb13f551f75bc1d5d72041490ea07ce64958b4cb7845b3e7897870a"}, "observer": "127.0.0.1:3573","secure_observer": {"host":"127.0.0.1:3574","key":"dfd23feae09b41ab6202ecaeebdfb75cd69b1c5188176e811f01239464fe9324747797c8cd478d8eca5fb09a0baf4f7e4105d0297f155ef3adc89dd30fce4e7a"}}}
+
