@@ -65,7 +65,7 @@ func TestOrchestrator_HandleEventFromCorruptedNode_SingleExecutionReceipt(t *tes
 		"orchestrator could not send corrupted receipts on time")
 }
 
-func TestOrchestrator_HandleEventFromCorruptedNode_MultipleExecutionReceipt(t *testing.T) {
+func TestOrchestrator_HandleEventFromCorruptedNode_MultipleExecutionReceipts(t *testing.T) {
 	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
 	corruptedExecutionIds := flow.IdentifierList(corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs())
 	// identities of nodes who are expected targets of an execution receipt.
@@ -284,4 +284,25 @@ func orchestratorOutputSanityCheck(
 		}
 	}
 	require.Equal(t, expBouncedReceiptCount, actualBouncedReceiptCount)
+}
+
+// distinctExecutionReceiptsFixture creates a set of execution receipts (with distinct result) one per given executor id.
+// It returns a map of execution receipts to their relevant attack network events.
+func receiptsWithDistinctResultFixture(exeIds flow.IdentifierList, targetIds flow.IdentifierList) map[*flow.ExecutionReceipt]*insecure.Event {
+	receiptMap := make(map[*flow.ExecutionReceipt]*insecure.Event)
+
+	for _, exeId := range exeIds {
+		receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(exeId))
+		event := &insecure.Event{
+			CorruptedId:       exeId,
+			Channel:           engine.PushReceipts,
+			Protocol:          insecure.Protocol_UNICAST,
+			TargetIds:         targetIds,
+			FlowProtocolEvent: receipt,
+		}
+
+		receiptMap[receipt] = event
+	}
+
+	return receiptMap
 }
