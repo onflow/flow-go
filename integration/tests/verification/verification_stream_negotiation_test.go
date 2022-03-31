@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
@@ -31,9 +32,9 @@ func (suite *VerificationStreamNegotiationSuite) TestVerificationNodeHappyPath()
 func testVerificationNodeHappyPath(t *testing.T,
 	exeID flow.Identifier,
 	verID flow.Identifier,
-	blocks *BlockState,
-	receipts *ReceiptState,
-	approvals *ResultApprovalState,
+	blocks *lib.BlockState,
+	receipts *lib.ReceiptState,
+	approvals *lib.ResultApprovalState,
 ) {
 
 	// wait for next height finalized (potentially first height), called blockA
