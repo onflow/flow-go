@@ -2,13 +2,20 @@ package execution
 
 import (
 	"context"
-
-	"github.com/stretchr/testify/require"
+	"testing"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func TestExecutionFailingTxReverted(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
+	suite.Run(t, new(FailingTxRevertedSuite))
+}
 
 type FailingTxRevertedSuite struct {
 	Suite
@@ -25,11 +32,11 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	s.T().Logf("got blockA height %v ID %v\n", blockA.Header.Height, blockA.Header.ID())
 
 	// send transaction
-	err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), common.CounterContract)
+	err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), lib.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, erBlockB := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), s.BlockState, s.ReceiptState)
+	blockB, erBlockB := lib.WaitUntilFinalizedStateCommitmentChanged(s.T(), s.BlockState, s.ReceiptState)
 	s.T().Logf("got blockB height %v ID %v\n", blockB.Header.Height, blockB.Header.ID())
 
 	// final states
@@ -37,20 +44,20 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	require.NoError(s.T(), err)
 
 	// send transaction that panics and should revert
-	tx := common.SDKTransactionFixture(
-		common.WithTransactionDSL(common.CreateCounterPanicTx(chain)),
-		common.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
-		common.WithChainID(chainID),
+	tx := lib.SDKTransactionFixture(
+		lib.WithTransactionDSL(lib.CreateCounterPanicTx(chain)),
+		lib.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
+		lib.WithChainID(chainID),
 	)
 
 	err = s.AccessClient().SendTransaction(context.Background(), &tx)
 	require.NoError(s.T(), err, "could not send tx to create counter that should panic")
 
 	// send transaction that has no sigs and should not execute
-	tx = common.SDKTransactionFixture(
-		common.WithTransactionDSL(common.CreateCounterTx(sdk.Address(serviceAddress))),
-		common.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
-		common.WithChainID(chainID),
+	tx = lib.SDKTransactionFixture(
+		lib.WithTransactionDSL(lib.CreateCounterTx(sdk.Address(serviceAddress))),
+		lib.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
+		lib.WithChainID(chainID),
 	)
 	tx.PayloadSignatures = nil
 	tx.EnvelopeSignatures = nil

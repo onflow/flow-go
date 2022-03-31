@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -19,23 +19,23 @@ import (
 // against happy path of verification nodes.
 type Suite struct {
 	suite.Suite
-	log                        zerolog.Logger
-	common.TestnetStateTracker                      // used to track messages over testnet
-	cancel                     context.CancelFunc   // used to tear down the testnet
-	net                        *testnet.FlowNetwork // used to keep an instance of testnet
-	nodeConfigs                []testnet.NodeConfig // used to keep configuration of nodes in testnet
-	nodeIDs                    []flow.Identifier    // used to keep identifier of nodes in testnet
-	ghostID                    flow.Identifier      // represents id of ghost node
-	exe1ID                     flow.Identifier
-	exe2ID                     flow.Identifier
-	verID                      flow.Identifier // represents id of verification node
-	PreferredUnicasts          string          // preferred unicast protocols between execution and verification nodes.
+	log                     zerolog.Logger
+	lib.TestnetStateTracker                      // used to track messages over testnet
+	cancel                  context.CancelFunc   // used to tear down the testnet
+	net                     *testnet.FlowNetwork // used to keep an instance of testnet
+	nodeConfigs             []testnet.NodeConfig // used to keep configuration of nodes in testnet
+	nodeIDs                 []flow.Identifier    // used to keep identifier of nodes in testnet
+	ghostID                 flow.Identifier      // represents id of ghost node
+	exe1ID                  flow.Identifier
+	exe2ID                  flow.Identifier
+	verID                   flow.Identifier // represents id of verification node
+	PreferredUnicasts       string          // preferred unicast protocols between execution and verification nodes.
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
 func (s *Suite) Ghost() *client.GhostClient {
 	ghost := s.net.ContainerByID(s.ghostID)
-	cli, err := common.GetGhostClient(ghost)
+	cli, err := lib.GetGhostClient(ghost)
 	require.NoError(s.T(), err, "could not get ghost client")
 	return cli
 }

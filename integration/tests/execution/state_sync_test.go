@@ -2,16 +2,24 @@ package execution
 
 import (
 	"context"
+	"testing"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func TestExecutionStateSync(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_DEPRECATED, "state sync disabled")
+	suite.Run(t, new(StateSyncSuite))
+}
 
 type StateSyncSuite struct {
 	Suite
@@ -29,11 +37,11 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	s.T().Logf("got erExe1BlockA with SC %x", finalStateExe1BlockA)
 
 	// send transaction
-	err = s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), common.CounterContract)
+	err = s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), lib.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), s.BlockState, s.ReceiptState)
+	blockB, _ := lib.WaitUntilFinalizedStateCommitmentChanged(s.T(), s.BlockState, s.ReceiptState)
 	s.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// wait for execution receipt for blockB from execution node 1
@@ -69,7 +77,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	require.NoError(s.T(), err)
 
 	// wait for ExecutionStateDelta
-	msg2 := s.MsgState.WaitForMsgFrom(s.T(), common.MsgIsExecutionStateDeltaWithChanges, s.exe1ID, "state delta from execution node")
+	msg2 := s.MsgState.WaitForMsgFrom(s.T(), lib.MsgIsExecutionStateDeltaWithChanges, s.exe1ID, "state delta from execution node")
 	executionStateDelta := msg2.(*messages.ExecutionStateDelta)
 	require.Equal(s.T(), finalStateExe1BlockB, executionStateDelta.EndState)
 }
