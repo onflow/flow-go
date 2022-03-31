@@ -60,7 +60,6 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 			if err != nil {
 				return fmt.Errorf("could not send rpc on channel: %w", err)
 			}
-			fmt.Printf("corrupted event: %x corrupted id: %x \n", event.FlowProtocolEvent.(*flow.ExecutionReceipt).ExecutorID, corruptedIdentity.NodeID)
 			return nil
 		}
 
