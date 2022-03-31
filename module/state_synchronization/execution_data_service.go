@@ -38,7 +38,7 @@ type ExecutionDataService interface {
 	Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error)
 
 	// Check checks if the ExecutionData for the given root CID is valid, and if not, returns the invalid CIDs
-	Check(ctx context.Context, rootID flow.Identifier) ([]cid.Cid, []error)
+	Check(ctx context.Context, rootID flow.Identifier) ([]InvalidCid, bool)
 }
 
 type executionDataServiceImpl struct {
@@ -47,6 +47,12 @@ type executionDataServiceImpl struct {
 	maxBlobSize int
 	metrics     module.ExecutionDataServiceMetrics
 	logger      zerolog.Logger
+}
+
+// InvalidCid is used by Check to communicate invalid CIDs within a blob tree
+type InvalidCid struct {
+	Cid cid.Cid
+	Err error
 }
 
 var _ ExecutionDataService = (*executionDataServiceImpl)(nil)
@@ -404,19 +410,30 @@ func (s *executionDataServiceImpl) Get(ctx context.Context, rootID flow.Identifi
 	return nil, ErrBlobTreeDepthExceeded
 }
 
-func (s *executionDataServiceImpl) checkBlobs(ctx context.Context, cids []cid.Cid) ([]cid.Cid, []error) {
-	errs := []error{}
-	invalidCids := []cid.Cid{}
+// checkBlobs gets each CID provided individually, and returns a list of InvalidCid objects if any
+// of the CIDs are invalid. This is intended to be used with a blobservice that has HashOnRead
+// enabled so GetBlob will return an error if any of the CIDs hashes don't match the CID.
+func (s *executionDataServiceImpl) checkBlobs(ctx context.Context, cids []cid.Cid) []InvalidCid {
+	invalidCids := []InvalidCid{}
 	for _, c := range cids {
 		if _, err := s.blobService.GetBlob(ctx, c); err != nil {
-			errs = append(errs, err)
-			invalidCids = append(invalidCids, c)
+			invalidCids = append(invalidCids, InvalidCid{
+				Cid: c,
+				Err: err,
+			})
 		}
 	}
-	return invalidCids, errs
+	return invalidCids
 }
 
-func (s *executionDataServiceImpl) Check(ctx context.Context, rootID flow.Identifier) ([]cid.Cid, []error) {
+// Check inspects all CIDs within a blob tree to ensure that they are valid and can be used to
+// reconstruct the underlying ExecutionData object.
+// If any are invalid, Check returns a list of InvalidCid objects, which contain the CID and the error
+// for any CIDs that are not valid
+//
+// This should be used with a blobservice that has HashOnRead enabled so corrupt data can be isolated
+// to specific CID(s).
+func (s *executionDataServiceImpl) Check(ctx context.Context, rootID flow.Identifier) ([]InvalidCid, bool) {
 	rootCid := flow.IdToCid(rootID)
 
 	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
@@ -431,30 +448,40 @@ func (s *executionDataServiceImpl) Check(ctx context.Context, rootID flow.Identi
 			// We know the specific error, so return it
 			var blobSizeLimitExceededError *BlobSizeLimitExceededError
 			if errors.As(err, &blobSizeLimitExceededError) {
-				return []cid.Cid{blobSizeLimitExceededError.cid}, []error{err}
+				return []InvalidCid{{
+					Cid: blobSizeLimitExceededError.cid,
+					Err: err,
+				}}, false
 			}
 
 			var malformedDataError *MalformedDataError
 			if errors.As(err, &malformedDataError) {
-				return []cid.Cid{rootCid}, []error{err}
+				return []InvalidCid{{
+					Cid: rootCid,
+					Err: err,
+				}}, false
 			}
 
 			// Otherwise we got a not found error, which just means the blobstore didn't return a blob.
 			// Validate each of the CIDs in this set, and return any that are invalid.
-			return s.checkBlobs(ctx, cids)
+			invalidCids := s.checkBlobs(ctx, cids)
+			return invalidCids, len(invalidCids) == 0
 		}
 
 		switch v := v.(type) {
 		case *ExecutionData:
-			// we a valid object
-			return nil, nil
+			// the object is valid
+			return nil, true
 		case *[]cid.Cid:
 			cids = *v
 		}
 	}
 
 	logger.Error().Err(ErrBlobTreeDepthExceeded).Msgf("blob tree depth exceeded during check")
-	return []cid.Cid{rootCid}, []error{ErrBlobTreeDepthExceeded}
+	return []InvalidCid{{
+		Cid: rootCid,
+		Err: ErrBlobTreeDepthExceeded,
+	}}, false
 }
 
 // MalformedDataError is returned when malformed data is found at some level of the requested

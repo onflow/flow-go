@@ -5,10 +5,7 @@ package state_synchronization
 import (
 	context "context"
 
-	cid "github.com/ipfs/go-cid"
-
 	flow "github.com/onflow/flow-go/model/flow"
-
 	mock "github.com/stretchr/testify/mock"
 
 	state_synchronization "github.com/onflow/flow-go/module/state_synchronization"
@@ -52,25 +49,23 @@ func (_m *ExecutionDataService) Add(ctx context.Context, sd *state_synchronizati
 }
 
 // Check provides a mock function with given fields: ctx, rootID
-func (_m *ExecutionDataService) Check(ctx context.Context, rootID flow.Identifier) ([]cid.Cid, []error) {
+func (_m *ExecutionDataService) Check(ctx context.Context, rootID flow.Identifier) ([]state_synchronization.InvalidCid, bool) {
 	ret := _m.Called(ctx, rootID)
 
-	var r0 []cid.Cid
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) []cid.Cid); ok {
+	var r0 []state_synchronization.InvalidCid
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) []state_synchronization.InvalidCid); ok {
 		r0 = rf(ctx, rootID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]cid.Cid)
+			r0 = ret.Get(0).([]state_synchronization.InvalidCid)
 		}
 	}
 
-	var r1 []error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) []error); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) bool); ok {
 		r1 = rf(ctx, rootID)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]error)
-		}
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1

@@ -657,12 +657,12 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 }
 
 func (e *executionDataRequesterImpl) checkExecutionData(ctx irrecoverable.SignalerContext, localEDS state_synchronization.ExecutionDataService, rootID flow.Identifier) (bool, error) {
-	invalidCIDs, cidErrs := localEDS.Check(ctx, rootID)
+	invalidCIDs, ok := localEDS.Check(ctx, rootID)
 
 	// Check returns a list of CIDs with the corresponding errors encountered while retrieving their
 	// data from the local datastore.
 
-	if len(invalidCIDs) == 0 {
+	if ok {
 		return true, nil
 	}
 
@@ -670,8 +670,9 @@ func (e *executionDataRequesterImpl) checkExecutionData(ctx irrecoverable.Signal
 	missing := false
 
 	var errs *multierror.Error
-	for i, cid := range invalidCIDs {
-		err := cidErrs[i]
+	for _, invalidCID := range invalidCIDs {
+		cid := invalidCID.Cid
+		err := invalidCID.Err
 
 		// Not Found, just report and continue
 		if errors.Is(err, blockservice.ErrNotFound) {
