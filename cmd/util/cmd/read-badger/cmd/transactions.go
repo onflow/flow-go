@@ -168,12 +168,9 @@ var transactionsDuplicateCmd = &cobra.Command{
 							if err != nil {
 								panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
 							}
-							delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
-						} else {
-							//if err == nil {
-							delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
-							//}
 						}
+						delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
+
 						indexNewEntries++
 					} else {
 						panic(fmt.Sprintf("error while querying transaction result by (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
