@@ -1,4 +1,4 @@
-package common
+package lib
 
 import (
 	"context"
@@ -117,7 +117,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 
 // WaitUntilFinalizedStateCommitmentChanged waits until a different state commitment for a finalized block is received
 // compared to the latest one from any execution node and returns the corresponding block and execution receipt
-func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *blockstate.BlockState, rs *receiptstate.ReceiptState,
+func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *blockstate.BlockState, rs *ReceiptState,
 	qualifiers ...func(receipt flow.ExecutionReceipt) bool) (*messages.BlockProposal,
 	*flow.ExecutionReceipt) {
 
@@ -161,10 +161,10 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *blockstate.Block
 		}
 
 		return true
-	}, receiptstate.StateTimeout, 100*time.Millisecond,
+	}, receiptStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive an execution receipt with a different state commitment from %x within %v seconds,"+
 			" initial finalized height: %v "+
-			" last block checked height %v, last block checked ID %x", initialFinalizedSC, receiptstate.ReceiptTimeout,
+			" last block checked height %v, last block checked ID %x", initialFinalizedSC, receiptTimeout,
 			initFinalizedheight,
 			currentHeight, currentID))
 

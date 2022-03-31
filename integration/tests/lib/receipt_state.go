@@ -1,4 +1,4 @@
-package common
+package lib
 
 import (
 	"fmt"
@@ -11,8 +11,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const ReceiptTimeout = 60 * time.Second
-const StateTimeout = 120 * time.Second
+const receiptTimeout = 60 * time.Second
+const receiptStateTimeout = 120 * time.Second
 
 type ReceiptState struct {
 	sync.RWMutex
@@ -46,9 +46,9 @@ func (rs *ReceiptState) WaitForReceiptFromAny(t *testing.T, blockID flow.Identif
 		defer rs.RUnlock()
 
 		return len(rs.receipts[blockID]) > 0
-	}, ReceiptTimeout, 100*time.Millisecond,
+	}, receiptTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive execution receipt for block ID %x from any node within %v seconds", blockID,
-			ReceiptTimeout))
+			receiptTimeout))
 	for _, r := range rs.receipts[blockID] {
 		return r
 	}
@@ -65,8 +65,8 @@ func (rs *ReceiptState) WaitForReceiptFrom(t *testing.T, blockID, executorID flo
 		var ok bool
 		r, ok = rs.receipts[blockID][executorID]
 		return ok
-	}, ReceiptTimeout, 100*time.Millisecond,
+	}, receiptTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive execution receipt for block ID %x from %x within %v seconds", blockID, executorID,
-			ReceiptTimeout))
+			receiptTimeout))
 	return r
 }

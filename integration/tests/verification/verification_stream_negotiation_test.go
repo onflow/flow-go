@@ -31,9 +31,9 @@ func (suite *VerificationStreamNegotiationSuite) TestVerificationNodeHappyPath()
 func testVerificationNodeHappyPath(t *testing.T,
 	exeID flow.Identifier,
 	verID flow.Identifier,
-	blocks *blockstate.BlockState,
-	receipts *receiptstate.ReceiptState,
-	approvals *approvalstate.ResultApprovalState,
+	blocks *BlockState,
+	receipts *ReceiptState,
+	approvals *ResultApprovalState,
 ) {
 
 	// wait for next height finalized (potentially first height), called blockA
