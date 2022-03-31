@@ -72,25 +72,7 @@ func TestOrchestrator_HandleEventFromCorruptedNode_MultipleExecutionReceipts(t *
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
-	corruptedEnId1 := corruptedExecutionIds[0]
-	receipt1 := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(corruptedEnId1))
-	event1 := &insecure.Event{
-		CorruptedId:       corruptedEnId1,
-		Channel:           engine.PushReceipts,
-		Protocol:          insecure.Protocol_UNICAST,
-		TargetIds:         receiptTargetIds.NodeIDs(),
-		FlowProtocolEvent: receipt1,
-	}
-
-	corruptedEnId2 := corruptedExecutionIds[1]
-	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(corruptedEnId2))
-	event2 := &insecure.Event{
-		CorruptedId:       corruptedEnId2,
-		Channel:           engine.PushReceipts,
-		Protocol:          insecure.Protocol_UNICAST,
-		TargetIds:         receiptTargetIds.NodeIDs(),
-		FlowProtocolEvent: receipt2,
-	}
+	eventMap, receipts := receiptsWithDistinctResultFixture(corruptedExecutionIds, receiptTargetIds.NodeIDs())
 
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
 
@@ -122,22 +104,17 @@ func TestOrchestrator_HandleEventFromCorruptedNode_MultipleExecutionReceipts(t *
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
 	corruptedReceiptsSentWG := sync.WaitGroup{}
-	corruptedReceiptsSentWG.Add(2)
-	go func() {
-		err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event1)
-		require.Equal(t, event1.CorruptedId, receipt1.ExecutorID)
-		require.NoError(t, err)
+	corruptedReceiptsSentWG.Add(len(eventMap))
+	for _, event := range eventMap {
+		event := event
 
-		corruptedReceiptsSentWG.Done()
-	}()
+		go func() {
+			err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
+			require.NoError(t, err)
 
-	go func() {
-		err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event2)
-		require.Equal(t, event2.CorruptedId, receipt2.ExecutorID)
-		require.NoError(t, err)
-
-		corruptedReceiptsSentWG.Done()
-	}()
+			corruptedReceiptsSentWG.Done()
+		}()
+	}
 
 	// waits till corrupted receipts dictated to all execution nodes.
 	unittest.RequireReturnsBefore(t,
@@ -156,7 +133,7 @@ func TestOrchestrator_HandleEventFromCorruptedNode_MultipleExecutionReceipts(t *
 		t,
 		receivedEventList,
 		corruptedExecutionIds,
-		flow.IdentifierList{receipt1.ID(), receipt2.ID()},
+		flow.GetIDs(receipts),
 		1)
 }
 
@@ -288,8 +265,15 @@ func orchestratorOutputSanityCheck(
 
 // distinctExecutionReceiptsFixture creates a set of execution receipts (with distinct result) one per given executor id.
 // It returns a map of execution receipts to their relevant attack network events.
-func receiptsWithDistinctResultFixture(exeIds flow.IdentifierList, targetIds flow.IdentifierList) map[*flow.ExecutionReceipt]*insecure.Event {
-	receiptMap := make(map[*flow.ExecutionReceipt]*insecure.Event)
+func receiptsWithDistinctResultFixture(
+	exeIds flow.IdentifierList,
+	targetIds flow.IdentifierList,
+) (map[flow.Identifier]*insecure.Event, []*flow.ExecutionReceipt) {
+	// list of execution receipts
+	receipts := make([]*flow.ExecutionReceipt, 0)
+
+	// map of execution receipt ids to their event.
+	eventMap := make(map[flow.Identifier]*insecure.Event)
 
 	for _, exeId := range exeIds {
 		receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(exeId))
@@ -301,8 +285,9 @@ func receiptsWithDistinctResultFixture(exeIds flow.IdentifierList, targetIds flo
 			FlowProtocolEvent: receipt,
 		}
 
-		receiptMap[receipt] = event
+		receipts = append(receipts, receipt)
+		eventMap[receipt.ID()] = event
 	}
 
-	return receiptMap
+	return eventMap, receipts
 }
