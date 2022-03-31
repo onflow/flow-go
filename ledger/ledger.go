@@ -321,6 +321,7 @@ func (v Value) MarshalJSON() ([]byte, error) {
 // Migration defines how to convert the given slice of input payloads into an slice of output payloads
 type Migration func(payloads []Payload) ([]Payload, error)
 
+// Ouputs of state extraction that can be used within reports
 type ExportOutputs struct {
 	CurrentStateCommitement string
 }

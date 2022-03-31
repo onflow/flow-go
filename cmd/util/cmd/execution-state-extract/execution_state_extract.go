@@ -93,10 +93,6 @@ func extractExecutionState(
 				Chain:                   chain,
 				PreviousStateCommitment: targetHash,
 			},
-			&reporters.EpochCounterReporter{
-				Log:   log,
-				Chain: chain,
-			},
 			&reporters.AccountReporter{
 				Log:   log,
 				Chain: chain,
