@@ -50,7 +50,6 @@ func TestForwardOutgoingMessages(t *testing.T) {
 	// expected DKGMessage
 	destinationID := unittest.IdentifierFixture()
 	expectedMsg := msg.NewDKGMessage(
-		1,
 		[]byte("hello"),
 		"dkg-123",
 	)
@@ -81,7 +80,7 @@ func TestForwardIncomingMessages(t *testing.T) {
 
 	originID := unittest.IdentifierFixture()
 	expectedMsg := msg.PrivDKGMessageIn{
-		DKGMessage: msg.NewDKGMessage(1, []byte("hello"), "dkg-123"),
+		DKGMessage: msg.NewDKGMessage([]byte("hello"), "dkg-123"),
 		OriginID:   originID,
 	}
 

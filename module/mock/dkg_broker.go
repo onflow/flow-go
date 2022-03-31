@@ -32,15 +32,15 @@ func (_m *DKGBroker) FlagMisbehavior(participant int, log string) {
 }
 
 // GetBroadcastMsgCh provides a mock function with given fields:
-func (_m *DKGBroker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
+func (_m *DKGBroker) GetBroadcastMsgCh() <-chan messages.BroadcastDKGMessage {
 	ret := _m.Called()
 
-	var r0 <-chan messages.DKGMessage
-	if rf, ok := ret.Get(0).(func() <-chan messages.DKGMessage); ok {
+	var r0 <-chan messages.BroadcastDKGMessage
+	if rf, ok := ret.Get(0).(func() <-chan messages.BroadcastDKGMessage); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan messages.DKGMessage)
+			r0 = ret.Get(0).(<-chan messages.BroadcastDKGMessage)
 		}
 	}
 
@@ -62,15 +62,15 @@ func (_m *DKGBroker) GetIndex() int {
 }
 
 // GetPrivateMsgCh provides a mock function with given fields:
-func (_m *DKGBroker) GetPrivateMsgCh() <-chan messages.DKGMessage {
+func (_m *DKGBroker) GetPrivateMsgCh() <-chan messages.PrivateDKGMessage {
 	ret := _m.Called()
 
-	var r0 <-chan messages.DKGMessage
-	if rf, ok := ret.Get(0).(func() <-chan messages.DKGMessage); ok {
+	var r0 <-chan messages.PrivateDKGMessage
+	if rf, ok := ret.Get(0).(func() <-chan messages.PrivateDKGMessage); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan messages.DKGMessage)
+			r0 = ret.Get(0).(<-chan messages.PrivateDKGMessage)
 		}
 	}
 
