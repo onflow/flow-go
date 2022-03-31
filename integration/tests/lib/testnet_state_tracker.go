@@ -17,10 +17,10 @@ import (
 
 type TestnetStateTracker struct {
 	ghostTracking bool
-	BlockState    *blockstate.BlockState
-	ReceiptState  *receiptstate.ReceiptState
-	ApprovalState *approvalstate.ResultApprovalState
-	MsgState      *msgstate.MsgState
+	BlockState    *BlockState
+	ReceiptState  *ReceiptState
+	ApprovalState *ResultApprovalState
+	MsgState      *MsgState
 }
 
 // Track starts to track new blocks, execution receipts and individual messages the ghost receives. The context will
