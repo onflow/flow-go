@@ -121,8 +121,12 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 
 func (s *CollectorSuite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
-	s.net.Remove()
-	s.cancel()
+	if s.net != nil {
+		s.net.Remove()
+	}
+	if s.cancel != nil {
+		s.cancel()
+	}
 	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
