@@ -54,6 +54,10 @@ var transactionsCmd = &cobra.Command{
 	},
 }
 
+// small utility to fill (block_id, tx_index) index
+// it iterates over all blocks, and, if requested, fills missing index entries
+// Importantly, not all blocks are executed (forks), so not every block will have tx results
+// However there should be at least one block executed for each height, hence adding that check as well
 var transactionsDuplicateCmd = &cobra.Command{
 	Use:   "transactions-duplicates",
 	Short: "report/fix duplicated transactions",
@@ -166,9 +170,9 @@ var transactionsDuplicateCmd = &cobra.Command{
 							}
 							delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
 						} else {
-							if err == nil {
-								delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
-							}
+							//if err == nil {
+							delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
+							//}
 						}
 						indexNewEntries++
 					} else {
@@ -197,7 +201,7 @@ var transactionsDuplicateCmd = &cobra.Command{
 			return
 		}
 
-		log.Info().Int("blocks", blockNo).Int("total_tx", totalTxs).Msg("processing progress")
+		log.Info().Int("blocks", blockNo).Int("total_tx", totalTxs).Msg("processing finished")
 
 		err = batch.Flush()
 		if err != nil {
