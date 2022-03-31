@@ -152,11 +152,12 @@ func TestOrchestrator_HandleEventFromCorruptedNode_MultipleExecutionReceipt(t *t
 		"orchestrator could not receive corrupted receipts on time")
 
 	// checks one receipt gets corrupted and sent to both corrupted execution nodes
-	receivedExecutionReceiptEventsSanityCheck(
+	orchestratorOutputSanityCheck(
 		t,
 		receivedEventList,
 		corruptedExecutionIds,
-		flow.IdentifierList{receipt1.ID(), receipt2.ID()})
+		flow.IdentifierList{receipt1.ID(), receipt2.ID()},
+		1)
 }
 
 // TestHandleEventFromCorruptedNode_HonestVN tests that honest VN will be ignored when they send a chunk data request
@@ -234,31 +235,53 @@ func mockAttackNetworkForCorruptedExecutionResult(
 	return wg
 }
 
-func receivedExecutionReceiptEventsSanityCheck(
+// orchestratorOutputSanityCheck performs a sanity check on the output events dictated by the wintermute orchestrator to the corrupted nodes.
+// It checks that: (1) exactly one execution result is dictated to ALL corrupted execution nodes. (2) except that one execution result, all other
+// incoming execution receipts are bounced back to corrupted execution node who sent it originally.
+//
+// An execution result is "dictated" when orchestrator corrupts a given result.
+// An execution receipt is "bounced" back when orchestrator doesn't tamper with it, and let it go to the flow network as it is.
+func orchestratorOutputSanityCheck(
 	t *testing.T,
-	events []*insecure.Event,
-	corruptedExecutionIds flow.IdentifierList,
-	originalReceiptIds flow.IdentifierList) {
+	outputEvents []*insecure.Event, // list of all output events of the wintermute orchestrator.
+	corrEnIds flow.IdentifierList, // list of all corrupted execution node ids.
+	orgReceiptIds flow.IdentifierList, // list of all execution receipt ids originally sent to orchestrator.
+	expBouncedReceiptCount int, // expected number of execution receipts that must remain uncorrupted
+) {
 
-	corruptedResults := make(map[flow.Identifier]flow.IdentifierList)
-	seenReceipts := flow.IdentifierList{}
-	for _, submittedEvent := range events {
-		switch event := submittedEvent.FlowProtocolEvent.(type) {
+	// keeps a map of (corrupted results ids -> execution node ids)
+	dictatedResults := make(map[flow.Identifier]flow.IdentifierList)
+
+	// keeps a list of all bounced back execution receipts.
+	bouncedReceipts := flow.IdentifierList{}
+	for _, outputEvent := range outputEvents {
+		switch event := outputEvent.FlowProtocolEvent.(type) {
 		case *flow.ExecutionReceipt:
-			seenReceipts.Union(flow.IdentifierList{event.ID()})
+			// uses union to avoid adding duplicate.
+			bouncedReceipts = bouncedReceipts.Union(flow.IdentifierList{event.ID()})
 		case *flow.ExecutionResult:
 			resultId := event.ID()
-			if corruptedResults[resultId] == nil {
-				corruptedResults[resultId] = flow.IdentifierList{}
+			if dictatedResults[resultId] == nil {
+				dictatedResults[resultId] = flow.IdentifierList{}
 			}
-			corruptedResults[event.ID()].Union(flow.IdentifierList{submittedEvent.CorruptedId})
+			// uses union to avoid adding duplicate.
+			dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedId})
 		}
 	}
 
 	// there must be only one corrupted result during a wintermute attack, and
 	// that corrupted result must be dictated to all corrupted execution ids.
-	require.Len(t, corruptedResults, 1)
-	for _, corruptedIds := range corruptedResults {
-		require.ElementsMatch(t, corruptedExecutionIds, corruptedIds)
+	require.Len(t, dictatedResults, 1)
+	for _, actualCorrEnIds := range dictatedResults {
+		require.ElementsMatch(t, corrEnIds, actualCorrEnIds)
 	}
+
+	// number of bounced receipts should match the expected value.
+	actualBouncedReceiptCount := 0
+	for _, originalReceiptId := range orgReceiptIds {
+		if bouncedReceipts.Contains(originalReceiptId) {
+			actualBouncedReceiptCount++
+		}
+	}
+	require.Equal(t, expBouncedReceiptCount, actualBouncedReceiptCount)
 }
