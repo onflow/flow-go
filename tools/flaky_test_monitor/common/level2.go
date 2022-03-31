@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // Level2Summary models full level 2 summary of multiple tests from 1 or more level 1 test runs
@@ -21,10 +23,10 @@ type Level2TestResult struct {
 	Passed          int       `json:"passed"`
 	Failed          int       `json:"failed"`
 	Skipped         int       `json:"skipped"`
-	NoResult        int       `json:"no_result"`
-	FailureRate     float32   `json:"failure_rate"`
-	AverageDuration float32   `json:"average_duration"`
-	Durations       []float32 `json:"durations"`
+	Exceptions      int       `json:"exceptions"`
+	FailureRate     float64   `json:"failure_rate"`
+	AverageDuration float64   `json:"average_duration"`
+	Durations       []float64 `json:"durations"`
 }
 
 // AssertLevel2TestResults checks that 2 Level2TestResult structs are equal, doing a deep comparison.
@@ -37,10 +39,10 @@ func AssertLevel2TestResults(t *testing.T, expectedLevel2TestResult, actualLevel
 	require.Equal(t, expectedLevel2TestResult.Passed, actualLevel2TestResult.Passed, "passed not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, expectedLevel2TestResult.Failed, actualLevel2TestResult.Failed, "failed not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, expectedLevel2TestResult.Skipped, actualLevel2TestResult.Skipped, "skipped not equal; test: "+expectedLevel2TestResult.Test)
-	require.Equal(t, expectedLevel2TestResult.NoResult, actualLevel2TestResult.NoResult, "no result not equal; test: "+expectedLevel2TestResult.Test)
+	require.Equal(t, expectedLevel2TestResult.Exceptions, actualLevel2TestResult.Exceptions, "exceptions not equal; test: "+expectedLevel2TestResult.Test)
 
-	require.Equal(t, expectedLevel2TestResult.FailureRate, actualLevel2TestResult.FailureRate, "failure rate not equal; test: "+expectedLevel2TestResult.Test)
-	require.Equal(t, expectedLevel2TestResult.AverageDuration, actualLevel2TestResult.AverageDuration, "avg duration not equal; test: "+expectedLevel2TestResult.Test)
+	unittest.AssertFloatEqual(t, expectedLevel2TestResult.FailureRate, actualLevel2TestResult.FailureRate, "failure rate not equal; test: "+expectedLevel2TestResult.Test)
+	unittest.AssertFloatEqual(t, expectedLevel2TestResult.AverageDuration, actualLevel2TestResult.AverageDuration, "avg duration not equal; test: "+expectedLevel2TestResult.Test)
 	require.Equal(t, len(expectedLevel2TestResult.Durations), len(actualLevel2TestResult.Durations), PrintLevel2TestResult(&actualLevel2TestResult, "duration list sizes don't match"))
 	// skip checking all individual durations because
 	// a. require.Contains() seems to have a bug for checking float values in a list
@@ -56,7 +58,7 @@ func PrintLevel2TestResult(level2TestResult *Level2TestResult, message string) s
 	builder.WriteString("\nRuns: " + fmt.Sprintf("%d", level2TestResult.Runs))
 	builder.WriteString("\nPassed: " + fmt.Sprintf("%d", level2TestResult.Passed))
 	builder.WriteString("\nFailed: " + fmt.Sprintf("%d", level2TestResult.Failed))
-	builder.WriteString("\nNo Result: " + fmt.Sprintf("%d", level2TestResult.NoResult))
+	builder.WriteString("\nExceptions: " + fmt.Sprintf("%d", level2TestResult.Exceptions))
 	builder.WriteString("\nSkipped: " + fmt.Sprintf("%d", level2TestResult.Skipped))
 	builder.WriteString("\nAvg Duration: " + fmt.Sprintf("%f", level2TestResult.AverageDuration))
 

@@ -2,7 +2,18 @@ package common
 
 import (
 	"time"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
+
+type SkippedTestEntry struct {
+	Test       string              `json:"test"`
+	SkipReason unittest.SkipReason `json:"skip_reason,omitempty"`
+	Package    string              `json:"package"`
+	CommitDate time.Time           `json:"commit_date"`
+	CommitSHA  string              `json:"commit_sha"`
+	Category   string              `json:"category"`
+}
 
 // RawTestStep models single line from "go test -json" output.
 type RawTestStep struct {
@@ -11,17 +22,7 @@ type RawTestStep struct {
 	Package string    `json:"Package"`
 	Test    string    `json:"Test"`
 	Output  string    `json:"Output"`
-	Elapsed float32   `json:"Elapsed"`
-}
-
-// Level1Summary models full level 1 summary of a test run from "go test -json".
-type Level1Summary struct {
-	TestMap map[string][]Level1TestResult `json:"-"`
-	Rows    []Level1TestResultRow         `json:"rows"`
-}
-
-type Level1TestResultRow struct {
-	TestResult Level1TestResult `json:"json"`
+	Elapsed float64   `json:"Elapsed"`
 }
 
 // Level1TestResult models result of a single test
@@ -31,14 +32,17 @@ type Level1TestResult struct {
 	CommitSha  string    `json:"commit_sha"`
 	CommitDate time.Time `json:"commit_date"`
 	JobRunDate time.Time `json:"job_run_date"`
+	RunID      string    `json:"run_id"`
 
 	// test specific data
-	Test    string `json:"test"`
-	Package string `json:"package"`
-	Output  []struct {
-		Item string `json:"item"`
-	} `json:"output"`
-	Result   string  `json:"result"`
-	Elapsed  float32 `json:"elapsed"`
-	NoResult bool    `json:"no_result"`
+	Test      string   `json:"test"`
+	Package   string   `json:"package"`
+	Output    []string `json:"output,omitempty"`
+	Elapsed   float64  `json:"elapsed"`
+	Pass      int      `json:"pass"`
+	Exception int      `json:"exception"`
+
+	Action string `json:"-"`
 }
+
+type Level1Summary []Level1TestResult

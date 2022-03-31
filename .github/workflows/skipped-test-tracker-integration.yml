@@ -1,0 +1,65 @@
+name: Skipped Test Tracker Integration Test
+
+on:
+  push:
+    branches:
+      - staging
+      - trying
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  generate-skipped-test-summary:
+    name: Generate Skipped Test Summary
+    strategy:
+      fail-fast: false
+      matrix:
+        test-category:
+          - unit
+          - unit-crypto
+          - unit-integration
+          - integration-mvp
+          - integration-ghost
+          - integration-network
+          - integration-epochs
+          - integration-access
+          - integration-collection
+          - integration-consensus
+          - integration-execution
+          - integration-verification
+    env:
+      TEST_CATEGORY: ${{ matrix.test-category }}
+      COMMIT_SHA: ${{ github.sha }}
+      RUN_ID: ${{ github.run_id }}
+      SKIPPED_TESTS_FILE: skipped-tests
+      TEST_OUTPUT_FILE: test-output
+    runs-on: ubuntu-latest
+    steps:
+    - name: Get job run date
+      id: job_run_date
+      run: echo "::set-output name=date::$(TZ=":America/Los_Angeles" date -Iseconds)"
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ env.COMMIT_SHA }}
+    - name: Get commit date
+      id: commit_date
+      run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
+    - name: Test setup
+      run: ./tools/flaky_test_monitor/test-setup.sh
+    - name: Run tests
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 60
+        max_attempts: 5
+        command: ./tools/flaky_test_monitor/run-tests.sh
+    - name: Process test results
+      run: cat $TEST_OUTPUT_FILE | go run tools/flaky_test_monitor/level1/process_summary1_results.go
+      env:
+        JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
+        COMMIT_DATE: ${{ steps.commit_date.outputs.date }}

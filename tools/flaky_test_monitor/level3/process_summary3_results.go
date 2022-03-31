@@ -9,7 +9,7 @@ import (
 )
 
 // generateLevel3Summary processes a level 2 summary and produces level 3 summary which summarizes:
-// most failed tests, tests with no-results, longest running tests.
+// most failed tests, tests with exceptions, longest running tests.
 func generateLevel3Summary(level2FilePath string, propertyFileDirectory string) common.Level3Summary {
 
 	config := common.ReadProperties(propertyFileDirectory)
@@ -30,19 +30,19 @@ func generateLevel3Summary(level2FilePath string, propertyFileDirectory string) 
 	}
 
 	// create lists to keep track of 3 main things
-	// 1. tests with no-results (ordered by most no-results)
+	// 1. tests with exceptions (ordered by most exceptions)
 	// 2. tests with failures (ordered by most failures)
 	// 3. tests with durations > 0 (ordered by longest durations)
 
-	noResultsTRS := []common.Level2TestResult{}
+	exceptionsTRS := []common.Level2TestResult{}
 	failuresTRS := []common.Level2TestResult{}
 	durationTRS := []common.Level2TestResult{}
 
 	// go through all level 2 test results to figure out grouping for tests with
-	// most failures, no-results, longest running
+	// most failures, exceptions, longest running
 	for _, trs := range level2Summary.TestResultsMap {
-		if trs.NoResult > 0 {
-			noResultsTRS = append(noResultsTRS, *trs)
+		if trs.Exceptions > 0 {
+			exceptionsTRS = append(exceptionsTRS, *trs)
 		}
 		if trs.Failed > 0 && trs.FailureRate >= config.FailureThresholdPercent {
 			failuresTRS = append(failuresTRS, *trs)
@@ -53,8 +53,8 @@ func generateLevel3Summary(level2FilePath string, propertyFileDirectory string) 
 	}
 
 	// sort no result slice from most no results to least - that's why less function compares in reverse order
-	sort.Slice(noResultsTRS, func(i, j int) bool {
-		return (noResultsTRS[i].NoResult > noResultsTRS[j].NoResult)
+	sort.Slice(exceptionsTRS, func(i, j int) bool {
+		return (exceptionsTRS[i].Exceptions > exceptionsTRS[j].Exceptions)
 	})
 
 	// sort failures slice from most failures to least - that's why less function compares in reverse order
@@ -68,7 +68,7 @@ func generateLevel3Summary(level2FilePath string, propertyFileDirectory string) 
 	})
 
 	var level3Summary common.Level3Summary
-	level3Summary.NoResults = noResultsTRS
+	level3Summary.Exceptions = exceptionsTRS
 
 	// total # of failed tests that satisfy min failure threshold
 	level3Summary.MostFailuresTotal = len(failuresTRS)

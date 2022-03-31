@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -24,17 +25,17 @@ func AssertNoError(err error, panicMessage string) {
 // ConvertToNDecimalPlaces2 converts the supplied numerator and denominator fraction into
 // a decimal with n decimal places. Works the same way as ConvertToNDecimalPlaces()
 // but has a float for the numerator.
-func ConvertToNDecimalPlaces2(n int, numerator float32, denominator int) float32 {
-	return convertToNDecimalPlacesInternal(n, numerator, float32(denominator))
+func ConvertToNDecimalPlaces2(n int, numerator float64, denominator int) float64 {
+	return convertToNDecimalPlacesInternal(n, numerator, float64(denominator))
 }
 
 // ConvertToNDecimalPlaces converts the supplied numerator and denominator fraction into
 // a decimal with n decimal places.
-func ConvertToNDecimalPlaces(n int, numerator, denominator int) float32 {
-	return convertToNDecimalPlacesInternal(n, float32(numerator), float32(denominator))
+func ConvertToNDecimalPlaces(n int, numerator, denominator int) float64 {
+	return convertToNDecimalPlacesInternal(n, float64(numerator), float64(denominator))
 }
 
-func convertToNDecimalPlacesInternal(n int, numerator, denominator float32) float32 {
+func convertToNDecimalPlacesInternal(n int, numerator, denominator float64) float64 {
 	if numerator == 0 || denominator == 0 {
 		return 0
 	}
@@ -42,7 +43,7 @@ func convertToNDecimalPlacesInternal(n int, numerator, denominator float32) floa
 	ratioString := fmt.Sprintf(formatSpecifier, numerator/denominator)
 	ratioFloat, err := strconv.ParseFloat(ratioString, 32)
 	AssertNoError(err, "failure parsing string to float")
-	return float32(ratioFloat)
+	return float64(ratioFloat)
 }
 
 func GetCommitSha() string {
@@ -53,21 +54,29 @@ func GetCommitSha() string {
 	return commitSha
 }
 
+func GetRunID() string {
+	runID := os.Getenv("RUN_ID")
+	if runID == "" {
+		panic("RUN_ID can't be empty")
+	}
+	return runID
+}
+
 func GetCommitDate() time.Time {
 	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
 	AssertNoError(err, "error parsing COMMIT_DATE")
-	return commitDate.UTC()
+	return commitDate
 }
 
 func GetJobRunDate() time.Time {
 	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
 	AssertNoError(err, "error parsing JOB_STARTED")
-	return jobStarted.UTC()
+	return jobStarted
 }
 
 // IsDirEmpty checks if directory is empty (has no files) and return true if it's empty, false otherwise.
-// Useful for determining whether to delete the failures / no-results directories
-// for cases when there were no failures / no-results.
+// Useful for determining whether to delete the failures / exceptions directories
+// for cases when there were no failures / exceptions.
 // From https://stackoverflow.com/a/30708914/5719544.
 func IsDirEmpty(name string) bool {
 	f, err := os.Open(name)
@@ -107,9 +116,32 @@ func SaveToFile(fileName string, testSummary interface{}) {
 	AssertNoError(err, "error marshalling json")
 
 	file, err := os.Create(fileName)
-	AssertNoError(err, "error creating filename")
+	AssertNoError(err, "error creating "+fileName)
 	defer file.Close()
 
 	_, err = file.Write(testSummaryBytes)
 	AssertNoError(err, "error saving test summary to file")
+}
+
+func SaveLinesToFile(fileName string, list interface{}) {
+	sliceType := reflect.TypeOf(list)
+	if sliceType.Kind() != reflect.Slice && sliceType.Kind() != reflect.Array {
+		panic("argument must be an array or slice")
+	}
+
+	file, err := os.Create(fileName)
+	AssertNoError(err, "error creating "+fileName)
+	defer file.Close()
+
+	l := reflect.ValueOf(list)
+	for i := 0; i < l.Len(); i++ {
+		b, err := json.Marshal(l.Index(i).Interface())
+		AssertNoError(err, "error marshalling json")
+
+		_, err = file.Write(b)
+		AssertNoError(err, "error writing line to file")
+
+		_, err = file.Write([]byte("\n"))
+		AssertNoError(err, "error writing newline")
+	}
 }
