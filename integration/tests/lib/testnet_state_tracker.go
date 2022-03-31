@@ -117,7 +117,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 
 // WaitUntilFinalizedStateCommitmentChanged waits until a different state commitment for a finalized block is received
 // compared to the latest one from any execution node and returns the corresponding block and execution receipt
-func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *blockstate.BlockState, rs *ReceiptState,
+func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState,
 	qualifiers ...func(receipt flow.ExecutionReceipt) bool) (*messages.BlockProposal,
 	*flow.ExecutionReceipt) {
 
