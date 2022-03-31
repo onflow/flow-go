@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
@@ -144,7 +145,7 @@ var transactionsDuplicateCmd = &cobra.Command{
 			for _, txID := range txs {
 
 				if _, has := megaMap[txID]; !has {
-					megaMap[txID] = make(map[flow.Identifier]struct{}, 0)
+					megaMap[txID] = make(map[flow.Identifier]struct{})
 				}
 
 				if _, has := megaMap[txID][blockID]; has {
