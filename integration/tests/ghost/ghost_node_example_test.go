@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -63,7 +63,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	ghostContainer := net.ContainerByID(ghostCollNode.Identifier)
 
 	// get a ghost client connected to the ghost node
-	ghostClient, err := common.GetGhostClient(ghostContainer)
+	ghostClient, err := lib.GetGhostClient(ghostContainer)
 	assert.NoError(t, err)
 
 	// generate a test transaction
@@ -74,7 +74,6 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	assert.NoError(t, err)
 	t.Logf("%v ================> FINISH TESTING %v", time.Now().UTC(), t.Name())
 }
-
 
 // TestGhostNodeExample_Subscribe demonstrates how to emulate a node and receive all inbound events for it
 func TestGhostNodeExample_Subscribe(t *testing.T) {
@@ -124,7 +123,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	ghostContainer := net.ContainerByID(ghostExeNode.Identifier)
 
 	// get a ghost client connected to the ghost node
-	ghostClient, err := common.GetGhostClient(ghostContainer)
+	ghostClient, err := lib.GetGhostClient(ghostContainer)
 	assert.NoError(t, err)
 
 	// subscribe to all the events the ghost execution node will receive
