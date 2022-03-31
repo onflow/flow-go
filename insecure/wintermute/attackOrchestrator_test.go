@@ -295,3 +295,37 @@ func receiptsWithDistinctResultFixture(
 
 	return eventMap, receipts
 }
+
+// receiptsWithSameResultFixture creates a set of receipts (all with the same result) one per given executor id.
+// It returns a map of execution receipts to their relevant attack network events.
+func receiptsWithSameResultFixture(
+	exeIds flow.IdentifierList,
+	targetIds flow.IdentifierList,
+) (map[flow.Identifier]*insecure.Event, []*flow.ExecutionReceipt) {
+	// list of execution receipts
+	receipts := make([]*flow.ExecutionReceipt, 0)
+
+	// map of execution receipt ids to their event.
+	eventMap := make(map[flow.Identifier]*insecure.Event)
+
+	result := unittest.ExecutionResultFixture()
+
+	for _, exeId := range exeIds {
+		receipt := unittest.ExecutionReceiptFixture(
+			unittest.WithExecutorID(exeId),
+			unittest.WithResult(result))
+
+		event := &insecure.Event{
+			CorruptedId:       exeId,
+			Channel:           engine.PushReceipts,
+			Protocol:          insecure.Protocol_UNICAST,
+			TargetIds:         targetIds,
+			FlowProtocolEvent: receipt,
+		}
+
+		receipts = append(receipts, receipt)
+		eventMap[receipt.ID()] = event
+	}
+
+	return eventMap, receipts
+}
