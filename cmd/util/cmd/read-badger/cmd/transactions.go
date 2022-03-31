@@ -159,14 +159,12 @@ var transactionsDuplicateCmd = &cobra.Command{
 						transactionResult, err := storages.TransactionResults.ByBlockIDTransactionID(blockID, txID)
 
 						if flagFixTransactionResultsIndex {
-							if err != nil {
-								panic(fmt.Sprintf("cannot get transaction results by (block_id, tx_id) (%s, %s): %s", blockID.String(), txID.String(), err))
-							}
-
-							result := operation.BatchIndexTransactionResult(blockID, txIndex, transactionResult)
-							err = result(batch.GetWriter())
-							if err != nil {
-								panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
+							if err == nil {
+								result := operation.BatchIndexTransactionResult(blockID, txIndex, transactionResult)
+								err = result(batch.GetWriter())
+								if err != nil {
+									panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
+								}
 							}
 						}
 						delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
