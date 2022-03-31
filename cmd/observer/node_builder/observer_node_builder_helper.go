@@ -1,9 +1,9 @@
 package observer
 
 import (
-	"encoding/json"
+	"encoding/hex"
 	"fmt"
-	"strings"
+	"github.com/onflow/flow-go/apiservice"
 	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -27,7 +27,6 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -169,6 +168,7 @@ type FlowAccessNodeBuilder struct {
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
+	Proxy                      *apiservice.FlowAPIService
 	// for the observer service, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
@@ -512,14 +512,26 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 		// json unmarshaller needs a quotes before and after the string
 		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
 		// hence this additional check to ensure the key is indeed quoted
-		if !strings.HasPrefix(key, "\"") {
-			key = fmt.Sprintf("\"%s\"", key)
-		}
+		//if !strings.HasPrefix(key, "\"") {
+		//	key = fmt.Sprintf("\"%s\"", key)
+		//}
+
 		// networking public key
-		var networkKey encodable.NetworkPubKey
-		err := json.Unmarshal([]byte(key), &networkKey)
+		buf, err := hex.DecodeString(key)
 		if err != nil {
 			return nil, err
+		}
+
+		// networking public key
+		networkKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, buf)
+		if err != nil {
+			networkKey, err = crypto.DecodePublicKey(crypto.ECDSASecp256k1, buf)
+			if err != nil {
+				networkKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, buf)
+				if err != nil {
+					networkKey = nil
+				}
+			}
 		}
 
 		// create the identity of the peer by setting only the relevant fields

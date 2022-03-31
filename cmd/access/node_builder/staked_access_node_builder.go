@@ -2,6 +2,7 @@ package node_builder
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -191,6 +192,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("server certificate", func(node *cmd.NodeConfig) error {
+			node.Logger.Info().Msg(fmt.Sprintf("grpc public key %s", hex.EncodeToString(node.NetworkKey.PublicKey().Encode())))
 			// generate the server certificate that will be served by the GRPC server
 			x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
 			if err != nil {
@@ -221,6 +223,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
+				nil,
 			)
 			return builder.RpcEng, nil
 		}).

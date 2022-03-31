@@ -53,7 +53,7 @@ jobs:
     - name: Docker build
       run: make docker-build-flow
     - name: Run Observer End To End
-      run: bash -c 'cd integration/localnet/ && make init-observer && make start && (docker ps | grep observer) && make stop'
+      run: bash -c 'cd integration/localnet/ && make init-with-observer && make start && (docker ps | grep observer) && make stop'
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
@@ -84,7 +84,7 @@ jobs:
     - name: Install Flow Client
       run: sh -ci "$(curl -fsSL https://storage.googleapis.com/flow-cli/install.sh)" && mv ~/.local/bin/flow /tmp
     - name: Set up Localnet
-      run: bash -c 'cd integration/localnet/ && make init-observer && make start'
+      run: bash -c 'cd integration/localnet/ && make init-with-observer && make start'
     - name: Wait 20 seconds to start
       run: sleep 20
     - name: Get Latest Blocks
