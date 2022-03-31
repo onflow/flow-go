@@ -71,6 +71,7 @@ var transactionsDuplicateCmd = &cobra.Command{
 		megaMap := map[flow.Identifier]map[flow.Identifier]struct{}{}
 
 		missingHeights := map[uint64]struct{}{}
+		allHeights := map[uint64]struct{}{}
 
 		blockNo := 0
 		totalTxs := 0
@@ -109,6 +110,7 @@ var transactionsDuplicateCmd = &cobra.Command{
 			}
 
 			missingHeights[block.Header.Height] = struct{}{}
+			allHeights[block.Header.Height] = struct{}{}
 
 			txIndex := uint32(0)
 			for i, guarantee := range block.Payload.Guarantees {
@@ -204,9 +206,9 @@ var transactionsDuplicateCmd = &cobra.Command{
 		}
 
 		if len(missingHeights) > 0 {
-			log.Info().Int("missing_heights_count", len(missingHeights)).Msg("missing block heights")
+			log.Info().Int("missing_heights_count", len(missingHeights)).Int("all_heights_count", len(allHeights)).Msg("missing block heights")
 		} else {
-			log.Info().Msg("all heights mapped")
+			log.Info().Int("all_heights_count", len(allHeights)).Msg("all heights mapped")
 		}
 
 		log.Info().Int("existing_entries", indexExistingEntries).Int("new_entries", indexNewEntries).Msg("index fixed")
