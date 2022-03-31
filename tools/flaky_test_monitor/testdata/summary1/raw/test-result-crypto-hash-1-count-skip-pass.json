@@ -8,7 +8,7 @@
 {"Time":"2021-10-06T07:11:37.589999-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_384","Elapsed":0}
 {"Time":"2021-10-06T07:11:37.590008-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256"}
 {"Time":"2021-10-06T07:11:37.590017-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256","Output":"=== RUN   TestSanitySha2_256\n"}
-{"Time":"2021-10-06T07:11:37.590029-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256","Output":"    hash_test.go:36: skip for testing\n"}
+{"Time":"2021-10-06T07:11:37.590029-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256","Output":"    hash_test.go:36: SKIP [TEST_TODO]: skip for testing\n"}
 {"Time":"2021-10-06T07:11:37.590039-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256","Output":"--- SKIP: TestSanitySha2_256 (0.00s)\n"}
 {"Time":"2021-10-06T07:11:37.590049-04:00","Action":"skip","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256","Elapsed":0}
 {"Time":"2021-10-06T07:11:37.590061-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_384"}
@@ -21,7 +21,7 @@
 {"Time":"2021-10-06T07:11:37.590169-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanityKmac128","Elapsed":0}
 {"Time":"2021-10-06T07:11:37.590178-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI"}
 {"Time":"2021-10-06T07:11:37.590186-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI","Output":"=== RUN   TestHashersAPI\n"}
-{"Time":"2021-10-06T07:11:37.5902-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI","Output":"    hash_test.go:96: skip for testing\n"}
+{"Time":"2021-10-06T07:11:37.5902-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI","Output":"    hash_test.go:96: SKIP [TEST_TODO]: skip for testing\n"}
 {"Time":"2021-10-06T07:11:37.590209-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI","Output":"--- SKIP: TestHashersAPI (0.00s)\n"}
 {"Time":"2021-10-06T07:11:37.590246-04:00","Action":"skip","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI","Elapsed":0}
 {"Time":"2021-10-06T07:11:37.590253-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3"}

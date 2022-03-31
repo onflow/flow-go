@@ -1,6 +1,5 @@
 {
-  "no_results": [],
-
+  "exceptions": [],
   "most_failures": [
     {
       "test": "TestSanitySha3_256",
@@ -9,7 +8,7 @@
       "passed": 0,
       "failed": 1,
       "skipped": 0,
-      "no_result": 0,
+      "exceptions": 0,
       "failure_rate": 1,
       "average_duration": 0,
       "durations": [
@@ -17,9 +16,7 @@
       ]
     }
   ],
-
   "most_failures_total": 1,
-
   "longest_running": [
     {
       "test": "TestSha3",
@@ -28,7 +25,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "no_result": 0,
+      "exceptions": 0,
       "failure_rate": 0,
       "average_duration": 0.23,
       "durations": [
@@ -42,7 +39,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "no_result": 0,
+      "exceptions": 0,
       "failure_rate": 0,
       "average_duration": 0.12,
       "durations": [
@@ -56,7 +53,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "no_result": 0,
+      "exceptions": 0,
       "failure_rate": 0,
       "average_duration": 0.11,
       "durations": [
@@ -64,6 +61,5 @@
       ]
     }
   ],
-
   "longest_running_total": 3
 }

@@ -13,13 +13,13 @@ import (
 
 func TestGenerateLevel3Summary(t *testing.T) {
 	testDataMap := map[string]string{
-		"1 failure the rest pass":                          "test1-1package-1failure",
-		"1 no-result test, no other tests":                 "test2-1-no-result-test",
-		"many no-result tests":                             "test3-multi-no-result-tests",
-		"many failures, many passes":                       "test4-multi-failures",
-		"many failures, many passes, many no-result tests": "test5-multi-durations",
-		"many failures - cap failures":                     "test6-multi-failures-cap",
-		"many durations - cap durations":                   "test7-multi-durations-cap",
+		"1 failure the rest pass":                     "test1-1package-1failure",
+		"1 exception, no other tests":                 "test2-1-exception",
+		"many exceptions":                             "test3-multi-exceptions",
+		"many failures, many passes":                  "test4-multi-failures",
+		"many failures, many passes, many exceptions": "test5-multi-durations",
+		"many failures - cap failures":                "test6-multi-failures-cap",
+		"many durations - cap durations":              "test7-multi-durations-cap",
 	}
 
 	for k, testDir := range testDataMap {
@@ -52,8 +52,8 @@ func runGenerateLevel3Summary(t *testing.T, testDir string) {
 
 	// check all details of test summary level 2 between expected and actual
 
-	// check # of no-results, failures and longest durations is the same for expected vs actual
-	require.Equal(t, len(expectedTestSummary3.NoResults), len(actualTestSummary3.NoResults))
+	// check # of exceptions, failures and longest durations is the same for expected vs actual
+	require.Equal(t, len(expectedTestSummary3.Exceptions), len(actualTestSummary3.Exceptions))
 
 	require.Equal(t, len(expectedTestSummary3.MostFailures), len(actualTestSummary3.MostFailures))
 	require.Equal(t, expectedTestSummary3.MostFailuresTotal, actualTestSummary3.MostFailuresTotal)
@@ -61,9 +61,9 @@ func runGenerateLevel3Summary(t *testing.T, testDir string) {
 	require.Equal(t, len(expectedTestSummary3.LongestRunning), len(actualTestSummary3.LongestRunning))
 	require.Equal(t, expectedTestSummary3.LongestRunningTotal, actualTestSummary3.LongestRunningTotal)
 
-	// check no-result, failure and duration lists are the same for expected vs actual
-	for noResultsIndex := range expectedTestSummary3.NoResults {
-		common.AssertLevel2TestResults(t, expectedTestSummary3.NoResults[noResultsIndex], actualTestSummary3.NoResults[noResultsIndex])
+	// check exception, failure and duration lists are the same for expected vs actual
+	for ExceptionsIndex := range expectedTestSummary3.Exceptions {
+		common.AssertLevel2TestResults(t, expectedTestSummary3.Exceptions[ExceptionsIndex], actualTestSummary3.Exceptions[ExceptionsIndex])
 	}
 
 	for failuresIndex := range expectedTestSummary3.MostFailures {
