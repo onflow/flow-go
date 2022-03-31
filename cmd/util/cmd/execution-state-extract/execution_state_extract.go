@@ -86,6 +86,13 @@ func extractExecutionState(
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
 		rs = []ledger.Reporter{
+			// The ExportReporter needs to be run first so that it can be used
+			// immediately after execution
+			&reporters.ExportReporter{
+				Log:                     log,
+				Chain:                   chain,
+				PreviousStateCommitment: targetHash,
+			},
 			&reporters.EpochCounterReporter{
 				Log:   log,
 				Chain: chain,

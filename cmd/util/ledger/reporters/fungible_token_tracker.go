@@ -84,7 +84,7 @@ type job struct {
 
 // Report creates a fungible_token_report_*.json file that contains data on all fungible token Vaults in the state commitment.
 // I recommend using gojq to browse through the data, because of the large uint64 numbers which jq won't be able to handle.
-func (r *FungibleTokenTracker) Report(payloads []ledger.Payload) error {
+func (r *FungibleTokenTracker) Report(payloads []ledger.Payload, _ ledger.ExportOutputs) error {
 	r.rw = r.rwf.ReportWriter(FungibleTokenTrackerReportPrefix)
 	defer r.rw.Close()
 

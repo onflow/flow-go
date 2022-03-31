@@ -372,6 +372,10 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("generating reports")
 
+	exportOutputs := ledger.ExportOutputs{
+		CurrentStateCommitement: statecommitment.String(),
+	}
+
 	// run reporters
 	for _, reporter := range reporters {
 		l.logger.Info().
@@ -379,7 +383,7 @@ func (l *Ledger) ExportCheckpointAt(
 			Msg("starting reporter")
 
 		start := time.Now()
-		err = reporter.Report(payloads)
+		err = reporter.Report(payloads, exportOutputs)
 		elapsed := time.Since(start)
 
 		l.logger.Info().

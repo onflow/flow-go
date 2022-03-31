@@ -17,30 +17,17 @@ import (
 
 // EpochCounterReporter reports the current epoch counter from the FlowEpoch smart contract.
 type EpochCounterReporter struct {
-	Chain flow.Chain
-	Log   zerolog.Logger
+	Chain                   flow.Chain
+	Log                     zerolog.Logger
+	PreviousStateCommitment flow.StateCommitment
 }
 
 func (e *EpochCounterReporter) Name() string {
 	return "EpochCounterReporter"
 }
 
-func (e *EpochCounterReporter) Report(payload []ledger.Payload) error {
-	l := migrations.NewView(payload)
-	prog := programs.NewEmptyPrograms()
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(e.Chain))
-
-	sc, err := systemcontracts.SystemContractsForChain(e.Chain.ChainID())
-	if err != nil {
-		return fmt.Errorf("error getting SystemContracts for chain %s: %w", e.Chain.String(), err)
-	}
-	address := sc.Epoch.Address
-	scriptCode := templates.GenerateGetCurrentEpochCounterScript(templates.Environment{
-		EpochAddress: address.Hex(),
-	})
-	script := fvm.Script(scriptCode)
-	err = vm.Run(ctx, script, l, prog)
+func (e *EpochCounterReporter) Report(payload []ledger.Payload, _ ledger.ExportOutputs) error {
+	script, address, err := ExecuteCurrentEpochScript(e.Chain, payload)
 	if err != nil {
 		e.Log.
 			Error().
@@ -64,6 +51,24 @@ func (e *EpochCounterReporter) Report(payload []ledger.Payload) error {
 			Msg("Failed to get epoch counter")
 	}
 	return nil
+}
+
+func ExecuteCurrentEpochScript(c flow.Chain, payload []ledger.Payload) (*fvm.ScriptProcedure, flow.Address, error) {
+	l := migrations.NewView(payload)
+	prog := programs.NewEmptyPrograms()
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(c))
+
+	sc, err := systemcontracts.SystemContractsForChain(c.ChainID())
+	if err != nil {
+		return nil, flow.Address{}, fmt.Errorf("error getting SystemContracts for chain %s: %w", c.String(), err)
+	}
+	address := sc.Epoch.Address
+	scriptCode := templates.GenerateGetCurrentEpochCounterScript(templates.Environment{
+		EpochAddress: address.Hex(),
+	})
+	script := fvm.Script(scriptCode)
+	return script, address, vm.Run(ctx, script, l, prog)
 }
 
 var _ ledger.Reporter = &EpochCounterReporter{}
