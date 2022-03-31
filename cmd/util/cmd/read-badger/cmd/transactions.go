@@ -109,11 +109,14 @@ var transactionsDuplicateCmd = &cobra.Command{
 				panic(fmt.Sprintf("header %s if here but not block", blockID.String()))
 			}
 
-			missingHeights[block.Header.Height] = struct{}{}
-			allHeights[block.Header.Height] = struct{}{}
+			missingHeights[header.Height] = struct{}{}
+			allHeights[header.Height] = struct{}{}
 
 			txIndex := uint32(0)
-			for i, guarantee := range block.Payload.Guarantees {
+
+			txs := make([]flow.Identifier, 0)
+
+			for _, guarantee := range block.Payload.Guarantees {
 				lightCollection, err := storages.Collections.LightByID(guarantee.CollectionID)
 				if err != nil {
 
@@ -128,60 +131,56 @@ var transactionsDuplicateCmd = &cobra.Command{
 					lightCollection = &light
 				}
 
-				txs := make([]flow.Identifier, len(lightCollection.Transactions))
+				txs = append(txs, lightCollection.Transactions...)
+			}
 
-				copy(txs, lightCollection.Transactions)
+			// add system tx
+			txs = append(txs, systemTxID)
 
-				// add system tx to last collection in block
-				if i == len(block.Payload.Guarantees)+1 {
-					txs = append(txs, systemTxID)
+			for _, txID := range txs {
+
+				if _, has := megaMap[txID]; !has {
+					megaMap[txID] = make(map[flow.Identifier]struct{}, 0)
 				}
 
-				for _, txID := range txs {
+				if _, has := megaMap[txID][blockID]; has {
+					panic(fmt.Sprintf("duplicated tx %s in block %s", txID.String(), blockID.String()))
+				}
 
-					if _, has := megaMap[txID]; !has {
-						megaMap[txID] = make(map[flow.Identifier]struct{}, 0)
-					}
+				megaMap[txID][blockID] = struct{}{}
 
-					if _, has := megaMap[txID][blockID]; has {
-						panic(fmt.Sprintf("duplicated tx %s in block %s", txID.String(), blockID.String()))
-					}
+				_, err := storages.TransactionResults.ByBlockIDTransactionIndex(blockID, txIndex)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						transactionResult, err := storages.TransactionResults.ByBlockIDTransactionID(blockID, txID)
 
-					megaMap[txID][blockID] = struct{}{}
-
-					_, err := storages.TransactionResults.ByBlockIDTransactionIndex(blockID, txIndex)
-					if err != nil {
-						if errors.Is(err, storage.ErrNotFound) {
-							transactionResult, err := storages.TransactionResults.ByBlockIDTransactionID(blockID, txID)
-
-							if flagFixTransactionResultsIndex {
-								if err != nil {
-									panic(fmt.Sprintf("cannot get transaction results by (block_id, tx_id) (%s, %s): %s", blockID.String(), txID.String(), err))
-								}
-
-								result := operation.BatchIndexTransactionResult(blockID, txIndex, transactionResult)
-								err = result(batch.GetWriter())
-								if err != nil {
-									panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
-								}
-								delete(missingHeights, block.Header.Height) // assume existing entries means whole block is mapped for a height
-							} else {
-								if err == nil {
-									delete(missingHeights, block.Header.Height) // assume existing entries means whole block is mapped for a height
-								}
+						if flagFixTransactionResultsIndex {
+							if err != nil {
+								panic(fmt.Sprintf("cannot get transaction results by (block_id, tx_id) (%s, %s): %s", blockID.String(), txID.String(), err))
 							}
-							indexNewEntries++
-						} else {
-							panic(fmt.Sprintf("error while querying transaction result by (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
-						}
-					} else {
-						delete(missingHeights, block.Header.Height) // assume existing entries means whole block is mapped for a height
-						indexExistingEntries++
-					}
 
-					totalTxs++
-					txIndex++
+							result := operation.BatchIndexTransactionResult(blockID, txIndex, transactionResult)
+							err = result(batch.GetWriter())
+							if err != nil {
+								panic(fmt.Sprintf("cannot batch index tx results by  (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
+							}
+							delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
+						} else {
+							if err == nil {
+								delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
+							}
+						}
+						indexNewEntries++
+					} else {
+						panic(fmt.Sprintf("error while querying transaction result by (block_id, tx_index) (%s, %d): %s", blockID.String(), txIndex, err))
+					}
+				} else {
+					delete(missingHeights, header.Height) // assume existing entries means whole block is mapped for a height
+					indexExistingEntries++
 				}
+
+				totalTxs++
+				txIndex++
 			}
 
 			blockNo++
