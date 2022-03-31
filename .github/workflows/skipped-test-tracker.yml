@@ -19,7 +19,8 @@ jobs:
           - unit
           - unit-crypto
           - unit-integration
-          - integration-common
+          - integration-mvp
+          - integration-ghost
           - integration-network
           - integration-epochs
           - integration-access

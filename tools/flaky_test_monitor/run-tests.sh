@@ -9,7 +9,7 @@ shopt -s extglob
 export JSON_OUTPUT=true
 
 # run tests and process results
-if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]
+if [[ $TEST_CATEGORY =~ integration-(ghost|mvp|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then
     # kill and remove orphaned containers from previous run
     docker rm -f $(docker ps -a -q) || true

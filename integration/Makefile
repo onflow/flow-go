@@ -3,10 +3,10 @@ COVER_PROFILE := cover.out
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: access-tests common-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests
+integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests
 
 .PHONY: ci-integration-test
-ci-integration-test: access-tests common-tests epochs-tests consensus-tests execution-tests verification-tests network-tests collection-tests
+ci-integration-test: access-tests ghost-tests mvp-tests epochs-tests consensus-tests execution-tests verification-tests network-tests collection-tests
 
 .PHONY: benchmark
 benchmark:
@@ -41,9 +41,13 @@ consensus-tests:
 epochs-tests:
 	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs/...
 
-.PHONY: common-tests
-common-tests:
-	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/common/...
+.PHONY: ghost-tests
+mvp-tests:
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/ghost/...
+
+.PHONY: mvp-tests
+mvp-tests:
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/mvp/...
 
 .PHONY: execution-tests
 execution-tests:

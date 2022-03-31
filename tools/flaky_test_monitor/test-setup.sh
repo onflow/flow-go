@@ -5,7 +5,7 @@ shopt -s extglob
 
 make crypto_setup_gopath
 
-if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]
+if [[ $TEST_CATEGORY =~ integration-(ghost|mvp|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then
     make docker-build-flow
 else
