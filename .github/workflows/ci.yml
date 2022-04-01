@@ -15,6 +15,9 @@ on:
       - 'feature/**'
       - 'v[0-9]+.[0-9]+'
 
+env:
+  GO_VERSION: 1.17
+
 jobs:
   golangci:
     name: Lint
@@ -23,7 +26,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.17
+        go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic
@@ -43,18 +46,12 @@ jobs:
         ignore: 'relic'
   unit-test:
     name: Unit Tests
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version:
-          - 1.16
-          - 1.17
     runs-on: ubuntu-latest
     steps:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: ${{ matrix.go-version }}
+        go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run tests
@@ -69,7 +66,6 @@ jobs:
         command: make ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v1
-      if: ${{ matrix.go-version == '1.17' }}
       with:
         file: ./coverage.txt
         flags: unittests
@@ -80,9 +76,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version:
-          - 1.16
-          - 1.17
         test-category:
           - integration-mvp
           - integration-ghost
@@ -100,7 +93,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: ${{ matrix.go-version}}
+        go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic

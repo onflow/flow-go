@@ -11,6 +11,9 @@ on:
     branches:
       - master
 
+env:
+  GO_VERSION: 1.17
+
 jobs:
   generate-flaky-test-summary:
     name: Generate Flaky Test Summary
@@ -43,7 +46,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.16
+        go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
       uses: actions/checkout@v2
       with:
