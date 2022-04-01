@@ -19,7 +19,7 @@ import (
 
 var _ ledger.Reporter = &ExportReporter{}
 
-type StateCommitmentProvider func() flow.StateCommitment
+type GetStateCommitmentFunc func() flow.StateCommitment
 
 type ExportReport struct {
 	EpochCounter            uint64
@@ -29,23 +29,23 @@ type ExportReport struct {
 
 // ExportReporter writes data that can be leveraged outside of extraction
 type ExportReporter struct {
-	logger                                zerolog.Logger
-	chain                                 flow.Chain
-	getBeforeMigrationStateCommitmentFunc StateCommitmentProvider
-	getAfterMigrationStateCommitmentFunc  StateCommitmentProvider
+	logger                   zerolog.Logger
+	chain                    flow.Chain
+	getBeforeMigrationSCFunc GetStateCommitmentFunc
+	getAfterMigrationSCFunc  GetStateCommitmentFunc
 }
 
 func NewExportReporter(
 	logger zerolog.Logger,
 	chain flow.Chain,
-	getBeforeMigrationStateCommitmentFunc StateCommitmentProvider,
-	getAfterMigrationStateCommitmentFunc StateCommitmentProvider,
+	getBeforeMigrationSCFunc GetStateCommitmentFunc,
+	getAfterMigrationSCFunc GetStateCommitmentFunc,
 ) *ExportReporter {
 	return &ExportReporter{
-		logger:                                logger,
-		chain:                                 chain,
-		getBeforeMigrationStateCommitmentFunc: getBeforeMigrationStateCommitmentFunc,
-		getAfterMigrationStateCommitmentFunc:  getAfterMigrationStateCommitmentFunc,
+		logger:                   logger,
+		chain:                    chain,
+		getBeforeMigrationSCFunc: getBeforeMigrationSCFunc,
+		getAfterMigrationSCFunc:  getAfterMigrationSCFunc,
 	}
 }
 
@@ -83,8 +83,8 @@ func (e *ExportReporter) Report(payload []ledger.Payload) error {
 
 	report := ExportReport{
 		EpochCounter:            script.Value.ToGoValue().(uint64),
-		PreviousStateCommitment: e.getBeforeMigrationStateCommitmentFunc(),
-		CurrentStateCommitment:  e.getAfterMigrationStateCommitmentFunc(),
+		PreviousStateCommitment: e.getBeforeMigrationSCFunc(),
+		CurrentStateCommitment:  e.getAfterMigrationSCFunc(),
 	}
 	file, _ := json.MarshalIndent(report, "", " ")
 	e.logger.
