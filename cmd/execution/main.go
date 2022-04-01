@@ -221,7 +221,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.NodeConfig) error {
