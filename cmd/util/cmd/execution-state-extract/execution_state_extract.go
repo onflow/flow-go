@@ -59,6 +59,7 @@ func extractExecutionState(
 
 	var migrations []ledger.Migration
 	var rs []ledger.Reporter
+	var newState ledger.State
 
 	if migrate {
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
@@ -88,11 +89,11 @@ func extractExecutionState(
 		rs = []ledger.Reporter{
 			// The ExportReporter needs to be run first so that it can be used
 			// immediately after execution
-			&reporters.ExportReporter{
-				Log:                     log,
-				Chain:                   chain,
-				PreviousStateCommitment: targetHash,
-			},
+			reporters.NewExportReporter(log,
+				chain,
+				func() flow.StateCommitment { return targetHash },
+				func() flow.StateCommitment { return flow.StateCommitment(newState) },
+			),
 			&reporters.AccountReporter{
 				Log:   log,
 				Chain: chain,
@@ -102,7 +103,7 @@ func extractExecutionState(
 		}
 	}
 
-	newState, err := led.ExportCheckpointAt(
+	newState, err = led.ExportCheckpointAt(
 		ledger.State(targetHash),
 		migrations,
 		rs,

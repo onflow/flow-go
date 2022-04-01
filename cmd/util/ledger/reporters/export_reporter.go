@@ -17,21 +17,36 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var (
-	currentStateCommitment string
-)
+var _ ledger.Reporter = &ExportReporter{}
+
+type StateCommitmentProvider func() flow.StateCommitment
 
 type ExportReport struct {
-	CurrentStateCommitment  string
 	EpochCounter            uint64
 	PreviousStateCommitment flow.StateCommitment
+	CurrentStateCommitment  flow.StateCommitment
 }
 
 // ExportReporter writes data that can be leveraged outside of extraction
 type ExportReporter struct {
-	Chain                   flow.Chain
-	Log                     zerolog.Logger
-	PreviousStateCommitment flow.StateCommitment
+	logger                                zerolog.Logger
+	chain                                 flow.Chain
+	getBeforeMigrationStateCommitmentFunc StateCommitmentProvider
+	getAfterMigrationStateCommitmentFunc  StateCommitmentProvider
+}
+
+func NewExportReporter(
+	logger zerolog.Logger,
+	chain flow.Chain,
+	getBeforeMigrationStateCommitmentFunc StateCommitmentProvider,
+	getAfterMigrationStateCommitmentFunc StateCommitmentProvider,
+) *ExportReporter {
+	return &ExportReporter{
+		logger:                                logger,
+		chain:                                 chain,
+		getBeforeMigrationStateCommitmentFunc: getBeforeMigrationStateCommitmentFunc,
+		getAfterMigrationStateCommitmentFunc:  getAfterMigrationStateCommitmentFunc,
+	}
 }
 
 func (e *ExportReporter) Name() string {
@@ -39,10 +54,10 @@ func (e *ExportReporter) Name() string {
 }
 
 func (e *ExportReporter) Report(payload []ledger.Payload) error {
-	script, _, err := ExecuteCurrentEpochScript(e.Chain, payload)
+	script, _, err := ExecuteCurrentEpochScript(e.chain, payload)
 
 	if err != nil {
-		e.Log.
+		e.logger.
 			Error().
 			Err(err).
 			Msg("error running GetCurrentEpochCounter script")
@@ -51,7 +66,7 @@ func (e *ExportReporter) Report(payload []ledger.Payload) error {
 	}
 
 	if script.Err != nil && script.Value == nil {
-		e.Log.
+		e.logger.
 			Error().
 			Err(script.Err).
 			Msg("Failed to get epoch counter")
@@ -61,27 +76,18 @@ func (e *ExportReporter) Report(payload []ledger.Payload) error {
 	}
 
 	epochCounter := script.Value.ToGoValue().(uint64)
-	e.Log.
+	e.logger.
 		Info().
 		Uint64("epochCounter", epochCounter).
 		Msg("Fetched epoch counter from the FlowEpoch smart contract")
 
-	sc, err := GetStateCommittment()
-	if err != nil {
-		e.Log.
-			Error().
-			Err(err).
-			Msg("error could not get state committment")
-		return nil
-	}
-
 	report := ExportReport{
-		CurrentStateCommitment:  sc,
 		EpochCounter:            script.Value.ToGoValue().(uint64),
-		PreviousStateCommitment: e.PreviousStateCommitment,
+		PreviousStateCommitment: e.getBeforeMigrationStateCommitmentFunc(),
+		CurrentStateCommitment:  e.getAfterMigrationStateCommitmentFunc(),
 	}
 	file, _ := json.MarshalIndent(report, "", " ")
-	e.Log.
+	e.logger.
 		Info().
 		Str("ExportReport", string(file)).
 		Msg("Ledger Export has finished")
@@ -107,16 +113,3 @@ func ExecuteCurrentEpochScript(c flow.Chain, payload []ledger.Payload) (*fvm.Scr
 	script := fvm.Script(scriptCode)
 	return script, address, vm.Run(ctx, script, l, prog)
 }
-
-func GetStateCommittment() (string, error) {
-	if currentStateCommitment == "" {
-		return "", fmt.Errorf("error state committment has not been set")
-	}
-	return currentStateCommitment, nil
-}
-
-func SetStateCommittment(sc string) {
-	currentStateCommitment = sc
-}
-
-var _ ledger.Reporter = &ExportReporter{}

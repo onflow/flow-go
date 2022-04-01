@@ -7,7 +7,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -372,8 +371,6 @@ func (l *Ledger) ExportCheckpointAt(
 	l.logger.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
 
 	l.logger.Info().Msgf("generating reports")
-
-	reporters.SetStateCommittment(statecommitment.String())
 
 	// run reporters
 	for _, reporter := range rs {
