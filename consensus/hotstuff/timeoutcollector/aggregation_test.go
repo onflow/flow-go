@@ -1,17 +1,20 @@
 package timeoutcollector
 
 import (
+	"math/rand"
+	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"math/rand"
-	"sync"
-	"testing"
 )
 
+// createAggregationData is a helper which creates fixture data for testing
 func createAggregationData(t *testing.T, signersNumber int) (
 	*MultiMessageSignatureAggregator,
 	flow.IdentityList,
@@ -55,6 +58,8 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	return aggregator, ids, pks, sigs, msgs, hashers
 }
 
+// TestNewMultiMessageSigAggregator tests different happy and unhappy path scenarios when constructing
+// multi message signature aggregator.
 func TestNewMultiMessageSigAggregator(t *testing.T) {
 	tag := "random_tag"
 
@@ -82,6 +87,8 @@ func TestNewMultiMessageSigAggregator(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestMultiMessageSignatureAggregator_HappyPath tests happy path when aggregating signatures
+// Tests verification, adding and aggregation. Test is performed in concurrent environment
 func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 	signersNum := 20
 	aggregator, ids, pks, sigs, msgs, hashers := createAggregationData(t, signersNum)
@@ -142,6 +149,7 @@ func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 	require.ElementsMatch(t, signers, identifiers)
 }
 
+// TestMultiMessageSignatureAggregator_TrustedAdd tests behavior of TrustedAdd under invalid input data.
 func TestMultiMessageSignatureAggregator_TrustedAdd(t *testing.T) {
 	signersNum := 20
 
@@ -191,6 +199,8 @@ func TestMultiMessageSignatureAggregator_TrustedAdd(t *testing.T) {
 	})
 }
 
+// TestMultiMessageSignatureAggregator_Aggregate tests that Aggregate performs internal checks and
+// doesn't produce aggregated signature even when feed with invalid signatures.
 func TestMultiMessageSignatureAggregator_Aggregate(t *testing.T) {
 	signersNum := 20
 
