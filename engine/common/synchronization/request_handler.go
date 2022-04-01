@@ -193,7 +193,14 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 
 	// enforce client-side max request size
-	maxHeight := req.FromHeight + uint64(r.core.(*synchronization.Core).Config.MaxSize)
+	var maxSize uint
+	// TODO: clean up this logic
+	if core, ok := r.core.(*synchronization.Core); ok {
+		maxSize = core.Config.MaxSize
+	} else {
+		maxSize = synchronization.DefaultConfig().MaxSize
+	}
+	maxHeight := req.FromHeight + uint64(maxSize)
 	if maxHeight < req.ToHeight {
 		req.ToHeight = maxHeight
 	}
@@ -241,13 +248,21 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		return nil
 	}
 
+	// TODO: clean up this logic
+	var maxSize uint
+	if core, ok := r.core.(*synchronization.Core); ok {
+		maxSize = core.Config.MaxSize
+	} else {
+		maxSize = synchronization.DefaultConfig().MaxSize
+	}
+
 	// deduplicate the block IDs in the batch request
 	blockIDs := make(map[flow.Identifier]struct{})
 	for _, blockID := range req.BlockIDs {
 		blockIDs[blockID] = struct{}{}
 
 		// enforce client-side max request size
-		if len(blockIDs) == int(r.core.(*synchronization.Core).Config.MaxSize) {
+		if len(blockIDs) == int(maxSize) {
 			break
 		}
 	}
