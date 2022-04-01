@@ -2,9 +2,9 @@ package wintermute
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -15,19 +15,20 @@ import (
 
 // Orchestrator encapsulates a stateful implementation of wintermute attack orchestrator logic.
 type Orchestrator struct {
-	attackDoneFlag *atomic.Bool // atomic boolean flag keeping track of whether attack conducted.
-	logger         zerolog.Logger
-	network        insecure.AttackNetwork
-	corruptedIds   flow.IdentityList
-	allIds         flow.IdentityList // identity of all nodes in the network (including non-corrupted ones)
+	sync.Mutex
+	state        *attackState
+	logger       zerolog.Logger
+	network      insecure.AttackNetwork
+	corruptedIds flow.IdentityList
+	allIds       flow.IdentityList // identity of all nodes in the network (including non-corrupted ones)
 }
 
 func NewOrchestrator(allIds flow.IdentityList, corruptedIds flow.IdentityList, logger zerolog.Logger) *Orchestrator {
 	o := &Orchestrator{
-		logger:         logger,
-		corruptedIds:   corruptedIds,
-		allIds:         allIds,
-		attackDoneFlag: atomic.NewBool(false),
+		logger:       logger,
+		corruptedIds: corruptedIds,
+		allIds:       allIds,
+		state:        nil,
 	}
 
 	return o
@@ -42,6 +43,9 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
 // the attacker instead of dispatching them to the network.
 func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
+	o.Lock()
+	defer o.Unlock()
+
 	corruptedIdentity, ok := o.corruptedIds.ByNodeID(event.CorruptedId)
 	if !ok {
 		return fmt.Errorf("could not find corrupted identity for: %x", event.CorruptedId)
@@ -54,8 +58,15 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 			return fmt.Errorf("wrong sender role for execution receipt: %s", corruptedIdentity.Role.String())
 		}
 
-		canConductAttack := o.attackDoneFlag.CAS(false, true)
-		if !canConductAttack {
+		if o.state != nil {
+			// non-nil state means an execution result has already been corrupted.
+			if protocolEvent.ExecutionResult.ID() == o.state.originalResult.ID() {
+				// receipt contains the original result that has been corrupted.
+				// corrupted result must have already been sent to this node, so
+				// just discards it.
+				return nil
+			}
+
 			err := o.network.Send(event)
 			if err != nil {
 				return fmt.Errorf("could not send rpc on channel: %w", err)
@@ -84,6 +95,14 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 			})
 			if err != nil {
 				return fmt.Errorf("could not send rpc on channel: %w", err)
+			}
+
+			// saves state of attack for further replies
+			o.state = &attackState{
+				originalResult:    &protocolEvent.ExecutionResult,
+				corruptedResult:   corruptedResult,
+				originalChunkIds:  flow.GetIDs(protocolEvent.ExecutionResult.Chunks),
+				corruptedChunkIds: flow.GetIDs(corruptedResult.Chunks),
 			}
 		}
 
