@@ -168,7 +168,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig))
+			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
