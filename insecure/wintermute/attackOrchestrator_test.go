@@ -153,7 +153,7 @@ func TestMultipleExecutionReceipts_SameResult(t *testing.T) {
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
-	eventMap, receipts := receiptsWithSameResultFixture(corruptedExecutionIds, receiptTargetIds.NodeIDs())
+	eventMap, receipts := receiptsWithSameResultFixture(t, corruptedExecutionIds, receiptTargetIds.NodeIDs())
 
 	wintermuteOrchestrator := wintermute.NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
 
@@ -377,6 +377,7 @@ func receiptsWithDistinctResultFixture(
 // receiptsWithSameResultFixture creates a set of receipts (all with the same result) one per given executor id.
 // It returns a map of execution receipts to their relevant attack network events.
 func receiptsWithSameResultFixture(
+	t *testing.T,
 	exeIds flow.IdentifierList,
 	targetIds flow.IdentifierList,
 ) (map[flow.Identifier]*insecure.Event, []*flow.ExecutionReceipt) {
@@ -392,6 +393,8 @@ func receiptsWithSameResultFixture(
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(exeId),
 			unittest.WithResult(result))
+
+		require.Equal(t, result.ID(), receipt.ExecutionResult.ID())
 
 		event := executionReceiptEvent(receipt, targetIds)
 
