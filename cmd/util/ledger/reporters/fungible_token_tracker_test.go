@@ -131,4 +131,5 @@ func TestFungibleTokenTracker(t *testing.T) {
 	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"7e60df042a9c0868","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"912d5440f7e3769e","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 
+	t.Log("success")
 }
