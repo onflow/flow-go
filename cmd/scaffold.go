@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
@@ -146,6 +147,13 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpochPhase, "dynamic-startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpoch, "dynamic-startup-epoch", "current", "the target epoch for dynamic-startup, use \"current\" to start node in the current epoch")
 	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in which the node will check if it can start")
+
+	// sync core flags
+	fnb.flags.DurationVar(&fnb.BaseConfig.SyncCoreConfig.RetryInterval, "sync-retry-interval", defaultConfig.SyncCoreConfig.RetryInterval, "the initial interval before we retry a sync request, uses exponential backoff")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.Tolerance, "sync-tolerance", defaultConfig.SyncCoreConfig.Tolerance, "determines how big of a difference in block heights we tolerate before actively syncing with range requests")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxAttempts, "sync-max-attempts", defaultConfig.SyncCoreConfig.MaxAttempts, "the maximum number of attempts we make for each requested block/height before discarding")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize, "sync-max-size", defaultConfig.SyncCoreConfig.MaxSize, "the maximum number of blocks we request in the same block request message")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -979,6 +987,12 @@ func WithSecretsDBEnabled(enabled bool) Option {
 func WithMetricsEnabled(enabled bool) Option {
 	return func(config *BaseConfig) {
 		config.MetricsEnabled = enabled
+	}
+}
+
+func WithSyncCoreConfig(syncConfig synchronization.Config) Option {
+	return func(config *BaseConfig) {
+		config.SyncCoreConfig = syncConfig
 	}
 }
 

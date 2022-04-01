@@ -195,7 +195,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -425,7 +425,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				synchronization.DefaultConfig(),
+				node.SyncCoreConfig,
 			)
 			if err != nil {
 				return nil, err

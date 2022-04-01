@@ -338,7 +338,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
