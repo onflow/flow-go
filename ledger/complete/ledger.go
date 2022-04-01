@@ -265,7 +265,7 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 func (l *Ledger) ExportCheckpointAt(
 	state ledger.State,
 	migrations []ledger.Migration,
-	rs []ledger.Reporter,
+	reporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
 ) (ledger.State, error) {
@@ -373,7 +373,7 @@ func (l *Ledger) ExportCheckpointAt(
 	l.logger.Info().Msgf("generating reports")
 
 	// run reporters
-	for _, reporter := range rs {
+	for _, reporter := range reporters {
 		l.logger.Info().
 			Str("name", reporter.Name()).
 			Msg("starting reporter")
