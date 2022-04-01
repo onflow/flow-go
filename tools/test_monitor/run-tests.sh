@@ -9,8 +9,12 @@ shopt -s extglob
 if [[ $TEST_CATEGORY =~ integration-(ghost|mvp|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then
     # kill and remove orphaned containers from previous run
-    sudo systemctl restart docker >&2
-    (docker rm -f $(docker ps -a -q) || true) >&2
+    containers=$(docker ps -a -q)
+    
+    if [ ! -z "$containers" ]
+    then
+        docker rm -f $containers > /dev/null
+    fi
     
     make -C integration -s ${BASH_REMATCH[1]}-tests
 else
