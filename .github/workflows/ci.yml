@@ -83,6 +83,18 @@ jobs:
         go-version:
           - 1.16
           - 1.17
+        test-category:
+          - integration-mvp
+          - integration-ghost
+          - integration-network
+          - integration-epochs
+          - integration-access
+          - integration-collection
+          - integration-consensus
+          - integration-execution
+          - integration-verification
+    env:
+      TEST_CATEGORY: ${{ matrix.test-category }}
     runs-on: ubuntu-latest
     steps:
     - name: Setup Go
@@ -97,11 +109,11 @@ jobs:
       run: make docker-build-flow
     - name: Run tests
       if: github.actor != 'bors[bot]'
-      run: make ci-integration
+      run: ./tools/test_monitor/run-tests.sh
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 15
         max_attempts: 2
-        command: make ci-integration
+        command: ./tools/test_monitor/run-tests.sh
