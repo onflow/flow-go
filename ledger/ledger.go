@@ -321,15 +321,10 @@ func (v Value) MarshalJSON() ([]byte, error) {
 // Migration defines how to convert the given slice of input payloads into an slice of output payloads
 type Migration func(payloads []Payload) ([]Payload, error)
 
-// Ouputs of state extraction that can be used within reports
-type ExportOutputs struct {
-	CurrentStateCommitement string
-}
-
 // Reporter reports on data from the state
 type Reporter interface {
 	// Name returns the name of the reporter. Only used for logging.
 	Name() string
 	// Report accepts slice ledger payloads and reports the state of the ledger
-	Report(payloads []Payload, exportOutputs ExportOutputs) error
+	Report(payloads []Payload) error
 }

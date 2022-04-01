@@ -17,6 +17,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var (
+	currentStateCommitment string
+)
+
 type ExportReport struct {
 	CurrentStateCommitment  string
 	EpochCounter            uint64
@@ -34,7 +38,7 @@ func (e *ExportReporter) Name() string {
 	return "ExportReporter"
 }
 
-func (e *ExportReporter) Report(payload []ledger.Payload, o ledger.ExportOutputs) error {
+func (e *ExportReporter) Report(payload []ledger.Payload) error {
 	script, _, err := ExecuteCurrentEpochScript(e.Chain, payload)
 
 	if err != nil {
@@ -62,8 +66,17 @@ func (e *ExportReporter) Report(payload []ledger.Payload, o ledger.ExportOutputs
 		Uint64("epochCounter", epochCounter).
 		Msg("Fetched epoch counter from the FlowEpoch smart contract")
 
+	sc, err := GetStateCommittment()
+	if err != nil {
+		e.Log.
+			Error().
+			Err(err).
+			Msg("error could not get state committment")
+		return nil
+	}
+
 	report := ExportReport{
-		CurrentStateCommitment:  o.CurrentStateCommitement,
+		CurrentStateCommitment:  sc,
 		EpochCounter:            script.Value.ToGoValue().(uint64),
 		PreviousStateCommitment: e.PreviousStateCommitment,
 	}
@@ -93,6 +106,17 @@ func ExecuteCurrentEpochScript(c flow.Chain, payload []ledger.Payload) (*fvm.Scr
 	})
 	script := fvm.Script(scriptCode)
 	return script, address, vm.Run(ctx, script, l, prog)
+}
+
+func GetStateCommittment() (string, error) {
+	if currentStateCommitment == "" {
+		return "", fmt.Errorf("error state committment has not been set")
+	}
+	return currentStateCommitment, nil
+}
+
+func SetStateCommittment(sc string) {
+	currentStateCommitment = sc
 }
 
 var _ ledger.Reporter = &ExportReporter{}

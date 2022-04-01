@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -265,7 +266,7 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 func (l *Ledger) ExportCheckpointAt(
 	state ledger.State,
 	migrations []ledger.Migration,
-	reporters []ledger.Reporter,
+	rs []ledger.Reporter,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
 ) (ledger.State, error) {
@@ -372,18 +373,16 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("generating reports")
 
-	exportOutputs := ledger.ExportOutputs{
-		CurrentStateCommitement: statecommitment.String(),
-	}
+	reporters.SetStateCommittment(statecommitment.String())
 
 	// run reporters
-	for _, reporter := range reporters {
+	for _, reporter := range rs {
 		l.logger.Info().
 			Str("name", reporter.Name()).
 			Msg("starting reporter")
 
 		start := time.Now()
-		err = reporter.Report(payloads, exportOutputs)
+		err = reporter.Report(payloads)
 		elapsed := time.Since(start)
 
 		l.logger.Info().

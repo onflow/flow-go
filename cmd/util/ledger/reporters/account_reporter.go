@@ -56,7 +56,7 @@ type momentsRecord struct {
 	Moments int    `json:"moments"`
 }
 
-func (r *AccountReporter) Report(payload []ledger.Payload, _ ledger.ExportOutputs) error {
+func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	rwa := r.RWF.ReportWriter("account_report")
 	rwc := r.RWF.ReportWriter("contract_report")
 	rwm := r.RWF.ReportWriter("moments_report")
