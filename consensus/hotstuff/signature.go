@@ -107,6 +107,43 @@ type WeightedSignatureAggregator interface {
 	Aggregate() ([]flow.Identifier, []byte, error)
 }
 
+// MultiMessageSignatureAggregator aggregates signatures of the same signature scheme but
+// possibly distinct message from different signers. Only public keys are agreed upon upfront.
+// It's similar to WeightedSignatureAggregator but supports distinct messages.
+// It is also recommended to only aggregate signatures generated with keys representing
+// equivalent security-bit level.
+// Furthermore, a weight [unsigned int64] is assigned to each signer ID. The
+// MultiMessageSignatureAggregator internally tracks the total weight of all collected signatures.
+// Implementations must be concurrency safe.
+type MultiMessageSignatureAggregator interface {
+	// Verify verifies the signature under the stored public keys.
+	// Expected errors during normal operations:
+	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
+	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+	Verify(signerID flow.Identifier, sig crypto.Signature, msg []byte) error
+
+	// TrustedAdd adds signature and message to the internal set of signatures and adds the signer's
+	// weight to the total collected weight, iff the signature is _not_ a duplicate.
+	// The total weight of all collected signatures (excluding duplicates) is returned regardless
+	// of any returned error.
+	// The function errors with:
+	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
+	//  - model.DuplicatedSignerError if the signer has been already added
+	TrustedAdd(signerID flow.Identifier, sig crypto.Signature, msg []byte) (totalWeight uint64, exception error)
+
+	// TotalWeight returns the total weight presented by the collected signatures.
+	TotalWeight() uint64
+
+	// Aggregate aggregates the signatures and returns the aggregated signature.
+	// The function performs a final verification and errors if the aggregated
+	// signature is not valid. This is required for the function safety since
+	// `TrustedAdd` allows adding invalid signatures.
+	// Expected errors during normal operations:
+	//  - model.InsufficientSignaturesError if no signatures have been added yet
+	//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
+	Aggregate() ([]flow.Identifier, []byte, error)
+}
+
 // BlockSignatureData is an intermediate struct for Packer to pack the
 // aggregated signature data into raw bytes or unpack from raw bytes.
 type BlockSignatureData struct {

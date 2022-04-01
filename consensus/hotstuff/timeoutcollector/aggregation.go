@@ -2,6 +2,7 @@ package timeoutcollector
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -22,6 +23,13 @@ type sigInfo struct {
 	msg []byte
 }
 
+// MultiMessageSignatureAggregator implements consensus/hotstuff.MultiMessageSignatureAggregator.
+// It aggregates BLS signatures for many messages from different signers.
+// Only public keys needs to be agreed upon upfront.
+// Each signer is allowed to sign at most once.
+// Aggregation uses BLS scheme. Mitigation against rogue attacks is done using Proof Of Possession (PoP)
+// This module does not verify PoPs of input public keys, it assumes verification was done outside this module.
+// Implementation is thread-safe.
 type MultiMessageSignatureAggregator struct {
 	lock             sync.RWMutex
 	hasher           hash.Hasher
@@ -31,6 +39,8 @@ type MultiMessageSignatureAggregator struct {
 	publicKeys       []crypto.PublicKey             // keys indexed from 0 to n-1, signer i is assigned to public key i
 	totalWeight      uint64                         // total accumulated weight
 }
+
+var _ hotstuff.MultiMessageSignatureAggregator = (*MultiMessageSignatureAggregator)(nil)
 
 // NewMultiMessageSigAggregator returns a multi message signature aggregator initialized with a list of flow
 // identities, their respective public keys and a domain separation tag. The identities
