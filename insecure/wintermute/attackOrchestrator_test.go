@@ -146,6 +146,81 @@ func TestMultipleExecutionReceipts_DistinctResult(t *testing.T) {
 		1)
 }
 
+func TestMultipleExecutionReceipts_SameResult(t *testing.T) {
+	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
+	corruptedExecutionIds := flow.IdentifierList(corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs())
+	// identities of nodes who are expected targets of an execution receipt.
+	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
+	require.NoError(t, err)
+
+	eventMap, receipts := receiptsWithSameResultFixture(corruptedExecutionIds, receiptTargetIds.NodeIDs())
+
+	wintermuteOrchestrator := wintermute.NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
+
+	// keeps list of output events sent by orchestrator to the attack network.
+	orchestratorOutputEvents := make([]*insecure.Event, 0)
+	orchestratorSentAllEventsWg := &sync.WaitGroup{}
+	// orchestrator is supposed to only two events:
+	// same corrupted execution result sent to two nodes.
+	orchestratorSentAllEventsWg.Add(2)
+
+	// mocks attack network to record and keep the output events of
+	// orchestrator for further sanity check.
+	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	mockAttackNetwork.
+		On("Send", mock.Anything).
+		Run(func(args mock.Arguments) {
+			// assert that args passed are correct
+			// extracts Event sent
+			event, ok := args[0].(*insecure.Event)
+			require.True(t, ok)
+
+			// makes sure sender is a corrupted execution node.
+			ok = corruptedExecutionIds.Contains(event.CorruptedId)
+			require.True(t, ok)
+
+			orchestratorOutputEvents = append(orchestratorOutputEvents, event)
+			orchestratorSentAllEventsWg.Done()
+		}).Return(nil)
+	// registers mock network with orchestrator
+	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
+
+	// imitates sending events from corrupted execution nodes to the attacker orchestrator.
+	corruptedEnEventSendWG := sync.WaitGroup{}
+	corruptedEnEventSendWG.Add(len(eventMap))
+	for _, event := range eventMap {
+		event := event // suppress loop variable
+
+		go func() {
+			err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
+			require.NoError(t, err)
+
+			corruptedEnEventSendWG.Done()
+		}()
+	}
+
+	// waits till corrupted nodes send their protocol layer events to orchestrator.
+	unittest.RequireReturnsBefore(t,
+		corruptedEnEventSendWG.Wait,
+		1*time.Second,
+		"orchestrator could not send corrupted receipts on time")
+
+	// waits till corrupted receipts dictated to all execution nodes.
+	unittest.RequireReturnsBefore(t,
+		orchestratorSentAllEventsWg.Wait,
+		1*time.Second,
+		"orchestrator could not receive corrupted receipts on time")
+
+	// checks one receipt gets corrupted and sent to both corrupted execution nodes, while
+	// rest is bounced back.
+	orchestratorOutputSanityCheck(
+		t,
+		orchestratorOutputEvents,
+		corruptedExecutionIds,
+		flow.GetIDs(receipts),
+		0)
+}
+
 // TestHandleEventFromCorruptedNode_HonestVN tests that honest VN will be ignored when they send a chunk data request
 func TestHandleEventFromCorruptedNode_HonestVN(t *testing.T) {
 
