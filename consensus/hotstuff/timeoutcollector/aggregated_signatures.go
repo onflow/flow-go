@@ -36,6 +36,9 @@ func NewMultiMessageSigAggregator(ids flow.IdentityList, // list of all authoriz
 	pks []crypto.PublicKey, // list of corresponding public keys used for signature verifications
 	dsTag string, // domain separation tag used by the signature) *MultiMessageSignatureAggregator
 ) (*MultiMessageSignatureAggregator, error) {
+	if len(ids) != len(pks) {
+		return nil, fmt.Errorf("keys length %d and identities length %d do not match", len(pks), len(ids))
+	}
 
 	if len(pks) == 0 {
 		return nil, fmt.Errorf("number of participants must be larger than 0, got %d", len(pks))
