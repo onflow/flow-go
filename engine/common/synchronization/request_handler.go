@@ -193,7 +193,7 @@ func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.
 	}
 
 	// enforce client-side max request size
-	maxHeight := req.FromHeight + uint64(synchronization.DefaultConfig().MaxSize)
+	maxHeight := req.FromHeight + uint64(r.core.(*synchronization.Core).Config.MaxSize)
 	if maxHeight < req.ToHeight {
 		req.ToHeight = maxHeight
 	}
@@ -247,7 +247,7 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 		blockIDs[blockID] = struct{}{}
 
 		// enforce client-side max request size
-		if len(blockIDs) == int(synchronization.DefaultConfig().MaxSize) {
+		if len(blockIDs) == int(r.core.(*synchronization.Core).Config.MaxSize) {
 			break
 		}
 	}
