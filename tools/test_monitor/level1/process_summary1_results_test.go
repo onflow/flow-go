@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/tools/flaky_test_monitor/common/testdata"
+	"github.com/onflow/flow-go/tools/test_monitor/common/testdata"
 )
 
 func TestGenerateLevel1Summary_Struct(t *testing.T) {
