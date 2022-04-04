@@ -47,6 +47,7 @@ type ScriptEnv struct {
 	logs          []string
 	rng           *rand.Rand
 	traceSpan     opentracing.Span
+	meter         meter.MemoryMeter
 }
 
 func (e *ScriptEnv) Context() *Context {
@@ -79,6 +80,7 @@ func NewScriptEnvironment(
 		accountKeys:   accountKeys,
 		uuidGenerator: uuidGenerator,
 		programs:      programsHandler,
+		meter:         meter.NewMemoryMeter(),
 	}
 
 	env.contracts = handler.NewContractHandler(
@@ -835,5 +837,5 @@ func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.
 }
 
 func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
-	return nil
+	return e.meter.ConsumeMemory(usage)
 }

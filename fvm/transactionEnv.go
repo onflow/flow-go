@@ -53,6 +53,7 @@ type TransactionEnv struct {
 	txID             flow.Identifier
 	traceSpan        opentracing.Span
 	authorizers      []runtime.Address
+	meter            meter.MemoryMeter
 }
 
 func NewTransactionEnvironment(
@@ -93,6 +94,7 @@ func NewTransactionEnvironment(
 		txIndex:          txIndex,
 		txID:             tx.ID(),
 		traceSpan:        traceSpan,
+		meter:            meter.NewMemoryMeter(),
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
@@ -1149,5 +1151,5 @@ func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.Interpreter, _ *int
 }
 
 func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
-	return nil
+	return e.meter.ConsumeMemory(usage)
 }
