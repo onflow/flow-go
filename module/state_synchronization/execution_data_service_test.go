@@ -484,7 +484,8 @@ func TestWithNetwork(t *testing.T) {
 }
 
 func TestReprovider(t *testing.T) {
-	t.Parallel()
+	// test is flaky when run in parallel
+	// t.Parallel()
 
 	parent, cancel := context.WithCancel(context.Background())
 	defer cancel()

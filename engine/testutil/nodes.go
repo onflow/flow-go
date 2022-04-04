@@ -152,8 +152,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 	chainID flow.ChainID) testmock.GenericNode {
 
 	me := LocalFixture(t, identity)
-	net, err := stub.NewNetwork(stateFixture.State, me, hub)
-	require.NoError(t, err)
+	net := stub.NewNetwork(t, identity.NodeID, hub)
 
 	parentCtx, cancel := context.WithCancel(context.Background())
 	ctx, _ := irrecoverable.WithSignaler(parentCtx)
