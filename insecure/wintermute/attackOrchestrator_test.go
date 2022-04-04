@@ -123,7 +123,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	if sameResult {
 		eventMap, receipts = receiptsWithSameResultFixture(t, count, corruptedExecutionIds, receiptTargetIds.NodeIDs())
 	} else {
-		eventMap, receipts = receiptsWithDistinctResultFixture(corruptedExecutionIds, receiptTargetIds.NodeIDs())
+		eventMap, receipts = receiptsWithDistinctResultFixture(t, count, corruptedExecutionIds, receiptTargetIds.NodeIDs())
 	}
 
 	wintermuteOrchestrator := wintermute.NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
@@ -321,23 +321,32 @@ func orchestratorOutputSanityCheck(
 // distinctExecutionReceiptsFixture creates a set of execution receipts (with distinct result) one per given executor id.
 // It returns a map of execution receipts to their relevant attack network events.
 func receiptsWithDistinctResultFixture(
+	t *testing.T,
+	count int,
 	exeIds flow.IdentifierList,
 	targetIds flow.IdentifierList,
 ) (map[flow.Identifier]*insecure.Event, []*flow.ExecutionReceipt) {
+
 	// list of execution receipts
 	receipts := make([]*flow.ExecutionReceipt, 0)
 
 	// map of execution receipt ids to their event.
 	eventMap := make(map[flow.Identifier]*insecure.Event)
 
-	for _, exeId := range exeIds {
-		receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(exeId))
-		event := executionReceiptEvent(receipt, targetIds)
+	for i := 0; i < count; i++ {
+		for _, exeId := range exeIds {
+			receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(exeId))
+			event := executionReceiptEvent(receipt, targetIds)
 
-		receipts = append(receipts, receipt)
-		eventMap[receipt.ID()] = event
+			_, ok := eventMap[receipt.ID()]
+			require.False(t, ok) // checks for duplicate receipts.
+
+			receipts = append(receipts, receipt)
+			eventMap[receipt.ID()] = event
+		}
 	}
 
+	require.Len(t, eventMap, count*len(exeIds))
 	return eventMap, receipts
 }
 
@@ -378,6 +387,7 @@ func receiptsWithSameResultFixture(
 		}
 	}
 
+	require.Len(t, eventMap, count*len(exeIds))
 	return eventMap, receipts
 }
 
