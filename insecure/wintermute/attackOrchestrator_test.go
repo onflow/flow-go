@@ -21,41 +21,33 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestOrchestrator_HandleEventFromCorruptedNode_SingleExecutionReceipt tests that the orchestrator corrupts the execution receipt if the receipt is
+// TestSingleExecutionReceipt tests that the orchestrator corrupts the execution receipt if the receipt is
 // from a corrupted execution node.
 // If an execution receipt is coming from a corrupt execution node,
 // then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
 // enforces all corrupted execution nodes to send that counterfeit receipt on their behalf in the flow network.
-func TestOrchestrator_HandleEventFromCorruptedNode_SingleExecutionReceipt(t *testing.T) {
+func TestSingleExecutionReceipt(t *testing.T) {
 	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
-
-	receipt := unittest.ExecutionReceiptFixture()
-
-	corruptedExecutionNodes := corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()
 
 	// identities of nodes who are expected targets of an execution receipt.
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
+	corruptedExecutionIds := flow.IdentifierList(corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs())
+	eventMap, receipts := receiptsWithSameResultFixture(t, 1, corruptedExecutionIds[0:1], receiptTargetIds.NodeIDs())
+
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
 	corruptedReceiptsSentWG := mockAttackNetworkForCorruptedExecutionResult(t,
 		mockAttackNetwork,
-		receipt,
+		receipts[0],
 		receiptTargetIds.NodeIDs(),
-		corruptedExecutionNodes)
+		corruptedExecutionIds)
 
 	wintermuteOrchestrator := wintermute.NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
-	event := &insecure.Event{
-		CorruptedId:       corruptedExecutionNodes[0],
-		Channel:           engine.PushReceipts,
-		Protocol:          insecure.Protocol_UNICAST,
-		TargetIds:         receiptTargetIds.NodeIDs(),
-		FlowProtocolEvent: receipt,
-	}
 
 	// register mock network with orchestrator
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
-	err = wintermuteOrchestrator.HandleEventFromCorruptedNode(event)
+	err = wintermuteOrchestrator.HandleEventFromCorruptedNode(eventMap[receipts[0].ID()])
 	require.NoError(t, err)
 
 	// waits till corrupted receipts dictated to all execution nodes.
@@ -70,32 +62,37 @@ func TestOrchestrator_HandleEventFromCorruptedNode_SingleExecutionReceipt(t *tes
 // The receipts are coming concurrently.
 // Orchestrator only corrupts one of them (whichever it receives first), while bouncing back the other.
 // Orchestrator sends the corrupted one to both corrupted execution nodes.
-func TestConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
+func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 	// orchestrator is supposed send three events: (justifying parameter with value = 3).
 	// one corrupted execution result sent to two execution node.
 	// one execution receipt is bounced back (justifying parameter with value = 1)
-	testConcurrentExecutionReceipts(t, false, 3, 1)
+	testConcurrentExecutionReceipts(t, 2, false, 3, 1)
 }
 
-// TestConcurrentExecutionReceipts_SameResult evaluates the following scenario:
+// TestTwoConcurrentExecutionReceipts_SameResult evaluates the following scenario:
 // Orchestrator receives two receipts the same result from distinct corrupted execution nodes.
 // The receipts are coming concurrently.
 // Orchestrator corrupts result of first receipt (whichever it receives first).
 // Orchestrator sends the corrupted one to both corrupted execution nodes.
 // When the second receipt arrives since it has the same result, and the corrupted version of that already sent to both
 // execution node, the orchestrator does nothing.
-func TestConcurrentExecutionReceipts_SameResult(t *testing.T) {
+func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 	// orchestrator is supposed send two events: (justifying parameter with value = 2).
 	// one corrupted execution result sent to two execution node.
 	// no receipt bounce back happens (justifying parameter with value = 0).
-	testConcurrentExecutionReceipts(t, true, 2, 0)
+	testConcurrentExecutionReceipts(t, 2, true, 2, 0)
 }
 
 // testConcurrentExecutionReceipts sends two execution receipts concurrently to the orchestrator. Depending on the "sameResult" parameter, receipts
 // may have the same execution result or not.
 // It then sanity checks the behavior of orchestrator regarding the total expected number of events it sends to the attack network, as well as
 // the execution receipts it bounces back.
-func testConcurrentExecutionReceipts(t *testing.T, sameResult bool, expectedOrchestratorOutputEvents int, expectedBouncedBackReceipts int) {
+func testConcurrentExecutionReceipts(t *testing.T,
+	count int, // total number of execution receipts per execution node.
+	sameResult bool,
+	expectedOrchestratorOutputEvents int,
+	expectedBouncedBackReceipts int) {
+
 	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
 	corruptedExecutionIds := flow.IdentifierList(corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs())
 	// identities of nodes who are expected targets of an execution receipt.
@@ -106,7 +103,7 @@ func testConcurrentExecutionReceipts(t *testing.T, sameResult bool, expectedOrch
 	receipts := make([]*flow.ExecutionReceipt, 0)
 
 	if sameResult {
-		eventMap, receipts = receiptsWithSameResultFixture(t, corruptedExecutionIds, receiptTargetIds.NodeIDs())
+		eventMap, receipts = receiptsWithSameResultFixture(t, count, corruptedExecutionIds, receiptTargetIds.NodeIDs())
 	} else {
 		eventMap, receipts = receiptsWithDistinctResultFixture(corruptedExecutionIds, receiptTargetIds.NodeIDs())
 	}
@@ -326,12 +323,13 @@ func receiptsWithDistinctResultFixture(
 	return eventMap, receipts
 }
 
-// receiptsWithSameResultFixture creates a set of receipts (all with the same result) one per given executor id.
+// receiptsWithSameResultFixture creates a set of receipts (all with the same result) per given executor id.
 // It returns a map of execution receipts to their relevant attack network events.
 func receiptsWithSameResultFixture(
 	t *testing.T,
-	exeIds flow.IdentifierList,
-	targetIds flow.IdentifierList,
+	count int, // total receipts per execution id.
+	exeIds flow.IdentifierList, // identifier of execution nodes.
+	targetIds flow.IdentifierList, // target recipients of the execution receipts.
 ) (map[flow.Identifier]*insecure.Event, []*flow.ExecutionReceipt) {
 	// list of execution receipts
 	receipts := make([]*flow.ExecutionReceipt, 0)
@@ -342,16 +340,21 @@ func receiptsWithSameResultFixture(
 	result := unittest.ExecutionResultFixture()
 
 	for _, exeId := range exeIds {
-		receipt := unittest.ExecutionReceiptFixture(
-			unittest.WithExecutorID(exeId),
-			unittest.WithResult(result))
+		for i := 0; i < count; i++ {
+			receipt := unittest.ExecutionReceiptFixture(
+				unittest.WithExecutorID(exeId),
+				unittest.WithResult(result))
 
-		require.Equal(t, result.ID(), receipt.ExecutionResult.ID())
+			require.Equal(t, result.ID(), receipt.ExecutionResult.ID())
 
-		event := executionReceiptEvent(receipt, targetIds)
+			event := executionReceiptEvent(receipt, targetIds)
 
-		receipts = append(receipts, receipt)
-		eventMap[receipt.ID()] = event
+			_, ok := eventMap[receipt.ID()]
+			require.False(t, ok) // check for duplicate receipts.
+
+			receipts = append(receipts, receipt)
+			eventMap[receipt.ID()] = event
+		}
 	}
 
 	return eventMap, receipts
