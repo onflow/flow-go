@@ -229,7 +229,7 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 
 func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error {
 	if v.options.CheckScriptsParse {
-		_, err := parser2.ParseProgram(string(tx.Script))
+		_, err := parser2.ParseProgram(string(tx.Script), nil)
 		if err != nil {
 			return InvalidScriptError{ParserErr: err}
 		}

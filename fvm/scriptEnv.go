@@ -118,7 +118,7 @@ func (e *ScriptEnv) setMeteringWeights() {
 	m.SetMemoryWeights(memoryWeights)
 }
 
-func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.Interpreter, _ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
 }
 
 func (e *ScriptEnv) seedRNG(header *flow.Header) {
@@ -539,7 +539,7 @@ func (e *ScriptEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, err
 		defer sp.Finish()
 	}
 
-	v, err := jsoncdc.Decode(b)
+	v, err := jsoncdc.Decode(e, b)
 	if err != nil {
 		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
 		return nil, fmt.Errorf("decodeing argument failed: %w", err)
@@ -832,4 +832,8 @@ func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 
 func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
+}
+
+func (e *ScriptEnv) MeterMemory(usage common.MemoryUsage) error {
+	return nil
 }

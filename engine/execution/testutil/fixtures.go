@@ -215,7 +215,7 @@ func CreateAccountsWithSimpleAddresses(
 
 		for _, event := range tx.Events {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(event.Payload)
+				data, err := jsoncdc.Decode(nil, event.Payload)
 				if err != nil {
 					return nil, errors.New("error decoding events")
 				}

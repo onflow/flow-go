@@ -336,6 +336,10 @@ func (e *ErrorReturningRuntime) SetTracingEnabled(_ bool) {
 	panic("SetTracingEnabled not expected")
 }
 
+func (e *ErrorReturningRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
+	panic("SetInvalidatedResourceValidationEnabled not expected")
+}
+
 func encodeContractNames(contractNames []string) ([]byte, error) {
 	sort.Strings(contractNames)
 	var buf bytes.Buffer

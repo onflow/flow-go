@@ -678,7 +678,7 @@ func (e *TransactionEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value
 		defer sp.Finish()
 	}
 
-	v, err := jsoncdc.Decode(b)
+	v, err := jsoncdc.Decode(e, b)
 	if err != nil {
 		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
 		return nil, fmt.Errorf("decodeing argument failed: %w", err)
@@ -1145,5 +1145,9 @@ func (e *TransactionEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*run
 	return crypto.AggregatePublicKeys(keys)
 }
 
-func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+func (e *TransactionEnv) ResourceOwnerChanged(_ *interpreter.Interpreter, _ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
+}
+
+func (e *TransactionEnv) MeterMemory(usage common.MemoryUsage) error {
+	return nil
 }
