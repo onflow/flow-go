@@ -218,13 +218,15 @@ func VerifySignatureFromTransaction(
 	if pk.Algorithm() != crypto.ECDSAP256 && pk.Algorithm() != crypto.ECDSASecp256k1 {
 		// TODO: check if we should panic
 		// This case only happens in production if there is a bug
-		return false, errors.NewValueErrorf(pk.Algorithm().String(), "is not supported in transactions")
+		return false, errors.NewUnknownFailure(fmt.Errorf(
+			pk.Algorithm().String(), "is not supported in transactions"))
 	}
 	// hashing compatibility
 	if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
 		// TODO: check if we should panic
 		// This case only happens in production if there is a bug
-		return false, errors.NewValueErrorf(hashAlgo.String(), "is not supported in transactions")
+		return false, errors.NewUnknownFailure(fmt.Errorf(
+			hashAlgo.String(), "is not supported in transactions"))
 	}
 
 	hasher, err := NewPrefixedHashing(hashAlgo, flow.TransactionTagString)
