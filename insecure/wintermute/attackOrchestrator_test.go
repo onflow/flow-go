@@ -78,6 +78,7 @@ func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 // When the second receipt arrives since it has the same result, and the corrupted version of that already sent to both
 // execution node, the orchestrator does nothing.
 func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
+	// orchestrator is expected to receive two receipts one per execution node (justifying parameter with value = 2).
 	// orchestrator is supposed send two events: (justifying parameter with value = 2).
 	// one corrupted execution result sent to two execution node.
 	// no receipt bounce back happens (justifying parameter with value = 0).
