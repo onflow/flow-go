@@ -85,6 +85,22 @@ func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 	testConcurrentExecutionReceipts(t, 2, true, 2, 0)
 }
 
+// TestMultipleConcurrentExecutionReceipts_SameResult evaluates the following scenario:
+// Orchestrator receives multiple receipts from corrupted execution nodes (5 from each), where pairs of receipts have the same result.
+// The receipts are coming concurrently.
+// Orchestrator corrupts result of first receipt (whichever it receives first).
+// Orchestrator sends the corrupted one to both corrupted execution nodes.
+// When the receipt (with the same result) arrives since it has the same result, and the corrupted version of that already sent to both
+// execution node, the orchestrator does nothing.
+// For the result of receipts, orchestrator simply bounces them back (since already conducted an corruption).
+func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
+	// orchestrator is expected to receive 5 receipts one per execution node (justifying parameter with value = 5).
+	// orchestrator is supposed send two events: (justifying parameter with value = 10):
+	// one corrupted execution result sent to two execution node.
+	// 4 receipts bounce back per execution nodes (4 * 2 = 8) (justifying parameter with value = 8).
+	testConcurrentExecutionReceipts(t, 5, true, 10, 8)
+}
+
 // testConcurrentExecutionReceipts sends two execution receipts concurrently to the orchestrator. Depending on the "sameResult" parameter, receipts
 // may have the same execution result or not.
 // It then sanity checks the behavior of orchestrator regarding the total expected number of events it sends to the attack network, as well as
@@ -339,10 +355,13 @@ func receiptsWithSameResultFixture(
 	// map of execution receipt ids to their event.
 	eventMap := make(map[flow.Identifier]*insecure.Event)
 
-	result := unittest.ExecutionResultFixture()
+	// generates "count"-many receipts per execution nodes with the same
+	// set of results.
+	for i := 0; i < count; i++ {
 
-	for _, exeId := range exeIds {
-		for i := 0; i < count; i++ {
+		result := unittest.ExecutionResultFixture()
+
+		for _, exeId := range exeIds {
 			receipt := unittest.ExecutionReceiptFixture(
 				unittest.WithExecutorID(exeId),
 				unittest.WithResult(result))
