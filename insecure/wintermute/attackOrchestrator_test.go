@@ -63,6 +63,7 @@ func TestSingleExecutionReceipt(t *testing.T) {
 // Orchestrator only corrupts one of them (whichever it receives first), while bouncing back the other.
 // Orchestrator sends the corrupted one to both corrupted execution nodes.
 func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
+	// orchestrator is expected to receive two receipts one per execution node (justifying parameter with value = 2).
 	// orchestrator is supposed send three events: (justifying parameter with value = 3).
 	// one corrupted execution result sent to two execution node.
 	// one execution receipt is bounced back (justifying parameter with value = 1)
