@@ -59,6 +59,7 @@ func TestSingleExecutionReceipt(t *testing.T) {
 
 // TestMultipleExecutionReceipts_DistinctResult evaluates the following scenario:
 // Orchestrator receives two receipts with distinct results from distinct corrupted execution nodes.
+// Each receipt has a distinct result.
 // The receipts are coming concurrently.
 // Orchestrator only corrupts one of them (whichever it receives first), while bouncing back the other.
 // Orchestrator sends the corrupted one to both corrupted execution nodes.
@@ -70,13 +71,22 @@ func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 		1)     // one execution receipt is bounced back.
 }
 
-//func TestMultipleConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
-//	// orchestrator is expected to receive two receipts one per execution node (justifying parameter with value = 2).
-//	// orchestrator is supposed send three events: (justifying parameter with value = 3).
-//	// one corrupted execution result sent to two execution node.
-//	// one execution receipt is bounced back (justifying parameter with value = 1)
-//	testConcurrentExecutionReceipts(t, 5, false, 11, 9)
-//}
+// TestMultipleConcurrentExecutionReceipts_DistinctResult evaluates the following scenario:
+// Orchestrator receives multiple receipts from corrupted execution nodes (5 from each).
+// The receipts are coming concurrently.
+// Each receipt has a distinct result.
+// Orchestrator corrupts result of first receipt (whichever it receives first).
+// Orchestrator sends the corrupted one to both corrupted execution nodes.
+// When the receipt (with the same result) arrives since it has the same result, and the corrupted version of that already sent to both
+// execution node, the orchestrator does nothing.
+// For the result of receipts, orchestrator simply bounces them back (since already conducted an corruption).
+func TestMultipleConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
+	testConcurrentExecutionReceipts(t,
+		5,     // 5 receipts per execution node.
+		false, // receipts have distinct results.
+		11,    // one corrupted result is sent back to two execution nodes (total 2) + 9 bounce back.
+		9)     // 9 receipts bounced back.
+}
 
 // TestTwoConcurrentExecutionReceipts_SameResult evaluates the following scenario:
 // Orchestrator receives two receipts the same result from distinct corrupted execution nodes.
