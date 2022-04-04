@@ -155,7 +155,7 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 
 // corruptExecutionResult creates a corrupted version of the input receipt by tampering its content so that
 // the resulted corrupted version would not pass verification.
-func (o Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *flow.ExecutionResult {
+func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *flow.ExecutionResult {
 	return &flow.ExecutionResult{
 		PreviousResultID: receipt.ExecutionResult.PreviousResultID,
 		BlockID:          receipt.ExecutionResult.BlockID,
