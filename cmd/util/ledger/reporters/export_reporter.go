@@ -61,7 +61,8 @@ func (e *ExportReporter) Report(payload []ledger.Payload) error {
 			Error().
 			Err(err).
 			Msg("error running GetCurrentEpochCounter script")
-		// Safely exit and move on to next reporter
+		
+		// Safely exit and move on to next reporter so we do not block other reporters
 		return nil
 	}
 
@@ -71,7 +72,7 @@ func (e *ExportReporter) Report(payload []ledger.Payload) error {
 			Err(script.Err).
 			Msg("Failed to get epoch counter")
 
-		// Safely exit and move on to next reporter
+		// Safely exit and move on to next reporter so we do not block other reporters
 		return nil
 	}
 
