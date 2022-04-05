@@ -251,7 +251,7 @@ FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compact
   // If a compactLeaf from a higher height is carried over, then we are necessarily in case 2.a 
   // (node == nil and only one register to create)
   if compactLeaf != nil {
-   return NewLeaf(compactLeaf.path, compactLeaf.payload, height)
+   return NewLeafNode(compactLeaf.path, compactLeaf.payload, height)
   }
   // No updates to make, re-use the same sub-trie
   return node
@@ -260,7 +260,7 @@ FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compact
  // The remaining sub-case of 2.a (node == nil and only one register to create): 
  // the register payload is the input and no compactified leaf is to be carried over. 
  if len(paths) == 1 && node == nil && compactLeaf == nil {
-  return NewLeaf(paths[0], payloads[0], height)
+  return NewLeafNode(paths[0], payloads[0], height)
  }
  
  // case 1: we reach a non-nil leaf. Per Lemma, compactLeaf is necessarily nil
@@ -269,7 +269,7 @@ FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compact
     if len(paths) == 1 { // case 1.a.i
      // the resource-exhaustion counter-measure
      if !node.payload == payloads[i] {
-      return NewLeaf(paths[i], payloads[i], height)
+      return NewLeafNode(paths[i], payloads[i], height)
      }
      return node  // re-cycle the same node
     }

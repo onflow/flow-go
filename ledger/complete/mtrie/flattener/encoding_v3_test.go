@@ -22,10 +22,10 @@ func TestNodeV3Decoding(t *testing.T) {
 	const leafNode1Index = 1
 	const leafNode2Index = 2
 
-	leafNode1 := node.NewNode(255, nil, nil, utils.PathByUint8(0), utils.LightPayload8('A', 'a'), hash.Hash([32]byte{1, 1, 1}))
-	leafNode2 := node.NewNode(255, nil, nil, utils.PathByUint8(1), utils.LightPayload8('B', 'b'), hash.Hash([32]byte{2, 2, 2}))
+	leafNode1 := node.NewLeafNodeWithHash(utils.PathByUint8(0), utils.LightPayload8('A', 'a'), 255, hash.Hash([32]byte{1, 1, 1}))
+	leafNode2 := node.NewLeafNodeWithHash(utils.PathByUint8(1), utils.LightPayload8('B', 'b'), 255, hash.Hash([32]byte{2, 2, 2}))
 
-	interimNode := node.NewNode(256, leafNode1, leafNode2, ledger.DummyPath, nil, hash.Hash([32]byte{3, 3, 3}))
+	interimNode := node.NewInterimNodeWithHash(256, leafNode1, leafNode2, hash.Hash([32]byte{3, 3, 3}))
 
 	encodedLeafNode1 := []byte{
 		0x00, 0x00, // encoding version
@@ -69,7 +69,7 @@ func TestNodeV3Decoding(t *testing.T) {
 
 	t.Run("leaf node", func(t *testing.T) {
 		reader := bytes.NewReader(encodedLeafNode1)
-		newNode, regCount, regSize, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+		newNode, regCount, regSize, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (node.Node, uint64, uint64, error) {
 			return nil, 0, 0, fmt.Errorf("no call expected")
 		})
 		require.NoError(t, err)
@@ -80,7 +80,7 @@ func TestNodeV3Decoding(t *testing.T) {
 
 	t.Run("interim node", func(t *testing.T) {
 		reader := bytes.NewReader(encodedInterimNode)
-		newNode, regCount, regSize, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+		newNode, regCount, regSize, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (node.Node, uint64, uint64, error) {
 			switch nodeIndex {
 			case leafNode1Index:
 				return leafNode1, 1, uint64(leafNode1.Payload().Size()), nil
@@ -104,7 +104,7 @@ func TestTrieV3Decoding(t *testing.T) {
 	const rootNodeRegSize = 1000000
 
 	hashValue := hash.Hash([32]byte{2, 2, 2})
-	rootNode := node.NewNode(256, nil, nil, ledger.DummyPath, nil, hashValue)
+	rootNode := node.NewLeafNodeWithHash(ledger.DummyPath, nil, 256, hashValue)
 
 	expected := []byte{
 		0x00, 0x00, // encoding version
@@ -118,7 +118,7 @@ func TestTrieV3Decoding(t *testing.T) {
 
 	reader := bytes.NewReader(expected)
 
-	trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+	trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (node.Node, uint64, uint64, error) {
 		switch nodeIndex {
 		case rootNodeIndex:
 			return rootNode, rootNodeRegCount, rootNodeRegSize, nil

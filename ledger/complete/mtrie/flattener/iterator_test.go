@@ -1,7 +1,6 @@
 package flattener_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -43,11 +42,6 @@ func TestPopulatedTrie(t *testing.T) {
 	testTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
 
-	for itr := flattener.NewNodeIterator(testTrie); itr.Next(); {
-		fmt.Println(itr.Value().FmtStr("", ""))
-		fmt.Println()
-	}
-
 	itr := flattener.NewNodeIterator(testTrie)
 
 	require.True(t, itr.Next())
@@ -85,7 +79,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		require.True(t, nil == itr.Value()) // initial iterator should return nil
 
 		// visitedNodes is empty map
-		visitedNodes := make(map[*node.Node]uint64)
+		visitedNodes := make(map[node.Node]uint64)
 		itr = flattener.NewUniqueNodeIterator(emptyTrie, visitedNodes)
 		require.False(t, itr.Next())
 		require.True(t, nil == itr.Value()) // initial iterator should return nil
@@ -117,7 +111,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		//   n1 (p1/v1)     n2 (p2/v2)
 		//
 
-		expectedNodes := []*node.Node{
+		expectedNodes := []node.Node{
 			updatedTrie.RootNode().LeftChild().LeftChild(),  // n1
 			updatedTrie.RootNode().LeftChild().RightChild(), // n2
 			updatedTrie.RootNode().LeftChild(),              // n3
@@ -136,7 +130,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 
 		// visitedNodes is not nil, but it's pointless for iterating a single trie because
 		// there isn't any shared sub-trie.
-		visitedNodes := make(map[*node.Node]uint64)
+		visitedNodes := make(map[node.Node]uint64)
 		i = 0
 		for itr := flattener.NewUniqueNodeIterator(updatedTrie, visitedNodes); itr.Next(); {
 			n := itr.Value()
@@ -233,7 +227,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 
 		tries = append(tries, trie3)
 
-		expectedNodes := []*node.Node{
+		expectedNodes := []node.Node{
 			// unique nodes from trie1
 			trie1.RootNode().LeftChild().LeftChild(),  // n1
 			trie1.RootNode().LeftChild().RightChild(), // n2
@@ -251,7 +245,7 @@ func TestUniqueNodeIterator(t *testing.T) {
 		}
 
 		// Use visitedNodes to prevent revisiting shared sub-tries.
-		visitedNodes := make(map[*node.Node]uint64)
+		visitedNodes := make(map[node.Node]uint64)
 		i := 0
 		for _, trie := range tries {
 			for itr := flattener.NewUniqueNodeIterator(trie, visitedNodes); itr.Next(); {

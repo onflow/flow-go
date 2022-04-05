@@ -19,7 +19,7 @@ import (
 const encodingDecodingVersion = uint16(0)
 
 // getNodeFunc returns node by nodeIndex along with node's regCount and regSize.
-type getNodeFunc func(nodeIndex uint64) (n *node.Node, regCount uint64, regSize uint64, err error)
+type getNodeFunc func(nodeIndex uint64) (n node.Node, regCount uint64, regSize uint64, err error)
 
 // ReadNodeFromCheckpointV3AndEarlier returns a node recontructed from data in
 // checkpoint v3 and earlier versions.  It also returns node's regCount and regSize.
@@ -33,7 +33,7 @@ type getNodeFunc func(nodeIndex uint64) (n *node.Node, regCount uint64, regSize 
 // - path (2 bytes + 32 bytes)
 // - payload (4 bytes + n bytes)
 // - hash (2 bytes + 32 bytes)
-func ReadNodeFromCheckpointV3AndEarlier(reader io.Reader, getNode getNodeFunc) (*node.Node, uint64, uint64, error) {
+func ReadNodeFromCheckpointV3AndEarlier(reader io.Reader, getNode getNodeFunc) (node.Node, uint64, uint64, error) {
 
 	// Read version (2 bytes)
 	buf := make([]byte, 2)
@@ -147,7 +147,7 @@ func ReadNodeFromCheckpointV3AndEarlier(reader io.Reader, getNode getNodeFunc) (
 			pl = payload.DeepCopy()
 		}
 
-		n := node.NewNode(int(height), nil, nil, path, pl, nodeHash)
+		n := node.NewLeafNodeWithHash(path, pl, int(height), nodeHash)
 
 		// Leaf node has 1 register and register size is payload size.
 		return n, 1, uint64(pl.Size()), nil
@@ -165,7 +165,7 @@ func ReadNodeFromCheckpointV3AndEarlier(reader io.Reader, getNode getNodeFunc) (
 		return nil, 0, 0, fmt.Errorf("failed to find right child node of serialized node in v3: %w", err)
 	}
 
-	n := node.NewNode(int(height), lchild, rchild, ledger.DummyPath, nil, nodeHash)
+	n := node.NewInterimNodeWithHash(int(height), lchild, rchild, nodeHash)
 	return n, lchildRegCount + rchildRegCount, lchildRegSize + rchildRegSize, nil
 }
 

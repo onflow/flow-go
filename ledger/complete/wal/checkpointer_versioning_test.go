@@ -24,7 +24,7 @@ func TestLoadCheckpointV1(t *testing.T) {
 
 	for i, trie := range tries {
 		require.Equal(t, expectedRootHash[i], trie.RootHash())
-		require.True(t, trie.RootNode().VerifyCachedHash())
+		require.True(t, trie.IsAValidTrie())
 	}
 }
 
@@ -43,7 +43,7 @@ func TestLoadCheckpointV3(t *testing.T) {
 
 	for i, trie := range tries {
 		require.Equal(t, expectedRootHash[i], trie.RootHash())
-		require.True(t, trie.RootNode().VerifyCachedHash())
+		require.True(t, trie.IsAValidTrie())
 	}
 }
 
@@ -62,7 +62,7 @@ func TestLoadCheckpointV4(t *testing.T) {
 
 	for i, trie := range tries {
 		require.Equal(t, expectedRootHash[i], trie.RootHash())
-		require.True(t, trie.RootNode().VerifyCachedHash())
+		require.True(t, trie.IsAValidTrie())
 	}
 }
 

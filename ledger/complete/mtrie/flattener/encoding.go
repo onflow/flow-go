@@ -34,7 +34,7 @@ const (
 
 const payloadEncodingVersion = 1
 
-// encodeLeafNode encodes leaf node in the following format:
+// EncodeLeafNode encodes leaf node in the following format:
 // - node type (1 byte)
 // - height (2 bytes)
 // - hash (32 bytes)
@@ -48,7 +48,7 @@ const payloadEncodingVersion = 1
 // WARNING: The returned buffer is likely to share the same underlying array as
 // the scratch buffer. Caller is responsible for copying or using returned buffer
 // before scratch buffer is used again.
-func encodeLeafNode(n *node.Node, scratch []byte) []byte {
+func EncodeLeafNode(n *node.LeafNode, scratch []byte) []byte {
 
 	encPayloadSize := encoding.EncodedPayloadLengthWithoutPrefix(n.Payload(), payloadEncodingVersion)
 
@@ -99,7 +99,7 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 	return buf
 }
 
-// encodeInterimNode encodes interim node in the following format:
+// EncodeInterimNode encodes interim node in the following format:
 // - node type (1 byte)
 // - height (2 bytes)
 // - hash (32 bytes)
@@ -112,7 +112,7 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 // WARNING: The returned buffer is likely to share the same underlying array as
 // the scratch buffer. Caller is responsible for copying or using returned buffer
 // before scratch buffer is used again.
-func encodeInterimNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scratch []byte) []byte {
+func EncodeInterimNode(n *node.InterimNode, lchildIndex uint64, rchildIndex uint64, scratch []byte) []byte {
 
 	const encodedNodeSize = encNodeTypeSize +
 		encHeightSize +
@@ -155,24 +155,12 @@ func encodeInterimNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scr
 	return buf[:pos]
 }
 
-// EncodeNode encodes node.
-// Scratch buffer is used to avoid allocs.
-// WARNING: The returned buffer is likely to share the same underlying array as
-// the scratch buffer. Caller is responsible for copying or using returned buffer
-// before scratch buffer is used again.
-func EncodeNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scratch []byte) []byte {
-	if n.IsLeaf() {
-		return encodeLeafNode(n, scratch)
-	}
-	return encodeInterimNode(n, lchildIndex, rchildIndex, scratch)
-}
-
 // ReadNode reconstructs a node from data read from reader.
 // Scratch buffer is used to avoid allocs. It should be used directly instead
 // of using append.  This function uses len(scratch) and ignores cap(scratch),
 // so any extra capacity will not be utilized.
 // If len(scratch) < 1024, then a new buffer will be allocated and used.
-func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*node.Node, error) {
+func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (node.Node, error)) (node.Node, error) {
 
 	// minBufSize should be large enough for interim node and leaf node with small payload.
 	// minBufSize is a failsafe and is only used when len(scratch) is much smaller
@@ -232,7 +220,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 			return nil, fmt.Errorf("failed to read and decode payload of serialized node: %w", err)
 		}
 
-		node := node.NewNode(int(height), nil, nil, path, payload, nodeHash)
+		node := node.NewLeafNodeWithHash(path, payload, int(height), nodeHash)
 		return node, nil
 	}
 
@@ -265,7 +253,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 		return nil, fmt.Errorf("failed to find right child node of serialized node: %w", err)
 	}
 
-	n := node.NewNode(int(height), lchild, rchild, ledger.DummyPath, nil, nodeHash)
+	n := node.NewInterimNodeWithHash(int(height), lchild, rchild, nodeHash)
 	return n, nil
 }
 
@@ -307,7 +295,7 @@ func EncodeTrie(trie *trie.MTrie, rootIndex uint64, scratch []byte) []byte {
 }
 
 // ReadTrie reconstructs a trie from data read from reader.
-func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*trie.MTrie, error) {
+func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (node.Node, error)) (*trie.MTrie, error) {
 
 	if len(scratch) < encodedTrieSize {
 		scratch = make([]byte, encodedTrieSize)

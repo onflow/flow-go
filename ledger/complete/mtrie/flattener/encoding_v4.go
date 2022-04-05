@@ -38,7 +38,7 @@ const (
 // - hash (32 bytes)
 // - path (32 bytes)
 // - payload (4 bytes + n bytes)
-func ReadNodeFromCheckpointV4(reader io.Reader, scratch []byte, getNode getNodeFunc) (*node.Node, uint64, uint64, error) {
+func ReadNodeFromCheckpointV4(reader io.Reader, scratch []byte, getNode getNodeFunc) (node.Node, uint64, uint64, error) {
 
 	// minBufSize should be large enough for interim node and leaf node with small payload.
 	// minBufSize is a failsafe and is only used when len(scratch) is much smaller
@@ -114,7 +114,7 @@ func ReadNodeFromCheckpointV4(reader io.Reader, scratch []byte, getNode getNodeF
 			return nil, 0, 0, fmt.Errorf("failed to read and decode payload of serialized node: %w", err)
 		}
 
-		n := node.NewNode(int(height), nil, nil, path, payload, nodeHash)
+		n := node.NewLeafNodeWithHash(path, payload, int(height), nodeHash)
 
 		// Leaf node has 1 register and register size is payload size.
 		return n, 1, uint64(payload.Size()), nil
@@ -149,7 +149,7 @@ func ReadNodeFromCheckpointV4(reader io.Reader, scratch []byte, getNode getNodeF
 		return nil, 0, 0, fmt.Errorf("failed to find right child node of serialized node: %w", err)
 	}
 
-	n := node.NewNode(int(height), lchild, rchild, ledger.DummyPath, nil, nodeHash)
+	n := node.NewInterimNodeWithHash(int(height), lchild, rchild, nodeHash)
 	return n, lchildRegCount + rchildRegCount, lchildRegSize + rchildRegSize, nil
 }
 

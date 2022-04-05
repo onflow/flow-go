@@ -51,8 +51,8 @@ type NodeIterator struct {
 	// unprocessedRoot contains the trie's root before the first call of Next().
 	// Thereafter, it is set to nil (which prevents repeated iteration through the trie).
 	// This has the advantage, that we gracefully handle tries whose root node is nil.
-	unprocessedRoot *node.Node
-	stack           []*node.Node
+	unprocessedRoot node.Node
+	stack           []node.Node
 	// visitedNodes are nodes that were visited and can be skipped during
 	// traversal through dig(). visitedNodes is used to optimize node traveral
 	// IN FOREST by skipping nodes in shared sub-tries after they are visited,
@@ -61,7 +61,7 @@ type NodeIterator struct {
 	// NodeIterator only uses visitedNodes for read operation.
 	// No special handling is needed if visitedNodes is nil.
 	// WARNING: visitedNodes is not safe for concurrent use.
-	visitedNodes map[*node.Node]uint64
+	visitedNodes map[node.Node]uint64
 }
 
 // NewNodeIterator returns a node NodeIterator, which iterates through all nodes
@@ -80,7 +80,7 @@ func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
 	// for a Trie with height H (measured by number of edges), the longest possible path contains H+1 vertices
 	stackSize := ledger.NodeMaxHeight + 1
 	i := &NodeIterator{
-		stack: make([]*node.Node, 0, stackSize),
+		stack: make([]node.Node, 0, stackSize),
 	}
 	i.unprocessedRoot = mTrie.RootNode()
 	return i
@@ -98,12 +98,12 @@ func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
 // When re-building the Trie from the sequence of nodes, one can build the trie on the fly,
 // as for each node, the children have been previously encountered.
 // WARNING: visitedNodes is not safe for concurrent use.
-func NewUniqueNodeIterator(mTrie *trie.MTrie, visitedNodes map[*node.Node]uint64) *NodeIterator {
+func NewUniqueNodeIterator(mTrie *trie.MTrie, visitedNodes map[node.Node]uint64) *NodeIterator {
 	// For a Trie with height H (measured by number of edges), the longest possible path
 	// contains H+1 vertices.
 	stackSize := ledger.NodeMaxHeight + 1
 	i := &NodeIterator{
-		stack:        make([]*node.Node, 0, stackSize),
+		stack:        make([]node.Node, 0, stackSize),
 		visitedNodes: visitedNodes,
 	}
 	i.unprocessedRoot = mTrie.RootNode()
@@ -135,14 +135,14 @@ func (i *NodeIterator) Next() bool {
 	return false // as len(i.stack) == 0, i.e. there are no more elements to recall
 }
 
-func (i *NodeIterator) Value() *node.Node {
+func (i *NodeIterator) Value() node.Node {
 	if len(i.stack) == 0 {
 		return nil
 	}
 	return i.peek()
 }
 
-func (i *NodeIterator) pop() *node.Node {
+func (i *NodeIterator) pop() node.Node {
 	if len(i.stack) == 0 {
 		return nil
 	}
@@ -152,11 +152,11 @@ func (i *NodeIterator) pop() *node.Node {
 	return head
 }
 
-func (i *NodeIterator) peek() *node.Node {
+func (i *NodeIterator) peek() node.Node {
 	return i.stack[len(i.stack)-1]
 }
 
-func (i *NodeIterator) dig(n *node.Node) {
+func (i *NodeIterator) dig(n node.Node) {
 	if n == nil {
 		return
 	}

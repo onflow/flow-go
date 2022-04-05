@@ -539,7 +539,7 @@ func Test_Pruning(t *testing.T) {
 		require.Equal(t, uint16(3), maxDepthTouched)
 		require.Equal(t, expectedRegCount, trie1withpruning.AllocatedRegCount())
 		require.Equal(t, expectedRegSize, trie1withpruning.AllocatedRegSize())
-		require.True(t, trie1withpruning.RootNode().VerifyCachedHash())
+		require.True(t, trie1withpruning.IsAValidTrie())
 
 		// after pruning
 		//                    n7
@@ -571,7 +571,7 @@ func Test_Pruning(t *testing.T) {
 		require.Equal(t, uint16(2), maxDepthTouched)
 		require.Equal(t, expectedRegCount, trie2withpruning.AllocatedRegCount())
 		require.Equal(t, expectedRegSize, trie2withpruning.AllocatedRegSize())
-		require.True(t, trie2withpruning.RootNode().VerifyCachedHash())
+		require.True(t, trie2withpruning.IsAValidTrie())
 
 		require.Equal(t, trie2.RootHash(), trie2withpruning.RootHash())
 
@@ -599,7 +599,7 @@ func Test_Pruning(t *testing.T) {
 		//                 /payload1)
 
 		require.Equal(t, trie22.RootHash(), trie22withpruning.RootHash())
-		require.True(t, trie22withpruning.RootNode().VerifyCachedHash())
+		require.True(t, trie22withpruning.IsAValidTrie())
 
 	})
 
@@ -621,7 +621,7 @@ func Test_Pruning(t *testing.T) {
 		// after pruning
 		//       n7  (path1/payload1)
 		require.Equal(t, trie3.RootHash(), trie3withpruning.RootHash())
-		require.True(t, trie3withpruning.RootNode().VerifyCachedHash())
+		require.True(t, trie3withpruning.IsAValidTrie())
 	})
 
 	t.Run("smoke testing trie pruning", func(t *testing.T) {

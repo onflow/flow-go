@@ -24,20 +24,20 @@ func TestLeafNodeEncodingDecoding(t *testing.T) {
 	path1 := utils.PathByUint8(0)
 	payload1 := (*ledger.Payload)(nil)
 	hashValue1 := hash.Hash([32]byte{1, 1, 1})
-	leafNodeNilPayload := node.NewNode(255, nil, nil, ledger.Path(path1), payload1, hashValue1)
+	leafNodeNilPayload := node.NewLeafNodeWithHash(ledger.Path(path1), payload1, 255, hashValue1)
 
 	// Leaf node with empty payload (not nil)
 	// EmptyPayload() not used because decoded playload's value is empty slice (not nil)
 	path2 := utils.PathByUint8(1)
 	payload2 := &ledger.Payload{Value: []byte{}}
 	hashValue2 := hash.Hash([32]byte{2, 2, 2})
-	leafNodeEmptyPayload := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2)
+	leafNodeEmptyPayload := node.NewLeafNodeWithHash(ledger.Path(path2), payload2, 255, hashValue2)
 
 	// Leaf node with payload
 	path3 := utils.PathByUint8(2)
 	payload3 := utils.LightPayload8('A', 'a')
 	hashValue3 := hash.Hash([32]byte{3, 3, 3})
-	leafNodePayload := node.NewNode(255, nil, nil, ledger.Path(path3), payload3, hashValue3)
+	leafNodePayload := node.NewLeafNodeWithHash(ledger.Path(path3), payload3, 255, hashValue3)
 
 	encodedLeafNodeNilPayload := []byte{
 		0x00,       // node type
@@ -88,7 +88,7 @@ func TestLeafNodeEncodingDecoding(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		node        *node.Node
+		node        *node.LeafNode
 		encodedNode []byte
 	}{
 		{"nil payload", leafNodeNilPayload, encodedLeafNodeNilPayload},
@@ -106,7 +106,7 @@ func TestLeafNodeEncodingDecoding(t *testing.T) {
 			}
 
 			for _, scratch := range scratchBuffers {
-				encodedNode := flattener.EncodeNode(tc.node, 0, 0, scratch)
+				encodedNode := flattener.EncodeLeafNode(tc.node, scratch)
 				assert.Equal(t, tc.encodedNode, encodedNode)
 
 				if len(scratch) > 0 {
@@ -131,7 +131,7 @@ func TestLeafNodeEncodingDecoding(t *testing.T) {
 
 			for _, scratch := range scratchBuffers {
 				reader := bytes.NewReader(tc.encodedNode)
-				newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+				newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (node.Node, error) {
 					return nil, fmt.Errorf("no call expected")
 				})
 				require.NoError(t, err)
@@ -162,9 +162,9 @@ func TestRandomLeafNodeEncodingDecoding(t *testing.T) {
 		var hashValue hash.Hash
 		rand.Read(hashValue[:])
 
-		n := node.NewNode(height, nil, nil, paths[i], payloads[i], hashValue)
+		n := node.NewLeafNodeWithHash(paths[i], payloads[i], height, hashValue)
 
-		encodedNode := flattener.EncodeNode(n, 0, 0, writeScratch)
+		encodedNode := flattener.EncodeLeafNode(n, writeScratch)
 
 		if len(writeScratch) >= len(encodedNode) {
 			// reuse scratch buffer
@@ -175,7 +175,7 @@ func TestRandomLeafNodeEncodingDecoding(t *testing.T) {
 		}
 
 		reader := bytes.NewReader(encodedNode)
-		newNode, err := flattener.ReadNode(reader, readScratch, func(nodeIndex uint64) (*node.Node, error) {
+		newNode, err := flattener.ReadNode(reader, readScratch, func(nodeIndex uint64) (node.Node, error) {
 			return nil, fmt.Errorf("no call expected")
 		})
 		require.NoError(t, err)
@@ -193,17 +193,17 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 	path1 := utils.PathByUint8(0)
 	payload1 := utils.LightPayload8('A', 'a')
 	hashValue1 := hash.Hash([32]byte{1, 1, 1})
-	leafNode1 := node.NewNode(255, nil, nil, ledger.Path(path1), payload1, hashValue1)
+	leafNode1 := node.NewLeafNodeWithHash(ledger.Path(path1), payload1, 255, hashValue1)
 
 	// Child node
 	path2 := utils.PathByUint8(1)
 	payload2 := utils.LightPayload8('B', 'b')
 	hashValue2 := hash.Hash([32]byte{2, 2, 2})
-	leafNode2 := node.NewNode(255, nil, nil, ledger.Path(path2), payload2, hashValue2)
+	leafNode2 := node.NewLeafNodeWithHash(ledger.Path(path2), payload2, 255, hashValue2)
 
 	// Interim node
 	hashValue3 := hash.Hash([32]byte{3, 3, 3})
-	interimNode := node.NewNode(256, leafNode1, leafNode2, ledger.DummyPath, nil, hashValue3)
+	interimNode := node.NewInterimNodeWithHash(256, leafNode1, leafNode2, hashValue3)
 
 	encodedInterimNode := []byte{
 		0x01,       // node type
@@ -225,7 +225,7 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 		}
 
 		for _, scratch := range scratchBuffers {
-			data := flattener.EncodeNode(interimNode, lchildIndex, rchildIndex, scratch)
+			data := flattener.EncodeInterimNode(interimNode, lchildIndex, rchildIndex, scratch)
 			assert.Equal(t, encodedInterimNode, data)
 		}
 	})
@@ -240,7 +240,7 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 
 		for _, scratch := range scratchBuffers {
 			reader := bytes.NewReader(encodedInterimNode)
-			newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+			newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (node.Node, error) {
 				switch nodeIndex {
 				case lchildIndex:
 					return leafNode1, nil
@@ -261,7 +261,7 @@ func TestInterimNodeEncodingDecoding(t *testing.T) {
 		scratch := make([]byte, 1024)
 
 		reader := bytes.NewReader(encodedInterimNode)
-		newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		newNode, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (node.Node, error) {
 			return nil, nodeNotFoundError
 		})
 		require.Nil(t, newNode)
@@ -273,7 +273,7 @@ func TestTrieEncodingDecoding(t *testing.T) {
 	rootNodeNilIndex := uint64(20)
 
 	hashValue := hash.Hash([32]byte{2, 2, 2})
-	rootNode := node.NewNode(256, nil, nil, ledger.DummyPath, nil, hashValue)
+	rootNode := node.NewLeafNodeWithHash(ledger.DummyPath, nil, 256, hashValue)
 	rootNodeIndex := uint64(21)
 
 	mtrie, err := trie.NewMTrie(rootNode, 7, 1234)
@@ -345,7 +345,7 @@ func TestTrieEncodingDecoding(t *testing.T) {
 
 			for _, scratch := range scratchBuffers {
 				reader := bytes.NewReader(tc.encodedTrie)
-				trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+				trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (node.Node, error) {
 					if nodeIndex != tc.rootNodeIndex {
 						return nil, fmt.Errorf("unexpected root node index %d ", nodeIndex)
 					}
@@ -364,7 +364,7 @@ func TestTrieEncodingDecoding(t *testing.T) {
 			scratch := make([]byte, 1024)
 
 			reader := bytes.NewReader(tc.encodedTrie)
-			newNode, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+			newNode, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (node.Node, error) {
 				return nil, nodeNotFoundError
 			})
 			require.Nil(t, newNode)

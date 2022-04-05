@@ -32,14 +32,15 @@ const VersionV1 uint16 = 0x01
 const VersionV3 uint16 = 0x03
 
 // Version 4 contains a footer with node count and trie count (previously in the header).
-// Version 4 also reduces checkpoint data size.  See EncodeNode() and EncodeTrie() for more details.
+// Version 4 also reduces checkpoint data size.  See EncodeLeafNode(), EncodeInterimNode(),
+// and EncodeTrie() for more details.
 const VersionV4 uint16 = 0x04
 
 // Version 5 includes these changes:
 // - remove regCount and maxDepth from serialized nodes
 // - add allocated register count and size to serialized tries
 // - reduce number of bytes used to encode payload value size from 8 bytes to 4 bytes.
-// See EncodeNode() and EncodeTrie() for more details.
+// See EncodeLeafNode(), EncodeInterimNode(), and EncodeTrie() for more details.
 const VersionV5 uint16 = 0x05
 
 const (
@@ -310,7 +311,7 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 	// allNodes contains all unique nodes of given tries and their index
 	// (ordered by node traversal sequence).
 	// Index 0 is a special case with nil node.
-	allNodes := make(map[*node.Node]uint64)
+	allNodes := make(map[node.Node]uint64)
 	allNodes[nil] = 0
 
 	// Serialize all unique nodes
@@ -324,26 +325,35 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 			allNodes[n] = nodeCounter
 			nodeCounter++
 
-			var lchildIndex, rchildIndex uint64
+			var encNode []byte
+			switch nd := n.(type) {
+			case *node.LeafNode:
+				encNode = flattener.EncodeLeafNode(nd, scratch)
 
-			if lchild := n.LeftChild(); lchild != nil {
-				var found bool
-				lchildIndex, found = allNodes[lchild]
-				if !found {
-					hash := lchild.Hash()
-					return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+			case *node.InterimNode:
+				var lchildIndex, rchildIndex uint64
+				if lchild := nd.LeftChild(); lchild != nil {
+					var found bool
+					lchildIndex, found = allNodes[lchild]
+					if !found {
+						hash := lchild.Hash()
+						return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+					}
 				}
-			}
-			if rchild := n.RightChild(); rchild != nil {
-				var found bool
-				rchildIndex, found = allNodes[rchild]
-				if !found {
-					hash := rchild.Hash()
-					return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+				if rchild := nd.RightChild(); rchild != nil {
+					var found bool
+					rchildIndex, found = allNodes[rchild]
+					if !found {
+						hash := rchild.Hash()
+						return fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
+					}
 				}
+				encNode = flattener.EncodeInterimNode(nd, lchildIndex, rchildIndex, scratch)
+
+			default:
+				return fmt.Errorf("internal error: invalid node type %T", nd)
 			}
 
-			encNode := flattener.EncodeNode(n, lchildIndex, rchildIndex, scratch)
 			_, err = crc32Writer.Write(encNode)
 			if err != nil {
 				return fmt.Errorf("cannot serialize node: %w", err)
@@ -463,7 +473,7 @@ func readCheckpoint(f *os.File) ([]*trie.MTrie, error) {
 }
 
 type nodeWithRegMetrics struct {
-	n        *node.Node
+	n        node.Node
 	regCount uint64
 	regSize  uint64
 }
@@ -502,7 +512,7 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		n, regCount, regSize, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+		n, regCount, regSize, err := flattener.ReadNodeFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(i) {
 				return nil, 0, 0, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -518,7 +528,7 @@ func readCheckpointV3AndEarlier(f *os.File, version uint16) ([]*trie.MTrie, erro
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
-		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+		trie, err := flattener.ReadTrieFromCheckpointV3AndEarlier(reader, func(nodeIndex uint64) (node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(len(nodes)) {
 				return nil, 0, 0, fmt.Errorf("sequence of stored nodes doesn't contain node")
 			}
@@ -609,7 +619,7 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		n, regCount, regSize, err := flattener.ReadNodeFromCheckpointV4(reader, scratch, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+		n, regCount, regSize, err := flattener.ReadNodeFromCheckpointV4(reader, scratch, func(nodeIndex uint64) (node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(i) {
 				return nil, 0, 0, fmt.Errorf("sequence of stored nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -625,7 +635,7 @@ func readCheckpointV4(f *os.File) ([]*trie.MTrie, error) {
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
-		trie, err := flattener.ReadTrieFromCheckpointV4(reader, scratch, func(nodeIndex uint64) (*node.Node, uint64, uint64, error) {
+		trie, err := flattener.ReadTrieFromCheckpointV4(reader, scratch, func(nodeIndex uint64) (node.Node, uint64, uint64, error) {
 			if nodeIndex >= uint64(len(nodes)) {
 				return nil, 0, 0, fmt.Errorf("sequence of stored nodes doesn't contain node")
 			}
@@ -716,11 +726,11 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 	}
 
 	// nodes's element at index 0 is a special, meaning nil .
-	nodes := make([]*node.Node, nodesCount+1) //+1 for 0 index meaning nil
+	nodes := make([]node.Node, nodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*trie.MTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
-		n, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		n, err := flattener.ReadNode(reader, scratch, func(nodeIndex uint64) (node.Node, error) {
 			if nodeIndex >= uint64(i) {
 				return nil, fmt.Errorf("sequence of serialized nodes does not satisfy Descendents-First-Relationship")
 			}
@@ -733,7 +743,7 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 	}
 
 	for i := uint16(0); i < triesCount; i++ {
-		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (*node.Node, error) {
+		trie, err := flattener.ReadTrie(reader, scratch, func(nodeIndex uint64) (node.Node, error) {
 			if nodeIndex >= uint64(len(nodes)) {
 				return nil, fmt.Errorf("sequence of stored nodes doesn't contain node")
 			}
