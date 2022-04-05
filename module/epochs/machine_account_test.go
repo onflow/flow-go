@@ -1,10 +1,14 @@
 package epochs
 
 import (
+	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
+	"github.com/sethvargo/go-retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -176,5 +180,35 @@ func TestMachineAccountChecking(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Regexp(t, "non-standard key index", hook.Logs())
 		})
+	})
+}
+
+// TestBackoff tests the backoff config behaves as expected. In particular, once
+// we reach the cap duration, all future backoffs should be equal to the cap duration.
+func TestMachineAccountValidatorBackoff_Overflow(t *testing.T) {
+
+	// large initial value to force a quick overflow, if unhandled
+	backoff := retry.NewExponential(time.Hour * 1000)
+	backoff = retry.WithCappedDuration(time.Microsecond*10, backoff)
+	backoff = retry.WithJitterPercent(5, backoff) // 5% jitter
+
+	calls := 0
+	last := time.Now()
+	retry.Do(context.Background(), backoff, func(ctx context.Context) error {
+		calls++
+		fmt.Println(calls, time.Since(last))
+
+		// assert the time between calls is greater than the cap
+		// an overflow would
+		if calls > 1 {
+			assert.Greater(t, time.Since(last), time.Microsecond*9)
+		}
+		last = time.Now()
+
+		// exit after 60 calls - this is enough to overflow 1000hrs
+		if calls > 60 {
+			return nil
+		}
+		return retry.RetryableError(fmt.Errorf(""))
 	})
 }
