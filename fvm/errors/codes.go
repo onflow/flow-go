@@ -15,14 +15,13 @@ func (fc FailureCode) String() string {
 }
 
 const (
-	FailureCodeUnknownFailure                      FailureCode = 2000
-	FailureCodeEncodingFailure                     FailureCode = 2001
-	FailureCodeLedgerFailure                       FailureCode = 2002
-	FailureCodeStateMergeFailure                   FailureCode = 2003
-	FailureCodeBlockFinderFailure                  FailureCode = 2004
-	FailureCodeHasherFailure                       FailureCode = 2005
-	FailureCodeAccountStorageNotInitializedFailure FailureCode = 2006
-	FailureCodeMetaTransactionFailure              FailureCode = 2100
+	FailureCodeUnknownFailure         FailureCode = 2000
+	FailureCodeEncodingFailure        FailureCode = 2001
+	FailureCodeLedgerFailure          FailureCode = 2002
+	FailureCodeStateMergeFailure      FailureCode = 2003
+	FailureCodeBlockFinderFailure     FailureCode = 2004
+	FailureCodeHasherFailure          FailureCode = 2005
+	FailureCodeMetaTransactionFailure FailureCode = 2100
 )
 
 const (
@@ -66,10 +65,11 @@ const (
 
 	// accounts errors 1200 - 1250
 	// ErrCodeAccountError              ErrorCode = 1200 - reserved
-	ErrCodeAccountNotFoundError          ErrorCode = 1201
-	ErrCodeAccountPublicKeyNotFoundError ErrorCode = 1202
-	ErrCodeAccountAlreadyExistsError     ErrorCode = 1203
-	ErrCodeFrozenAccountError            ErrorCode = 1204
+	ErrCodeAccountNotFoundError              ErrorCode = 1201
+	ErrCodeAccountPublicKeyNotFoundError     ErrorCode = 1202
+	ErrCodeAccountAlreadyExistsError         ErrorCode = 1203
+	ErrCodeFrozenAccountError                ErrorCode = 1204
+	ErrCodeAccountStorageNotInitializedError ErrorCode = 1205
 
 	// contract errors 1250 - 1300
 	// ErrCodeContractError          ErrorCode = 1250 - reserved

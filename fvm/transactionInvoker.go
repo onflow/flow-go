@@ -143,10 +143,6 @@ func (i *TransactionInvoker) Process(
 			if errors.As(err, &interactionLimiExceededErr) {
 				// If it is this special interaction limit error, just set it directly as the tx error
 				txError = err
-			} else if errors.IsStorageNotInitializedFailure(err) {
-				// If it is this a StorageNotInitializedFailure error, just set it directly as the tx error
-				// TODO: this should not be handled here
-				txError = err
 			} else {
 				// Otherwise, do what we use to do
 				txError = fmt.Errorf("transaction invocation failed when executing transaction: %w", errors.HandleRuntimeError(err))
