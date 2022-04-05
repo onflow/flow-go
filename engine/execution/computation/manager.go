@@ -69,7 +69,6 @@ type Manager struct {
 	scriptLogThreshold time.Duration
 	uploaders          []uploader.Uploader
 	eds                state_synchronization.ExecutionDataService
-	edCache            state_synchronization.ExecutionDataCIDCache
 }
 
 func New(
@@ -85,7 +84,6 @@ func New(
 	scriptLogThreshold time.Duration,
 	uploaders []uploader.Uploader,
 	eds state_synchronization.ExecutionDataService,
-	edCache state_synchronization.ExecutionDataCIDCache,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -119,7 +117,6 @@ func New(
 		scriptLogThreshold: scriptLogThreshold,
 		uploaders:          uploaders,
 		eds:                eds,
-		edCache:            edCache,
 	}
 
 	return &e, nil
@@ -300,7 +297,6 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
 
-	e.edCache.Insert(block.Block.Header, blobTree)
 	e.log.Info().Hex("block_id", logging.Entity(block.Block)).Hex("execution_data_id", rootID[:]).Msg("execution data ID computed")
 	// result.ExecutionDataID = rootID
 

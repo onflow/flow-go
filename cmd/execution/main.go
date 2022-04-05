@@ -129,8 +129,8 @@ func main() {
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
 		executionDataService          state_synchronization.ExecutionDataService
-		executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
-		executionDataCIDCacheSize     uint = 100
+		executionDataCIDCache         state_synchronization.ExecutionDataCIDComparator
+		executionDataCIDCacheSize     uint = 20000
 		edsDatastoreTTL               time.Duration
 	)
 
@@ -380,7 +380,7 @@ func main() {
 			// TODO: if the node is not starting from the beginning of the spork, it may be useful to prepopulate
 			// the cache with the existing Execution Data blob trees. Currently, the cache is empty every time the
 			// node restarts, meaning that there will initially be no prioritization of requests.
-			executionDataCIDCache = state_synchronization.NewExecutionDataCIDCache(executionDataCIDCacheSize)
+			executionDataCIDCache = state_synchronization.NewExecutionDataCIDComparator(executionDataCIDCacheSize)
 
 			bs, err := node.Network.RegisterBlobService(
 				engine.ExecutionDataService,
@@ -388,27 +388,15 @@ func main() {
 				p2p.WithBitswapOptions(
 					bitswap.WithTaskComparator(
 						func(ta, tb *bitswap.TaskInfo) bool {
-							ra, err := executionDataCIDCache.Get(ta.Cid)
-
-							if err != nil {
+							// TODO: before merging, update this to use
+							// blobRecord comparison code
+							if !ta.HaveBlock {
 								return false
-							}
-
-							rb, err := executionDataCIDCache.Get(tb.Cid)
-
-							if err != nil {
+							} else if !tb.HaveBlock {
 								return true
 							}
 
-							if ra.BlobTreeRecord.BlockHeight > rb.BlobTreeRecord.BlockHeight {
-								// more recent block has higher priority
-								return true
-							} else if ra.BlobTreeRecord.BlockID == rb.BlobTreeRecord.BlockID {
-								// deeper node in the same blob tree has higher priority
-								return ra.BlobTreeLocation.Height < rb.BlobTreeLocation.Height
-							} else {
-								return false
-							}
+							return executionDataCIDCache.Compare(ta.Cid, tb.Cid)
 						},
 					),
 				))
@@ -461,7 +449,6 @@ func main() {
 				scriptLogThreshold,
 				blockDataUploaders,
 				executionDataService,
-				executionDataCIDCache,
 			)
 			if err != nil {
 				return nil, err
