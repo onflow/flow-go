@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	goruntime "runtime"
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	cpu "github.com/shirou/gopsutil/v3/cpu"
+	host "github.com/shirou/gopsutil/v3/host"
 	mem "github.com/shirou/gopsutil/v3/mem"
 	"github.com/spf13/pflag"
 
@@ -144,7 +146,7 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.StringVar(&executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data_blobstore"), "directory to use for Execution Data blobstore")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
-			flags.UintVar(&checkpointDistance, "checkpoint-distance", 40, "number of WAL segments between checkpoints")
+			flags.UintVar(&checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
@@ -204,11 +206,11 @@ func main() {
 			)
 			return err
 		}).
-		Module("hardware specs", func(node *cmd.NodeConfig) error {
-			hwLogger := node.Logger.With().Str("system", "hardware").Logger()
-			err = logHardware(hwLogger)
+		Module("system specs", func(node *cmd.NodeConfig) error {
+			sysInfoLogger := node.Logger.With().Str("system", "specs").Logger()
+			err = logSysInfo(sysInfoLogger)
 			if err != nil {
-				hwLogger.Error().Err(err)
+				sysInfoLogger.Error().Err(err)
 			}
 			return nil
 		}).
@@ -221,7 +223,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.NodeConfig) error {
@@ -841,7 +843,7 @@ func copyBootstrapState(dir, trie string) error {
 	return out.Close()
 }
 
-func logHardware(logger zerolog.Logger) error {
+func logSysInfo(logger zerolog.Logger) error {
 
 	vmem, err := mem.VirtualMemory()
 	if err != nil {
@@ -867,10 +869,21 @@ func logHardware(logger zerolog.Logger) error {
 		return fmt.Errorf("cpu info length is 0")
 	}
 
-	logger.Info().Msgf("CPU: ModelName=%s, MHz=%.0f, Family=%s, Model=%s, Stepping=%d, PhysicalCores=%d, LogicalCores=%d",
-		info[0].ModelName, info[0].Mhz, info[0].Family, info[0].Model, info[0].Stepping, physicalCores, logicalCores)
+	logger.Info().Msgf("CPU: ModelName=%s, MHz=%.0f, Family=%s, Model=%s, Stepping=%d, Microcode=%s, PhysicalCores=%d, LogicalCores=%d",
+		info[0].ModelName, info[0].Mhz, info[0].Family, info[0].Model, info[0].Stepping, info[0].Microcode, physicalCores, logicalCores)
 
 	logger.Info().Msgf("RAM: Total=%d, Free=%d", vmem.Total, vmem.Free)
+
+	hostInfo, err := host.Info()
+	if err != nil {
+		return fmt.Errorf("failed to get platform info: %w", err)
+	}
+	logger.Info().Msgf("OS: OS=%s, Platform=%s, PlatformVersion=%s, KernelVersion=%s, Uptime: %d",
+		hostInfo.OS, hostInfo.Platform, hostInfo.PlatformVersion, hostInfo.KernelVersion, hostInfo.Uptime)
+
+	// goruntime.GOMAXPROCS(0) doesn't modify any settings.
+	logger.Info().Msgf("GO: GoVersion=%s, GOMAXPROCS=%d, NumCPU=%d",
+		goruntime.Version(), goruntime.GOMAXPROCS(0), goruntime.NumCPU())
 
 	return nil
 }

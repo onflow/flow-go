@@ -11,6 +11,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const TransactionFeesExecutionEffortWeightsPathDomain = "storage"
+const TransactionFeesExecutionEffortWeightsPathIdentifier = "executionEffortWeights"
+
 const deployTxFeesTransactionTemplate = `
 transaction {
   prepare(flowFeesAccount: AuthAccount, serviceAccount: AuthAccount) {
@@ -180,4 +183,63 @@ transaction(surgeFactor: UFix64, inclusionEffortCost: UFix64, executionEffortCos
         flowFeesAdmin.setFeeParameters(surgeFactor: surgeFactor, inclusionEffortCost: inclusionEffortCost, executionEffortCost: executionEffortCost)
     }
 }
+`
+
+// SetExecutionEffortWeightsTransaction creates a transaction that sets up weights for the weighted Meter.
+func SetExecutionEffortWeightsTransaction(
+	service flow.Address,
+	weights map[uint]uint64,
+) (*flow.TransactionBody, error) {
+	return setExecutionWeightsTransaction(
+		service,
+		weights,
+		TransactionFeesExecutionEffortWeightsPathDomain,
+		TransactionFeesExecutionEffortWeightsPathIdentifier,
+	)
+}
+
+func setExecutionWeightsTransaction(
+	service flow.Address,
+	weights map[uint]uint64,
+	domain string,
+	identifier string,
+) (*flow.TransactionBody, error) {
+	newWeightsKeyValuePairs := make([]cadence.KeyValuePair, len(weights))
+	i := 0
+	for k, w := range weights {
+		newWeightsKeyValuePairs[i] = cadence.KeyValuePair{
+			Key:   cadence.UInt64(k),
+			Value: cadence.UInt64(w),
+		}
+		i += 1
+	}
+	newWeights, err := jsoncdc.Encode(cadence.NewDictionary(newWeightsKeyValuePairs))
+	if err != nil {
+		return nil, err
+	}
+
+	storagePath, err := jsoncdc.Encode(cadence.Path{
+		Domain:     domain,
+		Identifier: identifier,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(setExecutionWeightsScript)).
+		AddArgument(newWeights).
+		AddArgument(storagePath).
+		AddAuthorizer(service)
+
+	return tx, nil
+}
+
+const setExecutionWeightsScript = `
+	transaction(newWeights: {UInt64: UInt64}, path: StoragePath) {
+		prepare(signer: AuthAccount) {
+			signer.load<{UInt64: UInt64}>(from: path)
+			signer.save(newWeights, to: path)
+		}
+	}
 `

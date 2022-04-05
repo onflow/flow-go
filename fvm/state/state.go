@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/meter/noop"
@@ -54,6 +56,10 @@ func defaultState(view View) *State {
 
 func (s *State) View() View {
 	return s.view
+}
+
+func (s *State) Meter() meter.Meter {
+	return s.meter
 }
 
 type StateOption func(st *State) *State
@@ -186,7 +192,7 @@ func (s *State) Touch(owner, controller, key string) error {
 }
 
 // MeterComputation meters computation usage
-func (s *State) MeterComputation(kind, intensity uint) error {
+func (s *State) MeterComputation(kind common.ComputationKind, intensity uint) error {
 	return s.meter.MeterComputation(kind, intensity)
 }
 
@@ -195,14 +201,24 @@ func (s *State) TotalComputationUsed() uint {
 	return s.meter.TotalComputationUsed()
 }
 
+// ComputationIntensities returns computation intensities
+func (s *State) ComputationIntensities() meter.MeteredIntensities {
+	return s.meter.ComputationIntensities()
+}
+
 // TotalComputationLimit returns total computation limit
 func (s *State) TotalComputationLimit() uint {
 	return s.meter.TotalComputationLimit()
 }
 
 // MeterMemory meters memory usage
-func (s *State) MeterMemory(kind, intensity uint) error {
+func (s *State) MeterMemory(kind common.ComputationKind, intensity uint) error {
 	return s.meter.MeterMemory(kind, intensity)
+}
+
+// MemoryIntensities returns computation intensities
+func (s *State) MemoryIntensities() meter.MeteredIntensities {
+	return s.meter.MemoryIntensities()
 }
 
 // TotalMemoryUsed returns total memory used
@@ -232,7 +248,7 @@ func (s *State) MergeState(other *State, enforceLimit bool) error {
 		return errors.NewStateMergeFailure(err)
 	}
 
-	err = s.meter.MergeMeter(other.meter)
+	err = s.meter.MergeMeter(other.meter, enforceLimit)
 	if err != nil {
 		return err
 	}

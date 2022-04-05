@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/validator"
@@ -231,7 +232,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, synchronization.DefaultConfig())
+		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
 		builder.SyncCore = syncCore
 
 		return err
@@ -472,6 +473,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
+	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
 
 	codec := cborcodec.NewCodec()
@@ -482,11 +484,11 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		codec,
 		nodeID,
 		func() (network.Middleware, error) { return builder.Middleware, nil },
-		p2p.DefaultCacheSize,
 		topology,
 		p2p.NewChannelSubscriptionManager(middleware),
 		networkMetrics,
 		builder.IdentityProvider,
+		receiveCache,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)

@@ -69,7 +69,7 @@ func main() {
 		startupTime                            time.Time
 
 		followerState protocol.MutableState
-		ingestConf    ingest.Config = ingest.DefaultConfig()
+		ingestConf    = ingest.DefaultConfig()
 		rpcConf       rpc.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
@@ -181,7 +181,17 @@ func main() {
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
-			create := func() mempool.Transactions { return herocache.NewTransactions(uint32(txLimit), node.Logger) }
+			create := func(epoch uint64) mempool.Transactions {
+				var heroCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+				if node.BaseConfig.HeroCacheMetricsEnable {
+					heroCacheMetricsCollector = metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegisterer, epoch)
+				}
+				return herocache.NewTransactions(
+					uint32(txLimit),
+					node.Logger,
+					heroCacheMetricsCollector)
+			}
+
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
@@ -195,7 +205,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -425,7 +435,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				synchronization.DefaultConfig(),
+				node.SyncCoreConfig,
 			)
 			if err != nil {
 				return nil, err

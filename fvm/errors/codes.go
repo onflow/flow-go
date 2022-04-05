@@ -54,15 +54,16 @@ const (
 	ErrCodeEncodingUnsupportedValue ErrorCode = 1102
 	ErrCodeStorageCapacityExceeded  ErrorCode = 1103
 	//  Deprecated: ErrCodeGasLimitExceededError  ErrorCode = 1104
-	ErrCodeEventLimitExceededError            ErrorCode = 1105
-	ErrCodeLedgerIntractionLimitExceededError ErrorCode = 1106
-	ErrCodeStateKeySizeLimitError             ErrorCode = 1107
-	ErrCodeStateValueSizeLimitError           ErrorCode = 1108
-	ErrCodeTransactionFeeDeductionFailedError ErrorCode = 1109
-	ErrCodeComputationLimitExceededError      ErrorCode = 1110
-	ErrCodeMemoryLimitExceededError           ErrorCode = 1111
-	ErrCodeScriptExecutionCancelledError      ErrorCode = 1112
-	ErrCodeScriptExecutionTimedOutError       ErrorCode = 1113
+	ErrCodeEventLimitExceededError                   ErrorCode = 1105
+	ErrCodeLedgerIntractionLimitExceededError        ErrorCode = 1106
+	ErrCodeStateKeySizeLimitError                    ErrorCode = 1107
+	ErrCodeStateValueSizeLimitError                  ErrorCode = 1108
+	ErrCodeTransactionFeeDeductionFailedError        ErrorCode = 1109
+	ErrCodeComputationLimitExceededError             ErrorCode = 1110
+	ErrCodeMemoryLimitExceededError                  ErrorCode = 1111
+	ErrCodeCouldNotDecodeExecutionParameterFromState ErrorCode = 1112
+	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
+	ErrCodeScriptExecutionTimedOutError              ErrorCode = 1113
 
 	// accounts errors 1200 - 1250
 	// ErrCodeAccountError              ErrorCode = 1200 - reserved

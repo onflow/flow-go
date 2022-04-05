@@ -27,6 +27,8 @@ import (
 // -- execution results are discarded.
 // -- the test is passed if no result approval is emitted for any of the chunks in a timely manner.
 func TestVerificationHappyPath(t *testing.T) {
+	t.Parallel()
+
 	testcases := []struct {
 		blockCount      int
 		opts            []vertestutils.CompleteExecutionReceiptBuilderOpt

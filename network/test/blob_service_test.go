@@ -81,7 +81,13 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	suite.cancel = cancel
 
 	ids, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
-		ctx, suite.T(), suite.numNodes, logger, 100, tops, WithDHT("blob_service_test", p2p.AsServer()), WithPeerManagerOpts(p2p.WithInterval(time.Second)),
+		ctx,
+		suite.T(),
+		suite.numNodes,
+		logger,
+		tops,
+		WithDHT("blob_service_test", p2p.AsServer()),
+		WithPeerManagerOpts(p2p.WithInterval(time.Second)),
 	)
 	suite.networks = networks
 

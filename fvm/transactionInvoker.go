@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/onflow/cadence/runtime"
@@ -63,8 +64,6 @@ func (i *TransactionInvoker) Process(
 
 	parentState := sth.State()
 	childState := sth.NewChild()
-	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
-	predeclaredValues := valueDeclarations(ctx, env)
 
 	defer func() {
 		// an extra check for state holder health, this should never happen
@@ -89,6 +88,12 @@ func (i *TransactionInvoker) Process(
 		sth.SetActiveState(parentState)
 	}()
 
+	env, err := NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	if err != nil {
+		return fmt.Errorf("error creating new environment: %w", err)
+	}
+	predeclaredValues := valueDeclarations(ctx, env)
+
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 		if retry {
 			// rest state
@@ -106,7 +111,7 @@ func (i *TransactionInvoker) Process(
 
 			// reset error part of proc
 			// Warning right now the tx requires retry logic doesn't change
-			// anything on state but we might want to revert the state changes (or not committing)
+			// anything on state, but we might want to revert the state changes (or not committing)
 			// if we decided to expand it further.
 			proc.Err = nil
 			proc.Logs = make([]string, 0)
@@ -114,7 +119,10 @@ func (i *TransactionInvoker) Process(
 			proc.ServiceEvents = make([]flow.Event, 0)
 
 			// reset env
-			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+			env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+			if err != nil {
+				return fmt.Errorf("error creating new environment: %w", err)
+			}
 		}
 
 		location := common.TransactionLocation(proc.ID[:])
@@ -155,12 +163,18 @@ func (i *TransactionInvoker) Process(
 	// 	panic(err)
 	// }
 
-	// disable the limit checks on states
+	// read computationUsed from the environment. This will be used to charge fees.
+	computationUsed := env.ComputationUsed()
 
+	// log te execution intensities here, so tha they do not contain data from storage limit checks and
+	// transaction deduction, because the payer is not charged for those.
+	i.logExecutionIntensities(sth, txIDStr)
+
+	// disable the limit checks on states
 	sth.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
 	// disable the limit checks on states
-	feesError := i.deductTransactionFees(env, proc, sth)
+	feesError := i.deductTransactionFees(env, proc, sth, computationUsed)
 	if feesError != nil {
 		txError = feesError
 	}
@@ -178,7 +192,12 @@ func (i *TransactionInvoker) Process(
 
 	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
+		// disable the computation/memory limit checks on storage checks,
+		// so we don't error from computation/memory limits on this part.
+		// We cannot charge the user for this part, since fee deduction already happened.
+		sth.DisableAllLimitEnforcements()
 		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		sth.EnableAllLimitEnforcements()
 	}
 
 	// it there was any transaction error clear changes and try to deduct fees again
@@ -194,14 +213,16 @@ func (i *TransactionInvoker) Process(
 		i.logger.Info().
 			Str("txHash", txIDStr).
 			Uint64("blockHeight", blockHeight).
-			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
 
 		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+		env, err = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+		if err != nil {
+			return fmt.Errorf("error creating new environment: %w", err)
+		}
 
 		// try to deduct fees again, to get the fee deduction events
-		feesError = i.deductTransactionFees(env, proc, sth)
+		feesError = i.deductTransactionFees(env, proc, sth, computationUsed)
 
 		updatedKeys, err = env.Commit()
 		if err != nil && feesError == nil {
@@ -216,16 +237,15 @@ func (i *TransactionInvoker) Process(
 			i.logger.Info().
 				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
-				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 				Msg("transaction fee deduction executed with error")
 
 			return feesError
 		}
 	}
 
-	// if tx failed this will only contain fee deduction logs and computation
+	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.ComputationUsed()
+	proc.ComputationUsed = proc.ComputationUsed + computationUsed
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -239,18 +259,24 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
-func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure, sth *state.StateHolder) (err error) {
+func (i *TransactionInvoker) deductTransactionFees(
+	env *TransactionEnv,
+	proc *TransactionProcedure,
+	sth *state.StateHolder,
+	computationUsed uint64) (err error) {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
 
-	computationUsed := sth.State().TotalComputationUsed()
+	if computationUsed > uint64(sth.State().TotalComputationLimit()) {
+		computationUsed = uint64(sth.State().TotalComputationLimit())
+	}
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
 	// Hardcoded inclusion effort (of 1.0 UFix). Eventually this will be dynamic.
 	// Execution effort will be connected to computation used.
 	inclusionEffort := uint64(100_000_000)
-	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, uint64(computationUsed))
+	_, err = deductTxFees(proc.Transaction.Payer, inclusionEffort, computationUsed)
 
 	if err != nil {
 		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, err)
@@ -408,4 +434,26 @@ func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedu
 		Str("codes", string(codesJSON)).
 		Str("programs", string(programsJSON)).
 		Msg("checking failed")
+}
+
+// logExecutionIntensities logs execution intensities of the transaction
+func (i *TransactionInvoker) logExecutionIntensities(sth *state.StateHolder, txHash string) {
+	if i.logger.Debug().Enabled() {
+		computation := zerolog.Dict()
+		for s, u := range sth.State().ComputationIntensities() {
+			computation.Uint(strconv.FormatUint(uint64(s), 10), u)
+		}
+		memory := zerolog.Dict()
+		for s, u := range sth.State().MemoryIntensities() {
+			memory.Uint(strconv.FormatUint(uint64(s), 10), u)
+		}
+		i.logger.Info().
+			Str("txHash", txHash).
+			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
+			Uint("computationUsed", sth.State().TotalComputationUsed()).
+			Uint("memoryUsed", sth.State().TotalMemoryUsed()).
+			Dict("computationIntensities", computation).
+			Dict("memoryIntensities", memory).
+			Msg("transaction execution data")
+	}
 }
