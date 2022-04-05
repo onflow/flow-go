@@ -223,7 +223,20 @@ func TestExecuteScript(t *testing.T) {
 	eds := new(state_synchronization.ExecutionDataService)
 	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	engine, err := New(logger, metrics.NewNoopCollector(), nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, DefaultScriptExecutionTimeLimit, nil, eds, edCache)
+	engine, err := New(logger,
+		metrics.NewNoopCollector(),
+		nil,
+		me,
+		nil,
+		vm,
+		execCtx,
+		DefaultProgramsCacheSize,
+		committer.NewNoopViewCommitter(),
+		scriptLogThreshold,
+		DefaultScriptExecutionTimeLimit,
+		nil,
+		eds,
+		edCache)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -245,7 +258,20 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	eds := new(state_synchronization.ExecutionDataService)
 	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold, DefaultScriptExecutionTimeLimit, nil, eds, edCache)
+	manager, err := New(log,
+		metrics.NewNoopCollector(),
+		nil,
+		nil,
+		nil,
+		vm,
+		ctx,
+		DefaultProgramsCacheSize,
+		committer.NewNoopViewCommitter(),
+		scriptLogThreshold,
+		DefaultScriptExecutionTimeLimit,
+		nil,
+		eds,
+		edCache)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
@@ -269,7 +295,20 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	eds := new(state_synchronization.ExecutionDataService)
 	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond, DefaultScriptExecutionTimeLimit, nil, eds, edCache)
+	manager, err := New(log,
+		metrics.NewNoopCollector(),
+		nil,
+		nil,
+		nil,
+		vm,
+		ctx,
+		DefaultProgramsCacheSize,
+		committer.NewNoopViewCommitter(),
+		1*time.Millisecond,
+		DefaultScriptExecutionTimeLimit,
+		nil,
+		eds,
+		edCache)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
@@ -293,7 +332,20 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	eds := new(state_synchronization.ExecutionDataService)
 	edCache := new(state_synchronization.ExecutionDataCIDCache)
 
-	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second, DefaultScriptExecutionTimeLimit, nil, eds, edCache)
+	manager, err := New(log,
+		metrics.NewNoopCollector(),
+		nil,
+		nil,
+		nil,
+		vm,
+		ctx,
+		DefaultProgramsCacheSize,
+		committer.NewNoopViewCommitter(),
+		1*time.Second,
+		DefaultScriptExecutionTimeLimit,
+		nil,
+		eds,
+		edCache)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript(context.Background(), []byte("whatever"), nil, &header, noopView())
