@@ -35,12 +35,12 @@ type PrivDKGMessageOut struct {
 
 // BroadcastDKGMessage is a wrapper around a DKGMessage intended for broadcasting.
 // It contains a signature of the DKGMessage signed with the staking key of the
-// sender. Due to the fact that BroadcastDKGMessage are communicated via the DKG smart contract
-// we must also include the Orig or DKG committee index of the sender so that when these
-// messages are consumed we can verify if BroadcastDKGMessage was sent by a DKG committee member.
+// sender. When the DKG contract receives BroadcastDKGMessage' it will attach the
+// NodeID of the sender, we then add this field to the BroadcastDKGMessage when reading broadcast messages.
 type BroadcastDKGMessage struct {
 	DKGMessage
-	Orig      uint64
+	Orig      uint64          `json:"-"` // Orig field is set when reading broadcast messages using the NodeID to find the index of the sender in the DKG committee
+	NodeID    flow.Identifier `json:"-"` // NodeID field is added when reading broadcast messages from the DKG contract, this field is ignored when sending broadcast messages
 	Signature crypto.Signature
 }
 

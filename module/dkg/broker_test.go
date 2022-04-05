@@ -260,6 +260,7 @@ func TestPoll(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		bmsg, err := sender.prepareBroadcastMessage([]byte(fmt.Sprintf("msg%d", i)))
 		require.NoError(t, err)
+		bmsg.NodeID = committee[0].NodeID
 		bcastMsgs = append(bcastMsgs, bmsg)
 	}
 

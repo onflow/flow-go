@@ -339,6 +339,14 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	}
 
 	for _, msg := range msgs {
+		// set the Orig field for the message
+		memberIndex, ok := b.committee.GetIndex(msg.NodeID)
+		if !ok {
+			b.log.Error().Msgf("broadcast message from node with id (%v) does not match the ID of any committee member", msg.NodeID)
+			continue
+		}
+		msg.Orig = uint64(memberIndex)
+
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
 			b.log.Error().Err(err).Msg("unable to verify broadcast message")
@@ -458,7 +466,6 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 	}
 	bcastMsg := messages.BroadcastDKGMessage{
 		DKGMessage: dkgMessage,
-		Orig:       uint64(b.myIndex),
 		Signature:  signature,
 	}
 	return bcastMsg, nil

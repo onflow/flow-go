@@ -1336,7 +1336,7 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // and height of zero.
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
-	ChunkDataPackRequest {
+ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
@@ -1881,6 +1881,7 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	return &messages.BroadcastDKGMessage{
 		DKGMessage: *DKGMessageFixture(),
 		Orig:       uint64(rand.Int()),
+		NodeID:     IdentifierFixture(),
 		Signature:  SignatureFixture(),
 	}
 }
