@@ -12,16 +12,19 @@ import (
 
 // header codes to distinguish between different types of data
 const (
-	CodeRecursiveCIDs = iota + 1
-	CodeExecutionData
+	codeRecursiveCIDs = iota + 1
+	codeExecutionDataRoot
+	codeChunkExecutionData
 )
 
 func getCode(v interface{}) (byte, error) {
 	switch v.(type) {
-	case *ExecutionData:
-		return CodeExecutionData, nil
+	case *ExecutionDataRoot:
+		return codeExecutionDataRoot, nil
+	case *ChunkExecutionData:
+		return codeChunkExecutionData, nil
 	case []cid.Cid:
-		return CodeRecursiveCIDs, nil
+		return codeRecursiveCIDs, nil
 	default:
 		return 0, fmt.Errorf("invalid type for interface: %T", v)
 	}
@@ -29,9 +32,11 @@ func getCode(v interface{}) (byte, error) {
 
 func getPrototype(code byte) (interface{}, error) {
 	switch code {
-	case CodeExecutionData:
-		return &ExecutionData{}, nil
-	case CodeRecursiveCIDs:
+	case codeExecutionDataRoot:
+		return &ExecutionDataRoot{}, nil
+	case codeChunkExecutionData:
+		return &ChunkExecutionData{}, nil
+	case codeRecursiveCIDs:
 		return &[]cid.Cid{}, nil
 	default:
 		return nil, fmt.Errorf("invalid code: %v", code)

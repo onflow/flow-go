@@ -1,6 +1,7 @@
 package state_synchronization
 
 import (
+	"github.com/ipfs/go-cid"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -13,7 +14,6 @@ type ChunkExecutionData struct {
 }
 
 type ExecutionDataRoot struct {
-	BlockID                     flow.Identifier
-	PreviousExecutionDataRootID flow.Identifier
-	ChunkExecutionDataIDs       []flow.Identifier
+	BlockID               flow.Identifier
+	ChunkExecutionDataIDs []cid.Cid
 }

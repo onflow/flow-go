@@ -1,6 +1,7 @@
 package state_synchronization
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,25 +27,52 @@ const (
 
 var ErrBlobTreeDepthExceeded = errors.New("blob tree depth exceeded")
 
-type BlobTree [][]cid.Cid
-
 // ExecutionDataService handles adding/getting execution data to/from a blobservice
 type ExecutionDataService interface {
-	// Add constructs a blob tree for the given ExecutionData and
-	// adds it to the blobservice, and then returns the root CID
-	// and list of all CIDs.
-	Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, BlobTree, error)
+	// Add constructs a blob tree from the given list of ChunkExecutionData and
+	// adds it to the blobservice, and then returns the root ID.
+	Add(ctx context.Context, blockID flow.Identifier, blockHeight uint64, ceds []*ChunkExecutionData) (flow.Identifier, error)
 
-	// Get gets the ExecutionData for the given root CID from the blobservice.
-	Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error)
+	// Get gets the list of ChunkExecutionData for the given root ID from the blobservice.
+	Get(ctx context.Context, blockID flow.Identifier, blockHeight uint64, rootID flow.Identifier) ([]*ChunkExecutionData, uint64, error)
+}
+
+type ExecutionDataServiceOption func(*executionDataServiceImpl)
+
+func WithMaxBlobSize(size int) ExecutionDataServiceOption {
+	return func(s *executionDataServiceImpl) {
+		s.maxBlobSize = size
+	}
+}
+
+func WithMaxBlobTreeDepth(depth int) ExecutionDataServiceOption {
+	return func(s *executionDataServiceImpl) {
+		s.maxBlobTreeDepth = depth
+	}
+}
+
+func WithBlobBatchSize(batchSize int) ExecutionDataServiceOption {
+	return func(s *executionDataServiceImpl) {
+		s.blobBatchSize = batchSize
+	}
+}
+
+func WithStatusTrackerFactory(factory StatusTrackerFactory) ExecutionDataServiceOption {
+	return func(s *executionDataServiceImpl) {
+		s.statusTrackerFactory = factory
+	}
 }
 
 type executionDataServiceImpl struct {
-	serializer  *serializer
-	blobService network.BlobService
-	maxBlobSize int
-	metrics     module.ExecutionDataServiceMetrics
-	logger      zerolog.Logger
+	serializer           *serializer
+	blobService          network.BlobService
+	maxBlobSize          int
+	maxBlobTreeDepth     int
+	blobBatchSize        int
+	metrics              module.ExecutionDataServiceMetrics
+	logger               zerolog.Logger
+	statusTrackerFactory StatusTrackerFactory
+	cidCacherFactory     CIDCacherFactory
 }
 
 var _ ExecutionDataService = (*executionDataServiceImpl)(nil)
@@ -53,14 +83,25 @@ func NewExecutionDataService(
 	blobService network.BlobService,
 	metrics module.ExecutionDataServiceMetrics,
 	logger zerolog.Logger,
+	opts ...ExecutionDataServiceOption,
 ) *executionDataServiceImpl {
-	return &executionDataServiceImpl{
+	eds := &executionDataServiceImpl{
 		&serializer{codec, compressor},
 		blobService,
 		defaultMaxBlobSize,
+		defaultMaxBlobTreeDepth,
+		defaultBlobBatchSize,
 		metrics,
 		logger.With().Str("component", "execution_data_service").Logger(),
+		&NoopStatusTrackerFactory{},
+		nil, // TODO
 	}
+
+	for _, opt := range opts {
+		opt(eds)
+	}
+
+	return eds
 }
 
 func (s *executionDataServiceImpl) Ready() <-chan struct{} {
@@ -75,7 +116,7 @@ func (s *executionDataServiceImpl) Done() <-chan struct{} {
 func (s *executionDataServiceImpl) receiveBatch(ctx context.Context, br *blobs.BlobReceiver) ([]blobs.Blob, error) {
 	var batch []blobs.Blob
 
-	for i := 0; i < defaultBlobBatchSize; i++ {
+	for i := 0; i < s.blobBatchSize; i++ {
 		blob, err := br.Receive()
 
 		if err != nil {
@@ -121,22 +162,28 @@ func (s *executionDataServiceImpl) storeBlobs(parent context.Context, br *blobs.
 			return nil, recvErr
 		}
 
-		batchCids := zerolog.Arr()
+		err := s.blobService.AddBlobs(ctx, batch)
 
-		for _, blob := range batch {
-			cids = append(cids, blob.Cid())
-			batchCids.Str(blob.Cid().String())
+		if logger.GetLevel() >= zerolog.DebugLevel {
+			batchCids := zerolog.Arr()
+
+			for _, blob := range batch {
+				cids = append(cids, blob.Cid())
+				batchCids.Str(blob.Cid().String())
+			}
+
+			batchLogger := logger.With().Array("cids", batchCids).Logger()
+
+			if err != nil {
+				batchLogger.Debug().Err(err).Msg("failed to add batch to blobservice")
+			} else {
+				batchLogger.Debug().Msg("added batch to blobservice")
+			}
 		}
 
-		batchLogger := logger.With().Array("cids", batchCids).Logger()
-
-		if err := s.blobService.AddBlobs(ctx, batch); err != nil {
-			batchLogger.Debug().Err(err).Msg("failed to add batch to blobservice")
-
+		if err != nil {
 			return nil, err
 		}
-
-		batchLogger.Debug().Msg("added batch to blobservice")
 	}
 
 	return cids, nil
@@ -187,49 +234,120 @@ func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, 
 	return cids, bcw.TotalBytesWritten(), serializeErr
 }
 
-// Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
-func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, BlobTree, error) {
-	logger := s.logger.With().Str("block_id", sd.BlockID.String()).Logger()
+func (s *executionDataServiceImpl) addExecutionDataRoot(
+	ctx context.Context,
+	blockID flow.Identifier,
+	blockHeight uint64,
+	chunkExecutionDataIDs []cid.Cid,
+	cidCacher CIDCacher,
+) (flow.Identifier, error) {
+	edRoot := &ExecutionDataRoot{
+		BlockID:               blockID,
+		ChunkExecutionDataIDs: chunkExecutionDataIDs,
+	}
+
+	buf := new(bytes.Buffer)
+	if err := s.serializer.Serialize(buf, edRoot); err != nil {
+		return flow.ZeroID, fmt.Errorf("failed to serialize execution data root: %w", err)
+	}
+
+	rootBlob := blobs.NewBlob(buf.Bytes())
+	if err := s.blobService.AddBlob(ctx, rootBlob); err != nil {
+		return flow.ZeroID, fmt.Errorf("failed to add execution data root to blobservice: %w", err)
+	}
+
+	cidCacher.InsertRootCID(rootBlob.Cid())
+
+	return flow.CidToId(rootBlob.Cid())
+}
+
+func (s *executionDataServiceImpl) Add(ctx context.Context, blockID flow.Identifier, blockHeight uint64, ceds []*ChunkExecutionData) (flow.Identifier, error) {
+	logger := s.logger.With().Str("block_id", blockID.String()).Logger()
 	logger.Debug().Msg("adding execution data")
 
 	s.metrics.ExecutionDataAddStarted()
 
+	success := false
+	totalSize := atomic.NewUint64(0)
+	chunkExecutionDataIDs := make([]cid.Cid, len(ceds))
 	start := time.Now()
-	cids, totalBytes, err := s.addBlobs(ctx, sd, logger)
 
+	defer func() {
+		s.metrics.ExecutionDataAddFinished(time.Since(start), success, totalSize.Load())
+	}()
+
+	cidCacher := s.cidCacherFactory.GetCIDCacher(blockID, blockHeight)
+	g, gCtx := errgroup.WithContext(ctx)
+
+	for i, ced := range ceds {
+		i := i
+		ced := ced
+
+		g.Go(func() error {
+			cedID, size, err := s.addChunkExecutionData(gCtx, i, ced, logger.With().Int("chunk_index", i).Logger(), cidCacher)
+
+			if err != nil {
+				return fmt.Errorf("failed to add chunk execution data at index %d: %w", i, err)
+			}
+
+			chunkExecutionDataIDs[i] = cedID
+			totalSize.Add(size)
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return flow.ZeroID, err
+	}
+
+	if rootID, err := s.addExecutionDataRoot(ctx, blockID, blockHeight, chunkExecutionDataIDs, cidCacher); err != nil {
+		return flow.ZeroID, err
+	} else {
+		success = true
+		return rootID, nil
+	}
+}
+
+func (s *executionDataServiceImpl) addChunkExecutionData(
+	ctx context.Context,
+	chunkIndex int,
+	ced *ChunkExecutionData,
+	logger zerolog.Logger,
+	cidCacher CIDCacher,
+) (cid.Cid, uint64, error) {
+	cids, totalBytes, err := s.addBlobs(ctx, ced, logger)
 	if err != nil {
-		s.metrics.ExecutionDataAddFinished(time.Since(start), false, 0)
-
-		return flow.ZeroID, nil, fmt.Errorf("failed to add execution data blobs: %w", err)
+		return cid.Undef, 0, fmt.Errorf("failed to add chunk execution data blobs: %w")
 	}
 
 	var blobTreeSize uint64
-	var blobTree BlobTree
+	var height int
 
 	for {
-		cidArr := zerolog.Arr()
+		cidCacher.InsertBlobTreeLevel(chunkIndex, height, cids)
 
-		for _, cid := range cids {
-			cidArr.Str(cid.String())
+		if logger.GetLevel() >= zerolog.DebugLevel {
+			cidArr := zerolog.Arr()
+
+			for _, cid := range cids {
+				cidArr.Str(cid.String())
+			}
+
+			logger.Debug().Array("cids", cidArr).Msg("added blobs")
 		}
 
-		logger.Debug().Array("cids", cidArr).Msg("added blobs")
-
-		blobTree = append(blobTree, cids)
 		blobTreeSize += totalBytes
 
 		if len(cids) == 1 {
-			s.metrics.ExecutionDataAddFinished(time.Since(start), true, blobTreeSize)
-
-			root, err := flow.CidToId(cids[0])
-			return root, blobTree, err
+			return cids[0], totalBytes, err
 		}
 
 		if cids, totalBytes, err = s.addBlobs(ctx, cids, logger); err != nil {
-			s.metrics.ExecutionDataAddFinished(time.Since(start), false, blobTreeSize)
-
-			return flow.ZeroID, nil, fmt.Errorf("failed to add cid blobs: %w", err)
+			return cid.Undef, 0, fmt.Errorf("failed to add cid blobs: %w", err)
 		}
+
+		height++
 	}
 }
 
@@ -357,46 +475,144 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 	return v, bcr.TotalBytesRead(), nil
 }
 
+func (s *executionDataServiceImpl) getExecutionDataRoot(
+	ctx context.Context,
+	blockID flow.Identifier,
+	rootID flow.Identifier,
+	blobGetter network.BlobGetter,
+	statusTracker StatusTracker,
+) (*ExecutionDataRoot, error) {
+	if err := statusTracker.StartTransfer(); err != nil {
+		return nil, fmt.Errorf("failed to track transfer start: %w", err)
+	}
+
+	blob, err := blobGetter.GetBlob(ctx, flow.IdToCid(rootID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get execution data root blob: %w", err)
+	}
+
+	v, err := s.serializer.Deserialize(bytes.NewBuffer(blob.RawData()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize execution data root blob: %w", err)
+	}
+
+	edRoot, ok := v.(*ExecutionDataRoot)
+	if !ok {
+		return nil, fmt.Errorf("execution data root blob is not an ExecutionDataRoot")
+	}
+
+	if edRoot.BlockID != blockID {
+		return nil, &MismatchedBlockIDError{blockID, edRoot.BlockID}
+	}
+
+	return edRoot, nil
+}
+
 // Get gets the ExecutionData for the given root CID from the blobservice.
 // The returned error will be:
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if any blob in the blob tree exceeds the maximum blob size
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobservice
-func (s *executionDataServiceImpl) Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error) {
-	rootCid := flow.IdToCid(rootID)
-
-	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
+func (s *executionDataServiceImpl) Get(
+	ctx context.Context,
+	blockID flow.Identifier,
+	blockHeight uint64,
+	rootID flow.Identifier,
+) ([]*ChunkExecutionData, uint64, error) {
+	logger := s.logger.With().Str("root_id", rootID.String()).Logger()
 	logger.Debug().Msg("getting execution data")
 
 	s.metrics.ExecutionDataGetStarted()
 
+	success := false
+	blobGetter := s.blobService.GetSession(ctx)
+	totalSize := atomic.NewUint64(0)
 	start := time.Now()
-	cids := []cid.Cid{rootCid}
 
+	defer func() {
+		s.metrics.ExecutionDataGetFinished(time.Since(start), success, totalSize.Load())
+	}()
+
+	statusTracker := s.statusTrackerFactory.GetStatusTracker(blockID, blockHeight, rootID)
+
+	edRoot, err := s.getExecutionDataRoot(ctx, blockID, rootID, blobGetter, statusTracker)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	g, gCtx := errgroup.WithContext(ctx)
+
+	chunkExecutionDatas := make([]*ChunkExecutionData, len(edRoot.ChunkExecutionDataIDs))
+	for i, chunkID := range edRoot.ChunkExecutionDataIDs {
+		i := i
+		chunkID := chunkID
+
+		g.Go(func() error {
+			ced, size, err := s.getChunkExecutionData(gCtx, chunkID, blobGetter, logger.With().
+				Str("chunk_id", chunkID.String()).
+				Int("chunk_index", i).
+				Logger(),
+				statusTracker,
+			)
+
+			if err != nil {
+				return fmt.Errorf("failed to get chunk execution data at index %d: %w", i, err)
+			}
+
+			chunkExecutionDatas[i] = ced
+			totalSize.Add(size)
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, 0, err
+	}
+
+	if latestIncorporatedHeight, err := statusTracker.FinishTransfer(); err != nil {
+		return nil, 0, fmt.Errorf("failed to track transfer finish: %w", err)
+	} else {
+		success = true
+		return chunkExecutionDatas, latestIncorporatedHeight, nil
+	}
+}
+
+func (s *executionDataServiceImpl) getChunkExecutionData(
+	ctx context.Context,
+	chunkExecutionDataID cid.Cid,
+	blobGetter network.BlobGetter,
+	logger zerolog.Logger,
+	statusTracker StatusTracker,
+) (*ChunkExecutionData, uint64, error) {
 	var blobTreeSize uint64
 
-	for i := uint(0); i <= defaultMaxBlobTreeDepth; i++ {
-		v, totalBytes, err := s.getBlobs(ctx, cids, logger)
+	cids := []cid.Cid{chunkExecutionDataID}
 
+	for i := 0; i <= s.maxBlobTreeDepth; i++ {
+		err := statusTracker.TrackBlobs(cids)
 		if err != nil {
-			s.metrics.ExecutionDataGetFinished(time.Since(start), false, blobTreeSize)
-
-			return nil, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
+			return nil, 0, fmt.Errorf("failed to track blobs: %w", err)
 		}
+
+		v, totalBytes, err := s.getBlobs(ctx, cids, logger)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
+		}
+
+		logger.Debug().Uint64("total_bytes", totalBytes).Int("level", i).Msg("got level of blob tree")
 
 		blobTreeSize += totalBytes
 
 		switch v := v.(type) {
-		case *ExecutionData:
-			s.metrics.ExecutionDataGetFinished(time.Since(start), true, blobTreeSize)
-
-			return v, nil
+		case *ChunkExecutionData:
+			return v, blobTreeSize, nil
 		case *[]cid.Cid:
 			cids = *v
 		}
 	}
 
-	return nil, ErrBlobTreeDepthExceeded
+	return nil, 0, ErrBlobTreeDepthExceeded
 }
 
 // MalformedDataError is returned when malformed data is found at some level of the requested
@@ -428,4 +644,15 @@ type BlobNotFoundError struct {
 
 func (e *BlobNotFoundError) Error() string {
 	return fmt.Sprintf("blob %v not found", e.cid.String())
+}
+
+type MismatchedBlockIDError struct {
+	expected flow.Identifier
+	actual   flow.Identifier
+}
+
+func (e *MismatchedBlockIDError) Error() string {
+	return fmt.Sprintf("execution data root has mismatched block ID:\n"+
+		"expected: %q\n"+
+		"actual  : %q", e.expected, e.actual)
 }
