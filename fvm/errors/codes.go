@@ -15,13 +15,14 @@ func (fc FailureCode) String() string {
 }
 
 const (
-	FailureCodeUnknownFailure         FailureCode = 2000
-	FailureCodeEncodingFailure        FailureCode = 2001
-	FailureCodeLedgerFailure          FailureCode = 2002
-	FailureCodeStateMergeFailure      FailureCode = 2003
-	FailureCodeBlockFinderFailure     FailureCode = 2004
-	FailureCodeHasherFailure          FailureCode = 2005
-	FailureCodeMetaTransactionFailure FailureCode = 2100
+	FailureCodeUnknownFailure                      FailureCode = 2000
+	FailureCodeEncodingFailure                     FailureCode = 2001
+	FailureCodeLedgerFailure                       FailureCode = 2002
+	FailureCodeStateMergeFailure                   FailureCode = 2003
+	FailureCodeBlockFinderFailure                  FailureCode = 2004
+	FailureCodeHasherFailure                       FailureCode = 2005
+	FailureCodeAccountStorageNotInitializedFailure FailureCode = 2006
+	FailureCodeMetaTransactionFailure              FailureCode = 2100
 )
 
 const (

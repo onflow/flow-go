@@ -397,7 +397,7 @@ func (a *StatefulAccounts) GetStorageUsed(address flow.Address) (uint64, error) 
 	}
 
 	if len(storageUsedRegister) != uint64StorageSize {
-		return 0, fmt.Errorf("account %s storage used is not initialized or not initialized correctly", address.Hex())
+		return 0, errors.NewStorageNotInitialized(address.Hex())
 	}
 
 	storageUsed, _, err := readUint64(storageUsedRegister)

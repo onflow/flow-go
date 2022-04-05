@@ -55,6 +55,35 @@ func (e EncodingFailure) Unwrap() error {
 	return e.err
 }
 
+// StorageNotInitialized captures a fatal error when trying to update storage used on a non-initialized account
+type StorageNotInitialized struct {
+	Address string
+}
+
+// NewStorageNotInitialized formats and returns a new StorageNotInitialized
+func NewStorageNotInitialized(address string) *StorageNotInitialized {
+	return &StorageNotInitialized{
+		Address: address,
+	}
+}
+
+func (e *StorageNotInitialized) Error() string {
+	return fmt.Sprintf("%s account %s storage used is not initialized or not initialized correctly",
+		e.FailureCode().String(),
+		e.Address)
+}
+
+// FailureCode returns the failure code
+func (e *StorageNotInitialized) FailureCode() FailureCode {
+	return FailureCodeAccountStorageNotInitializedFailure
+}
+
+// IsStorageNotInitializedFailure  checks if the error is a StorageNotInitializedFailure
+func IsStorageNotInitializedFailure(err error) bool {
+	var t *StorageNotInitialized
+	return errors.As(err, &t)
+}
+
 // LedgerFailure captures a fatal error cause by ledger failures
 type LedgerFailure struct {
 	err error
