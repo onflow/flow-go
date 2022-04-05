@@ -76,7 +76,7 @@ require (
 	github.com/rs/cors v1.8.0
 	github.com/rs/zerolog v1.19.0
 	github.com/schollz/progressbar/v3 v3.8.3
-	github.com/sethvargo/go-retry v0.1.0
+	github.com/sethvargo/go-retry v0.2.3
 	github.com/shirou/gopsutil/v3 v3.22.2
 	github.com/smartystreets/assertions v1.0.0 // indirect
 	github.com/spf13/afero v1.8.0 // indirect
