@@ -328,3 +328,46 @@ func TestLogHook(t *testing.T) {
 	sender.FlagMisbehavior(1, "test")
 	require.Equal(t, 2, hookCalls)
 }
+
+// TestProcessPrivateMessage_InvalidOrigin checks that incoming DKG messages are
+// discarded if the sender is not part of the DKG committee.
+func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
+	committee, locals := initCommittee(2)
+
+	// receiving broker
+	receiver := NewBroker(
+		zerolog.Logger{},
+		dkgInstanceID,
+		committee,
+		locals[dest],
+		dest,
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
+		NewBrokerTunnel(),
+	)
+
+	// Launch a background routine to capture messages forwared to the private
+	// message channel. No messages should be received because we are only
+	// sending invalid ones.
+	doneCh := make(chan struct{})
+	go func() {
+		msgCh := receiver.GetPrivateMsgCh()
+		for {
+			<-msgCh
+			close(doneCh)
+		}
+	}()
+
+	dkgMsg := msg.NewDKGMessage(
+		msgb,
+		dkgInstanceID,
+	)
+	// simulate receiving an incoming message with an OriginID of a non-committee member
+	receiver.tunnel.SendIn(
+		msg.PrivDKGMessageIn{
+			DKGMessage: dkgMsg,
+			OriginID:   unittest.IdentifierFixture(),
+		},
+	)
+
+	unittest.RequireNeverClosedWithin(t, doneCh, 50*time.Millisecond, "no invalid incoming message should be forwarded")
+}
