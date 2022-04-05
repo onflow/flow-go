@@ -35,7 +35,7 @@ type PrivDKGMessageOut struct {
 
 // BroadcastDKGMessage is a wrapper around a DKGMessage intended for broadcasting.
 // It contains a signature of the DKGMessage signed with the staking key of the
-// sender. DTTF that BroadcastDKGMessage are communicated via the DKG smart contract
+// sender. Due to the fact that BroadcastDKGMessage are communicated via the DKG smart contract
 // we must also include the Orig or DKG committee index of the sender so that when these
 // messages are consumed we can verify if BroadcastDKGMessage was sent by a DKG committee member.
 type BroadcastDKGMessage struct {
