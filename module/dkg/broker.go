@@ -422,7 +422,7 @@ func (b *Broker) listen() {
 // onPrivateMessage verifies the integrity of an incoming message and forwards
 // it to consumers via the msgCh.
 func (b *Broker) onPrivateMessage(originID flow.Identifier, msg messages.DKGMessage) {
-	memberIndex, ok := b.committee.GetIndex(originID);
+	memberIndex, ok := b.committee.GetIndex(originID)
 	if !ok {
 		b.log.Error().Msgf("bad message: OriginID (%v) does not match the NodeID of any committee member", originID)
 		return
