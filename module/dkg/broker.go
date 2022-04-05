@@ -1,7 +1,6 @@
 package dkg
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -415,23 +414,19 @@ func (b *Broker) listen() {
 // onPrivateMessage verifies the integrity of an incoming message and forwards
 // it to consumers via the msgCh.
 func (b *Broker) onPrivateMessage(originID flow.Identifier, msg messages.DKGMessage) {
-	if memberIndex, ok := b.committee.GetIndex(originID); ok {
-		err := b.checkMessageInstanceAndOrigin(uint64(memberIndex), msg)
-		if err != nil {
-			b.log.Err(err).Msg("bad message")
-			return
-		}
-		// check that the message's origin matches the sender's flow identifier
-		nodeID := b.committee[memberIndex].NodeID
-		if !bytes.Equal(nodeID[:], originID[:]) {
-			b.log.Error().Msgf("bad message: OriginID (%v) does not match committee member %d (%v)", originID, memberIndex, nodeID)
-			return
-		}
-		b.privateMsgCh <- messages.PrivateDKGMessage{DKGMessage: msg, Orig: uint64(memberIndex)}
-	} else {
+	memberIndex, ok := b.committee.GetIndex(originID);
+	if !ok {
 		b.log.Error().Msgf("bad message: OriginID (%v) does not match the NodeID of any committee member", originID)
 		return
 	}
+
+	err := b.checkMessageInstanceAndOrigin(uint64(memberIndex), msg)
+	if err != nil {
+		b.log.Err(err).Msg("bad message")
+		return
+	}
+
+	b.privateMsgCh <- messages.PrivateDKGMessage{DKGMessage: msg, Orig: uint64(memberIndex)}
 }
 
 // checkMessageInstanceAndOrigin returns an error if the message's dkgInstanceID
