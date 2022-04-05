@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/meter/memory"
 	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -53,7 +54,7 @@ type TransactionEnv struct {
 	txID             flow.Identifier
 	traceSpan        opentracing.Span
 	authorizers      []runtime.Address
-	meter            meter.MemoryMeter
+	meter            memory.MemoryMeter
 }
 
 func NewTransactionEnvironment(
@@ -94,7 +95,7 @@ func NewTransactionEnvironment(
 		txIndex:          txIndex,
 		txID:             tx.ID(),
 		traceSpan:        traceSpan,
-		meter:            meter.NewMemoryMeter(),
+		meter:            memory.NewMemoryMeter(),
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,

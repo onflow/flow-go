@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/meter/memory"
 	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -47,7 +48,7 @@ type ScriptEnv struct {
 	logs          []string
 	rng           *rand.Rand
 	traceSpan     opentracing.Span
-	meter         meter.MemoryMeter
+	meter         memory.MemoryMeter
 }
 
 func (e *ScriptEnv) Context() *Context {
@@ -80,7 +81,7 @@ func NewScriptEnvironment(
 		accountKeys:   accountKeys,
 		uuidGenerator: uuidGenerator,
 		programs:      programsHandler,
-		meter:         meter.NewMemoryMeter(),
+		meter:         memory.NewMemoryMeter(),
 	}
 
 	env.contracts = handler.NewContractHandler(

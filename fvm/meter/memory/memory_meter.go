@@ -1,4 +1,4 @@
-package meter
+package memory
 
 import (
 	"github.com/onflow/cadence/runtime/common"
