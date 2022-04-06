@@ -206,17 +206,6 @@ func testConcurrentExecutionReceipts(t *testing.T,
 		expectedBouncedBackReceipts)
 }
 
-// TestHandleEventFromCorruptedNode_HonestVN tests that honest VN will be ignored when they send a chunk data request
-func TestHandleEventFromCorruptedNode_HonestVN(t *testing.T) {
-
-}
-
-// TestHandleEventFromCorruptedNode_CorruptVN tests that orchestrator sends the result approval for the corrupted
-// execution result if the chunk data request is coming from a corrupt VN
-func TestHandleEventFromCorruptedNode_CorruptVN(t *testing.T) {
-
-}
-
 // helper functions
 
 // bootstrapWintermuteFlowSystem bootstraps flow network with following setup:
