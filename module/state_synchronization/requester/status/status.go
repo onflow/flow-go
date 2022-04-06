@@ -36,7 +36,7 @@ type Status struct {
 	// ConsumerProgress datastore where the requester's state is persisted
 	progress storage.ConsumerProgress
 
-	heap *notificationHeap
+	heap *NotificationHeap
 	mu   sync.RWMutex
 	log  zerolog.Logger
 }
@@ -47,7 +47,7 @@ var _ module.Jobs = (*Status)(nil)
 func New(log zerolog.Logger, maxCachedEntries, maxSearchAhead uint64, ingester module.Resumable, progress storage.ConsumerProgress) *Status {
 	return &Status{
 		log:      log,
-		heap:     &notificationHeap{},
+		heap:     &NotificationHeap{},
 		ingester: ingester,
 		progress: progress,
 

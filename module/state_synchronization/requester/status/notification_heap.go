@@ -1,28 +1,28 @@
 package status
 
-// notificationHeap tracks outstanding notifications for the ExecutionDataRequester
+// NotificationHeap tracks outstanding notifications for the ExecutionDataRequester
 // This uses the standard implementation for PriorityQueue from the go docs
 // https://pkg.go.dev/container/heap
 // with the addition of PeekMin()
-type notificationHeap []*BlockEntry
+type NotificationHeap []*BlockEntry
 
-func (h notificationHeap) Len() int {
+func (h NotificationHeap) Len() int {
 	return len(h)
 }
 
-func (h notificationHeap) Less(i, j int) bool {
+func (h NotificationHeap) Less(i, j int) bool {
 	return h[i].Height < h[j].Height
 }
 
-func (h notificationHeap) Swap(i, j int) {
+func (h NotificationHeap) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
 }
 
-func (h *notificationHeap) Push(x interface{}) {
+func (h *NotificationHeap) Push(x interface{}) {
 	*h = append(*h, x.(*BlockEntry))
 }
 
-func (h *notificationHeap) Pop() interface{} {
+func (h *NotificationHeap) Pop() interface{} {
 	old := *h
 	n := len(old)
 	entry := old[n-1]
@@ -32,7 +32,7 @@ func (h *notificationHeap) Pop() interface{} {
 }
 
 // PeekMin returns the entry with the smallest height without modifying the heap
-func (h *notificationHeap) PeekMin() *BlockEntry {
+func (h *NotificationHeap) PeekMin() *BlockEntry {
 	if len(*h) == 0 {
 		return nil
 	}
