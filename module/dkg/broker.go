@@ -466,7 +466,7 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 	return bcastMsg, nil
 }
 
-// verifyBroadcastMessage checks the DKG instance and Origin of a broadcast
+// verifyBroadcastMessage checks the DKG instance of a broadcast
 // message, as well as the signature against the staking key of the sender.
 // Returns:
 // * true, nil if the message contents are valid and have a valid signature
