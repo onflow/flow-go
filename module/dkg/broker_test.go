@@ -157,6 +157,7 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 
 	dkgMessage := msg.NewDKGMessage(msgb, dkgInstanceID)
 	expectedMsg := msg.PrivDKGMessageIn{
+		OriginID:             committee[0].NodeID,
 		DKGMessage:           dkgMessage,
 		CommitteeMemberIndex: uint64(orig),
 	}
