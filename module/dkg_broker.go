@@ -20,7 +20,7 @@ type DKGBroker interface {
 
 	// GetPrivateMsgCh returns the channel through which a user can receive
 	// incoming private DKGMessages.
-	GetPrivateMsgCh() <-chan messages.PrivateDKGMessage
+	GetPrivateMsgCh() <-chan messages.PrivDKGMessageIn
 
 	// GetBroadcastMsgCh returns the channel through which a user can receive
 	// incoming broadcast DKGMessages.

@@ -23,7 +23,8 @@ func NewDKGMessage(data []byte, dkgInstanceID string) DKGMessage {
 // of the sender.
 type PrivDKGMessageIn struct {
 	DKGMessage
-	OriginID flow.Identifier
+	CommitteeMemberIndex uint64 // CommitteeMemberIndex field is set when the message arrives at the Broker
+	OriginID             flow.Identifier
 }
 
 // PrivDKGMessageOut is a wrapper around a DKGMessage containing the network ID of
@@ -39,18 +40,7 @@ type PrivDKGMessageOut struct {
 // NodeID of the sender, we then add this field to the BroadcastDKGMessage when reading broadcast messages.
 type BroadcastDKGMessage struct {
 	DKGMessage
-	Orig      uint64          `json:"-"` // Orig field is set when reading broadcast messages using the NodeID to find the index of the sender in the DKG committee
-	NodeID    flow.Identifier `json:"-"` // NodeID field is added when reading broadcast messages from the DKG contract, this field is ignored when sending broadcast messages
-	Signature crypto.Signature
-}
-
-// PrivateDKGMessage is a wrapper around DKGMessage intended for use when communicating
-// incoming private DKG messages from the messaging engine. This wrapper adds Orig or DKG committee index of the sender
-// which is needed when processing the DKG message in the crypto library.
-// PrivDKGMessageIn component flow:		message_engine -> broker -> controller
-// At the point where the private message reaches the broker, the broker will get the DKG committee index of the sender
-// validate and attach it to an instance of PrivateDKGMessage that will then be forwarded to the controller.
-type PrivateDKGMessage struct {
-	DKGMessage
-	Orig uint64
+	CommitteeMemberIndex uint64          `json:"-"` // CommitteeMemberIndex field is set when reading broadcast messages using the NodeID to find the index of the sender in the DKG committee
+	NodeID               flow.Identifier `json:"-"` // NodeID field is added when reading broadcast messages from the DKG contract, this field is ignored when sending broadcast messages
+	Signature            crypto.Signature
 }

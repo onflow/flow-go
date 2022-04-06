@@ -156,9 +156,9 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 	)
 
 	dkgMessage := msg.NewDKGMessage(msgb, dkgInstanceID)
-	expectedMsg := msg.PrivateDKGMessage{
-		DKGMessage: dkgMessage,
-		Orig:       uint64(orig),
+	expectedMsg := msg.PrivDKGMessageIn{
+		DKGMessage:           dkgMessage,
+		CommitteeMemberIndex: uint64(orig),
 	}
 
 	// launch a background routine to capture messages forwared to the private

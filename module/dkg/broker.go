@@ -65,7 +65,7 @@ type Broker struct {
 	dkgContractClients        []module.DKGContractClient        // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
 	lastSuccessfulClientIndex int                               // index of the contract client that was last successful during retries
 	tunnel                    *BrokerTunnel                     // channels through which the broker communicates with the network engine
-	privateMsgCh              chan messages.PrivateDKGMessage   // channel to forward incoming private messages to consumers
+	privateMsgCh              chan messages.PrivDKGMessageIn    // channel to forward incoming private messages to consumers
 	broadcastMsgCh            chan messages.BroadcastDKGMessage // channel to forward incoming broadcast messages to consumers
 	messageOffset             uint                              // offset for next broadcast messages to fetch
 	shutdownCh                chan struct{}                     // channel to stop the broker from listening
@@ -107,7 +107,7 @@ func NewBroker(
 		myIndex:            myIndex,
 		dkgContractClients: dkgContractClients,
 		tunnel:             tunnel,
-		privateMsgCh:       make(chan messages.PrivateDKGMessage),
+		privateMsgCh:       make(chan messages.PrivDKGMessageIn),
 		broadcastMsgCh:     make(chan messages.BroadcastDKGMessage),
 		shutdownCh:         make(chan struct{}),
 	}
@@ -282,7 +282,7 @@ func (b *Broker) FlagMisbehavior(node int, log string) {
 
 // GetPrivateMsgCh returns the channel through which consumers can receive
 // incoming private DKG messages.
-func (b *Broker) GetPrivateMsgCh() <-chan messages.PrivateDKGMessage {
+func (b *Broker) GetPrivateMsgCh() <-chan messages.PrivDKGMessageIn {
 	return b.privateMsgCh
 }
 
@@ -339,13 +339,13 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	}
 
 	for _, msg := range msgs {
-		// set the Orig field for the message
+		// set the CommitteeMemberIndex field for the message
 		memberIndex, ok := b.committee.GetIndex(msg.NodeID)
 		if !ok {
 			b.log.Error().Msgf("broadcast message from node with id (%v) does not match the ID of any committee member", msg.NodeID)
 			continue
 		}
-		msg.Orig = uint64(memberIndex)
+		msg.CommitteeMemberIndex = uint64(memberIndex)
 
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
@@ -419,7 +419,7 @@ func (b *Broker) listen() {
 	}
 }
 
-// onPrivateMessage verifies the integrity of an incoming message and forwards
+// onPrivateMessage verifies the integrity of an incoming message, sets the CommitteeMemberIndex and forwards
 // it to consumers via the msgCh.
 func (b *Broker) onPrivateMessage(originID flow.Identifier, msg messages.DKGMessage) {
 	memberIndex, ok := b.committee.GetIndex(originID)
@@ -428,27 +428,22 @@ func (b *Broker) onPrivateMessage(originID flow.Identifier, msg messages.DKGMess
 		return
 	}
 
-	err := b.checkMessageInstanceAndOrigin(uint64(memberIndex), msg)
+	err := b.hasValidDKGInstanceID(msg)
 	if err != nil {
 		b.log.Err(err).Msg("bad message")
 		return
 	}
 
-	b.privateMsgCh <- messages.PrivateDKGMessage{DKGMessage: msg, Orig: uint64(memberIndex)}
+	b.privateMsgCh <- messages.PrivDKGMessageIn{DKGMessage: msg, OriginID: originID, CommitteeMemberIndex: uint64(memberIndex)}
 }
 
-// checkMessageInstanceAndOrigin returns an error if the message's dkgInstanceID
-// does not correspond to the current instance, or if the message's origin index
-// is out of range with respect to the committee list.
-func (b *Broker) checkMessageInstanceAndOrigin(memberIndex uint64, msg messages.DKGMessage) error {
+// hasValidDKGInstanceID returns an error if msg.DKGInstanceID does not match Broker.DKGInstanceID
+func (b *Broker) hasValidDKGInstanceID(msg messages.DKGMessage) error {
 	// check that the message corresponds to the current epoch
 	if b.dkgInstanceID != msg.DKGInstanceID {
 		return fmt.Errorf("wrong DKG instance. Got %s, want %s", msg.DKGInstanceID, b.dkgInstanceID)
 	}
-	// check that the message's origin is not out of range
-	if memberIndex >= uint64(len(b.committee)) {
-		return fmt.Errorf("origin id out of range: %d", memberIndex)
-	}
+
 	return nil
 }
 
@@ -480,11 +475,11 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 //   or the signature could not be checked
 // TODO differentiate errors
 func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (bool, error) {
-	err := b.checkMessageInstanceAndOrigin(bcastMsg.Orig, bcastMsg.DKGMessage)
+	err := b.hasValidDKGInstanceID(bcastMsg.DKGMessage)
 	if err != nil {
 		return false, err
 	}
-	origin := b.committee[bcastMsg.Orig]
+	origin := b.committee[bcastMsg.CommitteeMemberIndex]
 	signData := fingerprint.Fingerprint(bcastMsg.DKGMessage)
 	return origin.StakingPubKey.Verify(
 		bcastMsg.Signature,

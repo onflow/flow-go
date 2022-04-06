@@ -62,15 +62,15 @@ func (_m *DKGBroker) GetIndex() int {
 }
 
 // GetPrivateMsgCh provides a mock function with given fields:
-func (_m *DKGBroker) GetPrivateMsgCh() <-chan messages.PrivateDKGMessage {
+func (_m *DKGBroker) GetPrivateMsgCh() <-chan messages.PrivDKGMessageIn {
 	ret := _m.Called()
 
-	var r0 <-chan messages.PrivateDKGMessage
-	if rf, ok := ret.Get(0).(func() <-chan messages.PrivateDKGMessage); ok {
+	var r0 <-chan messages.PrivDKGMessageIn
+	if rf, ok := ret.Get(0).(func() <-chan messages.PrivDKGMessageIn); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan messages.PrivateDKGMessage)
+			r0 = ret.Get(0).(<-chan messages.PrivDKGMessageIn)
 		}
 	}
 

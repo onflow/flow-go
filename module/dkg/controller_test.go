@@ -90,7 +90,7 @@ func (n *node) run() error {
 // private and public messages through a shared set of channels.
 type broker struct {
 	id                int
-	privateChannels   []chan msg.PrivateDKGMessage
+	privateChannels   []chan msg.PrivDKGMessageIn
 	broadcastChannels []chan msg.BroadcastDKGMessage
 	logger            zerolog.Logger
 	dkgInstanceID     string
@@ -98,9 +98,9 @@ type broker struct {
 
 // PrivateSend implements the crypto.DKGProcessor interface.
 func (b *broker) PrivateSend(dest int, data []byte) {
-	b.privateChannels[dest] <- msg.PrivateDKGMessage{
-		DKGMessage: msg.NewDKGMessage(data, b.dkgInstanceID),
-		Orig:       uint64(b.id),
+	b.privateChannels[dest] <- msg.PrivDKGMessageIn{
+		DKGMessage:           msg.NewDKGMessage(data, b.dkgInstanceID),
+		CommitteeMemberIndex: uint64(b.id),
 	}
 }
 
@@ -118,8 +118,8 @@ func (b *broker) Broadcast(data []byte) {
 		}
 		// epoch and phase are not relevant at the controller level
 		b.broadcastChannels[i] <- msg.BroadcastDKGMessage{
-			DKGMessage: msg.NewDKGMessage(data, b.dkgInstanceID),
-			Orig:       uint64(b.id),
+			DKGMessage:           msg.NewDKGMessage(data, b.dkgInstanceID),
+			CommitteeMemberIndex: uint64(b.id),
 		}
 	}
 }
@@ -140,7 +140,7 @@ func (b *broker) GetIndex() int {
 }
 
 // GetPrivateMsgCh implements the DKGBroker interface.
-func (b *broker) GetPrivateMsgCh() <-chan msg.PrivateDKGMessage {
+func (b *broker) GetPrivateMsgCh() <-chan msg.PrivDKGMessageIn {
 	return b.privateChannels[b.id]
 }
 
@@ -228,10 +228,10 @@ func testDKG(t *testing.T, totalNodes int, goodNodes int, phase1Duration, phase2
 // Initialise nodes and communication channels.
 func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Duration time.Duration) []*node {
 	// Create the channels through which the nodes will communicate
-	privateChannels := make([]chan msg.PrivateDKGMessage, 0, n)
+	privateChannels := make([]chan msg.PrivDKGMessageIn, 0, n)
 	broadcastChannels := make([]chan msg.BroadcastDKGMessage, 0, n)
 	for i := 0; i < n; i++ {
-		privateChannels = append(privateChannels, make(chan msg.PrivateDKGMessage, 5*n*n))
+		privateChannels = append(privateChannels, make(chan msg.PrivDKGMessageIn, 5*n*n))
 		broadcastChannels = append(broadcastChannels, make(chan msg.BroadcastDKGMessage, 5*n*n))
 	}
 
