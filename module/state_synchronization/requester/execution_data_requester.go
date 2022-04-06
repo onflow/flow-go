@@ -418,6 +418,8 @@ func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverabl
 	}()
 
 	// Get the data from the network
+	// this is a blocking call, won't be unblocked until either hitting error (including timeout) or 
+	// the data is received
 	executionData, err = e.eds.Get(ctx, executionDataID)
 
 	if err != nil {
