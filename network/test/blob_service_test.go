@@ -9,8 +9,10 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/query"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	dshelp "github.com/ipfs/go-ipfs-ds-help"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
@@ -183,9 +185,31 @@ func (suite *BlobServiceTestSuite) TestGetBlobsWithSession() {
 	}
 }
 
+// This test ensures that datastore key lengths and values that we depend upon in
+// the state synchronization state tracker don't change between versions.
+// If a dependency change causes this test to break, it means that the blockstore /
+// datastore implementations have changed their key formatting, and we need to
+// update our code accordingly.
+// TODO: move this to state synchronization test suite
+func (suite *BlobServiceTestSuite) TestDatastoreKey() {
+	results, err := suite.datastores[0].Query(context.Background(), query.Query{
+		KeysOnly: true,
+	})
+	suite.Require().NoError(err)
+
+	defer results.Close()
+
+	result, ok := results.NextSync()
+	suite.Require().True(ok)
+
+	suite.Assert().Equal(dshelp.NewKeyFromBinary(suite.blobCids[0].Bytes()).String(), result.Entry.Key)
+	suite.Assert().Equal(len(result.Entry.Key), network.BlobServiceDatastoreKeyLength)
+}
+
 func (suite *BlobServiceTestSuite) TestHas() {
 	var blobChans []<-chan blobs.Blob
 	unreceivedBlobs := make([]map[cid.Cid]struct{}, len(suite.blobServices))
+
 	for i, bex := range suite.blobServices {
 		unreceivedBlobs[i] = make(map[cid.Cid]struct{})
 		// check that peers are notified when we have a new blob

@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -34,7 +33,6 @@ import (
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func mockBlobService(bs blockstore.Blockstore) network.BlobService {
@@ -86,10 +84,8 @@ func testBlobstore() blockstore.Blockstore {
 	return blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore()))
 }
 
-func executionData(t *testing.T, s *serializer, minSerializedSize uint64) (*ExecutionData, []byte) {
-	ed := &ExecutionData{
-		BlockID: unittest.IdentifierFixture(),
-	}
+func chunkExecutionData(t *testing.T, s *serializer, minSerializedSize uint64) (*ChunkExecutionData, []byte) {
+	ed := &ChunkExecutionData{}
 
 	size := 1
 
@@ -102,31 +98,40 @@ func executionData(t *testing.T, s *serializer, minSerializedSize uint64) (*Exec
 			return ed, buf.Bytes()
 		}
 
-		if len(ed.TrieUpdates) == 0 {
-			ed.TrieUpdates = append(ed.TrieUpdates, &ledger.TrieUpdate{
-				Payloads: []*ledger.Payload{{}},
-			})
-		}
-
 		v := make([]byte, size)
 		rand.Read(v)
-		ed.TrieUpdates[0].Payloads[0].Value = v
+		ed.TrieUpdate.Payloads[0].Value = v
 		size *= 2
 	}
 }
 
-func getExecutionData(eds ExecutionDataService, rootID flow.Identifier, timeout time.Duration) (*ExecutionData, error) {
+func getChunkExecutionDatas(
+	edg ExecutionDataGetter,
+	blockID flow.Identifier,
+	blockHeight uint64,
+	rootID flow.Identifier,
+	timeout time.Duration,
+) ([]*ChunkExecutionData, uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return eds.Get(ctx, rootID)
+	return edg.GetChunkExecutionDatas(ctx, blockID, blockHeight, rootID)
 }
 
-func addExecutionData(eds ExecutionDataService, ed *ExecutionData, timeout time.Duration) (flow.Identifier, error) {
+func addChunkExecutionData(eds ExecutionDataAdder, blockID flow.Identifier, chunkIndex int, ced *ChunkExecutionData, timeout time.Duration) (cid.Cid, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	id, _, err := eds.Add(ctx, ed)
+	id, err := eds.AddChunkExecutionData(ctx, blockID, chunkIndex, ced)
+
+	return id, err
+}
+
+func addExecutionDataRoot(eds ExecutionDataAdder, blockID flow.Identifier, chunkExecutionDataIDs []cid.Cid, timeout time.Duration) (flow.Identifier, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	id, err := eds.AddExecutionDataRoot(ctx, blockID, chunkExecutionDataIDs)
 
 	return id, err
 }
@@ -232,7 +237,11 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	test(0)                       // small execution data (single level blob tree)
-	test(10 * defaultMaxBlobSize) // large execution data (multi level blob tree)
+	test(10 * DefaultMaxBlobSize) // large execution data (multi level blob tree)
+}
+
+func TestMismatchedBlockID(t *testing.T) {
+	// TODO
 }
 
 func TestMalformedData(t *testing.T) {

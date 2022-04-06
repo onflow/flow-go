@@ -321,14 +321,16 @@ type WALMetrics interface {
 	DiskSize(uint64)
 }
 
-type ExecutionDataServiceMetrics interface {
-	ExecutionDataAddStarted()
-
-	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize uint64)
-
+type ExecutionDataGetterMetrics interface {
 	ExecutionDataGetStarted()
+	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize int)
+}
 
-	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize uint64)
+type ExecutionDataAdderMetrics interface {
+	ChunkExecutionDataAddStarted()
+	ChunkExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize int)
+	ExecutionDataRootAddStarted()
+	ExecutionDataRootAddFinished(duration time.Duration, success bool, size int)
 }
 
 type RuntimeMetrics interface {

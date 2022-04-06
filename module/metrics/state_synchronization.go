@@ -28,7 +28,7 @@ func NewExecutionDataServiceCollector() module.ExecutionDataServiceMetrics {
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_add_duration_ms",
 		Help:      "the duration of execution data add operation",
-		Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
+		Buckets:   []float64{0, 1, 100, 500, 1000, 2000, 5000},
 	})
 
 	executionDataAddInProgress := promauto.NewGauge(prometheus.GaugeOpts{
@@ -50,7 +50,7 @@ func NewExecutionDataServiceCollector() module.ExecutionDataServiceMetrics {
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_get_duration_ms",
 		Help:      "the duration of execution data get operation",
-		Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
+		Buckets:   []float64{0, 1, 100, 500, 1000, 2000, 5000},
 	})
 
 	executionDataGetInProgress := promauto.NewGauge(prometheus.GaugeOpts{
@@ -72,7 +72,7 @@ func NewExecutionDataServiceCollector() module.ExecutionDataServiceMetrics {
 		Subsystem: subsystemExecutionDataService,
 		Name:      "execution_data_blob_tree_size",
 		Help:      "the size execution data blob tree",
-		Buckets:   []float64{1, 1000, 10000, 50000, 100000, 500000, 1000000, 10000000, 50000000, 100000000, 250000000, 500000000},
+		Buckets:   []float64{0, 1, 1000, 10000, 50000, 100000, 500000, 1000000, 10000000, 50000000, 100000000, 250000000, 500000000},
 	})
 
 	return &ExecutionDataServiceCollector{

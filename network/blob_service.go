@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-base32"
 
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
@@ -50,3 +51,5 @@ type BlobService interface {
 }
 
 type BlobServiceOption func(BlobService)
+
+var BlobServiceDatastoreKeyLength = 1 + base32.RawStdEncoding.EncodedLen(blobs.CidLength)
