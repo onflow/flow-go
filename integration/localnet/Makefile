@@ -35,8 +35,8 @@ init:
 		-consensus-delay=$(CONSENSUS_DELAY) \
 		-collection-delay=$(COLLECTION_DELAY)
 
-.PHONY: init-observer
-init-observer:
+.PHONY: init-with-observer
+init-with-observer:
 	go run -tags relic \
 		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
 		-X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \

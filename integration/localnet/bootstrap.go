@@ -4,15 +4,18 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/plus3it/gorecurcopy"
 	"gopkg.in/yaml.v2"
 
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -243,6 +246,7 @@ type Service struct {
 	Environment []string `yaml:"environment,omitempty"`
 	Volumes     []string
 	Ports       []string `yaml:"ports,omitempty"`
+	Links       []string `yaml:"links,omitempty"`
 }
 
 // Build ...
@@ -263,6 +267,10 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 		numVerification = 0
 		numAccess       = 0
 	)
+
+	var bootstrapAccessNodePublicKey crypto.PublicKey = nil
+	var bootstrapAccessNodeAddress string
+	var bootstrapAccessNodeContainer string
 
 	for n, container := range containers {
 		switch container.Role {
@@ -288,9 +296,22 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 			numVerification++
 		case flow.RoleAccess:
 			services[container.ContainerName] = prepareAccessService(container, numAccess, n)
+			if bootstrapAccessNodePublicKey == nil {
+				bootstrapAccessNodePublicKey = container.NetworkPubKey()
+				bootstrapAccessNodeAddress = container.Address //container.ContainerName + "_1"
+				bootstrapAccessNodeContainer = container.ContainerName
+			}
 			numAccess++
+		}
+	}
+
+	for n, container := range containers {
+		switch container.Role {
 		case flow.RoleObserverService:
-			services[container.ContainerName] = prepareObserverService(container, numAccess, n)
+			services[container.ContainerName] = prepareObserverService(
+				container, numAccess, n,
+				bootstrapAccessNodeAddress, bootstrapAccessNodePublicKey, bootstrapAccessNodeContainer)
+			// We treat these as access nodes in numbering to limit the port ranges
 			numAccess++
 		}
 	}
@@ -365,7 +386,6 @@ func prepareService(container testnet.ContainerConfig, i int, n int) Service {
 			container.Role == flow.RoleObserverService {
 			service.DependsOn = []string{"access_1"}
 		}
-
 	} else {
 		// remaining services of this role must depend on first service
 		service.DependsOn = []string{
@@ -494,9 +514,44 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 	return service
 }
 
-func prepareObserverService(container testnet.ContainerConfig, i int, n int) Service {
+func prepareObserverService(container testnet.ContainerConfig, i int, n int, bootstrapAddress string, bootstrapPubKey crypto.PublicKey, bootstrapContainer string) Service {
 	container.Role = flow.RoleObserverService
-	return prepareAccessService(container, i, n)
+	service := prepareService(container, i, n)
+
+	// Generate the key in production: go run -tags relic ./cmd/bootstrap observer-network-key -f /tmp/network-key
+	observerNetworkKeyPath := "./observer-network-key"
+	dockerObserverNetworkKeyPath := "/bootstrap-observer-network-key"
+	_ = os.Remove(observerNetworkKeyPath)
+	cmd.ObserverNetworkKeyWrite(observerNetworkKeyPath)
+	service.Volumes = append(service.Volumes, fmt.Sprintf("%s:%s:z", observerNetworkKeyPath, dockerObserverNetworkKeyPath))
+
+	compacted, err := json.Marshal(bootstrapPubKey.Encode())
+	if err != nil {
+		bootstrapAddress = ""
+	}
+
+	service.Command = append(service.Command, []string{
+		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--secure-rpc-addr=%s:%d", container.ContainerName, SecuredRPCPort),
+		fmt.Sprintf("--http-addr=%s:%d", container.ContainerName, HTTPPort),
+		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
+		"--log-tx-time-to-finalized",
+		"--log-tx-time-to-executed",
+		"--log-tx-time-to-finalized-executed",
+		fmt.Sprintf("--observer-networking-key-path=%s", dockerObserverNetworkKeyPath),
+		fmt.Sprintf("--bootstrap-node-addresses=%s", bootstrapAddress),
+		fmt.Sprintf("--bootstrap-node-public-keys=%s", strings.Trim(string(compacted), "\"")),
+		fmt.Sprintf("--public-network-bootstrapAddress=%s:%d", container.ContainerName, AccessAPIPort+2*i),
+	}...)
+
+	service.Links = []string{bootstrapContainer}
+
+	service.Ports = []string{
+		fmt.Sprintf("%d:%d", AccessAPIPort+2*i, RPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+(2*i+1), SecuredRPCPort),
+	}
+
+	return service
 }
 
 func writeDockerComposeConfig(services Services) error {

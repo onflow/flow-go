@@ -40,20 +40,23 @@ func init() {
 
 // observerNetworkKeyRun generate a network key and writes it to the provided file path.
 func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
+	ObserverNetworkKeyWrite(flagOutputFile)
+}
 
+func ObserverNetworkKeyWrite(path string) {
 	// generate seed if not specified via flag
 	if len(flagNetworkSeed) == 0 {
 		flagNetworkSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSASecp256k1)
 	}
 
 	// if the file already exists, exit
-	keyExists, err := pathExists(flagOutputFile)
+	keyExists, err := pathExists(path)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not check if %s exists", flagOutputFile)
+		log.Fatal().Err(err).Msgf("could not check if %s exists", path)
 	}
 
 	if keyExists {
-		log.Warn().Msgf("%s already exists, exiting...", flagOutputFile)
+		log.Warn().Msgf("%s already exists, exiting...", path)
 		return
 	}
 
@@ -70,10 +73,10 @@ func observerNetworkKeyRun(_ *cobra.Command, _ []string) {
 	hex.Encode(output, keyBytes)
 
 	// write to file
-	err = ioutil.WriteFile(flagOutputFile, output, 0600)
+	err = ioutil.WriteFile(path, output, 0600)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write file")
 	}
 
-	log.Info().Msgf("wrote file %v", flagOutputFile)
+	log.Info().Msgf("wrote file %v", path)
 }
