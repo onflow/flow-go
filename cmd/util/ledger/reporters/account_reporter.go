@@ -165,13 +165,11 @@ func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc Report
 	bp.balanceScript = []byte(fmt.Sprintf(`
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
-
 				pub fun main(account: Address): UFix64 {
 					let acct = getAccount(account)
 					let vaultRef = acct.getCapability(/public/flowTokenBalance)
 						.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 						?? panic("Could not borrow Balance reference to the Vault")
-
 					return vaultRef.balance
 				}
 			`, fvm.FungibleTokenAddress(bp.ctx.Chain), fvm.FlowTokenAddress(bp.ctx.Chain)))
@@ -179,26 +177,21 @@ func newAccountDataProcessor(logger zerolog.Logger, rwa ReportWriter, rwc Report
 	bp.fusdScript = []byte(fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FUSD from 0x%s
-
 			pub fun main(address: Address): UFix64 {
 				let account = getAccount(address)
-
 				let vaultRef = account.getCapability(/public/fusdBalance)!
 					.borrow<&FUSD.Vault{FungibleToken.Balance}>()
 					?? panic("Could not borrow Balance reference to the Vault")
-
 				return vaultRef.balance
 			}
 			`, fvm.FungibleTokenAddress(bp.ctx.Chain), "3c5959b568896393"))
 
 	bp.momentsScript = []byte(`
 			import TopShot from 0x0b2a3299cc857e29
-
 			pub fun main(account: Address): Int {
 				let acct = getAccount(account)
 				let collectionRef = acct.getCapability(/public/MomentCollection)
 										.borrow<&{TopShot.MomentCollectionPublic}>()!
-
 				return collectionRef.getIDs().length
 			}
 			`)
