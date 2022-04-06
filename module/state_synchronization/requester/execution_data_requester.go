@@ -93,9 +93,7 @@ const (
 // ErrRequesterHalted is returned when an invalid ExectutionData is encountered
 var ErrRequesterHalted = errors.New("requester was halted due to invalid data")
 
-// ExecutionDataReceivedCallback is a callback that is called ExecutionData is received for a new block
-type ExecutionDataReceivedCallback func(*state_synchronization.ExecutionData)
-
+// ExecutionDataConfig contains configuration options for the ExecutionDataRequester
 type ExecutionDataConfig struct {
 	// The first block height for which to request ExecutionData
 	StartBlockHeight uint64
@@ -118,14 +116,6 @@ type ExecutionDataConfig struct {
 
 	// Whether or not to run datastore check on startup
 	CheckEnabled bool
-}
-
-// ExecutionDataRequester downloads ExecutionData for newly sealed blocks from the network using the
-// ExecutionDataService.
-type ExecutionDataRequester interface {
-	component.Component
-	OnBlockFinalized(*model.Block)
-	AddOnExecutionDataFetchedConsumer(fn ExecutionDataReceivedCallback)
 }
 
 type executionDataRequesterImpl struct {
@@ -152,10 +142,12 @@ type executionDataRequesterImpl struct {
 	notificationConsumer *jobqueue.WrappedConsumer
 
 	// List of callbacks to call when ExecutionData is successfully fetched for a block
-	consumers []ExecutionDataReceivedCallback
+	consumers []state_synchronization.ExecutionDataReceivedCallback
 
 	consumerMu sync.RWMutex
 }
+
+var _ state_synchronization.ExecutionDataRequester = (*executionDataRequesterImpl)(nil)
 
 // New creates a new execution data requester component
 func New(
@@ -170,7 +162,7 @@ func New(
 	blocks storage.Blocks,
 	results storage.ExecutionResults,
 	cfg ExecutionDataConfig,
-) (ExecutionDataRequester, error) {
+) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequesterImpl{
 		log:           log.With().Str("component", "execution_data_requester").Logger(),
 		ds:            datastore,
@@ -261,7 +253,7 @@ func (e *executionDataRequesterImpl) OnBlockFinalized(*model.Block) {
 //   * be concurrency safe
 //   * be non-blocking
 //   * handle repetition of the same events (with some processing overhead).
-func (e *executionDataRequesterImpl) AddOnExecutionDataFetchedConsumer(fn ExecutionDataReceivedCallback) {
+func (e *executionDataRequesterImpl) AddOnExecutionDataFetchedConsumer(fn state_synchronization.ExecutionDataReceivedCallback) {
 	e.consumerMu.Lock()
 	defer e.consumerMu.Unlock()
 

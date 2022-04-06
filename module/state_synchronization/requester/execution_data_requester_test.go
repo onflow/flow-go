@@ -326,7 +326,7 @@ func generateBlocksWithRandomDelays(blockCount int) map[uint64]testExecutionData
 	return delays
 }
 
-func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (requester.ExecutionDataRequester, *pubsub.FinalizationDistributor) {
+func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FinalizationDistributor) {
 	blocks := synctest.MockBlocksStorage(synctest.WithByID(cfg.blocksByID), synctest.WithByHeight(cfg.blocksByHeight))
 	results := synctest.MockResultsStorage(synctest.WithByBlockID(cfg.resultsByID))
 	state := suite.mockProtocolState(cfg.blocksByHeight)
@@ -363,7 +363,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	return edr, finalizationDistributor
 }
 
-func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr requester.ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) receivedExecutionData {
+func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchronization.ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) receivedExecutionData {
 	// make sure test helper goroutines are cleaned up
 	ctx, cancel := context.WithCancel(context.Background())
 
