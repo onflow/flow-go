@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"runtime"
+
 	"github.com/onflow/cadence/runtime/common"
 )
 
@@ -38,6 +40,55 @@ var memory_weights = [...]uint64{
 	/* MemoryKindTokenComment */ 0,
 	/* MemoryKindTokenNumericLiteral */ 0,
 	/* MemoryKindTokenSyntax */ 0,
+
+	/* MemoryKindIdentifier */ 0,
+	/* MemoryKindArgument */ 0,
+	/* MemoryKindBlock */ 0,
+
+	/* MemoryKindFunctionDeclaration */ 0,
+	/* MemoryKindCompositeDeclaration */ 0,
+	/* MemoryKindInterfaceDeclaration */ 0,
+	/* MemoryKindEnumCaseDeclaration */ 0,
+	/* MemoryKindFieldDeclaration */ 0,
+	/* MemoryKindTransactionDeclaration */ 0,
+	/* MemoryKindImportDeclaration */ 0,
+	/* MemoryKindVariableDeclaration */ 0,
+	/* MemoryKindSpecialFunctionDeclaration */ 0,
+	/* MemoryKindPragmaDeclaration */ 0,
+
+	/* MemoryKindAssignmentStatement */ 0,
+	/* MemoryKindBreakStatement */ 0,
+	/* MemoryKindContinueStatement */ 0,
+	/* MemoryKindEmitStatement */ 0,
+	/* MemoryKindExpressionStatement */ 0,
+	/* MemoryKindForStatement */ 0,
+	/* MemoryKindIfStatement */ 0,
+	/* MemoryKindReturnStatement */ 0,
+	/* MemoryKindSwapStatement */ 0,
+	/* MemoryKindSwitchStatement */ 0,
+	/* MemoryKindWhileStatement */ 0,
+
+	/* MemoryKindBooleanExpression */ 0,
+	/* MemoryKindNilExpression */ 0,
+	/* MemoryKindStringExpression */ 0,
+	/* MemoryKindIntegerExpression */ 0,
+	/* MemoryKindFixedPointExpression */ 0,
+	/* MemoryKindArrayExpression */ 0,
+	/* MemoryKindDictionaryExpression */ 0,
+	/* MemoryKindIdentifierExpression */ 0,
+	/* MemoryKindInvocationExpression */ 0,
+	/* MemoryKindMemberExpression */ 0,
+	/* MemoryKindIndexExpression */ 0,
+	/* MemoryKindConditionalExpression */ 0,
+	/* MemoryKindUnaryExpression */ 0,
+	/* MemoryKindBinaryExpression */ 0,
+	/* MemoryKindFunctionExpression */ 0,
+	/* MemoryKindCastingExpression */ 0,
+	/* MemoryKindCreateExpression */ 0,
+	/* MemoryKindDestroyExpression */ 0,
+	/* MemoryKindReferenceExpression */ 0,
+	/* MemoryKindForceExpression */ 0,
+	/* MemoryKindPathExpression */ 0,
 }
 
 const MaximumMemoryAllowance uint64 = 0
@@ -45,7 +96,7 @@ const MaximumMemoryAllowance uint64 = 0
 func _() {
 	// A compiler error signifies that we have not accounted for all memory kinds
 	var x [1]struct{}
-	_ = x[int(common.MemoryKindTokenSyntax)+1-len(memory_weights)]
+	_ = x[int(common.MemoryKindLast)-len(memory_weights)]
 }
 
 type OutOfMemoryError struct {
@@ -57,12 +108,15 @@ func (e *OutOfMemoryError) Error() string {
 }
 
 type MemoryMeter struct {
-	totalMemoryUsed uint64
+	initialMemoryUsage uint64
+	totalMemoryUsed    uint64
 }
 
 func NewMemoryMeter() MemoryMeter {
+	var m runtime.MemStats
 	return MemoryMeter{
-		totalMemoryUsed: 0,
+		initialMemoryUsage: m.TotalAlloc,
+		totalMemoryUsed:    0,
 	}
 }
 
