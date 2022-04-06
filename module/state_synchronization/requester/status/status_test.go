@@ -2,19 +2,27 @@ package status_test
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
+	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
+	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -25,8 +33,10 @@ type StatusSuite struct {
 	maxCachedEntries uint64
 	maxSearchAhead   uint64
 
-	ds     datastore.Batching
-	status *status.Status
+	ds       datastore.Batching
+	status   *status.Status
+	consumer *modulemock.Resumable
+	progress *storagemock.ConsumerProgress
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -41,13 +51,18 @@ func (suite *StatusSuite) SetupTest() {
 	suite.rootHeight = uint64(100)
 	suite.maxCachedEntries = uint64(10)
 	suite.maxSearchAhead = uint64(20)
+	suite.consumer = new(modulemock.Resumable)
+
+	suite.progress = new(storagemock.ConsumerProgress)
+	suite.progress.On("ProcessedIndex").Return(suite.rootHeight, nil)
+	suite.progress.On("Halted").Return(false, nil)
 
 	suite.ds = dssync.MutexWrap(datastore.NewMapDatastore())
-	suite.status = status.New(suite.ds, zerolog.Nop(), suite.rootHeight, suite.maxCachedEntries, suite.maxSearchAhead)
+	suite.status = status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, suite.progress)
 
 	suite.ctx, suite.cancel = context.WithTimeout(context.Background(), 30*time.Second)
 
-	err := suite.status.Load(suite.ctx)
+	err := suite.status.Load()
 	assert.NoError(suite.T(), err)
 }
 
@@ -55,102 +70,199 @@ func (suite *StatusSuite) TearDownTest() {
 	suite.cancel()
 }
 
-func (suite *StatusSuite) TestLoadFromEmptyState() {
-	assert.Equal(suite.T(), suite.rootHeight, suite.status.LastReceived())
-	assert.Equal(suite.T(), suite.rootHeight, suite.status.LastProcessed())
-	assert.Equal(suite.T(), suite.rootHeight, suite.status.LastNotified())
-}
-
 func (suite *StatusSuite) reset(flushDB bool) {
 	if flushDB {
 		suite.ds = dssync.MutexWrap(datastore.NewMapDatastore())
-		suite.status = status.New(suite.ds, zerolog.Nop(), suite.rootHeight, suite.maxCachedEntries, suite.maxSearchAhead)
+		suite.status = status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, suite.progress)
 	}
 
-	err := suite.status.Load(suite.ctx)
+	err := suite.status.Load()
 	assert.NoError(suite.T(), err)
 }
 
-func EntryFixture(height uint64) *status.BlockEntry {
-	blockID := unittest.IdentifierFixture()
-	return &status.BlockEntry{
-		BlockID: blockID,
-		Height:  height,
-		ExecutionData: &state_synchronization.ExecutionData{
-			BlockID: blockID,
-		},
-	}
-}
+// TestLoadFromEmptyState tests that the status is initialized correctly when starting with an
+// empty state
+func (suite *StatusSuite) TestLoad() {
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		progress := bstorage.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
+		err := progress.InitProcessedIndex(suite.rootHeight)
+		assert.NoError(suite.T(), err)
 
-func (suite *StatusSuite) TestFetched() {
-	suite.Run("LastReceived is set correctly when fetched in order", func() {
-		testLength := uint64(50)
-		for i := uint64(0); i < testLength; i++ {
-			entry := EntryFixture(suite.rootHeight + i)
-			suite.status.Fetched(entry)
-			assert.Equal(suite.T(), entry.Height, suite.status.LastReceived())
-		}
-		assert.Equal(suite.T(), int(testLength), suite.status.OutstandingNotifications())
+		suite.Run("Load from an empty state", func() {
+			s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+			err = s.Load()
+			assert.NoError(suite.T(), err)
+
+			assert.Equal(suite.T(), suite.rootHeight, s.LastNotified())
+			assert.False(suite.T(), s.Halted())
+		})
+
+		suite.Run("Load from a non-empty state", func() {
+			// reuses progress and db
+			s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+			err = s.Load()
+			assert.NoError(suite.T(), err)
+
+			assert.Equal(suite.T(), suite.rootHeight, s.LastNotified())
+			assert.False(suite.T(), s.Halted())
+		})
+
+		suite.Run("Load from a non-empty state", func() {
+			// set new value for processed and halted
+			err := progress.SetProcessedIndex(suite.rootHeight + 1)
+			assert.NoError(suite.T(), err)
+			err = progress.SetHalted(true)
+			assert.NoError(suite.T(), err)
+
+			s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+			err = s.Load()
+			assert.NoError(suite.T(), err)
+
+			assert.Equal(suite.T(), suite.rootHeight+1, s.LastNotified())
+			assert.True(suite.T(), s.Halted())
+		})
 	})
 
-	suite.Run("LastReceived is set correctly when fetched out of order", func() {
+	suite.Run("Load returns error from progress", func() {
+		expectedErr := errors.New("load error")
+		progress := new(storagemock.ConsumerProgress)
+		progress.On("ProcessedIndex").Return(uint64(0), expectedErr).Once()
+
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		err := s.Load()
+		assert.ErrorIs(suite.T(), err, expectedErr)
+	})
+
+	suite.Run("Load returns error from halted", func() {
+		expectedErr := errors.New("halted error")
+		progress := new(storagemock.ConsumerProgress)
+		progress.On("ProcessedIndex").Return(suite.rootHeight, nil).Once()
+		progress.On("Halted").Return(false, expectedErr).Once()
+
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		err := s.Load()
+		assert.ErrorIs(suite.T(), err, expectedErr)
+	})
+
+	suite.Run("Load initializes halted state", func() {
+		progress := new(storagemock.ConsumerProgress)
+		progress.On("ProcessedIndex").Return(suite.rootHeight, nil).Once()
+		progress.On("Halted").Return(false, storage.ErrNotFound).Once()
+		progress.On("InitHalted").Return(nil).Once()
+
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		err := s.Load()
+		assert.NoError(suite.T(), err)
+	})
+
+	suite.Run("Load returns error from initializing halted state", func() {
+		expectedErr := errors.New("initialization error")
+		progress := new(storagemock.ConsumerProgress)
+		progress.On("ProcessedIndex").Return(suite.rootHeight, nil).Once()
+		progress.On("Halted").Return(false, storage.ErrNotFound).Once()
+		progress.On("InitHalted").Return(expectedErr).Once()
+
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		err := s.Load()
+		assert.ErrorIs(suite.T(), err, expectedErr)
+	})
+}
+
+// TestFetched tests that the status is updated correctly when a new entry is fetched
+func (suite *StatusSuite) TestFetched() {
+	suite.Run("fetched adds all entries when in order", func() {
+		testLength := suite.maxSearchAhead - 1
+		for i := uint64(1); i <= testLength; i++ {
+			entry := synctest.BlockEntryFixture(suite.rootHeight + i)
+			suite.status.Fetched(entry)
+
+			assert.Equal(suite.T(), int(i), suite.status.OutstandingNotifications())
+		}
+	})
+
+	suite.Run("fetched adds all entries when out of order", func() {
 		suite.reset(true)
 
 		// Fetch in random order by iterating a map of heights
-		testLength := uint64(50)
+		testLength := suite.maxSearchAhead - 1
 		heights := make(map[uint64]struct{}, testLength)
-		for i := uint64(0); i < testLength; i++ {
+		for i := uint64(1); i <= testLength; i++ {
 			heights[suite.rootHeight+i] = struct{}{}
 		}
 
+		count := 0
 		max := uint64(0)
 		for height := range heights {
 			if height > max {
 				max = height
 			}
 
-			entry := EntryFixture(height)
+			entry := synctest.BlockEntryFixture(height)
 			suite.status.Fetched(entry)
-			assert.Equal(suite.T(), max, suite.status.LastReceived())
+			count++
+
+			assert.Equal(suite.T(), count, suite.status.OutstandingNotifications())
 		}
-		assert.Equal(suite.T(), int(testLength), suite.status.OutstandingNotifications())
+	})
+
+	suite.Run("fetched pauses when exceeding search ahead", func() {
+		suite.reset(true)
+
+		testLength := suite.maxSearchAhead + 5
+
+		// should pause when # of entries >= maxSearchAhead
+		suite.consumer.On("Pause").Times(int(testLength - suite.maxSearchAhead + 1))
+
+		for i := uint64(1); i <= testLength; i++ {
+			entry := synctest.BlockEntryFixture(suite.rootHeight + i)
+			suite.status.Fetched(entry)
+
+			assert.Equal(suite.T(), int(i), suite.status.OutstandingNotifications())
+		}
 	})
 
 	suite.Run("fetch ignored when height already notified", func() {
 		suite.reset(true)
 
-		before := suite.status.LastReceived()
-		entry := EntryFixture(before - 1)
-
+		entry := synctest.BlockEntryFixture(suite.rootHeight)
 		suite.status.Fetched(entry)
-		assert.Equal(suite.T(), before, suite.status.LastReceived())
+
 		assert.Equal(suite.T(), 0, suite.status.OutstandingNotifications())
 	})
 }
 
+// TestCache tests that ExecutionData objects are cached correctly
 func (suite *StatusSuite) TestCache() {
+	suite.consumer.On("Pause")  // ignore for this test
+	suite.consumer.On("Resume") // ignore for this test
+
 	testLength := suite.maxCachedEntries * 2
 	heights := make([]uint64, testLength)
 	heightsMap := make(map[uint64]struct{}, testLength)
 	for i := uint64(0); i < testLength; i++ {
-		h := suite.rootHeight + i
+		h := suite.rootHeight + 1 + i
 		heights[int(i)] = h
 		heightsMap[h] = struct{}{}
 	}
 
-	check := func() {
+	check := func(height uint64) {
 		notified := make([]uint64, 0, testLength)
 		cached := 0
 		for {
-			entry, ok := suite.status.NextNotification(suite.ctx)
-			if !ok {
+			job, err := suite.status.AtIndex(height)
+			if errors.Is(err, storage.ErrNotFound) {
 				break
 			}
+			assert.NoError(suite.T(), err)
+
+			entry, err := status.JobToBlockEntry(job)
+			assert.NoError(suite.T(), err)
 
 			notified = append(notified, entry.Height)
 			if entry.ExecutionData != nil {
 				cached++
 			}
+			height++
 		}
 
 		assert.Len(suite.T(), notified, int(testLength), "missing notifications")
@@ -158,227 +270,303 @@ func (suite *StatusSuite) TestCache() {
 		assert.Equal(suite.T(), heights, notified, "missing/out of order notifications")
 	}
 
-	suite.Run("max cached enforced properly when fetched in order", func() {
+	suite.Run("maxCachedEntries enforced properly when fetched in order", func() {
 		for _, height := range heights {
-			suite.status.Fetched(EntryFixture(height))
+			suite.status.Fetched(synctest.BlockEntryFixture(height))
 		}
-		check()
+		check(suite.rootHeight + 1)
 	})
 
-	suite.Run("max cached enforced properly when fetched in order", func() {
+	suite.Run("maxCachedEntries enforced properly when fetched in order", func() {
 		suite.reset(true)
 
 		// Fetch in random order by iterating a map of heights
 		for height := range heightsMap {
-			suite.status.Fetched(EntryFixture(height))
+			suite.status.Fetched(synctest.BlockEntryFixture(height))
 		}
-		check()
+		check(suite.rootHeight + 1)
 	})
 }
 
-func (suite *StatusSuite) TestNotifications() {
-	entry0 := EntryFixture(suite.rootHeight)
-	entry1 := EntryFixture(suite.rootHeight + 1)
-	entry3 := EntryFixture(suite.rootHeight + 3)
+func (suite *StatusSuite) TestAtIndex() {
+	entry1 := synctest.BlockEntryFixture(suite.rootHeight + 1)
+	entry2 := synctest.BlockEntryFixture(suite.rootHeight + 2)
+	entry3 := synctest.BlockEntryFixture(suite.rootHeight + 3)
+	entry4 := synctest.BlockEntryFixture(suite.rootHeight + 4)
 
-	suite.Run("returns false when no pending notifications", func() {
-		entry, ok := suite.status.NextNotification(suite.ctx)
-		assert.False(suite.T(), ok)
-		assert.Nil(suite.T(), entry)
+	suite.Run("returns NotFound when no pending notifications", func() {
+		job, err := suite.status.AtIndex(entry1.Height)
+		assert.ErrorIs(suite.T(), err, storage.ErrNotFound)
+		assert.Nil(suite.T(), job)
 	})
 
-	suite.Run("returns false when next height is not ready", func() {
-		suite.status.Fetched(entry1)
+	suite.Run("returns NotFound when next height is not ready", func() {
+		suite.status.Fetched(entry2)
 
-		entry, ok := suite.status.NextNotification(suite.ctx)
-		assert.False(suite.T(), ok)
-		assert.Nil(suite.T(), entry)
+		job, err := suite.status.AtIndex(entry1.Height)
+		assert.ErrorIs(suite.T(), err, storage.ErrNotFound)
+		assert.Nil(suite.T(), job)
 	})
 
-	suite.Run("returns entry when next height is ready until ", func() {
+	suite.Run("returns entry when next height is ready", func() {
 		suite.reset(true)
 
-		suite.status.Fetched(entry0)
-		assert.Equal(suite.T(), entry0.Height, suite.status.LastReceived())
-		suite.status.Fetched(entry1)
-		assert.Equal(suite.T(), entry1.Height, suite.status.LastReceived())
-		suite.status.Fetched(entry3) //  leave a gap to the heap's not empty
-		assert.Equal(suite.T(), entry3.Height, suite.status.LastReceived())
+		// called every time a notification is returned
+		suite.consumer.On("Resume").Times(2)
 
-		// Notify for entry0
-		entry, ok := suite.status.NextNotification(suite.ctx)
-		assert.True(suite.T(), ok)
-		assert.Equal(suite.T(), entry0, entry)
+		suite.status.Fetched(entry1)
+		suite.status.Fetched(entry2)
+		suite.status.Fetched(entry4) // leave a gap so the heap's not empty
 
 		// Notify for entry1
-		entry, ok = suite.status.NextNotification(suite.ctx)
-		assert.True(suite.T(), ok)
-		assert.Equal(suite.T(), entry1, entry)
+		job, err := suite.status.AtIndex(entry1.Height)
+		assert.NoErrorf(suite.T(), err, "error returned for job at index %d", entry1.Height)
+		assertJobIsEntry(suite.T(), entry1, job)
+
+		// Notify for entry2
+		job, err = suite.status.AtIndex(entry2.Height)
+		assert.NoErrorf(suite.T(), err, "error returned for job at index %d", entry2.Height)
+		assertJobIsEntry(suite.T(), entry2, job)
 
 		// Next entry isn't available
-		entry, ok = suite.status.NextNotification(suite.ctx)
-		assert.False(suite.T(), ok)
-		assert.Nil(suite.T(), entry)
+		job, err = suite.status.AtIndex(entry3.Height)
+		assert.ErrorIs(suite.T(), err, storage.ErrNotFound)
+		assert.Nil(suite.T(), job)
 	})
 
 	rand.Seed(time.Now().UnixNano())
 	blockCount := 100
 	expected := make([]uint64, blockCount)
+	blocks := make(map[flow.Identifier]*status.BlockEntry, blockCount)
 	for i := 0; i < blockCount; i++ {
-		expected[i] = suite.rootHeight + uint64(i)
+		expected[i] = suite.rootHeight + 1 + uint64(i)
+		for j := 0; j <= rand.Intn(3); j++ {
+			entry := synctest.BlockEntryFixture(expected[i])
+			blocks[entry.BlockID] = entry
+		}
 	}
 
-	check := func() {
+	check := func(height uint64) {
 		heights := []uint64{}
 		for {
-			entry, ok := suite.status.NextNotification(suite.ctx)
-			if !ok {
+			job, err := suite.status.AtIndex(height)
+			if errors.Is(err, storage.ErrNotFound) {
 				break
 			}
+			assert.NoError(suite.T(), err)
+
+			entry, err := status.JobToBlockEntry(job)
+			assert.NoError(suite.T(), err)
+
 			heights = append(heights, entry.Height)
+			height++
 		}
 
 		assert.Equal(suite.T(), expected, heights)
 	}
+
+	suite.consumer.On("Pause")  // ignore for this test
+	suite.consumer.On("Resume") // ignore for this test
 
 	suite.Run("drops duplicate entries fetched in order", func() {
 		suite.reset(true)
 
 		for _, height := range expected {
 			for j := 0; j <= rand.Intn(3); j++ {
-				suite.status.Fetched(EntryFixture(height))
+				suite.status.Fetched(synctest.BlockEntryFixture(height))
 			}
 		}
 
-		check()
+		check(expected[0])
 	})
 
 	suite.Run("drops duplicate entries fetched in random order", func() {
 		suite.reset(true)
 
-		blocks := make(map[flow.Identifier]*status.BlockEntry, blockCount)
-		for _, height := range expected {
-			for j := 0; j <= rand.Intn(3); j++ {
-				entry := EntryFixture(height)
-				blocks[entry.BlockID] = entry
-			}
-		}
-
 		for _, entry := range blocks {
 			suite.status.Fetched(entry)
 		}
 
-		check()
+		check(expected[0])
 	})
+}
 
-	suite.Run("lastNotified loaded from db", func() {
-		suite.reset(true)
+func (suite *StatusSuite) TestHead() {
+	suite.consumer.On("Pause")  // ignore for this test
+	suite.consumer.On("Resume") // ignore for this test
 
-		entry := EntryFixture(suite.rootHeight)
+	check := func(expected uint64) {
+		height, err := suite.status.Head()
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), expected, height)
+	}
+
+	checkNotFound := func() {
+		job, err := suite.status.Head()
+		assert.ErrorIs(suite.T(), err, storage.ErrNotFound)
+		assert.Zero(suite.T(), job)
+	}
+
+	suite.Run("returns NotFound when no pending notifications", func() {
+		checkNotFound()
+
+		// entry is not the next height
+		entry := synctest.BlockEntryFixture(suite.rootHeight + 2)
 		suite.status.Fetched(entry)
 
-		actual, ok := suite.status.NextNotification(suite.ctx)
-		assert.True(suite.T(), ok)
-		assert.Equal(suite.T(), entry, actual)
+		checkNotFound()
+	})
 
-		suite.reset(false) // reset using existing db
+	suite.Run("returns height for pending notification", func() {
+		entry1 := synctest.BlockEntryFixture(suite.rootHeight + 1)
+		suite.status.Fetched(entry1)
 
-		assert.Equal(suite.T(), entry.Height, suite.status.LastNotified())
+		check(entry1.Height)
+
+		entry2 := synctest.BlockEntryFixture(suite.rootHeight + 2)
+		suite.status.Fetched(entry2)
+
+		// Head always returns the next available height
+		check(entry1.Height)
+
+		_, err := suite.status.AtIndex(entry1.Height)
+		assert.NoError(suite.T(), err)
+
+		// Next available should be incremented
+		check(entry2.Height)
 	})
 }
 
 func (suite *StatusSuite) TestHalted() {
-	suite.Run("halted defaults to false", func() {
-		assert.False(suite.T(), suite.status.Halted())
-	})
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		progress := bstorage.NewConsumerProgress(db, module.ConsumeProgressExecutionDataRequesterNotification)
+		err := progress.InitProcessedIndex(suite.rootHeight)
+		assert.NoError(suite.T(), err)
 
-	suite.Run("calling Halt sets halted to true", func() {
-		suite.status.Halt(suite.ctx)
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		err = s.Load()
+		assert.NoError(suite.T(), err)
 
-		assert.True(suite.T(), suite.status.Halted())
-	})
+		suite.Run("halted defaults to false", func() {
+			assert.False(suite.T(), suite.status.Halted())
+		})
 
-	suite.Run("halted persists across loads", func() {
-		suite.reset(true)
+		suite.Run("calling Halt sets halted to true", func() {
+			s.Halt()
 
-		suite.status.Halt(suite.ctx)
-		suite.reset(false) // reset using existing db
+			assert.True(suite.T(), s.Halted())
+		})
 
-		assert.True(suite.T(), suite.status.Halted())
+		suite.Run("halted persists across loads", func() {
+			s = status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+			err = s.Load()
+			assert.NoError(suite.T(), err)
+
+			assert.True(suite.T(), s.Halted())
+		})
 	})
 }
 
-func (suite *StatusSuite) TestProcessed() {
-	before := suite.status.LastProcessed()
-	expected := uint64(500)
-	suite.status.Processed(expected)
-	after := suite.status.LastProcessed()
+func (suite *StatusSuite) TestPauseResume() {
+	var s *status.Status
+	maxSearchAhead := uint64(3)
+	start := suite.rootHeight + 1
 
-	assert.NotEqual(suite.T(), before, after)
-	assert.Equal(suite.T(), expected, after)
-}
+	setup := func(consumer *modulemock.Resumable) {
+		s = status.New(zerolog.Nop(), suite.maxCachedEntries, maxSearchAhead, consumer, suite.progress)
+		err := s.Load()
+		assert.NoError(suite.T(), err)
+	}
 
-func (suite *StatusSuite) TestIsPaused() {
-	suite.Run("fresh status is not paused", func() {
-		assert.False(suite.T(), suite.status.IsPaused())
-	})
+	removeJob := func(height uint64) {
+		job, err := s.AtIndex(height)
+		assert.NoError(suite.T(), err)
+		assert.NotNil(suite.T(), job)
+	}
 
 	suite.Run("status is not paused when under search ahead limit", func() {
-		lastNotified := suite.status.LastNotified()
-		suite.status.Processed(lastNotified + suite.maxSearchAhead)
-		assert.False(suite.T(), suite.status.IsPaused())
+		consumer := new(modulemock.Resumable)
+		// Pause never called
+		consumer.On("Resume").Times(1)
+
+		setup(consumer)
+
+		s.Fetched(synctest.BlockEntryFixture(start))
+		s.Fetched(synctest.BlockEntryFixture(start + 1))
+
+		// Removes job, so limit is never reached
+		removeJob(start) // resumed
+
+		s.Fetched(synctest.BlockEntryFixture(start + 2))
 	})
 
 	suite.Run("status is paused when over search ahead limit", func() {
-		lastNotified := suite.status.LastNotified()
-		suite.status.Processed(lastNotified + suite.maxSearchAhead + 1)
-		assert.True(suite.T(), suite.status.IsPaused())
+		consumer := new(modulemock.Resumable)
+		consumer.On("Pause").Times(3)
+		consumer.On("Resume").Times(0)
+
+		setup(consumer)
+
+		s.Fetched(synctest.BlockEntryFixture(start))
+		s.Fetched(synctest.BlockEntryFixture(start + 1))
+		s.Fetched(synctest.BlockEntryFixture(start + 2)) // paused
+		s.Fetched(synctest.BlockEntryFixture(start + 3)) // paused
+
+		// Removes 1 job, but not enough to get under the limit
+		removeJob(start)
+
+		s.Fetched(synctest.BlockEntryFixture(start + 4)) // paused
+	})
+
+	suite.Run("status is resumed when notifications catch up", func() {
+		consumer := new(modulemock.Resumable)
+		consumer.On("Pause").Times(3)
+		consumer.On("Resume").Times(2)
+
+		setup(consumer)
+
+		s.Fetched(synctest.BlockEntryFixture(start))
+		s.Fetched(synctest.BlockEntryFixture(start + 1))
+		s.Fetched(synctest.BlockEntryFixture(start + 2)) // paused
+		s.Fetched(synctest.BlockEntryFixture(start + 3)) // paused
+
+		// Remove 2 jobs to get under the search ahead limit
+		removeJob(start)
+		removeJob(start + 1) // resumed
+
+		s.Fetched(synctest.BlockEntryFixture(start + 4)) // paused
+
+		removeJob(start + 2) // resumed
 	})
 }
 
 func (suite *StatusSuite) TestNextNotificationHeight() {
+	suite.consumer.On("Resume") // ignore for this test
+
 	suite.Run("next height returns correct height for startblock", func() {
-		assert.Equal(suite.T(), suite.rootHeight, suite.status.NextNotificationHeight())
+		assert.Equal(suite.T(), suite.rootHeight+1, suite.status.NextNotificationHeight())
 	})
 
 	suite.Run("next height returns correct height", func() {
-		entry := EntryFixture(suite.rootHeight)
-		suite.status.Fetched(entry)
+		height := suite.rootHeight + 1
+		expected := synctest.BlockEntryFixture(height)
+		suite.status.Fetched(expected)
+		suite.status.Fetched(synctest.BlockEntryFixture(height + 1))
 
-		actual, ok := suite.status.NextNotification(suite.ctx)
-		assert.True(suite.T(), ok) // Not time to notify yet
-		assert.Equal(suite.T(), entry, actual)
-		assert.Equal(suite.T(), entry.Height+1, suite.status.NextNotificationHeight())
+		job, err := suite.status.AtIndex(height)
+		assert.NoError(suite.T(), err)
+
+		assertJobIsEntry(suite.T(), expected, job)
+		assert.Equal(suite.T(), expected.Height+1, suite.status.NextNotificationHeight())
 	})
 
-	suite.Run("next height handles block zero", func() {
-		entry0 := EntryFixture(0)
-		entry1 := EntryFixture(1)
+}
 
-		suite.rootHeight = 0
-		suite.reset(true)
+func assertJobIsEntry(t *testing.T, expected *status.BlockEntry, job module.Job) {
+	require.NotNil(t, job)
 
-		// 1. Next should be 0 from an empty state with start height == 0
-		assert.Equal(suite.T(), uint64(0), suite.status.NextNotificationHeight())
+	actual, err := status.JobToBlockEntry(job)
+	assert.NoError(t, err)
 
-		// Process block 1 out of order
-		suite.status.Fetched(entry1)
-
-		entry, ok := suite.status.NextNotification(suite.ctx)
-		assert.False(suite.T(), ok) // Not time to notify yet
-		assert.Nil(suite.T(), entry)
-
-		// 2. Next should still be 0 since block 0 still hasn't been notified
-		assert.Equal(suite.T(), uint64(0), suite.status.NextNotificationHeight())
-
-		// Process block 0
-		suite.status.Fetched(entry0)
-
-		entry, ok = suite.status.NextNotification(suite.ctx)
-		assert.True(suite.T(), ok)
-		assert.Equal(suite.T(), entry0, entry)
-
-		// 3. Next should be 1 after processing the notification for block 0
-		assert.Equal(suite.T(), uint64(1), suite.status.NextNotificationHeight())
-	})
+	assert.Equal(t, expected, actual)
 }

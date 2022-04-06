@@ -19,10 +19,8 @@ type ExecutionDataRequesterCollector struct {
 	highestDownloadHeight     prometheus.Gauge
 	halted                    prometheus.Gauge
 
-	downloadRetries           prometheus.Counter
-	droppedFinalizationEvents prometheus.Counter
-	droppedRetryRequests      prometheus.Counter
-	failedDownloads           prometheus.Counter
+	downloadRetries prometheus.Counter
+	failedDownloads prometheus.Counter
 }
 
 func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
@@ -77,20 +75,6 @@ func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
 		Help:      "number of execution data download retries",
 	})
 
-	droppedFinalizationEvents := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceStateSync,
-		Subsystem: subsystemExecutionDataRequester,
-		Name:      "execution_data_dropped_finalization_events_total",
-		Help:      "number of dropped block finalized events",
-	})
-
-	droppedRetryRequests := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceStateSync,
-		Subsystem: subsystemExecutionDataRequester,
-		Name:      "execution_data_dropped_retry_requests_total",
-		Help:      "number of dropped execution data download retry requests",
-	})
-
 	failedDownloads := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataRequester,
@@ -105,8 +89,6 @@ func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
 		highestDownloadHeight:     highestDownloadHeight,
 		highestNotificationHeight: highestNotificationHeight,
 		downloadRetries:           downloadRetries,
-		droppedFinalizationEvents: droppedFinalizationEvents,
-		droppedRetryRequests:      droppedRetryRequests,
 		failedDownloads:           failedDownloads,
 		halted:                    halted,
 	}
@@ -130,14 +112,6 @@ func (ec *ExecutionDataRequesterCollector) ExecutionDataFetchFinished(duration t
 func (ec *ExecutionDataRequesterCollector) NotificationSent(height uint64) {
 	ec.outstandingNotifications.Dec()
 	ec.highestNotificationHeight.Set(float64(height))
-}
-
-func (ec *ExecutionDataRequesterCollector) FinalizationEventDropped() {
-	ec.droppedFinalizationEvents.Inc()
-}
-
-func (ec *ExecutionDataRequesterCollector) RetryDropped() {
-	ec.droppedRetryRequests.Inc()
 }
 
 func (ec *ExecutionDataRequesterCollector) FetchRetried() {

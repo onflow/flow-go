@@ -128,6 +128,29 @@ func (c *Consumer) Stop() {
 	c.log.Info().Msg("consumer stopped")
 }
 
+// Pause gracefully stops the consumer from reading new jobs from the job queue. It does not stop
+// the existing worker finishing their jobs.
+// It does NOT block.
+func (c *Consumer) Pause() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.running = false
+
+	c.log.Info().Msg("pausing consumer")
+}
+
+// Resume reenables the consumer and kicks off the next job if any workers are available.
+func (c *Consumer) Resume() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.running = true
+
+	c.log.Info().Msg("resuming consumer")
+	c.checkProcessable()
+}
+
 // Size returns number of in-memory jobs that consumer is processing.
 func (c *Consumer) Size() uint {
 	return uint(len(c.processings))

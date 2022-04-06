@@ -9,6 +9,41 @@ type ConsumerProgress struct {
 	mock.Mock
 }
 
+// Halted provides a mock function with given fields:
+func (_m *ConsumerProgress) Halted() (bool, error) {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// InitHalted provides a mock function with given fields:
+func (_m *ConsumerProgress) InitHalted() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // InitProcessedIndex provides a mock function with given fields: defaultIndex
 func (_m *ConsumerProgress) InitProcessedIndex(defaultIndex uint64) error {
 	ret := _m.Called(defaultIndex)
@@ -42,6 +77,20 @@ func (_m *ConsumerProgress) ProcessedIndex() (uint64, error) {
 	}
 
 	return r0, r1
+}
+
+// SetHalted provides a mock function with given fields: halted
+func (_m *ConsumerProgress) SetHalted(halted bool) error {
+	ret := _m.Called(halted)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(bool) error); ok {
+		r0 = rf(halted)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // SetProcessedIndex provides a mock function with given fields: processed

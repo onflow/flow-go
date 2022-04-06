@@ -10,4 +10,8 @@ type ConsumerProgress interface {
 	// update the processed index in the storage layer.
 	// it will fail if InitProcessedIndex was never called.
 	SetProcessedIndex(processed uint64) error
+
+	Halted() (bool, error)
+	InitHalted() error
+	SetHalted(halted bool) error
 }

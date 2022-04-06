@@ -7,6 +7,9 @@ import (
 const (
 	ConsumeProgressVerificationBlockHeight = "ConsumeProgressVerificationBlockHeight"
 	ConsumeProgressVerificationChunkIndex  = "ConsumeProgressVerificationChunkIndex"
+
+	ConsumeProgressExecutionDataRequesterBlockHeight  = "ConsumeProgressExecutionDataRequesterBlockHeight"
+	ConsumeProgressExecutionDataRequesterNotification = "ConsumeProgressExecutionDataRequesterNotification"
 )
 
 // JobID is a unique ID of the job.
@@ -18,10 +21,21 @@ type NewJobListener interface {
 	Check()
 }
 
+type Resumable interface {
+	// Pause gracefully stops the consumer from reading new jobs from the job queue. It does not stop
+	// the existing worker finishing their jobs.
+	// It does NOT block.
+	Pause()
+
+	// Resume reenables the consumer and kicks off the next job if any workers are available.
+	Resume()
+}
+
 // JobConsumer consumes jobs from a job queue, and it remembers which job it has processed, and is able
 // to resume processing from the next.
 type JobConsumer interface {
 	NewJobListener
+	Resumable
 
 	// Start starts processing jobs from a job queue. If this is the first time, a processed index
 	// will be initialized in the storage. If it fails to initialize, an error will be returned

@@ -341,12 +341,6 @@ type ExecutionDataRequesterMetrics interface {
 	// NotificationSent reports that ExecutionData received notifications were sent for a block height
 	NotificationSent(height uint64)
 
-	// FinalizationEventDropped reports the total number of finalized block notifications dropped
-	FinalizationEventDropped()
-
-	// RetryDropped reports the total number of ExecutionData download retries requests dropped
-	RetryDropped()
-
 	// FetchRetried reports that a download retry was processed
 	FetchRetried()
 

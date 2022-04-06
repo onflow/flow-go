@@ -74,6 +74,7 @@ const (
 	codeJobConsumerProcessed = 70
 	codeJobQueue             = 71
 	codeJobQueuePointer      = 72
+	codeJobQueueHalted       = 73
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

@@ -1,18 +1,14 @@
-package requester
-
-// putting tests directly into requester package so the suite can inject data directly onto the
-// requesters queues
+package requester_test
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-cid"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -25,14 +21,16 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
+	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/state/protocol"
+	statemock "github.com/onflow/flow-go/state/protocol/mock"
+	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,8 +39,9 @@ type ExecutionDataRequesterSuite struct {
 
 	blobservice *mocknetwork.BlobService
 	datastore   datastore.Batching
+	db          *badger.DB
 
-	cleanup func()
+	mockSnapshot *mockSnapshot
 }
 
 func TestExecutionDataRequesterSuite(t *testing.T) {
@@ -53,13 +52,7 @@ func TestExecutionDataRequesterSuite(t *testing.T) {
 
 func (suite *ExecutionDataRequesterSuite) SetupTest() {
 	suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
-	suite.blobservice = mockBlobService(blockstore.NewBlockstore(suite.datastore))
-}
-
-func (suite *ExecutionDataRequesterSuite) TearDownTest() {
-	if suite.cleanup != nil {
-		suite.cleanup()
-	}
+	suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
 }
 
 type testExecutionDataServiceEntry struct {
@@ -70,6 +63,12 @@ type testExecutionDataServiceEntry struct {
 	Err error
 	// Otherwise, the execution data will be returned directly with no error
 	ExecutionData *state_synchronization.ExecutionData
+}
+
+type edTestRun struct {
+	name          string
+	blockCount    int
+	specialBlocks func(int) map[uint64]testExecutionDataCallback
 }
 
 type testExecutionDataCallback func(*state_synchronization.ExecutionData) (*state_synchronization.ExecutionData, error)
@@ -119,100 +118,14 @@ func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServ
 	return eds
 }
 
-func mockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
-	bex := new(mocknetwork.BlobService)
+func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[uint64]*flow.Block) *statemock.State {
+	state := new(statemock.State)
 
-	bex.On("GetBlobs", mock.Anything, mock.AnythingOfType("[]cid.Cid")).
-		Return(func(ctx context.Context, cids []cid.Cid) <-chan blobs.Blob {
-			ch := make(chan blobs.Blob)
+	suite.mockSnapshot = new(mockSnapshot)
+	suite.mockSnapshot.set(blocksByHeight[0].Header, nil) // genesis block
 
-			var wg sync.WaitGroup
-			wg.Add(len(cids))
-
-			for _, c := range cids {
-				c := c
-				go func() {
-					defer wg.Done()
-
-					blob, err := bs.Get(ctx, c)
-
-					if err != nil {
-						// In the real implementation, Bitswap would keep trying to get the blob from
-						// the network indefinitely, sending requests to more and more peers until it
-						// eventually finds the blob, or the context is canceled. Here, we know that
-						// if the blob is not already in the blobstore, then we will never appear, so
-						// we just wait for the context to be canceled.
-						<-ctx.Done()
-
-						return
-					}
-
-					ch <- blob
-				}()
-			}
-
-			go func() {
-				wg.Wait()
-				close(ch)
-			}()
-
-			return ch
-		})
-
-	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(bs.PutMany)
-
-	noop := module.NoopReadyDoneAware{}
-	bex.On("Ready").Return(func() <-chan struct{} { return noop.Ready() })
-
-	return bex
-}
-
-func mockBlocksStorage(blocksByID map[flow.Identifier]*flow.Block, blocksByHeight map[uint64]*flow.Block) *storagemock.Blocks {
-	blocks := new(storagemock.Blocks)
-
-	blocks.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) *flow.Block {
-			return blocksByID[blockID]
-		},
-		func(blockID flow.Identifier) error {
-			if _, has := blocksByID[blockID]; !has {
-				return fmt.Errorf("block %s not found", blockID)
-			}
-			return nil
-		},
-	)
-
-	blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-		func(height uint64) *flow.Block {
-			return blocksByHeight[height]
-		},
-		func(height uint64) error {
-			if _, has := blocksByHeight[height]; !has {
-				return fmt.Errorf("block %d not found", height)
-			}
-			return nil
-		},
-	)
-
-	return blocks
-}
-
-func mockResultsStorage(resultsByID map[flow.Identifier]*flow.ExecutionResult) *storagemock.ExecutionResults {
-	results := new(storagemock.ExecutionResults)
-
-	results.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) *flow.ExecutionResult {
-			return resultsByID[blockID]
-		},
-		func(blockID flow.Identifier) error {
-			if _, has := resultsByID[blockID]; !has {
-				return fmt.Errorf("result %s not found", blockID)
-			}
-			return nil
-		},
-	)
-
-	return results
+	state.On("Sealed").Return(suite.mockSnapshot).Maybe()
+	return state
 }
 
 // Test cases:
@@ -220,11 +133,8 @@ func mockResultsStorage(resultsByID map[flow.Identifier]*flow.ExecutionResult) *
 // * bootstrap with an empty db sets configuration correctly mid spork
 // * bootstrap with a non-empty db sets configuration correctly
 // * bootstrap with halted db does not start
-// * catch up after finalization queue overflow
-// * catch up after fetch [retry] queue overflow
-// * out of order blocks are notified in order
-// * blocks not in queue are refetched
 // * halts are handled gracefully
+// * pause resume works as expected
 
 func (suite *ExecutionDataRequesterSuite) TestBootstrapFromEmptyStateAtSporkStart() {
 
@@ -268,11 +178,7 @@ func (suite *ExecutionDataRequesterSuite) TestBootstrapFromEmptyStateMidSpork() 
 
 func (suite *ExecutionDataRequesterSuite) TestRequesterProcessesBlocks() {
 
-	tests := []struct {
-		name          string
-		blockCount    int
-		specialBlocks func(int) map[uint64]testExecutionDataCallback
-	}{
+	tests := []edTestRun{
 		// Test that blocks are processed in order
 		{
 			"happy path",
@@ -297,11 +203,85 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterProcessesBlocks() {
 
 	for _, run := range tests {
 		suite.Run(run.name, func() {
-			testData := suite.generateTestData(run.blockCount, run.specialBlocks(run.blockCount))
-			edr, fd := suite.prepareRequesterTest(testData)
-			suite.runRequesterTest(edr, fd, testData)
+			unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+				suite.db = db
+
+				suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
+				suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+
+				testData := suite.generateTestData(run.blockCount, run.specialBlocks(run.blockCount))
+				edr, fd := suite.prepareRequesterTest(testData)
+				fetchedExecutionData := suite.runRequesterTest(edr, fd, testData)
+
+				verifyFetchedExecutionData(suite.T(), fetchedExecutionData, testData)
+
+				suite.T().Log("Shutting down test")
+			})
 		})
 	}
+}
+
+func (suite *ExecutionDataRequesterSuite) TestRequesterResumesProcessing() {
+	run := edTestRun{
+		"requester resumes processing",
+		1000,
+		func(_ int) map[uint64]testExecutionDataCallback {
+			return map[uint64]testExecutionDataCallback{}
+		},
+	}
+
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		suite.db = db
+
+		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
+		suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+
+		testData := suite.generateTestData(run.blockCount, run.specialBlocks(run.blockCount))
+
+		// Process half of the blocks
+		edr, fd := suite.prepareRequesterTest(testData)
+		testData.stopHeight = testData.startHeight + uint64(run.blockCount)/2
+		testData.fetchedExecutionData = suite.runRequesterTest(edr, fd, testData)
+
+		// Stand up a new component using the same datastore, and make sure all remaining
+		// blocks are processed
+		edr, fd = suite.prepareRequesterTest(testData)
+		testData.resumeHeight = testData.stopHeight + 1
+		testData.stopHeight = 0
+		fetchedExecutionData := suite.runRequesterTest(edr, fd, testData)
+
+		verifyFetchedExecutionData(suite.T(), fetchedExecutionData, testData)
+
+		suite.T().Log("Shutting down test")
+	})
+}
+
+func (suite *ExecutionDataRequesterSuite) TestRequesterCatchesUp() {
+	run := edTestRun{
+		"requester catches up",
+		1000,
+		func(_ int) map[uint64]testExecutionDataCallback {
+			return map[uint64]testExecutionDataCallback{}
+		},
+	}
+
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		suite.db = db
+
+		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
+		suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+
+		testData := suite.generateTestData(run.blockCount, run.specialBlocks(run.blockCount))
+
+		// start processing with all seals available
+		edr, fd := suite.prepareRequesterTest(testData)
+		testData.resumeHeight = testData.endHeight
+		fetchedExecutionData := suite.runRequesterTest(edr, fd, testData)
+
+		verifyFetchedExecutionData(suite.T(), fetchedExecutionData, testData)
+
+		suite.T().Log("Shutting down test")
+	})
 }
 
 func generateBlocksWithSomeMissed(blockCount int) map[uint64]testExecutionDataCallback {
@@ -346,47 +326,70 @@ func generateBlocksWithRandomDelays(blockCount int) map[uint64]testExecutionData
 	return delays
 }
 
-func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (ExecutionDataRequester, *pubsub.FinalizationDistributor) {
-	blocks := mockBlocksStorage(cfg.blocksByID, cfg.blocksByHeight)
-	results := mockResultsStorage(cfg.resultsByID)
+func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (requester.ExecutionDataRequester, *pubsub.FinalizationDistributor) {
+	blocks := synctest.MockBlocksStorage(synctest.WithByID(cfg.blocksByID), synctest.WithByHeight(cfg.blocksByHeight))
+	results := synctest.MockResultsStorage(synctest.WithByBlockID(cfg.resultsByID))
+	state := suite.mockProtocolState(cfg.blocksByHeight)
 
 	eds := mockExecutionDataService(cfg.executionDataEntries)
 
-	edr, err := New(
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	processedHeight := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotification := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
+
+	edr, err := requester.New(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
 		metrics.NewNoopCollector(),
 		suite.datastore,
 		suite.blobservice,
 		eds,
-		uint64(0),
-		DefaultMaxCachedEntries,
-		DefaultMaxSearchAhead,
+		processedHeight,
+		processedNotification,
+		state,
 		blocks,
 		results,
-		DefaultFetchTimeout,
-		false,
+		requester.ExecutionDataConfig{
+			StartBlockHeight: cfg.startHeight,
+			MaxCachedEntries: requester.DefaultMaxCachedEntries,
+			MaxSearchAhead:   requester.DefaultMaxSearchAhead,
+			FetchTimeout:     requester.DefaultFetchTimeout,
+			RetryDelay:       1 * time.Millisecond,
+			MaxRetryDelay:    15 * time.Millisecond,
+			CheckEnabled:     false,
+		},
 	)
 	assert.NoError(suite.T(), err)
-
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
-	finalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 
 	return edr, finalizationDistributor
 }
 
-func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) {
+func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr requester.ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) receivedExecutionData {
 	// make sure test helper goroutines are cleaned up
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go irrecoverableNotExpected(suite.T(), ctx, errChan)
 
-	// setup sync to wait for all notifications
-	outstandingBlocks := sync.WaitGroup{}
-	outstandingBlocks.Add(cfg.sealedCount)
+	startHeight := cfg.startHeight
+	if cfg.resumeHeight > 0 {
+		startHeight = cfg.resumeHeight
+	}
 
-	fetchedExecutionData := make(map[flow.Identifier]*state_synchronization.ExecutionData, cfg.sealedCount)
+	stopHeight := cfg.endHeight
+	if cfg.stopHeight > 0 {
+		stopHeight = cfg.stopHeight
+	}
+	// blockID of the seal contained in the last block (last execution data expected)
+	lastSeal := cfg.blocksByHeight[stopHeight].Payload.Seals[0].BlockID
+
+	fetchedExecutionData := cfg.fetchedExecutionData
+	if fetchedExecutionData == nil {
+		fetchedExecutionData = make(receivedExecutionData, cfg.sealedCount)
+	}
+
+	// setup sync to wait for all notifications
+	fetchDone := make(chan struct{})
+
 	edr.AddOnExecutionDataFetchedConsumer(func(ed *state_synchronization.ExecutionData) {
 		if _, has := fetchedExecutionData[ed.BlockID]; has {
 			suite.T().Errorf("duplicate execution data for block %s", ed.BlockID)
@@ -394,8 +397,11 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr ExecutionDataRequ
 		}
 
 		fetchedExecutionData[ed.BlockID] = ed
-		outstandingBlocks.Done()
 		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Header.Height, len(fetchedExecutionData), cfg.sealedCount)
+
+		if lastSeal == cfg.blocksByID[ed.BlockID].ID() {
+			close(fetchDone)
+		}
 	})
 
 	edr.Start(signalerCtx)
@@ -403,39 +409,37 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr ExecutionDataRequ
 	<-edr.Ready()
 
 	// Send blocks through finalizationDistributor
-	var parentView uint64
-	for i := cfg.startHeight; i <= cfg.endHeight; i++ {
+	for i := startHeight; i <= cfg.endHeight; i++ {
 		b := cfg.blocksByHeight[i]
 
 		suite.T().Log(">>>> Finalizing block", b.ID(), b.Header.Height)
 
-		block := model.BlockFromFlow(b.Header, parentView)
-		finalizationDistributor.OnFinalizedBlock(block)
+		if len(b.Payload.Seals) > 0 {
+			seal := b.Payload.Seals[0]
+			sealedHeader := cfg.blocksByID[seal.BlockID].Header
 
-		parentView = b.Header.View
+			suite.mockSnapshot.set(sealedHeader, nil)
+			suite.T().Log(">>>> Sealing block", sealedHeader.ID(), sealedHeader.Height)
+		}
 
-		// needs a slight delay otherwise it will fill the queue immediately.
-		time.Sleep(5 * time.Millisecond)
+		finalizationDistributor.OnFinalizedBlock(&model.Block{})
 
-		// the requester can catch up after receiving a finalization block, so on the last block,
-		// put the block directly into the finalized block channel to ensure it's accepted
-		if i == cfg.endHeight {
-			select {
-			case <-ctx.Done():
-				suite.T().Error("timed out before sending last block")
-			case edr.(*executionDataRequesterImpl).finalizedBlocks <- block.BlockID:
-			}
+		if cfg.stopHeight == i {
+			break
 		}
 	}
 
 	// Pause until we've received all of the expected notifications
-	// TODO: this should honor context timeouts
-	outstandingBlocks.Wait()
+	unittest.RequireCloseBefore(suite.T(), fetchDone, time.Second*5, "timed out waiting for notifications")
 	suite.T().Log("All notifications received")
 
-	verifyFetchedExecutionData(suite.T(), fetchedExecutionData, cfg)
+	cancel()
+	<-edr.Done()
+
+	return fetchedExecutionData
 }
 
+type receivedExecutionData map[flow.Identifier]*state_synchronization.ExecutionData
 type fetchTestRun struct {
 	sealedCount           int
 	startHeight           uint64
@@ -446,6 +450,10 @@ type fetchTestRun struct {
 	executionDataByID     map[flow.Identifier]*state_synchronization.ExecutionData
 	executionDataEntries  map[flow.Identifier]*testExecutionDataServiceEntry
 	expectedIrrecoverable error
+
+	stopHeight           uint64
+	resumeHeight         uint64
+	fetchedExecutionData map[flow.Identifier]*state_synchronization.ExecutionData
 }
 
 func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, missingHeightFuncs map[uint64]testExecutionDataCallback) *fetchTestRun {
@@ -455,29 +463,21 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, missi
 	resultsByID := map[flow.Identifier]*flow.ExecutionResult{}
 	executionDataByID := map[flow.Identifier]*state_synchronization.ExecutionData{}
 
-	sealedCount := blockCount - 3
-	firstSeal := blockCount - sealedCount + 2 // offset by 2 so the first block can contain multiple seals
+	sealedCount := blockCount - 4 // seals for blocks 1-96
+	firstSeal := blockCount - sealedCount
 
-	startHeight := uint64(0)
-	endHeight := startHeight + uint64(blockCount) - 1
+	// genesis is block 0, we start syncing from block 1
+	startHeight := uint64(1)
+	endHeight := uint64(blockCount) - 1
 
 	var previousBlock *flow.Block
 	var previousResult *flow.ExecutionResult
 	for i := 0; i < blockCount; i++ {
 		var seals []*flow.Header
 
-		if i == firstSeal {
-			// first block with seals contains 3
+		if i >= firstSeal {
 			seals = []*flow.Header{
-				// intentionally out of order
-				blocksByHeight[uint64(i-firstSeal+2)].Header,
-				blocksByHeight[uint64(i-firstSeal)].Header,
-				blocksByHeight[uint64(i-firstSeal+1)].Header,
-			}
-			suite.T().Logf("block %d has seals for %d, %d, %d", i, seals[1].Height, seals[2].Height, seals[0].Height)
-		} else if i > firstSeal {
-			seals = []*flow.Header{
-				blocksByHeight[uint64(i-firstSeal+2)].Header,
+				blocksByHeight[uint64(i-firstSeal+1)].Header, // block 0 doesn't get sealed (it's pre-sealed in the genesis state)
 			}
 			suite.T().Logf("block %d has seals for %d", i, seals[0].Height)
 		}
@@ -495,7 +495,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, missi
 		resultsByID[block.ID()] = result
 
 		// ignore all the data we don't need to verify the test
-		if i < sealedCount {
+		if i > 0 && i <= sealedCount {
 			executionDataByID[block.ID()] = ed
 			edsEntries[cid] = &testExecutionDataServiceEntry{ExecutionData: ed}
 			if fn, missing := missingHeightFuncs[height]; missing {
@@ -562,7 +562,7 @@ func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan 
 	}
 }
 
-func verifyFetchedExecutionData(t *testing.T, actual map[flow.Identifier]*state_synchronization.ExecutionData, cfg *fetchTestRun) {
+func verifyFetchedExecutionData(t *testing.T, actual receivedExecutionData, cfg *fetchTestRun) {
 	expected := cfg.executionDataByID
 	assert.Len(t, actual, len(expected))
 
@@ -573,11 +573,48 @@ func verifyFetchedExecutionData(t *testing.T, actual map[flow.Identifier]*state_
 
 		expectedED := expected[blockID]
 		actualED, has := actual[blockID]
-		if !has {
-			assert.Fail(t, "missing execution data for block %v", blockID)
-			continue
+		assert.True(t, has, "missing execution data for block %v height %d", blockID, height)
+		if has {
+			assert.Equal(t, expectedED, actualED, "execution data for block %v doesn't match", blockID)
 		}
-
-		assert.Equal(t, expectedED, actualED, "execution data for block %v doesn't match", blockID)
 	}
 }
+
+type mockSnapshot struct {
+	header *flow.Header
+	err    error
+	mu     sync.Mutex
+}
+
+func (m *mockSnapshot) set(header *flow.Header, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.header = header
+	m.err = err
+}
+
+func (m *mockSnapshot) Head() (*flow.Header, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.header, m.err
+}
+
+// none of these are used in this test
+func (m *mockSnapshot) QuorumCertificate() (*flow.QuorumCertificate, error) { return nil, nil }
+func (m *mockSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+	return nil, nil
+}
+func (m *mockSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) { return nil, nil }
+func (m *mockSnapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
+	return nil, nil, nil
+}
+func (m *mockSnapshot) Commit() (flow.StateCommitment, error)         { return flow.DummyStateCommitment, nil }
+func (m *mockSnapshot) SealingSegment() (*flow.SealingSegment, error) { return nil, nil }
+func (m *mockSnapshot) Descendants() ([]flow.Identifier, error)       { return nil, nil }
+func (m *mockSnapshot) ValidDescendants() ([]flow.Identifier, error)  { return nil, nil }
+func (m *mockSnapshot) RandomSource() ([]byte, error)                 { return nil, nil }
+func (m *mockSnapshot) Phase() (flow.EpochPhase, error)               { return flow.EpochPhaseUndefined, nil }
+func (m *mockSnapshot) Epochs() protocol.EpochQuery                   { return nil }
+func (m *mockSnapshot) Params() protocol.GlobalParams                 { return nil }
