@@ -298,7 +298,8 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 			services[container.ContainerName] = prepareAccessService(container, numAccess, n)
 			if bootstrapAccessNodePublicKey == nil {
 				bootstrapAccessNodePublicKey = container.NetworkPubKey()
-				bootstrapAccessNodeAddress = container.Address //container.ContainerName + "_1"
+				bootstrapAccessNodeAddress = strings.SplitN(container.Address, ":", 2)[0]
+				bootstrapAccessNodeAddress = fmt.Sprintf("localnet_%s_1:%d", bootstrapAccessNodeAddress, RPCPort)
 				bootstrapAccessNodeContainer = container.ContainerName
 			}
 			numAccess++
@@ -539,9 +540,9 @@ func prepareObserverService(container testnet.ContainerConfig, i int, n int, boo
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
 		fmt.Sprintf("--observer-networking-key-path=%s", dockerObserverNetworkKeyPath),
-		fmt.Sprintf("--bootstrap-node-addresses=%s", bootstrapAddress),
+		fmt.Sprintf("--bootstrap-node-addresses=%s", bootstrapAddress), // TODO SecuredRPCPort?
 		fmt.Sprintf("--bootstrap-node-public-keys=%s", strings.Trim(string(compacted), "\"")),
-		fmt.Sprintf("--public-network-bootstrapAddress=%s:%d", container.ContainerName, AccessAPIPort+2*i),
+		fmt.Sprintf("--public-network-address=%s:%d", "localhost", AccessAPIPort+2*i),
 	}...)
 
 	service.Links = []string{bootstrapContainer}
