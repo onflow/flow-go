@@ -35,28 +35,27 @@ import (
 // The ExecutionDataRequester downloads ExecutionData for sealed blocks from other participants
 // in the network running the ExecutionDataService. The requester is made up of 4 subcomponents:
 //
-// * OnBlockFinalized:        receives block finalized events from the finalization distributor and
-//                            pushes them to the finalizedBlocks channel.
+// * OnBlockFinalized:     receives block finalized events from the finalization distributor and
+//                         forwards them to the sealed blockConsumer.
 //
-// * bootstrap: is a single worker that consumes from the finalizedBlocks channel,
-//                            and generates ExecutionData fetch requests for the all blocks with
-//                            results sealed in the finalized block.
+// * blockConsumer:        is a jobqueue that receives block finalization events. On each event,
+//                         it checks for the latest sealed block, then uses a pool of workers to
+//                         download ExecutionData for each block from the network. After each
+//                         successful download, the blockConsumer sends a notification to the
+//                         notificationConsumer that a new ExecutionData is available.
 //
-// * fetchRequestProcessor:   is a pool of workers that consume fetch requests and download the
-//                            ExecutionData from the network.
+// * notificationConsumer: is a jobqueue that receives ExecutionData fetched events. On each event,
+//                         it checks if ExecutionData for the next consecutive block height is
+//                         available, then uses a single worker to send notifications to registered
+//                         consumers.
 //
-// * notificationProcessor:   is a single worker that sends notifications to registered consumers
-//                            in sequential block height order.
-//
-//                                                               +-----------------------+
-//                                                            +--| fetchRequestProcessor |--+
-//                                                            |  +-----------------------+  |
-//    +------------------+      +-------------------------+   |  +-----------------------+  |   +-----------------------+
-// -->| OnBlockFinalized |<---->| bootstrap |<--+->| fetchRequestProcessor |<-+-->| notificationProcessor |
-//    +------------------+      +-------------------------+   |  +-----------------------+  |   +-----------------------+
-//                                                            |  +-----------------------+  |
-//                                                            +--| fetchRequestProcessor |--+
-//                                                               +-----------------------+
+//    +------------------+      +---------------+       +----------------------+
+// -->| OnBlockFinalized |----->| blockConsumer |   +-->| notificationConsumer |<-+
+//    +------------------+      +-------+-------+   |   +-----------+----------+  | scan for addition
+//                                      |           |               |             | notifications to
+//                               +------+------+    |        +------+------+      | send
+//                            xN | Worker Pool |----+     x1 | Worker Pool |------+
+//                               +-------------+             +-------------+
 //
 // The requester has 2 main priorities:
 //   1. ensure execution state is as widely distributed as possible among the network participants
@@ -118,7 +117,7 @@ type ExecutionDataConfig struct {
 	CheckEnabled bool
 }
 
-type executionDataRequesterImpl struct {
+type executionDataRequester struct {
 	component.Component
 	cm      *component.ComponentManager
 	ds      datastore.Batching
@@ -147,7 +146,7 @@ type executionDataRequesterImpl struct {
 	consumerMu sync.RWMutex
 }
 
-var _ state_synchronization.ExecutionDataRequester = (*executionDataRequesterImpl)(nil)
+var _ state_synchronization.ExecutionDataRequester = (*executionDataRequester)(nil)
 
 // New creates a new execution data requester component
 func New(
@@ -163,7 +162,7 @@ func New(
 	results storage.ExecutionResults,
 	cfg ExecutionDataConfig,
 ) (state_synchronization.ExecutionDataRequester, error) {
-	e := &executionDataRequesterImpl{
+	e := &executionDataRequester{
 		log:           log.With().Str("component", "execution_data_requester").Logger(),
 		ds:            datastore,
 		bs:            blobservice,
@@ -244,7 +243,8 @@ func New(
 	return e, nil
 }
 
-func (e *executionDataRequesterImpl) OnBlockFinalized(*model.Block) {
+// OnBlockFinalized accepts block finalization notifications from the FinalizationDistributor
+func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
 	e.blockNotifier.Notify()
 }
 
@@ -253,7 +253,7 @@ func (e *executionDataRequesterImpl) OnBlockFinalized(*model.Block) {
 //   * be concurrency safe
 //   * be non-blocking
 //   * handle repetition of the same events (with some processing overhead).
-func (e *executionDataRequesterImpl) AddOnExecutionDataFetchedConsumer(fn state_synchronization.ExecutionDataReceivedCallback) {
+func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_synchronization.ExecutionDataReceivedCallback) {
 	e.consumerMu.Lock()
 	defer e.consumerMu.Unlock()
 
@@ -262,7 +262,7 @@ func (e *executionDataRequesterImpl) AddOnExecutionDataFetchedConsumer(fn state_
 
 // bootstrap runs the main process that processes finalized block notifications and
 // requests ExecutionData for each block seal
-func (e *executionDataRequesterImpl) bootstrap(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (e *executionDataRequester) bootstrap(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	// needs state from notificationConsumer
 	<-e.notificationConsumer.Ready()
 
@@ -301,7 +301,7 @@ func (e *executionDataRequesterImpl) bootstrap(ctx irrecoverable.SignalerContext
 
 // processBlockJob consumes jobs from the blockConsumer and attempts to download an ExecutionData
 // for the given block height.
-func (e *executionDataRequesterImpl) processBlockJob(ctx irrecoverable.SignalerContext, job module.Job, complete func()) {
+func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerContext, job module.Job, complete func()) {
 	// convert job into a block entry
 	block, err := status.JobToBlock(job)
 	if err != nil {
@@ -322,10 +322,8 @@ func (e *executionDataRequesterImpl) processBlockJob(ctx irrecoverable.SignalerC
 }
 
 // processSealedHeight downloads ExecutionData for the given block height.
-// If the download fails, it will retry using forever, using exponential backoff.
-func (e *executionDataRequesterImpl) processSealedHeight(ctx irrecoverable.SignalerContext, request *status.BlockEntry) error {
-	// download execution data for the block
-
+// If the download fails, it will retry forever, using exponential backoff.
+func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerContext, request *status.BlockEntry) error {
 	backoff, err := retry.NewExponential(e.config.RetryDelay)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to create retry mechanism: %w", err))
@@ -336,6 +334,7 @@ func (e *executionDataRequesterImpl) processSealedHeight(ctx irrecoverable.Signa
 	// the only error returned is ctx.Err()
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
+		// download execution data for the block
 		err := e.processFetchRequest(ctx, request)
 
 		if attempt > 0 {
@@ -347,7 +346,7 @@ func (e *executionDataRequesterImpl) processSealedHeight(ctx irrecoverable.Signa
 	})
 }
 
-func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.SignalerContext, request *status.BlockEntry) error {
+func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, request *status.BlockEntry) error {
 	logger := e.log.With().Str("block_id", request.BlockID.String()).Logger()
 	logger.Debug().Msgf("processing fetch request for block %d", request.Height)
 
@@ -398,7 +397,7 @@ func (e *executionDataRequesterImpl) processFetchRequest(ctx irrecoverable.Signa
 }
 
 // fetchExecutionData fetches the ExecutionData by its ID, and times out if fetchTimeout is exceeded
-func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier, height uint64) (executionData *state_synchronization.ExecutionData, err error) {
+func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier, height uint64) (executionData *state_synchronization.ExecutionData, err error) {
 	ctx, cancel := context.WithTimeout(signalerCtx, e.config.FetchTimeout)
 	defer cancel()
 
@@ -410,7 +409,7 @@ func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverabl
 	}()
 
 	// Get the data from the network
-	// this is a blocking call, won't be unblocked until either hitting error (including timeout) or 
+	// this is a blocking call, won't be unblocked until either hitting error (including timeout) or
 	// the data is received
 	executionData, err = e.eds.Get(ctx, executionDataID)
 
@@ -430,7 +429,7 @@ func (e *executionDataRequesterImpl) fetchExecutionData(signalerCtx irrecoverabl
 
 // Notification Worker Methods
 
-func (e *executionDataRequesterImpl) processNotificationJob(ctx irrecoverable.SignalerContext, job module.Job, complete func()) {
+func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.SignalerContext, job module.Job, complete func()) {
 	// convert job into a block entry
 	entry, err := status.JobToBlockEntry(job)
 	if err != nil {
@@ -441,14 +440,13 @@ func (e *executionDataRequesterImpl) processNotificationJob(ctx irrecoverable.Si
 	complete()
 }
 
-func (e *executionDataRequesterImpl) processNotification(ctx irrecoverable.SignalerContext, entry *status.BlockEntry) {
+func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, entry *status.BlockEntry) {
 	e.log.Debug().Msgf("notifying for block %d", entry.Height)
 
-	// ExecutionData may have been purged, in which case, look it up again
+	// ExecutionData may have been purged from the cache, look it up again
 	if entry.ExecutionData == nil {
 		e.log.Debug().Msgf("execution data not in cache for block %d", entry.Height)
 
-		// get it from db
 		result, err := e.results.ByBlockID(entry.BlockID)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to lookup execution result for block: %w", err))
@@ -467,7 +465,7 @@ func (e *executionDataRequesterImpl) processNotification(ctx irrecoverable.Signa
 	e.metrics.NotificationSent(entry.Height)
 }
 
-func (e *executionDataRequesterImpl) notifyConsumers(executionData *state_synchronization.ExecutionData) {
+func (e *executionDataRequester) notifyConsumers(executionData *state_synchronization.ExecutionData) {
 
 	e.consumerMu.RLock()
 	defer e.consumerMu.RUnlock()
@@ -479,7 +477,7 @@ func (e *executionDataRequesterImpl) notifyConsumers(executionData *state_synchr
 
 // Bootstrap Methods
 
-func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerContext, lastHeight uint64) error {
+func (e *executionDataRequester) checkDatastore(ctx irrecoverable.SignalerContext, lastHeight uint64) error {
 	// we're only interested in inspecting blobs that exist in our local db, so create an
 	// ExecutionDataService that only uses the local datastore
 	localEDS, err := e.localExecutionDataService(ctx)
@@ -492,9 +490,8 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 		return fmt.Errorf("failed to create local ExecutionDataService: %w", err)
 	}
 
-	// Search from genesis to the lastHeight, and confirm data is still available for all heights
-	// Update the notification state based on the data in the db. All data should be present, otherwise
-	// data was deleted or corrupted on disk.
+	// Search from the start height to the lastHeight, and confirm data is still available for all
+	// heights. All data should be present, otherwise data was deleted or corrupted on disk.
 	for height := e.config.StartBlockHeight; height <= lastHeight; height++ {
 		if ctx.Err() != nil {
 			return nil
@@ -529,6 +526,9 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 
 		if !exists {
 			// blocking download of any missing block that should exist in the datastore
+			// TODO: ideally, this should push a job into the blockConsumer's queue for the worker
+			// pool to consume. However, the jobqueue doesn't currently have a convenient way to
+			// push work into the queue.
 			e.processSealedHeight(ctx, &status.BlockEntry{
 				BlockID: block.ID(),
 				Height:  height,
@@ -539,7 +539,7 @@ func (e *executionDataRequesterImpl) checkDatastore(ctx irrecoverable.SignalerCo
 	return nil
 }
 
-func (e *executionDataRequesterImpl) checkExecutionData(ctx irrecoverable.SignalerContext, localEDS state_synchronization.ExecutionDataService, rootID flow.Identifier) (bool, error) {
+func (e *executionDataRequester) checkExecutionData(ctx irrecoverable.SignalerContext, localEDS state_synchronization.ExecutionDataService, rootID flow.Identifier) (bool, error) {
 	invalidCIDs, ok := localEDS.Check(ctx, rootID)
 
 	// Check returns a list of CIDs with the corresponding errors encountered while retrieving their
@@ -590,7 +590,7 @@ func (e *executionDataRequesterImpl) checkExecutionData(ctx irrecoverable.Signal
 // localExecutionDataService returns an ExecutionDataService that's configured to use only the local
 // datastore, and to rehash blobs on read. This is used to check the validity of blobs that exist in
 // the local db.
-func (e *executionDataRequesterImpl) localExecutionDataService(ctx irrecoverable.SignalerContext) (state_synchronization.ExecutionDataService, error) {
+func (e *executionDataRequester) localExecutionDataService(ctx irrecoverable.SignalerContext) (state_synchronization.ExecutionDataService, error) {
 	blobService := p2p.NewBlobService(e.ds, p2p.WithHashOnRead(true))
 	blobService.Start(ctx)
 
