@@ -71,12 +71,12 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 	for _, val := range values {
 		id, err := strconv.Unquote(val.(cadence.Struct).Fields[0].String())
 		if err != nil {
-			return nil, fmt.Errorf("could unquote nodeID cadence string (%s): %w", id, err)
+			return nil, fmt.Errorf("could not unquote nodeID cadence string (%s): %w", id, err)
 		}
 
 		nodeID, err := flow.HexStringToIdentifier(id)
 		if err != nil {
-			return nil, fmt.Errorf("could parse nodeID (%s): %w", id, err)
+			return nil, fmt.Errorf("could not parse nodeID (%v): %w", val, err)
 		}
 
 		content := val.(cadence.Struct).Fields[1]
