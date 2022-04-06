@@ -53,7 +53,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 		msgs = append(msgs, msg)
 		hashers = append(hashers, hasher)
 	}
-	aggregator, err := NewMultiMessageSigAggregator(ids, pks, tag)
+	aggregator, err := NewWeightedMultiMessageSigAggregator(ids, pks, tag)
 	require.NoError(t, err)
 	return aggregator, ids, pks, sigs, msgs, hashers
 }
@@ -65,7 +65,7 @@ func TestNewMultiMessageSigAggregator(t *testing.T) {
 
 	signer := unittest.IdentityFixture()
 	// identity with empty key
-	_, err := NewMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{nil}, tag)
+	_, err := NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{nil}, tag)
 	require.Error(t, err)
 	// wrong key type
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
@@ -74,16 +74,16 @@ func TestNewMultiMessageSigAggregator(t *testing.T) {
 	sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 	require.NoError(t, err)
 	pk := sk.PublicKey()
-	_, err = NewMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk}, tag)
+	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk}, tag)
 	require.Error(t, err)
 	// empty signers
-	_, err = NewMultiMessageSigAggregator(flow.IdentityList{}, []crypto.PublicKey{}, tag)
+	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{}, []crypto.PublicKey{}, tag)
 	require.Error(t, err)
 	// mismatching input lengths
 	sk, err = crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)
 	pk = sk.PublicKey()
-	_, err = NewMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk, pk}, tag)
+	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk, pk}, tag)
 	require.Error(t, err)
 }
 

@@ -11,10 +11,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// signerInfo holds information about a signer, its weight and index
+// signerInfo holds information about a signer, its public key and weight
 type signerInfo struct {
+	pk     crypto.PublicKey
 	weight uint64
-	index  int
 }
 
 // sigInfo holds signature and message submitted by some signer
@@ -31,18 +31,16 @@ type sigInfo struct {
 // This module does not verify PoPs of input public keys, it assumes verification was done outside this module.
 // Implementation is thread-safe.
 type WeightedMultiMessageSignatureAggregator struct {
-	lock             sync.RWMutex
-	hasher           hash.Hasher
-	ids              flow.IdentityList              // all possible ids (only gets updated by constructor)
-	idToInfo         map[flow.Identifier]signerInfo // auxiliary map to lookup signer weight and index by ID (only gets updated by constructor)
-	indexToSignature map[int]sigInfo                // signatures indexed by the signer index
-	publicKeys       []crypto.PublicKey             // keys indexed from 0 to n-1, signer i is assigned to public key i
-	totalWeight      uint64                         // total accumulated weight
+	lock          sync.RWMutex
+	hasher        hash.Hasher
+	idToInfo      map[flow.Identifier]signerInfo // auxiliary map to lookup signer weight and public key (only gets updated by constructor)
+	idToSignature map[flow.Identifier]sigInfo    // signatures indexed by the signer ID
+	totalWeight   uint64                         // total accumulated weight
 }
 
 var _ hotstuff.WeightedMultiMessageSignatureAggregator = (*WeightedMultiMessageSignatureAggregator)(nil)
 
-// NewMultiMessageSigAggregator returns a multi message signature aggregator initialized with a list of flow
+// NewWeightedMultiMessageSigAggregator returns a multi message signature aggregator initialized with a list of flow
 // identities, their respective public keys and a domain separation tag. The identities
 // represent the list of all possible signers.
 // The constructor errors if:
@@ -52,7 +50,7 @@ var _ hotstuff.WeightedMultiMessageSignatureAggregator = (*WeightedMultiMessageS
 //
 // A multi message sig aggregator is used for one aggregation only. A new instance should be used for each
 // signature aggregation task in the protocol.
-func NewMultiMessageSigAggregator(ids flow.IdentityList, // list of all authorized signers
+func NewWeightedMultiMessageSigAggregator(ids flow.IdentityList, // list of all authorized signers
 	pks []crypto.PublicKey, // list of corresponding public keys used for signature verifications
 	dsTag string, // domain separation tag used by the signature) *WeightedMultiMessageSignatureAggregator
 ) (*WeightedMultiMessageSignatureAggregator, error) {
@@ -74,17 +72,15 @@ func NewMultiMessageSigAggregator(ids flow.IdentityList, // list of all authoriz
 	idToInfo := make(map[flow.Identifier]signerInfo)
 	for i, id := range ids {
 		idToInfo[id.NodeID] = signerInfo{
+			pk:     pks[i],
 			weight: id.Weight,
-			index:  i,
 		}
 	}
 
 	return &WeightedMultiMessageSignatureAggregator{
-		hasher:           crypto.NewBLSKMAC(dsTag),
-		ids:              ids,
-		idToInfo:         idToInfo,
-		indexToSignature: make(map[int]sigInfo),
-		publicKeys:       pks,
+		hasher:        crypto.NewBLSKMAC(dsTag),
+		idToInfo:      idToInfo,
+		idToSignature: make(map[flow.Identifier]sigInfo),
 	}, nil
 }
 
@@ -98,7 +94,7 @@ func (a *WeightedMultiMessageSignatureAggregator) Verify(signerID flow.Identifie
 	if !ok {
 		return model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
 	}
-	valid, err := a.publicKeys[info.index].Verify(sig, msg, a.hasher)
+	valid, err := info.pk.Verify(sig, msg, a.hasher)
 	if err != nil {
 		return fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
 	}
@@ -126,11 +122,11 @@ func (a *WeightedMultiMessageSignatureAggregator) TrustedAdd(signerID flow.Ident
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if _, duplicate := a.indexToSignature[info.index]; duplicate {
+	if _, duplicate := a.idToSignature[signerID]; duplicate {
 		return a.totalWeight, model.NewDuplicatedSignerErrorf("signature from %v was already added", signerID)
 	}
 
-	a.indexToSignature[info.index] = sigInfo{
+	a.idToSignature[signerID] = sigInfo{
 		sig: sig,
 		msg: msg,
 	}
@@ -159,7 +155,7 @@ func (a *WeightedMultiMessageSignatureAggregator) Aggregate() ([]flow.Identifier
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	sharesNum := len(a.indexToSignature)
+	sharesNum := len(a.idToSignature)
 	if sharesNum == 0 {
 		return nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures\"")
 	}
@@ -168,12 +164,12 @@ func (a *WeightedMultiMessageSignatureAggregator) Aggregate() ([]flow.Identifier
 	signatures := make([]crypto.Signature, 0, sharesNum)
 	hashers := make([]hash.Hasher, 0, sharesNum)
 	signerIDs := make([]flow.Identifier, 0, sharesNum)
-	for i, info := range a.indexToSignature {
-		pks = append(pks, a.publicKeys[i])
+	for id, info := range a.idToSignature {
+		pks = append(pks, a.idToInfo[id].pk)
 		messages = append(messages, info.msg)
 		signatures = append(signatures, info.sig)
 		hashers = append(hashers, a.hasher)
-		signerIDs = append(signerIDs, a.ids[i].NodeID)
+		signerIDs = append(signerIDs, id)
 	}
 
 	aggSignature, err := crypto.AggregateBLSSignatures(signatures)
