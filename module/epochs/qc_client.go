@@ -42,6 +42,7 @@ type QCContractClient struct {
 func NewQCContractClient(
 	log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
+	flowClientANID flow.Identifier,
 	nodeID flow.Identifier,
 	accountAddress string,
 	accountKeyIndex uint,
@@ -49,7 +50,10 @@ func NewQCContractClient(
 	signer sdkcrypto.Signer,
 ) *QCContractClient {
 
-	log = log.With().Str("component", "qc_contract_client").Logger()
+	log = log.With().
+		Str("component", "qc_contract_client").
+		Str("flow-client-an-id", flowClientANID.String()).
+		Logger()
 	base := NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, qcContractAddress)
 
 	// set QCContractAddress to the contract address given
