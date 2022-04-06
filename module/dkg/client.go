@@ -42,7 +42,7 @@ func NewClient(
 
 	log = log.With().
 		Str("component", "dkg_contract_client").
-		Str("flow-client-an-id", flowClientANID.String()).
+		Str("flow_client_an_id", flowClientANID.String()).
 		Logger()
 	base := epochs.NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, dkgContractAddress)
 

@@ -52,7 +52,7 @@ func NewQCContractClient(
 
 	log = log.With().
 		Str("component", "qc_contract_client").
-		Str("flow-client-an-id", flowClientANID.String()).
+		Str("flow_client_an_id", flowClientANID.String()).
 		Logger()
 	base := NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, qcContractAddress)
 
