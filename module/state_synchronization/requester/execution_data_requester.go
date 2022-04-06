@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
@@ -216,26 +217,9 @@ func New(
 	}
 
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.bootstrap).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-
-			// Don't start processing new blocks until everything else is ready
-			<-e.notificationConsumer.Ready()
-			<-e.Ready()
-
-			e.blockConsumer.Start(ctx)
-			<-e.blockConsumer.Ready()
-
-			<-e.blockConsumer.Done()
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			e.notificationConsumer.Start(ctx)
-			<-e.notificationConsumer.Ready()
-			ready()
-
-			<-e.notificationConsumer.Done()
-		})
+		AddWorker(e.runBootstrap).
+		AddWorker(e.runBlockConsumer).
+		AddWorker(e.runNotificationConsumer)
 
 	e.cm = builder.Build()
 	e.Component = e.cm
@@ -260,14 +244,17 @@ func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_sync
 	e.consumers = append(e.consumers, fn)
 }
 
-// bootstrap runs the main process that processes finalized block notifications and
-// requests ExecutionData for each block seal
-func (e *executionDataRequester) bootstrap(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// runBootstrap runs the main process that processes finalized block notifications and requests
+// ExecutionData for each block seal
+func (e *executionDataRequester) runBootstrap(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	// needs state from notificationConsumer
-	<-e.notificationConsumer.Ready()
+	err := util.WaitClosed(ctx, e.notificationConsumer.Ready())
+	if err != nil {
+		return // context cancelled
+	}
 
-	// Load previous requester state from db if it exists
-	err := e.status.Load()
+	// Load previous requester state
+	err = e.status.Load()
 	if err != nil {
 		e.log.Error().Err(err).Msg("failed to load notification state. using defaults")
 	}
@@ -275,14 +262,17 @@ func (e *executionDataRequester) bootstrap(ctx irrecoverable.SignalerContext, re
 	// Requester came up halted.
 	if e.status.Halted() {
 		e.log.Error().Msg("HALTING REQUESTER: requester was halted on a previous run due to invalid data")
-		// By returning before ready, none of the other workers will start, effectively
-		// disabling the component.
+		// By returning before ready, the blockConsumer will not start, effectively disabling the
+		// component.
 		return
 	}
 
 	e.log.Debug().Msgf("starting with LastNotified: %d", e.status.LastNotified())
 
-	<-e.eds.Ready()
+	err = util.WaitClosed(ctx, e.eds.Ready())
+	if err != nil {
+		return // context cancelled
+	}
 
 	// only run datastore check if enabled
 	if e.config.CheckEnabled {
@@ -295,6 +285,37 @@ func (e *executionDataRequester) bootstrap(ctx irrecoverable.SignalerContext, re
 	}
 
 	ready()
+}
+
+// runBlockConsumer runs the blockConsumer component
+func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	// start the blockConsumer after bootstrapping the requester is complete
+	err := util.WaitClosed(ctx, e.Ready())
+	if err != nil {
+		return // context cancelled
+	}
+
+	e.blockConsumer.Start(ctx)
+
+	// ignore context error since we always want to wait for Done()
+	util.WaitClosed(ctx, e.blockConsumer.Ready())
+
+	<-e.blockConsumer.Done()
+}
+
+// runNotificationConsumer runs the notificationConsumer component
+func (e *executionDataRequester) runNotificationConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+
+	e.notificationConsumer.Start(ctx)
+
+	err := util.WaitClosed(ctx, e.notificationConsumer.Ready())
+	if err == nil {
+		ready()
+	}
+
+	<-e.notificationConsumer.Done()
 }
 
 // Fetch Worker Methods
