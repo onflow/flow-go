@@ -107,15 +107,15 @@ type WeightedSignatureAggregator interface {
 	Aggregate() ([]flow.Identifier, []byte, error)
 }
 
-// MultiMessageSignatureAggregator aggregates signatures of the same signature scheme but
+// WeightedMultiMessageSignatureAggregator aggregates signatures of the same signature scheme but
 // possibly distinct message from different signers. Only public keys are agreed upon upfront.
-// It's similar to WeightedSignatureAggregator but supports distinct messages.
+// It's similar to WeightedSignatureAggregator but supports distinct messages and  messages are not known upfront.
 // It is also recommended to only aggregate signatures generated with keys representing
 // equivalent security-bit level.
 // Furthermore, a weight [unsigned int64] is assigned to each signer ID. The
-// MultiMessageSignatureAggregator internally tracks the total weight of all collected signatures.
+// WeightedMultiMessageSignatureAggregator internally tracks the total weight of all collected signatures.
 // Implementations must be concurrency safe.
-type MultiMessageSignatureAggregator interface {
+type WeightedMultiMessageSignatureAggregator interface {
 	// Verify verifies the signature under the stored public keys.
 	// Expected errors during normal operations:
 	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)

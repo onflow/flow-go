@@ -23,14 +23,14 @@ type sigInfo struct {
 	msg []byte
 }
 
-// MultiMessageSignatureAggregator implements consensus/hotstuff.MultiMessageSignatureAggregator.
+// WeightedMultiMessageSignatureAggregator implements consensus/hotstuff.WeightedMultiMessageSignatureAggregator.
 // It aggregates BLS signatures for many messages from different signers.
 // Only public keys needs to be agreed upon upfront.
 // Each signer is allowed to sign at most once.
 // Aggregation uses BLS scheme. Mitigation against rogue attacks is done using Proof Of Possession (PoP)
 // This module does not verify PoPs of input public keys, it assumes verification was done outside this module.
 // Implementation is thread-safe.
-type MultiMessageSignatureAggregator struct {
+type WeightedMultiMessageSignatureAggregator struct {
 	lock             sync.RWMutex
 	hasher           hash.Hasher
 	ids              flow.IdentityList              // all possible ids (only gets updated by constructor)
@@ -40,7 +40,7 @@ type MultiMessageSignatureAggregator struct {
 	totalWeight      uint64                         // total accumulated weight
 }
 
-var _ hotstuff.MultiMessageSignatureAggregator = (*MultiMessageSignatureAggregator)(nil)
+var _ hotstuff.WeightedMultiMessageSignatureAggregator = (*WeightedMultiMessageSignatureAggregator)(nil)
 
 // NewMultiMessageSigAggregator returns a multi message signature aggregator initialized with a list of flow
 // identities, their respective public keys and a domain separation tag. The identities
@@ -54,8 +54,8 @@ var _ hotstuff.MultiMessageSignatureAggregator = (*MultiMessageSignatureAggregat
 // signature aggregation task in the protocol.
 func NewMultiMessageSigAggregator(ids flow.IdentityList, // list of all authorized signers
 	pks []crypto.PublicKey, // list of corresponding public keys used for signature verifications
-	dsTag string, // domain separation tag used by the signature) *MultiMessageSignatureAggregator
-) (*MultiMessageSignatureAggregator, error) {
+	dsTag string, // domain separation tag used by the signature) *WeightedMultiMessageSignatureAggregator
+) (*WeightedMultiMessageSignatureAggregator, error) {
 	if len(ids) != len(pks) {
 		return nil, fmt.Errorf("keys length %d and identities length %d do not match", len(pks), len(ids))
 	}
@@ -79,7 +79,7 @@ func NewMultiMessageSigAggregator(ids flow.IdentityList, // list of all authoriz
 		}
 	}
 
-	return &MultiMessageSignatureAggregator{
+	return &WeightedMultiMessageSignatureAggregator{
 		hasher:           crypto.NewBLSKMAC(dsTag),
 		ids:              ids,
 		idToInfo:         idToInfo,
@@ -93,7 +93,7 @@ func NewMultiMessageSigAggregator(ids flow.IdentityList, // list of all authoriz
 //  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 //  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 // The function is thread-safe.
-func (a *MultiMessageSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature, msg []byte) error {
+func (a *WeightedMultiMessageSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature, msg []byte) error {
 	info, ok := a.idToInfo[signerID]
 	if !ok {
 		return model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
@@ -117,7 +117,7 @@ func (a *MultiMessageSignatureAggregator) Verify(signerID flow.Identifier, sig c
 //  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 //  - model.DuplicatedSignerError if the signer has been already added
 // The function is thread-safe.
-func (a *MultiMessageSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature, msg []byte) (uint64, error) {
+func (a *WeightedMultiMessageSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature, msg []byte) (uint64, error) {
 	info, found := a.idToInfo[signerID]
 	if !found {
 		return a.TotalWeight(), model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
@@ -141,7 +141,7 @@ func (a *MultiMessageSignatureAggregator) TrustedAdd(signerID flow.Identifier, s
 
 // TotalWeight returns the total weight presented by the collected signatures.
 // The function is thread-safe
-func (a *MultiMessageSignatureAggregator) TotalWeight() uint64 {
+func (a *WeightedMultiMessageSignatureAggregator) TotalWeight() uint64 {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	return a.totalWeight
@@ -155,9 +155,7 @@ func (a *MultiMessageSignatureAggregator) TotalWeight() uint64 {
 //  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 // The function is thread-safe.
 //
-// TODO : When compacting the list of signers, update the return from []flow.Identifier
-//        to a compact bit vector.
-func (a *MultiMessageSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+func (a *WeightedMultiMessageSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
