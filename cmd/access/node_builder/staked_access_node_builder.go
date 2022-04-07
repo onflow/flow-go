@@ -118,7 +118,6 @@ func (builder *StakedAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
-
 	builder.
 		BuildConsensusFollower().
 		Module("collection node client", func(node *cmd.NodeConfig) error {

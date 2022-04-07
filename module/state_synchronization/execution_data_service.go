@@ -445,24 +445,6 @@ func (s *executionDataServiceImpl) Check(ctx context.Context, rootID flow.Identi
 		v, _, err := s.getBlobs(ctx, cids, logger)
 
 		if err != nil {
-			// We know the specific error, so return it
-			var blobSizeLimitExceededError *BlobSizeLimitExceededError
-			if errors.As(err, &blobSizeLimitExceededError) {
-				return []InvalidCid{{
-					Cid: blobSizeLimitExceededError.cid,
-					Err: err,
-				}}, false
-			}
-
-			var malformedDataError *MalformedDataError
-			if errors.As(err, &malformedDataError) {
-				return []InvalidCid{{
-					Cid: rootCid,
-					Err: err,
-				}}, false
-			}
-
-			// Otherwise we got a not found error, which just means the blobstore didn't return a blob.
 			// Validate each of the CIDs in this set, and return any that are invalid.
 			invalidCids := s.checkBlobs(ctx, cids)
 			return invalidCids, len(invalidCids) == 0

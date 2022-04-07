@@ -68,6 +68,7 @@ func (s *Status) Load() error {
 
 	halted, err := s.progress.Halted()
 	if errors.Is(err, storage.ErrNotFound) {
+		// initialize the halted state if this is an empty db
 		err = s.progress.InitHalted()
 	}
 	if err != nil {

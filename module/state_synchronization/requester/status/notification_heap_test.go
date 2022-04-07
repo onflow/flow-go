@@ -83,11 +83,11 @@ func (r *rapidHeap) PeekMin(t *rapid.T) {
 		t.Fatal("heap.PeekMin() returned nil with non-empty heap")
 	}
 
+	// sort the heights ascending so we can scan from the beginning for smaller heights
 	sort.Slice(r.heights, func(i, j int) bool {
 		return r.heights[i] < r.heights[j]
 	})
 
-	// sort the heights list so we can scan from the beginning for smaller heights
 	firstPos := 0
 	for _, h := range r.heights {
 		// found a larger height, we're done
@@ -95,7 +95,7 @@ func (r *rapidHeap) PeekMin(t *rapid.T) {
 			break
 		}
 
-		// found a stale smaller height
+		// found a stale smaller height to remove
 		if _, has := r.state[h]; !has {
 			firstPos++
 			continue

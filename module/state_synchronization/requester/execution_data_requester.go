@@ -595,12 +595,6 @@ func (e *executionDataRequester) checkExecutionData(ctx irrecoverable.SignalerCo
 			continue
 		}
 
-		// It should not be possible to encounter one of these errors since they are checked when
-		// the block is originally received
-		if isInvalidBlobError(err) {
-			return false, ErrRequesterHalted
-		}
-
 		// Record any other errors to return
 		errs = multierror.Append(errs, err)
 	}
