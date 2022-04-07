@@ -110,6 +110,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
 	))
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),
@@ -159,6 +160,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	// assert that the block was retrieved and all collections were requested
 	suite.headers.AssertExpectations(suite.T())
 	suite.request.AssertNumberOfCalls(suite.T(), "EntityByID", len(block.Payload.Guarantees))
+	suite.request.AssertNumberOfCalls(suite.T(), "Index", len(block.Payload.Seals))
 }
 
 // TestOnCollection checks that when a Collection is received, it is persisted
@@ -203,8 +205,8 @@ func (suite *Suite) TestOnCollection() {
 	suite.transactions.AssertNumberOfCalls(suite.T(), "Store", len(collection.Transactions))
 }
 
-// TestExecutionResultsAreIndexed checks that execution results are properly indexed
-func (suite *Suite) TestExecutionResultsAreIndexed() {
+// TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
+func (suite *Suite) TestExecutionReceiptsAreIndexed() {
 
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
