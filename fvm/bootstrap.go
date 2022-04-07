@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
+	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,7 +36,8 @@ type BootstrapProcedure struct {
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
 
-	transactionFees BootstrapProcedureFeeParameters
+	transactionFees        BootstrapProcedureFeeParameters
+	executionEffortWeights weightedMeter.ExecutionEffortWeights
 
 	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
@@ -118,6 +120,13 @@ func WithAccountCreationFee(fee cadence.UFix64) BootstrapProcedureOption {
 func WithTransactionFee(fees BootstrapProcedureFeeParameters) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.transactionFees = fees
+		return bp
+	}
+}
+
+func WithExecutionEffortWeights(weights weightedMeter.ExecutionEffortWeights) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.executionEffortWeights = weights
 		return bp
 	}
 }
@@ -225,6 +234,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 		b.transactionFees.InclusionEffortCost,
 		b.transactionFees.ExecutionEffortCost,
 	)
+
+	b.setupExecutionEffortWeights(service, b.executionEffortWeights)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
@@ -555,6 +566,33 @@ func (b *BootstrapProcedure) setupFees(service, flowFees flow.Address, surgeFact
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup fees: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address, weights weightedMeter.ExecutionEffortWeights) {
+	// if executionEffortWeights were not set skip this part and just use the defaults.
+	if b.executionEffortWeights == nil {
+		return
+	}
+
+	uintWeights := make(map[uint]uint64, len(weights))
+	for i, weight := range weights {
+		uintWeights[uint(i)] = weight
+	}
+
+	tb, err := blueprints.SetExecutionEffortWeightsTransaction(service, uintWeights)
+	if err != nil {
+		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
+	}
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			tb,
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to setup execution effort weights: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(

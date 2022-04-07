@@ -48,7 +48,7 @@ func (er ExecutionResult) FinalStateCommitment() (StateCommitment, error) {
 }
 
 // InitialStateCommit returns a commitment to the execution state used as input
-// for computing the block the block, i.e. the leading chunk's input state.
+// for computing the block, i.e. the leading chunk's input state.
 // Error returns:
 //  * ErrNoChunks: if there are no chunks (ExecutionResult is malformed)
 func (er ExecutionResult) InitialStateCommit() (StateCommitment, error) {

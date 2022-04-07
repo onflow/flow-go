@@ -10,6 +10,5 @@ package models
 
 type AggregatedSignature struct {
 	VerifierSignatures []string `json:"verifier_signatures"`
-
-	SignerIds []string `json:"signer_ids"`
+	SignerIds          []string `json:"signer_ids"`
 }
