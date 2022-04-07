@@ -12,7 +12,6 @@ import (
 	"github.com/ipfs/go-datastore/query"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	dshelp "github.com/ipfs/go-ipfs-ds-help"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
@@ -202,7 +201,10 @@ func (suite *BlobServiceTestSuite) TestDatastoreKey() {
 	result, ok := results.NextSync()
 	suite.Require().True(ok)
 
-	suite.Assert().Equal(dshelp.NewKeyFromBinary(suite.blobCids[0].Bytes()).String(), result.Entry.Key)
+	blobCid := suite.blobCids[0]
+
+	suite.Assert().Equal(result.Entry.Key[0], network.BlobServiceDatastoreKeyPrefix)
+	suite.Assert().Equal(network.BlobServiceDatastoreKeyForCid(blobCid).String(), result.Entry.Key)
 	suite.Assert().Equal(len(result.Entry.Key), network.BlobServiceDatastoreKeyLength)
 }
 
