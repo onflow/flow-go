@@ -24,8 +24,125 @@ var (
 		common.ComputationKindFunctionInvocation: 1 << MeterInternalPrecisionBytes,
 	}
 	// DefaultMemoryWeights are empty as memory metering is not fully defined yet
-	DefaultMemoryWeights = ExecutionMemoryWeights{}
+	DefaultMemoryWeights = ExecutionMemoryWeights{
+
+		// Values
+
+		common.MemoryKindBool:                    0,
+		common.MemoryKindAddress:                 0,
+		common.MemoryKindString:                  0,
+		common.MemoryKindCharacter:               0,
+		common.MemoryKindMetaType:                0,
+		common.MemoryKindNumber:                  0,
+		common.MemoryKindArrayBase:               0,
+		common.MemoryKindArrayLength:             0,
+		common.MemoryKindDictionaryBase:          0,
+		common.MemoryKindDictionarySize:          0,
+		common.MemoryKindCompositeBase:           0,
+		common.MemoryKindCompositeSize:           0,
+		common.MemoryKindOptional:                0,
+		common.MemoryKindNil:                     0,
+		common.MemoryKindVoid:                    0,
+		common.MemoryKindTypeValue:               0,
+		common.MemoryKindPathValue:               0,
+		common.MemoryKindCapabilityValue:         0,
+		common.MemoryKindLinkValue:               0,
+		common.MemoryKindStorageReferenceValue:   0,
+		common.MemoryKindEphemeralReferenceValue: 0,
+		common.MemoryKindInterpretedFunction:     0,
+		common.MemoryKindHostFunction:            0,
+		common.MemoryKindBoundFunction:           0,
+		common.MemoryKindBigInt:                  0,
+
+		// Misc
+
+		common.MemoryKindRawString:       0,
+		common.MemoryKindAddressLocation: 0,
+		common.MemoryKindBytes:           0,
+		common.MemoryKindVariable:        0,
+
+		// Tokens
+
+		common.MemoryKindTokenIdentifier:     0,
+		common.MemoryKindTokenComment:        0,
+		common.MemoryKindTokenNumericLiteral: 0,
+		common.MemoryKindTokenSyntax:         0,
+
+		// AST nodes
+
+		common.MemoryKindProgram:        0,
+		common.MemoryKindIdentifier:     0,
+		common.MemoryKindArgument:       0,
+		common.MemoryKindBlock:          0,
+		common.MemoryKindFunctionBlock:  0,
+		common.MemoryKindParameter:      0,
+		common.MemoryKindParameterList:  0,
+		common.MemoryKindTransfer:       0,
+		common.MemoryKindMembers:        0,
+		common.MemoryKindTypeAnnotation: 0,
+
+		common.MemoryKindFunctionDeclaration:        0,
+		common.MemoryKindCompositeDeclaration:       0,
+		common.MemoryKindInterfaceDeclaration:       0,
+		common.MemoryKindEnumCaseDeclaration:        0,
+		common.MemoryKindFieldDeclaration:           0,
+		common.MemoryKindTransactionDeclaration:     0,
+		common.MemoryKindImportDeclaration:          0,
+		common.MemoryKindVariableDeclaration:        0,
+		common.MemoryKindSpecialFunctionDeclaration: 0,
+		common.MemoryKindPragmaDeclaration:          0,
+
+		common.MemoryKindAssignmentStatement: 0,
+		common.MemoryKindBreakStatement:      0,
+		common.MemoryKindContinueStatement:   0,
+		common.MemoryKindEmitStatement:       0,
+		common.MemoryKindExpressionStatement: 0,
+		common.MemoryKindForStatement:        0,
+		common.MemoryKindIfStatement:         0,
+		common.MemoryKindReturnStatement:     0,
+		common.MemoryKindSwapStatement:       0,
+		common.MemoryKindSwitchStatement:     0,
+		common.MemoryKindWhileStatement:      0,
+
+		common.MemoryKindBooleanExpression:     0,
+		common.MemoryKindNilExpression:         0,
+		common.MemoryKindStringExpression:      0,
+		common.MemoryKindIntegerExpression:     0,
+		common.MemoryKindFixedPointExpression:  0,
+		common.MemoryKindArrayExpression:       0,
+		common.MemoryKindDictionaryExpression:  0,
+		common.MemoryKindIdentifierExpression:  0,
+		common.MemoryKindInvocationExpression:  0,
+		common.MemoryKindMemberExpression:      0,
+		common.MemoryKindIndexExpression:       0,
+		common.MemoryKindConditionalExpression: 0,
+		common.MemoryKindUnaryExpression:       0,
+		common.MemoryKindBinaryExpression:      0,
+		common.MemoryKindFunctionExpression:    0,
+		common.MemoryKindCastingExpression:     0,
+		common.MemoryKindCreateExpression:      0,
+		common.MemoryKindDestroyExpression:     0,
+		common.MemoryKindReferenceExpression:   0,
+		common.MemoryKindForceExpression:       0,
+		common.MemoryKindPathExpression:        0,
+
+		common.MemoryKindConstantSizedType: 0,
+		common.MemoryKindDictionaryType:    0,
+		common.MemoryKindFunctionType:      0,
+		common.MemoryKindInstantiationType: 0,
+		common.MemoryKindNominalType:       0,
+		common.MemoryKindOptionalType:      0,
+		common.MemoryKindReferenceType:     0,
+		common.MemoryKindRestrictedType:    0,
+		common.MemoryKindVariableSizedType: 0,
+	}
 )
+
+func _() {
+	// A compiler error signifies that we have not accounted for all memory kinds
+	var x [1]struct{}
+	_ = x[int(common.MemoryKindLast)-len(DefaultMemoryWeights)-1]
+}
 
 var _ interfaceMeter.Meter = &Meter{}
 

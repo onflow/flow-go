@@ -245,7 +245,7 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 		for _, eventList := range computationResult.Events {
 			for _, event := range eventList {
 				if event.Type == flow.EventAccountCreated {
-					data, err := jsoncdc.Decode(event.Payload)
+					data, err := jsoncdc.Decode(nil, event.Payload)
 					if err != nil {
 						tb.Fatal("setup account failed, error decoding events")
 					}

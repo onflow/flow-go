@@ -551,7 +551,7 @@ func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, err
 		defer sp.Finish()
 	}
 
-	v, err := jsoncdc.Decode(b)
+	v, err := jsoncdc.Decode(e, b)
 	if err != nil {
 		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
 		return nil, fmt.Errorf("decodeing argument failed: %w", err)
