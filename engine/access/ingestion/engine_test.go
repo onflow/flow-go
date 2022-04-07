@@ -126,6 +126,8 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	// expect that the block storage is indexed with each of the collection guarantee
 	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
 
+	suite.results.On("Index", mock.Anything, mock.Anything).Return(nil)
+
 	// for each of the guarantees, we should request the corresponding collection once
 	needed := make(map[flow.Identifier]struct{})
 	for _, guarantee := range block.Payload.Guarantees {
@@ -201,7 +203,7 @@ func (suite *Suite) TestOnCollection() {
 	suite.transactions.AssertNumberOfCalls(suite.T(), "Store", len(collection.Transactions))
 }
 
-// TestExecutionResultsAreIndexed checks that execution results are properly indexedd
+// TestExecutionResultsAreIndexed checks that execution results are properly indexed
 func (suite *Suite) TestExecutionResultsAreIndexed() {
 
 	originID := unittest.IdentifierFixture()
@@ -227,11 +229,9 @@ func (suite *Suite) TestExecutionResultsAreIndexed() {
 	er2 := unittest.ExecutionReceiptFixture()
 
 	suite.receipts.On("Store", mock.Anything).Return(nil)
-	suite.results.On("ForceIndex", mock.Anything, mock.Anything).Return(nil)
 	suite.blocks.On("ByID", er1.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
 	suite.receipts.On("Store", mock.Anything).Return(nil)
-	suite.results.On("ForceIndex", mock.Anything, mock.Anything).Return(nil)
 	suite.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
 	err := suite.eng.handleExecutionReceipt(originID, er1)
