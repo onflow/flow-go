@@ -248,7 +248,7 @@ func (s *State) MergeState(other *State, enforceLimit bool) error {
 		return errors.NewStateMergeFailure(err)
 	}
 
-	err = s.meter.MergeMeter(other.meter)
+	err = s.meter.MergeMeter(other.meter, enforceLimit)
 	if err != nil {
 		return err
 	}

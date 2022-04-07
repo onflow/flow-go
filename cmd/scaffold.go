@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
@@ -154,6 +155,13 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.BoolVar(&fnb.BaseConfig.InsecureSecretsDB, "insecure-secrets-db", false, "allow the node to start up without an secrets DB encryption key")
 	fnb.flags.BoolVar(&fnb.BaseConfig.HeroCacheMetricsEnable, "herocache-metrics-collector", false, "enables herocache metrics collection")
+
+	// sync core flags
+	fnb.flags.DurationVar(&fnb.BaseConfig.SyncCoreConfig.RetryInterval, "sync-retry-interval", defaultConfig.SyncCoreConfig.RetryInterval, "the initial interval before we retry a sync request, uses exponential backoff")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.Tolerance, "sync-tolerance", defaultConfig.SyncCoreConfig.Tolerance, "determines how big of a difference in block heights we tolerate before actively syncing with range requests")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxAttempts, "sync-max-attempts", defaultConfig.SyncCoreConfig.MaxAttempts, "the maximum number of attempts we make for each requested block/height before discarding")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize, "sync-max-size", defaultConfig.SyncCoreConfig.MaxSize, "the maximum number of blocks we request in the same block request message")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -1037,6 +1045,12 @@ func WithMetricsEnabled(enabled bool) Option {
 	}
 }
 
+func WithSyncCoreConfig(syncConfig synchronization.Config) Option {
+	return func(config *BaseConfig) {
+		config.SyncCoreConfig = syncConfig
+	}
+}
+
 func WithLogLevel(level string) Option {
 	return func(config *BaseConfig) {
 		config.level = level
@@ -1113,6 +1127,8 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return storageCommands.NewReadResultsCommand(config.State, config.Storage.Results)
 	}).AdminCommand("read-seals", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
+	}).AdminCommand("get-latest-identity", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewGetIdentityCommand(config.IdentityProvider)
 	})
 }
 

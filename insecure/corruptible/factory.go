@@ -2,18 +2,25 @@ package corruptible
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
+	"sync"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 )
+
+const networkingProtocolTCP = "tcp"
 
 // ConduitFactory implements a corruptible conduit factory, that creates corruptible conduits and acts as their master.
 // A remote attacker can register itself to this conduit factory.
@@ -21,25 +28,85 @@ import (
 // factory, which in turn is relayed to the register attacker.
 // The attacker can asynchronously dictate the conduit factory to send messages on behalf of the node this factory resides on.
 type ConduitFactory struct {
-	*component.ComponentManager
+	component.Component
+	cm                    *component.ComponentManager
 	logger                zerolog.Logger
 	codec                 network.Codec
 	myId                  flow.Identifier
 	adapter               network.Adapter
 	attackerObserveClient insecure.Attacker_ObserveClient
+	server                *grpc.Server // touch point of attack network to this factory.
+	address               net.Addr
+	ctx                   context.Context
 }
 
-func NewCorruptibleConduitFactory(logger zerolog.Logger, chainId flow.ChainID, myId flow.Identifier, codec network.Codec) *ConduitFactory {
+func NewCorruptibleConduitFactory(
+	logger zerolog.Logger,
+	chainId flow.ChainID,
+	myId flow.Identifier,
+	codec network.Codec,
+	address string) *ConduitFactory {
+
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corruptible conduit factory")
 	}
 
-	return &ConduitFactory{
-		ComponentManager: component.NewComponentManagerBuilder().Build(),
-		myId:             myId,
-		codec:            codec,
-		logger:           logger.With().Str("module", "corruptible-conduit-factory").Logger(),
+	factory := &ConduitFactory{
+		myId:   myId,
+		codec:  codec,
+		logger: logger.With().Str("module", "corruptible-conduit-factory").Logger(),
 	}
+
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			factory.start(ctx, address)
+			factory.ctx = ctx
+
+			ready()
+
+			<-ctx.Done()
+
+			factory.stop()
+		}).Build()
+
+	factory.Component = cm
+	factory.cm = cm
+
+	return factory
+}
+
+// ServerAddress returns address of the gRPC server that is running by this corrupted conduit factory.
+func (c ConduitFactory) ServerAddress() string {
+	return c.address.String()
+}
+
+func (c *ConduitFactory) start(ctx irrecoverable.SignalerContext, address string) {
+	// starts up gRPC server of corruptible conduit factory at given address.
+	s := grpc.NewServer()
+	insecure.RegisterCorruptibleConduitFactoryServer(s, c)
+	ln, err := net.Listen(networkingProtocolTCP, address)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
+	}
+	c.server = s
+	c.address = ln.Addr()
+
+	// waits till gRPC server is coming up and running.
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		wg.Done()
+		if err = s.Serve(ln); err != nil { // blocking call
+			ctx.Throw(fmt.Errorf("could not bind factory to the tcp listener: %w", err))
+		}
+	}()
+
+	wg.Wait()
+}
+
+// stop conducts the termination logic of the sub-modules of attack network.
+func (c *ConduitFactory) stop() {
+	c.server.Stop()
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
@@ -77,7 +144,7 @@ func (c *ConduitFactory) NewConduit(ctx context.Context, channel network.Channel
 func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleConduitFactory_ProcessAttackerMessageServer) error {
 	for {
 		select {
-		case <-c.ComponentManager.ShutdownSignal():
+		case <-c.cm.ShutdownSignal():
 			if c.attackerObserveClient != nil {
 				_, err := c.attackerObserveClient.CloseAndRecv()
 				if err != nil {
@@ -88,7 +155,7 @@ func (c *ConduitFactory) ProcessAttackerMessage(stream insecure.CorruptibleCondu
 			return nil
 		default:
 			msg, err := stream.Recv()
-			if err == io.EOF {
+			if err == io.EOF || errors.Is(stream.Context().Err(), context.Canceled) {
 				c.logger.Info().Msg("attacker closed processing stream")
 				return stream.SendAndClose(&empty.Empty{})
 			}
@@ -129,7 +196,7 @@ func (c *ConduitFactory) processAttackerMessage(msg *insecure.Message) error {
 // Registering an attacker on a conduit is an exactly-once immutable operation, any second attempt after a successful registration returns an error.
 func (c *ConduitFactory) RegisterAttacker(ctx context.Context, in *insecure.AttackerRegisterMessage) (*empty.Empty, error) {
 	select {
-	case <-c.ComponentManager.ShutdownSignal():
+	case <-c.cm.ShutdownSignal():
 		return nil, fmt.Errorf("conduit factory has been shut down")
 	default:
 		return &empty.Empty{}, c.registerAttacker(ctx, in.Address)
@@ -142,13 +209,14 @@ func (c *ConduitFactory) registerAttacker(ctx context.Context, address string) e
 		return fmt.Errorf("illegal state: trying to register an attacker (%s) while one already exists", address)
 	}
 
-	clientConn, err := grpc.Dial(address)
+	clientConn, err := grpc.Dial(address,
+		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("could not establish a client connection to attacker: %w", err)
 	}
 
 	attackerClient := insecure.NewAttackerClient(clientConn)
-	c.attackerObserveClient, err = attackerClient.Observe(ctx)
+	c.attackerObserveClient, err = attackerClient.Observe(c.ctx)
 	if err != nil {
 		return fmt.Errorf("could not establish an observe stream to the attacker: %w", err)
 	}

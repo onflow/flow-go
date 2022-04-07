@@ -166,6 +166,10 @@ func (i *TransactionInvoker) Process(
 	// read computationUsed from the environment. This will be used to charge fees.
 	computationUsed := env.ComputationUsed()
 
+	// log te execution intensities here, so tha they do not contain data from storage limit checks and
+	// transaction deduction, because the payer is not charged for those.
+	i.logExecutionIntensities(sth, txIDStr)
+
 	// disable the limit checks on states
 	sth.DisableAllLimitEnforcements()
 	// try to deduct fees even if there is an error.
@@ -188,7 +192,12 @@ func (i *TransactionInvoker) Process(
 
 	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
+		// disable the computation/memory limit checks on storage checks,
+		// so we don't error from computation/memory limits on this part.
+		// We cannot charge the user for this part, since fee deduction already happened.
+		sth.DisableAllLimitEnforcements()
 		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		sth.EnableAllLimitEnforcements()
 	}
 
 	// it there was any transaction error clear changes and try to deduct fees again
@@ -230,7 +239,6 @@ func (i *TransactionInvoker) Process(
 				Uint64("blockHeight", blockHeight).
 				Msg("transaction fee deduction executed with error")
 
-			i.logExecutionIntensities(sth, txIDStr)
 			return feesError
 		}
 	}
@@ -248,7 +256,6 @@ func (i *TransactionInvoker) Process(
 	proc.Events = append(proc.Events, env.Events()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
-	i.logExecutionIntensities(sth, txIDStr)
 	return txError
 }
 

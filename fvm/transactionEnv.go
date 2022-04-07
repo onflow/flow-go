@@ -838,6 +838,9 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	err = e.meterComputation(meter.ComputationKindCreateAccount, 1)
+	if err != nil {
+		return address, err
+	}
 
 	e.sth.DisableAllLimitEnforcements() // don't enforce limit during account creation
 	defer e.sth.EnableAllLimitEnforcements()
