@@ -3471,7 +3471,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
+			weightedMeter.ExecutionEffortWeights{
 				common.ComputationKindLoop: 100_000 << weightedMeter.MeterInternalPrecisionBytes,
 			},
 		),
@@ -3508,7 +3508,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
+			weightedMeter.ExecutionEffortWeights{
 				meter.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << weightedMeter.MeterInternalPrecisionBytes,
 			},
 		),
@@ -3542,7 +3542,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
+			weightedMeter.ExecutionEffortWeights{
 				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
 			},
 		),
@@ -3577,7 +3577,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
+			weightedMeter.ExecutionEffortWeights{
 				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
 			},
 		),
@@ -3611,7 +3611,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithExecutionEffortWeights(
-			weightedMeter.ExecutionWeights{
+			weightedMeter.ExecutionEffortWeights{
 				common.ComputationKindStatement: 1 << weightedMeter.MeterInternalPrecisionBytes,
 			},
 		),

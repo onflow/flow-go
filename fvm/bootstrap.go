@@ -37,7 +37,7 @@ type BootstrapProcedure struct {
 	restrictedAccountCreationEnabled cadence.Bool
 
 	transactionFees        BootstrapProcedureFeeParameters
-	executionEffortWeights weightedMeter.ExecutionWeights
+	executionEffortWeights weightedMeter.ExecutionEffortWeights
 
 	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
@@ -124,7 +124,7 @@ func WithTransactionFee(fees BootstrapProcedureFeeParameters) BootstrapProcedure
 	}
 }
 
-func WithExecutionEffortWeights(weights weightedMeter.ExecutionWeights) BootstrapProcedureOption {
+func WithExecutionEffortWeights(weights weightedMeter.ExecutionEffortWeights) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.executionEffortWeights = weights
 		return bp
@@ -568,7 +568,7 @@ func (b *BootstrapProcedure) setupFees(service, flowFees flow.Address, surgeFact
 	panicOnMetaInvokeErrf("failed to setup fees: %s", txError, err)
 }
 
-func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address, weights weightedMeter.ExecutionWeights) {
+func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address, weights weightedMeter.ExecutionEffortWeights) {
 	// if executionEffortWeights were not set skip this part and just use the defaults.
 	if b.executionEffortWeights == nil {
 		return
