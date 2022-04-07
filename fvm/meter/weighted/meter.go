@@ -23,7 +23,9 @@ var (
 		common.ComputationKindLoop:               1 << MeterInternalPrecisionBytes,
 		common.ComputationKindFunctionInvocation: 1 << MeterInternalPrecisionBytes,
 	}
-	// DefaultMemoryWeights are empty as memory metering is not fully defined yet
+
+	// DefaultMemoryWeights are currently hard-coded here. In the future we might like to
+	// define this in a contract similar to the computation weights
 	DefaultMemoryWeights = ExecutionMemoryWeights{
 
 		// Values
@@ -304,10 +306,10 @@ func (m *Meter) MemoryIntensities() interfaceMeter.MeteredMemoryIntensities {
 
 // TotalMemoryUsed returns the total memory used
 func (m *Meter) TotalMemoryUsed() uint {
-	return uint(m.memoryUsed >> MeterInternalPrecisionBytes)
+	return uint(m.memoryUsed)
 }
 
 // TotalMemoryLimit returns the total memory limit
 func (m *Meter) TotalMemoryLimit() uint {
-	return uint(m.memoryLimit >> MeterInternalPrecisionBytes)
+	return uint(m.memoryLimit)
 }
