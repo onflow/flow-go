@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/insecure"
@@ -46,65 +47,13 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 	o.Lock()
 	defer o.Unlock()
 
-	corruptedIdentity, ok := o.corruptedIds.ByNodeID(event.CorruptedId)
-	if !ok {
-		return fmt.Errorf("could not find corrupted identity for: %x", event.CorruptedId)
-	}
-
 	switch protocolEvent := event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
-		if corruptedIdentity.Role != flow.RoleExecution {
-			return fmt.Errorf("wrong sender role for execution receipt: %s", corruptedIdentity.Role.String())
+		if err := o.handleExecutionReceiptEvent(event); err != nil {
+			return fmt.Errorf("could not handle execution receipt event: %w", err)
 		}
-
-		if o.state != nil {
-			// non-nil state means an execution result has already been corrupted.
-			if protocolEvent.ExecutionResult.ID() == o.state.originalResult.ID() {
-				// receipt contains the original result that has been corrupted.
-				// corrupted result must have already been sent to this node, so
-				// just discards it.
-				return nil
-			}
-
-			err := o.network.Send(event)
-			if err != nil {
-				return fmt.Errorf("could not send rpc on channel: %w", err)
-			}
-			return nil
-		}
-
-		// replace honest receipt with corrupted receipt
-		corruptedResult := o.corruptExecutionResult(protocolEvent)
-		// save all corrupted chunks so can create result approvals for them
-		// can just create result approvals here and save them
-
-		corruptedExecutionIds := o.corruptedIds.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()
-
-		// sends corrupted execution receipt to all corrupted execution nodes.
-		for _, corruptedExecutionId := range corruptedExecutionIds {
-			// sets executor id of the result as the same corrupted execution node id that
-			// is meant to send this message to the flow network.
-			err := o.network.Send(&insecure.Event{
-				CorruptedId:       corruptedExecutionId,
-				Channel:           event.Channel,
-				Protocol:          event.Protocol,
-				TargetNum:         event.TargetNum,
-				TargetIds:         event.TargetIds,
-				FlowProtocolEvent: corruptedResult,
-			})
-			if err != nil {
-				return fmt.Errorf("could not send rpc on channel: %w", err)
-			}
-
-			// saves state of attack for further replies
-			o.state = &attackState{
-				originalResult:    &protocolEvent.ExecutionResult,
-				corruptedResult:   corruptedResult,
-				originalChunkIds:  flow.GetIDs(protocolEvent.ExecutionResult.Chunks),
-				corruptedChunkIds: flow.GetIDs(corruptedResult.Chunks),
-			}
-		}
+	case *verification.ChunkDataPackRequest:
 
 	default:
 		return fmt.Errorf("unexpected message type for wintermute attack orchestrator: %T", protocolEvent)
@@ -164,4 +113,87 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 		ServiceEvents:   receipt.ExecutionResult.ServiceEvents,
 		ExecutionDataID: receipt.ExecutionResult.ExecutionDataID,
 	}
+}
+
+func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event) error {
+	corruptedIdentity, ok := o.corruptedIds.ByNodeID(receiptEvent.CorruptedId)
+	if !ok {
+		return fmt.Errorf("could not find corrupted identity for: %x", receiptEvent.CorruptedId)
+	}
+	if corruptedIdentity.Role != flow.RoleExecution {
+		return fmt.Errorf("wrong sender role for execution receipt: %s", corruptedIdentity.Role.String())
+	}
+
+	receipt, ok := receiptEvent.FlowProtocolEvent.(*flow.ExecutionReceipt)
+	if !ok {
+		return fmt.Errorf("protocol event is not an execution receipt: %T", receiptEvent.FlowProtocolEvent)
+	}
+
+	if o.state != nil {
+		// non-nil state means an execution result has already been corrupted.
+		if receipt.ExecutionResult.ID() == o.state.originalResult.ID() {
+			// receipt contains the original result that has been corrupted.
+			// corrupted result must have already been sent to this node, so
+			// just discards it.
+			return nil
+		}
+
+		err := o.network.Send(receiptEvent)
+		if err != nil {
+			return fmt.Errorf("could not send rpc on channel: %w", err)
+		}
+		return nil
+	}
+
+	// replace honest receipt with corrupted receipt
+	corruptedResult := o.corruptExecutionResult(receipt)
+
+	corruptedExecutionIds := o.corruptedIds.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()
+
+	// sends corrupted execution receipt to all corrupted execution nodes.
+	for _, corruptedExecutionId := range corruptedExecutionIds {
+		// sets executor id of the result as the same corrupted execution node id that
+		// is meant to send this message to the flow network.
+		err := o.network.Send(&insecure.Event{
+			CorruptedId:       corruptedExecutionId,
+			Channel:           receiptEvent.Channel,
+			Protocol:          receiptEvent.Protocol,
+			TargetNum:         receiptEvent.TargetNum,
+			TargetIds:         receiptEvent.TargetIds,
+			FlowProtocolEvent: corruptedResult,
+		})
+		if err != nil {
+			return fmt.Errorf("could not send rpc on channel: %w", err)
+		}
+
+		// saves state of attack for further replies
+		o.state = &attackState{
+			originalResult:    &receipt.ExecutionResult,
+			corruptedResult:   corruptedResult,
+			originalChunkIds:  flow.GetIDs(receipt.ExecutionResult.Chunks),
+			corruptedChunkIds: flow.GetIDs(corruptedResult.Chunks),
+		}
+	}
+
+	return nil
+}
+
+func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.Event) error {
+	corruptedIdentity, ok := o.corruptedIds.ByNodeID(chunkDataPackRequestEvent.CorruptedId)
+	if !ok {
+		return fmt.Errorf("could not find corrupted identity for: %x", chunkDataPackRequestEvent.CorruptedId)
+	}
+	if corruptedIdentity.Role != flow.RoleVerification {
+		return fmt.Errorf("wrong sender role for chunk data pack request: %s", corruptedIdentity.Role.String())
+	}
+
+	if o.state == nil {
+		// no attack yet conducted, hence bouncing back the chunk data request.
+		err := o.network.Send(chunkDataPackRequestEvent)
+		if err != nil {
+			return fmt.Errorf("could not send rpc on channel: %w", err)
+		}
+	}
+
+	return nil
 }
