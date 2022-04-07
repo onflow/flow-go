@@ -64,11 +64,14 @@ func TestSingleExecutionReceipt(t *testing.T) {
 // Orchestrator only corrupts one of them (whichever it receives first), while bouncing back the other.
 // Orchestrator sends the corrupted one to both corrupted execution nodes.
 func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
-	testConcurrentExecutionReceipts(t,
+	testConcurrentExecutionReceipts(
+		t,
 		1,     // two receipts one per execution node.
 		false, // receipts have contradicting results.
 		3,     // one corrupted execution result sent to two execution node (total 2) + 1 bounced back
-		1)     // one execution receipt is bounced back.
+		1,     // one execution receipt is bounced back.
+		func(*testing.T, *wintermute.Orchestrator) {},
+		func(*testing.T, *wintermute.Orchestrator) {})
 }
 
 // TestMultipleConcurrentExecutionReceipts_DistinctResult evaluates the following scenario:
@@ -81,11 +84,14 @@ func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 // execution node, the orchestrator does nothing.
 // For the result of receipts, orchestrator simply bounces them back (since already conducted an corruption).
 func TestMultipleConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
-	testConcurrentExecutionReceipts(t,
+	testConcurrentExecutionReceipts(
+		t,
 		5,     // 5 receipts per execution node.
 		false, // receipts have distinct results.
 		11,    // one corrupted result is sent back to two execution nodes (total 2) + 9 bounce back.
-		9)     // 9 receipts bounced back.
+		9,     // 9 receipts bounced back.
+		func(t *testing.T, orchestrator *wintermute.Orchestrator) {},
+		func(*testing.T, *wintermute.Orchestrator) {}) // 9 receipts bounced back.
 }
 
 // TestTwoConcurrentExecutionReceipts_SameResult evaluates the following scenario:
@@ -96,11 +102,14 @@ func TestMultipleConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 // When the second receipt arrives since it has the same result, and the corrupted version of that already sent to both
 // execution node, the orchestrator does nothing.
 func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
-	testConcurrentExecutionReceipts(t,
+	testConcurrentExecutionReceipts(
+		t,
 		1,    // one receipt per corrupted execution node.
 		true, // both execution receipts have same results.
 		2,    // orchestrator is supposed send two events
-		0)    // no receipt bounce back happens.
+		0,    // no receipt bounce back happens.
+		func(*testing.T, *wintermute.Orchestrator) {},
+		func(*testing.T, *wintermute.Orchestrator) {})
 }
 
 // TestMultipleConcurrentExecutionReceipts_SameResult evaluates the following scenario:
@@ -112,22 +121,29 @@ func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 // execution node, the orchestrator does nothing.
 // For the result of receipts, orchestrator simply bounces them back (since already conducted an corruption).
 func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
-	testConcurrentExecutionReceipts(t,
+	testConcurrentExecutionReceipts(
+		t,
 		5,    // 5 receipts one per execution node.
 		true, // pairwise receipts of execution nodes have same results.
 		10,   // one corrupted execution result sent to each execution nodes (total 2) + 8 bounced back
-		8)    // 4 receipts bounce back per execution nodes (4 * 2 = 8)
+		8,    // 4 receipts bounce back per execution nodes (4 * 2 = 8)
+		func(*testing.T, *wintermute.Orchestrator) {},
+		func(*testing.T, *wintermute.Orchestrator) {})
 }
 
 // testConcurrentExecutionReceipts sends two execution receipts concurrently to the orchestrator. Depending on the "sameResult" parameter, receipts
 // may have the same execution result or not.
 // It then sanity checks the behavior of orchestrator regarding the total expected number of events it sends to the attack network, as well as
 // the execution receipts it bounces back.
-func testConcurrentExecutionReceipts(t *testing.T,
-	count int, // total number of execution receipts per execution node.
+func testConcurrentExecutionReceipts(
+	t *testing.T,
+	count int,
 	sameResult bool,
 	expectedOrchestratorOutputEvents int,
-	expectedBouncedBackReceipts int) {
+	expectedBouncedBackReceipts int,
+	preAttack func(*testing.T, *wintermute.Orchestrator), // pre-attack scenario
+	postAttack func(*testing.T, *wintermute.Orchestrator), // post-attack scenario
+) {
 
 	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
 	corruptedExecutionIds := flow.IdentifierList(corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs())
@@ -172,6 +188,9 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	// registers mock network with orchestrator
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
+	// executes pre-attack scenario
+	preAttack(t, wintermuteOrchestrator)
+
 	// imitates sending events from corrupted execution nodes to the attacker orchestrator.
 	corruptedEnEventSendWG := sync.WaitGroup{}
 	corruptedEnEventSendWG.Add(len(eventMap))
@@ -204,6 +223,9 @@ func testConcurrentExecutionReceipts(t *testing.T,
 		corruptedExecutionIds,
 		flow.GetIDs(receipts),
 		expectedBouncedBackReceipts)
+
+	// executes post-attack scenario
+	postAttack(t, wintermuteOrchestrator)
 }
 
 // helper functions
