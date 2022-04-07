@@ -627,3 +627,34 @@ func TestComponentManager(t *testing.T) {
 
 	rapid.Check(t, rapid.Run(&ComponentManagerMachine{}))
 }
+
+func TestComponentManagerShutdown(t *testing.T) {
+	mgr := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			select {
+			case <-ctx.Done():
+				return
+			}
+		}).Build()
+
+	parent, cancel := context.WithCancel(context.Background())
+	ctx, _ := irrecoverable.WithSignaler(parent)
+
+	mgr.Start(ctx)
+	unittest.AssertClosesBefore(t, mgr.Ready(), 10*time.Millisecond)
+	cancel()
+
+	// ShutdownSignal indicates we have started shutdown, Done indicates we have completed
+	// shutdown. If we have completed shutdown, we must have started shutdown.
+	unittest.AssertClosesBefore(t, mgr.Done(), 10*time.Millisecond)
+	closed := util.CheckClosed(mgr.ShutdownSignal())
+	assert.True(t, closed)
+}
+
+// run the test many times to reproduce consistently
+func TestComponentManagerShutdown_100(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		TestComponentManagerShutdown(t)
+	}
+}
