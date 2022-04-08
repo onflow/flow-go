@@ -201,7 +201,7 @@ func WithComputationWeights(weights ExecutionEffortWeights) WeightedMeterOptions
 
 // WithMemoryWeights sets the weights for the memory intensities
 func WithMemoryWeights(weights ExecutionMemoryWeights) WeightedMeterOptions {
-	if int(common.MemoryKindLast)-len(DefaultMemoryWeights) != 1 {
+	if int(common.MemoryKindLast)-len(weights) != 1 {
 		panic(InvalidMemoryWeightsError{})
 	}
 
@@ -293,7 +293,7 @@ func (m *Meter) TotalComputationLimit() uint {
 
 // SetMemoryWeights sets the memory weights
 func (m *Meter) SetMemoryWeights(weights ExecutionMemoryWeights) {
-	if int(common.MemoryKindLast)-len(DefaultMemoryWeights) != 1 {
+	if int(common.MemoryKindLast)-len(weights) != 1 {
 		panic(InvalidMemoryWeightsError{})
 	}
 	m.memoryWeights = weights
