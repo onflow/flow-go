@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/insecure/wintermute"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -150,6 +151,30 @@ func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 // execution node, the orchestrator does nothing.
 // For the result of receipts, orchestrator simply bounces them back (since already conducted an corruption).
 func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
+	testConcurrentExecutionReceipts(
+		t,
+		5,    // 5 receipts one per execution node.
+		true, // pairwise receipts of execution nodes have same results.
+		10,   // one corrupted execution result sent to each execution nodes (total 2) + 8 bounced back
+		func(t *testing.T, orchestrator *wintermute.Orchestrator, network *mockinsecure.AttackNetwork) {
+
+		}, func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList) {
+			orchestratorOutputSanityCheck(
+				t,
+				outputEvents,
+				corrEnIds,
+				orgReceiptIds,
+				8, // 4 receipts bounce back per execution nodes (4 * 2 = 8)
+			)
+		})
+}
+
+// TestMultipleConcurrentExecutionReceipts_SameResult_PreAttackCdpRequest evaluates the same scenario as
+// TestMultipleConcurrentExecutionReceipts_SameResult, except, prior the attack the orchestrator receives
+// chunk data pack requests and responses from corrupted verification and execution nodes respectively.
+// Since the attack has not conducted yet, it should bounce back all those events to their origin corrupted node
+// to bounce back in the Flow network intact.
+func TestMultipleConcurrentExecutionReceipts_SameResult_PreAttackCdpRepReq(t *testing.T) {
 	testConcurrentExecutionReceipts(
 		t,
 		5,    // 5 receipts one per execution node.
@@ -334,14 +359,15 @@ func orchestratorOutputSanityCheck(
 	outputEvents []*insecure.Event, // list of all output events of the wintermute orchestrator.
 	corrEnIds flow.IdentifierList, // list of all corrupted execution node ids.
 	orgReceiptIds flow.IdentifierList, // list of all execution receipt ids originally sent to orchestrator.
-	expBouncedReceiptCount int, // expected number of execution receipts that must remain uncorrupted
+	expBouncedReceiptCount int, // expected number of execution receipts that must remain uncorrupted.
 ) {
 
 	// keeps a map of (corrupted results ids -> execution node ids)
 	dictatedResults := make(map[flow.Identifier]flow.IdentifierList)
 
-	// keeps a list of all bounced back execution receipts.
+	// keeps a list of all bounced back events.
 	bouncedReceipts := flow.IdentifierList{}
+
 	for _, outputEvent := range outputEvents {
 		switch event := outputEvent.FlowProtocolEvent.(type) {
 		case *flow.ExecutionReceipt:
@@ -374,7 +400,32 @@ func orchestratorOutputSanityCheck(
 	require.Equal(t, expBouncedReceiptCount, actualBouncedReceiptCount)
 }
 
-// distinctExecutionReceiptsFixture creates a set of execution receipts (with distinct result) one per given executor id.
+func chunkDataPackRequestsSanityCheck(t *testing.T,
+	outputEvents []*insecure.Event, // list of all output events of the wintermute orchestrator.
+	originalChunkRequestIds flow.IdentifierList, // list of original chunk data requests sent by corrupted verification nodes.
+	expectedBouncedBackReqs int, // number of expected bounced back chunk data pack requests.
+) {
+
+	bouncedBackRequestedChunkIds := flow.IdentifierList{}
+
+	for _, outputEvent := range outputEvents {
+		switch event := outputEvent.FlowProtocolEvent.(type) {
+		case *verification.ChunkDataPackRequest:
+			bouncedBackRequestedChunkIds = bouncedBackRequestedChunkIds.Union(flow.IdentifierList{event.ChunkID})
+		}
+	}
+
+	// number of bounced receipts should match the expected value.
+	actualBouncedChunkDataRequestCount := 0
+	for _, chunkId := range bouncedBackRequestedChunkIds {
+		if originalChunkRequestIds.Contains(chunkId) {
+			actualBouncedChunkDataRequestCount++
+		}
+	}
+	require.Equal(t, expectedBouncedBackReqs, actualBouncedChunkDataRequestCount)
+}
+
+// receiptsWithDistinctResultFixture creates a set of execution receipts (with distinct result) one per given executor id.
 // It returns a map of execution receipts to their relevant attack network events.
 func receiptsWithDistinctResultFixture(
 	t *testing.T,
