@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
@@ -22,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
 	utilsio "github.com/onflow/flow-go/utils/io"
-	"github.com/rs/zerolog"
 )
 
 const checkpointFilenamePrefix = "checkpoint."
