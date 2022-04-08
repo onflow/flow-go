@@ -58,11 +58,6 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 	start := time.Now()
 	var snapshot protocol.Snapshot
 
-	constRetry, err := retry.NewConstant(retryInterval)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create retry mechanism: %w", err)
-	}
-
 	log = log.With().
 		Uint64("target_epoch_counter", startupEpoch).
 		Str("target_epoch_phase", startupEpochPhase.String()).
@@ -70,8 +65,9 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 
 	log.Info().Msg("starting dynamic startup - waiting until target epoch/phase to start...")
 
-	err = retry.Do(ctx, constRetry, func(ctx context.Context) error {
-		snapshot, err = getSnapshot(ctx)
+	backoff := retry.NewConstant(retryInterval)
+	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
+		snapshot, err := getSnapshot(ctx)
 		if err != nil {
 			err = fmt.Errorf("failed to get protocol snapshot: %w", err)
 			log.Error().Err(err).Msg("could not get protocol snapshot")
