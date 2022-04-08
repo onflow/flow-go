@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/libp2p/go-libp2p"
+	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"

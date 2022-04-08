@@ -23,7 +23,7 @@ import (
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -170,7 +170,7 @@ func (s *DKGSuite) setupDKGAdmin() {
 
 // createAndFundAccount creates a nodeAccount and funds it in the emulator
 func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
-	accountPrivateKey := common.RandomPrivateKey()
+	accountPrivateKey := lib.RandomPrivateKey()
 	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(accountPrivateKey).
 		SetSigAlgo(sdkcrypto.ECDSA_P256).

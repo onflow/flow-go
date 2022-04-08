@@ -145,7 +145,7 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.StringVar(&executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data_blobstore"), "directory to use for Execution Data blobstore")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
-			flags.UintVar(&checkpointDistance, "checkpoint-distance", 40, "number of WAL segments between checkpoints")
+			flags.UintVar(&checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
@@ -221,7 +221,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.NodeConfig) error {

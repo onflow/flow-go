@@ -53,6 +53,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = m.MeterComputation(0, 8)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
+		require.Equal(t, err.(*errors.ComputationLimitExceededError).Error(), errors.NewComputationLimitExceededError(10).Error())
 
 		err = m.MeterMemory(0, 2)
 		require.NoError(t, err)
@@ -65,6 +66,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = m.MeterMemory(0, 8)
 		require.Error(t, err)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
+		require.Equal(t, err.(*errors.MemoryLimitExceededError).Error(), errors.NewMemoryLimitExceededError(10).Error())
 	})
 
 	t.Run("meter computation and memory with weights", func(t *testing.T) {
@@ -141,20 +143,43 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = child3.MeterComputation(compKind, 4)
 		require.NoError(t, err)
 
-		err = m.MergeMeter(child1)
+		err = m.MergeMeter(child1, true)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2), m.TotalComputationUsed())
 		require.Equal(t, uint(1+2), m.ComputationIntensities()[compKind])
 
-		err = m.MergeMeter(child2)
+		err = m.MergeMeter(child2, true)
 		require.NoError(t, err)
 		require.Equal(t, uint(1+2+3), m.TotalComputationUsed())
 		require.Equal(t, uint(1+2+3), m.ComputationIntensities()[compKind])
 
 		// error on merge (hitting limit)
-		err = m.MergeMeter(child3)
+		err = m.MergeMeter(child3, true)
 		require.Error(t, err)
 		require.True(t, errors.IsComputationLimitExceededError(err))
+		require.Equal(t, err.(*errors.ComputationLimitExceededError).Error(), errors.NewComputationLimitExceededError(9).Error())
+	})
+
+	t.Run("merge meters - ignore limits", func(t *testing.T) {
+		compKind := common.ComputationKind(0)
+		m := weighted.NewMeter(
+			9,
+			0,
+			weighted.WithComputationWeights(map[common.ComputationKind]uint64{0: 1 << weighted.MeterInternalPrecisionBytes}),
+		)
+
+		err := m.MeterComputation(compKind, 1)
+		require.NoError(t, err)
+
+		child := m.NewChild()
+		err = child.MeterComputation(compKind, 1)
+		require.NoError(t, err)
+
+		// hitting limit and ignoring it
+		err = m.MergeMeter(child, false)
+		require.NoError(t, err)
+		require.Equal(t, uint(1+1), m.TotalComputationUsed())
+		require.Equal(t, uint(1+1), m.ComputationIntensities()[compKind])
 	})
 
 	t.Run("merge meters - large values - computation", func(t *testing.T) {
@@ -173,7 +198,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = child1.MeterComputation(0, 1)
 		require.NoError(t, err)
 
-		err = m.MergeMeter(child1)
+		err = m.MergeMeter(child1, true)
 		require.True(t, errors.IsComputationLimitExceededError(err))
 	})
 
@@ -193,8 +218,11 @@ func TestWeightedComputationMetering(t *testing.T) {
 		err = child1.MeterMemory(0, 1)
 		require.NoError(t, err)
 
-		err = m.MergeMeter(child1)
+		err = m.MergeMeter(child1, true)
+
+		require.Error(t, err)
 		require.True(t, errors.IsMemoryLimitExceededError(err))
+		require.Equal(t, err.(*errors.MemoryLimitExceededError).Error(), errors.NewMemoryLimitExceededError(math.MaxUint32).Error())
 	})
 
 	t.Run("add intensity - test limits - computation", func(t *testing.T) {
