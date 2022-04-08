@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -25,7 +26,12 @@ type backendScripts struct {
 	state             protocol.State
 	connFactory       ConnectionFactory
 	log               zerolog.Logger
-	seenScripts       map[[md5.Size]byte]time.Time // to keep track of unique scripts sent by clients. bounded to 1MB (2^16*2*8) due to fixed key size
+	seenScripts       scriptMap
+}
+
+type scriptMap struct {
+	scripts map[[md5.Size]byte]time.Time // to keep track of unique scripts sent by clients. bounded to 1MB (2^16*2*8) due to fixed key size
+	lock    sync.Mutex
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -107,7 +113,9 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
-				timestamp, seen := b.seenScripts[encodedScript]
+				b.seenScripts.lock.Lock()
+				timestamp, seen := b.seenScripts.scripts[encodedScript]
+				b.seenScripts.lock.Unlock()
 				// log if the script is unique in the time window
 				if !seen || executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
 					b.log.Debug().
@@ -116,7 +124,9 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 						Hex("script_hash", encodedScript[:]).
 						Str("script", string(script)).
 						Msg("Successfully executed script")
-					b.seenScripts[encodedScript] = executionTime
+					b.seenScripts.lock.Lock()
+					b.seenScripts.scripts[encodedScript] = executionTime
+					b.seenScripts.lock.Unlock()
 				}
 			}
 			return result, nil
