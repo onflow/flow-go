@@ -633,7 +633,7 @@ func (m *Middleware) unicastMaxMsgDuration(msg *message.Message) time.Duration {
 	switch msg.Type {
 	case "messages.ChunkDataResponse":
 		if LargeMsgUnicastTimeout > m.unicastMessageTimeout {
-			return LargeMsgMaxUnicastMsgSize
+			return LargeMsgUnicastTimeout
 		}
 		return m.unicastMessageTimeout
 	default:
