@@ -534,7 +534,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		file.Close()
 
 		t.Run("works without data modification", func(t *testing.T) {
-			tries, err := realWAL.LoadCheckpoint(filepath)
+			tries, err := realWAL.LoadCheckpoint(filepath, nil)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(tries))
 			require.Equal(t, updatedTrie, tries[0])
@@ -551,7 +551,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 			err = os.WriteFile(filepath, b, 0644)
 			require.NoError(t, err)
 
-			tries, err := realWAL.LoadCheckpoint(filepath)
+			tries, err := realWAL.LoadCheckpoint(filepath, nil)
 			require.Error(t, err)
 			require.Nil(t, tries)
 			require.Contains(t, err.Error(), "checksum")

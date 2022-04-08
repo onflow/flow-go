@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
 	utilsio "github.com/onflow/flow-go/utils/io"
+	"github.com/rs/zerolog"
 )
 
 const checkpointFilenamePrefix = "checkpoint."
@@ -245,15 +246,11 @@ func NumberToFilename(n int) string {
 }
 
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
-	return CreateCheckpointWriter(c.dir, to)
-}
-
-func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
-	return CreateCheckpointWriterForFile(dir, NumberToFilename(fileNo))
+	return CreateCheckpointWriterForFile(c.dir, NumberToFilename(to), &c.wal.log)
 }
 
 // CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
-func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error) {
+func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger) (io.WriteCloser, error) {
 
 	fullname := path.Join(dir, filename)
 
@@ -268,6 +265,7 @@ func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error)
 
 	writer := bufio.NewWriterSize(tmpFile, defaultBufioWriteSize)
 	return &SyncOnCloseRenameFile{
+		logger:     logger,
 		file:       tmpFile,
 		targetName: fullname,
 		Writer:     writer,
@@ -395,12 +393,12 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
 	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
-	return LoadCheckpoint(filepath)
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
 	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
-	return LoadCheckpoint(filepath)
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
@@ -417,7 +415,7 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(filepath string) ([]*trie.MTrie, error) {
+func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
@@ -425,7 +423,7 @@ func LoadCheckpoint(filepath string) ([]*trie.MTrie, error) {
 	defer func() {
 		_ = file.Close()
 
-		_ = requestDropFromOSFileCache(filepath)
+		_ = requestDropFromOSFileCache(filepath, logger)
 	}()
 
 	return readCheckpoint(file)
@@ -777,7 +775,7 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 // requestDropFromOSFileCache requests the specified file
 // be dropped from OS file cache.
 // CAUTION: Returns nil without doing anything if GOOS != linux.
-func requestDropFromOSFileCache(fileName string) error {
+func requestDropFromOSFileCache(fileName string, logger *zerolog.Logger) error {
 	if runtime.GOOS != "linux" {
 		return nil
 	}
@@ -811,5 +809,10 @@ func requestDropFromOSFileCache(fileName string) error {
 	}
 
 	cmd := exec.Command(cmdFileName, "if="+s, "iflag=nocache", "count=0")
+
+	if logger != nil {
+		logger.Info().Msgf("run %q to drop file from OS file cache", cmd.String())
+	}
+
 	return cmd.Run()
 }
