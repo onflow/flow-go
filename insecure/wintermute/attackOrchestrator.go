@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/insecure"
@@ -53,7 +53,10 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		if err := o.handleExecutionReceiptEvent(event); err != nil {
 			return fmt.Errorf("could not handle execution receipt event: %w", err)
 		}
-	case *verification.ChunkDataPackRequest:
+	case *messages.ChunkDataRequest:
+		if err := o.handleChunkDataPackRequestEvent(event); err != nil {
+			return fmt.Errorf("could not handle chunk data pack request event: %w", err)
+		}
 
 	default:
 		return fmt.Errorf("unexpected message type for wintermute attack orchestrator: %T", protocolEvent)

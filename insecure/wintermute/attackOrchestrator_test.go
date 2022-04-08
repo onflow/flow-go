@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -79,7 +78,7 @@ func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 		1,     // two receipts one per execution node.
 		false, // receipts have contradicting results.
 		3,     // one corrupted execution result sent to two execution node (total 2) + 1 bounced back
-		func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork) {},
+		func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork, flow.IdentityList) {},
 		func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList) {
 			orchestratorOutputSanityCheck(
 				t,
@@ -106,7 +105,7 @@ func TestMultipleConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 		5,     // 5 receipts per execution node.
 		false, // receipts have distinct results.
 		11,    // one corrupted result is sent back to two execution nodes (total 2) + 9 bounce back.
-		func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork) {},
+		func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork, flow.IdentityList) {},
 		func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList) {
 			orchestratorOutputSanityCheck(
 				t,
@@ -131,7 +130,7 @@ func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 		1,    // one receipt per corrupted execution node.
 		true, // both execution receipts have same results.
 		2,    // orchestrator is supposed send two events
-		func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork) {},
+		func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork, flow.IdentityList) {},
 		func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList) {
 			orchestratorOutputSanityCheck(
 				t,
@@ -157,7 +156,7 @@ func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
 		5,    // 5 receipts one per execution node.
 		true, // pairwise receipts of execution nodes have same results.
 		10,   // one corrupted execution result sent to each execution nodes (total 2) + 8 bounced back
-		func(t *testing.T, orchestrator *wintermute.Orchestrator, network *mockinsecure.AttackNetwork) {
+		func(t *testing.T, orchestrator *wintermute.Orchestrator, network *mockinsecure.AttackNetwork, corruptedIds flow.IdentityList) {
 
 		}, func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList) {
 			orchestratorOutputSanityCheck(
@@ -176,19 +175,41 @@ func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
 // Since the attack has not conducted yet, it should bounce back all those events to their origin corrupted node
 // to bounce back in the Flow network intact.
 func TestMultipleConcurrentExecutionReceipts_SameResult_PreAttackCdpRepReq(t *testing.T) {
-	cdpReqs := unittest.ChunkDataPackRequestListFixture(10)
+	// creates a receipt with 10 chunks
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(
+			unittest.ExecutionResultFixture(unittest.WithChunks(10))))
+
+	var cdpReqMap map[flow.Identifier][]*insecure.Event
+	var cdpReqs flow.IdentifierList
 
 	testConcurrentExecutionReceipts(
 		t,
 		5,    // 5 receipts one per execution node.
 		true, // pairwise receipts of execution nodes have same results.
-		10,   // one corrupted execution result sent to each execution nodes (total 2) + 8 bounced back
-		func(t *testing.T, orchestrator *wintermute.Orchestrator, network *mockinsecure.AttackNetwork) {
-			for _, cdpReq := range cdpReqs {
-				go func() {
+		40,   // one corrupted execution result sent to each execution nodes (total 2) + 8 bounced back
+		// + 10 chunk requests per verification nodes (3 * 10) = 40
+		func(t *testing.T, orchestrator *wintermute.Orchestrator, network *mockinsecure.AttackNetwork, corruptedIds flow.IdentityList) {
 
-				}()
+			corruptedVerIds := corruptedIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs()
+			cdpReqMap, cdpReqs = chunkDataPackRequestForReceipts([]*flow.ExecutionReceipt{receipt}, corruptedVerIds)
+
+			wg := &sync.WaitGroup{}
+
+			for _, cdpReqEvents := range cdpReqMap {
+				for _, event := range cdpReqEvents {
+					wg.Add(1)
+					event := event // supper loop variable
+					go func() {
+						err := orchestrator.HandleEventFromCorruptedNode(event)
+						require.NoError(t, err)
+						wg.Done()
+					}()
+				}
 			}
+
+			unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not send all chunk data requests to orchestrator")
+
 		}, func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList) {
 			orchestratorOutputSanityCheck(
 				t,
@@ -197,6 +218,10 @@ func TestMultipleConcurrentExecutionReceipts_SameResult_PreAttackCdpRepReq(t *te
 				orgReceiptIds,
 				8, // 4 receipts bounce back per execution nodes (4 * 2 = 8)
 			)
+			chunkDataPackRequestsSanityCheck(t,
+				outputEvents,
+				cdpReqs,
+				10) // since no attack yet conducted, all 10 chunk data pack request must bounce back.
 		})
 }
 
@@ -208,7 +233,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	count int,
 	sameResult bool,
 	expectedOrchestratorOutputEvents int,
-	preAttack func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork),
+	preAttack func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork, flow.IdentityList),
 	postAttack postAttackFunc) {
 
 	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
@@ -244,10 +269,6 @@ func testConcurrentExecutionReceipts(t *testing.T,
 			event, ok := args[0].(*insecure.Event)
 			require.True(t, ok)
 
-			// makes sure sender is a corrupted execution node.
-			ok = corruptedExecutionIds.Contains(event.CorruptedId)
-			require.True(t, ok)
-
 			orchestratorOutputEvents = append(orchestratorOutputEvents, event)
 			orchestratorSentAllEventsWg.Done()
 		}).Return(nil)
@@ -255,7 +276,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
 	// executes pre-attack scenario
-	preAttack(t, wintermuteOrchestrator, mockAttackNetwork)
+	preAttack(t, wintermuteOrchestrator, mockAttackNetwork, corruptedIdentityList)
 
 	// imitates sending events from corrupted execution nodes to the attacker orchestrator.
 	corruptedEnEventSendWG := sync.WaitGroup{}
@@ -378,6 +399,9 @@ func orchestratorOutputSanityCheck(
 	for _, outputEvent := range outputEvents {
 		switch event := outputEvent.FlowProtocolEvent.(type) {
 		case *flow.ExecutionReceipt:
+			// makes sure sender is a corrupted execution node.
+			ok := corrEnIds.Contains(outputEvent.CorruptedId)
+			require.True(t, ok)
 			// uses union to avoid adding duplicate.
 			bouncedReceipts = bouncedReceipts.Union(flow.IdentifierList{event.ID()})
 		case *flow.ExecutionResult:
@@ -417,7 +441,7 @@ func chunkDataPackRequestsSanityCheck(t *testing.T,
 
 	for _, outputEvent := range outputEvents {
 		switch event := outputEvent.FlowProtocolEvent.(type) {
-		case *verification.ChunkDataPackRequest:
+		case *messages.ChunkDataRequest:
 			bouncedBackRequestedChunkIds = bouncedBackRequestedChunkIds.Union(flow.IdentifierList{event.ChunkID})
 		}
 	}
@@ -517,7 +541,8 @@ func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.Identi
 }
 
 // chunkDataPackRequestForReceipts creates and returns chunk data pack requests as well as their corresponding events for the given set of receipts.
-func chunkDataPackRequestForReceipts(receipts []*flow.ExecutionReceipt) (map[flow.Identifier]*insecure.Event, []*messages.ChunkDataRequest) {
+func chunkDataPackRequestForReceipts(receipts []*flow.ExecutionReceipt, corruptedVerIds flow.IdentifierList) (map[flow.Identifier][]*insecure.Event,
+	flow.IdentifierList) {
 
 	// stratifies result ids based on executor.
 	executorIds := make(map[flow.Identifier]flow.IdentifierList)
@@ -526,8 +551,8 @@ func chunkDataPackRequestForReceipts(receipts []*flow.ExecutionReceipt) (map[flo
 		executorIds[resultId] = flow.IdentifierList{receipt.ExecutorID}.Union(executorIds[resultId])
 	}
 
-	cdpReqs := make([]*messages.ChunkDataRequest, 0)
-	cdpReqMap := make(map[flow.Identifier]*insecure.Event)
+	chunkIds := flow.IdentifierList{}
+	cdpReqMap := make(map[flow.Identifier][]*insecure.Event)
 	for _, receipt := range receipts {
 		result := receipt.ExecutionResult
 		for _, chunk := range result.Chunks {
@@ -541,20 +566,27 @@ func chunkDataPackRequestForReceipts(receipts []*flow.ExecutionReceipt) (map[flo
 			cdpReq := &messages.ChunkDataRequest{
 				ChunkID: chunkId,
 			}
-			cdpReqs = append(cdpReqs, cdpReq)
+			chunkIds = chunkIds.Union(flow.IdentifierList{chunkId})
 
-			event := &insecure.Event{
-				CorruptedId:       flow.Identifier{},
-				Channel:           engine.RequestChunks,
-				Protocol:          insecure.Protocol_PUBLISH,
-				TargetNum:         0,
-				TargetIds:         executorIds[result.ID()],
-				FlowProtocolEvent: cdpReq,
+			requests := make([]*insecure.Event, 0)
+
+			// creates a request event per verification node
+			for _, verId := range corruptedVerIds {
+				event := &insecure.Event{
+					CorruptedId:       verId,
+					Channel:           engine.RequestChunks,
+					Protocol:          insecure.Protocol_PUBLISH,
+					TargetNum:         0,
+					TargetIds:         executorIds[result.ID()],
+					FlowProtocolEvent: cdpReq,
+				}
+
+				requests = append(requests, event)
 			}
 
-			cdpReqMap[chunkId] = event
+			cdpReqMap[chunkId] = requests
 		}
 	}
 
-	return cdpReqMap, cdpReqs
+	return cdpReqMap, chunkIds
 }
