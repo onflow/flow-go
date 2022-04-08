@@ -774,6 +774,7 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 
 // requestDropFromOSFileCache requests the specified file
 // be dropped from OS file cache.
+// The use case is that when a new checkpoint is generated, OS file cache will still cache the entire checkpoint file in memory, causing the memory usage to stay high. Dropping it could free up the memory.
 // CAUTION: Returns nil without doing anything if GOOS != linux.
 func requestDropFromOSFileCache(fileName string, logger *zerolog.Logger) error {
 	if runtime.GOOS != "linux" {
