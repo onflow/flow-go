@@ -43,13 +43,13 @@ func (_m *ComputationManager) ComputeBlock(ctx context.Context, block *entity.Ex
 	return r0, r1
 }
 
-// ExecuteScript provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *ComputationManager) ExecuteScript(_a0 []byte, _a1 [][]byte, _a2 *flow.Header, _a3 state.View) ([]byte, error) {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
+// ExecuteScript provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
+func (_m *ComputationManager) ExecuteScript(_a0 context.Context, _a1 []byte, _a2 [][]byte, _a3 *flow.Header, _a4 state.View) ([]byte, error) {
+	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func([]byte, [][]byte, *flow.Header, state.View) []byte); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, *flow.Header, state.View) []byte); ok {
+		r0 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -57,8 +57,8 @@ func (_m *ComputationManager) ExecuteScript(_a0 []byte, _a1 [][]byte, _a2 *flow.
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]byte, [][]byte, *flow.Header, state.View) error); ok {
-		r1 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, *flow.Header, state.View) error); ok {
+		r1 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
 		r1 = ret.Error(1)
 	}
