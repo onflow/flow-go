@@ -28,3 +28,8 @@ issues:
     - path: _test\.go # disable some linters on test files
       linters:
         - unused
+    # typecheck currently not handling the way we do function inheritance well
+    # disabling for now
+    - path: 'cmd/access/node_build/*' 
+      linters:
+        - typecheck

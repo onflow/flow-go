@@ -573,7 +573,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 
 	runWithEngine(t, func(ctx testingContext) {
 
