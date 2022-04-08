@@ -7,21 +7,28 @@ import (
 	interfaceMeter "github.com/onflow/flow-go/fvm/meter"
 )
 
-// MeterInternalPrecisionBytes are the amount of bytes that are used internally by the Meter
+// MeterExecutionInternalPrecisionBytes are the amount of bytes that are used internally by the Meter
 // to allow for metering computation smaller than one unit of computation. This allows for more fine weights.
 // A weight of 1 unit of computation is equal to 1<<16. The minimum possible weight is 1/65536.
-const MeterInternalPrecisionBytes = 16
+const MeterExecutionInternalPrecisionBytes = 16
 
 type ExecutionEffortWeights map[common.ComputationKind]uint64
 type ExecutionMemoryWeights map[common.MemoryKind]uint64
+
+// An InvalidMemoryWeightsError indicates that an invalid set of memory weights has been assigned.
+type InvalidMemoryWeightsError struct{}
+
+func (e InvalidMemoryWeightsError) Error() string {
+	return "invalid assignment of memory weights"
+}
 
 var (
 	// DefaultComputationWeights is the default weights for computation intensities
 	// these weighs make the computation metering the same as it was before dynamic execution fees
 	DefaultComputationWeights = ExecutionEffortWeights{
-		common.ComputationKindStatement:          1 << MeterInternalPrecisionBytes,
-		common.ComputationKindLoop:               1 << MeterInternalPrecisionBytes,
-		common.ComputationKindFunctionInvocation: 1 << MeterInternalPrecisionBytes,
+		common.ComputationKindStatement:          1 << MeterExecutionInternalPrecisionBytes,
+		common.ComputationKindLoop:               1 << MeterExecutionInternalPrecisionBytes,
+		common.ComputationKindFunctionInvocation: 1 << MeterExecutionInternalPrecisionBytes,
 	}
 
 	// DefaultMemoryWeights are currently hard-coded here. In the future we might like to
@@ -170,8 +177,8 @@ type WeightedMeterOptions func(*Meter)
 func NewMeter(computationLimit, memoryLimit uint, options ...WeightedMeterOptions) *Meter {
 
 	m := &Meter{
-		computationLimit:       uint64(computationLimit) << MeterInternalPrecisionBytes,
-		memoryLimit:            uint64(memoryLimit) << MeterInternalPrecisionBytes,
+		computationLimit:       uint64(computationLimit) << MeterExecutionInternalPrecisionBytes,
+		memoryLimit:            uint64(memoryLimit),
 		computationWeights:     DefaultComputationWeights,
 		memoryWeights:          DefaultMemoryWeights,
 		computationIntensities: make(interfaceMeter.MeteredComputationIntensities),
@@ -194,6 +201,10 @@ func WithComputationWeights(weights ExecutionEffortWeights) WeightedMeterOptions
 
 // WithMemoryWeights sets the weights for the memory intensities
 func WithMemoryWeights(weights ExecutionMemoryWeights) WeightedMeterOptions {
+	if int(common.MemoryKindLast)-len(DefaultMemoryWeights) != 1 {
+		panic(InvalidMemoryWeightsError{})
+	}
+
 	return func(m *Meter) {
 		m.memoryWeights = weights
 	}
@@ -218,7 +229,7 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 	if basic, ok := child.(*Meter); ok {
 		childComputationUsed = basic.computationUsed
 	} else {
-		childComputationUsed = uint64(child.TotalComputationUsed()) << MeterInternalPrecisionBytes
+		childComputationUsed = uint64(child.TotalComputationUsed()) << MeterExecutionInternalPrecisionBytes
 	}
 	m.computationUsed = m.computationUsed + childComputationUsed
 	if m.computationUsed > m.computationLimit {
@@ -233,7 +244,7 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 	if basic, ok := child.(*Meter); ok {
 		childMemoryUsed = basic.memoryUsed
 	} else {
-		childMemoryUsed = uint64(child.TotalMemoryUsed()) << MeterInternalPrecisionBytes
+		childMemoryUsed = uint64(child.TotalMemoryUsed()) << MeterExecutionInternalPrecisionBytes
 	}
 	m.memoryUsed = m.memoryUsed + childMemoryUsed
 	if m.memoryUsed > m.memoryLimit {
@@ -272,16 +283,19 @@ func (m *Meter) ComputationIntensities() interfaceMeter.MeteredComputationIntens
 
 // TotalComputationUsed returns the total computation used
 func (m *Meter) TotalComputationUsed() uint {
-	return uint(m.computationUsed >> MeterInternalPrecisionBytes)
+	return uint(m.computationUsed >> MeterExecutionInternalPrecisionBytes)
 }
 
 // TotalComputationLimit returns the total computation limit
 func (m *Meter) TotalComputationLimit() uint {
-	return uint(m.computationLimit >> MeterInternalPrecisionBytes)
+	return uint(m.computationLimit >> MeterExecutionInternalPrecisionBytes)
 }
 
 // SetMemoryWeights sets the memory weights
 func (m *Meter) SetMemoryWeights(weights ExecutionMemoryWeights) {
+	if int(common.MemoryKindLast)-len(DefaultMemoryWeights) != 1 {
+		panic(InvalidMemoryWeightsError{})
+	}
 	m.memoryWeights = weights
 }
 
