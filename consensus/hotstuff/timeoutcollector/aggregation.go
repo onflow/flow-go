@@ -157,7 +157,7 @@ func (a *WeightedMultiMessageSignatureAggregator) Aggregate() ([]flow.Identifier
 
 	sharesNum := len(a.idToSignature)
 	if sharesNum == 0 {
-		return nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures\"")
+		return nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures")
 	}
 	pks := make([]crypto.PublicKey, 0, sharesNum)
 	messages := make([][]byte, 0, sharesNum)

@@ -224,8 +224,6 @@ func TestMultiMessageSignatureAggregator_Aggregate(t *testing.T) {
 		require.True(t, model.IsInvalidSignatureIncludedError(err))
 		require.Nil(t, agg)
 		require.Nil(t, signers)
-		// fix sigs[0]
-		sigs[0][4] ^= 1
 	})
 
 	t.Run("aggregating empty set of signatures", func(t *testing.T) {
