@@ -21,6 +21,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// postAttackFunc represents the function type that encapsulates sanity checks post a Wintermute attack scenario.
+type postAttackFunc func(
+	t *testing.T,
+	outputEvents []*insecure.Event, // list of all output events of the wintermute orchestrator.
+	corrEnIds flow.IdentifierList, // list of all corrupted execution node ids.
+	orgReceiptIds flow.IdentifierList, // list of all execution receipt ids originally sent to orchestrator.
+	expBouncedReceiptCount int) // expected number of execution receipts that must remain uncorrupted
+
 // TestSingleExecutionReceipt tests that the orchestrator corrupts the execution receipt if the receipt is
 // from a corrupted execution node.
 // If an execution receipt is coming from a corrupt execution node,
@@ -70,8 +78,10 @@ func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 		false, // receipts have contradicting results.
 		3,     // one corrupted execution result sent to two execution node (total 2) + 1 bounced back
 		1,     // one execution receipt is bounced back.
-		func(*testing.T, *wintermute.Orchestrator) {},
-		func(*testing.T, *wintermute.Orchestrator) {})
+		func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork) {},
+		func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList, expBouncedReceiptCount int) {
+
+		})
 }
 
 // TestMultipleConcurrentExecutionReceipts_DistinctResult evaluates the following scenario:
@@ -90,8 +100,10 @@ func TestMultipleConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 		false, // receipts have distinct results.
 		11,    // one corrupted result is sent back to two execution nodes (total 2) + 9 bounce back.
 		9,     // 9 receipts bounced back.
-		func(t *testing.T, orchestrator *wintermute.Orchestrator) {},
-		func(*testing.T, *wintermute.Orchestrator) {}) // 9 receipts bounced back.
+		func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork) {},
+		func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList, expBouncedReceiptCount int) {
+
+		})
 }
 
 // TestTwoConcurrentExecutionReceipts_SameResult evaluates the following scenario:
@@ -108,8 +120,10 @@ func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 		true, // both execution receipts have same results.
 		2,    // orchestrator is supposed send two events
 		0,    // no receipt bounce back happens.
-		func(*testing.T, *wintermute.Orchestrator) {},
-		func(*testing.T, *wintermute.Orchestrator) {})
+		func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork) {},
+		func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList, expBouncedReceiptCount int) {
+
+		})
 }
 
 // TestMultipleConcurrentExecutionReceipts_SameResult evaluates the following scenario:
@@ -127,23 +141,24 @@ func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
 		true, // pairwise receipts of execution nodes have same results.
 		10,   // one corrupted execution result sent to each execution nodes (total 2) + 8 bounced back
 		8,    // 4 receipts bounce back per execution nodes (4 * 2 = 8)
-		func(*testing.T, *wintermute.Orchestrator) {},
-		func(*testing.T, *wintermute.Orchestrator) {})
+		func(t *testing.T, orchestrator *wintermute.Orchestrator, network *mockinsecure.AttackNetwork) {
+
+		}, func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList, expBouncedReceiptCount int) {
+
+		})
 }
 
 // testConcurrentExecutionReceipts sends two execution receipts concurrently to the orchestrator. Depending on the "sameResult" parameter, receipts
 // may have the same execution result or not.
 // It then sanity checks the behavior of orchestrator regarding the total expected number of events it sends to the attack network, as well as
 // the execution receipts it bounces back.
-func testConcurrentExecutionReceipts(
-	t *testing.T,
+func testConcurrentExecutionReceipts(t *testing.T,
 	count int,
 	sameResult bool,
 	expectedOrchestratorOutputEvents int,
 	expectedBouncedBackReceipts int,
-	preAttack func(*testing.T, *wintermute.Orchestrator), // pre-attack scenario
-	postAttack func(*testing.T, *wintermute.Orchestrator), // post-attack scenario
-) {
+	preAttack func(*testing.T, *wintermute.Orchestrator, *mockinsecure.AttackNetwork),
+	postAttack postAttackFunc) {
 
 	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
 	corruptedExecutionIds := flow.IdentifierList(corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs())
@@ -189,7 +204,7 @@ func testConcurrentExecutionReceipts(
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
 	// executes pre-attack scenario
-	preAttack(t, wintermuteOrchestrator)
+	preAttack(t, wintermuteOrchestrator, mockAttackNetwork)
 
 	// imitates sending events from corrupted execution nodes to the attacker orchestrator.
 	corruptedEnEventSendWG := sync.WaitGroup{}
@@ -225,7 +240,7 @@ func testConcurrentExecutionReceipts(
 		expectedBouncedBackReceipts)
 
 	// executes post-attack scenario
-	postAttack(t, wintermuteOrchestrator)
+	postAttack(t, orchestratorOutputEvents, corruptedExecutionIds, flow.GetIDs(receipts), expectedBouncedBackReceipts)
 }
 
 // helper functions
