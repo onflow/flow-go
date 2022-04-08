@@ -60,6 +60,11 @@ func (s *SyncOnCloseRenameFile) Close() error {
 		return fmt.Errorf("error while renaming from %s to %s: %w", s.file.Name(), s.targetName, err)
 	}
 
+	err = requestDropFromOSFileCache(s.targetName)
+	if err != nil {
+		return fmt.Errorf("error while requesting drop of %s from OS file cache : %w", s.targetName, err)
+	}
+
 	return nil
 }
 

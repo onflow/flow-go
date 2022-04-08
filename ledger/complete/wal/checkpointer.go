@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -422,6 +424,8 @@ func LoadCheckpoint(filepath string) ([]*trie.MTrie, error) {
 	}
 	defer func() {
 		_ = file.Close()
+
+		_ = requestDropFromOSFileCache(filepath)
 	}()
 
 	return readCheckpoint(file)
@@ -768,4 +772,44 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 	}
 
 	return tries, nil
+}
+
+// requestDropFromOSFileCache requests the specified file
+// be dropped from OS file cache.
+// CAUTION: Returns nil without doing anything if GOOS != linux.
+func requestDropFromOSFileCache(fileName string) error {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+
+	// Try using /bin/dd (Debian, Ubuntu, etc.)
+	cmdFileName := "/bin/dd"
+
+	// If /bin/dd isn't found, then try /usr/bin/dd (OpenSUSE Leap, etc.)
+	_, err := os.Stat(cmdFileName)
+	if os.IsNotExist(err) {
+		cmdFileName = "/usr/bin/dd"
+		_, err := os.Stat(cmdFileName)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("required program dd not found in /bin/ and /usr/bin/")
+		}
+	}
+
+	// Remove some special chars from fileName just in case.
+	// Regex would be shorter but not as easy to read.
+	s := strings.ReplaceAll(fileName, " ", "")
+	s = strings.ReplaceAll(s, ";", "")
+	s = strings.ReplaceAll(s, "$", "")
+	s = strings.ReplaceAll(s, "|", "")
+	s = strings.ReplaceAll(s, ">", "")
+	s = strings.ReplaceAll(s, "<", "")
+	s = strings.ReplaceAll(s, "*", "")
+
+	_, err = os.Stat(s)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("sanitized filename %s does not exist", s)
+	}
+
+	cmd := exec.Command(cmdFileName, "if="+s, "iflag=nocache", "count=0")
+	return cmd.Run()
 }
