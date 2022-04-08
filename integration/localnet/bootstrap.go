@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -297,9 +298,11 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 		case flow.RoleAccess:
 			services[container.ContainerName] = prepareAccessService(container, numAccess, n)
 			if bootstrapAccessNodePublicKey == nil {
+				// Collect bootstrap parameters to the first access node added
 				bootstrapAccessNodePublicKey = container.NetworkPubKey()
 				bootstrapAccessNodeAddress = strings.SplitN(container.Address, ":", 2)[0]
-				bootstrapAccessNodeAddress = fmt.Sprintf("localnet_%s_1:%d", bootstrapAccessNodeAddress, RPCPort)
+				// TODO switch to secure access
+				bootstrapAccessNodeAddress = fmt.Sprintf("localnet_%s_1:%d", bootstrapAccessNodeAddress, SecuredRPCPort)
 				bootstrapAccessNodeContainer = container.ContainerName
 			}
 			numAccess++
@@ -312,7 +315,7 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 			services[container.ContainerName] = prepareObserverService(
 				container, numAccess, n,
 				bootstrapAccessNodeAddress, bootstrapAccessNodePublicKey, bootstrapAccessNodeContainer)
-			// We treat these as access nodes in numbering to limit the port ranges
+			// We use the port pool of access nodes to limit the port range count
 			numAccess++
 		}
 	}
@@ -526,10 +529,9 @@ func prepareObserverService(container testnet.ContainerConfig, i int, n int, boo
 	cmd.ObserverNetworkKeyWrite(observerNetworkKeyPath)
 	service.Volumes = append(service.Volumes, fmt.Sprintf("%s:%s:z", observerNetworkKeyPath, dockerObserverNetworkKeyPath))
 
-	compacted, err := json.Marshal(bootstrapPubKey.Encode())
-	if err != nil {
-		bootstrapAddress = ""
-	}
+	// hex encode and write to file
+	bootstrapAddresses := fmt.Sprintf("%v", bootstrapAddress) // TODO SecuredRPCPort?
+	bootstrapPublicKeys := fmt.Sprintf("%v", hex.EncodeToString(bootstrapPubKey.Encode()))
 
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
@@ -540,8 +542,8 @@ func prepareObserverService(container testnet.ContainerConfig, i int, n int, boo
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
 		fmt.Sprintf("--observer-networking-key-path=%s", dockerObserverNetworkKeyPath),
-		fmt.Sprintf("--bootstrap-node-addresses=%s", bootstrapAddress), // TODO SecuredRPCPort?
-		fmt.Sprintf("--bootstrap-node-public-keys=%s", strings.Trim(string(compacted), "\"")),
+		fmt.Sprintf("--bootstrap-node-addresses=%s", bootstrapAddresses),
+		fmt.Sprintf("--bootstrap-node-public-keys=%s", bootstrapPublicKeys),
 		fmt.Sprintf("--public-network-address=%s:%d", "localhost", AccessAPIPort+2*i),
 	}...)
 
