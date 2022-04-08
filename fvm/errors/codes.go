@@ -67,10 +67,11 @@ const (
 
 	// accounts errors 1200 - 1250
 	// ErrCodeAccountError              ErrorCode = 1200 - reserved
-	ErrCodeAccountNotFoundError          ErrorCode = 1201
-	ErrCodeAccountPublicKeyNotFoundError ErrorCode = 1202
-	ErrCodeAccountAlreadyExistsError     ErrorCode = 1203
-	ErrCodeFrozenAccountError            ErrorCode = 1204
+	ErrCodeAccountNotFoundError              ErrorCode = 1201
+	ErrCodeAccountPublicKeyNotFoundError     ErrorCode = 1202
+	ErrCodeAccountAlreadyExistsError         ErrorCode = 1203
+	ErrCodeFrozenAccountError                ErrorCode = 1204
+	ErrCodeAccountStorageNotInitializedError ErrorCode = 1205
 
 	// contract errors 1250 - 1300
 	// ErrCodeContractError          ErrorCode = 1250 - reserved

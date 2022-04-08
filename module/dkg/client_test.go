@@ -132,7 +132,6 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	broadcastedMsg := messages[0]
 	assert.Equal(s.T(), msg.DKGInstanceID, broadcastedMsg.DKGInstanceID)
 	assert.Equal(s.T(), msg.Data, broadcastedMsg.Data)
-	assert.Equal(s.T(), msg.Orig, broadcastedMsg.Orig)
 	assert.Equal(s.T(), msg.Signature, broadcastedMsg.Signature)
 }
 

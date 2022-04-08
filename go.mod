@@ -58,7 +58,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.2.0
-	github.com/onflow/cadence v0.23.2
+	github.com/onflow/cadence v0.23.3
 	github.com/onflow/flow v0.2.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.0
@@ -95,6 +95,7 @@ require (
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
+	golang.org/x/text v0.3.7
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/api v0.63.0
 	google.golang.org/genproto v0.0.0-20220211171837-173942840c17
