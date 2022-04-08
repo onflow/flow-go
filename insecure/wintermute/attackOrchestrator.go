@@ -171,10 +171,11 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 
 		// saves state of attack for further replies
 		o.state = &attackState{
-			originalResult:    &receipt.ExecutionResult,
-			corruptedResult:   corruptedResult,
-			originalChunkIds:  flow.GetIDs(receipt.ExecutionResult.Chunks),
-			corruptedChunkIds: flow.GetIDs(corruptedResult.Chunks),
+			originalResult:         &receipt.ExecutionResult,
+			corruptedResult:        corruptedResult,
+			originalChunkIds:       flow.GetIDs(receipt.ExecutionResult.Chunks),
+			corruptedChunkIds:      flow.GetIDs(corruptedResult.Chunks),
+			corruptedChunkIndexMap: chunkIndexMap(corruptedResult.Chunks),
 		}
 	}
 
@@ -190,13 +191,47 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 		return fmt.Errorf("wrong sender role for chunk data pack request: %s", corruptedIdentity.Role.String())
 	}
 
-	if o.state == nil {
-		// no attack yet conducted, hence bouncing back the chunk data request.
-		err := o.network.Send(chunkDataPackRequestEvent)
-		if err != nil {
-			return fmt.Errorf("could not send rpc on channel: %w", err)
+	if o.state != nil {
+		cdpReq := chunkDataPackRequestEvent.FlowProtocolEvent.(*messages.ChunkDataRequest)
+
+		// a result corruption has already conducted
+		if o.state.corruptedChunkIds.Contains(cdpReq.ChunkID) {
+			// requested chunk belongs to corrupted result.
+			attestation := &flow.Attestation{
+				BlockID:           o.state.corruptedResult.BlockID,
+				ExecutionResultID: o.state.originalResult.ID(),
+				ChunkIndex:        o.state.corruptedChunkIndexMap[cdpReq.ChunkID],
+			}
+
+			// sends an attestation for the corrupted chunk to corrupted verification node.
+			err := o.network.Send(&insecure.Event{
+				CorruptedId:       corruptedIdentity.NodeID,
+				Channel:           chunkDataPackRequestEvent.Channel,
+				Protocol:          chunkDataPackRequestEvent.Protocol,
+				TargetNum:         chunkDataPackRequestEvent.TargetNum,
+				TargetIds:         chunkDataPackRequestEvent.TargetIds,
+				FlowProtocolEvent: attestation,
+			})
+			if err != nil {
+				return fmt.Errorf("could not send attestation for corrupted chunk: %w", err)
+			}
 		}
 	}
 
+	// no result corruption yet conducted, hence bouncing back the chunk data request.
+	err := o.network.Send(chunkDataPackRequestEvent)
+	if err != nil {
+		return fmt.Errorf("could not send rpc on channel: %w", err)
+	}
 	return nil
+}
+
+// chunkIndexMap returns the map from chunks to indices.
+func chunkIndexMap(chunkList flow.ChunkList) map[flow.Identifier]uint64 {
+	cm := make(map[flow.Identifier]uint64)
+	for _, chunk := range chunkList {
+		cm[chunk.ID()] = chunk.Index
+	}
+
+	return cm
 }
