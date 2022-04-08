@@ -6,8 +6,9 @@ import (
 
 // attackState keeps data structures related to a specific wintermute attack instance.
 type attackState struct {
-	originalResult    *flow.ExecutionResult // original valid execution result
-	corruptedResult   *flow.ExecutionResult // corrupted execution result by orchestrator
-	originalChunkIds  flow.IdentifierList   // list of chunk ids of original result
-	corruptedChunkIds flow.IdentifierList   // list of chunk ids of corrupted result
+	originalResult         *flow.ExecutionResult      // original valid execution result
+	corruptedResult        *flow.ExecutionResult      // corrupted execution result by orchestrator
+	originalChunkIds       flow.IdentifierList        // list of chunk ids of original result
+	corruptedChunkIds      flow.IdentifierList        // list of chunk ids of corrupted result
+	corruptedChunkIndexMap map[flow.Identifier]uint64 // map from chunk id to index
 }
