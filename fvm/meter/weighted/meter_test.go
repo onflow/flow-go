@@ -15,14 +15,11 @@ import (
 func TestWeightedComputationMetering(t *testing.T) {
 
 	t.Run("get limits", func(t *testing.T) {
-		var m *weighted.Meter
-		defer func() {
-			m = weighted.NewMeter(
-				1,
-				2,
-				weighted.WithComputationWeights(map[common.ComputationKind]uint64{}),
-				weighted.WithMemoryWeights(map[common.MemoryKind]uint64{}))
-		}()
+		m := weighted.NewMeter(
+			1,
+			2,
+			weighted.WithComputationWeights(map[common.ComputationKind]uint64{}),
+			weighted.WithMemoryWeights(map[common.MemoryKind]uint64{}))
 		require.Equal(t, uint(1), m.TotalComputationLimit())
 		require.Equal(t, uint(2), m.TotalMemoryLimit())
 	})
@@ -292,7 +289,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 				weighted.WithMemoryWeights(map[common.MemoryKind]uint64{
 					0: 0,
 					1: 1,
-					2: 1,
+					2: 2,
 					3: math.MaxUint64,
 				}),
 			)
@@ -314,7 +311,7 @@ func TestWeightedComputationMetering(t *testing.T) {
 		reset()
 		err = m.MeterMemory(1, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(0), m.TotalMemoryUsed())
+		require.Equal(t, uint(1), m.TotalMemoryUsed())
 		reset()
 		err = m.MeterMemory(1, 1)
 		require.NoError(t, err)
@@ -322,20 +319,19 @@ func TestWeightedComputationMetering(t *testing.T) {
 		reset()
 		err = m.MeterMemory(1, math.MaxUint32)
 		require.NoError(t, err)
-		require.Equal(t, uint(1<<16-1), m.TotalMemoryUsed())
+		require.Equal(t, uint(math.MaxUint32), m.TotalMemoryUsed())
 
 		reset()
 		err = m.MeterMemory(2, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(1), m.TotalMemoryUsed())
+		require.Equal(t, uint(2), m.TotalMemoryUsed())
 		reset()
 		err = m.MeterMemory(2, 1)
 		require.NoError(t, err)
-		require.Equal(t, uint(1<<16), m.TotalMemoryUsed())
+		require.Equal(t, uint(2), m.TotalMemoryUsed())
 		reset()
 		err = m.MeterMemory(2, math.MaxUint32)
-		require.NoError(t, err)
-		require.Equal(t, uint(math.MaxUint32), m.TotalMemoryUsed())
+		require.True(t, errors.IsMemoryLimitExceededError(err))
 
 		reset()
 		err = m.MeterMemory(3, 1)
