@@ -1,14 +1,10 @@
 package epochs
 
 import (
-	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
-	"github.com/sethvargo/go-retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -187,28 +183,24 @@ func TestMachineAccountChecking(t *testing.T) {
 // we reach the cap duration, all future backoffs should be equal to the cap duration.
 func TestMachineAccountValidatorBackoff_Overflow(t *testing.T) {
 
-	// large initial value to force a quick overflow, if unhandled
-	backoff := retry.NewExponential(time.Hour * 1000)
-	backoff = retry.WithCappedDuration(time.Microsecond*10, backoff)
-	backoff = retry.WithJitterPercent(5, backoff) // 5% jitter
+	backoff := checkMachineAccountRetryBackoff()
 
-	calls := 0
-	last := time.Now()
-	retry.Do(context.Background(), backoff, func(ctx context.Context) error {
-		calls++
-		fmt.Println(calls, time.Since(last))
+	// once the backoff reaches the maximum, it should remain in [(1-jitter)*max,(1+jitter*max)]
+	max := checkMachineAccountRetryMax + checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
+	min := checkMachineAccountRetryMax - checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
 
-		// assert the time between calls is greater than the cap
-		// an overflow would
-		if calls > 1 {
-			assert.Greater(t, time.Since(last), time.Microsecond*9)
+	lastWait, stop := backoff.Next()
+	assert.False(t, stop)
+	for i := 0; i < 100; i++ {
+		wait, stop := backoff.Next()
+		assert.False(t, stop)
+		// the backoff value should either:
+		// * strictly increase, or
+		// * be within range of max duration + jitter
+		if wait < lastWait {
+			assert.Less(t, min, wait)
+			assert.Less(t, wait, max)
 		}
-		last = time.Now()
-
-		// exit after 60 calls - this is enough to overflow 1000hrs
-		if calls > 60 {
-			return nil
-		}
-		return retry.RetryableError(fmt.Errorf(""))
-	})
+		lastWait = wait
+	}
 }
