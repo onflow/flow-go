@@ -15,13 +15,6 @@ const MeterExecutionInternalPrecisionBytes = 16
 type ExecutionEffortWeights map[common.ComputationKind]uint64
 type ExecutionMemoryWeights map[common.MemoryKind]uint64
 
-// An InvalidMemoryWeightsError indicates that an invalid set of memory weights has been assigned.
-type InvalidMemoryWeightsError struct{}
-
-func (e InvalidMemoryWeightsError) Error() string {
-	return "invalid assignment of memory weights"
-}
-
 var (
 	// DefaultComputationWeights is the default weights for computation intensities
 	// these weighs make the computation metering the same as it was before dynamic execution fees
@@ -202,7 +195,11 @@ func WithComputationWeights(weights ExecutionEffortWeights) WeightedMeterOptions
 // WithMemoryWeights sets the weights for the memory intensities
 func WithMemoryWeights(weights ExecutionMemoryWeights) WeightedMeterOptions {
 	if int(common.MemoryKindLast)-len(weights) != 1 {
-		panic(InvalidMemoryWeightsError{})
+		return func(m *Meter) {
+			for kind, weight := range weights {
+				m.memoryWeights[kind] = weight
+			}
+		}
 	}
 
 	return func(m *Meter) {
@@ -294,7 +291,9 @@ func (m *Meter) TotalComputationLimit() uint {
 // SetMemoryWeights sets the memory weights
 func (m *Meter) SetMemoryWeights(weights ExecutionMemoryWeights) {
 	if int(common.MemoryKindLast)-len(weights) != 1 {
-		panic(InvalidMemoryWeightsError{})
+		for kind, weight := range weights {
+			m.memoryWeights[kind] = weight
+		}
 	}
 	m.memoryWeights = weights
 }
