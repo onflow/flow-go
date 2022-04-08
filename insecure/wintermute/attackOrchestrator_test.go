@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/insecure/wintermute"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -175,13 +176,19 @@ func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
 // Since the attack has not conducted yet, it should bounce back all those events to their origin corrupted node
 // to bounce back in the Flow network intact.
 func TestMultipleConcurrentExecutionReceipts_SameResult_PreAttackCdpRepReq(t *testing.T) {
+	cdpReqs := unittest.ChunkDataPackRequestListFixture(10)
+
 	testConcurrentExecutionReceipts(
 		t,
 		5,    // 5 receipts one per execution node.
 		true, // pairwise receipts of execution nodes have same results.
 		10,   // one corrupted execution result sent to each execution nodes (total 2) + 8 bounced back
 		func(t *testing.T, orchestrator *wintermute.Orchestrator, network *mockinsecure.AttackNetwork) {
+			for _, cdpReq := range cdpReqs {
+				go func() {
 
+				}()
+			}
 		}, func(t *testing.T, outputEvents []*insecure.Event, corrEnIds flow.IdentifierList, orgReceiptIds flow.IdentifierList) {
 			orchestratorOutputSanityCheck(
 				t,
@@ -507,4 +514,47 @@ func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.Identi
 		TargetIds:         targetIds,
 		FlowProtocolEvent: receipt,
 	}
+}
+
+// chunkDataPackRequestForReceipts creates and returns chunk data pack requests as well as their corresponding events for the given set of receipts.
+func chunkDataPackRequestForReceipts(receipts []*flow.ExecutionReceipt) (map[flow.Identifier]*insecure.Event, []*messages.ChunkDataRequest) {
+
+	// stratifies result ids based on executor.
+	executorIds := make(map[flow.Identifier]flow.IdentifierList)
+	for _, receipt := range receipts {
+		resultId := receipt.ExecutionResult.ID()
+		executorIds[resultId] = flow.IdentifierList{receipt.ExecutorID}.Union(executorIds[resultId])
+	}
+
+	cdpReqs := make([]*messages.ChunkDataRequest, 0)
+	cdpReqMap := make(map[flow.Identifier]*insecure.Event)
+	for _, receipt := range receipts {
+		result := receipt.ExecutionResult
+		for _, chunk := range result.Chunks {
+			chunkId := chunk.ID()
+
+			if _, ok := cdpReqMap[chunkId]; ok {
+				// chunk data pack request already created
+				continue
+			}
+
+			cdpReq := &messages.ChunkDataRequest{
+				ChunkID: chunkId,
+			}
+			cdpReqs = append(cdpReqs, cdpReq)
+
+			event := &insecure.Event{
+				CorruptedId:       flow.Identifier{},
+				Channel:           engine.RequestChunks,
+				Protocol:          insecure.Protocol_PUBLISH,
+				TargetNum:         0,
+				TargetIds:         executorIds[result.ID()],
+				FlowProtocolEvent: cdpReq,
+			}
+
+			cdpReqMap[chunkId] = event
+		}
+	}
+
+	return cdpReqMap, cdpReqs
 }
