@@ -355,7 +355,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msg("creating a checkpoint for the new trie")
 
-	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile)
+	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
