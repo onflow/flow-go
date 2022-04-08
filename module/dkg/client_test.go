@@ -57,7 +57,7 @@ func (s *ClientSuite) SetupTest() {
 	// deploy contract
 	s.deployDKGContract()
 
-	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
+	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
 }
 
 func (s *ClientSuite) deployDKGContract() {
@@ -218,7 +218,7 @@ func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*Client {
 	// create clients for each participant
 	clients := make([]*Client, len(participants))
 	for index := range participants {
-		clients[index] = NewClient(zerolog.Nop(), s.emulatorClient, signers[index], s.dkgAddress.String(), addresses[index].String(), 0)
+		clients[index] = NewClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, signers[index], s.dkgAddress.String(), addresses[index].String(), 0)
 	}
 
 	return clients
