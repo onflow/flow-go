@@ -31,7 +31,7 @@ type backendScripts struct {
 
 type scriptMap struct {
 	scripts map[[md5.Size]byte]time.Time // to keep track of unique scripts sent by clients. bounded to 1MB (2^16*2*8) due to fixed key size
-	lock    sync.Mutex
+	lock    sync.RWMutex
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -113,9 +113,9 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
-				b.seenScripts.lock.Lock()
+				b.seenScripts.lock.RLock()
 				timestamp, seen := b.seenScripts.scripts[encodedScript]
-				b.seenScripts.lock.Unlock()
+				b.seenScripts.lock.RUnlock()
 				// log if the script is unique in the time window
 				if !seen || executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
 					b.log.Debug().

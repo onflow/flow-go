@@ -108,7 +108,7 @@ func New(
 			log:               log,
 			seenScripts: scriptMap{
 				scripts: make(map[[md5.Size]byte]time.Time),
-				lock:    sync.Mutex{},
+				lock:    sync.RWMutex{},
 			},
 		},
 		backendTransactions: backendTransactions{
