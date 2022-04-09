@@ -2903,10 +2903,12 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	t.Run("Transaction sequence number check fails and sequence number is not incremented", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 	).
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+				ctx.TransactionFeesEnabled = true
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -2930,10 +2932,15 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
+				balanceBefore := getBalance(vm, chain, ctx, view, accounts[0])
+
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
 				require.Equal(t, uint64(0), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+
+				balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
+				require.Equal(t, balanceAfter, balanceBefore)
 			}),
 	)
 
@@ -2941,10 +2948,12 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 	).
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+				ctx.TransactionFeesEnabled = true
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -2975,11 +2984,14 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				// send it again
 				tx = fvm.Transaction(txBody, 0)
 
+				balanceBefore := getBalance(vm, chain, ctx, view, accounts[0])
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
 				require.Equal(t, uint64(1), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+				balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
+				require.Equal(t, balanceAfter, balanceBefore)
 			}),
 	)
 }
