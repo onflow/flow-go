@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-var _ StatusTrackerFactory = (*storage)(nil)
+var _ StatusTrackerFactory = (*Storage)(nil)
 
 const (
 	prefixGlobalState byte = iota + 1
@@ -31,6 +31,7 @@ const (
 
 const (
 	globalStateLatestIncorporatedHeight = iota + 1
+	globalStateStoredDataLowerBound
 )
 
 func retryOnConflict(db *badger.DB, fn func(txn *badger.Txn) error) error {
@@ -109,8 +110,12 @@ type ExecutionDataRecord struct {
 	RootID      flow.Identifier
 	Completed   bool
 }
-type storage struct {
+type Storage struct {
 	db *badger.DB
+}
+
+func NewStorage(db *badger.DB) *Storage {
+	return &Storage{db: db}
 }
 
 type CheckOptions struct {
@@ -118,7 +123,7 @@ type CheckOptions struct {
 	RemoveExtraneous bool
 }
 
-func (s *storage) checkBlobTreeRecords() (map[cid.Cid]uint64, uint64, *multierror.Error, error) {
+func (s *Storage) checkBlobTreeRecords() (map[cid.Cid]uint64, uint64, *multierror.Error, error) {
 	blobTreeRecordPrefix := []byte{prefixBlobTreeRecord}
 	latestHeightSeen := make(map[cid.Cid]uint64)
 	var latestBlobTreeRecordHeight uint64
@@ -161,7 +166,7 @@ func (s *storage) checkBlobTreeRecords() (map[cid.Cid]uint64, uint64, *multierro
 	return latestHeightSeen, latestBlobTreeRecordHeight, errors, nil
 }
 
-func (s *storage) checkBlobRecords(latestHeightSeen map[cid.Cid]uint64) (*multierror.Error, error) {
+func (s *Storage) checkBlobRecords(latestHeightSeen map[cid.Cid]uint64) (*multierror.Error, error) {
 	blobRecordPrefix := []byte{prefixBlobRecord}
 	var errors *multierror.Error
 
@@ -215,7 +220,7 @@ func (s *storage) checkBlobRecords(latestHeightSeen map[cid.Cid]uint64) (*multie
 	return errors, nil
 }
 
-func (s *storage) checkExecutionDataStatuses(latestBlobTreeRecordHeight uint64) (*multierror.Error, error) {
+func (s *Storage) checkExecutionDataStatuses(latestBlobTreeRecordHeight uint64) (*multierror.Error, error) {
 	executionDataStatusPrefix := []byte{prefixExecutionDataStatus}
 	latestIncorporatedHeightKey := makeGlobalStateKey(globalStateLatestIncorporatedHeight)
 	var minExecutionDataStatusHeight uint64
@@ -283,8 +288,8 @@ func (s *storage) checkExecutionDataStatuses(latestBlobTreeRecordHeight uint64) 
 	return errors, nil
 }
 
-func (s *storage) checkBlobs(blobCids map[cid.Cid]uint64) (*multierror.Error, error) {
-	blobPrefix := []byte{network.BlobServiceDatastoreKeyPrefix}
+func (s *Storage) checkBlobs(blobCids map[cid.Cid]uint64) (*multierror.Error, error) {
+	blobPrefix := network.BlobServiceDatastoreKeyPrefix
 	var errors *multierror.Error
 
 	err := s.db.View(func(txn *badger.Txn) error {
@@ -318,7 +323,7 @@ func (s *storage) checkBlobs(blobCids map[cid.Cid]uint64) (*multierror.Error, er
 	return errors, nil
 }
 
-func (s *storage) Check(options CheckOptions) error {
+func (s *Storage) Check(options CheckOptions) error {
 	latestHeightSeen, latestBlobTreeRecordHeight, errors1, err := s.checkBlobTreeRecords()
 	if err != nil {
 		return err
@@ -355,7 +360,7 @@ func (s *storage) Check(options CheckOptions) error {
 	return multierror.Append(errors1, errors2, errors3, errors4).ErrorOrNil()
 }
 
-func (s *storage) LoadState() (
+func (s *Storage) LoadState() (
 	trackedItems []*ExecutionDataRecord,
 	pendingHeights []uint64,
 	err error,
@@ -418,8 +423,13 @@ func (s *storage) LoadState() (
 	return trackedItems, pendingHeights, nil
 }
 
-func (s *storage) batchDeleteCIDs(cids []cid.Cid, blockHeights []uint64) error {
-	return retryOnConflict(s.db, func(txn *badger.Txn) error {
+func (s *Storage) batchDeleteCIDs(cids []cid.Cid, blockHeights []uint64, deletedCIDs []cid.Cid) (int, error) {
+	var numDeleted int
+
+	err := retryOnConflict(s.db, func(txn *badger.Txn) error {
+
+		n := 0
+
 		for i, c := range cids {
 			blockHeight := blockHeights[i]
 
@@ -457,14 +467,24 @@ func (s *storage) batchDeleteCIDs(cids []cid.Cid, blockHeights []uint64) error {
 				if err != nil {
 					return fmt.Errorf("failed to delete blob: %w", err)
 				}
+				deletedCIDs[n] = c
+				n += 1
 			}
 		}
 
+		numDeleted = n
+
 		return nil
 	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return numDeleted, nil
 }
 
-func (s *storage) getCidsToDelete(height uint64) ([]cid.Cid, []uint64, error) {
+func (s *Storage) getCidsToDelete(height uint64) ([]cid.Cid, []uint64, error) {
 	var cidsToDelete []cid.Cid
 	var blockHeights []uint64
 
@@ -504,10 +524,14 @@ func (s *storage) getCidsToDelete(height uint64) ([]cid.Cid, []uint64, error) {
 	return cidsToDelete, blockHeights, nil
 }
 
-func (s *storage) Bootstrap(startHeight uint64) error {
+func (s *Storage) Bootstrap(startHeight uint64) error {
 	latestIncorporatedHeightKey := makeGlobalStateKey(globalStateLatestIncorporatedHeight)
 	latestIncorporatedHeightValue := make([]byte, 8)
 	binary.LittleEndian.PutUint64(latestIncorporatedHeightValue, startHeight)
+
+	storedDataLowerBoundKey := makeGlobalStateKey(globalStateStoredDataLowerBound)
+	storedDataLowerBoundValue := make([]byte, 8)
+	binary.LittleEndian.PutUint64(storedDataLowerBoundValue, startHeight)
 
 	return s.db.Update(func(txn *badger.Txn) error {
 		err := txn.Set(latestIncorporatedHeightKey, latestIncorporatedHeightValue)
@@ -515,18 +539,102 @@ func (s *storage) Bootstrap(startHeight uint64) error {
 			return fmt.Errorf("failed to set latest incorporated height: %w", err)
 		}
 
+		err = txn.Set(storedDataLowerBoundKey, storedDataLowerBoundValue)
+		if err != nil {
+			return fmt.Errorf("failed to set stored data lower bound: %w", err)
+		}
+
 		return nil
 	})
+}
+
+func (s *Storage) GetLatestIncorporatedHeight() (uint64, error) {
+	latestIncorporatedHeightKey := makeGlobalStateKey(globalStateLatestIncorporatedHeight)
+	var latestIncorporatedHeight uint64
+
+	err := s.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(latestIncorporatedHeightKey)
+		if err != nil {
+			return fmt.Errorf("failed to get latest incorporated height: %w", err)
+		}
+
+		latestIncorporatedHeightValue, err := item.ValueCopy(nil)
+		if err != nil {
+			return fmt.Errorf("failed to get latest incorporated height value: %w", err)
+		}
+
+		latestIncorporatedHeight = binary.LittleEndian.Uint64(latestIncorporatedHeightValue)
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return latestIncorporatedHeight, nil
+}
+
+// Get returns the maximum h such that the storage contains no data for any block heights <= h
+// TODO: please help me think of a better name for this function
+func (s *Storage) GetStoredDataLowerBound() (uint64, error) {
+	// TODO: need to add stuff to Check() to check the correctness of this.
+
+	storedDataLowerBoundKey := makeGlobalStateKey(globalStateStoredDataLowerBound)
+	var storedDataLowerBound uint64
+
+	err := s.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(storedDataLowerBoundKey)
+		if err != nil {
+			return fmt.Errorf("failed to get stored data lower bound: %w", err)
+		}
+
+		storedDataLowerBoundValue, err := item.ValueCopy(nil)
+		if err != nil {
+			return fmt.Errorf("failed to get stored data lower bound value: %w", err)
+		}
+
+		storedDataLowerBound = binary.LittleEndian.Uint64(storedDataLowerBoundValue)
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return storedDataLowerBound, nil
 }
 
 // Prune removes all data from storage corresponding to block heights lower than or equal to the given height.
 // This includes all blob tree records, blob records, and blob data.
 // This should only be called with height <= latest incorporated height.
-func (s *storage) Prune(height uint64) error {
+func (s *Storage) Prune(height uint64) ([]cid.Cid, error) {
+	storedDataLowerBoundKey := makeGlobalStateKey(globalStateStoredDataLowerBound)
+	storedDataLowerBoundValue := make([]byte, 8)
+	binary.LittleEndian.PutUint64(storedDataLowerBoundValue, height)
+
+	/// TODO: Probably we need to perform Replay function or similar in the Init call.
+	err := s.db.Update(func(txn *badger.Txn) error {
+		err := txn.Set(storedDataLowerBoundKey, storedDataLowerBoundValue)
+		if err != nil {
+			return fmt.Errorf("failed to set stored data lower bound: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	cidsToDelete, blockHeights, err := s.getCidsToDelete(height)
 	if err != nil {
-		return fmt.Errorf("failed to gather list of CIDs for deletion: %w", err)
+		return nil, fmt.Errorf("failed to gather list of CIDs for deletion: %w", err)
 	}
+
+	deletedCIDs := make([]cid.Cid, len(cidsToDelete))
+	numDeleted := 0
 
 	writeCountPerCid := 3
 	writeSizePerCid := 3*2 + blobTreeRecordKeyLength + blobRecordKeyLength + network.BlobServiceDatastoreKeyLength
@@ -546,19 +654,20 @@ func (s *storage) Prune(height uint64) error {
 			batchSize = len(cidsToDelete)
 		}
 
-		err := s.batchDeleteCIDs(cidsToDelete[:batchSize], blockHeights[:batchSize])
+		n, err := s.batchDeleteCIDs(cidsToDelete[:batchSize], blockHeights[:batchSize], deletedCIDs[numDeleted:])
 		if err != nil {
-			return fmt.Errorf("failed to delete CIDs: %w", err)
+			return nil, fmt.Errorf("failed to delete CIDs: %w", err)
 		}
 
+		numDeleted += n
 		cidsToDelete = cidsToDelete[batchSize:]
 		blockHeights = blockHeights[batchSize:]
 	}
 
-	return nil
+	return deletedCIDs[:numDeleted], nil
 }
 
-func (s *storage) GetStatusTracker(blockID flow.Identifier, blockHeight uint64, executionDataID flow.Identifier) StatusTracker {
+func (s *Storage) GetStatusTracker(blockID flow.Identifier, blockHeight uint64, executionDataID flow.Identifier) StatusTracker {
 	return &executionDataStatusTracker{
 		db:          s.db,
 		blockID:     blockID,
@@ -608,6 +717,7 @@ func (s *executionDataStatusTracker) trackBlob(txn *badger.Txn, c cid.Cid) error
 	return nil
 }
 
+// TODO: if this is called in the wrong order, return error
 func (s *executionDataStatusTracker) StartTransfer() error {
 	executionDataStatusKey := makeExecutionDataStatusKey(s.blockHeight)
 	executionDataStatusValue := makeExecutionDataStatusValue(s.blockID, s.rootID)
@@ -630,8 +740,12 @@ func (s *executionDataStatusTracker) StartTransfer() error {
 	})
 }
 
+// TODO: if this is called in the wrong order, return error
 func (s *executionDataStatusTracker) TrackBlobs(cids []cid.Cid) error {
 	// TODO: handle ErrTxnTooBig
+	// NOTE: if we do handle this, then it's possible certain assumptions
+	// in Check will no longer hold.
+	// Maybe we need to perform Replay function or similar in the Init call.
 
 	return retryOnConflict(s.db, func(txn *badger.Txn) error {
 		for _, c := range cids {
@@ -644,6 +758,7 @@ func (s *executionDataStatusTracker) TrackBlobs(cids []cid.Cid) error {
 	})
 }
 
+// TODO: if this is called in the wrong order, return error
 // TODO: handle ErrTxnTooBig
 func (s *executionDataStatusTracker) FinishTransfer() (latestIncorporatedHeight uint64, err error) {
 	executionDataStatusKey := makeExecutionDataStatusKey(s.blockHeight)

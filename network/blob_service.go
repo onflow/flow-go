@@ -5,6 +5,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	dshelp "github.com/ipfs/go-ipfs-ds-help"
 	"github.com/multiformats/go-base32"
 
@@ -54,15 +55,15 @@ type BlobService interface {
 
 type BlobServiceOption func(BlobService)
 
-var BlobServiceDatastoreKeyLength = 1 + base32.RawStdEncoding.EncodedLen(blobs.CidLength)
-var BlobServiceDatastoreKeyPrefix byte = '/'
+var BlobServiceDatastoreKeyLength = len(blockstore.BlockPrefix.Bytes()) + 1 + base32.RawStdEncoding.EncodedLen(blobs.CidLength)
+var BlobServiceDatastoreKeyPrefix []byte = append(blockstore.BlockPrefix.Bytes(), '/')
 
 func BlobServiceDatastoreKeyFromCid(c cid.Cid) datastore.Key {
-	return dshelp.NewKeyFromBinary(c.Bytes())
+	return blockstore.BlockPrefix.Child(dshelp.NewKeyFromBinary(c.Bytes()))
 }
 
 func CidFromBlobServiceDatastoreKey(k datastore.Key) (cid.Cid, error) {
-	b, err := base32.RawStdEncoding.DecodeString(k.String()[1:])
+	b, err := base32.RawStdEncoding.DecodeString(k.String()[len(blockstore.BlockPrefix.Bytes())+1:])
 	if err != nil {
 		return cid.Undef, err
 	}
