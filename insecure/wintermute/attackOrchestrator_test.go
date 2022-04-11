@@ -623,8 +623,10 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 			require.True(t, ok)
 
 			// checking content of attestation
-			blockID := wintermuteOrchestrator.state.corruptedResult.BlockID
-			require.Equal(t, attestation.BlockID, blockID)
+			require.Equal(t, attestation.BlockID, wintermuteOrchestrator.state.corruptedResult.BlockID)
+			require.Equal(t, attestation.ExecutionResultID, wintermuteOrchestrator.state.corruptedResult.ID())
+			chunk := wintermuteOrchestrator.state.corruptedResult.Chunks[attestation.ChunkIndex]
+			require.True(t, wintermuteOrchestrator.state.corruptedChunkIds.Contains(chunk.ID())) // attestation must be for a corrupted chunk
 
 			corruptedAttestationWG.Done()
 		}).Return(nil)
@@ -653,8 +655,13 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 		}
 	}
 
-	unittest.RequireReturnsBefore(t, corruptedChunkRequestWG.Wait, 1*time.Second, "could not send all chunk data pack requests on time")
-	// waits till corrupted receipts dictated to all execution nodes.
+	// waits till all chunk data pack requests are sent to orchestrator
+	unittest.RequireReturnsBefore(t,
+		corruptedChunkRequestWG.Wait,
+		1*time.Second,
+		"could not send all chunk data pack requests on time")
+
+	// waits till all chunk data pack requests replied with corrupted attestation.
 	unittest.RequireReturnsBefore(t,
 		corruptedAttestationWG.Wait,
 		1*time.Second,
