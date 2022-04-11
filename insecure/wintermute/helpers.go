@@ -16,7 +16,7 @@ func chunkDataPackRequestForReceipts(
 	receipts []*flow.ExecutionReceipt, // set of receipts for which chunk data pack requests are created.
 	corVnIds flow.IdentifierList, // identifier of corrupted verification nodes.
 	// returns:
-	// map of chunk ids -> chunk data pack requests from each of corrupted verificaiton nodes.
+	// map of chunk ids -> chunk data pack requests from each of corrupted verification nodes.
 	// list of chunk ids in the receipt.
 ) (map[flow.Identifier][]*insecure.Event, flow.IdentifierList) {
 
