@@ -215,6 +215,8 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 			if err != nil {
 				return fmt.Errorf("could not send attestation for corrupted chunk: %w", err)
 			}
+
+			return nil
 		}
 	}
 
