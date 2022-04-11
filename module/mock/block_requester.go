@@ -17,9 +17,9 @@ func (_m *BlockRequester) Prune(final *flow.Header) {
 	_m.Called(final)
 }
 
-// RequestBlock provides a mock function with given fields: blockID
-func (_m *BlockRequester) RequestBlock(blockID flow.Identifier) {
-	_m.Called(blockID)
+// RequestBlock provides a mock function with given fields: blockID, height
+func (_m *BlockRequester) RequestBlock(blockID flow.Identifier, height uint64) {
+	_m.Called(blockID, height)
 }
 
 // RequestHeight provides a mock function with given fields: height
