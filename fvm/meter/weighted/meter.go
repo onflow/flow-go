@@ -241,7 +241,7 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter, enforceLimits bool) error
 	if basic, ok := child.(*Meter); ok {
 		childMemoryUsed = basic.memoryUsed
 	} else {
-		childMemoryUsed = uint64(child.TotalMemoryUsed()) << MeterExecutionInternalPrecisionBytes
+		childMemoryUsed = uint64(child.TotalMemoryUsed())
 	}
 	m.memoryUsed = m.memoryUsed + childMemoryUsed
 	if enforceLimits && m.memoryUsed > m.memoryLimit {
