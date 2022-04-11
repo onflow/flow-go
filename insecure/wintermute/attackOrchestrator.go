@@ -57,7 +57,10 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 		if err := o.handleChunkDataPackRequestEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack request event: %w", err)
 		}
-
+	case *messages.ChunkDataResponse:
+		if err := o.handleChunkDataPackResponseEvent(event); err != nil {
+			return fmt.Errorf("could not handle chunk data pack response event: %w", err)
+		}
 	default:
 		return fmt.Errorf("unexpected message type for wintermute attack orchestrator: %T", protocolEvent)
 	}
@@ -142,6 +145,10 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 	return nil
 }
 
+// handleChunkDataPackRequestEvent processes a chunk data pack request event as follows:
+// If request is for a corrupted chunk and comes from a corrupted verification node it is replied wtih an attestation for that
+// chunk.
+// Otherwise, it is bounced back.
 func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.Event) error {
 	corruptedIdentity, ok := o.corruptedIds.ByNodeID(chunkDataPackRequestEvent.CorruptedId)
 	if !ok {
