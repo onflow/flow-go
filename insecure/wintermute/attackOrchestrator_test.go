@@ -191,7 +191,7 @@ func TestMultipleConcurrentExecutionReceipts_SameResult_PreAttackCdpRepReq(t *te
 		func(t *testing.T, orchestrator *Orchestrator, network *mockinsecure.AttackNetwork, corruptedIds flow.IdentityList) {
 
 			corruptedVerIds := corruptedIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs()
-			cdpReqMap, cdpReqs = chunkDataPackRequestForReceipts([]*flow.ExecutionReceipt{receipt}, corruptedVerIds)
+			cdpReqMap, cdpReqs = chunkDataPackRequestForReceipts(t, []*flow.ExecutionReceipt{receipt}, corruptedVerIds)
 
 			wg := &sync.WaitGroup{}
 
@@ -625,7 +625,7 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
 
 	// chunk data pack request event for original receipt
-	cdpReqs, _ := chunkDataPackRequestForReceipts(
+	cdpReqs, _ := chunkDataPackRequestForReceipts(t,
 		[]*flow.ExecutionReceipt{unittest.ExecutionReceiptFixture(unittest.WithResult(corruptedResult))},
 		corruptedVerIds)
 
@@ -671,7 +671,7 @@ func TestBouncingBackChunkDataRequests(t *testing.T) {
 		unittest.WithResult(
 			unittest.ExecutionResultFixture(
 				unittest.WithChunks(uint(totalChunks)))))
-	cdpReqs, chunkIds := chunkDataPackRequestForReceipts([]*flow.ExecutionReceipt{receipt}, corruptedVerIds)
+	cdpReqs, chunkIds := chunkDataPackRequestForReceipts(t, []*flow.ExecutionReceipt{receipt}, corruptedVerIds)
 
 	chunkRequestBouncedBack := &sync.WaitGroup{}
 	chunkRequestBouncedBack.Add(totalChunks * len(corruptedVerIds))
