@@ -539,57 +539,6 @@ func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.Identi
 	}
 }
 
-// chunkDataPackRequestForReceipts creates and returns chunk data pack requests as well as their corresponding events for the given set of receipts.
-func chunkDataPackRequestForReceipts(receipts []*flow.ExecutionReceipt, corruptedVerIds flow.IdentifierList) (map[flow.Identifier][]*insecure.Event,
-	flow.IdentifierList) {
-
-	// stratifies result ids based on executor.
-	executorIds := make(map[flow.Identifier]flow.IdentifierList)
-	for _, receipt := range receipts {
-		resultId := receipt.ExecutionResult.ID()
-		executorIds[resultId] = flow.IdentifierList{receipt.ExecutorID}.Union(executorIds[resultId])
-	}
-
-	chunkIds := flow.IdentifierList{}
-	cdpReqMap := make(map[flow.Identifier][]*insecure.Event)
-	for _, receipt := range receipts {
-		result := receipt.ExecutionResult
-		for _, chunk := range result.Chunks {
-			chunkId := chunk.ID()
-
-			if _, ok := cdpReqMap[chunkId]; ok {
-				// chunk data pack request already created
-				continue
-			}
-
-			cdpReq := &messages.ChunkDataRequest{
-				ChunkID: chunkId,
-			}
-			chunkIds = chunkIds.Union(flow.IdentifierList{chunkId})
-
-			requests := make([]*insecure.Event, 0)
-
-			// creates a request event per verification node
-			for _, verId := range corruptedVerIds {
-				event := &insecure.Event{
-					CorruptedId:       verId,
-					Channel:           engine.RequestChunks,
-					Protocol:          insecure.Protocol_PUBLISH,
-					TargetNum:         0,
-					TargetIds:         executorIds[result.ID()],
-					FlowProtocolEvent: cdpReq,
-				}
-
-				requests = append(requests, event)
-			}
-
-			cdpReqMap[chunkId] = requests
-		}
-	}
-
-	return cdpReqMap, chunkIds
-}
-
 // chunkDataPackResponseForReceipts creates and returns chunk data pack response as well as their corresponding events for the given set of receipts.
 func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds flow.IdentifierList) ([]*insecure.Event, flow.IdentifierList) {
 	chunkIds := flow.IdentifierList{}
