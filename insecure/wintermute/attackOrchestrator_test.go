@@ -590,6 +590,45 @@ func chunkDataPackRequestForReceipts(receipts []*flow.ExecutionReceipt, corrupte
 	return cdpReqMap, chunkIds
 }
 
+// chunkDataPackResponseForReceipts creates and returns chunk data pack response as well as their corresponding events for the given set of receipts.
+func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds flow.IdentifierList) ([]*insecure.Event, flow.IdentifierList) {
+	chunkIds := flow.IdentifierList{}
+	responseList := make([]*insecure.Event, 0)
+
+	for _, receipt := range receipts {
+		result := receipt.ExecutionResult
+		for _, chunk := range result.Chunks {
+			chunkId := chunk.ID()
+
+			if chunkIds.Contains(chunkId) {
+				// chunk data pack request already created
+				continue
+			}
+
+			cdpRep := &messages.ChunkDataResponse{
+				ChunkDataPack: *unittest.ChunkDataPackFixture(chunkId),
+			}
+			chunkIds = chunkIds.Union(flow.IdentifierList{chunkId})
+
+			// creates a request event per verification node
+			for _, verId := range verIds {
+				event := &insecure.Event{
+					CorruptedId:       receipt.ExecutorID,
+					Channel:           engine.RequestChunks,
+					Protocol:          insecure.Protocol_PUBLISH,
+					TargetNum:         0,
+					TargetIds:         flow.IdentifierList{verId},
+					FlowProtocolEvent: cdpRep,
+				}
+
+				responseList = append(responseList, event)
+			}
+		}
+	}
+
+	return responseList, chunkIds
+}
+
 // TestRespondingWithCorruptedAttestation evaluates when the Wintermute orchestrator receives a chunk data pack request from a CORRUPTED
 //	verification node for a CORRUPTED chunk, it replies that with a result approval attestation.
 func TestRespondingWithCorruptedAttestation(t *testing.T) {
@@ -698,6 +737,73 @@ func TestBouncingBackChunkDataRequests(t *testing.T) {
 
 			// since no attack yet conducted, the chunk data request must bounce back.
 			request, ok := event.FlowProtocolEvent.(*messages.ChunkDataRequest)
+			require.True(t, ok)
+
+			// request must be a bounced back
+			require.True(t, chunkIds.Contains(request.ChunkID))
+
+			chunkRequestBouncedBack.Done()
+		}).Return(nil)
+
+	// registers mock network with orchestrator
+	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
+
+	corruptedChunkRequestWG := &sync.WaitGroup{}
+	corruptedChunkRequestWG.Add(totalChunks * len(corruptedVerIds))
+	for _, cdpReqList := range cdpReqs {
+		for _, cdpReq := range cdpReqList {
+			cdpReq := cdpReq // suppress loop variable
+
+			go func() {
+				err := wintermuteOrchestrator.HandleEventFromCorruptedNode(cdpReq)
+				require.NoError(t, err)
+
+				corruptedChunkRequestWG.Done()
+			}()
+		}
+	}
+
+	// waits till all chunk data pack requests are sent to orchestrator
+	unittest.RequireReturnsBefore(t,
+		corruptedChunkRequestWG.Wait,
+		1*time.Second,
+		"could not send all chunk data pack requests on time")
+
+	// waits till all chunk data pack requests replied with corrupted attestation.
+	unittest.RequireReturnsBefore(t,
+		chunkRequestBouncedBack.Wait,
+		1*time.Second,
+		"orchestrator could not send corrupted attestations on time")
+}
+
+// TestBouncingBackChunkDataRequests evaluates when no attacks yet conducted, all chunk data pack requests from corrupted
+// verification nodes are bounced back.
+func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
+	totalChunks := 10
+	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	corruptedVerIds := flow.IdentifierList(corruptedIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs())
+	wintermuteOrchestrator := NewOrchestrator(allIds, corruptedIds, unittest.Logger())
+
+	wintermuteOrchestrator.state = state
+
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithChunks(uint(totalChunks)))))
+	cdpReqs, chunkIds := chunkDataPackRequestForReceipts([]*flow.ExecutionReceipt{receipt}, corruptedVerIds)
+
+	chunkRequestBouncedBack := &sync.WaitGroup{}
+	chunkRequestBouncedBack.Add(totalChunks * len(corruptedVerIds))
+	// mocks attack network to record and keep the output events of orchestrator
+	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	mockAttackNetwork.On("Send", mock.Anything).
+		Run(func(args mock.Arguments) {
+			// assert that args passed are correct
+			// extracts Event sent
+			event, ok := args[0].(*insecure.Event)
+			require.True(t, ok)
+
+			request, ok := event.FlowProtocolEvent.(*messages.ChunkDataResponse)
 			require.True(t, ok)
 
 			// request must be a bounced back
