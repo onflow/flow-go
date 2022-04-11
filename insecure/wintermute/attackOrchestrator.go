@@ -192,32 +192,7 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 	}
 
 	if o.state != nil {
-		cdpReq := chunkDataPackRequestEvent.FlowProtocolEvent.(*messages.ChunkDataRequest)
-
-		// a result corruption has already conducted
-		if o.state.corruptedChunkIds.Contains(cdpReq.ChunkID) {
-			// requested chunk belongs to corrupted result.
-			attestation := &flow.Attestation{
-				BlockID:           o.state.corruptedResult.BlockID,
-				ExecutionResultID: o.state.originalResult.ID(),
-				ChunkIndex:        o.state.corruptedChunkIndexMap[cdpReq.ChunkID],
-			}
-
-			// sends an attestation for the corrupted chunk to corrupted verification node.
-			err := o.network.Send(&insecure.Event{
-				CorruptedId:       corruptedIdentity.NodeID,
-				Channel:           chunkDataPackRequestEvent.Channel,
-				Protocol:          chunkDataPackRequestEvent.Protocol,
-				TargetNum:         chunkDataPackRequestEvent.TargetNum,
-				TargetIds:         chunkDataPackRequestEvent.TargetIds,
-				FlowProtocolEvent: attestation,
-			})
-			if err != nil {
-				return fmt.Errorf("could not send attestation for corrupted chunk: %w", err)
-			}
-
-			return nil
-		}
+		return o.replyWithAttestation(chunkDataPackRequestEvent)
 	}
 
 	// no result corruption yet conducted, hence bouncing back the chunk data request.
@@ -225,6 +200,35 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 	if err != nil {
 		return fmt.Errorf("could not send rpc on channel: %w", err)
 	}
+	return nil
+}
+
+func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.Event) error {
+	cdpReq := chunkDataPackRequestEvent.FlowProtocolEvent.(*messages.ChunkDataRequest)
+
+	// a result corruption has already conducted
+	if o.state.corruptedChunkIds.Contains(cdpReq.ChunkID) {
+		// requested chunk belongs to corrupted result.
+		attestation := &flow.Attestation{
+			BlockID:           o.state.corruptedResult.BlockID,
+			ExecutionResultID: o.state.corruptedResult.ID(),
+			ChunkIndex:        o.state.corruptedChunkIndexMap[cdpReq.ChunkID],
+		}
+
+		// sends an attestation for the corrupted chunk to corrupted verification node.
+		err := o.network.Send(&insecure.Event{
+			CorruptedId:       chunkDataPackRequestEvent.CorruptedId,
+			Channel:           chunkDataPackRequestEvent.Channel,
+			Protocol:          chunkDataPackRequestEvent.Protocol,
+			TargetNum:         chunkDataPackRequestEvent.TargetNum,
+			TargetIds:         chunkDataPackRequestEvent.TargetIds,
+			FlowProtocolEvent: attestation,
+		})
+		if err != nil {
+			return fmt.Errorf("could not send attestation for corrupted chunk: %w", err)
+		}
+	}
+
 	return nil
 }
 
