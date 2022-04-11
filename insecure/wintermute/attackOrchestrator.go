@@ -65,46 +65,6 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 	return nil
 }
 
-// TODO: how do we keep track of state between calls to HandleEventFromCorruptedNode()?
-// there will be many events sent to the orchestrator and we need a way to co-ordinate all the event calls
-
-//switch corruptedIdentity.Role {
-//case flow.RoleVerification:
-//	// if the event is a chunk data request for any of the chunks of the corrupted result, then:
-//	// if coming from an honest verification node -> do nothing (wintermuting the honest verification node).
-//	// if coming from a corrupted verification node -> create and send the result approval for the requested
-//	// chunk
-//	// request coming from verification node
-//
-//	request := event.FlowProtocolEvent.(*messages.ChunkDataRequest)
-//	request.ChunkID.String()
-//
-//	// go through the saved list of corrupted execution receipt - there should only be 1 execution receipt
-//	// go through the execution result (should only be 1) in that execution receipt
-//	// go through all the chunks in that execution result and check for a match with "ChunkID flow.Identifier" from ChunkDataRequest
-//	// if no matches across all chunks, then send (we'll go over next time)
-//	// if there is match, fill in result approval (attestation part) and send to verification node
-//
-//	// we need to lookup the chunk with the requested chunk id
-//	// if that chunk belongs to the corrupted result
-//	// we need to fill in an approval for it.
-//	approval := flow.ResultApproval{
-//		Body: flow.ResultApprovalBody{
-//			// attestation needs to be filled in
-//			//
-//			Attestation: flow.Attestation{
-//				BlockID:           flow.Identifier{},
-//				ExecutionResultID: flow.Identifier{},
-//				ChunkIndex:        0,
-//			},
-//			ApproverID:           flow.Identifier{}, // should be filled by corrupted VN ID
-//			AttestationSignature: nil,               // can be done later (at verification node side)
-//			Spock:                nil,               // can be done later (at verification node side)
-//		},
-//		VerifierSignature: nil,
-//	}
-//	approval.ID()
-
 // corruptExecutionResult creates a corrupted version of the input receipt by tampering its content so that
 // the resulted corrupted version would not pass verification.
 func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *flow.ExecutionResult {
@@ -198,7 +158,30 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 	// no result corruption yet conducted, hence bouncing back the chunk data request.
 	err := o.network.Send(chunkDataPackRequestEvent)
 	if err != nil {
-		return fmt.Errorf("could not send rpc on channel: %w", err)
+		return fmt.Errorf("could not send chunk data request: %w", err)
+	}
+	return nil
+}
+
+// handleChunkDataPackResponseEvent Wintermutes the chunk data pack reply if it belongs to a corrupted result, and is meant to
+// be sent to an honest verification node. Otherwise, it bounces it back.
+func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent *insecure.Event) error {
+	if o.state != nil {
+		cdpRep := chunkDataPackReplyEvent.FlowProtocolEvent.(*messages.ChunkDataResponse)
+
+		// chunk data pack reply goes over a unicast, hence, we only check first target id.
+		_, ok := o.corruptedIds.ByNodeID(chunkDataPackReplyEvent.TargetIds[0])
+		if !ok && o.state.corruptedChunkIds.Contains(cdpRep.ChunkDataPack.ChunkID) {
+			// this is a chunk data pack response for a CORRUPTED chunk to an HONEST verification node
+			// we WINTERMUTE it!
+			return nil
+		}
+	}
+
+	// no result corruption yet conducted, hence bouncing back the chunk data request.
+	err := o.network.Send(chunkDataPackReplyEvent)
+	if err != nil {
+		return fmt.Errorf("could not bounce back chunk data reply: %w", err)
 	}
 	return nil
 }
