@@ -776,10 +776,26 @@ func TestBouncingBackChunkDataRequests(t *testing.T) {
 		"orchestrator could not send corrupted attestations on time")
 }
 
-// TestBouncingBackChunkDataRequests evaluates all chunk data pack responses that do not match the corrupted chunk are bounced back from
+// TestBouncingBackChunkDataResponse_NoAttack evaluates all chunk data pack responses that do not match the corrupted chunk are bounced back from
 // orchestrator. In this test, the state of orchestrator is set to nil meaning no attack has been conducted yet.
 func TestBouncingBackChunkDataResponse_NoAttack(t *testing.T) {
 	testBouncingBackChunkDataResponse(t, nil)
+}
+
+// TestBouncingBackChunkDataResponse_WithAttack evaluates all chunk data pack responses that do not match the corrupted chunk are bounced back from
+// orchestrator. In this test, the state of orchestrator is set, meaning an attack has already been conducted.
+func TestBouncingBackChunkDataResponse_WithAttack(t *testing.T) {
+	originalResult := unittest.ExecutionResultFixture()
+	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
+	state := &attackState{
+		originalResult:         originalResult,
+		corruptedResult:        corruptedResult,
+		originalChunkIds:       flow.GetIDs(originalResult.Chunks),
+		corruptedChunkIds:      flow.GetIDs(corruptedResult.Chunks),
+		corruptedChunkIndexMap: chunkIndexMap(corruptedResult.Chunks),
+	}
+
+	testBouncingBackChunkDataResponse(t, state)
 }
 
 // testBouncingBackChunkDataRequests evaluates all chunk data pack responses that do not match the corrupted chunk are bounced back from
