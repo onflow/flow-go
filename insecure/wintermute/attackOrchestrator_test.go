@@ -830,7 +830,7 @@ func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
 			require.True(t, ok)
 
 			// response must be a bounced back
-			require.True(t, chunkIds.Contains(response.ChunkDataPack.ChunkID))
+			require.Contains(t, cdpReps, event)
 
 			chunkResponseBouncedBack.Done()
 		}).Return(nil)
