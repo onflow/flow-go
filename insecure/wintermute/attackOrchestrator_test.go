@@ -864,3 +864,51 @@ func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
 		1*time.Second,
 		"orchestrator could not bounce back chunk data responses on time")
 }
+
+// TestWintermuteChunkResponseForCorruptedChunks evaluates that chunk data responses for corrupted chunks that are sent by corrupted execution nodes
+// to HONEST verification nodes are wintermuted (i.e., dropped) by orchestrator.
+func TestWintermuteChunkResponseForCorruptedChunks(t *testing.T) {
+	totalChunks := 10
+	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	honestVnIds := flow.IdentifierList(
+		allIds.Filter(filter.And(
+			filter.HasRole(flow.RoleVerification),
+			filter.Not(filter.In(corruptedIds)))).NodeIDs())
+	wintermuteOrchestrator := NewOrchestrator(allIds, corruptedIds, unittest.Logger())
+
+	originalResult := unittest.ExecutionResultFixture()
+	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
+	state := &attackState{
+		originalResult:         originalResult,
+		corruptedResult:        corruptedResult,
+		originalChunkIds:       flow.GetIDs(originalResult.Chunks),
+		corruptedChunkIds:      flow.GetIDs(corruptedResult.Chunks),
+		corruptedChunkIndexMap: chunkIndexMap(corruptedResult.Chunks),
+	}
+	wintermuteOrchestrator.state = state
+
+	// creates chunk data pack response of corrupted chunks for HONEST verification nodes
+	cdpReps, _ := chunkDataPackResponseForReceipts(
+		[]*flow.ExecutionReceipt{unittest.ExecutionReceiptFixture(unittest.WithResult(corruptedResult))},
+		honestVnIds)
+
+	// sends responses to the orchestrator
+	corruptedChunkResponseWG := &sync.WaitGroup{}
+	corruptedChunkResponseWG.Add(totalChunks * len(honestVnIds))
+	for _, cdpRep := range cdpReps {
+		cdpRep := cdpRep // suppress loop variable
+
+		go func() {
+			err := wintermuteOrchestrator.HandleEventFromCorruptedNode(cdpRep)
+			require.NoError(t, err)
+
+			corruptedChunkResponseWG.Done()
+		}()
+	}
+
+	// waits till all chunk data pack responses are sent to orchestrator
+	unittest.RequireReturnsBefore(t,
+		corruptedChunkResponseWG.Wait,
+		1*time.Second,
+		"could not send all chunk data pack responses on time")
+}
