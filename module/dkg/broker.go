@@ -165,10 +165,7 @@ func (b *Broker) Broadcast(data []byte) {
 			log.Fatal().Err(err).Msg("failed to create broadcast message")
 		}
 
-		backoff, err := retry.NewExponential(b.config.RetryInitialWait)
-		if err != nil {
-			log.Fatal().Err(err).Msg("create retry mechanism")
-		}
+		backoff := retry.NewExponential(b.config.RetryInitialWait)
 		backoff = retry.WithMaxRetries(b.config.PublishMaxRetries, backoff)
 		backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
@@ -221,10 +218,7 @@ func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.Public
 		pubKeys = make([]crypto.PublicKey, len(b.committee))
 	}
 
-	backoff, err := retry.NewExponential(b.config.RetryInitialWait)
-	if err != nil {
-		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
-	}
+	backoff := retry.NewExponential(b.config.RetryInitialWait)
 	backoff = retry.WithMaxRetries(b.config.PublishMaxRetries, backoff)
 	backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
@@ -236,7 +230,7 @@ func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.Public
 	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
 	attempts := 1
-	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
+	err := retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 		err := dkgContractClient.SubmitResult(groupKey, pubKeys)
 		if err != nil {
 			b.log.Error().Err(err).Msgf("error submitting DKG result, retrying (attempt %d)", attempts)
@@ -303,10 +297,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	b.pollLock.Lock()
 	defer b.pollLock.Unlock()
 
-	backoff, err := retry.NewExponential(b.config.RetryInitialWait)
-	if err != nil {
-		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
-	}
+	backoff := retry.NewExponential(b.config.RetryInitialWait)
 	backoff = retry.WithMaxRetries(b.config.ReadMaxRetries, backoff)
 	backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
@@ -318,6 +309,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
 	var msgs []messages.BroadcastDKGMessage
+	var err error
 	attempt := 1
 	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 		msgs, err = dkgContractClient.ReadBroadcast(b.messageOffset, referenceBlock)
