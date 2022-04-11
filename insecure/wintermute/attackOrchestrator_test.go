@@ -593,12 +593,13 @@ func chunkDataPackRequestForReceipts(receipts []*flow.ExecutionReceipt, corrupte
 // TestRespondingWithCorruptedAttestation evaluates when the Wintermute orchestrator receives a chunk data pack request from a CORRUPTED
 //	verification node for a CORRUPTED chunk, it replies that with a result approval attestation.
 func TestRespondingWithCorruptedAttestation(t *testing.T) {
+	totalChunks := 10
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 	corruptedVerIds := flow.IdentifierList(corruptedIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs())
 	wintermuteOrchestrator := NewOrchestrator(allIds, corruptedIds, unittest.Logger())
 
 	originalResult := unittest.ExecutionResultFixture()
-	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
+	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
 	wintermuteOrchestrator.state = &attackState{
 		originalResult:         originalResult,
 		corruptedResult:        corruptedResult,
@@ -608,6 +609,7 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 	}
 
 	corruptedAttestationWG := &sync.WaitGroup{}
+	corruptedAttestationWG.Add(totalChunks * len(corruptedVerIds))
 	// mocks attack network to record and keep the output events of orchestrator
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
 	mockAttackNetwork.On("Send", mock.Anything).
@@ -640,11 +642,10 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 		corruptedVerIds)
 
 	corruptedChunkRequestWG := &sync.WaitGroup{}
+	corruptedChunkRequestWG.Add(totalChunks * len(corruptedVerIds))
 	for _, cdpReqList := range cdpReqs {
 		for _, cdpReq := range cdpReqList {
 			cdpReq := cdpReq // suppress loop variable
-			corruptedChunkRequestWG.Add(1)
-			corruptedAttestationWG.Add(1)
 
 			go func() {
 				err := wintermuteOrchestrator.HandleEventFromCorruptedNode(cdpReq)
