@@ -2,7 +2,6 @@ package epochmgr
 
 import (
 	"io/ioutil"
-	"sync"
 	"testing"
 	"time"
 
@@ -204,18 +203,16 @@ func (suite *Suite) TestRestartInSetupPhase() {
 
 	suite.snap.On("Phase").Return(flow.EpochPhaseSetup, nil)
 	// should call voter with next epoch
-	var called bool
+	var called = make(chan struct{})
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			called = true
+			close(called)
 		}).Once()
 
 	// start up the engine
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
-	suite.Assert().Eventually(func() bool {
-		return called
-	}, time.Second, time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), called, time.Second)
 
 	suite.voter.AssertExpectations(suite.T())
 }
@@ -233,19 +230,18 @@ func (suite *Suite) TestStartAsUnauthorizedNode() {
 	suite.snap.On("Phase").Return(flow.EpochPhaseSetup, nil)
 
 	// should call voter with next epoch
-	var wg sync.WaitGroup
-	wg.Add(1)
+	var called = make(chan struct{})
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			wg.Done() // indicate the method was called once
+			close(called)
 		}).Once()
 
 	// start the engine
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
 
 	// should have submitted vote
-	unittest.AssertReturnsBefore(suite.T(), wg.Wait, time.Second)
+	unittest.AssertClosesBefore(suite.T(), called, time.Second)
 	suite.voter.AssertExpectations(suite.T())
 	// should have no epoch components
 	assert.Empty(suite.T(), suite.engine.epochs, "should have 0 epoch components")
@@ -255,20 +251,18 @@ func (suite *Suite) TestStartAsUnauthorizedNode() {
 func (suite *Suite) TestRespondToPhaseChange() {
 
 	// should call voter with next epoch
-	var called bool
+	var called = make(chan struct{})
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			called = true
+			close(called)
 		}).Once()
 
 	first := unittest.BlockHeaderFixture()
 	suite.state.On("AtBlockID", first.ID()).Return(suite.snap)
 
 	suite.engine.EpochSetupPhaseStarted(0, &first)
-	suite.Assert().Eventually(func() bool {
-		return called
-	}, time.Second, time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), called, time.Second)
 
 	suite.voter.AssertExpectations(suite.T())
 }
@@ -286,9 +280,11 @@ func (suite *Suite) TestRespondToEpochTransition() {
 
 	// should set up callback for height at which previous epoch expires
 	var expiryCallback func()
+	var done = make(chan struct{})
 	suite.heights.On("OnHeight", first.Height+flow.DefaultTransactionExpiry, mock.Anything).
 		Run(func(args mock.Arguments) {
 			expiryCallback = args.Get(1).(func())
+			close(done)
 		}).
 		Once()
 
@@ -296,10 +292,8 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	suite.TransitionEpoch()
 	// notify the engine of the epoch transition
 	suite.engine.EpochTransition(suite.counter, &first)
-
-	suite.Assert().Eventually(func() bool {
-		return expiryCallback != nil
-	}, time.Second, time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), done, time.Second)
+	suite.Assert().NotNil(expiryCallback)
 
 	// the engine should have two epochs under management, the just ended epoch
 	// and the newly started epoch
@@ -317,6 +311,8 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	expiryCallback()
 
 	suite.Assert().Eventually(func() bool {
+		suite.engine.unit.Lock()
+		defer suite.engine.unit.Unlock()
 		return len(suite.engine.epochs) == 1
 	}, time.Second, time.Millisecond)
 
