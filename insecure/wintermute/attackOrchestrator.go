@@ -203,6 +203,8 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 	return nil
 }
 
+// replyWithAttestation sends an attestation for the given chunk data pack request if it belongs to
+// the corrupted result of orchestrator's state.
 func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.Event) error {
 	cdpReq := chunkDataPackRequestEvent.FlowProtocolEvent.(*messages.ChunkDataRequest)
 
