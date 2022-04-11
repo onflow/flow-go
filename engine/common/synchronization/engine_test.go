@@ -166,7 +166,7 @@ func (ss *SyncSuite) SetupTest() {
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
 
-	finalizedHeader, err := NewFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())
+	finalizedHeader, err := NewProtocolStateFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())
 	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
 
 	idCache, err := p2p.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())

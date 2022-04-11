@@ -521,7 +521,7 @@ func createNode(
 	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
 	require.NoError(t, err)
 
-	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
+	finalizedHeader, err := synceng.NewProtocolStateFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
 	require.NoError(t, err)
 
 	identities, err := state.Final().Identities(filter.And(

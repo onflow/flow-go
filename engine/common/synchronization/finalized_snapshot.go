@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -20,7 +21,7 @@ type FinalizedHeaderCache struct {
 	mu sync.RWMutex
 
 	log                       zerolog.Logger
-	state                     protocol.State
+	getFinalizedHeader        GetFinalizedHeaderFunc
 	lastFinalizedHeader       *flow.Header
 	finalizationEventNotifier engine.Notifier // notifier for finalization events
 
@@ -28,10 +29,14 @@ type FinalizedHeaderCache struct {
 	stopped chan struct{}
 }
 
+// GetFinalizedHeaderFunc is a function which returns the latest finalized header
+// for a given chain.
+type GetFinalizedHeaderFunc func() (*flow.Header, error)
+
 // NewFinalizedHeaderCache creates a new finalized header cache.
-func NewFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizationDistributor *pubsub.FinalizationDistributor) (*FinalizedHeaderCache, error) {
+func NewFinalizedHeaderCache(log zerolog.Logger, getFinalizedHeader GetFinalizedHeaderFunc, finalizationDistributor *pubsub.FinalizationDistributor) (*FinalizedHeaderCache, error) {
 	cache := &FinalizedHeaderCache{
-		state:                     state,
+		getFinalizedHeader:        getFinalizedHeader,
 		lm:                        lifecycle.NewLifecycleManager(),
 		log:                       log.With().Str("component", "finalized_snapshot_cache").Logger(),
 		finalizationEventNotifier: engine.NewNotifier(),
@@ -50,6 +55,20 @@ func NewFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizat
 	return cache, nil
 }
 
+func NewProtocolStateFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizationDistributor *pubsub.FinalizationDistributor) (*FinalizedHeaderCache, error) {
+	getFinalizedHeader := func() (*flow.Header, error) {
+		return state.Final().Head()
+	}
+	return NewFinalizedHeaderCache(log, getFinalizedHeader, finalizationDistributor)
+}
+
+func NewClusterStateFinalizedHeaderCache(log zerolog.Logger, state cluster.State, finalizationDistributor *pubsub.FinalizationDistributor) (*FinalizedHeaderCache, error) {
+	getFinalizedHeader := func() (*flow.Header, error) {
+		return state.Final().Head()
+	}
+	return NewFinalizedHeaderCache(log, getFinalizedHeader, finalizationDistributor)
+}
+
 // Get returns the last locally cached finalized header.
 func (f *FinalizedHeaderCache) Get() *flow.Header {
 	f.mu.RLock()
@@ -58,8 +77,7 @@ func (f *FinalizedHeaderCache) Get() *flow.Header {
 }
 
 func (f *FinalizedHeaderCache) getHeader() (*flow.Header, error) {
-	finalSnapshot := f.state.Final()
-	head, err := finalSnapshot.Head()
+	head, err := f.getFinalizedHeader()
 	if err != nil {
 		return nil, fmt.Errorf("could not get last finalized header: %w", err)
 	}

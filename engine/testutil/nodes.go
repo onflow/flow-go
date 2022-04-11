@@ -626,7 +626,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore, node.Tracer)
 	require.NoError(t, err)
 
-	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
+	finalizedHeader, err := synchronization.NewProtocolStateFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
 	idCache, err := p2p.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
