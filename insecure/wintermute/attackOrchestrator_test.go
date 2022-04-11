@@ -668,3 +668,71 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 		1*time.Second,
 		"orchestrator could not send corrupted attestations on time")
 }
+
+// TestBouncingBackChunkDataRequests evaluates when no attacks yet conducted, all chunk data pack requests from corrupted
+// verification nodes are bounced back.
+func TestBouncingBackChunkDataRequests(t *testing.T) {
+	totalChunks := 10
+	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	corruptedVerIds := flow.IdentifierList(corruptedIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs())
+	wintermuteOrchestrator := NewOrchestrator(allIds, corruptedIds, unittest.Logger())
+
+	wintermuteOrchestrator.state = nil // no attack yet conducted
+
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithChunks(uint(totalChunks)))))
+	cdpReqs, chunkIds := chunkDataPackRequestForReceipts([]*flow.ExecutionReceipt{receipt}, corruptedVerIds)
+
+	chunkRequestBouncedBack := &sync.WaitGroup{}
+	chunkRequestBouncedBack.Add(totalChunks * len(corruptedVerIds))
+	// mocks attack network to record and keep the output events of orchestrator
+	mockAttackNetwork := &mockinsecure.AttackNetwork{}
+	mockAttackNetwork.On("Send", mock.Anything).
+		Run(func(args mock.Arguments) {
+			// assert that args passed are correct
+			// extracts Event sent
+			event, ok := args[0].(*insecure.Event)
+			require.True(t, ok)
+
+			// since no attack yet conducted, the chunk data request must bounce back.
+			request, ok := event.FlowProtocolEvent.(*messages.ChunkDataRequest)
+			require.True(t, ok)
+
+			// request must be a bounced back
+			require.True(t, chunkIds.Contains(request.ChunkID))
+
+			chunkRequestBouncedBack.Done()
+		}).Return(nil)
+
+	// registers mock network with orchestrator
+	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
+
+	corruptedChunkRequestWG := &sync.WaitGroup{}
+	corruptedChunkRequestWG.Add(totalChunks * len(corruptedVerIds))
+	for _, cdpReqList := range cdpReqs {
+		for _, cdpReq := range cdpReqList {
+			cdpReq := cdpReq // suppress loop variable
+
+			go func() {
+				err := wintermuteOrchestrator.HandleEventFromCorruptedNode(cdpReq)
+				require.NoError(t, err)
+
+				corruptedChunkRequestWG.Done()
+			}()
+		}
+	}
+
+	// waits till all chunk data pack requests are sent to orchestrator
+	unittest.RequireReturnsBefore(t,
+		corruptedChunkRequestWG.Wait,
+		1*time.Second,
+		"could not send all chunk data pack requests on time")
+
+	// waits till all chunk data pack requests replied with corrupted attestation.
+	unittest.RequireReturnsBefore(t,
+		chunkRequestBouncedBack.Wait,
+		1*time.Second,
+		"orchestrator could not send corrupted attestations on time")
+}
