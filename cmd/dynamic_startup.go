@@ -56,7 +56,6 @@ func GetSnapshot(ctx context.Context, client *client.Client) (*inmem.Snapshot, e
 // If not check the snapshot at the specified interval until we reach the target epoch and phase.
 func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startupEpoch uint64, startupEpochPhase flow.EpochPhase, retryInterval time.Duration, getSnapshot GetProtocolSnapshot) (protocol.Snapshot, error) {
 	start := time.Now()
-	var snapshot protocol.Snapshot
 
 	log = log.With().
 		Uint64("target_epoch_counter", startupEpoch).
@@ -65,9 +64,12 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 
 	log.Info().Msg("starting dynamic startup - waiting until target epoch/phase to start...")
 
+	var snapshot protocol.Snapshot
+	var err error
+
 	backoff := retry.NewConstant(retryInterval)
-	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
-		snapshot, err := getSnapshot(ctx)
+	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
+		snapshot, err = getSnapshot(ctx)
 		if err != nil {
 			err = fmt.Errorf("failed to get protocol snapshot: %w", err)
 			log.Error().Err(err).Msg("could not get protocol snapshot")
