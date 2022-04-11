@@ -110,6 +110,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
 	))
 	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),
@@ -125,6 +126,8 @@ func (suite *Suite) TestOnFinalizedBlock() {
 
 	// expect that the block storage is indexed with each of the collection guarantee
 	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
+
+	suite.results.On("Index", mock.Anything, mock.Anything).Return(nil)
 
 	// for each of the guarantees, we should request the corresponding collection once
 	needed := make(map[flow.Identifier]struct{})
@@ -157,6 +160,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	// assert that the block was retrieved and all collections were requested
 	suite.headers.AssertExpectations(suite.T())
 	suite.request.AssertNumberOfCalls(suite.T(), "EntityByID", len(block.Payload.Guarantees))
+	suite.request.AssertNumberOfCalls(suite.T(), "Index", len(block.Payload.Seals))
 }
 
 // TestOnCollection checks that when a Collection is received, it is persisted
@@ -201,8 +205,8 @@ func (suite *Suite) TestOnCollection() {
 	suite.transactions.AssertNumberOfCalls(suite.T(), "Store", len(collection.Transactions))
 }
 
-// TestExecutionResultsAreIndexed checks that execution results are properly indexedd
-func (suite *Suite) TestExecutionResultsAreIndexed() {
+// TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
+func (suite *Suite) TestExecutionReceiptsAreIndexed() {
 
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
@@ -227,11 +231,9 @@ func (suite *Suite) TestExecutionResultsAreIndexed() {
 	er2 := unittest.ExecutionReceiptFixture()
 
 	suite.receipts.On("Store", mock.Anything).Return(nil)
-	suite.results.On("ForceIndex", mock.Anything, mock.Anything).Return(nil)
 	suite.blocks.On("ByID", er1.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
 	suite.receipts.On("Store", mock.Anything).Return(nil)
-	suite.results.On("ForceIndex", mock.Anything, mock.Anything).Return(nil)
 	suite.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
 
 	err := suite.eng.handleExecutionReceipt(originID, er1)

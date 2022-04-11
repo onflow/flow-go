@@ -795,7 +795,7 @@ func loadBeaconPrivateKey(dir string, myID flow.Identifier) (*encodable.RandomBe
 }
 
 // createDKGContractClient creates an dkgContractClient
-func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.DKGContractClient, error) {
+func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.DKGContractClient, error) {
 	var dkgClient module.DKGContractClient
 
 	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
@@ -815,6 +815,7 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 	dkgClient = dkgmodule.NewClient(
 		node.Logger,
 		flowClient,
+		anID,
 		txSigner,
 		dkgContractAddress,
 		machineAccountInfo.Address,
@@ -835,7 +836,7 @@ func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstra
 		}
 
 		node.Logger.Info().Msgf("created dkg contract client with opts: %s", opt.String())
-		dkgClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
+		dkgClient, err := createDKGContractClient(node, machineAccountInfo, flowClient, opt.AccessNodeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dkg contract client with flow client options: %s %w", flowClientOpts, err)
 		}
