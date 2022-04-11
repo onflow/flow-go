@@ -81,6 +81,9 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 	}
 }
 
+// handleExecutionReceiptEvent processes incoming execution receipt event from a corrupted execution node.
+// If no attack has already been conducted, it corrupts the result of receipt and sends it to all corrupted execution nodes.
+// Otherwise, it just bounces back the receipt to the sender.
 func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event) error {
 	corruptedIdentity, ok := o.corruptedIds.ByNodeID(receiptEvent.CorruptedId)
 	if !ok {
