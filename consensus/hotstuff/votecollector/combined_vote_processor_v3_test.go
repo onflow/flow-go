@@ -39,8 +39,8 @@ func TestCombinedVoteProcessorV3(t *testing.T) {
 type CombinedVoteProcessorV3TestSuite struct {
 	VoteProcessorTestSuiteBase
 
-	thresholdTotalWeight uint64
-	rbSharesTotal        uint64
+	thresholdTotalWeight atomic.Uint64
+	rbSharesTotal        atomic.Uint64
 
 	packer *mockhotstuff.Packer
 
@@ -60,30 +60,30 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 	s.proposal = helper.MakeProposal()
 
 	s.minRequiredShares = 9 // we require 9 RB shares to reconstruct signature
-	s.thresholdTotalWeight, s.rbSharesTotal = 0, 0
+	s.thresholdTotalWeight, s.rbSharesTotal = atomic.Uint64{}, atomic.Uint64{}
 
 	// setup threshold signature aggregator
 	s.rbSigAggregator.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		s.thresholdTotalWeight += s.sigWeight
+		s.thresholdTotalWeight.Add(s.sigWeight)
 	}).Return(func(signerID flow.Identifier, sig crypto.Signature) uint64 {
-		return s.thresholdTotalWeight
+		return s.thresholdTotalWeight.Load()
 	}, func(signerID flow.Identifier, sig crypto.Signature) error {
 		return nil
 	}).Maybe()
 	s.rbSigAggregator.On("TotalWeight").Return(func() uint64 {
-		return s.thresholdTotalWeight
+		return s.thresholdTotalWeight.Load()
 	}).Maybe()
 
 	// setup rb reconstructor
 	s.reconstructor.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		s.rbSharesTotal++
+		s.rbSharesTotal.Inc()
 	}).Return(func(signerID flow.Identifier, sig crypto.Signature) bool {
-		return s.rbSharesTotal >= s.minRequiredShares
+		return s.rbSharesTotal.Load() >= s.minRequiredShares
 	}, func(signerID flow.Identifier, sig crypto.Signature) error {
 		return nil
 	}).Maybe()
 	s.reconstructor.On("EnoughShares").Return(func() bool {
-		return s.rbSharesTotal >= s.minRequiredShares
+		return s.rbSharesTotal.Load() >= s.minRequiredShares
 	}).Maybe()
 
 	s.processor = &CombinedVoteProcessorV3{
