@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/insecure"
@@ -181,10 +182,21 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 
 		// chunk data pack reply goes over a unicast, hence, we only check first target id.
 		_, ok := o.corruptedIds.ByNodeID(chunkDataPackReplyEvent.TargetIds[0])
-		if !ok && o.state.corruptedChunkIds.Contains(cdpRep.ChunkDataPack.ChunkID) {
-			// this is a chunk data pack response for a CORRUPTED chunk to an HONEST verification node
-			// we WINTERMUTE it!
-			return nil
+		if o.state.corruptedChunkIds.Contains(cdpRep.ChunkDataPack.ChunkID) {
+			if !ok {
+				// this is a chunk data pack response for a CORRUPTED chunk to an HONEST verification node
+				// we WINTERMUTE it!
+				return nil
+			} else {
+				// Illegal state! chunk data pack response for a CORRUPTED chunk to a CORRUPTED verification node.
+				// Request must have never been reached to corrupted execution node, and must have been replaced with
+				// an attestation.
+				o.logger.Fatal().
+					Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
+					Hex("sender_id", logging.ID(chunkDataPackReplyEvent.CorruptedId)).
+					Hex("target_id", logging.ID(chunkDataPackReplyEvent.TargetIds[0])).
+					Msg("orchestrator received a chunk data response for corrupted chunk to a corrupted verification node")
+			}
 		}
 	}
 
