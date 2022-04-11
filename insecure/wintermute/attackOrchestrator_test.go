@@ -813,7 +813,7 @@ func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
 			unittest.ExecutionResultFixture(
 				unittest.WithChunks(uint(totalChunks)))))
 	// creates chunk data pack response for all verification nodes.
-	cdpReps, chunkIds := chunkDataPackResponseForReceipts([]*flow.ExecutionReceipt{receipt}, allIds.NodeIDs())
+	cdpReps, _ := chunkDataPackResponseForReceipts([]*flow.ExecutionReceipt{receipt}, allIds.NodeIDs())
 
 	chunkResponseBouncedBack := &sync.WaitGroup{}
 	chunkResponseBouncedBack.Add(totalChunks * len(verIds))
@@ -826,7 +826,7 @@ func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
 			event, ok := args[0].(*insecure.Event)
 			require.True(t, ok)
 
-			response, ok := event.FlowProtocolEvent.(*messages.ChunkDataResponse)
+			_, ok = event.FlowProtocolEvent.(*messages.ChunkDataResponse)
 			require.True(t, ok)
 
 			// response must be a bounced back
