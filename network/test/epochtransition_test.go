@@ -118,8 +118,7 @@ func (t *testNodeList) networks() []network.Network {
 }
 
 func TestMutableIdentityTable(t *testing.T) {
-	// Test is flaky, print it in order to avoid the unused linting error
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 	suite.Run(t, new(MutableIdentityTableSuite))
 }
 
