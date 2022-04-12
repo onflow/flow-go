@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/compliance"
 	metrics "github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -148,6 +149,31 @@ func (suite *Suite) TestHandleProposal() {
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())
+}
+
+func (suite *Suite) TestHandleProposalSkipProposalThreshold() {
+
+	// mock latest finalized state
+	final := unittest.BlockHeaderFixture()
+	suite.snapshot.On("Head").Return(&final, nil)
+
+	originID := unittest.IdentifierFixture()
+	block := unittest.BlockFixture()
+
+	block.Header.Height = final.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+
+	// not in cache or storage
+	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
+
+	// submit the block
+	proposal := unittest.ProposalFromBlock(&block)
+	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
+	assert.NoError(suite.T(), err)
+
+	// block should be dropped - not added to state or cache
+	suite.state.AssertNotCalled(suite.T(), "Extend", mock.Anything)
+	suite.cache.AssertNotCalled(suite.T(), "Add", originID, mock.Anything)
 }
 
 func (suite *Suite) TestHandleProposalWithPendingChildren() {
