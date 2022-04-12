@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 
 	"github.com/onflow/flow-go-sdk/client"
@@ -68,9 +69,11 @@ func main() {
 		startupTimeString                      string
 		startupTime                            time.Time
 
-		followerState protocol.MutableState
-		ingestConf    = ingest.DefaultConfig()
-		rpcConf       rpc.Config
+		followerState    protocol.MutableState
+		ingestConf       = ingest.DefaultConfig()
+		rpcConf          rpc.Config
+		followerConfig   modulecompliance.Config
+		complianceConfig modulecompliance.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
@@ -140,6 +143,10 @@ func main() {
 			"additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
+		flags.Uint64Var(&followerConfig.SkipNewProposalsThreshold,
+			"follower-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (follower engine)")
+		flags.Uint64Var(&followerConfig.SkipNewProposalsThreshold,
+			"compliance-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (cluster compliance engine)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
 
 		// epoch qc contract flags
