@@ -1,5 +1,7 @@
 package compliance
 
+const MinSkipNewProposalsThreshold = 1000
+
 // Config is shared config for consensus and collection compliance engines, and
 // the consensus follower engine.
 type Config struct {
@@ -17,8 +19,15 @@ func DefaultConfig() Config {
 
 type Opt func(*Config)
 
+// WithSkipNewProposalsThreshold returns an option to set the skip new proposals
+// threshold. For inputs less than the minimum threshold, the minimum threshold
+// will be set instead.
 func WithSkipNewProposalsThreshold(threshold uint64) Opt {
 	return func(config *Config) {
+		// sanity check: small values are dangerous and can cause finalization halt
+		if threshold < MinSkipNewProposalsThreshold {
+			threshold = MinSkipNewProposalsThreshold
+		}
 		config.SkipNewProposalsThreshold = threshold
 	}
 }
