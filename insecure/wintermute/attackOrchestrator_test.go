@@ -265,11 +265,8 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 	originalResult := unittest.ExecutionResultFixture()
 	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
 	wintermuteOrchestrator.state = &attackState{
-		originalResult:         originalResult,
-		corruptedResult:        corruptedResult,
-		originalChunkIds:       flow.GetIDs(originalResult.Chunks),
-		corruptedChunkIds:      flow.GetIDs(corruptedResult.Chunks),
-		corruptedChunkIndexMap: chunkIndexMap(corruptedResult.Chunks),
+		originalResult:  originalResult,
+		corruptedResult: corruptedResult,
 	}
 
 	corruptedAttestationWG := &sync.WaitGroup{}
@@ -292,7 +289,7 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 			require.Equal(t, attestation.BlockID, wintermuteOrchestrator.state.corruptedResult.BlockID)
 			require.Equal(t, attestation.ExecutionResultID, wintermuteOrchestrator.state.corruptedResult.ID())
 			chunk := wintermuteOrchestrator.state.corruptedResult.Chunks[attestation.ChunkIndex]
-			require.True(t, wintermuteOrchestrator.state.corruptedChunkIds.Contains(chunk.ID())) // attestation must be for a corrupted chunk
+			require.True(t, wintermuteOrchestrator.state.containsCorruptedChunkId(chunk.ID())) // attestation must be for a corrupted chunk
 
 			corruptedAttestationWG.Done()
 		}).Return(nil)
@@ -413,11 +410,8 @@ func TestBouncingBackChunkDataResponse_WithAttack(t *testing.T) {
 	originalResult := unittest.ExecutionResultFixture()
 	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
 	state := &attackState{
-		originalResult:         originalResult,
-		corruptedResult:        corruptedResult,
-		originalChunkIds:       flow.GetIDs(originalResult.Chunks),
-		corruptedChunkIds:      flow.GetIDs(corruptedResult.Chunks),
-		corruptedChunkIndexMap: chunkIndexMap(corruptedResult.Chunks),
+		originalResult:  originalResult,
+		corruptedResult: corruptedResult,
 	}
 
 	testBouncingBackChunkDataResponse(t, state)
@@ -505,11 +499,8 @@ func TestWintermuteChunkResponseForCorruptedChunks(t *testing.T) {
 	originalResult := unittest.ExecutionResultFixture()
 	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
 	state := &attackState{
-		originalResult:         originalResult,
-		corruptedResult:        corruptedResult,
-		originalChunkIds:       flow.GetIDs(originalResult.Chunks),
-		corruptedChunkIds:      flow.GetIDs(corruptedResult.Chunks),
-		corruptedChunkIndexMap: chunkIndexMap(corruptedResult.Chunks),
+		originalResult:  originalResult,
+		corruptedResult: corruptedResult,
 	}
 	wintermuteOrchestrator.state = state
 

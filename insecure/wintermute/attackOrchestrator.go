@@ -155,11 +155,8 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 
 	// saves state of attack for further replies
 	o.state = &attackState{
-		originalResult:         &receipt.ExecutionResult,
-		corruptedResult:        corruptedResult,
-		originalChunkIds:       flow.GetIDs(receipt.ExecutionResult.Chunks),
-		corruptedChunkIds:      flow.GetIDs(corruptedResult.Chunks),
-		corruptedChunkIndexMap: chunkIndexMap(corruptedResult.Chunks),
+		originalResult:  &receipt.ExecutionResult,
+		corruptedResult: corruptedResult,
 	}
 	lg.Info().
 		Hex("corrupted_result_id", logging.ID(corruptedResult.ID())).
@@ -216,7 +213,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 
 		// chunk data pack reply goes over a unicast, hence, we only check first target id.
 		_, ok := o.corruptedIds.ByNodeID(chunkDataPackReplyEvent.TargetIds[0])
-		if o.state.corruptedChunkIds.Contains(cdpRep.ChunkDataPack.ChunkID) {
+		if o.state.containsCorruptedChunkId(cdpRep.ChunkDataPack.ChunkID) {
 			if !ok {
 				// this is a chunk data pack response for a CORRUPTED chunk to an HONEST verification node
 				// we WINTERMUTE it!
@@ -248,16 +245,21 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 	cdpReq := chunkDataPackRequestEvent.FlowProtocolEvent.(*messages.ChunkDataRequest)
 
 	// a result corruption has already conducted
-	if o.state.corruptedChunkIds.Contains(cdpReq.ChunkID) {
+	if o.state.containsCorruptedChunkId(cdpReq.ChunkID) {
 		// requested chunk belongs to corrupted result.
+		corruptedChunkIndex, err := o.state.corruptedChunkIndexOf(cdpReq.ChunkID)
+		if err != nil {
+			return false, fmt.Errorf("could not find chunk index for corrupted chunk: %w", err)
+		}
+
 		attestation := &flow.Attestation{
 			BlockID:           o.state.corruptedResult.BlockID,
 			ExecutionResultID: o.state.corruptedResult.ID(),
-			ChunkIndex:        o.state.corruptedChunkIndexMap[cdpReq.ChunkID],
+			ChunkIndex:        corruptedChunkIndex,
 		}
 
 		// sends an attestation for the corrupted chunk to corrupted verification node.
-		err := o.network.Send(&insecure.Event{
+		err = o.network.Send(&insecure.Event{
 			CorruptedId:       chunkDataPackRequestEvent.CorruptedId,
 			Channel:           chunkDataPackRequestEvent.Channel,
 			Protocol:          chunkDataPackRequestEvent.Protocol,
@@ -281,14 +283,4 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 	}
 
 	return false, nil
-}
-
-// chunkIndexMap returns the map from chunks to indices.
-func chunkIndexMap(chunkList flow.ChunkList) map[flow.Identifier]uint64 {
-	cm := make(map[flow.Identifier]uint64)
-	for _, chunk := range chunkList {
-		cm[chunk.ID()] = chunk.Index
-	}
-
-	return cm
 }
