@@ -100,7 +100,7 @@ func (suite *Suite) TestHandlePendingBlock() {
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// don't return the parent when requested
-	suite.snapshot.On("Head").Return(head.Header, nil).Once()
+	suite.snapshot.On("Head").Return(head.Header, nil)
 	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound).Once()
 
@@ -133,7 +133,7 @@ func (suite *Suite) TestHandleProposal() {
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// the parent is the last finalized state
-	suite.snapshot.On("Head").Return(parent.Header, nil).Once()
+	suite.snapshot.On("Head").Return(parent.Header, nil)
 	// we should be able to extend the state with the block
 	suite.state.On("Extend", mock.Anything, &block).Return(nil).Once()
 	// we should be able to get the parent header by its ID
