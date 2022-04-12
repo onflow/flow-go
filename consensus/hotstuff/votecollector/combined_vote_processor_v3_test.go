@@ -528,8 +528,13 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			// check that aggregated signers are part of all votes signers
 			// due to concurrent processing it is possible that Aggregate will return less that we have actually aggregated
 			// but still enough to construct the QC
+			stakingAggregatorLock.Lock()
 			require.Subset(t, aggregatedStakingSigners, blockSigData.StakingSigners)
+			stakingAggregatorLock.Unlock()
+
+			beaconAggregatorLock.Lock()
 			require.Subset(t, aggregatedBeaconSigners, blockSigData.RandomBeaconSigners)
+			beaconAggregatorLock.Unlock()
 
 			// 2. CHECK: supermajority
 			// All participants have equal weights in this test. Per configuration, collecting `honestParticipants`
