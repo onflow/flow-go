@@ -5,6 +5,13 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
+const (
+	ProtocolUnicast   = "protocol-unicast"
+	ProtocolMulticast = "protocol-multicast"
+	ProtocolPublish   = "protocol-publish"
+	ProtocolUnknown   = "unknown-protocol"
+)
+
 // Event represents the data model that is exchanged between the attacker and the attack orchestrator.
 // An event is the protocol-level representation of an outgoing message of a corruptible conduit.
 // The corruptible conduit relays the message to the attacker instead of dispatching it through the Flow network.
@@ -23,4 +30,17 @@ type Event struct {
 	// sent to attacker to decide on its content before dispatching it to the
 	// Flow network.
 	FlowProtocolEvent interface{}
+}
+
+func ProtocolStr(p Protocol) string {
+	switch p {
+	case Protocol_UNICAST:
+		return ProtocolUnicast
+	case Protocol_MULTICAST:
+		return ProtocolMulticast
+	case Protocol_PUBLISH:
+		return ProtocolPublish
+	}
+
+	return ProtocolUnknown
 }
