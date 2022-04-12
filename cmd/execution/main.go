@@ -381,6 +381,7 @@ func main() {
 			// the cache with the existing Execution Data blob trees. Currently, the cache is empty every time the
 			// node restarts, meaning that there will initially be no prioritization of requests.
 			executionDataCIDCache = state_synchronization.NewExecutionDataCIDComparator(executionDataCIDCacheSize)
+			// TODO
 
 			bs, err := node.Network.RegisterBlobService(
 				engine.ExecutionDataService,
