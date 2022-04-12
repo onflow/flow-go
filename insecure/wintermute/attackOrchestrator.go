@@ -36,6 +36,7 @@ func NewOrchestrator(allIds flow.IdentityList, corruptedIds flow.IdentityList, l
 	return o
 }
 
+// WithAttackNetwork sets the attack network of the orchestrator.
 func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 	o.network = network
 }
@@ -86,6 +87,7 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 // If no attack has already been conducted, it corrupts the result of receipt and sends it to all corrupted execution nodes.
 // Otherwise, it just bounces back the receipt to the sender.
 func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event) error {
+
 	corruptedIdentity, ok := o.corruptedIds.ByNodeID(receiptEvent.CorruptedId)
 	if !ok {
 		return fmt.Errorf("could not find corrupted identity for: %x", receiptEvent.CorruptedId)
@@ -99,12 +101,24 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 		return fmt.Errorf("protocol event is not an execution receipt: %T", receiptEvent.FlowProtocolEvent)
 	}
 
+	lg := o.logger.With().
+		Hex("receipt_id", logging.ID(receipt.ID())).
+		Hex("executor_id", logging.ID(receipt.ExecutorID)).
+		Hex("result_id", logging.ID(receipt.ExecutionResult.ID())).
+		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
+		Hex("corrupted_id", logging.ID(receiptEvent.CorruptedId)).
+		Str("protocol", insecure.ProtocolStr(receiptEvent.Protocol)).
+		Str("channel", string(receiptEvent.Channel)).
+		Uint32("targets_num", receiptEvent.TargetNum).
+		Str("target_ids", fmt.Sprintf("%v", receiptEvent.TargetIds)).Logger()
+
 	if o.state != nil {
 		// non-nil state means an execution result has already been corrupted.
 		if receipt.ExecutionResult.ID() == o.state.originalResult.ID() {
 			// receipt contains the original result that has been corrupted.
 			// corrupted result must have already been sent to this node, so
 			// just discards it.
+			lg.Info().Msg("receipt event discarded")
 			return nil
 		}
 
@@ -112,6 +126,8 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
+
+		lg.Info().Msg("receipt event bounced back")
 		return nil
 	}
 
@@ -120,7 +136,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 
 	corruptedExecutionIds := o.corruptedIds.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()
 
-	// sends corrupted execution receipt to all corrupted execution nodes.
+	// sends corrupted execution result to all corrupted execution nodes.
 	for _, corruptedExecutionId := range corruptedExecutionIds {
 		// sets executor id of the result as the same corrupted execution node id that
 		// is meant to send this message to the flow network.
@@ -135,22 +151,25 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 		if err != nil {
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
-
-		// saves state of attack for further replies
-		o.state = &attackState{
-			originalResult:         &receipt.ExecutionResult,
-			corruptedResult:        corruptedResult,
-			originalChunkIds:       flow.GetIDs(receipt.ExecutionResult.Chunks),
-			corruptedChunkIds:      flow.GetIDs(corruptedResult.Chunks),
-			corruptedChunkIndexMap: chunkIndexMap(corruptedResult.Chunks),
-		}
 	}
+
+	// saves state of attack for further replies
+	o.state = &attackState{
+		originalResult:         &receipt.ExecutionResult,
+		corruptedResult:        corruptedResult,
+		originalChunkIds:       flow.GetIDs(receipt.ExecutionResult.Chunks),
+		corruptedChunkIds:      flow.GetIDs(corruptedResult.Chunks),
+		corruptedChunkIndexMap: chunkIndexMap(corruptedResult.Chunks),
+	}
+	lg.Info().
+		Hex("corrupted_result_id", logging.ID(corruptedResult.ID())).
+		Msg("result successfully corrupted")
 
 	return nil
 }
 
 // handleChunkDataPackRequestEvent processes a chunk data pack request event as follows:
-// If request is for a corrupted chunk and comes from a corrupted verification node it is replied wtih an attestation for that
+// If request is for a corrupted chunk and comes from a corrupted verification node it is replied with an attestation for that
 // chunk.
 // Otherwise, it is bounced back.
 func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.Event) error {
@@ -163,7 +182,13 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 	}
 
 	if o.state != nil {
-		return o.replyWithAttestation(chunkDataPackRequestEvent)
+		sent, err := o.replyWithAttestation(chunkDataPackRequestEvent)
+		if err != nil {
+			return fmt.Errorf("could not reply with attestation: %w", err)
+		}
+		if sent {
+			return nil
+		}
 	}
 
 	// no result corruption yet conducted, hence bouncing back the chunk data request.
@@ -171,6 +196,15 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 	if err != nil {
 		return fmt.Errorf("could not send chunk data request: %w", err)
 	}
+
+	o.logger.Info().
+		Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.CorruptedId)).
+		Str("protocol", insecure.ProtocolStr(chunkDataPackRequestEvent.Protocol)).
+		Str("channel", string(chunkDataPackRequestEvent.Channel)).
+		Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).
+		Str("target_ids", fmt.Sprintf("%v", chunkDataPackRequestEvent.TargetIds)).
+		Msg("chunk data pack request event bounced back")
+
 	return nil
 }
 
@@ -210,7 +244,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 
 // replyWithAttestation sends an attestation for the given chunk data pack request if it belongs to
 // the corrupted result of orchestrator's state.
-func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.Event) error {
+func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.Event) (bool, error) {
 	cdpReq := chunkDataPackRequestEvent.FlowProtocolEvent.(*messages.ChunkDataRequest)
 
 	// a result corruption has already conducted
@@ -232,11 +266,21 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 			FlowProtocolEvent: attestation,
 		})
 		if err != nil {
-			return fmt.Errorf("could not send attestation for corrupted chunk: %w", err)
+			return false, fmt.Errorf("could not send attestation for corrupted chunk: %w", err)
 		}
+
+		o.logger.Info().
+			Hex("corrupted_id", logging.ID(chunkDataPackRequestEvent.CorruptedId)).
+			Str("protocol", insecure.ProtocolStr(chunkDataPackRequestEvent.Protocol)).
+			Str("channel", string(chunkDataPackRequestEvent.Channel)).
+			Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).
+			Str("target_ids", fmt.Sprintf("%v", chunkDataPackRequestEvent.TargetIds)).
+			Msg("chunk data pack request event bounced back")
+
+		return true, nil
 	}
 
-	return nil
+	return false, nil
 }
 
 // chunkIndexMap returns the map from chunks to indices.
