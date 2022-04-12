@@ -205,7 +205,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -435,7 +435,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				synchronization.DefaultConfig(),
+				node.SyncCoreConfig,
 			)
 			if err != nil {
 				return nil, err
@@ -526,7 +526,7 @@ func main() {
 }
 
 // createQCContractClient creates QC contract client
-func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.QCContractClient, error) {
+func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
 
@@ -544,7 +544,7 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	txSigner := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
 
 	// create actual qc contract client, all flags and machine account info file found
-	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
+	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, anID, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
 
 	return qcContractClient, nil
 }
@@ -559,7 +559,7 @@ func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 			return nil, fmt.Errorf("failed to create flow client for qc contract client with options: %s %w", flowClientOpts, err)
 		}
 
-		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient)
+		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient, opt.AccessNodeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create qc contract client with flow client options: %s %w", flowClientOpts, err)
 		}

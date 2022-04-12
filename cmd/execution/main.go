@@ -120,6 +120,7 @@ func main() {
 		checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
 		diskWAL                       *wal.DiskWAL
 		scriptLogThreshold            time.Duration
+		scriptExecutionTimeLimit      time.Duration
 		chdpQueryTimeout              uint
 		chdpDeliveryTimeout           uint
 		enableBlockDataUpload         bool
@@ -145,7 +146,7 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.StringVar(&executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data_blobstore"), "directory to use for Execution Data blobstore")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
-			flags.UintVar(&checkpointDistance, "checkpoint-distance", 40, "number of WAL segments between checkpoints")
+			flags.UintVar(&checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
@@ -153,6 +154,7 @@ func main() {
 			flags.UintVar(&chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.DurationVar(&scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold, "threshold for logging script execution")
+			flags.DurationVar(&scriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit, "script execution time limit")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.UintVar(&transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
@@ -221,7 +223,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.NodeConfig) error {
@@ -459,6 +461,7 @@ func main() {
 				cadenceExecutionCache,
 				committer,
 				scriptLogThreshold,
+				scriptExecutionTimeLimit,
 				blockDataUploaders,
 				executionDataService,
 				executionDataCIDCache,

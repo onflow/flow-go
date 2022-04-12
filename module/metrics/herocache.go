@@ -29,6 +29,10 @@ func NetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) *HeroCac
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingReceiveCache, registrar)
 }
 
+func PublicNetworkReceiveCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
+	return NewHeroCacheCollector(namespaceNetwork, ResourcePublicNetworkingReceiveCache, registrar)
+}
+
 func NetworkDnsTxtCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsTxtCache, registrar)
 }

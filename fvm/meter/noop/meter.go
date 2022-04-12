@@ -22,7 +22,7 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 }
 
 // MergeMeter merges two noop meters
-func (m *Meter) MergeMeter(_ interfaceMeter.Meter) error {
+func (m *Meter) MergeMeter(child interfaceMeter.Meter, enforceLimits bool) error {
 	return nil
 }
 
