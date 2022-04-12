@@ -50,5 +50,6 @@ var resultsCmd = &cobra.Command{
 			}
       log.Info().Uint64("start_height", root.Height).Uint64("end_height", final.Height).Msg("indexed execution results")
 		}
+		log.Info().Uint64("start_height", root.Height).Uint64("end_height", final.Height).Msg("indexed execution results")
 	},
 }
