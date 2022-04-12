@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type edRecord struct {
@@ -44,6 +43,7 @@ type StorageMachine struct {
 	maxBlobTreeDepth     int
 	maxBlobTreeLevelSize int
 
+	ds      *badgerDs.Datastore
 	storage *state_synchronization.Storage
 	bstore  blockstore.Blockstore
 
@@ -52,172 +52,218 @@ type StorageMachine struct {
 	pendingHeights           map[uint64]*pendingEdRecord
 	completed                map[uint64]*edRecord
 	blobTrees                map[uint64]*blobTree
-	blobs                    map[cid.Cid]*blobRecord
+	blobRecords              map[cid.Cid]*blobRecord
+	blockIDs                 map[flow.Identifier]uint64
+	blobs                    map[cid.Cid]blobs.Blob
 
 	pruneGenerator    *rapid.Generator
 	resetGenerator    *rapid.Generator
 	blobTreeGenerator *rapid.Generator
-	flowIDGenerator   *rapid.Generator
+	blockIDGenerator  *rapid.Generator
 }
 
-func (c *StorageMachine) Init(t *rapid.T) {
-	c.maxRange = 20
-	c.maxBlobTreeDepth = 5
-	c.maxBlobTreeLevelSize = 10
+func (s *StorageMachine) Init(t *rapid.T) {
+	s.maxRange = 20
+	s.maxBlobTreeDepth = 5
+	s.maxBlobTreeLevelSize = 32
 
-	ds, err := badgerDs.NewDatastore("/tmp/badger", &badgerDs.DefaultOptions)
+	opts := badgerDs.DefaultOptions
+	// TODO: put this back to non-inmemory
+	opts.BypassLockGuard = true
+	opts.InMemory = true
+	ds, err := badgerDs.NewDatastore("", &opts)
 	require.NoError(t, err)
-	c.storage = state_synchronization.NewStorage(ds.DB)
-	c.bstore = blockstore.NewBlockstore(ds)
+	s.ds = ds
+	s.storage, err = state_synchronization.OpenStorage(ds.DB, 0)
+	require.NoError(t, err)
+	s.bstore = blockstore.NewBlockstore(ds)
 
-	c.latestIncorporatedHeight = 0
-	c.storedDataLowerBound = 0
-	c.pendingHeights = make(map[uint64]*pendingEdRecord)
-	c.completed = make(map[uint64]*edRecord)
-	c.blobTrees = make(map[uint64]*blobTree)
-	c.blobs = make(map[cid.Cid]*blobRecord)
+	s.latestIncorporatedHeight = 0
+	s.storedDataLowerBound = 0
+	s.pendingHeights = make(map[uint64]*pendingEdRecord)
+	s.completed = make(map[uint64]*edRecord)
+	s.blobTrees = make(map[uint64]*blobTree)
+	s.blobRecords = make(map[cid.Cid]*blobRecord)
+	s.blockIDs = make(map[flow.Identifier]uint64)
+	s.blobs = make(map[cid.Cid]blobs.Blob)
 
 	pPrune := rapid.Float64Range(0, 50).Draw(t, "p_prune").(float64)
-	pReset := rapid.Float64Range(0, 5).Draw(t, "p_reset").(float64)
-	pResample := rapid.Float64Range(0, 5).Draw(t, "p_resample").(float64)
-
-	c.pruneGenerator = rapid.Float64Range(0, 100).
+	s.pruneGenerator = rapid.Float64Range(0, 100).
 		Map(func(n float64) bool {
 			return n < pPrune
 		})
-	c.resetGenerator = rapid.Float64Range(0, 100).
+
+	pReset := rapid.Float64Range(0, 5).Draw(t, "p_reset").(float64)
+	s.resetGenerator = rapid.Float64Range(0, 100).
 		Map(func(n float64) bool {
 			return n < pReset
 		})
+
+	pResample := rapid.Float64Range(0, 5).Draw(t, "p_resample").(float64)
+	newBlobGenerator := rapid.SliceOf(rapid.Byte()).Map(func(blobData []byte) blobs.Blob {
+		return blobs.NewBlob(blobData)
+	}).Filter(func(blob blobs.Blob) bool {
+		_, ok := s.blobs[blob.Cid()]
+		if !ok {
+			s.blobs[blob.Cid()] = blob
+			return true
+		}
+		return false
+	})
 	blobGenerator := rapid.Float64Range(0, 100).
 		Map(func(n float64) bool {
 			return n < pResample
 		}).
 		Map(func(resample bool) blobs.Blob {
-			if resample {
+			if resample && len(s.blobs) > 0 {
 				var existingBlobs []blobs.Blob
-				for _, blobRecord := range c.blobs {
-					existingBlobs = append(existingBlobs, blobRecord.blob)
+				for _, blob := range s.blobs {
+					existingBlobs = append(existingBlobs, blob)
 				}
 				return rapid.SampledFrom(existingBlobs).Draw(t, "existing_blob").(blobs.Blob)
 			}
 
-			return rapid.SliceOf(rapid.Byte()).Map(func(blobData []byte) blobs.Blob {
-				return blobs.NewBlob(blobData)
-			}).Filter(func(blob blobs.Blob) bool {
-				_, ok := c.blobs[blob.Cid()]
-				return !ok
-			}).Draw(t, "new_blob").(blobs.Blob)
+			newBlob := newBlobGenerator.Draw(t, "new_blob").(blobs.Blob)
+			return newBlob
 		})
-	blobTreeLevelGenerator := rapid.SliceOfN(blobGenerator, 1, c.maxBlobTreeLevelSize)
-	c.blobTreeGenerator = rapid.SliceOfN(blobTreeLevelGenerator, 0, c.maxBlobTreeDepth).
+	blobTreeLevelGenerator := rapid.SliceOfN(blobGenerator, 1, s.maxBlobTreeLevelSize)
+	s.blobTreeGenerator = rapid.SliceOfN(blobTreeLevelGenerator, 0, s.maxBlobTreeDepth).
 		Map(func(levels [][]blobs.Blob) *blobTree {
-			root := blobGenerator.Draw(t, "blob_tree_root").(blobs.Blob)
+			root := newBlobGenerator.Draw(t, "blob_tree_root").(blobs.Blob)
 			return &blobTree{
 				root:   root,
 				levels: levels,
 			}
 		})
-	c.flowIDGenerator = rapid.Custom(func(t *rapid.T) flow.Identifier {
-		return unittest.IdentifierFixture()
+
+	s.blockIDGenerator = rapid.SliceOfN(rapid.Byte(), flow.IdentifierLen, flow.IdentifierLen).
+		Map(func(bytes []byte) flow.Identifier {
+			return flow.HashToID(bytes)
+		}).Filter(func(blockID flow.Identifier) bool {
+		_, ok := s.blockIDs[blockID]
+		return !ok
 	})
+
 }
 
-func (c *StorageMachine) DoSomething(t *rapid.T) {
-	if c.resetGenerator.Draw(t, "reset").(bool) {
-		for _, p := range c.pendingHeights {
+func (s *StorageMachine) Cleanup() {
+	if s.ds != nil {
+		s.ds.DB.DropAll()
+		s.ds.Close()
+		s.ds = nil
+	}
+}
+
+func (s *StorageMachine) DoSomething(t *rapid.T) {
+	if s.resetGenerator.Draw(t, "reset").(bool) {
+		for _, p := range s.pendingHeights {
 			p.progress = 0
 		}
 	}
 
-	if c.storedDataLowerBound < c.latestIncorporatedHeight && c.pruneGenerator.Draw(t, "prune").(bool) {
-		pruneHeight := rapid.Uint64Range(c.storedDataLowerBound+1, c.latestIncorporatedHeight).
+	if s.storedDataLowerBound < s.latestIncorporatedHeight && s.pruneGenerator.Draw(t, "prune").(bool) {
+		pruneHeight := rapid.Uint64Range(s.storedDataLowerBound+1, s.latestIncorporatedHeight).
 			Draw(t, "prune_height").(uint64)
 
 		var expectedDeletedCids []cid.Cid
-		for h := c.storedDataLowerBound + 1; h <= pruneHeight; h++ {
-			blobTree := c.blobTrees[h]
-			delete(c.blobTrees, h)
+		for h := s.storedDataLowerBound + 1; h <= pruneHeight; h++ {
+			blobTree := s.blobTrees[h]
+			delete(s.blobTrees, h)
 
-			if c.blobs[blobTree.root.Cid()].latestHeightSeen == h {
-				delete(c.blobs, blobTree.root.Cid())
-				expectedDeletedCids = append(expectedDeletedCids, blobTree.root.Cid())
-			}
-
+			cidsToDelete := make(map[cid.Cid]struct{})
+			cidsToDelete[blobTree.root.Cid()] = struct{}{}
 			for _, level := range blobTree.levels {
 				for _, blob := range level {
-					if c.blobs[blob.Cid()].latestHeightSeen == h {
-						delete(c.blobs, blob.Cid())
-						expectedDeletedCids = append(expectedDeletedCids, blob.Cid())
-					}
+					cidsToDelete[blob.Cid()] = struct{}{}
+				}
+			}
+
+			for c := range cidsToDelete {
+				if s.blobRecords[c].latestHeightSeen == h {
+					delete(s.blobs, c)
+					expectedDeletedCids = append(expectedDeletedCids, c)
 				}
 			}
 		}
 
-		actualDeletedCids, err := c.storage.Prune(pruneHeight)
+		actualDeletedCids, err := s.storage.Prune(pruneHeight)
 		require.NoError(t, err)
 
 		assert.ElementsMatch(t, expectedDeletedCids, actualDeletedCids)
 
-		c.storedDataLowerBound = pruneHeight
+		s.storedDataLowerBound = pruneHeight
 	} else {
-		h := rapid.Uint64Range(c.latestIncorporatedHeight+1, c.latestIncorporatedHeight+c.maxRange).
+		h := rapid.Uint64Range(s.latestIncorporatedHeight+1, s.latestIncorporatedHeight+s.maxRange).
 			Filter(func(height uint64) bool {
-				_, ok := c.completed[height]
+				_, ok := s.completed[height]
 				return !ok
 			}).Draw(t, "pending_height").(uint64)
 
-		r, ok := c.pendingHeights[h]
+		r, ok := s.pendingHeights[h]
 		if !ok {
+			bTree := s.blobTreeGenerator.Draw(t, "blob_tree").(*blobTree)
+			s.blobTrees[h] = bTree
+
+			rootID, err := flow.CidToId(bTree.root.Cid())
+			require.NoError(t, err)
+
+			blockID := s.blockIDGenerator.Draw(t, "block_id").(flow.Identifier)
+			s.blockIDs[blockID] = h
+
 			r = &pendingEdRecord{
 				record: &edRecord{
-					blockID:     c.flowIDGenerator.Draw(t, "block_id").(flow.Identifier),
+					blockID:     blockID,
 					blockHeight: h,
-					rootID:      c.flowIDGenerator.Draw(t, "root_id").(flow.Identifier),
+					rootID:      rootID,
 				},
 				progress: 0,
 			}
-			c.pendingHeights[h] = r
-			bTree := c.blobTreeGenerator.Draw(t, "blob_tree").(*blobTree)
-			c.blobTrees[r.record.blockHeight] = bTree
+			s.pendingHeights[h] = r
 		}
 
+		bTree := s.blobTrees[r.record.blockHeight]
+
+		t.Logf("progress: %d", r.progress)
 		if r.progress == 0 {
-			tracker := c.storage.GetStatusTracker(r.record.blockID, r.record.blockHeight, r.record.rootID)
+			tracker := s.storage.GetStatusTracker(r.record.blockID, r.record.blockHeight, r.record.rootID)
 			r.tracker = tracker
 			err := tracker.StartTransfer()
 			require.NoError(t, err)
+			s.updateBlobRecord(bTree.root, h)
 		} else {
-			bTree := c.blobTrees[r.record.blockHeight]
-
 			if r.progress == 2*(len(bTree.levels)+1) {
 				latestIncorporatedHeight, err := r.tracker.FinishTransfer()
 				require.NoError(t, err)
 
-				delete(c.pendingHeights, r.record.blockHeight)
-				c.completed[r.record.blockHeight] = r.record
+				delete(s.pendingHeights, r.record.blockHeight)
+				s.completed[r.record.blockHeight] = r.record
 
 				for {
-					_, ok := c.completed[c.latestIncorporatedHeight+1]
+					_, ok := s.completed[s.latestIncorporatedHeight+1]
 					if !ok {
 						break
 					}
 
-					delete(c.completed, c.latestIncorporatedHeight+1)
-					c.latestIncorporatedHeight++
+					delete(s.completed, s.latestIncorporatedHeight+1)
+					s.latestIncorporatedHeight++
 				}
 
-				assert.Equal(t, c.latestIncorporatedHeight, latestIncorporatedHeight)
+				assert.Equal(t, s.latestIncorporatedHeight, latestIncorporatedHeight)
 			} else if r.progress%2 == 0 {
+				level := bTree.levels[r.progress/2-1]
 				var cids []cid.Cid
-				for _, blob := range bTree.levels[r.progress/2-1] {
+				for _, blob := range level {
 					cids = append(cids, blob.Cid())
+					s.updateBlobRecord(blob, h)
 				}
 				err := r.tracker.TrackBlobs(cids)
 				require.NoError(t, err)
+			} else if r.progress == 1 {
+				err := s.bstore.Put(context.Background(), bTree.root)
+				require.NoError(t, err)
 			} else {
 				blobs := bTree.levels[r.progress/2-1]
-				err := c.bstore.PutMany(context.Background(), blobs)
+				err := s.bstore.PutMany(context.Background(), blobs)
 				require.NoError(t, err)
 			}
 		}
@@ -226,21 +272,34 @@ func (c *StorageMachine) DoSomething(t *rapid.T) {
 	}
 }
 
-func (c *StorageMachine) Check(t *rapid.T) {
-	latestIncorporatedHeight, err := c.storage.GetLatestIncorporatedHeight()
-	require.NoError(t, err)
-	assert.Equal(t, c.latestIncorporatedHeight, latestIncorporatedHeight)
+func (s *StorageMachine) updateBlobRecord(blob blobs.Blob, height uint64) {
+	br, ok := s.blobRecords[blob.Cid()]
+	if !ok {
+		br = &blobRecord{
+			blob:             blob,
+			latestHeightSeen: height,
+		}
+		s.blobRecords[blob.Cid()] = br
+	} else if br.latestHeightSeen < height {
+		br.latestHeightSeen = height
+	}
+}
 
-	storedDataLowerBound, err := c.storage.GetStoredDataLowerBound()
+func (s *StorageMachine) Check(t *rapid.T) {
+	latestIncorporatedHeight, err := s.storage.GetLatestIncorporatedHeight()
 	require.NoError(t, err)
-	assert.Equal(t, c.storedDataLowerBound, storedDataLowerBound)
+	assert.Equal(t, s.latestIncorporatedHeight, latestIncorporatedHeight)
 
-	err = c.storage.Check(state_synchronization.CheckOptions{
+	storedDataLowerBound, err := s.storage.GetStoredDataLowerBound()
+	require.NoError(t, err)
+	assert.Equal(t, s.storedDataLowerBound, storedDataLowerBound)
+
+	err = s.storage.Check(state_synchronization.CheckOptions{
 		Extended: true,
 	})
 	assert.NoError(t, err)
 
-	trackedItems, pendingHeights, err := c.storage.LoadState()
+	trackedItems, pendingHeights, err := s.storage.LoadState()
 	require.NoError(t, err)
 
 	var numCompleted int
@@ -248,16 +307,16 @@ func (c *StorageMachine) Check(t *rapid.T) {
 	for _, item := range trackedItems {
 		if item.Completed {
 			numCompleted++
-			if assert.Contains(t, c.completed, item.BlockHeight) {
-				record := c.completed[item.BlockHeight]
+			if assert.Contains(t, s.completed, item.BlockHeight) {
+				record := s.completed[item.BlockHeight]
 				assert.Equal(t, record.blockHeight, item.BlockHeight)
 				assert.Equal(t, record.blockID, item.BlockID)
 				assert.Equal(t, record.rootID, item.RootID)
 			}
 		} else {
 			numInProgress++
-			if assert.Contains(t, c.pendingHeights, item.BlockHeight) {
-				pendingRecord := c.pendingHeights[item.BlockHeight]
+			if assert.Contains(t, s.pendingHeights, item.BlockHeight) {
+				pendingRecord := s.pendingHeights[item.BlockHeight]
 				assert.NotNil(t, pendingRecord.tracker)
 				assert.NotNil(t, pendingRecord.record)
 				assert.Equal(t, pendingRecord.record.blockHeight, item.BlockHeight)
@@ -268,11 +327,11 @@ func (c *StorageMachine) Check(t *rapid.T) {
 	}
 
 	for _, h := range pendingHeights {
-		assert.NotContains(t, c.pendingHeights, h)
+		assert.NotContains(t, s.pendingHeights, h)
 	}
 
-	assert.Len(t, c.pendingHeights, len(pendingHeights)+numInProgress)
-	assert.Len(t, c.completed, numCompleted)
+	assert.Len(t, s.pendingHeights, numInProgress)
+	assert.Len(t, s.completed, numCompleted)
 }
 
 func TestStorage(t *testing.T) {

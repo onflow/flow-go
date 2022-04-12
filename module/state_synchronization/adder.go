@@ -135,7 +135,7 @@ func (s *executionDataAdderImpl) AddChunkExecutionData(
 
 	cids, totalBytes, err := s.addBlobs(ctx, ced, logger)
 	if err != nil {
-		return cid.Undef, fmt.Errorf("failed to add chunk execution data blobs: %w")
+		return cid.Undef, fmt.Errorf("failed to add chunk execution data blobs: %w", err)
 	}
 
 	for {
