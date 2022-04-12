@@ -145,7 +145,7 @@ func main() {
 			"the delay to broadcast block proposal in order to control block production rate")
 		flags.Uint64Var(&followerConfig.SkipNewProposalsThreshold,
 			"follower-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (follower engine)")
-		flags.Uint64Var(&followerConfig.SkipNewProposalsThreshold,
+		flags.Uint64Var(&complianceConfig.SkipNewProposalsThreshold,
 			"compliance-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (cluster compliance engine)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
 
@@ -313,6 +313,7 @@ func main() {
 				followerCore,
 				mainChainSyncCore,
 				node.Tracer,
+				modulecompliance.WithSkipNewProposalsThreshold(followerConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
