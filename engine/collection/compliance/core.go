@@ -118,6 +118,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	}
 
 	// ignore proposals which are too far ahead of our local finalized state
+	// instead, rely on sync engine to catch up finalization more effectively, and avoid
+	// large subtree of blocks to be cached.
 	final, err := c.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get latest finalized header: %w", err)
