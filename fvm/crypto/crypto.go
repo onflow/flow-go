@@ -241,7 +241,7 @@ func VerifySignatureFromTransaction(
 		if crypto.IsInvalidInputsError(err) {
 			return false, err
 		}
-		// TODO: check if we should panic or bubble the error up
+		// unexpected error in normal operations
 		panic(fmt.Errorf("verify transaction signature failed with unexpected error %w", err))
 	}
 

@@ -27,7 +27,7 @@ type prefixedHashing struct {
 func paddedDomainTag(s string) ([tagLength]byte, error) {
 	var tag [tagLength]byte
 	if len(s) > tagLength {
-		return tag, fmt.Errorf("domain tag cannot be longer than %d characters, got %d", tagLength, len(s))
+		return tag, fmt.Errorf("domain tag cannot be longer than %d characters, got %s", tagLength, s)
 	}
 	copy(tag[:], s)
 	return tag, nil
