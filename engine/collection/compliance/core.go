@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state"
 	clusterkv "github.com/onflow/flow-go/state/cluster"
@@ -28,6 +29,7 @@ import (
 // user of this object needs to ensure single thread access.
 type Core struct {
 	log               zerolog.Logger // used to log relevant actions with context
+	config            compliance.Config
 	metrics           module.EngineMetrics
 	mempoolMetrics    module.MempoolMetrics
 	collectionMetrics module.CollectionMetrics
@@ -49,10 +51,17 @@ func NewCore(
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
 	voteAggregator hotstuff.VoteAggregator,
+	opts ...compliance.Opt,
 ) (*Core, error) {
+
+	config := compliance.DefaultConfig()
+	for _, apply := range opts {
+		apply(&config)
+	}
 
 	c := &Core{
 		log:               log.With().Str("cluster_compliance", "core").Logger(),
+		config:            config,
 		metrics:           collector,
 		mempoolMetrics:    mempool,
 		collectionMetrics: collectionMetrics,
@@ -106,6 +115,18 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("could not check proposal: %w", err)
+	}
+
+	// ignore proposals which are too far ahead of our local finalized state
+	final, err := c.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get latest finalized header: %w", err)
+	}
+	if header.Height > final.Height && header.Height-final.Height > c.config.SkipNewProposalsThreshold {
+		log.Debug().
+			Uint64("final_height", final.Height).
+			Msg("dropping block too far ahead of locally finalized height")
+		return nil
 	}
 
 	// there are two possibilities if the proposal is neither already pending
