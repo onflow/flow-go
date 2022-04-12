@@ -117,20 +117,20 @@ func TestTopicValidator(t *testing.T) {
 	// node 1 does NOT receive the message due to the topic validator
 	var wg sync.WaitGroup
 	wg.Add(1)
-	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	timedCtx1, cancel1 := context.WithTimeout(context.Background(), time.Second)
+	defer cancel1()
 	go func() {
-		msg, err = sub1.Next(timedCtx)
+		_, err := sub1.Next(timedCtx1)
 		require.Error(t, err)
 		wg.Done()
 	}()
 
 	// node 2 also does not receive the message via gossip from the node1 (event after the 1 second hearbeat)
 	wg.Add(1)
-	timedCtx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	timedCtx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel2()
 	go func() {
-		msg, err = sub2.Next(timedCtx)
+		_, err := sub2.Next(timedCtx2)
 		require.Error(t, err)
 		wg.Done()
 	}()
