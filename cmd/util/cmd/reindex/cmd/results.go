@@ -48,8 +48,8 @@ var resultsCmd = &cobra.Command{
 					log.Fatal().Err(err).Msgf("could not index result ID at height %d", h)
 				}
 			}
-      log.Info().Uint64("start_height", root.Height).Uint64("end_height", final.Height).Msg("indexed execution results")
 		}
+
 		log.Info().Uint64("start_height", root.Height).Uint64("end_height", final.Height).Msg("indexed execution results")
 	},
 }
