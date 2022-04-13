@@ -134,7 +134,6 @@ func main() {
 		executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
 		executionDataCIDCacheSize     uint = 100
 		edsDatastoreTTL               time.Duration
-		followerConfig                compliance.Config
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -170,7 +169,6 @@ func main() {
 			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
 			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
 			flags.DurationVar(&edsDatastoreTTL, "execution-data-service-datastore-ttl", 0, "TTL for new blobs added to the execution data service blobstore")
-			flags.Uint64Var(&followerConfig.SkipNewProposalsThreshold, "follower-skip-proposals-threshold", compliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 		}).
 		ValidateFlags(func() error {
 			if enableBlockDataUpload {
@@ -677,7 +675,7 @@ func main() {
 				followerCore,
 				syncCore,
 				node.Tracer,
-				compliance.WithSkipNewProposalsThreshold(followerConfig.SkipNewProposalsThreshold),
+				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)

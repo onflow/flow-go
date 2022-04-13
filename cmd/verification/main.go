@@ -51,7 +51,6 @@ func main() {
 		backoffMaxInterval time.Duration // maximum time interval a chunk data pack request waits before dispatching.
 		backoffMultiplier  float64       // base of exponent in exponential backoff multiplier for backing off requests for chunk data packs.
 		requestTargets     uint64        // maximum number of execution nodes a chunk data pack request is dispatched to.
-		followerConfig     compliance.Config
 
 		blockWorkers uint64 // number of blocks processed in parallel.
 		chunkWorkers uint64 // number of chunks processed in parallel.
@@ -89,7 +88,6 @@ func main() {
 		flags.Uint64Var(&requestTargets, "request-targets", vereq.DefaultRequestTargets, "maximum number of execution nodes a chunk data pack request is dispatched to")
 		flags.Uint64Var(&blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 		flags.Uint64Var(&chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
-		flags.Uint64Var(&followerConfig.SkipNewProposalsThreshold, "follower-skip-proposals-threshold", compliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 
 	})
 
@@ -331,7 +329,7 @@ func main() {
 				followerCore,
 				syncCore,
 				node.Tracer,
-				compliance.WithSkipNewProposalsThreshold(followerConfig.SkipNewProposalsThreshold),
+				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
