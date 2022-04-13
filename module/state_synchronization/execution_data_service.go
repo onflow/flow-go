@@ -40,7 +40,6 @@ type ExecutionDataGetter interface {
 	GetChunkExecutionDatas(
 		ctx context.Context,
 		blockID flow.Identifier,
-		blockHeight uint64,
 		rootID flow.Identifier,
-	) ([]*ChunkExecutionData, uint64, error)
+	) ([]*ChunkExecutionData, error)
 }

@@ -636,7 +636,8 @@ func (s *Storage) getCidsToDelete(height uint64) ([]cid.Cid, []uint64, error) {
 
 // Prune removes all data from storage up to the given height, including all blob tree records, blob records, and blob data,
 // and returns the list of deleted CIDs. It should only be called with height <= latest incorporated height.
-// This method should not be called concurrently from multiple goroutines, but is safe to call concurrently with other methods.
+// NOTE: The caller must ensure that no other updates may be made to the underlying datastore during a call to this method,
+// otherwise the datastore may end up in an inconsistent state.
 func (s *Storage) Prune(height uint64) ([]cid.Cid, error) {
 	storedDataLowerBoundKey := makeGlobalStateKey(globalStateStoredDataLowerBound)
 	storedDataLowerBoundValue := make([]byte, 8)

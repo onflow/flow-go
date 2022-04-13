@@ -37,12 +37,6 @@ func WithMaxBlobTreeDepth(depth int) ExecutionDataGetterOption {
 	}
 }
 
-func WithStatusTrackerFactory(factory StatusTrackerFactory) ExecutionDataGetterOption {
-	return func(s *executionDataGetterImpl) {
-		s.statusTrackerFactory = factory
-	}
-}
-
 func NewExecutionDataGetter(
 	codec encoding.Codec,
 	compressor network.Compressor,
@@ -58,7 +52,6 @@ func NewExecutionDataGetter(
 		defaultMaxBlobTreeDepth,
 		metrics,
 		logger.With().Str("component", "execution_data_service").Logger(),
-		&NoopStatusTrackerFactory{},
 	}
 
 	for _, opt := range opts {
@@ -71,13 +64,12 @@ func NewExecutionDataGetter(
 var _ ExecutionDataGetter = (*executionDataGetterImpl)(nil)
 
 type executionDataGetterImpl struct {
-	serializer           *serializer
-	blobService          network.BlobService
-	maxBlobSize          int
-	maxBlobTreeDepth     int
-	metrics              module.ExecutionDataGetterMetrics
-	logger               zerolog.Logger
-	statusTrackerFactory StatusTrackerFactory
+	serializer       *serializer
+	blobService      network.BlobService
+	maxBlobSize      int
+	maxBlobTreeDepth int
+	metrics          module.ExecutionDataGetterMetrics
+	logger           zerolog.Logger
 }
 
 // retrieveBlobs retrieves the blobs for the given CIDs from the blobservice, and sends them to the given BlobSender
@@ -209,12 +201,7 @@ func (s *executionDataGetterImpl) getExecutionDataRoot(
 	blockID flow.Identifier,
 	rootID flow.Identifier,
 	blobGetter network.BlobGetter,
-	statusTracker StatusTracker,
 ) (*ExecutionDataRoot, error) {
-	if err := statusTracker.StartTransfer(); err != nil {
-		return nil, fmt.Errorf("failed to track transfer start: %w", err)
-	}
-
 	blob, err := blobGetter.GetBlob(ctx, flow.IdToCid(rootID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get execution data root blob: %w", err)
@@ -240,9 +227,8 @@ func (s *executionDataGetterImpl) getExecutionDataRoot(
 func (s *executionDataGetterImpl) GetChunkExecutionDatas(
 	ctx context.Context,
 	blockID flow.Identifier,
-	blockHeight uint64,
 	rootID flow.Identifier,
-) ([]*ChunkExecutionData, uint64, error) {
+) ([]*ChunkExecutionData, error) {
 	logger := s.logger.With().Str("root_id", rootID.String()).Logger()
 	logger.Debug().Msg("getting execution data")
 
@@ -257,11 +243,9 @@ func (s *executionDataGetterImpl) GetChunkExecutionDatas(
 		s.metrics.ExecutionDataGetFinished(time.Since(start), success, int(totalSize.Load()))
 	}()
 
-	statusTracker := s.statusTrackerFactory.GetStatusTracker(blockID, blockHeight, rootID)
-
-	edRoot, err := s.getExecutionDataRoot(ctx, blockID, rootID, blobGetter, statusTracker)
+	edRoot, err := s.getExecutionDataRoot(ctx, blockID, rootID, blobGetter)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -276,7 +260,6 @@ func (s *executionDataGetterImpl) GetChunkExecutionDatas(
 				Str("chunk_id", chunkID.String()).
 				Int("chunk_index", i).
 				Logger(),
-				statusTracker,
 			)
 
 			if err != nil {
@@ -291,15 +274,11 @@ func (s *executionDataGetterImpl) GetChunkExecutionDatas(
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	if latestIncorporatedHeight, err := statusTracker.FinishTransfer(); err != nil {
-		return nil, 0, fmt.Errorf("failed to track transfer finish: %w", err)
-	} else {
-		success = true
-		return chunkExecutionDatas, latestIncorporatedHeight, nil
-	}
+	success = true
+	return chunkExecutionDatas, nil
 }
 
 func (s *executionDataGetterImpl) getChunkExecutionData(
@@ -307,18 +286,12 @@ func (s *executionDataGetterImpl) getChunkExecutionData(
 	chunkExecutionDataID cid.Cid,
 	blobGetter network.BlobGetter,
 	logger zerolog.Logger,
-	statusTracker StatusTracker,
 ) (*ChunkExecutionData, uint64, error) {
 	var blobTreeSize uint64
 
 	cids := []cid.Cid{chunkExecutionDataID}
 
 	for i := 0; i <= s.maxBlobTreeDepth; i++ {
-		err := statusTracker.TrackBlobs(cids)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to track blobs: %w", err)
-		}
-
 		v, totalBytes, err := s.getBlobs(ctx, cids, logger)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
