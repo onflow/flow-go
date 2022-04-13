@@ -137,6 +137,9 @@ var (
 		common.MemoryKindReferenceType:     0,
 		common.MemoryKindRestrictedType:    0,
 		common.MemoryKindVariableSizedType: 0,
+
+		common.MemoryKindPosition: 0,
+		common.MemoryKindRange:    0,
 	}
 )
 
