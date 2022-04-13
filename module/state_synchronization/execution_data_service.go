@@ -436,7 +436,10 @@ func (s *executionDataServiceImpl) checkBlobs(ctx context.Context, cids []cid.Ci
 func (s *executionDataServiceImpl) Check(ctx context.Context, rootID flow.Identifier) ([]InvalidCid, bool) {
 	rootCid := flow.IdToCid(rootID)
 
-	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
+	logger := s.logger.With().
+		Str("rootID", rootID.String()).
+		Str("cid", rootCid.String()).
+		Logger()
 	logger.Debug().Msg("checking execution data")
 
 	cids := []cid.Cid{rootCid}

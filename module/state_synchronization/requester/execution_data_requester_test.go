@@ -304,7 +304,14 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterHalts() {
 		err := s.Load()
 		require.NoError(suite.T(), err)
 
-		s.Halt()
+		haltErr := &status.RequesterHaltedError{
+			ExecutionDataID: unittest.IdentifierFixture(),
+			BlockID:         unittest.IdentifierFixture(),
+			Height:          testData.startHeight,
+			Err:             err,
+		}
+
+		s.Halt(haltErr)
 
 		// start processing with all seals available
 		edr, _ := suite.prepareRequesterTest(testData)

@@ -38,7 +38,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/compliance"
-	"github.com/onflow/flow-go/module/component"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -416,121 +415,106 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var processedBlockHeight *storage.ConsumerProgress
 	var processedNotifications *storage.ConsumerProgress
 
-	builder.Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
-		err := os.MkdirAll(builder.executionDataDir, 0700)
-		if err != nil {
-			return err
-		}
-
-		ds, err = badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
-		if err != nil {
-			return err
-		}
-
-		builder.ShutdownFunc(func() error {
-			if err := ds.Close(); err != nil {
-				return fmt.Errorf("could not close execution data datastore: %w", err)
-			}
-			return nil
-		})
-
-		bs, err = node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	builder.Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
-		// uses the datastore's DB
-		processedBlockHeight = storage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
-		return nil
-	})
-
-	builder.Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
-		// uses the datastore's DB
-		processedNotifications = storage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
-		return nil
-	})
-
-	builder.Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-		builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
-			new(cbor.Codec),
-			compressor.NewLz4Compressor(),
-			bs,
-			metrics.NewExecutionDataServiceCollector(),
-			builder.Logger,
-		)
-
-		return builder.ExecutionDataService, nil
-	})
-
-	errorHander := func(err error) component.ErrorHandlingResult {
-		if errors.Is(err, edrequester.ErrRequesterHalted) {
-			// the requester is halted and should remain disabled, but the node can continue
-			// to operate safely. after the node starts back up, it will detect that it was
-			// previously halted and won't start.
-			return component.ErrorHandlingRestart
-		}
-
-		// all other errors are unhandled
-		return component.ErrorHandlingStop
-	}
-
-	builder.RestartableComponent("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// Validation of the start block height needs to be done after loading state
-		if builder.executionDataConfig.StartBlockHeight > 0 {
-			if builder.executionDataConfig.StartBlockHeight <= builder.RootBlock.Header.Height {
-				return nil, fmt.Errorf(
-					"execution data start block height (%d) must be greater than the root block height (%d)",
-					builder.executionDataConfig.StartBlockHeight, builder.RootBlock.Header.Height)
-			}
-
-			latestSeal, err := builder.State.Sealed().Head()
+	builder.
+		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
+			err := os.MkdirAll(builder.executionDataDir, 0700)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get latest sealed height")
+				return err
 			}
 
-			// Note: since the root block of a spork is also sealed in the root protocol state, the
-			// latest sealed height is always equal to the root block height. That means that at the
-			// very beginning of a spork, this check will always fail. Operators should not specify
-			// a StartBlockHeight when starting from the beginning of a spork.
-			if builder.executionDataConfig.StartBlockHeight > latestSeal.Height {
-				return nil, fmt.Errorf(
-					"execution data start block height (%d) must be less than or equal to the latest sealed block height (%d)",
-					builder.executionDataConfig.StartBlockHeight, latestSeal.Height)
+			ds, err = badger.NewDatastore(builder.executionDataDir, &badger.DefaultOptions)
+			if err != nil {
+				return err
 			}
-		} else {
-			// The default StartBlockHeight is the first block executed for the spork
-			builder.executionDataConfig.StartBlockHeight = builder.RootBlock.Header.Height + 1
-		}
 
-		edr, err := edrequester.New(
-			builder.Logger,
-			metrics.NewExecutionDataRequesterCollector(),
-			ds,
-			bs,
-			builder.ExecutionDataService,
-			processedBlockHeight,
-			processedNotifications,
-			builder.State,
-			builder.Storage.Headers,
-			builder.Storage.Results,
-			builder.executionDataConfig,
-		)
+			builder.ShutdownFunc(func() error {
+				if err := ds.Close(); err != nil {
+					return fmt.Errorf("could not close execution data datastore: %w", err)
+				}
+				return nil
+			})
 
-		if err != nil {
-			return nil, fmt.Errorf("could not create execution data requester: %w", err)
-		}
+			bs, err = node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
+			if err != nil {
+				return err
+			}
 
-		builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
+			return nil
+		}).
+		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
+			// uses the datastore's DB
+			processedBlockHeight = storage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			return nil
+		}).
+		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
+			// uses the datastore's DB
+			processedNotifications = storage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+			return nil
+		}).
+		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-		builder.ExecutionDataRequester = edr
+			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
+				new(cbor.Codec),
+				compressor.NewLz4Compressor(),
+				bs,
+				metrics.NewExecutionDataServiceCollector(),
+				builder.Logger,
+			)
 
-		return builder.ExecutionDataRequester, nil
-	}, errorHander)
+			return builder.ExecutionDataService, nil
+		}).
+		RestartableComponent("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// Validation of the start block height needs to be done after loading state
+			if builder.executionDataConfig.StartBlockHeight > 0 {
+				if builder.executionDataConfig.StartBlockHeight <= builder.RootBlock.Header.Height {
+					return nil, fmt.Errorf(
+						"execution data start block height (%d) must be greater than the root block height (%d)",
+						builder.executionDataConfig.StartBlockHeight, builder.RootBlock.Header.Height)
+				}
+
+				latestSeal, err := builder.State.Sealed().Head()
+				if err != nil {
+					return nil, fmt.Errorf("failed to get latest sealed height")
+				}
+
+				// Note: since the root block of a spork is also sealed in the root protocol state, the
+				// latest sealed height is always equal to the root block height. That means that at the
+				// very beginning of a spork, this check will always fail. Operators should not specify
+				// a StartBlockHeight when starting from the beginning of a spork.
+				if builder.executionDataConfig.StartBlockHeight > latestSeal.Height {
+					return nil, fmt.Errorf(
+						"execution data start block height (%d) must be less than or equal to the latest sealed block height (%d)",
+						builder.executionDataConfig.StartBlockHeight, latestSeal.Height)
+				}
+			} else {
+				// The default StartBlockHeight is the first block executed for the spork
+				builder.executionDataConfig.StartBlockHeight = builder.RootBlock.Header.Height + 1
+			}
+
+			edr, err := edrequester.New(
+				builder.Logger,
+				metrics.NewExecutionDataRequesterCollector(),
+				ds,
+				bs,
+				builder.ExecutionDataService,
+				processedBlockHeight,
+				processedNotifications,
+				builder.State,
+				builder.Storage.Headers,
+				builder.Storage.Results,
+				builder.executionDataConfig,
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create execution data requester: %w", err)
+			}
+
+			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
+
+			builder.ExecutionDataRequester = edr
+
+			return builder.ExecutionDataRequester, nil
+		}, edrequester.RequesterHaltedHandler)
 
 	return builder
 }

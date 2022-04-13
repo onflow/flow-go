@@ -271,8 +271,9 @@ func (e *executionDataRequester) runBootstrap(ctx irrecoverable.SignalerContext,
 	}
 
 	// Requester came up halted.
-	if e.status.Halted() {
-		e.log.Error().Msg("HALTING REQUESTER: requester was halted on a previous run due to invalid data")
+	haltErr := e.status.Halted()
+	if haltErr != nil {
+		e.log.Error().Err(haltErr).Msg("HALTING REQUESTER: requester was halted on a previous run due to invalid data")
 		// By returning before ready, the blockConsumer will not start, effectively disabling the
 		// component.
 		return
@@ -363,21 +364,24 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 	// the only error returned is ctx.Err()
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
-		// download execution data for the block
-		err := e.processFetchRequest(ctx, request)
-
 		if attempt > 0 {
 			e.metrics.FetchRetried()
 		}
 		attempt++
+
+		// download execution data for the block
+		err := e.processFetchRequest(ctx, request)
 
 		return retry.RetryableError(err)
 	})
 }
 
 func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, request *status.BlockEntry) error {
-	logger := e.log.With().Str("block_id", request.BlockID.String()).Logger()
-	logger.Debug().Msgf("processing fetch request for block %d", request.Height)
+	logger := e.log.With().
+		Str("block_id", request.BlockID.String()).
+		Uint64("height", request.Height).
+		Logger()
+	logger.Debug().Msg("processing fetch request")
 
 	result, err := e.results.ByBlockID(request.BlockID)
 
@@ -395,9 +399,16 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 			Str("execution_data_id", result.ExecutionDataID.String()).
 			Msg("HALTING REQUESTER: invalid execution data found")
 
-		e.status.Halt()
+		haltErr := &status.RequesterHaltedError{
+			ExecutionDataID: result.ExecutionDataID,
+			BlockID:         request.BlockID,
+			Height:          request.Height,
+			Err:             err,
+		}
+
+		e.status.Halt(haltErr)
 		e.metrics.Halted()
-		ctx.Throw(ErrRequesterHalted)
+		ctx.Throw(err)
 	}
 
 	// Some or all of the blob was missing or corrupt. retry
@@ -416,7 +427,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 		ctx.Throw(err)
 	}
 
-	logger.Debug().Msgf("Fetched execution data for block %d", request.Height)
+	logger.Debug().Msg("Fetched execution data")
 
 	request.ExecutionData = executionData
 
@@ -509,7 +520,7 @@ func (e *executionDataRequester) notifyConsumers(executionData *state_synchroniz
 func (e *executionDataRequester) checkDatastore(ctx irrecoverable.SignalerContext, lastHeight uint64) error {
 	// we're only interested in inspecting blobs that exist in our local db, so create an
 	// ExecutionDataService that only uses the local datastore
-	localEDS, err := e.localExecutionDataService(ctx)
+	localEDS, err := initLocalExecutionDataService(ctx, e.ds, e.log)
 
 	if errors.Is(err, context.Canceled) {
 		return nil
@@ -537,17 +548,6 @@ func (e *executionDataRequester) checkDatastore(ctx irrecoverable.SignalerContex
 		}
 
 		exists, err := e.checkExecutionData(ctx, localEDS, result.ExecutionDataID)
-
-		if errors.Is(err, ErrRequesterHalted) {
-			e.log.Error().Err(err).
-				Str("block_id", block.ID().String()).
-				Str("execution_data_id", result.ExecutionDataID.String()).
-				Msg("HALTING REQUESTER: invalid execution data found")
-
-			e.status.Halt()
-			e.metrics.Halted()
-			ctx.Throw(ErrRequesterHalted)
-		}
 
 		if err != nil {
 			return err
@@ -613,8 +613,8 @@ func (e *executionDataRequester) checkExecutionData(ctx irrecoverable.SignalerCo
 // localExecutionDataService returns an ExecutionDataService that's configured to use only the local
 // datastore, and to rehash blobs on read. This is used to check the validity of blobs that exist in
 // the local db.
-func (e *executionDataRequester) localExecutionDataService(ctx irrecoverable.SignalerContext) (state_synchronization.ExecutionDataService, error) {
-	blobService := p2p.NewBlobService(e.ds, p2p.WithHashOnRead(true))
+func initLocalExecutionDataService(ctx irrecoverable.SignalerContext, ds datastore.Batching, log zerolog.Logger) (state_synchronization.ExecutionDataService, error) {
+	blobService := p2p.NewBlobService(ds, p2p.WithHashOnRead(true))
 	blobService.Start(ctx)
 
 	eds := state_synchronization.NewExecutionDataService(
@@ -622,7 +622,7 @@ func (e *executionDataRequester) localExecutionDataService(ctx irrecoverable.Sig
 		compressor.NewLz4Compressor(),
 		blobService,
 		metrics.NewNoopCollector(),
-		e.log,
+		log,
 	)
 
 	select {
@@ -645,4 +645,17 @@ func isInvalidBlobError(err error) bool {
 func isBlobNotFoundError(err error) bool {
 	var blobNotFoundError *state_synchronization.BlobNotFoundError
 	return errors.As(err, &blobNotFoundError)
+}
+
+func RequesterHaltedHandler(err error) component.ErrorHandlingResult {
+	var requesterHaltedError *status.RequesterHaltedError
+	if errors.As(err, &requesterHaltedError) {
+		// the requester is halted and should remain disabled, but the node can continue
+		// to operate safely. after the node starts back up, it will detect that it was
+		// previously halted and won't start.
+		return component.ErrorHandlingRestart
+	}
+
+	// all other errors are unhandled
+	return component.ErrorHandlingStop
 }

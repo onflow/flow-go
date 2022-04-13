@@ -20,8 +20,8 @@ type Status struct {
 	// The highest block height whose ExecutionData has been fetched
 	lastReceived uint64
 
-	// Whether or not the requester has been halted
-	halted bool
+	// The error that caused the requester to halt, or nil if it is not halted
+	halted error
 
 	// Maximum number of blocks within the notification heap that can have ExecutionData
 	maxCachedEntries uint64
@@ -61,6 +61,8 @@ func (s *Status) Load() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.log.Debug().Msg("loading requester status")
+
 	lastNotified, err := s.progress.ProcessedIndex()
 	if err != nil {
 		return fmt.Errorf("failed to load last processed index: %w", err)
@@ -80,6 +82,7 @@ func (s *Status) Load() error {
 	s.lastNotified = lastNotified
 	s.lastReceived = lastNotified
 
+	// Note: only the error message is preserved between loads, not the type.
 	s.halted = halted
 
 	return nil
@@ -118,13 +121,13 @@ func (s *Status) Fetched(entry *BlockEntry) {
 }
 
 // Halt marks the requester as halted. This is persisted between restarts
-func (s *Status) Halt() {
+func (s *Status) Halt(err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.halted = true
+	s.halted = err
 
-	if err := s.progress.SetHalted(true); err != nil {
+	if err := s.progress.SetHalted(err); err != nil {
 		s.log.Error().Err(err).Msg("failed to persist halted state")
 	}
 }
@@ -138,7 +141,7 @@ func (s *Status) LastNotified() uint64 {
 }
 
 // Halted returns true if the requester has been halted
-func (s *Status) Halted() bool {
+func (s *Status) Halted() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

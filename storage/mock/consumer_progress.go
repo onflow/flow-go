@@ -10,14 +10,14 @@ type ConsumerProgress struct {
 }
 
 // Halted provides a mock function with given fields:
-func (_m *ConsumerProgress) Halted() (bool, error) {
+func (_m *ConsumerProgress) Halted() (error, error) {
 	ret := _m.Called()
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Error(0)
 	}
 
 	var r1 error
@@ -79,13 +79,13 @@ func (_m *ConsumerProgress) ProcessedIndex() (uint64, error) {
 	return r0, r1
 }
 
-// SetHalted provides a mock function with given fields: halted
-func (_m *ConsumerProgress) SetHalted(halted bool) error {
-	ret := _m.Called(halted)
+// SetHalted provides a mock function with given fields: err
+func (_m *ConsumerProgress) SetHalted(err error) error {
+	ret := _m.Called(err)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(bool) error); ok {
-		r0 = rf(halted)
+	if rf, ok := ret.Get(0).(func(error) error); ok {
+		r0 = rf(err)
 	} else {
 		r0 = ret.Error(0)
 	}

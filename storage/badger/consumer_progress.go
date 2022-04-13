@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -49,19 +50,23 @@ func (cp *ConsumerProgress) SetProcessedIndex(processed uint64) error {
 	return nil
 }
 
-func (cp *ConsumerProgress) Halted() (bool, error) {
-	var halted bool
-	err := cp.db.View(operation.RetrieveHalted(cp.consumer, &halted))
-	if err != nil {
-		return false, fmt.Errorf("failed to retrieve halted status: %w", err)
+func (cp *ConsumerProgress) Halted() (error, error) {
+	// since errors can be arbitrary structs, only the error message string is saved
+	var msg string
+	dbErr := cp.db.View(operation.RetrieveHalted(cp.consumer, &msg))
+	if dbErr != nil {
+		return nil, fmt.Errorf("failed to retrieve halted status: %w", dbErr)
 	}
-	return halted, nil
+	if msg != "" {
+		return errors.New(msg), nil
+	}
+	return nil, nil
 }
 
 // InitHalted insert unhalted status to the storage layer, can only be done once.
 // initialize for the second time will return storage.ErrAlreadyExists
 func (cp *ConsumerProgress) InitHalted() error {
-	err := operation.RetryOnConflict(cp.db.Update, operation.InsertHalted(cp.consumer, false))
+	err := operation.RetryOnConflict(cp.db.Update, operation.InsertHalted(cp.consumer, ""))
 	if err != nil {
 		return fmt.Errorf("could not update processed index: %w", err)
 	}
@@ -69,10 +74,12 @@ func (cp *ConsumerProgress) InitHalted() error {
 	return nil
 }
 
-func (cp *ConsumerProgress) SetHalted(halted bool) error {
-	err := operation.RetryOnConflict(cp.db.Update, operation.SetHalted(cp.consumer, halted))
-	if err != nil {
-		return fmt.Errorf("could not update halted status: %w", err)
+func (cp *ConsumerProgress) SetHalted(err error) error {
+	// since errors can be arbitrary structs, only the error message string is saved, which can be
+	// loaded into a flattened error on retrieval
+	dbErr := operation.RetryOnConflict(cp.db.Update, operation.SetHalted(cp.consumer, err.Error()))
+	if dbErr != nil {
+		return fmt.Errorf("could not update halted status: %w", dbErr)
 	}
 
 	return nil

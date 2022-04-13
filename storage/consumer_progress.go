@@ -12,11 +12,11 @@ type ConsumerProgress interface {
 	SetProcessedIndex(processed uint64) error
 
 	// read the current halted status
-	Halted() (bool, error)
-	// insert false value entry for halted into the storage layer, can only be done once.
+	Halted() (error, error)
+	// insert nil value entry for halted into the storage layer, can only be done once.
 	// initialize for the second time will return storage.ErrAlreadyExists
 	InitHalted() error
 	// update the halted status in the storage layer.
 	// it will fail if InitHalted was never called.
-	SetHalted(halted bool) error
+	SetHalted(err error) error
 }

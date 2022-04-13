@@ -55,7 +55,7 @@ func (suite *StatusSuite) SetupTest() {
 
 	suite.progress = new(storagemock.ConsumerProgress)
 	suite.progress.On("ProcessedIndex").Return(suite.rootHeight, nil)
-	suite.progress.On("Halted").Return(false, nil)
+	suite.progress.On("Halted").Return(nil, nil)
 
 	suite.ds = dssync.MutexWrap(datastore.NewMapDatastore())
 	suite.status = status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, suite.progress)
@@ -94,7 +94,7 @@ func (suite *StatusSuite) TestLoad() {
 			assert.NoError(suite.T(), err)
 
 			assert.Equal(suite.T(), suite.rootHeight, s.LastNotified())
-			assert.False(suite.T(), s.Halted())
+			assert.Nil(suite.T(), s.Halted())
 		})
 
 		suite.Run("Load from a non-empty state", func() {
@@ -104,14 +104,20 @@ func (suite *StatusSuite) TestLoad() {
 			assert.NoError(suite.T(), err)
 
 			assert.Equal(suite.T(), suite.rootHeight, s.LastNotified())
-			assert.False(suite.T(), s.Halted())
+			assert.Nil(suite.T(), s.Halted())
 		})
 
 		suite.Run("Load from a non-empty state", func() {
 			// set new value for processed and halted
+			haltErr := &status.RequesterHaltedError{
+				ExecutionDataID: unittest.IdentifierFixture(),
+				BlockID:         unittest.IdentifierFixture(),
+				Height:          suite.rootHeight + 1,
+				Err:             err,
+			}
 			err := progress.SetProcessedIndex(suite.rootHeight + 1)
 			assert.NoError(suite.T(), err)
-			err = progress.SetHalted(true)
+			err = progress.SetHalted(haltErr)
 			assert.NoError(suite.T(), err)
 
 			s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
@@ -119,7 +125,8 @@ func (suite *StatusSuite) TestLoad() {
 			assert.NoError(suite.T(), err)
 
 			assert.Equal(suite.T(), suite.rootHeight+1, s.LastNotified())
-			assert.True(suite.T(), s.Halted())
+			require.NotNil(suite.T(), s.Halted())
+			assert.Equal(suite.T(), haltErr.Error(), s.Halted().Error())
 		})
 	})
 
@@ -137,7 +144,7 @@ func (suite *StatusSuite) TestLoad() {
 		expectedErr := errors.New("halted error")
 		progress := new(storagemock.ConsumerProgress)
 		progress.On("ProcessedIndex").Return(suite.rootHeight, nil).Once()
-		progress.On("Halted").Return(false, expectedErr).Once()
+		progress.On("Halted").Return(nil, expectedErr).Once()
 
 		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
 		err := s.Load()
@@ -147,7 +154,7 @@ func (suite *StatusSuite) TestLoad() {
 	suite.Run("Load initializes halted state", func() {
 		progress := new(storagemock.ConsumerProgress)
 		progress.On("ProcessedIndex").Return(suite.rootHeight, nil).Once()
-		progress.On("Halted").Return(false, storage.ErrNotFound).Once()
+		progress.On("Halted").Return(nil, storage.ErrNotFound).Once()
 		progress.On("InitHalted").Return(nil).Once()
 
 		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
@@ -159,7 +166,7 @@ func (suite *StatusSuite) TestLoad() {
 		expectedErr := errors.New("initialization error")
 		progress := new(storagemock.ConsumerProgress)
 		progress.On("ProcessedIndex").Return(suite.rootHeight, nil).Once()
-		progress.On("Halted").Return(false, storage.ErrNotFound).Once()
+		progress.On("Halted").Return(nil, storage.ErrNotFound).Once()
 		progress.On("InitHalted").Return(expectedErr).Once()
 
 		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
@@ -447,14 +454,22 @@ func (suite *StatusSuite) TestHalted() {
 		err = s.Load()
 		assert.NoError(suite.T(), err)
 
-		suite.Run("halted defaults to false", func() {
-			assert.False(suite.T(), suite.status.Halted())
+		haltErr := &status.RequesterHaltedError{
+			ExecutionDataID: unittest.IdentifierFixture(),
+			BlockID:         unittest.IdentifierFixture(),
+			Height:          suite.rootHeight + 1,
+			Err:             err,
+		}
+
+		suite.Run("halted defaults to nil", func() {
+			assert.Nil(suite.T(), suite.status.Halted())
 		})
 
 		suite.Run("calling Halt sets halted to true", func() {
-			s.Halt()
+			s.Halt(haltErr)
 
-			assert.True(suite.T(), s.Halted())
+			// saved error matches original error
+			assert.Equal(suite.T(), haltErr, s.Halted())
 		})
 
 		suite.Run("halted persists across loads", func() {
@@ -462,7 +477,9 @@ func (suite *StatusSuite) TestHalted() {
 			err = s.Load()
 			assert.NoError(suite.T(), err)
 
-			assert.True(suite.T(), s.Halted())
+			// loaded error message matches original error message
+			require.NotNil(suite.T(), s.Halted())
+			assert.Equal(suite.T(), haltErr.Error(), s.Halted().Error())
 		})
 	})
 }
