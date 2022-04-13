@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -26,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
+	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
@@ -41,6 +43,8 @@ type ExecutionDataRequesterSuite struct {
 	datastore   datastore.Batching
 	db          *badger.DB
 
+	run edTestRun
+
 	mockSnapshot *mockSnapshot
 }
 
@@ -53,6 +57,14 @@ func TestExecutionDataRequesterSuite(t *testing.T) {
 func (suite *ExecutionDataRequesterSuite) SetupTest() {
 	suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
 	suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+
+	suite.run = edTestRun{
+		"",
+		1000,
+		func(_ int) map[uint64]testExecutionDataCallback {
+			return map[uint64]testExecutionDataCallback{}
+		},
+	}
 }
 
 type testExecutionDataServiceEntry struct {
@@ -129,27 +141,11 @@ func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[u
 }
 
 // Test cases:
-// * bootstrap with an empty db sets configuration correctly at beginning of spork
-// * bootstrap with an empty db sets configuration correctly mid spork
-// * bootstrap with a non-empty db sets configuration correctly
 // * bootstrap with halted db does not start
 // * halts are handled gracefully
 // * pause resume works as expected
 
-func (suite *ExecutionDataRequesterSuite) TestBootstrapFromEmptyStateAtSporkStart() {
-
-	// this is the standard case, we don't need an extra test
-
-}
-
-func (suite *ExecutionDataRequesterSuite) TestBootstrapFromEmptyStateMidSpork() {
-
-	// use normal test, but the first block to finalize is midway through the list
-
-}
-
 // func (suite *ExecutionDataRequesterSuite) TestBootstrapFromExistingStateMidSpork() {
-
 // 	// this is testing the case where a node is stopped for a period of time mid spork
 
 // 	// create status object. update fields. save. then start the node with the existing datastore
@@ -222,56 +218,58 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterProcessesBlocks() {
 }
 
 func (suite *ExecutionDataRequesterSuite) TestRequesterResumesProcessing() {
-	run := edTestRun{
-		"requester resumes processing",
-		1000,
-		func(_ int) map[uint64]testExecutionDataCallback {
-			return map[uint64]testExecutionDataCallback{}
-		},
+	suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
+	suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+
+	testData := suite.generateTestData(suite.run.blockCount, suite.run.specialBlocks(suite.run.blockCount))
+
+	test := func(stopHeight, resumeHeight uint64) {
+		testData.stopHeight = 0
+		testData.resumeHeight = 0
+		testData.fetchedExecutionData = nil
+
+		unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+			suite.db = db
+
+			// Process half of the blocks
+			edr, fd := suite.prepareRequesterTest(testData)
+			testData.stopHeight = testData.startHeight + uint64(suite.run.blockCount)/2
+			testData.fetchedExecutionData = suite.runRequesterTest(edr, fd, testData)
+
+			// Stand up a new component using the same datastore, and make sure all remaining
+			// blocks are processed
+			edr, fd = suite.prepareRequesterTest(testData)
+			testData.resumeHeight = testData.stopHeight + 1
+			testData.stopHeight = 0
+			fetchedExecutionData := suite.runRequesterTest(edr, fd, testData)
+
+			verifyFetchedExecutionData(suite.T(), fetchedExecutionData, testData)
+
+			suite.T().Log("Shutting down test")
+		})
 	}
 
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		suite.db = db
+	suite.Run("requester resumes processing with no gap", func() {
+		stopHeight := testData.startHeight + uint64(suite.run.blockCount)/2
+		resumeHeight := stopHeight + 1
+		test(stopHeight, resumeHeight)
+	})
 
-		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
-		suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
-
-		testData := suite.generateTestData(run.blockCount, run.specialBlocks(run.blockCount))
-
-		// Process half of the blocks
-		edr, fd := suite.prepareRequesterTest(testData)
-		testData.stopHeight = testData.startHeight + uint64(run.blockCount)/2
-		testData.fetchedExecutionData = suite.runRequesterTest(edr, fd, testData)
-
-		// Stand up a new component using the same datastore, and make sure all remaining
-		// blocks are processed
-		edr, fd = suite.prepareRequesterTest(testData)
-		testData.resumeHeight = testData.stopHeight + 1
-		testData.stopHeight = 0
-		fetchedExecutionData := suite.runRequesterTest(edr, fd, testData)
-
-		verifyFetchedExecutionData(suite.T(), fetchedExecutionData, testData)
-
-		suite.T().Log("Shutting down test")
+	suite.Run("requester resumes processing with gap", func() {
+		stopHeight := testData.startHeight + uint64(suite.run.blockCount)/2
+		resumeHeight := testData.endHeight
+		test(stopHeight, resumeHeight)
 	})
 }
 
 func (suite *ExecutionDataRequesterSuite) TestRequesterCatchesUp() {
-	run := edTestRun{
-		"requester catches up",
-		1000,
-		func(_ int) map[uint64]testExecutionDataCallback {
-			return map[uint64]testExecutionDataCallback{}
-		},
-	}
-
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		suite.db = db
 
 		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
 		suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
 
-		testData := suite.generateTestData(run.blockCount, run.specialBlocks(run.blockCount))
+		testData := suite.generateTestData(5, suite.run.specialBlocks(5))
 
 		// start processing with all seals available
 		edr, fd := suite.prepareRequesterTest(testData)
@@ -282,6 +280,62 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterCatchesUp() {
 
 		suite.T().Log("Shutting down test")
 	})
+}
+
+func (suite *ExecutionDataRequesterSuite) TestRequesterHalts() {
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		suite.db = db
+
+		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
+		suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
+
+		testData := suite.generateTestData(suite.run.blockCount, suite.run.specialBlocks(suite.run.blockCount))
+
+		processedNotification := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
+		processedNotification.InitProcessedIndex(testData.startHeight - 1)
+
+		s := status.New(
+			zerolog.New(os.Stdout).With().Timestamp().Logger(),
+			requester.DefaultMaxCachedEntries,
+			requester.DefaultMaxSearchAhead,
+			nil,
+			processedNotification,
+		)
+		err := s.Load()
+		require.NoError(suite.T(), err)
+
+		s.Halt()
+
+		// start processing with all seals available
+		edr, _ := suite.prepareRequesterTest(testData)
+		testData.resumeHeight = testData.endHeight
+		suite.runRequesterTestHalted(edr, testData)
+
+		suite.T().Log("Shutting down test")
+	})
+}
+
+func (suite *ExecutionDataRequesterSuite) runRequesterTestHalted(edr state_synchronization.ExecutionDataRequester, cfg *fetchTestRun) receivedExecutionData {
+	// make sure test helper goroutines are cleaned up
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go irrecoverableNotExpected(suite.T(), ctx, errChan)
+
+	edr.AddOnExecutionDataFetchedConsumer(func(ed *state_synchronization.ExecutionData) {
+		assert.Fail(suite.T(), "should not have received any execution data")
+	})
+
+	edr.Start(signalerCtx)
+
+	// requester should never become ready
+	unittest.RequireNeverClosedWithin(suite.T(), edr.Ready(), 100*time.Millisecond, "requester shutdown unexpectedly")
+
+	cancel()
+	<-edr.Done()
+
+	return nil
 }
 
 func generateBlocksWithSomeMissed(blockCount int) map[uint64]testExecutionDataCallback {
