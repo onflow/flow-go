@@ -223,14 +223,9 @@ func (h *Handler) GetTransactionResult(
 	return TransactionResultToMessage(result), nil
 }
 
-func (h *Handler) GetTransactionsByBlockID(ctx context.Context, request *access.GetTransactionsByBlockIDRequest) (*access.TransactionsResponse, error) {
-	//TODO implement me
-	return nil, status.Errorf(codes.Unimplemented, "not implemented")
-}
-
 func (h *Handler) GetTransactionResultsByBlockID(
 	ctx context.Context,
-	req *access.GetTransactionsByBlockIDRequest,
+	req *access.GetTransactionResultsByBlockIDRequest,
 ) (*access.TransactionResultsResponse, error) {
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
@@ -243,25 +238,6 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	}
 
 	return TransactionResultsToMessage(results), nil
-}
-
-func (h *Handler) GetTransactionsByBlockID(
-	ctx context.Context,
-	req *access.GetTransactionsByBlockIDRequest,
-) (*access.TransactionsResponse, error) {
-	id, err := convert.BlockID(req.GetBlockId())
-	if err != nil {
-		return nil, err
-	}
-
-	transactions, err := h.api.GetTransactionsByBlockID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return &access.TransactionsResponse{
-		Transactions: convert.TransactionsToMessages(transactions),
-	}, nil
 }
 
 // GetTransactionResultByIndex gets a transaction at a specific index for in a block that is executed,
