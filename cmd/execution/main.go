@@ -74,7 +74,6 @@ import (
 
 type ExecutionConfig struct {
 	rpcConf                     rpc.Config
-	err                         error
 	triedir                     string
 	executionDataDir            string
 	mTrieCacheSize              uint32
@@ -115,24 +114,24 @@ func NewExecutionNodeBuilder(nodeBuilder *cmd.FlowNodeBuilder) *ExecutionNodeBui
 }
 
 func main() {
-	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
+	exeBuilder := NewExecutionNodeBuilder(cmd.FlowNode(flow.RoleExecution.String()))
 
-	if err := nodeBuilder.Initialize(); err != nil {
-		nodeBuilder.Logger.Fatal().Err(err).Send()
+	exeBuilder.LoadFlags()
+
+	if err := exeBuilder.Initialize(); err != nil {
+		exeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
-	exeBuilder := NewExecutionNodeBuilder(nodeBuilder)
-	exeBuilder.LoadConfig()
-	exeBuilder.LoadComponents()
+	exeBuilder.LoadComponentsAndModules()
 
 	node, err := exeBuilder.Build()
 	if err != nil {
-		nodeBuilder.Logger.Fatal().Err(err).Send()
+		exeBuilder.Logger.Fatal().Err(err).Send()
 	}
 	node.Run()
 }
 
-func (e *ExecutionNodeBuilder) LoadConfig() {
+func (e *ExecutionNodeBuilder) LoadFlags() {
 	e.
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
@@ -186,7 +185,7 @@ func (e *ExecutionNodeBuilder) LoadConfig() {
 		})
 }
 
-func (e *ExecutionNodeBuilder) LoadComponents() {
+func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 	var (
 		collector                     module.ExecutionMetrics
 		executionDataServiceCollector module.ExecutionDataServiceMetrics
@@ -630,6 +629,10 @@ func (e *ExecutionNodeBuilder) LoadComponents() {
 				// hence we not need to check origin
 				requester.WithValidateStaking(false),
 			)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester engine: %w", err)
+			}
 
 			preferredExeFilter := filter.Any
 			preferredExeNodeID, err := flow.HexStringToIdentifier(e.exeConf.preferredExeNodeIDStr)
