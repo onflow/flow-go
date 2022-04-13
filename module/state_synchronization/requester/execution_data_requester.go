@@ -33,8 +33,18 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// The ExecutionDataRequester downloads ExecutionData for sealed blocks from other participants
-// in the network running the ExecutionDataService. The requester is made up of 4 subcomponents:
+// The ExecutionDataRequester downloads ExecutionData for sealed blocks from other participants. 
+// The ExecutionData for a sealed block is always downloadable, because a sealed block must have been executed.
+// Once the ExecutionData for a block is downloaded, it becomes the "Seed" to respond to others participants'
+// execution data requests. 
+// The downloading and seeding work is handled by the ExecutionDataService.
+// The ExecutionDataRequester internally uses a job queue to request and download for each sealed block with multiple workers. It downloads ExecutionData block by block towards the latest sealed block. 
+// In order to ensure it won't miss any sealed block to download, it persists the last downloaded height, and only 
+// increment it when the next height has been downloaded.
+// In the event of a crash failure, it will read the last downloaded height, and process from the next un-downloaded height.
+// The requester listens to block finalization event, and checks if sealed height has been changed, if changed, it
+// create job for each un-downloaded and sealed height. 
+// The requester is made up of 4 subcomponents:
 //
 // * OnBlockFinalized:     receives block finalized events from the finalization distributor and
 //                         forwards them to the sealed blockConsumer.
