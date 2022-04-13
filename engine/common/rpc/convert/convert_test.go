@@ -39,3 +39,8 @@ func TestConvertAccountKey(t *testing.T) {
 	assert.Equal(t, accountKey.PublicKey, converted.PublicKey)
 	assert.Equal(t, accountKey.Revoked, converted.Revoked)
 }
+
+func TestConvertEvents(t *testing.T) {
+	messages := convert.EventsToMessages(nil)
+	assert.Len(t, messages, 0)
+}
