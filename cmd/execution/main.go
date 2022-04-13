@@ -118,21 +118,21 @@ func main() {
 
 	exeBuilder.LoadFlags()
 
-	if err := exeBuilder.Initialize(); err != nil {
-		exeBuilder.Logger.Fatal().Err(err).Send()
+	if err := exeBuilder.FlowNodeBuilder.Initialize(); err != nil {
+		exeBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
 	exeBuilder.LoadComponentsAndModules()
 
-	node, err := exeBuilder.Build()
+	node, err := exeBuilder.FlowNodeBuilder.Build()
 	if err != nil {
-		exeBuilder.Logger.Fatal().Err(err).Send()
+		exeBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 	node.Run()
 }
 
 func (e *ExecutionNodeBuilder) LoadFlags() {
-	e.
+	e.FlowNodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
 			datadir := filepath.Join(homedir, ".flow", "execution")
@@ -219,7 +219,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		executionDataCIDCacheSize     uint = 100
 	)
 
-	e.
+	e.FlowNodeBuilder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(executionDataService)
 		}).
@@ -229,13 +229,13 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			bState, ok := node.State.(*badgerState.State)
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 			var err error
 			followerState, err = badgerState.NewFollowerState(
-				state,
+				bState,
 				node.Storage.Index,
 				node.Storage.Payloads,
 				node.Tracer,
@@ -424,7 +424,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				return nil, err
 			}
 
-			e.ShutdownFunc(ds.Close)
+			e.FlowNodeBuilder.ShutdownFunc(ds.Close)
 
 			// TODO: if the node is not starting from the beginning of the spork, it may be useful to prepopulate
 			// the cache with the existing Execution Data blob trees. Currently, the cache is empty every time the
@@ -496,7 +496,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 
-			committer := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
+			ledgerViewCommitter := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
 			manager, err := computation.New(
 				node.Logger,
 				collector,
@@ -506,7 +506,7 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				vm,
 				vmCtx,
 				e.exeConf.cadenceExecutionCache,
-				committer,
+				ledgerViewCommitter,
 				e.exeConf.scriptLogThreshold,
 				e.exeConf.scriptExecutionTimeLimit,
 				blockDataUploaders,
