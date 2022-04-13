@@ -2989,7 +2989,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	)
 }
 
-// TestHappyPathSigning checks that a signing a transaction with `SignMessageWithTag` doesn't produce an error.
+// TestHappyPathSigning checks that a signing a transaction with `Sign` doesn't produce an error.
 // Transaction verification tests are in `TestVerifySignatureFromTransaction`.
 func TestHappyPathTransactionSigning(t *testing.T) {
 
@@ -3012,7 +3012,7 @@ func TestHappyPathTransactionSigning(t *testing.T) {
 			hasher, err := exeUtils.NewHasher(privateKey.HashAlgo)
 			require.NoError(t, err)
 
-			sig, err := txBody.SignMessageWithTag(txBody.EnvelopeMessage(), privateKey.PrivateKey, hasher)
+			sig, err := txBody.Sign(txBody.EnvelopeMessage(), privateKey.PrivateKey, hasher)
 			require.NoError(t, err)
 			txBody.AddEnvelopeSignature(accounts[0], 0, sig)
 
