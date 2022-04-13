@@ -29,6 +29,7 @@ type API interface {
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
 	GetTransactionResult(ctx context.Context, id flow.Identifier) (*TransactionResult, error)
 	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32) (*TransactionResult, error)
+	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*TransactionResult, error)
 
 	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
 	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
@@ -63,6 +64,17 @@ func TransactionResultToMessage(result *TransactionResult) *access.TransactionRe
 		ErrorMessage: result.ErrorMessage,
 		Events:       convert.EventsToMessages(result.Events),
 		BlockId:      result.BlockID[:],
+	}
+}
+
+func TransactionResultsToMessage(results []*TransactionResult) *access.TransactionResultsResponse {
+	messages := make([]*access.TransactionResultResponse, len(results))
+	for i, result := range results {
+		messages[i] = TransactionResultToMessage(result)
+	}
+
+	return &access.TransactionResultsResponse{
+		Results: messages,
 	}
 }
 
