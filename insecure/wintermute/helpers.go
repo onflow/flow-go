@@ -169,7 +169,7 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 // verification nodes: 3 corrupted + 1 honest
 // execution nodes: 2 corrupted + 1 honest
 // other roles at the minimum required number and all honest.
-func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow.IdentityList, flow.IdentityList) {
+func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow.IdentityList, flow.IdentifierList) {
 	// creates identities to bootstrap system with
 	corruptedVnIds := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleVerification))
 	corruptedEnIds := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -181,7 +181,7 @@ func bootstrapWintermuteFlowSystem(t *testing.T) (*enginemock.StateFixture, flow
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	stateFixture := testutil.CompleteStateFixture(t, metrics.NewNoopCollector(), trace.NewNoopTracer(), rootSnapshot)
 
-	return stateFixture, identities, append(corruptedEnIds, corruptedVnIds...)
+	return stateFixture, identities, append(corruptedEnIds, corruptedVnIds...).NodeIDs()
 }
 
 // orchestratorOutputSanityCheck performs a sanity check on the output events dictated by the wintermute orchestrator to the corrupted nodes.

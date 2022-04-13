@@ -16,21 +16,31 @@ import (
 )
 
 // Orchestrator encapsulates a stateful implementation of wintermute attack orchestrator logic.
+// The attack logic works as follows:
+// 1. Orchestrator corrupts the result of the first incoming execution receipt from any of the corrupted execution node.
+// 2. Orchestrator sends the corrupted execution result to all corrupted execution nodes.
+// 3. If Orchestrator receives any chunk data pack request for a corrupted chunk from a corrupted verification node, it replies it with an attestation
+//    for that chunk.
+// 4. If Orchestrator receives any chunk data pack response from a corrupted execution node to an honest verification node, it drops the response
+//    if it is for one of the corrupted chunks.
+// 5. Any other incoming messages to the orchestrator are bounced back, i.e., are sent as they are in the original Flow network without any tampering.
 type Orchestrator struct {
 	sync.Mutex
-	state        *attackState
-	logger       zerolog.Logger
-	network      insecure.AttackNetwork
-	corruptedIds flow.IdentityList
-	allIds       flow.IdentityList // identity of all nodes in the network (including non-corrupted ones)
+	logger zerolog.Logger
+	state  *attackState
+
+	corruptedIds flow.IdentifierList // identifier of corrupted nodes.
+	allIds       flow.IdentityList   // identity of all nodes in the network (including non-corrupted ones)
+
+	network insecure.AttackNetwork
 }
 
-func NewOrchestrator(allIds flow.IdentityList, corruptedIds flow.IdentityList, logger zerolog.Logger) *Orchestrator {
+func NewOrchestrator(logger zerolog.Logger, corruptedIds flow.IdentifierList, allIds flow.IdentityList) *Orchestrator {
 	o := &Orchestrator{
-		logger:       logger,
+		logger:       logger.With().Str("component", "wintermute-orchestrator").Logger(),
 		corruptedIds: corruptedIds,
 		allIds:       allIds,
-		state:        nil,
+		state:        nil, // state is initialized to nil meaning no attack yet conducted.
 	}
 
 	return o
@@ -87,11 +97,14 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 // If no attack has already been conducted, it corrupts the result of receipt and sends it to all corrupted execution nodes.
 // Otherwise, it just bounces back the receipt to the sender.
 func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event) error {
-
-	corruptedIdentity, ok := o.corruptedIds.ByNodeID(receiptEvent.CorruptedId)
+	ok := o.corruptedIds.Contains(receiptEvent.CorruptedId)
+	if !ok {
+		return fmt.Errorf("")
+	}
 	if !ok {
 		return fmt.Errorf("could not find corrupted identity for: %x", receiptEvent.CorruptedId)
 	}
+
 	if corruptedIdentity.Role != flow.RoleExecution {
 		return fmt.Errorf("wrong sender role for execution receipt: %s", corruptedIdentity.Role.String())
 	}
@@ -205,7 +218,7 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 	return nil
 }
 
-// handleChunkDataPackResponseEvent Wintermutes the chunk data pack reply if it belongs to a corrupted result, and is meant to
+// handleChunkDataPackResponseEvent wintermutes the chunk data pack reply if it belongs to a corrupted result, and is meant to
 // be sent to an honest verification node. Otherwise, it bounces it back.
 func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent *insecure.Event) error {
 	if o.state != nil {

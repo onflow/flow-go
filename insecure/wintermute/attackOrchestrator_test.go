@@ -23,13 +23,17 @@ import (
 // then orchestrator tampers with the receipt and generates a counterfeit receipt, and then
 // enforces all corrupted execution nodes to send that counterfeit receipt on their behalf in the flow network.
 func TestSingleExecutionReceipt(t *testing.T) {
-	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
+	rootStateFixture, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 
 	// identities of nodes who are expected targets of an execution receipt.
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
-	corruptedExecutionIds := flow.IdentifierList(corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs())
+	corruptedExecutionIds := flow.IdentifierList(
+		allIds.Filter(
+			filter.And(filter.HasRole(flow.RoleExecution),
+				filter.HasNodeID(corruptedIds...)),
+		).NodeIDs())
 	eventMap, receipts := receiptsWithSameResultFixture(t, 1, corruptedExecutionIds[0:1], receiptTargetIds.NodeIDs())
 
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
@@ -39,7 +43,7 @@ func TestSingleExecutionReceipt(t *testing.T) {
 		receiptTargetIds.NodeIDs(),
 		corruptedExecutionIds)
 
-	wintermuteOrchestrator := NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	// register mock network with orchestrator
 	wintermuteOrchestrator.WithAttackNetwork(mockAttackNetwork)
@@ -147,7 +151,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 		eventMap, receipts = receiptsWithDistinctResultFixture(t, count, corruptedExecutionIds, receiptTargetIds.NodeIDs())
 	}
 
-	wintermuteOrchestrator := NewOrchestrator(allIdentityList, corruptedIdentityList, unittest.Logger())
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIdentityList, allIdentityList)
 
 	// keeps list of output events sent by orchestrator to the attack network.
 	orchestratorOutputEvents := make([]*insecure.Event, 0)
