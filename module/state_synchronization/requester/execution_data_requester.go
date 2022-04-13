@@ -33,17 +33,17 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// The ExecutionDataRequester downloads ExecutionData for sealed blocks from other participants. 
+// The ExecutionDataRequester downloads ExecutionData for sealed blocks from other participants.
 // The ExecutionData for a sealed block is always downloadable, because a sealed block must have been executed.
 // Once the ExecutionData for a block is downloaded, it becomes the "Seed" to respond to others participants'
-// execution data requests. 
+// execution data requests.
 // The downloading and seeding work is handled by the ExecutionDataService.
-// The ExecutionDataRequester internally uses a job queue to request and download for each sealed block with multiple workers. It downloads ExecutionData block by block towards the latest sealed block. 
-// In order to ensure it won't miss any sealed block to download, it persists the last downloaded height, and only 
+// The ExecutionDataRequester internally uses a job queue to request and download for each sealed block with multiple workers. It downloads ExecutionData block by block towards the latest sealed block.
+// In order to ensure it won't miss any sealed block to download, it persists the last downloaded height, and only
 // increment it when the next height has been downloaded.
 // In the event of a crash failure, it will read the last downloaded height, and process from the next un-downloaded height.
 // The requester listens to block finalization event, and checks if sealed height has been changed, if changed, it
-// create job for each un-downloaded and sealed height. 
+// create job for each un-downloaded and sealed height.
 // The requester is made up of 4 subcomponents:
 //
 // * OnBlockFinalized:     receives block finalized events from the finalization distributor and
@@ -138,14 +138,14 @@ type executionDataRequester struct {
 	log     zerolog.Logger
 
 	// Local db objects
-	blocks  storage.Blocks
+	headers storage.Headers
 	results storage.ExecutionResults
 
 	status *status.Status
 	config ExecutionDataConfig
 
 	// Notifiers for queue consumers
-	blockNotifier engine.Notifier
+	finalizationNotifier engine.Notifier
 
 	// Job queues
 	blockConsumer        *jobqueue.ReadyDoneAwareConsumer
@@ -169,20 +169,20 @@ func New(
 	processedHeight storage.ConsumerProgress,
 	processedNotifications storage.ConsumerProgress,
 	state protocol.State,
-	blocks storage.Blocks,
+	headers storage.Headers,
 	results storage.ExecutionResults,
 	cfg ExecutionDataConfig,
 ) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequester{
-		log:           log.With().Str("component", "execution_data_requester").Logger(),
-		ds:            datastore,
-		bs:            blobservice,
-		eds:           eds,
-		metrics:       edrMetrics,
-		blocks:        blocks,
-		results:       results,
-		config:        cfg,
-		blockNotifier: engine.NewNotifier(),
+		log:                  log.With().Str("component", "execution_data_requester").Logger(),
+		ds:                   datastore,
+		bs:                   blobservice,
+		eds:                  eds,
+		metrics:              edrMetrics,
+		headers:              headers,
+		results:              results,
+		config:               cfg,
+		finalizationNotifier: engine.NewNotifier(),
 	}
 
 	executionDataNotifier := engine.NewNotifier()
@@ -192,9 +192,9 @@ func New(
 	e.blockConsumer, err = jobqueue.NewReadyDoneAwareConsumer(
 		log.With().Str("module", "block_consumer").Logger(),
 		processedHeight,
-		status.NewSealedBlockReader(state, blocks), // when a block is finalized, we read new sealed blocks
+		status.NewSealedBlockReader(state, headers), // when a block is finalized, we read new sealed blocks
 		e.processBlockJob,
-		e.blockNotifier.Channel(),
+		e.finalizationNotifier.Channel(),
 		rootHeight,
 		fetchWorkers,
 		// notifies notificationConsumer when new ExecutionData blobs are available
@@ -240,7 +240,7 @@ func New(
 
 // OnBlockFinalized accepts block finalization notifications from the FinalizationDistributor
 func (e *executionDataRequester) OnBlockFinalized(*model.Block) {
-	e.blockNotifier.Notify()
+	e.finalizationNotifier.Notify()
 }
 
 // AddOnExecutionDataFetchedConsumer adds a callback to be called when a new ExecutionData is received
@@ -335,14 +335,14 @@ func (e *executionDataRequester) runNotificationConsumer(ctx irrecoverable.Signa
 // for the given block height.
 func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerContext, job module.Job, complete func()) {
 	// convert job into a block entry
-	block, err := status.JobToBlock(job)
+	header, err := status.JobToBlock(job)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
 	request := &status.BlockEntry{
-		BlockID: block.ID(),
-		Height:  block.Header.Height,
+		BlockID: header.ID(),
+		Height:  header.Height,
 	}
 
 	err = e.processSealedHeight(ctx, request)
@@ -356,10 +356,7 @@ func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerConte
 // processSealedHeight downloads ExecutionData for the given block height.
 // If the download fails, it will retry forever, using exponential backoff.
 func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerContext, request *status.BlockEntry) error {
-	backoff, err := retry.NewExponential(e.config.RetryDelay)
-	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to create retry mechanism: %w", err))
-	}
+	backoff := retry.NewExponential(e.config.RetryDelay)
 	backoff = retry.WithCappedDuration(e.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
 
@@ -529,7 +526,7 @@ func (e *executionDataRequester) checkDatastore(ctx irrecoverable.SignalerContex
 			return nil
 		}
 
-		block, err := e.blocks.ByHeight(height)
+		block, err := e.headers.ByHeight(height)
 		if err != nil {
 			return fmt.Errorf("failed to get block for height %d: %w", height, err)
 		}

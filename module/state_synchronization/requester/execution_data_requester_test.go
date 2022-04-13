@@ -381,7 +381,7 @@ func generateBlocksWithRandomDelays(blockCount int) map[uint64]testExecutionData
 }
 
 func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FinalizationDistributor) {
-	blocks := synctest.MockBlocksStorage(synctest.WithByID(cfg.blocksByID), synctest.WithByHeight(cfg.blocksByHeight))
+	headers := synctest.MockBlockHeaderStorage(synctest.WithByID(cfg.blocksByID), synctest.WithByHeight(cfg.blocksByHeight))
 	results := synctest.MockResultsStorage(synctest.WithByBlockID(cfg.resultsByID))
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 
@@ -400,7 +400,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		processedHeight,
 		processedNotification,
 		state,
-		blocks,
+		headers,
 		results,
 		requester.ExecutionDataConfig{
 			StartBlockHeight: cfg.startHeight,

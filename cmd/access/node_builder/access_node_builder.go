@@ -516,7 +516,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			processedBlockHeight,
 			processedNotifications,
 			builder.State,
-			builder.Storage.Blocks,
+			builder.Storage.Headers,
 			builder.Storage.Results,
 			builder.executionDataConfig,
 		)

@@ -74,9 +74,9 @@ func withReader(
 
 		snapshot := synctest.MockProtocolStateSnapshot(synctest.WithHead(seals[0]))
 		state := synctest.MockProtocolState(synctest.WithSnapshot(snapshot))
-		blocksStorage := synctest.MockBlocksStorage(synctest.WithByHeight(blocksByHeight))
+		headerStorage := synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 
-		reader := status.NewSealedBlockReader(state, blocksStorage)
+		reader := status.NewSealedBlockReader(state, headerStorage)
 
 		withBlockReader(reader, blocks)
 	})

@@ -142,13 +142,13 @@ func MockProtocolState(opts ...StateMockOptions) *statemock.State {
 	return state
 }
 
-type BlocksMockOptions func(*storagemock.Blocks)
+type BlockHeaderMockOptions func(*storagemock.Headers)
 
-func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlocksMockOptions {
-	return func(blocks *storagemock.Blocks) {
+func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions {
+	return func(blocks *storagemock.Headers) {
 		blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-			func(height uint64) *flow.Block {
-				return blocksByHeight[height]
+			func(height uint64) *flow.Header {
+				return blocksByHeight[height].Header
 			},
 			func(height uint64) error {
 				if _, has := blocksByHeight[height]; !has {
@@ -160,11 +160,11 @@ func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlocksMockOptions {
 	}
 }
 
-func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlocksMockOptions {
-	return func(blocks *storagemock.Blocks) {
+func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlockHeaderMockOptions {
+	return func(blocks *storagemock.Headers) {
 		blocks.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
-			func(blockID flow.Identifier) *flow.Block {
-				return blocksByID[blockID]
+			func(blockID flow.Identifier) *flow.Header {
+				return blocksByID[blockID].Header
 			},
 			func(blockID flow.Identifier) error {
 				if _, has := blocksByID[blockID]; !has {
@@ -176,14 +176,14 @@ func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlocksMockOptions {
 	}
 }
 
-func MockBlocksStorage(opts ...BlocksMockOptions) *storagemock.Blocks {
-	blocks := new(storagemock.Blocks)
+func MockBlockHeaderStorage(opts ...BlockHeaderMockOptions) *storagemock.Headers {
+	headers := new(storagemock.Headers)
 
 	for _, opt := range opts {
-		opt(blocks)
+		opt(headers)
 	}
 
-	return blocks
+	return headers
 }
 
 type ResultsMockOptions func(*storagemock.ExecutionResults)

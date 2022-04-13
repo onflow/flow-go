@@ -18,7 +18,7 @@ func TestJobID(t *testing.T) {
 }
 
 func TestBlockJob(t *testing.T) {
-	block := unittest.BlockFixture()
+	block := unittest.BlockHeaderFixture()
 
 	job := status.BlockToJob(&block)
 	assert.IsType(t, &status.BlockJob{}, job, "job is not a block job")

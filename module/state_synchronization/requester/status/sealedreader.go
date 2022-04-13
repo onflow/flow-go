@@ -11,15 +11,15 @@ import (
 
 // SealedBlockReader provides an abstraction for consumers to read blocks as job.
 type SealedBlockReader struct {
-	state  protocol.State
-	blocks storage.Blocks
+	state   protocol.State
+	headers storage.Headers
 }
 
 // NewSealedBlockReader creates and returns a SealedBlockReader.
-func NewSealedBlockReader(state protocol.State, blocks storage.Blocks) *SealedBlockReader {
+func NewSealedBlockReader(state protocol.State, headers storage.Headers) *SealedBlockReader {
 	return &SealedBlockReader{
-		state:  state,
-		blocks: blocks,
+		state:   state,
+		headers: headers,
 	}
 }
 
@@ -46,8 +46,8 @@ func (r SealedBlockReader) AtIndex(index uint64) (module.Job, error) {
 }
 
 // blockByHeight returns the block at the given height.
-func (r SealedBlockReader) blockByHeight(height uint64) (*flow.Block, error) {
-	block, err := r.blocks.ByHeight(height)
+func (r SealedBlockReader) blockByHeight(height uint64) (*flow.Header, error) {
+	block, err := r.headers.ByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
 	}
