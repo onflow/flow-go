@@ -46,3 +46,26 @@ func LookupTransactionResultsByBlockID(blockID flow.Identifier, txResults *[]flo
 
 	return traverse(makePrefix(codeTransactionResult, blockID), txErrIterFunc)
 }
+
+// LookupTransactionResultsByBlockIDUsingIndex retrieves all tx results for a block, but using
+// tx_index index. This correctly handles cases of duplicate transactions within block, and should
+// eventually replace uses of LookupTransactionResultsByBlockID
+func LookupTransactionResultsByBlockIDUsingIndex(blockID flow.Identifier, txResults *[]flow.TransactionResult) func(*badger.Txn) error {
+
+	txErrIterFunc := func() (checkFunc, createFunc, handleFunc) {
+		check := func(_ []byte) bool {
+			return true
+		}
+		var val flow.TransactionResult
+		create := func() interface{} {
+			return &val
+		}
+		handle := func() error {
+			*txResults = append(*txResults, val)
+			return nil
+		}
+		return check, create, handle
+	}
+
+	return traverse(makePrefix(codeTransactionResultIndex, blockID), txErrIterFunc)
+}

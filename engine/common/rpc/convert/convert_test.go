@@ -43,7 +43,6 @@ func TestConvertAccountKey(t *testing.T) {
 }
 
 func TestConvertEvents(t *testing.T) {
-
 	t.Run("empty", func(t *testing.T) {
 		messages := convert.EventsToMessages(nil)
 		assert.Len(t, messages, 0)
