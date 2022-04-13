@@ -99,8 +99,10 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event) error {
 	ok := o.corruptedIds.Contains(receiptEvent.CorruptedId)
 	if !ok {
-		return fmt.Errorf("")
+		return fmt.Errorf("sender of the event is not a corrupted node")
 	}
+
+	corruptedIdentity, ok := o.allIds.ByNodeID(receiptEvent.CorruptedId)
 	if !ok {
 		return fmt.Errorf("could not find corrupted identity for: %x", receiptEvent.CorruptedId)
 	}
@@ -147,7 +149,9 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 	// replace honest receipt with corrupted receipt
 	corruptedResult := o.corruptExecutionResult(receipt)
 
-	corruptedExecutionIds := o.corruptedIds.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()
+	corruptedExecutionIds := o.allIds.Filter(
+		filter.And(filter.HasRole(flow.RoleExecution),
+			filter.HasNodeID(o.corruptedIds...))).NodeIDs()
 
 	// sends corrupted execution result to all corrupted execution nodes.
 	for _, corruptedExecutionId := range corruptedExecutionIds {
@@ -183,7 +187,12 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 // chunk.
 // Otherwise, it is bounced back.
 func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.Event) error {
-	corruptedIdentity, ok := o.corruptedIds.ByNodeID(chunkDataPackRequestEvent.CorruptedId)
+	ok := o.corruptedIds.Contains(chunkDataPackRequestEvent.CorruptedId)
+	if !ok {
+		return fmt.Errorf("sender of the event is not a corrupted node")
+	}
+
+	corruptedIdentity, ok := o.allIds.ByNodeID(chunkDataPackRequestEvent.CorruptedId)
 	if !ok {
 		return fmt.Errorf("could not find corrupted identity for: %x", chunkDataPackRequestEvent.CorruptedId)
 	}
@@ -225,7 +234,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 		cdpRep := chunkDataPackReplyEvent.FlowProtocolEvent.(*messages.ChunkDataResponse)
 
 		// chunk data pack reply goes over a unicast, hence, we only check first target id.
-		_, ok := o.corruptedIds.ByNodeID(chunkDataPackReplyEvent.TargetIds[0])
+		ok := o.corruptedIds.Contains(chunkDataPackReplyEvent.TargetIds[0])
 		if o.state.containsCorruptedChunkId(cdpRep.ChunkDataPack.ChunkID) {
 			if !ok {
 				// this is a chunk data pack response for a CORRUPTED chunk to an HONEST verification node

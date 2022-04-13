@@ -136,8 +136,12 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	expectedOrchestratorOutputEvents int,
 	expBouncedBackReceipts int) {
 
-	rootStateFixture, allIdentityList, corruptedIdentityList := bootstrapWintermuteFlowSystem(t)
-	corruptedExecutionIds := flow.IdentifierList(corruptedIdentityList.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs())
+	rootStateFixture, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
+	corruptedExecutionIds := flow.IdentifierList(
+		allIds.Filter(
+			filter.And(filter.HasRole(flow.RoleExecution),
+				filter.HasNodeID(corruptedIds...)),
+		).NodeIDs())
 	// identities of nodes who are expected targets of an execution receipt.
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
@@ -151,7 +155,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 		eventMap, receipts = receiptsWithDistinctResultFixture(t, count, corruptedExecutionIds, receiptTargetIds.NodeIDs())
 	}
 
-	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIdentityList, allIdentityList)
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	// keeps list of output events sent by orchestrator to the attack network.
 	orchestratorOutputEvents := make([]*insecure.Event, 0)
@@ -263,8 +267,12 @@ func mockAttackNetworkForCorruptedExecutionResult(
 func TestRespondingWithCorruptedAttestation(t *testing.T) {
 	totalChunks := 10
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
-	corruptedVerIds := flow.IdentifierList(corruptedIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs())
-	wintermuteOrchestrator := NewOrchestrator(allIds, corruptedIds, unittest.Logger())
+	corruptedVerIds := flow.IdentifierList(
+		allIds.Filter(
+			filter.And(filter.HasRole(flow.RoleVerification),
+				filter.HasNodeID(corruptedIds...)),
+		).NodeIDs())
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	originalResult := unittest.ExecutionResultFixture()
 	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
@@ -339,8 +347,12 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 func TestBouncingBackChunkDataRequests(t *testing.T) {
 	totalChunks := 10
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
-	corruptedVerIds := flow.IdentifierList(corruptedIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs())
-	wintermuteOrchestrator := NewOrchestrator(allIds, corruptedIds, unittest.Logger())
+	corruptedVerIds := flow.IdentifierList(
+		allIds.Filter(
+			filter.And(filter.HasRole(flow.RoleVerification),
+				filter.HasNodeID(corruptedIds...)),
+		).NodeIDs())
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	wintermuteOrchestrator.state = nil // no attack yet conducted
 
@@ -427,7 +439,7 @@ func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
 	totalChunks := 10
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 	verIds := flow.IdentifierList(allIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs())
-	wintermuteOrchestrator := NewOrchestrator(allIds, corruptedIds, unittest.Logger())
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	wintermuteOrchestrator.state = state
 
@@ -497,8 +509,8 @@ func TestWintermuteChunkResponseForCorruptedChunks(t *testing.T) {
 	honestVnIds := flow.IdentifierList(
 		allIds.Filter(filter.And(
 			filter.HasRole(flow.RoleVerification),
-			filter.Not(filter.In(corruptedIds)))).NodeIDs())
-	wintermuteOrchestrator := NewOrchestrator(allIds, corruptedIds, unittest.Logger())
+			filter.Not(filter.HasNodeID(corruptedIds...)))).NodeIDs())
+	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	originalResult := unittest.ExecutionResultFixture()
 	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(uint(totalChunks)))
