@@ -17,21 +17,22 @@ import (
 
 var _ StatusTrackerFactory = (*Storage)(nil)
 
+// badger key prefixes
 const (
-	prefixGlobalState byte = iota + 1
-	prefixExecutionDataStatus
-	prefixBlobRecord
-	prefixBlobTreeRecord
+	prefixGlobalState         byte = iota + 1 // global state variables
+	prefixExecutionDataStatus                 // tracks the status of each execution data
+	prefixBlobRecord                          // tracks the latest height among all blob trees containing a blob
+	prefixBlobTreeRecord                      // tracks the set of blobs for each blob tree
 )
 
 const (
-	executionDataStatusInProgress byte = iota + 1
-	executionDataStatusComplete
+	executionDataStatusInProgress byte = iota + 1 // tracked but not yet fully downloaded
+	executionDataStatusComplete                   // fully downloaded but not yet incorporated (ancestors not yet downloaded)
 )
 
 const (
-	globalStateLatestIncorporatedHeight = iota + 1
-	globalStateStoredDataLowerBound
+	globalStateLatestIncorporatedHeight = iota + 1 // block height of the latest incorporated blob tree
+	globalStateStoredDataLowerBound                // block height lower bound for data stored in the DB
 )
 
 func retryOnConflict(db *badger.DB, fn func(txn *badger.Txn) error) error {
@@ -106,6 +107,8 @@ func parseExecutionDataStatusValue(val []byte) (flow.Identifier, flow.Identifier
 	return flow.HashToID(val[:flow.IdentifierLen]), flow.HashToID(val[flow.IdentifierLen:])
 }
 
+// getBatchItemCountLimit returns the maximum number of items that can be included in a single batch
+// transaction based on the number / total size of updates per item.
 func getBatchItemCountLimit(
 	db *badger.DB,
 	baseWriteCount int64,
@@ -133,6 +136,10 @@ type Storage struct {
 	db *badger.DB
 }
 
+type CheckOptions struct {
+	Extended bool // extended mode: check all blobstore data
+}
+
 func OpenStorage(db *badger.DB, startHeight uint64) (*Storage, error) {
 	storage := &Storage{db: db}
 	err := storage.init(startHeight)
@@ -140,13 +147,68 @@ func OpenStorage(db *badger.DB, startHeight uint64) (*Storage, error) {
 	return storage, err
 }
 
-type CheckOptions struct {
-	Extended bool
+func (s *Storage) init(startHeight uint64) error {
+	storedDataLowerBound, err1 := s.GetStoredDataLowerBound()
+	latestIncorporatedHeight, err2 := s.GetLatestIncorporatedHeight()
+
+	if err1 == nil && err2 == nil {
+		// db is already bootstrapped, we should complete any operations that were interrupted
+		// during the previous shutdown
+		if err := s.replay(storedDataLowerBound, latestIncorporatedHeight); err != nil {
+			return fmt.Errorf("failed to restore db: %w", err)
+		}
+	} else if errors.Is(err1, badger.ErrKeyNotFound) && errors.Is(err2, badger.ErrKeyNotFound) {
+		// db is empty, we need to bootstrap it
+		if err := s.bootstrap(startHeight); err != nil {
+			return fmt.Errorf("failed to bootstrap db: %w", err)
+		}
+	} else if (errors.Is(err1, badger.ErrKeyNotFound) && err2 == nil) || (err1 == nil && errors.Is(err2, badger.ErrKeyNotFound)) {
+		// db is partially bootstrapped
+		return fmt.Errorf("db is in inconsistent state")
+	} else {
+		return fmt.Errorf("failed to initialize storage: %w", err1)
+	}
+
+	return nil
+}
+
+func (s *Storage) replay(storedDataLowerBound uint64, latestIncorporatedHeight uint64) error {
+	if _, err := s.Prune(storedDataLowerBound); err != nil {
+		return err
+	}
+
+	if _, err := s.tryIncorporate(latestIncorporatedHeight + 1); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Storage) bootstrap(startHeight uint64) error {
+	latestIncorporatedHeightKey := makeGlobalStateKey(globalStateLatestIncorporatedHeight)
+	latestIncorporatedHeightValue := make([]byte, 8)
+	binary.LittleEndian.PutUint64(latestIncorporatedHeightValue, startHeight)
+
+	storedDataLowerBoundKey := makeGlobalStateKey(globalStateStoredDataLowerBound)
+	storedDataLowerBoundValue := make([]byte, 8)
+	binary.LittleEndian.PutUint64(storedDataLowerBoundValue, startHeight)
+
+	return s.db.Update(func(txn *badger.Txn) error {
+		if err := txn.Set(latestIncorporatedHeightKey, latestIncorporatedHeightValue); err != nil {
+			return fmt.Errorf("failed to set latest incorporated height: %w", err)
+		}
+
+		if err := txn.Set(storedDataLowerBoundKey, storedDataLowerBoundValue); err != nil {
+			return fmt.Errorf("failed to set stored data lower bound: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func (s *Storage) checkBlobTreeRecords() (map[cid.Cid]uint64, uint64, int, *multierror.Error, error) {
 	blobTreeRecordPrefix := []byte{prefixBlobTreeRecord}
-	latestHeightSeen := make(map[cid.Cid]uint64)
+	latestHeightSeen := make(map[cid.Cid]uint64) // block height of the latest blob tree containing each Cid
 	var highestBlobTreeRecordHeight uint64
 	var earliestBlobTreeRecordHeight uint64
 	var numBlobTreeRecords int
@@ -176,6 +238,7 @@ func (s *Storage) checkBlobTreeRecords() (map[cid.Cid]uint64, uint64, int, *mult
 			latestHeightSeen[c] = height
 
 			if i > 0 && height-previousHeight > 1 {
+				// there should not be any gaps in blob tree record heights
 				multierror.Append(errors, fmt.Errorf("missing blob tree records between heights %d and %d", previousHeight, height))
 			}
 
@@ -198,6 +261,7 @@ func (s *Storage) checkBlobTreeRecords() (map[cid.Cid]uint64, uint64, int, *mult
 		}
 
 		if earliestBlobTreeRecordHeight <= storedDataLowerBound {
+			// there should not be any data stored for heights lower than the lower bound
 			multierror.Append(errors, fmt.Errorf("stored data lower bound %d is not less than earliest blob tree record height %d", storedDataLowerBound, earliestBlobTreeRecordHeight))
 		}
 	}
@@ -305,6 +369,7 @@ func (s *Storage) checkExecutionDataStatuses(numBlobTreeRecords int, highestBlob
 
 	if numExecutionDataStatuses > 0 {
 		if numBlobTreeRecords == 0 {
+			// there should be at least one blob tree record per tracked execution data
 			multierror.Append(errors, fmt.Errorf("found %d execution data statuses but no blob tree records", numExecutionDataStatuses))
 		} else if maxExecutionDataStatusHeight != highestBlobTreeRecordHeight {
 			multierror.Append(errors, fmt.Errorf(
@@ -315,12 +380,14 @@ func (s *Storage) checkExecutionDataStatuses(numBlobTreeRecords int, highestBlob
 		}
 
 		if minExecutionDataStatusHeight <= latestIncorporatedHeight {
+			// once an execution data is incorporated, the execution data status entry should be removed
 			multierror.Append(errors, fmt.Errorf(
 				"min execution data status height %d is less than or equal to latest incorporated height %d",
 				minExecutionDataStatusHeight,
 				latestIncorporatedHeight,
 			))
 		} else if minExecutionDataStatusHeight == latestIncorporatedHeight+1 && firstExecutionDataStatus == executionDataStatusComplete {
+			// the latest incorporated height value is lower than it should be
 			multierror.Append(errors, fmt.Errorf("latest incorporated height is %d, but execution data status at height %d is complete", latestIncorporatedHeight, minExecutionDataStatusHeight))
 		}
 	} else if numBlobTreeRecords > 0 && latestIncorporatedHeight != highestBlobTreeRecordHeight {
@@ -367,6 +434,7 @@ func (s *Storage) checkBlobs(blobCids map[cid.Cid]uint64) (*multierror.Error, er
 	return errors, nil
 }
 
+// Check checks the integrity of the storage and returns any inconsistencies that were found.
 func (s *Storage) Check(options CheckOptions) error {
 	latestHeightSeen, highestBlobTreeRecordHeight, numBlobTreeRecords, errors1, err := s.checkBlobTreeRecords()
 	if err != nil {
@@ -400,11 +468,14 @@ func (s *Storage) Check(options CheckOptions) error {
 	return multierror.Append(errors1, errors2, errors3, errors4).ErrorOrNil()
 }
 
-func (s *Storage) LoadState() ([]*ExecutionDataRecord, []uint64, error) {
+// LoadState loads the state from the storage. It returns:
+// - the list of Execution Data records that are tracked by the storage
+// - the latest incorporated height
+func (s *Storage) LoadState() ([]*ExecutionDataRecord, uint64, error) {
 	latestIncorporatedHeightKey := makeGlobalStateKey(globalStateLatestIncorporatedHeight)
 	executionDataStatusPrefix := []byte{prefixExecutionDataStatus}
 	var trackedItems []*ExecutionDataRecord
-	var pendingHeights []uint64
+	var latestIncorporatedHeight uint64
 
 	if err := s.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(latestIncorporatedHeightKey)
@@ -417,7 +488,7 @@ func (s *Storage) LoadState() ([]*ExecutionDataRecord, []uint64, error) {
 			return fmt.Errorf("failed to retrieve latest incorporated height value: %w", err)
 		}
 
-		previousHeight := binary.LittleEndian.Uint64(latestIncorporatedHeightValue)
+		latestIncorporatedHeight = binary.LittleEndian.Uint64(latestIncorporatedHeightValue)
 
 		it := txn.NewIterator(badger.IteratorOptions{
 			PrefetchValues: true,
@@ -434,10 +505,6 @@ func (s *Storage) LoadState() ([]*ExecutionDataRecord, []uint64, error) {
 				return fmt.Errorf("failed to retrieve execution data status value at height %d: %w", height, err)
 			}
 
-			for i := previousHeight + 1; i < height; i++ {
-				pendingHeights = append(pendingHeights, i)
-			}
-
 			blockID, rootID := parseExecutionDataStatusValue(executionDataStatusValue)
 			trackedItems = append(trackedItems, &ExecutionDataRecord{
 				BlockID:     blockID,
@@ -446,17 +513,18 @@ func (s *Storage) LoadState() ([]*ExecutionDataRecord, []uint64, error) {
 				Completed:   item.UserMeta() == executionDataStatusComplete,
 			})
 
-			previousHeight = height
 		}
 
 		return nil
 	}); err != nil {
-		return nil, nil, err
+		return nil, 0, err
 	}
 
-	return trackedItems, pendingHeights, nil
+	return trackedItems, latestIncorporatedHeight, nil
 }
 
+// batchDelete accepts a list of blob CIDs and removes all deletable data associated with them.
+// It fills `deletedCIDs` with the CIDs that were completely removed, and returns the removed count.
 func (s *Storage) batchDeleteCIDs(cids []cid.Cid, blockHeights []uint64, deletedCIDs []cid.Cid) (int, error) {
 	var numDeleted int
 
@@ -478,6 +546,7 @@ func (s *Storage) batchDeleteCIDs(cids []cid.Cid, blockHeights []uint64, deleted
 			blobTreeRecordKey := blobTreeRecordKeys[i]
 			blobRecordKey := blobRecordKeys[i]
 
+			// remove blob tree record
 			if err := txn.Delete(blobTreeRecordKey); err != nil {
 				return fmt.Errorf("failed to delete blob tree record for Cid %s at height %d: %w", c.String(), blockHeight, err)
 			}
@@ -492,6 +561,7 @@ func (s *Storage) batchDeleteCIDs(cids []cid.Cid, blockHeights []uint64, deleted
 				return fmt.Errorf("failed to retrieve blob record value for Cid %s: %w", c.String(), err)
 			}
 
+			// only remove blob record and blob data if it is not referenced by any other blob tree
 			latestHeightContainingBlob := binary.LittleEndian.Uint64(blobRecordValue)
 			if latestHeightContainingBlob < blockHeight {
 				// this should never happen
@@ -506,7 +576,7 @@ func (s *Storage) batchDeleteCIDs(cids []cid.Cid, blockHeights []uint64, deleted
 
 				blobKey := network.BlobServiceDatastoreKeyFromCid(c).Bytes()
 				if err := txn.Delete(blobKey); err != nil {
-					return fmt.Errorf("failed to delete blob %s: %w", c.String(), err)
+					return fmt.Errorf("failed to delete blob data %s: %w", c.String(), err)
 				}
 
 				deletedCIDs[n] = c
@@ -524,6 +594,8 @@ func (s *Storage) batchDeleteCIDs(cids []cid.Cid, blockHeights []uint64, deleted
 	return numDeleted, nil
 }
 
+// getCidsToDelete returns the list of CIDs and corresponding block heights that are candidates
+// for deletion when pruning up to the given height.
 func (s *Storage) getCidsToDelete(height uint64) ([]cid.Cid, []uint64, error) {
 	var cidsToDelete []cid.Cid
 	var blockHeights []uint64
@@ -562,61 +634,133 @@ func (s *Storage) getCidsToDelete(height uint64) ([]cid.Cid, []uint64, error) {
 	return cidsToDelete, blockHeights, nil
 }
 
-func (s *Storage) init(startHeight uint64) error {
-	storedDataLowerBound, err1 := s.GetStoredDataLowerBound()
-	latestIncorporatedHeight, err2 := s.GetLatestIncorporatedHeight()
-
-	if err1 == nil && err2 == nil {
-		if err := s.replay(storedDataLowerBound, latestIncorporatedHeight); err != nil {
-			return fmt.Errorf("failed to restore db: %w", err)
-		}
-	} else if errors.Is(err1, badger.ErrKeyNotFound) && errors.Is(err2, badger.ErrKeyNotFound) {
-		if err := s.bootstrap(startHeight); err != nil {
-			return fmt.Errorf("failed to bootstrap db: %w", err)
-		}
-	} else if (errors.Is(err1, badger.ErrKeyNotFound) && err2 == nil) || (err1 == nil && errors.Is(err2, badger.ErrKeyNotFound)) {
-		return fmt.Errorf("db is in inconsistent state")
-	} else {
-		return fmt.Errorf("failed to initialize storage: %w", err1)
-	}
-
-	return nil
-}
-
-func (s *Storage) replay(storedDataLowerBound uint64, latestIncorporatedHeight uint64) error {
-	if _, err := s.Prune(storedDataLowerBound); err != nil {
-		return err
-	}
-
-	if _, err := s.tryIncorporate(latestIncorporatedHeight + 1); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Storage) bootstrap(startHeight uint64) error {
-	latestIncorporatedHeightKey := makeGlobalStateKey(globalStateLatestIncorporatedHeight)
-	latestIncorporatedHeightValue := make([]byte, 8)
-	binary.LittleEndian.PutUint64(latestIncorporatedHeightValue, startHeight)
-
+// Prune removes all data from storage up to the given height, including all blob tree records, blob records, and blob data,
+// and returns the list of deleted CIDs. It should only be called with height <= latest incorporated height.
+// This method should not be called concurrently from multiple goroutines, but is safe to call concurrently with other methods.
+func (s *Storage) Prune(height uint64) ([]cid.Cid, error) {
 	storedDataLowerBoundKey := makeGlobalStateKey(globalStateStoredDataLowerBound)
 	storedDataLowerBoundValue := make([]byte, 8)
-	binary.LittleEndian.PutUint64(storedDataLowerBoundValue, startHeight)
+	binary.LittleEndian.PutUint64(storedDataLowerBoundValue, height)
 
-	return s.db.Update(func(txn *badger.Txn) error {
-		if err := txn.Set(latestIncorporatedHeightKey, latestIncorporatedHeightValue); err != nil {
-			return fmt.Errorf("failed to set latest incorporated height: %w", err)
-		}
-
+	// update stored data lower bound first, so that we can resume later if the operation is interrupted by a crash / restart
+	if err := s.db.Update(func(txn *badger.Txn) error {
 		if err := txn.Set(storedDataLowerBoundKey, storedDataLowerBoundValue); err != nil {
 			return fmt.Errorf("failed to set stored data lower bound: %w", err)
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return nil, err
+	}
+
+	// get candidate CIDs for deletion
+	cidsToDelete, blockHeights, err := s.getCidsToDelete(height)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gather list of CIDs for deletion: %w", err)
+	}
+
+	deletedCIDs := make([]cid.Cid, len(cidsToDelete)) // stores actually deleted CIDs
+	numDeleted := 0
+
+	cidsPerBatch := 16
+	maxCidsPerBatch := getBatchItemCountLimit(
+		s.db,
+		0,
+		0,
+		3, // delete blob tree record, blob record, and blob data
+		blobTreeRecordKeyLength+blobRecordKeyLength+int64(network.BlobServiceDatastoreKeyLength),
+	)
+	if maxCidsPerBatch < cidsPerBatch {
+		cidsPerBatch = maxCidsPerBatch
+	}
+
+	for len(cidsToDelete) > 0 {
+		batchSize := cidsPerBatch
+		if len(cidsToDelete) < batchSize {
+			batchSize = len(cidsToDelete)
+		}
+
+		n, err := s.batchDeleteCIDs(cidsToDelete[:batchSize], blockHeights[:batchSize], deletedCIDs[numDeleted:])
+		if err != nil {
+			return nil, fmt.Errorf("failed to delete CIDs: %w", err)
+		}
+
+		numDeleted += n
+		cidsToDelete = cidsToDelete[batchSize:]
+		blockHeights = blockHeights[batchSize:]
+	}
+
+	return deletedCIDs[:numDeleted], nil
 }
 
+// tryIncorporate tries to incorporate as many heights as possible starting from the given height.
+func (s *Storage) tryIncorporate(height uint64) (uint64, error) {
+	var latestIncorporatedHeight uint64
+	latestIncorporatedHeightKey := makeGlobalStateKey(globalStateLatestIncorporatedHeight)
+
+	batchSize := 16
+	maxBatchSize := getBatchItemCountLimit(s.db, 1, globalStateKeyLength+8, 1, executionDataStatusKeyLength)
+	if maxBatchSize < batchSize {
+		batchSize = maxBatchSize
+	}
+
+	var finished bool
+	for startHeight := height; !finished; startHeight += uint64(batchSize) {
+		// incorporate up to batchSize heights starting from startHeight
+		if err := retryOnConflict(s.db, func(txn *badger.Txn) error {
+			var nextHeight uint64
+			var exitedEarly bool
+
+			for nextHeight = startHeight; nextHeight < startHeight+uint64(batchSize); nextHeight++ {
+				executionDataStatusKey := makeExecutionDataStatusKey(nextHeight)
+
+				item, err := txn.Get(executionDataStatusKey)
+				if err != nil {
+					if errors.Is(err, badger.ErrKeyNotFound) {
+						// execution data for this height is either not yet tracked,
+						// or has already been incorporated
+						exitedEarly = true
+						break
+					}
+
+					return fmt.Errorf("failed to get execution data status at height %d: %w", nextHeight, err)
+				}
+
+				status := item.UserMeta()
+				if status == executionDataStatusInProgress {
+					exitedEarly = true
+					break
+				} else if status != executionDataStatusComplete {
+					return fmt.Errorf("invalid execution data status at height %d: %v", nextHeight, status)
+				}
+
+				if err := txn.Delete(executionDataStatusKey); err != nil {
+					return fmt.Errorf("failed to delete execution data status: %w", err)
+				}
+			}
+
+			if nextHeight > startHeight {
+				// update latest incorporated height
+				latestIncorporatedHeightValue := make([]byte, 8)
+				binary.LittleEndian.PutUint64(latestIncorporatedHeightValue, nextHeight-1)
+				if err := txn.Set(latestIncorporatedHeightKey, latestIncorporatedHeightValue); err != nil {
+					return fmt.Errorf("failed to set latest incorporated height: %w", err)
+				}
+			}
+
+			latestIncorporatedHeight = nextHeight - 1
+			finished = exitedEarly
+
+			return nil
+		}); err != nil {
+			return 0, err
+		}
+	}
+
+	return latestIncorporatedHeight, nil
+}
+
+// GetLatestIncorporatedHeight returns the latest incorporated height.
 func (s *Storage) GetLatestIncorporatedHeight() (uint64, error) {
 	latestIncorporatedHeightKey := makeGlobalStateKey(globalStateLatestIncorporatedHeight)
 	var latestIncorporatedHeight uint64
@@ -669,119 +813,7 @@ func (s *Storage) GetStoredDataLowerBound() (uint64, error) {
 	return storedDataLowerBound, nil
 }
 
-// Prune removes all data from storage corresponding to block heights lower than or equal to the given height.
-// This includes all blob tree records, blob records, and blob data.
-// This should only be called with height <= latest incorporated height.
-func (s *Storage) Prune(height uint64) ([]cid.Cid, error) {
-	storedDataLowerBoundKey := makeGlobalStateKey(globalStateStoredDataLowerBound)
-	storedDataLowerBoundValue := make([]byte, 8)
-	binary.LittleEndian.PutUint64(storedDataLowerBoundValue, height)
-
-	if err := s.db.Update(func(txn *badger.Txn) error {
-		if err := txn.Set(storedDataLowerBoundKey, storedDataLowerBoundValue); err != nil {
-			return fmt.Errorf("failed to set stored data lower bound: %w", err)
-		}
-
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-
-	cidsToDelete, blockHeights, err := s.getCidsToDelete(height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to gather list of CIDs for deletion: %w", err)
-	}
-
-	deletedCIDs := make([]cid.Cid, len(cidsToDelete))
-	numDeleted := 0
-
-	cidsPerBatch := 16
-	maxCidsPerBatch := getBatchItemCountLimit(s.db, 0, 0, 3, blobTreeRecordKeyLength+blobRecordKeyLength+int64(network.BlobServiceDatastoreKeyLength))
-	if maxCidsPerBatch < cidsPerBatch {
-		cidsPerBatch = maxCidsPerBatch
-	}
-
-	for len(cidsToDelete) > 0 {
-		batchSize := cidsPerBatch
-		if len(cidsToDelete) < batchSize {
-			batchSize = len(cidsToDelete)
-		}
-
-		n, err := s.batchDeleteCIDs(cidsToDelete[:batchSize], blockHeights[:batchSize], deletedCIDs[numDeleted:])
-		if err != nil {
-			return nil, fmt.Errorf("failed to delete CIDs: %w", err)
-		}
-
-		numDeleted += n
-		cidsToDelete = cidsToDelete[batchSize:]
-		blockHeights = blockHeights[batchSize:]
-	}
-
-	return deletedCIDs[:numDeleted], nil
-}
-
-func (s *Storage) tryIncorporate(height uint64) (uint64, error) {
-	var latestIncorporatedHeight uint64
-	latestIncorporatedHeightKey := makeGlobalStateKey(globalStateLatestIncorporatedHeight)
-
-	batchSize := 16
-	maxBatchSize := getBatchItemCountLimit(s.db, 1, globalStateKeyLength+8, 1, executionDataStatusKeyLength)
-	if maxBatchSize < batchSize {
-		batchSize = maxBatchSize
-	}
-
-	var finished bool
-	for startHeight := height; !finished; startHeight += uint64(batchSize) {
-		if err := retryOnConflict(s.db, func(txn *badger.Txn) error {
-			var nextHeight uint64
-			var exitedEarly bool
-
-			for nextHeight = startHeight; nextHeight < startHeight+uint64(batchSize); nextHeight++ {
-				executionDataStatusKey := makeExecutionDataStatusKey(nextHeight)
-
-				item, err := txn.Get(executionDataStatusKey)
-				if err != nil {
-					if errors.Is(err, badger.ErrKeyNotFound) {
-						exitedEarly = true
-						break
-					}
-
-					return fmt.Errorf("failed to get execution data status at height %d: %w", nextHeight, err)
-				}
-
-				status := item.UserMeta()
-				if status == executionDataStatusInProgress {
-					exitedEarly = true
-					break
-				} else if status != executionDataStatusComplete {
-					return fmt.Errorf("invalid execution data status at height %d: %v", nextHeight, status)
-				}
-
-				if err := txn.Delete(executionDataStatusKey); err != nil {
-					return fmt.Errorf("failed to delete execution data status: %w", err)
-				}
-			}
-
-			if nextHeight > startHeight {
-				latestIncorporatedHeightValue := make([]byte, 8)
-				binary.LittleEndian.PutUint64(latestIncorporatedHeightValue, nextHeight-1)
-				if err := txn.Set(latestIncorporatedHeightKey, latestIncorporatedHeightValue); err != nil {
-					return fmt.Errorf("failed to set latest incorporated height: %w", err)
-				}
-			}
-
-			latestIncorporatedHeight = nextHeight - 1
-			finished = exitedEarly
-
-			return nil
-		}); err != nil {
-			return 0, err
-		}
-	}
-
-	return latestIncorporatedHeight, nil
-}
-
+// GetStatusTracker returns a status tracker which can be used to track the Execution Data download progress for the given block.
 func (s *Storage) GetStatusTracker(blockID flow.Identifier, blockHeight uint64, executionDataID flow.Identifier) StatusTracker {
 	return &executionDataStatusTracker{
 		storage:     s,
@@ -823,6 +855,7 @@ func (s *executionDataStatusTracker) trackBlob(txn *badger.Txn, c cid.Cid) error
 			return fmt.Errorf("failed to retrieve blob record value: %w", err)
 		}
 
+		// don't update the blob record if there is already a higher block height containing this blob
 		latestHeightContainingBlob := binary.LittleEndian.Uint64(value)
 		if latestHeightContainingBlob >= s.blockHeight {
 			return nil
@@ -839,6 +872,7 @@ func (s *executionDataStatusTracker) trackBlob(txn *badger.Txn, c cid.Cid) error
 	return nil
 }
 
+// StartTransfer tracks the start of the Execution Data transfer.
 func (s *executionDataStatusTracker) StartTransfer() error {
 	if s.started {
 		return ErrStatusTrackerAlreadyStarted
@@ -870,6 +904,7 @@ func (s *executionDataStatusTracker) StartTransfer() error {
 	return nil
 }
 
+// TrackBlobs tracks the given cids as part of the Execution Data.
 func (s *executionDataStatusTracker) TrackBlobs(cids []cid.Cid) error {
 	if !s.started {
 		return ErrStatusTrackerNotStarted
@@ -908,6 +943,8 @@ func (s *executionDataStatusTracker) TrackBlobs(cids []cid.Cid) error {
 	return nil
 }
 
+// FinishTransfer marks the transfer of the Execution Data as complete, triggers incorporation
+// if possible starting from the current height, and returns the resulting latest incorporated height.
 func (s *executionDataStatusTracker) FinishTransfer() (uint64, error) {
 	if !s.started {
 		return 0, ErrStatusTrackerNotStarted
@@ -949,6 +986,7 @@ func (s *executionDataStatusTracker) FinishTransfer() (uint64, error) {
 
 	s.finished = true
 
+	// only trigger incorporation if the previous height is incorporated
 	if latestIncorporatedHeight == s.blockHeight-1 {
 		return s.storage.tryIncorporate(s.blockHeight)
 	}
