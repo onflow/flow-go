@@ -713,13 +713,13 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	}
 
 	// concoctReq creates a GetTransactionResultsByBlockIDRequest
-	concoctReq := func(bID []byte) *execution.GetTransactionsByBlockIDRequest {
-		return &execution.GetTransactionsByBlockIDRequest{
+	concoctReq := func(bID []byte) *execution.GetTransactionResultsByBlockIDRequest {
+		return &execution.GetTransactionResultsByBlockIDRequest{
 			BlockId: bID,
 		}
 	}
 
-	assertEqual := func(expected, actual *execution.GetTransactionResultsResponse) {
+	assertEqual := func(expected, actual *execution.GetTransactionResultsByBlockIDResponse) {
 
 		suite.Require().Len(expected.TransactionResults, len(actual.TransactionResults))
 
@@ -737,8 +737,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.events.On("ByBlockID", bID).Return(eventsForBlock, nil).Once()
 
 		// create the expected result
-		expectedResult := &execution.GetTransactionResultsResponse{
-			TransactionResults: []*execution.GetTransactionResultResponse{
+		expectedResult := &execution.GetTransactionResultsByBlockIDResponse{
+			TransactionResults: []*entities.TransactionResult{
 				{
 					StatusCode:   0,
 					ErrorMessage: "",
@@ -792,8 +792,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.events.On("ByBlockID", bID).Return(eventsForBlock, nil).Once()
 
 		// create the expected result
-		expectedResult := &execution.GetTransactionResultsResponse{
-			TransactionResults: []*execution.GetTransactionResultResponse{
+		expectedResult := &execution.GetTransactionResultsByBlockIDResponse{
+			TransactionResults: []*entities.TransactionResult{
 				{
 					StatusCode:   0,
 					ErrorMessage: "",
@@ -869,8 +869,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.events.On("ByBlockID", nonexistingBlockID).Return(eventsForBlock, nil).Once()
 
 		// create the expected result
-		expectedResult := &execution.GetTransactionResultsResponse{
-			TransactionResults: []*execution.GetTransactionResultResponse{},
+		expectedResult := &execution.GetTransactionResultsByBlockIDResponse{
+			TransactionResults: []*entities.TransactionResult{},
 		}
 
 		// expect a call to lookup transaction result by block ID return a result with no error

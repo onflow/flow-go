@@ -199,20 +199,20 @@ func (_m *ExecutionAPIServer) GetTransactionResultByIndex(_a0 context.Context, _
 }
 
 // GetTransactionResultsByBlockID provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionAPIServer) GetTransactionResultsByBlockID(_a0 context.Context, _a1 *execution.GetTransactionsByBlockIDRequest) (*execution.GetTransactionResultsResponse, error) {
+func (_m *ExecutionAPIServer) GetTransactionResultsByBlockID(_a0 context.Context, _a1 *execution.GetTransactionResultsByBlockIDRequest) (*execution.GetTransactionResultsByBlockIDResponse, error) {
 	ret := _m.Called(_a0, _a1)
 
-	var r0 *execution.GetTransactionResultsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionsByBlockIDRequest) *execution.GetTransactionResultsResponse); ok {
+	var r0 *execution.GetTransactionResultsByBlockIDResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionResultsByBlockIDRequest) *execution.GetTransactionResultsByBlockIDResponse); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.GetTransactionResultsResponse)
+			r0 = ret.Get(0).(*execution.GetTransactionResultsByBlockIDResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetTransactionsByBlockIDRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetTransactionResultsByBlockIDRequest) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)

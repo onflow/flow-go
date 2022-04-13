@@ -18,6 +18,7 @@ type TransactionResults struct {
 	db         *badger.DB
 	cache      *Cache
 	indexCache *Cache
+	blockCache *Cache
 }
 
 func KeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) string {
@@ -28,6 +29,10 @@ func KeyFromBlockIDIndex(blockID flow.Identifier, txIndex uint32) string {
 	idData := make([]byte, 4) //uint32 fits into 4 bytes
 	binary.BigEndian.PutUint32(idData, txIndex)
 	return fmt.Sprintf("%x%x", blockID, idData)
+}
+
+func KeyFromBlockID(blockID flow.Identifier) string {
+	return blockID.String()
 }
 
 func KeyToBlockIDTransactionID(key string) (flow.Identifier, flow.Identifier, error) {
@@ -67,6 +72,16 @@ func KeyToBlockIDIndex(key string) (flow.Identifier, uint32, error) {
 	return blockID, txIndex, nil
 }
 
+func KeyToBlockID(key string) (flow.Identifier, error) {
+
+	blockID, err := flow.HexStringToIdentifier(key)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not get block ID: %w", err)
+	}
+
+	return blockID, err
+}
+
 func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transactionResultsCacheSize uint) *TransactionResults {
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		var txResult flow.TransactionResult
@@ -100,6 +115,22 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 			return txResult, nil
 		}
 	}
+	retrieveForBlock := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		var txResults []flow.TransactionResult
+		return func(tx *badger.Txn) (interface{}, error) {
+
+			blockID, err := KeyToBlockID(key.(string))
+			if err != nil {
+				return nil, fmt.Errorf("could not convert index key: %w", err)
+			}
+
+			err = operation.LookupTransactionResultsByBlockIDUsingIndex(blockID, &txResults)(tx)
+			if err != nil {
+				return nil, handleError(err, flow.TransactionResult{})
+			}
+			return txResults, nil
+		}
+	}
 	return &TransactionResults{
 		db: db,
 		cache: newCache(collector, metrics.ResourceTransactionResults,
@@ -111,6 +142,11 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 			withLimit(transactionResultsCacheSize),
 			withStore(noopStore),
 			withRetrieve(retrieveIndex),
+		),
+		blockCache: newCache(collector, metrics.ResourceTransactionResultIndices,
+			withLimit(transactionResultsCacheSize),
+			withStore(noopStore),
+			withRetrieve(retrieveForBlock),
 		),
 	}
 }
@@ -132,11 +168,19 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 	}
 
 	batch.OnSucceed(func() {
-		for _, result := range transactionResults {
+		for i, result := range transactionResults {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
 			tr.cache.Insert(key, result)
+
+			index := uint32(i)
+
+			keyIndex := KeyFromBlockIDIndex(blockID, index)
+			tr.indexCache.Insert(keyIndex, result)
 		}
+
+		key := KeyFromBlockID(blockID)
+		tr.blockCache.Insert(key, transactionResults)
 	})
 	return nil
 }
@@ -171,4 +215,20 @@ func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier,
 		return nil, fmt.Errorf("could not convert transaction result: %w", err)
 	}
 	return &transactionResult, nil
+}
+
+// ByBlockID gets all transaction results for a block, ordered by transaction index
+func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResult, error) {
+	tx := tr.db.NewTransaction(false)
+	defer tx.Discard()
+	key := KeyFromBlockID(blockID)
+	val, err := tr.blockCache.Get(key)(tx)
+	if err != nil {
+		return nil, err
+	}
+	transactionResults, ok := val.([]flow.TransactionResult)
+	if !ok {
+		return nil, fmt.Errorf("could not convert transaction result: %w", err)
+	}
+	return transactionResults, nil
 }
