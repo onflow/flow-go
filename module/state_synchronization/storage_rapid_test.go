@@ -68,10 +68,8 @@ func (s *StorageMachine) Init(t *rapid.T) {
 	s.maxBlobTreeLevelSize = 32
 
 	opts := badgerDs.DefaultOptions
-	// TODO: put this back to non-inmemory
 	opts.BypassLockGuard = true
-	opts.InMemory = true
-	ds, err := badgerDs.NewDatastore("", &opts)
+	ds, err := badgerDs.NewDatastore("/tmp/badger", &opts)
 	require.NoError(t, err)
 	s.ds = ds
 	s.storage, err = state_synchronization.OpenStorage(ds.DB, 0)
@@ -299,11 +297,13 @@ func (s *StorageMachine) Check(t *rapid.T) {
 	})
 	assert.NoError(t, err)
 
-	trackedItems, pendingHeights, err := s.storage.LoadState()
+	trackedItems, latestIncorporatedHeight, err := s.storage.LoadState()
 	require.NoError(t, err)
 
 	var numCompleted int
 	var numInProgress int
+	previousHeight := latestIncorporatedHeight
+	var missingHeights []uint64
 	for _, item := range trackedItems {
 		if item.Completed {
 			numCompleted++
@@ -324,9 +324,15 @@ func (s *StorageMachine) Check(t *rapid.T) {
 				assert.Equal(t, pendingRecord.record.rootID, item.RootID)
 			}
 		}
+
+		for h := previousHeight + 1; h < item.BlockHeight; h++ {
+			missingHeights = append(missingHeights, h)
+		}
+
+		previousHeight = item.BlockHeight
 	}
 
-	for _, h := range pendingHeights {
+	for _, h := range missingHeights {
 		assert.NotContains(t, s.pendingHeights, h)
 	}
 
