@@ -15,13 +15,12 @@ import (
 	"github.com/ipfs/go-bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
-	cpu "github.com/shirou/gopsutil/v3/cpu"
-	host "github.com/shirou/gopsutil/v3/host"
-	mem "github.com/shirou/gopsutil/v3/mem"
-	"github.com/spf13/pflag"
-
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
@@ -73,9 +72,125 @@ import (
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
-func main() {
+type ExecutionConfig struct {
+	rpcConf                     rpc.Config
+	err                         error
+	triedir                     string
+	executionDataDir            string
+	mTrieCacheSize              uint32
+	transactionResultsCacheSize uint
+	checkpointDistance          uint
+	checkpointsToKeep           uint
+	stateDeltasLimit            uint
+	cadenceExecutionCache       uint
+	cadenceTracing              bool
+	chdpCacheSize               uint
+	requestInterval             time.Duration
+	preferredExeNodeIDStr       string
+	syncByBlocks                bool
+	syncFast                    bool
+	syncThreshold               int
+	extensiveLog                bool
+	pauseExecution              bool
+	scriptLogThreshold          time.Duration
+	scriptExecutionTimeLimit    time.Duration
+	chdpQueryTimeout            uint
+	chdpDeliveryTimeout         uint
+	enableBlockDataUpload       bool
+	gcpBucketName               string
+	s3BucketName                string
+	edsDatastoreTTL             time.Duration
+}
 
+type ExecutionNodeBuilder struct {
+	*cmd.FlowNodeBuilder
+	exeConf *ExecutionConfig
+}
+
+func NewExecutionNodeBuilder(nodeBuilder *cmd.FlowNodeBuilder) *ExecutionNodeBuilder {
+	return &ExecutionNodeBuilder{
+		FlowNodeBuilder: nodeBuilder,
+		exeConf:         &ExecutionConfig{},
+	}
+}
+
+func main() {
+	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
+
+	if err := nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	exeBuilder := NewExecutionNodeBuilder(nodeBuilder)
+	exeBuilder.LoadConfig()
+	exeBuilder.LoadComponents()
+
+	node, err := exeBuilder.Build()
+	if err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
+}
+
+func (e *ExecutionNodeBuilder) LoadConfig() {
+	e.
+		ExtraFlags(func(flags *pflag.FlagSet) {
+			homedir, _ := os.UserHomeDir()
+			datadir := filepath.Join(homedir, ".flow", "execution")
+
+			flags.StringVarP(&e.exeConf.rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
+			flags.BoolVar(&e.exeConf.rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
+			flags.StringVar(&e.exeConf.triedir, "triedir", datadir, "directory to store the execution State")
+			flags.StringVar(&e.exeConf.executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data_blobstore"),
+				"directory to use for Execution Data blobstore")
+			flags.Uint32Var(&e.exeConf.mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
+			flags.UintVar(&e.exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
+			flags.UintVar(&e.exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
+			flags.UintVar(&e.exeConf.stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
+			flags.UintVar(&e.exeConf.cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize,
+				"cache size for Cadence execution")
+			flags.BoolVar(&e.exeConf.cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
+			flags.UintVar(&e.exeConf.chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
+			flags.DurationVar(&e.exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
+			flags.DurationVar(&e.exeConf.scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
+				"threshold for logging script execution")
+			flags.DurationVar(&e.exeConf.scriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
+				"script execution time limit")
+			flags.StringVar(&e.exeConf.preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
+			flags.UintVar(&e.exeConf.transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
+			flags.BoolVar(&e.exeConf.syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
+			flags.BoolVar(&e.exeConf.syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing,"+
+				" and rely on state syncing to catch up")
+			flags.IntVar(&e.exeConf.syncThreshold, "sync-threshold", 100,
+				"the maximum number of sealed and unexecuted blocks before triggering state syncing")
+			flags.BoolVar(&e.exeConf.extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
+			flags.UintVar(&e.exeConf.chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10,
+				"number of seconds to determine a chunk data pack query being slow")
+			flags.UintVar(&e.exeConf.chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10,
+				"number of seconds to determine a chunk data pack response delivery being slow")
+			flags.BoolVar(&e.exeConf.pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, "+
+				"but still be able to serve queries")
+			flags.BoolVar(&e.exeConf.enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
+			flags.StringVar(&e.exeConf.gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
+			flags.StringVar(&e.exeConf.s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
+			flags.DurationVar(&e.exeConf.edsDatastoreTTL, "execution-data-service-datastore-ttl", 0,
+				"TTL for new blobs added to the execution data service blobstore")
+		}).
+		ValidateFlags(func() error {
+			if e.exeConf.enableBlockDataUpload {
+				if e.exeConf.gcpBucketName == "" && e.exeConf.s3BucketName == "" {
+					return fmt.Errorf("invalid flag. gcp-bucket-name or s3-bucket-name required when blockdata-uploader is enabled")
+				}
+			}
+			return nil
+		})
+}
+
+func (e *ExecutionNodeBuilder) LoadComponents() {
 	var (
+		collector                     module.ExecutionMetrics
+		executionDataServiceCollector module.ExecutionDataServiceMetrics
+		executionState                state.ExecutionState
 		followerState                 protocol.MutableState
 		ledgerStorage                 *ledger.Ledger
 		events                        *storage.Events
@@ -95,94 +210,17 @@ func main() {
 		ingestionEng                  *ingestion.Engine
 		finalizationDistributor       *pubsub.FinalizationDistributor
 		finalizedHeader               *synchronization.FinalizedHeaderCache
-		rpcConf                       rpc.Config
-		err                           error
-		executionState                state.ExecutionState
-		triedir                       string
-		executionDataDir              string
-		collector                     module.ExecutionMetrics
-		executionDataServiceCollector module.ExecutionDataServiceMetrics
-		mTrieCacheSize                uint32
-		transactionResultsCacheSize   uint
-		checkpointDistance            uint
-		checkpointsToKeep             uint
-		stateDeltasLimit              uint
-		cadenceExecutionCache         uint
-		cadenceTracing                bool
-		chdpCacheSize                 uint
-		requestInterval               time.Duration
-		preferredExeNodeIDStr         string
-		syncByBlocks                  bool
-		syncFast                      bool
-		syncThreshold                 int
-		extensiveLog                  bool
-		pauseExecution                bool
 		checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
 		diskWAL                       *wal.DiskWAL
-		scriptLogThreshold            time.Duration
-		scriptExecutionTimeLimit      time.Duration
-		chdpQueryTimeout              uint
-		chdpDeliveryTimeout           uint
-		enableBlockDataUpload         bool
-		gcpBucketName                 string
-		s3BucketName                  string
 		blockDataUploaders            []uploader.Uploader
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
 		executionDataService          state_synchronization.ExecutionDataService
 		executionDataCIDCache         state_synchronization.ExecutionDataCIDCache
 		executionDataCIDCacheSize     uint = 100
-		edsDatastoreTTL               time.Duration
 	)
 
-	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
-	nodeBuilder.
-		ExtraFlags(func(flags *pflag.FlagSet) {
-			homedir, _ := os.UserHomeDir()
-			datadir := filepath.Join(homedir, ".flow", "execution")
-
-			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
-			flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
-			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
-			flags.StringVar(&executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data_blobstore"), "directory to use for Execution Data blobstore")
-			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
-			flags.UintVar(&checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
-			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
-			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
-			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
-			flags.BoolVar(&cadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
-			flags.UintVar(&chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
-			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
-			flags.DurationVar(&scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold, "threshold for logging script execution")
-			flags.DurationVar(&scriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit, "script execution time limit")
-			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
-			flags.UintVar(&transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
-			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
-			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
-			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
-			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
-			flags.UintVar(&chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10, "number of seconds to determine a chunk data pack query being slow")
-			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
-			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
-			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
-			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
-			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
-			flags.DurationVar(&edsDatastoreTTL, "execution-data-service-datastore-ttl", 0, "TTL for new blobs added to the execution data service blobstore")
-		}).
-		ValidateFlags(func() error {
-			if enableBlockDataUpload {
-				if gcpBucketName == "" && s3BucketName == "" {
-					return fmt.Errorf("invalid flag. gcp-bucket-name or s3-bucket-name required when blockdata-uploader is enabled")
-				}
-			}
-			return nil
-		})
-
-	if err = nodeBuilder.Initialize(); err != nil {
-		nodeBuilder.Logger.Fatal().Err(err).Send()
-	}
-
-	nodeBuilder.
+	e.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(executionDataService)
 		}).
@@ -196,6 +234,7 @@ func main() {
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
+			var err error
 			followerState, err = badgerState.NewFollowerState(
 				state,
 				node.Storage.Index,
@@ -208,7 +247,7 @@ func main() {
 		}).
 		Module("system specs", func(node *cmd.NodeConfig) error {
 			sysInfoLogger := node.Logger.With().Str("system", "specs").Logger()
-			err = logSysInfo(sysInfoLogger)
+			err := logSysInfo(sysInfoLogger)
 			if err != nil {
 				sysInfoLogger.Error().Err(err)
 			}
@@ -223,6 +262,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
+			var err error
 			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
@@ -236,11 +276,11 @@ func main() {
 			return nil
 		}).
 		Component("GCP block data uploader", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if enableBlockDataUpload && gcpBucketName != "" {
+			if e.exeConf.enableBlockDataUpload && e.exeConf.gcpBucketName != "" {
 				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
 				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
 					context.Background(),
-					gcpBucketName,
+					e.exeConf.gcpBucketName,
 					logger,
 				)
 				if err != nil {
@@ -266,7 +306,7 @@ func main() {
 			return &module.NoopReadyDoneAware{}, nil
 		}).
 		Component("S3 block data uploader", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if enableBlockDataUpload && s3BucketName != "" {
+			if e.exeConf.enableBlockDataUpload && e.exeConf.s3BucketName != "" {
 				logger := node.Logger.With().Str("component_name", "s3_block_data_uploader").Logger()
 
 				ctx := context.Background()
@@ -279,7 +319,7 @@ func main() {
 				s3Uploader := uploader.NewS3Uploader(
 					ctx,
 					client,
-					s3BucketName,
+					e.exeConf.s3BucketName,
 					logger,
 				)
 				asyncUploader := uploader.NewAsyncUploader(
@@ -300,7 +340,8 @@ func main() {
 			return &module.NoopReadyDoneAware{}, nil
 		}).
 		Module("state deltas mempool", func(node *cmd.NodeConfig) error {
-			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
+			var err error
+			deltas, err = ingestion.NewDeltas(e.exeConf.stateDeltasLimit)
 			return err
 		}).
 		Module("authorization checking function", func(node *cmd.NodeConfig) error {
@@ -310,7 +351,9 @@ func main() {
 			return nil
 		}).
 		Component("Write-Ahead Log", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(), node.MetricsRegisterer, collector, triedir, int(mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
+			var err error
+			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(),
+				node.MetricsRegisterer, collector, e.exeConf.triedir, int(e.exeConf.mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 			return diskWAL, err
 		}).
 		Component("execution state ledger", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -327,7 +370,7 @@ func main() {
 			if !bootstrapped {
 				// when bootstrapping, the bootstrap folder must have a checkpoint file
 				// we need to cover this file to the trie folder to restore the trie to restore the execution state.
-				err = copyBootstrapState(node.BootstrapDir, triedir)
+				err = copyBootstrapState(node.BootstrapDir, e.exeConf.triedir)
 				if err != nil {
 					return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 				}
@@ -348,7 +391,8 @@ func main() {
 				}
 			}
 
-			ledgerStorage, err = ledger.NewLedger(diskWAL, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), ledger.DefaultPathFinderVersion)
+			ledgerStorage, err = ledger.NewLedger(diskWAL, int(e.exeConf.mTrieCacheSize), collector, node.Logger.With().Str("subcomponent",
+				"ledger").Logger(), ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -357,27 +401,31 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep, node.Logger.With().Str("subcomponent", "checkpointer").Logger())
+			compactor := wal.NewCompactor(checkpointer,
+				10*time.Second,
+				e.exeConf.checkpointDistance,
+				e.exeConf.checkpointsToKeep,
+				node.Logger.With().Str("subcomponent", "checkpointer").Logger())
 
 			return compactor, nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			err := os.MkdirAll(executionDataDir, 0700)
+			err := os.MkdirAll(e.exeConf.executionDataDir, 0700)
 
 			if err != nil {
 				return nil, err
 			}
 
 			dsOpts := &badger.DefaultOptions
-			dsOpts.TTL = edsDatastoreTTL
+			dsOpts.TTL = e.exeConf.edsDatastoreTTL
 
-			ds, err := badger.NewDatastore(executionDataDir, dsOpts)
+			ds, err := badger.NewDatastore(e.exeConf.executionDataDir, dsOpts)
 
 			if err != nil {
 				return nil, err
 			}
 
-			nodeBuilder.ShutdownFunc(ds.Close)
+			e.ShutdownFunc(ds.Close)
 
 			// TODO: if the node is not starting from the beginning of the spork, it may be useful to prepopulate
 			// the cache with the existing Execution Data blob trees. Currently, the cache is empty every time the
@@ -432,7 +480,7 @@ func main() {
 			return eds, nil
 		}).
 		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			extraLogPath := path.Join(triedir, "extralogs")
+			extraLogPath := path.Join(e.exeConf.triedir, "extralogs")
 			err := os.MkdirAll(extraLogPath, 0777)
 			if err != nil {
 				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
@@ -441,7 +489,7 @@ func main() {
 			extralog.ExtraLogDumpPath = extraLogPath
 
 			options := []runtime.Option{}
-			if cadenceTracing {
+			if e.exeConf.cadenceTracing {
 				options = append(options, runtime.WithTracingEnabled(true))
 			}
 			rt := fvm.NewInterpreterRuntime(options...)
@@ -458,10 +506,10 @@ func main() {
 				node.State,
 				vm,
 				vmCtx,
-				cadenceExecutionCache,
+				e.exeConf.cadenceExecutionCache,
 				committer,
-				scriptLogThreshold,
-				scriptExecutionTimeLimit,
+				e.exeConf.scriptLogThreshold,
+				e.exeConf.scriptExecutionTimeLimit,
 				blockDataUploaders,
 				executionDataService,
 				executionDataCIDCache,
@@ -471,13 +519,13 @@ func main() {
 			}
 			computationManager = manager
 
-			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, chdpCacheSize)
+			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, e.exeConf.chdpCacheSize)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = storage.NewEvents(node.Metrics.Cache, node.DB)
 			serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-			txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, transactionResultsCacheSize)
+			txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, e.exeConf.transactionResultsCacheSize)
 
 			executionState = state.NewExecutionState(
 				ledgerStorage,
@@ -505,8 +553,8 @@ func main() {
 				executionState,
 				collector,
 				checkAuthorizedAtBlock,
-				chdpQueryTimeout,
-				chdpDeliveryTimeout,
+				e.exeConf.chdpQueryTimeout,
+				e.exeConf.chdpDeliveryTimeout,
 			)
 			if err != nil {
 				return nil, err
@@ -571,24 +619,25 @@ func main() {
 			return checkerEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
-				requester.WithBatchInterval(requestInterval),
+				requester.WithBatchInterval(e.exeConf.requestInterval),
 				// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
 				// hence we not need to check origin
 				requester.WithValidateStaking(false),
 			)
 
 			preferredExeFilter := filter.Any
-			preferredExeNodeID, err := flow.HexStringToIdentifier(preferredExeNodeIDStr)
+			preferredExeNodeID, err := flow.HexStringToIdentifier(e.exeConf.preferredExeNodeIDStr)
 			if err == nil {
 				node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
 				preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
-			} else if err != nil && preferredExeNodeIDStr != "" {
-				node.Logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
+			} else if err != nil && e.exeConf.preferredExeNodeIDStr != "" {
+				node.Logger.Debug().Str("prefered_exe_node_id_string", e.exeConf.preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 			}
 
 			ingestionEng, err = ingestion.New(
@@ -607,13 +656,13 @@ func main() {
 				executionState,
 				collector,
 				node.Tracer,
-				extensiveLog,
+				e.exeConf.extensiveLog,
 				preferredExeFilter,
 				deltas,
-				syncThreshold,
-				syncFast,
+				e.exeConf.syncThreshold,
+				e.exeConf.syncFast,
 				checkAuthorizedAtBlock,
-				pauseExecution,
+				e.exeConf.pauseExecution,
 			)
 
 			// TODO: we should solve these mutual dependencies better
@@ -702,6 +751,7 @@ func main() {
 			return eng, err
 		}).
 		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
 			finalizedHeader, err = synchronization.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -711,6 +761,7 @@ func main() {
 		}).
 		Component("synchronization engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
+			var err error
 			syncEngine, err = synchronization.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -729,15 +780,9 @@ func main() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
+			rpcEng := rpc.New(node.Logger, e.exeConf.rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
 		})
-
-	node, err := nodeBuilder.Build()
-	if err != nil {
-		nodeBuilder.Logger.Fatal().Err(err).Send()
-	}
-	node.Run()
 }
 
 // getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
