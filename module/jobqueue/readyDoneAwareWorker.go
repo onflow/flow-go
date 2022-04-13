@@ -7,9 +7,9 @@ import (
 	"github.com/onflow/flow-go/module/util"
 )
 
-// WrappedWorker implements the jobqueue.Worker interface, and wraps the processing to make it
+// ReadyDoneAwareWorker implements the jobqueue.Worker interface, and wraps the processing to make it
 // compatible with the Component interface.
-type WrappedWorker struct {
+type ReadyDoneAwareWorker struct {
 	component.Component
 
 	cm        *component.ComponentManager
@@ -41,9 +41,9 @@ type work struct {
 	done chan struct{}
 }
 
-// NewWrappedWorker returns a new WrappedWorker
-func NewWrappedWorker(processor JobProcessor, notify NotifyDone, workers uint64) *WrappedWorker {
-	w := &WrappedWorker{
+// NewReadyDoneAwareWorker returns a new ReadyDoneAwareWorker
+func NewReadyDoneAwareWorker(processor JobProcessor, notify NotifyDone, workers uint64) *ReadyDoneAwareWorker {
+	w := &ReadyDoneAwareWorker{
 		processor: processor,
 		notify:    notify,
 		ch:        make(chan *work),
@@ -65,7 +65,7 @@ func NewWrappedWorker(processor JobProcessor, notify NotifyDone, workers uint64)
 }
 
 // Run executes the worker's JobProcessor for the provided job.
-func (w *WrappedWorker) Run(job module.Job) error {
+func (w *ReadyDoneAwareWorker) Run(job module.Job) error {
 	// don't accept new jobs after shutdown is signalled
 	if util.CheckClosed(w.cm.ShutdownSignal()) {
 		return nil
@@ -95,7 +95,7 @@ func (w *WrappedWorker) Run(job module.Job) error {
 
 // workerLoop processes incoming jobs passed via the Run method. The job execution is wrapped in a
 // goroutine to support passing the worker's irrecoverable.SignalerContext into the processor.
-func (w *WrappedWorker) workerLoop(ctx irrecoverable.SignalerContext) {
+func (w *ReadyDoneAwareWorker) workerLoop(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():

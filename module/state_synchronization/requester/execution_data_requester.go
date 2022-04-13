@@ -138,8 +138,8 @@ type executionDataRequester struct {
 	blockNotifier engine.Notifier
 
 	// Job queues
-	blockConsumer        *jobqueue.WrappedConsumer
-	notificationConsumer *jobqueue.WrappedConsumer
+	blockConsumer        *jobqueue.ReadyDoneAwareConsumer
+	notificationConsumer *jobqueue.ReadyDoneAwareConsumer
 
 	// List of callbacks to call when ExecutionData is successfully fetched for a block
 	consumers []state_synchronization.ExecutionDataReceivedCallback
@@ -179,16 +179,16 @@ func New(
 	rootHeight := e.config.StartBlockHeight - 1
 
 	var err error
-	e.blockConsumer, err = jobqueue.NewWrappedConsumer(
+	e.blockConsumer, err = jobqueue.NewReadyDoneAwareConsumer(
 		log.With().Str("module", "block_consumer").Logger(),
 		processedHeight,
 		status.NewSealedBlockReader(state, blocks),
 		e.processBlockJob,
 		e.blockNotifier.Channel(),
 		rootHeight,
-		jobqueue.WithMaxProcessing(fetchWorkers),
+		fetchWorkers,
 		// notifies notificationConsumer when new ExecutionData blobs are available
-		jobqueue.WitNotifier(func(module.JobID) { executionDataNotifier.Notify() }),
+		func(module.JobID) { executionDataNotifier.Notify() },
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block consumer: %w", err)
@@ -202,15 +202,16 @@ func New(
 		processedNotifications,
 	)
 
-	e.notificationConsumer, err = jobqueue.NewWrappedConsumer(
+	e.notificationConsumer, err = jobqueue.NewReadyDoneAwareConsumer(
 		log.With().Str("module", "notification_consumer").Logger(),
 		processedNotifications,
 		e.status,
 		e.processNotificationJob,
 		executionDataNotifier.Channel(),
 		rootHeight,
+		1, // always use a single worker
 		// kick notifier to make sure we scan until the last available notification
-		jobqueue.WitNotifier(func(module.JobID) { executionDataNotifier.Notify() }),
+		func(module.JobID) { executionDataNotifier.Notify() },
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create notification consumer: %w", err)

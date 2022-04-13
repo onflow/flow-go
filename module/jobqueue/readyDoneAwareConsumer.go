@@ -11,23 +11,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type JobPreProcessor func(interface{})
-
-type WrappedConsumerOption func(*WrappedConsumer)
-
-func WitNotifier(notifier NotifyDone) WrappedConsumerOption {
-	return func(c *WrappedConsumer) {
-		c.notifier = notifier
-	}
-}
-
-func WithMaxProcessing(max uint64) WrappedConsumerOption {
-	return func(c *WrappedConsumer) {
-		c.maxProcessing = max
-	}
-}
-
-type WrappedConsumer struct {
+type ReadyDoneAwareConsumer struct {
 	component.Component
 	module.Resumable
 
@@ -36,47 +20,42 @@ type WrappedConsumer struct {
 	jobs         module.Jobs
 	workSignal   <-chan struct{}
 	defaultIndex uint64
+	notifier     NotifyDone
 	log          zerolog.Logger
-
-	preprocessor  JobPreProcessor
-	notifier      NotifyDone
-	maxProcessing uint64
 }
 
-// NewWrappedConsumer creates a new WrappedConsumer consumer
-func NewWrappedConsumer(
+// NewReadyDoneAwareConsumer creates a new ReadyDoneAwareConsumer consumer
+func NewReadyDoneAwareConsumer(
 	log zerolog.Logger,
 	progress storage.ConsumerProgress,
 	jobs module.Jobs,
 	processor JobProcessor, // method used to process jobs
 	workSignal <-chan struct{},
 	defaultIndex uint64,
-	opts ...WrappedConsumerOption,
-) (*WrappedConsumer, error) {
+	maxProcessing uint64,
+	notifier NotifyDone,
+) (*ReadyDoneAwareConsumer, error) {
 
-	c := &WrappedConsumer{
-		defaultIndex:  defaultIndex,
-		workSignal:    workSignal,
-		jobs:          jobs,
-		log:           log,
-		maxProcessing: 1,
+	c := &ReadyDoneAwareConsumer{
+		defaultIndex: defaultIndex,
+		workSignal:   workSignal,
+		notifier:     notifier,
+		jobs:         jobs,
+		log:          log,
 	}
 
-	for _, opt := range opts {
-		opt(c)
-	}
-
-	worker := NewWrappedWorker(
+	worker := NewReadyDoneAwareWorker(
 		processor,
 		func(id module.JobID) { c.NotifyJobIsDone(id) },
-		c.maxProcessing,
+		maxProcessing,
 	)
-	c.consumer = NewConsumer(c.log, c.jobs, progress, worker, c.maxProcessing)
+	c.consumer = NewConsumer(c.log, c.jobs, progress, worker, maxProcessing)
 
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			worker.Start(ctx)
 			<-worker.Ready()
+			c.log.Info().Msg("job consumer starting")
 
 			err := c.consumer.Start(c.defaultIndex)
 			if err != nil {
@@ -86,11 +65,13 @@ func NewWrappedConsumer(
 			ready()
 
 			<-ctx.Done()
+			c.log.Info().Msg("job consumer shutdown started")
 
 			// blocks until all running jobs have stopped
 			c.consumer.Stop()
 
 			<-worker.Done()
+			c.log.Info().Msg("job consumer shutdown complete")
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
@@ -107,7 +88,7 @@ func NewWrappedConsumer(
 
 // NotifyJobIsDone is invoked by the worker to let the consumer know that it is done
 // processing a (block) job.
-func (c *WrappedConsumer) NotifyJobIsDone(jobID module.JobID) uint64 {
+func (c *ReadyDoneAwareConsumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 	// notify wrapped consumer that job is complete
 	c.defaultIndex = c.consumer.NotifyJobIsDone(jobID)
 
@@ -120,16 +101,16 @@ func (c *WrappedConsumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 }
 
 // Size returns number of in-memory block jobs that block consumer is processing.
-func (c *WrappedConsumer) Size() uint {
+func (c *ReadyDoneAwareConsumer) Size() uint {
 	return c.consumer.Size()
 }
 
 // Head returns the highest job index available
-func (c *WrappedConsumer) Head() (uint64, error) {
+func (c *ReadyDoneAwareConsumer) Head() (uint64, error) {
 	return c.jobs.Head()
 }
 
-func (c *WrappedConsumer) processingLoop(ctx irrecoverable.SignalerContext) {
+func (c *ReadyDoneAwareConsumer) processingLoop(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
