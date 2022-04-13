@@ -234,7 +234,7 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 			if err != nil {
 				panic(err)
 			}
-			storageMap := m.NewStorage.GetStorageMap(address, domain)
+			storageMap := m.NewStorage.GetStorageMap(address, domain, true)
 			for _, pair := range keyValuePairs {
 				storageMap.SetValue(
 					m.Interpreter,
