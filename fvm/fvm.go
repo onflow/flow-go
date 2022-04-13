@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -143,13 +144,45 @@ func getExecutionWeights(
 		return nil, nil, err
 	}
 
-	computationWeights, ok = utils.CadenceValueToWeights(value)
+	computationWeightsRaw, ok := utils.CadenceValueToWeights(value)
 	if !ok {
 		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
 		return nil, nil, errors.NewCouldNotGetExecutionParameterFromStateError(
 			service.Hex(),
 			blueprints.TransactionFeesExecutionEffortWeightsPathDomain,
 			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
+	}
+
+	computationWeights = make(weighted.ExecutionEffortWeights)
+	for k, v := range computationWeightsRaw {
+		computationWeights[common.ComputationKind(k)] = v
+	}
+
+	value, err = env.VM().Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.TransactionFeesExecutionMemoryWeightsPathDomain,
+			Identifier: blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier,
+		},
+		runtime.Context{Interface: env},
+	)
+	if err != nil {
+		// this might be fatal, return as is
+		return nil, nil, err
+	}
+
+	memoryWeightsRaw, ok := utils.CadenceValueToWeights(value)
+	if !ok {
+		// this is a non-fatal error. It is expected if the weights are not set up on the network yet.
+		return nil, nil, errors.NewCouldNotGetExecutionParameterFromStateError(
+			service.Hex(),
+			blueprints.TransactionFeesExecutionMemoryWeightsPathDomain,
+			blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier)
+	}
+
+	memoryWeights = make(weighted.ExecutionMemoryWeights)
+	for k, v := range memoryWeightsRaw {
+		memoryWeights[common.MemoryKind(k)] = v
 	}
 
 	return computationWeights, memoryWeights, err
