@@ -23,7 +23,7 @@ import (
 //    for that chunk.
 // 4. If Orchestrator receives any chunk data pack response from a corrupted execution node to an honest verification node, it drops the response
 //    if it is for one of the corrupted chunks.
-// 5. Any other incoming messages to the orchestrator are bounced back, i.e., are sent as they are in the original Flow network without any tampering.
+// 5. Any other incoming messages to the orchestrator are passed through, i.e., are sent as they are in the original Flow network without any tampering.
 type Orchestrator struct {
 	sync.Mutex
 	logger zerolog.Logger
@@ -233,21 +233,24 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	if o.state != nil {
 		cdpRep := chunkDataPackReplyEvent.FlowProtocolEvent.(*messages.ChunkDataResponse)
 
+		lg := o.logger.With().
+			Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
+			Hex("sender_id", logging.ID(chunkDataPackReplyEvent.CorruptedId)).
+			Hex("target_id", logging.ID(chunkDataPackReplyEvent.TargetIds[0])).Logger()
+
 		// chunk data pack reply goes over a unicast, hence, we only check first target id.
 		ok := o.corruptedIds.Contains(chunkDataPackReplyEvent.TargetIds[0])
 		if o.state.containsCorruptedChunkId(cdpRep.ChunkDataPack.ChunkID) {
 			if !ok {
 				// this is a chunk data pack response for a CORRUPTED chunk to an HONEST verification node
 				// we WINTERMUTE it!
+				lg.Info().Msg("wintermuted corrupted chunk data response to an honest verification node")
 				return nil
 			} else {
 				// Illegal state! chunk data pack response for a CORRUPTED chunk to a CORRUPTED verification node.
 				// Request must have never been reached to corrupted execution node, and must have been replaced with
 				// an attestation.
-				o.logger.Fatal().
-					Hex("chunk_id", logging.ID(cdpRep.ChunkDataPack.ChunkID)).
-					Hex("sender_id", logging.ID(chunkDataPackReplyEvent.CorruptedId)).
-					Hex("target_id", logging.ID(chunkDataPackReplyEvent.TargetIds[0])).
+				lg.Fatal().
 					Msg("orchestrator received a chunk data response for corrupted chunk to a corrupted verification node")
 			}
 		}
