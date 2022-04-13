@@ -129,8 +129,8 @@ func getBatchItemCountLimit(
 type ExecutionDataRecord struct {
 	BlockID     flow.Identifier
 	BlockHeight uint64
-	RootID      flow.Identifier
-	Completed   bool
+	RootID      flow.Identifier // ID of the Execution Data root
+	Completed   bool            // whether or not the Execution Data is fully downloaded
 }
 type Storage struct {
 	db *badger.DB
