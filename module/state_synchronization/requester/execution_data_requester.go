@@ -192,7 +192,7 @@ func New(
 	e.blockConsumer, err = jobqueue.NewReadyDoneAwareConsumer(
 		log.With().Str("module", "block_consumer").Logger(),
 		processedHeight,
-		status.NewSealedBlockReader(state, blocks),
+		status.NewSealedBlockReader(state, blocks), // when a block is finalized, we read new sealed blocks
 		e.processBlockJob,
 		e.blockNotifier.Channel(),
 		rootHeight,
