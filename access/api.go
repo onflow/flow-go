@@ -61,13 +61,22 @@ type TransactionResult struct {
 
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
 	return &access.TransactionResultResponse{
-		Status:        entities.TransactionStatus(result.Status),
-		StatusCode:    uint32(result.StatusCode),
-		ErrorMessage:  result.ErrorMessage,
-		Events:        convert.EventsToMessages(result.Events),
-		BlockId:       result.BlockID[:],
-		TransactionId: result.TransactionID[:],
-		CollectionId:  result.CollectionID[:],
+		Status:       entities.TransactionStatus(result.Status),
+		StatusCode:   uint32(result.StatusCode),
+		ErrorMessage: result.ErrorMessage,
+		Events:       convert.EventsToMessages(result.Events),
+		BlockId:      result.BlockID[:],
+	}
+}
+
+func TransactionResultsToMessage(results []*TransactionResult) *access.TransactionResultsResponse {
+	messages := make([]*access.TransactionResultResponse, len(results))
+	for i, result := range results {
+		messages[i] = TransactionResultToMessage(result)
+	}
+
+	return &access.TransactionResultsResponse{
+		TransactionResults: messages,
 	}
 }
 

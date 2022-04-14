@@ -537,29 +537,6 @@ func (_m *API) GetTransactionResultsByBlockID(ctx context.Context, blockID flow.
 	return r0, r1
 }
 
-// GetTransactionsByBlockID provides a mock function with given fields: ctx, blockID
-func (_m *API) GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error) {
-	ret := _m.Called(ctx, blockID)
-
-	var r0 []*flow.TransactionBody
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) []*flow.TransactionBody); ok {
-		r0 = rf(ctx, blockID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.TransactionBody)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(ctx, blockID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Ping provides a mock function with given fields: ctx
 func (_m *API) Ping(ctx context.Context) error {
 	ret := _m.Called(ctx)

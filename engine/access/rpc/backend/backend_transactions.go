@@ -194,29 +194,6 @@ func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Iden
 	return tx, nil
 }
 
-func (b *backendTransactions) GetTransactionsByBlockID(
-	ctx context.Context,
-	blockID flow.Identifier,
-) ([]*flow.TransactionBody, error) {
-	var transactions []*flow.TransactionBody
-
-	block, err := b.blocks.ByID(blockID)
-	if err != nil {
-		return nil, convertStorageError(err)
-	}
-
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := b.collections.ByID(guarantee.CollectionID)
-		if err != nil {
-			return nil, convertStorageError(err)
-		}
-
-		transactions = append(transactions, collection.Transactions...)
-	}
-
-	return transactions, nil
-}
-
 func (b *backendTransactions) GetTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -269,12 +246,11 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	return &access.TransactionResult{
-		Status:        txStatus,
-		StatusCode:    uint(statusCode),
-		Events:        events,
-		ErrorMessage:  txError,
-		BlockID:       blockID,
-		TransactionID: txID,
+		Status:       txStatus,
+		StatusCode:   uint(statusCode),
+		Events:       events,
+		ErrorMessage: txError,
+		BlockID:      blockID,
 	}, nil
 }
 
@@ -292,11 +268,12 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	}
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
+		// TODO: update this section to incorporate the new fallback logic
 		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
 		if isInsufficientExecReceipts {
 			return nil, status.Errorf(codes.NotFound, err.Error())
 		}
-		return nil, status.Errorf(codes.Internal, "failed to retrieve results from any execution node: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
 	}
 
 	resp, err := b.getTransactionResultsByBlockIDFromAnyExeNode(ctx, execNodes, req)
@@ -308,39 +285,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	}
 
 	results := make([]*access.TransactionResult, len(resp.TransactionResults))
-	i := 0
-
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := b.collections.LightByID(guarantee.CollectionID)
-		if err != nil {
-			return nil, convertStorageError(err)
-		}
-
-		for _, txID := range collection.Transactions {
-			txResult := resp.TransactionResults[i]
-			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := b.deriveTransactionStatus(nil, true, block)
-			if err != nil {
-				return nil, convertStorageError(err)
-			}
-
-			results = append(results, &access.TransactionResult{
-				Status:        txStatus,
-				StatusCode:    uint(txResult.GetStatusCode()),
-				Events:        convert.MessagesToEvents(txResult.GetEvents()),
-				ErrorMessage:  txResult.GetErrorMessage(),
-				BlockID:       blockID,
-				TransactionID: txID,
-				CollectionID:  guarantee.CollectionID,
-			})
-
-			i++
-		}
-	}
-
-	// system chunk transactions
-	for i < len(resp.TransactionResults) {
-		txResult := resp.TransactionResults[i]
+	for _, txResult := range resp.TransactionResults {
 		// tx body is irrelevant to status if it's in an executed block
 		txStatus, err := b.deriveTransactionStatus(nil, true, block)
 		if err != nil {
@@ -354,8 +299,6 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			ErrorMessage: txResult.GetErrorMessage(),
 			BlockID:      blockID,
 		})
-
-		i++
 	}
 
 	return results, nil
@@ -680,7 +623,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	logAnyError := func() {
 		errToReturn := errs.ErrorOrNil()
 		if errToReturn != nil {
-			b.log.Err(errToReturn).Msg("failed to get transaction results from execution nodes")
+			b.log.Info().Err(errToReturn).Msg("failed to get transaction results from execution nodes")
 		}
 	}
 	defer logAnyError()
