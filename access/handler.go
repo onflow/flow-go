@@ -221,6 +221,11 @@ func (h *Handler) GetTransactionResult(
 	return TransactionResultToMessage(result), nil
 }
 
+func (h *Handler) GetTransactionsByBlockID(ctx context.Context, request *access.GetTransactionsByBlockIDRequest) (*access.TransactionsResponse, error) {
+	//TODO implement me
+	return nil, status.Errorf(codes.Unimplemented, "not implemented")
+}
+
 func (h *Handler) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	req *access.GetTransactionsByBlockIDRequest,
