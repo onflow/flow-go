@@ -499,7 +499,10 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 	var validators []psValidator.MessageValidator
 	if !engine.PublicChannels().Contains(channel) {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
-		validators = append(validators, psValidator.StakedValidator(m.ov.Identity))
+		validators = append(validators,
+			psValidator.StakedValidator(m.ov.Identity),
+			psValidator.AuthorizedSenderValidator(m.log, m.ov.Identity),
+		)
 	}
 
 	s, err := m.libP2PNode.Subscribe(topic, validators...)
