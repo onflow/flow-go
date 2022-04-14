@@ -229,6 +229,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		}).
 		Component("chunk consumer, requester, and fetcher engines", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
+
 			requesterEngine, err = vereq.New(
 				node.Logger,
 				node.State,
@@ -244,6 +245,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 					v.verConf.backoffMinInterval,
 				),
 				v.verConf.requestTargets)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester engine: %w", err)
+			}
 
 			fetcherEngine = fetcher.New(
 				node.Logger,
