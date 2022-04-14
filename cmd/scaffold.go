@@ -965,6 +965,8 @@ func (fnb *FlowNodeBuilder) Module(name string, f BuilderFunc) NodeBuilder {
 	return fnb
 }
 
+// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
+// already exists, it will be overridden.
 func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
 	fnb.modules = append(fnb.modules, namedModuleFunc{
 		fn:   f,
