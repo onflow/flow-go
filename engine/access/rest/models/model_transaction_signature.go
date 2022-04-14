@@ -8,6 +8,7 @@
  */
 package models
 
+// Base64 encoded signature.
 type TransactionSignature struct {
 	Address   string `json:"address"`
 	KeyIndex  string `json:"key_index"`
