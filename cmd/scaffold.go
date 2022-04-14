@@ -44,6 +44,7 @@ import (
 	netcache "github.com/onflow/flow-go/network/cache"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
@@ -142,8 +143,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
-	fnb.flags.StringVar(&fnb.BaseConfig.topologyProtocolName, "topology", defaultConfig.topologyProtocolName, "networking overlay topology")
-	fnb.flags.Float64Var(&fnb.BaseConfig.topologyEdgeProbability, "topology-edge-probability", defaultConfig.topologyEdgeProbability,
+	fnb.flags.StringVar(&fnb.BaseConfig.TopologyProtocolName, "topology", defaultConfig.TopologyProtocolName, "networking overlay topology")
+	fnb.flags.Float64Var(&fnb.BaseConfig.TopologyEdgeProbability, "topology-edge-probability", defaultConfig.TopologyEdgeProbability,
 		"pairwise edge probability between nodes in topology")
 
 	// dynamic node startup flags
@@ -235,7 +236,7 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
+func (fnb *FlowNodeBuilder) EnqueueLibP2pMiddlewareInit() {
 	fnb.Module("middleware", func(nodeConfig *NodeConfig) error {
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.BindAddr != NotSet {
@@ -281,50 +282,57 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		return nil
 	})
+}
 
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-
-		topologyFactory, err := topology.Factory(topology.Name(fnb.topologyProtocolName))
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.topologyProtocolName, err)
-		}
-		top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.topologyEdgeProbability)
-		if err != nil {
-			return nil, fmt.Errorf("could not create topology: %w", err)
-		}
-		topologyCache := topology.NewCache(fnb.Logger, top)
-
-		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-		if fnb.HeroCacheMetricsEnable {
-			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
-		}
-		receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
-			fnb.Logger,
-			heroCacheCollector)
-
-		err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
-		if err != nil {
-			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
-		}
-
-		net, err := p2p.NewNetwork(fnb.Logger,
-			cborcodec.NewCodec(),
-			fnb.Me,
-			func() (network.Middleware, error) { return fnb.Middleware, nil },
-			topologyCache,
-			subscriptionManager,
-			fnb.Metrics.Network,
-			fnb.IdentityProvider,
-			receiveCache,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize network: %w", err)
-		}
-
-		fnb.Network = net
-		return net, nil
+		return fnb.InitFlowNetworkWithConduitFactory(node, conduit.NewDefaultConduitFactory())
 	})
+}
+
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
+	subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
+
+	topologyFactory, err := topology.Factory(topology.Name(fnb.TopologyProtocolName))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.TopologyProtocolName, err)
+	}
+	top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.TopologyEdgeProbability)
+	if err != nil {
+		return nil, fmt.Errorf("could not create topology: %w", err)
+	}
+	topologyCache := topology.NewCache(fnb.Logger, top)
+
+	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+	if fnb.HeroCacheMetricsEnable {
+		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
+	}
+	receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
+		fnb.Logger,
+		heroCacheCollector)
+
+	err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+	if err != nil {
+		return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+	}
+
+	net, err := p2p.NewNetwork(fnb.Logger,
+		cborcodec.NewCodec(),
+		fnb.Me,
+		func() (network.Middleware, error) { return fnb.Middleware, nil },
+		topologyCache,
+		subscriptionManager,
+		fnb.Metrics.Network,
+		fnb.IdentityProvider,
+		receiveCache,
+		p2p.WithConduitFactory(cf),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize network: %w", err)
+	}
+
+	fnb.Network = net
+	return net, nil
 }
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
@@ -968,22 +976,20 @@ func (fnb *FlowNodeBuilder) Module(name string, f BuilderFunc) NodeBuilder {
 // OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
 // already exists, it will be overridden.
 func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
-	fnb.modules = append(fnb.modules, namedModuleFunc{
-		fn:   f,
-		name: name,
-	})
-
-	for i := 0; i < len(fnb.modules)-1; i++ {
+	for i := 0; i < len(fnb.modules); i++ {
 		if fnb.modules[i].name == name {
-			if i == 0 {
-				fnb.modules = fnb.modules[1:]
-			} else {
-				fnb.modules = append(fnb.modules[:i], fnb.modules[i+1:]...)
+			// found module with the name, override it.
+			fnb.modules[i] = namedModuleFunc{
+				fn:   f,
+				name: name,
 			}
+
+			return fnb
 		}
 	}
 
-	return fnb
+	// no module found with the same name, just adding it.
+	return fnb.Module(name, f)
 }
 
 // ShutdownFunc adds a callback function that is called after all components have exited.
@@ -1025,22 +1031,20 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 // OverrideComponent adds given builder function to the components set of the node builder. If a builder function with that name
 // already exists, it will be overridden.
 func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) NodeBuilder {
-	fnb.components = append(fnb.components, namedComponentFunc{
-		fn:   f,
-		name: name,
-	})
-
-	for i := 0; i < len(fnb.components)-1; i++ {
+	for i := 0; i < len(fnb.components); i++ {
 		if fnb.components[i].name == name {
-			if i == 0 {
-				fnb.components = fnb.components[1:]
-			} else {
-				fnb.components = append(fnb.components[:i], fnb.components[i+1:]...)
+			// found component with the name, override it.
+			fnb.components[i] = namedComponentFunc{
+				fn:   f,
+				name: name,
 			}
+
+			return fnb
 		}
 	}
 
-	return fnb
+	// no component found with the same name, hence just adding it.
+	return fnb.Component(name, f)
 }
 
 func (fnb *FlowNodeBuilder) PreInit(f BuilderFunc) NodeBuilder {
@@ -1142,8 +1146,8 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	fnb.EnqueueResolver()
 
+	fnb.EnqueueLibP2pMiddlewareInit()
 	fnb.EnqueueNetworkInit()
-
 	fnb.EnqueuePingService()
 
 	if fnb.MetricsEnabled {

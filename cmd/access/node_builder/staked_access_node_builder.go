@@ -83,7 +83,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 	builder.EnqueueResolver()
 
 	// enqueue the regular network
-	builder.EnqueueNetworkInit()
+	builder.EnqueueLibP2pMiddlewareInit()
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
 	if builder.supportsUnstakedFollower {

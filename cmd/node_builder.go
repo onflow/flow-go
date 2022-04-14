@@ -55,7 +55,7 @@ type NodeBuilder interface {
 	InitIDProviders()
 
 	// EnqueueNetworkInit enqueues the default network component with the given context
-	EnqueueNetworkInit()
+	EnqueueLibP2pMiddlewareInit()
 
 	// EnqueueMetricsServerInit enqueues the metrics component
 	EnqueueMetricsServerInit()
@@ -147,8 +147,8 @@ type BaseConfig struct {
 	db                              *badger.DB
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
-	topologyProtocolName            string
-	topologyEdgeProbability         float64
+	TopologyProtocolName            string
+	TopologyEdgeProbability         float64
 	HeroCacheMetricsEnable          bool
 	SyncCoreConfig                  synchronization.Config
 }
@@ -228,8 +228,8 @@ func DefaultBaseConfig() *BaseConfig {
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-		topologyProtocolName:            string(topology.TopicBased),
-		topologyEdgeProbability:         topology.MaximumEdgeProbability,
+		TopologyProtocolName:            string(topology.TopicBased),
+		TopologyEdgeProbability:         topology.MaximumEdgeProbability,
 		HeroCacheMetricsEnable:          false,
 		SyncCoreConfig:                  synchronization.DefaultConfig(),
 	}
