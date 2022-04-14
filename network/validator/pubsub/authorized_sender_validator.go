@@ -6,10 +6,11 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/rs/zerolog"
 )
 
 func init() {
@@ -24,7 +25,56 @@ var authorizedRolesMap map[uint8]flow.RoleList
 func initializeAuthorizedRolesMap() {
 	authorizedRolesMap = make(map[uint8]flow.RoleList)
 
+	// consensus
 	authorizedRolesMap[cborcodec.CodeBlockProposal] = flow.RoleList{flow.RoleConsensus}
+	authorizedRolesMap[cborcodec.CodeBlockVote] = flow.RoleList{flow.RoleConsensus}
+
+	// protocol state sync
+	authorizedRolesMap[cborcodec.CodeSyncRequest] = flow.Roles()
+	authorizedRolesMap[cborcodec.CodeSyncResponse] = flow.Roles()
+	authorizedRolesMap[cborcodec.CodeRangeRequest] = flow.Roles()
+	authorizedRolesMap[cborcodec.CodeBatchRequest] = flow.Roles()
+	authorizedRolesMap[cborcodec.CodeBlockResponse] = flow.Roles()
+
+	// cluster consensus
+	authorizedRolesMap[cborcodec.CodeClusterBlockProposal] = flow.RoleList{flow.RoleCollection}
+	authorizedRolesMap[cborcodec.CodeClusterBlockVote] = flow.RoleList{flow.RoleCollection}
+	authorizedRolesMap[cborcodec.CodeClusterBlockResponse] = flow.RoleList{flow.RoleCollection}
+
+	// collections, guarantees & transactions
+	authorizedRolesMap[cborcodec.CodeCollectionGuarantee] = flow.RoleList{flow.RoleCollection}
+	authorizedRolesMap[cborcodec.CodeTransactionBody] = flow.RoleList{flow.RoleCollection}
+	authorizedRolesMap[cborcodec.CodeTransaction] = flow.RoleList{flow.RoleCollection}
+
+	// core messages for execution & verification
+	authorizedRolesMap[cborcodec.CodeExecutionReceipt] = flow.RoleList{flow.RoleExecution}
+	authorizedRolesMap[cborcodec.CodeResultApproval] = flow.RoleList{flow.RoleVerification}
+
+	// execution state synchronization
+	authorizedRolesMap[cborcodec.CodeExecutionStateSyncRequest] = flow.RoleList{flow.RoleVerification}
+	authorizedRolesMap[cborcodec.CodeExecutionStateDelta] = flow.RoleList{flow.RoleVerification}
+
+	// data exchange for execution of blocks
+	authorizedRolesMap[cborcodec.CodeChunkDataRequest] = flow.RoleList{flow.RoleVerification}
+	authorizedRolesMap[cborcodec.CodeChunkDataResponse] = flow.RoleList{flow.RoleExecution}
+
+	// result approvals
+	authorizedRolesMap[cborcodec.CodeApprovalRequest] = flow.RoleList{flow.RoleConsensus}
+	authorizedRolesMap[cborcodec.CodeApprovalResponse] = flow.RoleList{flow.RoleVerification}
+
+	// generic entity exchange engines
+	authorizedRolesMap[cborcodec.CodeEntityRequest] = flow.RoleList{flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection} // only staked access nodes
+	authorizedRolesMap[cborcodec.CodeEntityResponse] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
+
+	// testing
+	authorizedRolesMap[cborcodec.CodeEcho] = flow.Roles()
+
+	// dkg
+	authorizedRolesMap[cborcodec.CodeDKGMessage] = flow.RoleList{flow.RoleConsensus} // sn nodes for next epoch
+
+
+
+
 }
 
 // AuthorizedSenderValidator using the getIdentity func will check if the role of the sender
