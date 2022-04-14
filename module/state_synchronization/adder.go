@@ -126,11 +126,11 @@ func (s *executionDataAdderImpl) AddChunkExecutionData(
 	s.metrics.ChunkExecutionDataAddStarted()
 
 	success := false
-	var blobTreeSize int
+	var blobTreeSize uint64
 	start := time.Now()
 
 	defer func() {
-		s.metrics.ChunkExecutionDataAddFinished(time.Since(start), success, blobTreeSize)
+		s.metrics.ChunkExecutionDataAddFinished(time.Since(start), success, int(blobTreeSize))
 	}()
 
 	cids, totalBytes, err := s.addBlobs(ctx, ced, logger)
@@ -166,7 +166,7 @@ func (s *executionDataAdderImpl) AddChunkExecutionData(
 //
 // blobs are added in a batched streaming fashion, using a separate goroutine to serialize the object and send the
 // blobs of serialized data over a blob channel to the main routine, which adds them in batches to the blobservice.
-func (s *executionDataAdderImpl) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, int, error) {
+func (s *executionDataAdderImpl) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, uint64, error) {
 	bcw, br := blobs.IncomingBlobChannel(s.maxBlobSize)
 
 	done := make(chan struct{})
@@ -204,7 +204,7 @@ func (s *executionDataAdderImpl) addBlobs(ctx context.Context, v interface{}, lo
 		return nil, 0, storeErr
 	}
 
-	return cids, int(bcw.TotalBytesWritten()), serializeErr
+	return cids, bcw.TotalBytesWritten(), serializeErr
 }
 
 // storeBlobs receives blobs from the given BlobReceiver, and stores them to the blobservice
@@ -267,6 +267,10 @@ func (s *executionDataAdderImpl) receiveBatch(ctx context.Context, br *blobs.Blo
 			// canceled, in which case we should return the context error
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
+			}
+
+			if !errors.Is(err, blobs.ErrClosedBlobChannel) {
+				return nil, err
 			}
 
 			// the blob channel is closed, signal to the caller that no more
