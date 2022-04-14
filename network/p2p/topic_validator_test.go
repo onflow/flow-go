@@ -87,19 +87,11 @@ func TestStakedValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// node1 gets the message
-	msg, err := sub1.Next(timedCtx)
-	require.NoError(t, err)
-	require.Equal(t, msg.Data, data1)
-
+	checkReceive(timedCtx, t, data1, sub1, nil, true)
 	// node2 also gets the message (as part of the libp2p loopback of published topic messages)
-	msg, err = sub2.Next(timedCtx)
-	require.NoError(t, err)
-	require.Equal(t, msg.Data, data1)
-
+	checkReceive(timedCtx, t, data1, sub2, nil, true)
 	// the unstaked node also gets the message since it subscribed to the channel without the topic validator
-	msg, err = unstakedSub.Next(timedCtx)
-	require.NoError(t, err)
-	require.Equal(t, msg.Data, data1)
+	checkReceive(timedCtx, t, data1, unstakedSub, nil, true)
 
 	timedCtx, cancel2s := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel2s()
@@ -114,31 +106,20 @@ func TestStakedValidator(t *testing.T) {
 	err = unstakedNode.Publish(timedCtx, badTopic, data2)
 	require.NoError(t, err)
 
-	// it receives its own message
-	msg, err = unstakedSub.Next(timedCtx)
-	require.NoError(t, err)
-	require.Equal(t, msg.Data, data2)
+	// unstaked node receives its own message
+	checkReceive(timedCtx, t, data2, unstakedSub, nil, true)
 
 	// node 1 does NOT receive the message due to the topic validator
 	var wg sync.WaitGroup
-	wg.Add(1)
+
 	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	go func() {
-		msg, err = sub1.Next(timedCtx)
-		require.Error(t, err)
-		wg.Done()
-	}()
+	checkReceive(timedCtx, t, nil, sub1, &wg, false)
 
 	// node 2 also does not receive the message via gossip from the node1 (event after the 1 second hearbeat)
-	wg.Add(1)
 	timedCtx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	go func() {
-		msg, err = sub2.Next(timedCtx)
-		require.Error(t, err)
-		wg.Done()
-	}()
+	checkReceive(timedCtx, t, nil, sub2, &wg, false)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 }
@@ -296,12 +277,14 @@ func checkReceive(ctx context.Context, t *testing.T, expectedData []byte, sub *p
 	}
 }
 
-func getMsgFixtureBz(t *testing.T, msg interface{}) []byte {
-	bz, err := cborcodec.NewCodec().Encode(msg)
-	m2 := message.Message{
+func getMsgFixtureBz(t *testing.T, v interface{}) []byte {
+	bz, err := cborcodec.NewCodec().Encode(v)
+	require.NoError(t, err)
+
+	msg := message.Message{
 		Payload: bz,
 	}
-	data, err := m2.Marshal()
+	data, err := msg.Marshal()
 	require.NoError(t, err)
 
 	return data
