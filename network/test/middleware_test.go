@@ -10,11 +10,12 @@ import (
 
 	"github.com/ipfs/go-log"
 	swarm "github.com/libp2p/go-libp2p-swarm"
-	channels "github.com/onflow/flow-go/engine"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
+
+	channels "github.com/onflow/flow-go/engine"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"

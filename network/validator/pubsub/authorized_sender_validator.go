@@ -138,7 +138,7 @@ func isAuthorizedNodeRole(role flow.Role, msgType uint8) error {
 }
 
 // isActiveNode checks that the node has a weight > 0 and is not ejected
-func isActiveNode(nodeID flow.Identifier, weight uint64,  ejected bool) error {
+func isActiveNode(nodeID flow.Identifier, weight uint64, ejected bool) error {
 	if weight <= 0 {
 		return fmt.Errorf("node %s has an invalid weight of %d is not an active node", nodeID, weight)
 	}
