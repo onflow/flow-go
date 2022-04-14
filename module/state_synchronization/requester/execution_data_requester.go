@@ -197,6 +197,7 @@ func New(
 		e.finalizationNotifier.Channel(),
 		rootHeight,
 		fetchWorkers,
+		e.config.MaxSearchAhead,
 		// notifies notificationConsumer when new ExecutionData blobs are available
 		func(module.JobID) { executionDataNotifier.Notify() },
 	)
@@ -207,8 +208,6 @@ func New(
 	e.status = status.New(
 		log.With().Str("module", "requester_status").Logger(),
 		cfg.MaxCachedEntries,
-		cfg.MaxSearchAhead,
-		e.blockConsumer,
 		processedNotifications,
 	)
 
@@ -220,6 +219,7 @@ func New(
 		executionDataNotifier.Channel(),
 		rootHeight,
 		1, // always use a single worker
+		0, // search ahead limit controlled by worker count
 		// kick notifier to make sure we scan until the last available notification
 		func(module.JobID) { executionDataNotifier.Notify() },
 	)

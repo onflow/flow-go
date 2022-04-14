@@ -26,13 +26,6 @@ type Status struct {
 	// Maximum number of blocks within the notification heap that can have ExecutionData
 	maxCachedEntries uint64
 
-	// Maximum number of blocks heights to process beyond the lastNotified before pausing the requester.
-	// This puts a limit on the resources used by the requestor when it gets stuck on fetching a height.
-	maxSearchAhead uint64
-
-	// Resumable that should be paused/resumed based on maxSearchAhead
-	ingester module.Resumable
-
 	// ConsumerProgress datastore where the requester's state is persisted
 	progress storage.ConsumerProgress
 
@@ -44,15 +37,13 @@ type Status struct {
 var _ module.Jobs = (*Status)(nil)
 
 // New returns a new Status struct
-func New(log zerolog.Logger, maxCachedEntries, maxSearchAhead uint64, ingester module.Resumable, progress storage.ConsumerProgress) *Status {
+func New(log zerolog.Logger, maxCachedEntries uint64, progress storage.ConsumerProgress) *Status {
 	return &Status{
 		log:      log,
 		heap:     &NotificationHeap{},
-		ingester: ingester,
 		progress: progress,
 
 		maxCachedEntries: maxCachedEntries,
-		maxSearchAhead:   maxSearchAhead,
 	}
 }
 
@@ -109,14 +100,6 @@ func (s *Status) Fetched(entry *BlockEntry) {
 	// Only track the highest height
 	if entry.Height > s.lastReceived {
 		s.lastReceived = entry.Height
-	}
-
-	// Pause the download workers if the lastNotified is more than maxSearchAhead blocks
-	// behind. Since workers will not return until they have successfully downloaded the
-	// ExecutionData, this will effectively pause new downloads, and allow existing ones
-	// to complete (including the next to notify).
-	if s.shouldPause() {
-		s.ingester.Pause()
 	}
 }
 
@@ -178,21 +161,11 @@ func (s *Status) nextNotification() (*BlockEntry, bool) {
 	// Now we have the next height to notify
 	s.lastNotified = entry.Height
 
-	// Resume processing if notifications have caught up
-	// Resume is a noop if the block consumer is already running
-	if !s.shouldPause() {
-		s.ingester.Resume()
-	}
-
 	return entry, true
 }
 
 func (s *Status) nextHeight() uint64 {
 	return s.lastNotified + 1
-}
-
-func (s *Status) shouldPause() bool {
-	return s.lastReceived >= s.lastNotified+s.maxSearchAhead
 }
 
 // OutstandingNotifications returns the number of blocks that have been Fetched but not notified

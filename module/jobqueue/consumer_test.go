@@ -19,14 +19,28 @@ import (
 func TestProcessableJobs(t *testing.T) {
 	t.Parallel()
 
+	processedIndex := uint64(2)
 	maxProcessing := uint64(3)
+	maxSearchAhead := uint64(5)
+
+	populate := func(start, end uint64, incomplete []uint64) map[uint64]*jobStatus {
+		processings := map[uint64]*jobStatus{}
+		for i := start; i <= end; i++ {
+			processings[i] = &jobStatus{jobID: JobIDAtIndex(i), done: true}
+		}
+		for _, i := range incomplete {
+			processings[i].done = false
+		}
+
+		return processings
+	}
 
 	t.Run("no job, nothing to process", func(t *testing.T) {
 		jobs := NewMockJobs() // no job in the queue
 		processings := map[uint64]*jobStatus{}
 		processedIndex := uint64(0)
 
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, 0, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), processedTo)
@@ -36,19 +50,12 @@ func TestProcessableJobs(t *testing.T) {
 	t.Run("max processing was not reached", func(t *testing.T) {
 		jobs := NewMockJobs()
 		require.NoError(t, jobs.PushN(20)) // enough jobs in the queue
-		processings := map[uint64]*jobStatus{}
-		for i := uint64(3); i <= 11; i++ {
-			// job 3 are 5 are not done, 2 processing in total
-			// 4, 6, 7, 8, 9, 10, 11 are finished, 7 finished in total
-			done := true
-			if i == 3 || i == 5 {
-				done = false
-			}
-			processings[i] = &jobStatus{jobID: JobIDAtIndex(i), done: done}
-		}
 
-		processedIndex := uint64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+		// job 3 are 5 are not done, 2 processing in total
+		// 4, 6, 7, 8, 9, 10, 11 are finished, 7 finished in total
+		processings := populate(3, 11, []uint64{3, 5})
+
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, 0, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), processedTo)
@@ -61,18 +68,12 @@ func TestProcessableJobs(t *testing.T) {
 	t.Run("reached max processing", func(t *testing.T) {
 		jobs := NewMockJobs()
 		require.NoError(t, jobs.PushN(20)) // enough jobs in the queue
-		processings := map[uint64]*jobStatus{}
-		for i := uint64(3); i <= 12; i++ {
-			// job 3, 5, 6 are not done, which have reached max processing(3)
-			// 4, 7, 8, 9, 10, 11, 12 are finished, 7 finished in total
-			done := true
-			if i == 3 || i == 5 || i == 6 {
-				done = false
-			}
-			processings[i] = &jobStatus{jobID: JobIDAtIndex(i), done: done}
-		}
-		processedIndex := uint64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+
+		// job 3, 5, 6 are not done, which have reached max processing(3)
+		// 4, 7, 8, 9, 10, 11, 12 are finished, 7 finished in total
+		processings := populate(3, 12, []uint64{3, 5, 6})
+
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, 0, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), processedTo)
@@ -80,22 +81,53 @@ func TestProcessableJobs(t *testing.T) {
 		assertJobs(t, []uint64{}, jobsToRun)
 	})
 
+	t.Run("processing pauses and resumes", func(t *testing.T) {
+		jobs := NewMockJobs()
+		require.NoError(t, jobs.PushN(20)) // enough jobs in the queue
+
+		maxProcessing := uint64(4)
+
+		// job 3, 5 are not done
+		// 4, 6, 7 are finished, 3 finished in total
+		processings := populate(3, processedIndex+maxSearchAhead, []uint64{3, 5})
+
+		// it will not process any job, because the consumer is paused
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, maxSearchAhead, processedIndex)
+
+		require.NoError(t, err)
+		require.Equal(t, processedIndex, processedTo)
+		assertJobs(t, []uint64{}, jobsToRun)
+
+		// lowest job is processed, which should cause consumer to resume
+		processings[uint64(3)].done = true
+
+		// Job 3 is done, so it should return 2 more jobs 8-9 and pause again with one available worker
+		jobsToRun, processedTo, err = processableJobs(jobs, processings, maxProcessing, maxSearchAhead, processedIndex)
+
+		require.NoError(t, err)
+		require.Equal(t, uint64(4), processedTo)
+		assertJobs(t, []uint64{8, 9}, jobsToRun)
+
+		// lowest job is processed, which should cause consumer to resume
+		processings[uint64(5)].done = true
+
+		// job 5 is processed, it should return jobs 8-11 (one job for each worker)
+		jobsToRun, processedTo, err = processableJobs(jobs, processings, maxProcessing, maxSearchAhead, processedIndex)
+
+		require.NoError(t, err)
+		require.Equal(t, uint64(7), processedTo)
+		assertJobs(t, []uint64{8, 9, 10, 11}, jobsToRun)
+	})
+
 	t.Run("no more job", func(t *testing.T) {
 		jobs := NewMockJobs()
 		require.NoError(t, jobs.PushN(11)) // 11 jobs, no more job to process
-		processings := map[uint64]*jobStatus{}
-		for i := uint64(3); i <= 11; i++ {
-			// job 3, 11 are not done, which have not reached max processing (3)
-			// 4, 5, 6, 7, 8, 9, 10 are finished, 7 finished in total
-			done := true
-			if i == 3 || i == 11 {
-				done = false
-			}
-			processings[i] = &jobStatus{jobID: JobIDAtIndex(i), done: done}
-		}
 
-		processedIndex := uint64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+		// job 3, 11 are not done, which have not reached max processing (3)
+		// 4, 5, 6, 7, 8, 9, 10 are finished, 7 finished in total
+		processings := populate(3, 11, []uint64{3, 11})
+
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, 0, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), processedTo)
@@ -105,19 +137,12 @@ func TestProcessableJobs(t *testing.T) {
 	t.Run("next jobs were done", func(t *testing.T) {
 		jobs := NewMockJobs()
 		require.NoError(t, jobs.PushN(20)) // enough jobs in the queue
-		processings := map[uint64]*jobStatus{}
-		for i := uint64(3); i <= 6; i++ {
-			// job 3, 5 are done
-			// job 4, 6 are not done, which have not reached max processing
-			done := true
-			if i == 4 || i == 6 {
-				done = false
-			}
-			processings[i] = &jobStatus{jobID: JobIDAtIndex(i), done: done}
-		}
 
-		processedIndex := uint64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+		// job 3, 5 are done
+		// job 4, 6 are not done, which have not reached max processing
+		processings := populate(3, 6, []uint64{4, 6})
+
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, 0, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), processedTo)
@@ -137,7 +162,7 @@ func TestProcessedIndexDeletion(t *testing.T) {
 			progress := badger.NewConsumerProgress(db, "consumer")
 			worker := newMockWorker()
 			maxProcessing := uint64(3)
-			c := NewConsumer(log, jobs, progress, worker, maxProcessing)
+			c := NewConsumer(log, jobs, progress, worker, maxProcessing, 0)
 			worker.WithConsumer(c)
 
 			f(c, jobs)

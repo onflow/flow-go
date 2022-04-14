@@ -13,7 +13,6 @@ import (
 
 type ReadyDoneAwareConsumer struct {
 	component.Component
-	module.Resumable
 
 	cm           *component.ComponentManager
 	consumer     module.JobConsumer
@@ -33,6 +32,7 @@ func NewReadyDoneAwareConsumer(
 	workSignal <-chan struct{},
 	defaultIndex uint64,
 	maxProcessing uint64,
+	maxSearchAhead uint64,
 	notifier NotifyDone,
 ) (*ReadyDoneAwareConsumer, error) {
 
@@ -49,7 +49,7 @@ func NewReadyDoneAwareConsumer(
 		func(id module.JobID) { c.NotifyJobIsDone(id) },
 		maxProcessing,
 	)
-	c.consumer = NewConsumer(c.log, c.jobs, progress, worker, maxProcessing)
+	c.consumer = NewConsumer(c.log, c.jobs, progress, worker, maxProcessing, maxSearchAhead)
 
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -81,7 +81,6 @@ func NewReadyDoneAwareConsumer(
 	cm := builder.Build()
 	c.cm = cm
 	c.Component = cm
-	c.Resumable = c.consumer
 
 	return c, nil
 }

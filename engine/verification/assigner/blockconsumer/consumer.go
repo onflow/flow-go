@@ -59,7 +59,7 @@ func NewBlockConsumer(log zerolog.Logger,
 	// the block reader is where the consumer reads new finalized blocks from (i.e., jobs).
 	jobs := NewFinalizedBlockReader(state, blocks)
 
-	consumer := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing)
+	consumer := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing, 0)
 	defaultIndex, err := defaultProcessedIndex(state)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read default processed index: %w", err)

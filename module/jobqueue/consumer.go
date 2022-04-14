@@ -29,7 +29,8 @@ type Consumer struct {
 	worker Worker // to process job and notify consumer when finish processing a job
 
 	// Config
-	maxProcessing uint64 // max number of jobs to be processed concurrently
+	maxProcessing  uint64 // max number of jobs to be processed concurrently
+	maxSearchAhead uint64 // max number of jobs beyond processedIndex to process. 0 means no limit
 
 	// State Variables
 	running bool // a signal to control whether to start processing more jobs. Useful for waiting
@@ -50,6 +51,7 @@ func NewConsumer(
 	progress storage.ConsumerProgress,
 	worker Worker,
 	maxProcessing uint64,
+	maxSearchAhead uint64,
 ) *Consumer {
 	return &Consumer{
 		log: log.With().Str("sub_module", "job_queue").Logger(),
@@ -60,7 +62,8 @@ func NewConsumer(
 		worker:   worker,
 
 		// update config
-		maxProcessing: maxProcessing,
+		maxProcessing:  maxProcessing,
+		maxSearchAhead: maxSearchAhead,
 
 		// init state variables
 		running:          false,
@@ -126,29 +129,6 @@ func (c *Consumer) Stop() {
 	c.log.Info().Msg("stopping consumer")
 	c.runningJobs.Wait()
 	c.log.Info().Msg("consumer stopped")
-}
-
-// Pause gracefully stops the consumer from reading new jobs from the job queue. It does not stop
-// the existing worker finishing their jobs.
-// It does NOT block.
-func (c *Consumer) Pause() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.running = false
-
-	c.log.Info().Msg("pausing consumer")
-}
-
-// Resume reenables the consumer and kicks off the next job if any workers are available.
-func (c *Consumer) Resume() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.running = true
-
-	c.log.Info().Msg("resuming consumer")
-	c.checkProcessable()
 }
 
 // Size returns number of in-memory jobs that consumer is processing.
@@ -270,6 +250,7 @@ func (c *Consumer) processableJobs() ([]*jobAtIndex, uint64, error) {
 		c.jobs,
 		c.processings,
 		c.maxProcessing,
+		c.maxSearchAhead,
 		c.processedIndex,
 	)
 
@@ -289,7 +270,7 @@ func (c *Consumer) processableJobs() ([]*jobAtIndex, uint64, error) {
 // processableJobs check the worker's capacity and if sufficient, read
 // jobs from the storage, return the processable jobs, and the processed
 // index
-func processableJobs(jobs module.Jobs, processings map[uint64]*jobStatus, maxProcessing uint64, processedIndex uint64) ([]*jobAtIndex, uint64,
+func processableJobs(jobs module.Jobs, processings map[uint64]*jobStatus, maxProcessing uint64, maxSearchAhead uint64, processedIndex uint64) ([]*jobAtIndex, uint64,
 	error) {
 	processables := make([]*jobAtIndex, 0)
 
@@ -297,8 +278,18 @@ func processableJobs(jobs module.Jobs, processings map[uint64]*jobStatus, maxPro
 	// in order to decide whether to process a new job
 	processing := uint64(0)
 
+	// determine if the consumer should pause processing new jobs because it's too far ahead of
+	// the lowest in progress index
+	shouldPause := func(index uint64) bool {
+		if maxSearchAhead == 0 {
+			return false
+		}
+
+		return index-processedIndex > maxSearchAhead
+	}
+
 	// if still have processing capacity, find the next processable job
-	for i := processedIndex + 1; processing < maxProcessing; i++ {
+	for i := processedIndex + 1; processing < maxProcessing && !shouldPause(i); i++ {
 		status, ok := processings[i]
 
 		// if no worker is processing the next job, try to read it and process

@@ -17,7 +17,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
@@ -31,11 +30,9 @@ type StatusSuite struct {
 
 	rootHeight       uint64
 	maxCachedEntries uint64
-	maxSearchAhead   uint64
 
 	ds       datastore.Batching
 	status   *status.Status
-	consumer *modulemock.Resumable
 	progress *storagemock.ConsumerProgress
 
 	ctx    context.Context
@@ -50,15 +47,13 @@ func TestStatusSuite(t *testing.T) {
 func (suite *StatusSuite) SetupTest() {
 	suite.rootHeight = uint64(100)
 	suite.maxCachedEntries = uint64(10)
-	suite.maxSearchAhead = uint64(20)
-	suite.consumer = new(modulemock.Resumable)
 
 	suite.progress = new(storagemock.ConsumerProgress)
 	suite.progress.On("ProcessedIndex").Return(suite.rootHeight, nil)
 	suite.progress.On("Halted").Return(nil, nil)
 
 	suite.ds = dssync.MutexWrap(datastore.NewMapDatastore())
-	suite.status = status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, suite.progress)
+	suite.status = status.New(zerolog.Nop(), suite.maxCachedEntries, suite.progress)
 
 	suite.ctx, suite.cancel = context.WithTimeout(context.Background(), 30*time.Second)
 
@@ -73,7 +68,7 @@ func (suite *StatusSuite) TearDownTest() {
 func (suite *StatusSuite) reset(flushDB bool) {
 	if flushDB {
 		suite.ds = dssync.MutexWrap(datastore.NewMapDatastore())
-		suite.status = status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, suite.progress)
+		suite.status = status.New(zerolog.Nop(), suite.maxCachedEntries, suite.progress)
 	}
 
 	err := suite.status.Load()
@@ -89,7 +84,7 @@ func (suite *StatusSuite) TestLoad() {
 		assert.NoError(suite.T(), err)
 
 		suite.Run("Load from an empty state", func() {
-			s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+			s := status.New(zerolog.Nop(), suite.maxCachedEntries, progress)
 			err = s.Load()
 			assert.NoError(suite.T(), err)
 
@@ -99,7 +94,7 @@ func (suite *StatusSuite) TestLoad() {
 
 		suite.Run("Load from a non-empty state", func() {
 			// reuses progress and db
-			s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+			s := status.New(zerolog.Nop(), suite.maxCachedEntries, progress)
 			err = s.Load()
 			assert.NoError(suite.T(), err)
 
@@ -120,7 +115,7 @@ func (suite *StatusSuite) TestLoad() {
 			err = progress.SetHalted(haltErr)
 			assert.NoError(suite.T(), err)
 
-			s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+			s := status.New(zerolog.Nop(), suite.maxCachedEntries, progress)
 			err = s.Load()
 			assert.NoError(suite.T(), err)
 
@@ -135,7 +130,7 @@ func (suite *StatusSuite) TestLoad() {
 		progress := new(storagemock.ConsumerProgress)
 		progress.On("ProcessedIndex").Return(uint64(0), expectedErr).Once()
 
-		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, progress)
 		err := s.Load()
 		assert.ErrorIs(suite.T(), err, expectedErr)
 	})
@@ -146,7 +141,7 @@ func (suite *StatusSuite) TestLoad() {
 		progress.On("ProcessedIndex").Return(suite.rootHeight, nil).Once()
 		progress.On("Halted").Return(nil, expectedErr).Once()
 
-		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, progress)
 		err := s.Load()
 		assert.ErrorIs(suite.T(), err, expectedErr)
 	})
@@ -157,7 +152,7 @@ func (suite *StatusSuite) TestLoad() {
 		progress.On("Halted").Return(nil, storage.ErrNotFound).Once()
 		progress.On("InitHalted").Return(nil).Once()
 
-		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, progress)
 		err := s.Load()
 		assert.NoError(suite.T(), err)
 	})
@@ -169,7 +164,7 @@ func (suite *StatusSuite) TestLoad() {
 		progress.On("Halted").Return(nil, storage.ErrNotFound).Once()
 		progress.On("InitHalted").Return(expectedErr).Once()
 
-		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, progress)
 		err := s.Load()
 		assert.ErrorIs(suite.T(), err, expectedErr)
 	})
@@ -178,7 +173,7 @@ func (suite *StatusSuite) TestLoad() {
 // TestFetched tests that the status is updated correctly when a new entry is fetched
 func (suite *StatusSuite) TestFetched() {
 	suite.Run("fetched adds all entries when in order", func() {
-		testLength := suite.maxSearchAhead - 1
+		testLength := uint64(100)
 		for i := uint64(1); i <= testLength; i++ {
 			entry := synctest.BlockEntryFixture(suite.rootHeight + i)
 			suite.status.Fetched(entry)
@@ -191,7 +186,7 @@ func (suite *StatusSuite) TestFetched() {
 		suite.reset(true)
 
 		// Fetch in random order by iterating a map of heights
-		testLength := suite.maxSearchAhead - 1
+		testLength := uint64(100)
 		heights := make(map[uint64]struct{}, testLength)
 		for i := uint64(1); i <= testLength; i++ {
 			heights[suite.rootHeight+i] = struct{}{}
@@ -212,22 +207,6 @@ func (suite *StatusSuite) TestFetched() {
 		}
 	})
 
-	suite.Run("fetched pauses when exceeding search ahead", func() {
-		suite.reset(true)
-
-		testLength := suite.maxSearchAhead + 5
-
-		// should pause when # of entries >= maxSearchAhead
-		suite.consumer.On("Pause").Times(int(testLength - suite.maxSearchAhead + 1))
-
-		for i := uint64(1); i <= testLength; i++ {
-			entry := synctest.BlockEntryFixture(suite.rootHeight + i)
-			suite.status.Fetched(entry)
-
-			assert.Equal(suite.T(), int(i), suite.status.OutstandingNotifications())
-		}
-	})
-
 	suite.Run("fetch ignored when height already notified", func() {
 		suite.reset(true)
 
@@ -240,8 +219,6 @@ func (suite *StatusSuite) TestFetched() {
 
 // TestCache tests that ExecutionData objects are cached correctly
 func (suite *StatusSuite) TestCache() {
-	suite.consumer.On("Pause")  // ignore for this test
-	suite.consumer.On("Resume") // ignore for this test
 
 	testLength := suite.maxCachedEntries * 2
 	heights := make([]uint64, testLength)
@@ -318,9 +295,6 @@ func (suite *StatusSuite) TestAtIndex() {
 	suite.Run("returns entry when next height is ready", func() {
 		suite.reset(true)
 
-		// called every time a notification is returned
-		suite.consumer.On("Resume").Times(2)
-
 		suite.status.Fetched(entry1)
 		suite.status.Fetched(entry2)
 		suite.status.Fetched(entry4) // leave a gap so the heap's not empty
@@ -372,9 +346,6 @@ func (suite *StatusSuite) TestAtIndex() {
 		assert.Equal(suite.T(), expected, heights)
 	}
 
-	suite.consumer.On("Pause")  // ignore for this test
-	suite.consumer.On("Resume") // ignore for this test
-
 	suite.Run("drops duplicate entries fetched in order", func() {
 		suite.reset(true)
 
@@ -399,8 +370,6 @@ func (suite *StatusSuite) TestAtIndex() {
 }
 
 func (suite *StatusSuite) TestHead() {
-	suite.consumer.On("Pause")  // ignore for this test
-	suite.consumer.On("Resume") // ignore for this test
 
 	check := func(expected uint64) {
 		height, err := suite.status.Head()
@@ -450,7 +419,7 @@ func (suite *StatusSuite) TestHalted() {
 		err := progress.InitProcessedIndex(suite.rootHeight)
 		assert.NoError(suite.T(), err)
 
-		s := status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+		s := status.New(zerolog.Nop(), suite.maxCachedEntries, progress)
 		err = s.Load()
 		assert.NoError(suite.T(), err)
 
@@ -473,7 +442,7 @@ func (suite *StatusSuite) TestHalted() {
 		})
 
 		suite.Run("halted persists across loads", func() {
-			s = status.New(zerolog.Nop(), suite.maxCachedEntries, suite.maxSearchAhead, suite.consumer, progress)
+			s = status.New(zerolog.Nop(), suite.maxCachedEntries, progress)
 			err = s.Load()
 			assert.NoError(suite.T(), err)
 
@@ -484,81 +453,7 @@ func (suite *StatusSuite) TestHalted() {
 	})
 }
 
-func (suite *StatusSuite) TestPauseResume() {
-	var s *status.Status
-	maxSearchAhead := uint64(3)
-	start := suite.rootHeight + 1
-
-	setup := func(consumer *modulemock.Resumable) {
-		s = status.New(zerolog.Nop(), suite.maxCachedEntries, maxSearchAhead, consumer, suite.progress)
-		err := s.Load()
-		assert.NoError(suite.T(), err)
-	}
-
-	removeJob := func(height uint64) {
-		job, err := s.AtIndex(height)
-		assert.NoError(suite.T(), err)
-		assert.NotNil(suite.T(), job)
-	}
-
-	suite.Run("status is not paused when under search ahead limit", func() {
-		consumer := new(modulemock.Resumable)
-		// Pause never called
-		consumer.On("Resume").Times(1)
-
-		setup(consumer)
-
-		s.Fetched(synctest.BlockEntryFixture(start))
-		s.Fetched(synctest.BlockEntryFixture(start + 1))
-
-		// Removes job, so limit is never reached
-		removeJob(start) // resumed
-
-		s.Fetched(synctest.BlockEntryFixture(start + 2))
-	})
-
-	suite.Run("status is paused when over search ahead limit", func() {
-		consumer := new(modulemock.Resumable)
-		consumer.On("Pause").Times(3)
-		consumer.On("Resume").Times(0)
-
-		setup(consumer)
-
-		s.Fetched(synctest.BlockEntryFixture(start))
-		s.Fetched(synctest.BlockEntryFixture(start + 1))
-		s.Fetched(synctest.BlockEntryFixture(start + 2)) // paused
-		s.Fetched(synctest.BlockEntryFixture(start + 3)) // paused
-
-		// Removes 1 job, but not enough to get under the limit
-		removeJob(start)
-
-		s.Fetched(synctest.BlockEntryFixture(start + 4)) // paused
-	})
-
-	suite.Run("status is resumed when notifications catch up", func() {
-		consumer := new(modulemock.Resumable)
-		consumer.On("Pause").Times(3)
-		consumer.On("Resume").Times(2)
-
-		setup(consumer)
-
-		s.Fetched(synctest.BlockEntryFixture(start))
-		s.Fetched(synctest.BlockEntryFixture(start + 1))
-		s.Fetched(synctest.BlockEntryFixture(start + 2)) // paused
-		s.Fetched(synctest.BlockEntryFixture(start + 3)) // paused
-
-		// Remove 2 jobs to get under the search ahead limit
-		removeJob(start)
-		removeJob(start + 1) // resumed
-
-		s.Fetched(synctest.BlockEntryFixture(start + 4)) // paused
-
-		removeJob(start + 2) // resumed
-	})
-}
-
 func (suite *StatusSuite) TestNextNotificationHeight() {
-	suite.consumer.On("Resume") // ignore for this test
 
 	suite.Run("next height returns correct height for startblock", func() {
 		assert.Equal(suite.T(), suite.rootHeight+1, suite.status.NextNotificationHeight())

@@ -31,16 +31,6 @@ func (_m *JobConsumer) NotifyJobIsDone(_a0 module.JobID) uint64 {
 	return r0
 }
 
-// Pause provides a mock function with given fields:
-func (_m *JobConsumer) Pause() {
-	_m.Called()
-}
-
-// Resume provides a mock function with given fields:
-func (_m *JobConsumer) Resume() {
-	_m.Called()
-}
-
 // Size provides a mock function with given fields:
 func (_m *JobConsumer) Size() uint {
 	ret := _m.Called()
