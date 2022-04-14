@@ -2,6 +2,7 @@ package validator
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -27,7 +28,11 @@ func initializeAuthorizedRolesMap() {
 }
 
 // AuthorizedSenderValidator using the getIdentity func will check if the role of the sender
-// is part of the authorized roles list for the type of message being sent.
+// is part of the authorized roles list for the type of message being sent. A node is considered
+// to be authorized to send a message if all of the following are true.
+// 1. The message type is a known message type (initialized in the authorizedRolesMap).
+// 2. The authorized roles list for the message type contains the senders role.
+// 3. The node has a weight > 0 and is not ejected
 func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
@@ -41,28 +46,54 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 		}
 
 		msgType := msg.Payload[0]
-		roleList, ok := authorizedRolesMap[msgType]
-		if !ok {
-			// unknown message type
+
+		if err := isAuthorizedNodeRole(identity.Role, msgType); err != nil {
 			log.Warn().
+				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
 				Uint8("message_type", msgType).
-				Msg("unknown message type does not match any code from the cbor codec")
+				Msg("rejecting message")
 
 			return pubsub.ValidationReject
 		}
 
-		if !roleList.Contains(identity.Role) {
+		if err := isActiveNode(identity); err != nil {
 			log.Warn().
+				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
 				Uint8("message_type", msgType).
-				Msg("sender is not authorized to send this message type")
-
-			return pubsub.ValidationReject
+				Msg("rejecting message")
 		}
 
 		return pubsub.ValidationAccept
 	}
+}
+
+// isAuthorizedNodeRole checks if a role is authorized to send message type
+func isAuthorizedNodeRole(role flow.Role, msgType uint8) error {
+	roleList, ok := authorizedRolesMap[msgType]
+	if !ok {
+		return fmt.Errorf("unknown message type does not match any code from the cbor codec")
+	}
+
+	if !roleList.Contains(role) {
+		return fmt.Errorf("sender is not authorized to send this message type")
+	}
+
+	return nil
+}
+
+// isActiveNode checks that the node has a weight > 0 and is not ejected
+func isActiveNode(identity flow.Identity) error {
+	if identity.Weight == 0 {
+		return fmt.Errorf("node %s has a weight of 0 is not an active node", identity.NodeID)
+	}
+
+	if identity.Ejected {
+		return fmt.Errorf("node %s is an ejected node", identity.NodeID)
+	}
+	
+	return nil
 }
