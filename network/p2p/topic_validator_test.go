@@ -9,6 +9,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/onflow/flow-go/model/messages"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/rs/zerolog"
@@ -142,8 +143,10 @@ func TestStakedValidator(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 }
 
-// TestAuthorizedSenderValidator tests that the authorized sender validator rejects messages from node roles that are not authorized
-// to send them.
+// TestAuthorizedSenderValidator tests that the authorized sender validator rejects messages from;
+// 1. Nodes that are not authorized to send the message
+// 2. Nodes that are ejected
+// 3. Nodes with an invalid weight
 func TestAuthorizedSenderValidator(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
@@ -200,16 +203,9 @@ func TestAuthorizedSenderValidator(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
-
 	// create a dummy block proposal to publish from our SN node
-	codec := cborcodec.NewCodec()
 	header := unittest.BlockHeaderFixture()
-	bz, err := codec.Encode(&messages.BlockProposal{Header: &header})
-	m1 := message.Message{
-		Payload: bz,
-	}
-	data1, err := m1.Marshal()
-	require.NoError(t, err)
+	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
@@ -217,30 +213,18 @@ func TestAuthorizedSenderValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// sn1 gets the message
-	msg, err := sub1.Next(timedCtx)
-	require.NoError(t, err)
-	require.Equal(t, msg.Data, data1)
+	checkReceive(timedCtx, t, data1, sub1, nil, true)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	msg, err = sub2.Next(timedCtx)
-	require.NoError(t, err)
-	require.Equal(t, msg.Data, data1)
+	checkReceive(timedCtx, t, data1, sub2, nil, true)
 
 	// an1 also gets the message
-	msg, err = sub3.Next(timedCtx)
-	require.NoError(t, err)
-	require.Equal(t, msg.Data, data1)
+	checkReceive(timedCtx, t, data1, sub3, nil, true)
 
 	timedCtx, cancel2s := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel2s()
-
 	header = unittest.BlockHeaderFixture()
-	bz, err = codec.Encode(&messages.BlockProposal{Header: &header})
-	m2 := message.Message{
-		Payload: bz,
-	}
-	data2, err := m2.Marshal()
-	require.NoError(t, err)
+	data2 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
 
 	// the access node now publishes the block proposal message, AN are not authorized to publish block proposals
 	// the message should be rejected by the topic validator on sn1
@@ -248,35 +232,77 @@ func TestAuthorizedSenderValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// an1 receives its own message
-	msg, err = sub3.Next(timedCtx)
-	require.NoError(t, err)
-	require.Equal(t, msg.Data, data2)
+	checkReceive(timedCtx, t, data2, sub3, nil, true)
 
-	// sn1 does NOT receive it's own message due to the topic validator
 	var wg sync.WaitGroup
+
 	// sn1 does NOT receive the message due to the topic validator
-	wg.Add(1)
 	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	go func() {
-		msg, err = sub1.Next(timedCtx)
-		require.Error(t, err)
-		wg.Done()
-	}()
+	checkReceive(timedCtx, t, nil, sub1, &wg, false)
 
 	// sn2 also does not receive the message via gossip from the sn1 (event after the 1 second hearbeat)
-	wg.Add(1)
 	timedCtx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	go func() {
-		msg, err = sub2.Next(timedCtx)
-		require.Error(t, err)
-		wg.Done()
-	}()
+	checkReceive(timedCtx, t, nil, sub2, &wg, false)
+
+	// "eject" sn2 to ensure messages published by ejected nodes get rejected
+	identity2.Ejected = true
+	header = unittest.BlockHeaderFixture()
+	data3 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
+	timedCtx, cancel2s = context.WithTimeout(context.Background(), time.Second)
+	defer cancel2s()
+	err = sn2.Publish(timedCtx, topic, data3)
+
+	// sn1 should not receive rejected message from ejected sn2
+	timedCtx, cancel = context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	checkReceive(timedCtx, t, nil, sub1, &wg, false)
+
+	identity2.Ejected = false
+	// ensure messages from nodes with invalid weight are dropped
+	identity2.Weight = 0
+	header = unittest.BlockHeaderFixture()
+	data4 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
+	timedCtx, cancel2s = context.WithTimeout(context.Background(), time.Second)
+	defer cancel2s()
+	err = sn2.Publish(timedCtx, topic, data4)
+
+	// sn1 should not receive rejected message from sn2 with weight 0
+	timedCtx, cancel = context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	checkReceive(timedCtx, t, nil, sub1, &wg, false)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 
-	// due to the fact that sn1 will reject the message and log a warning sn2 will not receive the message via gossip thus
-	// hook calls should be 1
-	require.Equalf(t, 1, hookCalls, "expected a warning to be logged")
+	// expecting 3 warn calls for each invalid message (unauthorized, ejected, invalid weight)
+	require.Equalf(t, 3, hookCalls, "expected a warning to be logged")
+}
+
+// checkReceive checks that the subscription can receive the next message or not
+func checkReceive(ctx context.Context, t *testing.T, expectedData []byte, sub *pubsub.Subscription, wg *sync.WaitGroup, shouldReceive bool)  {
+	if shouldReceive {
+		// assert we can receive the next message
+		msg, err := sub.Next(ctx)
+		require.NoError(t, err)
+		require.Equal(t, expectedData, msg.Data)
+	} else {
+		wg.Add(1)
+		go func() {
+			_, err := sub.Next(ctx)
+			require.Error(t, err)
+			wg.Done()
+		}()
+	}
+}
+
+func getMsgFixtureBz(t *testing.T, msg interface{}) []byte {
+	bz, err := cborcodec.NewCodec().Encode(msg)
+	m2 := message.Message{
+		Payload: bz,
+	}
+	data, err := m2.Marshal()
+	require.NoError(t, err)
+
+	return data
 }

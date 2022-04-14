@@ -65,6 +65,8 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 				Str("role", identity.Role.String()).
 				Uint8("message_type", msgType).
 				Msg("rejecting message")
+
+			return pubsub.ValidationReject
 		}
 
 		return pubsub.ValidationAccept
@@ -86,14 +88,14 @@ func isAuthorizedNodeRole(role flow.Role, msgType uint8) error {
 }
 
 // isActiveNode checks that the node has a weight > 0 and is not ejected
-func isActiveNode(identity flow.Identity) error {
-	if identity.Weight == 0 {
-		return fmt.Errorf("node %s has a weight of 0 is not an active node", identity.NodeID)
+func isActiveNode(identity *flow.Identity) error {
+	if identity.Weight <= 0 {
+		return fmt.Errorf("node %s has an invalid weight of %d is not an active node", identity.NodeID, identity.Weight)
 	}
 
 	if identity.Ejected {
 		return fmt.Errorf("node %s is an ejected node", identity.NodeID)
 	}
-	
+
 	return nil
 }
