@@ -68,8 +68,8 @@ func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 		t,
 		1,     // two receipts one per execution node.
 		false, // receipts have contradicting results.
-		3,     // one corrupted execution result sent to two execution node (total 2) + 1 bounced back
-		1,     // one receipt bounces back.
+		3,     // one corrupted execution result sent to two execution node (total 2) + 1 is passed through.
+		1,     // one receipt is passed through.
 	)
 }
 
@@ -81,14 +81,14 @@ func TestTwoConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 // Orchestrator sends the corrupted one to both corrupted execution nodes.
 // When the receipt (with the same result) arrives since it has the same result, and the corrupted version of that already sent to both
 // execution node, the orchestrator does nothing.
-// For the result of receipts, orchestrator simply bounces them back (since already conducted an corruption).
+// For the result of receipts, orchestrator simply passes them through them (since already conducted a corruption).
 func TestMultipleConcurrentExecutionReceipts_DistinctResult(t *testing.T) {
 	testConcurrentExecutionReceipts(
 		t,
 		5,     // 5 receipts per execution node.
 		false, // receipts have distinct results.
-		11,    // one corrupted result is sent back to two execution nodes (total 2) + 9 bounce back.
-		9)     // 9 receipts bounce back.
+		11,    // one corrupted result is sent back to two execution nodes (total 2) + 9 pass through.
+		9)     // 9 receipts is passed through.
 }
 
 // TestTwoConcurrentExecutionReceipts_SameResult evaluates the following scenario:
@@ -104,7 +104,7 @@ func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 		1,    // one receipt per corrupted execution node.
 		true, // both execution receipts have same results.
 		2,    // orchestrator is supposed send two events
-		0,    // no receipts bounce back.
+		0,    // no receipts is passed through.
 	)
 }
 
@@ -115,26 +115,26 @@ func TestTwoConcurrentExecutionReceipts_SameResult(t *testing.T) {
 // Orchestrator sends the corrupted one to both corrupted execution nodes.
 // When the receipt (with the same result) arrives since it has the same result, and the corrupted version of that already sent to both
 // execution node, the orchestrator does nothing.
-// For the result of receipts, orchestrator simply bounces them back (since already conducted an corruption).
+// For the result of receipts, orchestrator simply passes them through (since already conducted a corruption).
 func TestMultipleConcurrentExecutionReceipts_SameResult(t *testing.T) {
 	testConcurrentExecutionReceipts(
 		t,
 		5,    // 5 receipts one per execution node.
 		true, // pairwise receipts of execution nodes have same results.
-		10,   // one corrupted execution result sent to each execution nodes (total 2) + 8 bounced back
-		8,    // 4 receipts bounce back per execution nodes (4 * 2 = 8)
+		10,   // one corrupted execution result sent to each execution nodes (total 2) + 8 pass through.
+		8,    // 4 receipts are passed through per execution nodes (4 * 2 = 8)
 	)
 }
 
 // testConcurrentExecutionReceipts sends two execution receipts concurrently to the orchestrator. Depending on the "sameResult" parameter, receipts
 // may have the same execution result or not.
 // It then sanity checks the behavior of orchestrator regarding the total expected number of events it sends to the attack network, as well as
-// the execution receipts it bounces back.
+// the execution receipts it passes through.
 func testConcurrentExecutionReceipts(t *testing.T,
 	count int,
 	sameResult bool,
 	expectedOrchestratorOutputEvents int,
-	expBouncedBackReceipts int) {
+	passThroughReceipts int) {
 
 	rootStateFixture, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 	corruptedExecutionIds := flow.IdentifierList(
@@ -211,7 +211,7 @@ func testConcurrentExecutionReceipts(t *testing.T,
 		orchestratorOutputEvents,
 		corruptedExecutionIds,
 		flow.GetIDs(receipts),
-		expBouncedBackReceipts,
+		passThroughReceipts,
 	)
 }
 
@@ -343,7 +343,7 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 }
 
 // TestBouncingBackChunkDataRequests evaluates when no attacks yet conducted, all chunk data pack requests from corrupted
-// verification nodes are bounced back.
+// verification nodes are passed through.
 func TestBouncingBackChunkDataRequests(t *testing.T) {
 	totalChunks := 10
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
@@ -362,8 +362,8 @@ func TestBouncingBackChunkDataRequests(t *testing.T) {
 				unittest.WithChunks(uint(totalChunks)))))
 	cdpReqs, chunkIds := chunkDataPackRequestForReceipts(t, []*flow.ExecutionReceipt{receipt}, corruptedVerIds)
 
-	chunkRequestBouncedBack := &sync.WaitGroup{}
-	chunkRequestBouncedBack.Add(totalChunks * len(corruptedVerIds))
+	chunkRequestPassThrough := &sync.WaitGroup{}
+	chunkRequestPassThrough.Add(totalChunks * len(corruptedVerIds))
 	// mocks attack network to record and keep the output events of orchestrator
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
 	mockAttackNetwork.On("Send", mock.Anything).
@@ -373,14 +373,14 @@ func TestBouncingBackChunkDataRequests(t *testing.T) {
 			event, ok := args[0].(*insecure.Event)
 			require.True(t, ok)
 
-			// since no attack yet conducted, the chunk data request must bounce back.
+			// since no attack yet conducted, the chunk data request must be passed through.
 			request, ok := event.FlowProtocolEvent.(*messages.ChunkDataRequest)
 			require.True(t, ok)
 
-			// request must be a bounced back
+			// request must be a pass-through.
 			require.True(t, chunkIds.Contains(request.ChunkID))
 
-			chunkRequestBouncedBack.Done()
+			chunkRequestPassThrough.Done()
 		}).Return(nil)
 
 	// registers mock network with orchestrator
@@ -409,18 +409,18 @@ func TestBouncingBackChunkDataRequests(t *testing.T) {
 
 	// waits till all chunk data pack requests replied with corrupted attestation.
 	unittest.RequireReturnsBefore(t,
-		chunkRequestBouncedBack.Wait,
+		chunkRequestPassThrough.Wait,
 		1*time.Second,
 		"orchestrator could not send corrupted attestations on time")
 }
 
-// TestBouncingBackChunkDataResponse_NoAttack evaluates all chunk data pack responses that do not match the corrupted chunk are bounced back from
+// TestBouncingBackChunkDataResponse_NoAttack evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
 // orchestrator. In this test, the state of orchestrator is set to nil meaning no attack has been conducted yet.
 func TestBouncingBackChunkDataResponse_NoAttack(t *testing.T) {
 	testBouncingBackChunkDataResponse(t, nil)
 }
 
-// TestBouncingBackChunkDataResponse_WithAttack evaluates all chunk data pack responses that do not match the corrupted chunk are bounced back from
+// TestBouncingBackChunkDataResponse_WithAttack evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
 // orchestrator. In this test, the state of orchestrator is set, meaning an attack has already been conducted.
 func TestBouncingBackChunkDataResponse_WithAttack(t *testing.T) {
 	originalResult := unittest.ExecutionResultFixture()
@@ -433,7 +433,7 @@ func TestBouncingBackChunkDataResponse_WithAttack(t *testing.T) {
 	testBouncingBackChunkDataResponse(t, state)
 }
 
-// testBouncingBackChunkDataRequests evaluates all chunk data pack responses that do not match the corrupted chunk are bounced back from
+// testBouncingBackChunkDataResponse evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
 //orchestrator.
 func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
 	totalChunks := 10
@@ -450,8 +450,8 @@ func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
 	// creates chunk data pack response for all verification nodes.
 	cdpReps, _ := chunkDataPackResponseForReceipts([]*flow.ExecutionReceipt{receipt}, verIds)
 
-	chunkResponseBouncedBack := &sync.WaitGroup{}
-	chunkResponseBouncedBack.Add(totalChunks * len(verIds))
+	chunkResponsePassThrough := &sync.WaitGroup{}
+	chunkResponsePassThrough.Add(totalChunks * len(verIds))
 
 	// mocks attack network to record and keep the output events of orchestrator
 	mockAttackNetwork := &mockinsecure.AttackNetwork{}
@@ -465,10 +465,10 @@ func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
 			_, ok = event.FlowProtocolEvent.(*messages.ChunkDataResponse)
 			require.True(t, ok)
 
-			// response must be a bounced back
+			// response must be a pass through
 			require.Contains(t, cdpReps, event)
 
-			chunkResponseBouncedBack.Done()
+			chunkResponsePassThrough.Done()
 		}).Return(nil)
 
 	// registers mock network with orchestrator
@@ -494,11 +494,11 @@ func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
 		1*time.Second,
 		"could not send all chunk data pack responses on time")
 
-	// waits till all chunk data pack responses are bounced back.
+	// waits till all chunk data pack responses are passed through.
 	unittest.RequireReturnsBefore(t,
-		chunkResponseBouncedBack.Wait,
+		chunkResponsePassThrough.Wait,
 		1*time.Second,
-		"orchestrator could not bounce back chunk data responses on time")
+		"orchestrator could not pass through chunk data responses on time")
 }
 
 // TestWintermuteChunkResponseForCorruptedChunks evaluates that chunk data responses for corrupted chunks that are sent by corrupted execution nodes

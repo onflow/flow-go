@@ -95,7 +95,7 @@ func (o *Orchestrator) corruptExecutionResult(receipt *flow.ExecutionReceipt) *f
 
 // handleExecutionReceiptEvent processes incoming execution receipt event from a corrupted execution node.
 // If no attack has already been conducted, it corrupts the result of receipt and sends it to all corrupted execution nodes.
-// Otherwise, it just bounces back the receipt to the sender.
+// Otherwise, it just passes through the receipt to the sender.
 func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event) error {
 	ok := o.corruptedIds.Contains(receiptEvent.CorruptedId)
 	if !ok {
@@ -142,7 +142,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 			return fmt.Errorf("could not send rpc on channel: %w", err)
 		}
 
-		lg.Info().Msg("receipt event bounced back")
+		lg.Info().Msg("receipt event passed through")
 		return nil
 	}
 
@@ -185,7 +185,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 // handleChunkDataPackRequestEvent processes a chunk data pack request event as follows:
 // If request is for a corrupted chunk and comes from a corrupted verification node it is replied with an attestation for that
 // chunk.
-// Otherwise, it is bounced back.
+// Otherwise, it is passed through.
 func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent *insecure.Event) error {
 	ok := o.corruptedIds.Contains(chunkDataPackRequestEvent.CorruptedId)
 	if !ok {
@@ -222,13 +222,13 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 		Str("channel", string(chunkDataPackRequestEvent.Channel)).
 		Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).
 		Str("target_ids", fmt.Sprintf("%v", chunkDataPackRequestEvent.TargetIds)).
-		Msg("chunk data pack request event bounced back")
+		Msg("chunk data pack request event passed through")
 
 	return nil
 }
 
 // handleChunkDataPackResponseEvent wintermutes the chunk data pack reply if it belongs to a corrupted result, and is meant to
-// be sent to an honest verification node. Otherwise, it bounces it back.
+// be sent to an honest verification node. Otherwise, it is passed through.
 func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent *insecure.Event) error {
 	if o.state != nil {
 		cdpRep := chunkDataPackReplyEvent.FlowProtocolEvent.(*messages.ChunkDataResponse)
@@ -259,7 +259,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 	// no result corruption yet conducted, hence bouncing back the chunk data request.
 	err := o.network.Send(chunkDataPackReplyEvent)
 	if err != nil {
-		return fmt.Errorf("could not bounce back chunk data reply: %w", err)
+		return fmt.Errorf("could not passed through chunk data reply: %w", err)
 	}
 	return nil
 }
@@ -302,7 +302,7 @@ func (o *Orchestrator) replyWithAttestation(chunkDataPackRequestEvent *insecure.
 			Str("channel", string(chunkDataPackRequestEvent.Channel)).
 			Uint32("targets_num", chunkDataPackRequestEvent.TargetNum).
 			Str("target_ids", fmt.Sprintf("%v", chunkDataPackRequestEvent.TargetIds)).
-			Msg("chunk data pack request event bounced back")
+			Msg("chunk data pack request event passed through")
 
 		return true, nil
 	}
