@@ -115,7 +115,6 @@ func NewExecutionNodeBuilder(nodeBuilder *cmd.FlowNodeBuilder) *ExecutionNodeBui
 
 func main() {
 	exeBuilder := NewExecutionNodeBuilder(cmd.FlowNode(flow.RoleExecution.String()))
-
 	exeBuilder.LoadFlags()
 
 	if err := exeBuilder.FlowNodeBuilder.Initialize(); err != nil {
