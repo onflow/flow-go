@@ -1022,6 +1022,27 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 	return fnb
 }
 
+// OverrideComponent adds given builder function to the components set of the node builder. If a builder function with that name
+// already exists, it will be overridden.
+func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) NodeBuilder {
+	fnb.components = append(fnb.components, namedComponentFunc{
+		fn:   f,
+		name: name,
+	})
+
+	for i := 0; i < len(fnb.components)-1; i++ {
+		if fnb.components[i].name == name {
+			if i == 0 {
+				fnb.components = fnb.components[1:]
+			} else {
+				fnb.components = append(fnb.components[:i], fnb.components[i+1:]...)
+			}
+		}
+	}
+
+	return fnb
+}
+
 func (fnb *FlowNodeBuilder) PreInit(f BuilderFunc) NodeBuilder {
 	fnb.preInitFns = append(fnb.preInitFns, f)
 	return fnb
