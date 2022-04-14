@@ -573,7 +573,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 
 	runWithEngine(t, func(ctx testingContext) {
 
@@ -946,7 +946,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 
 		// Successful call to computation manager
 		ctx.computationManager.
-			On("ExecuteScript", script, [][]byte(nil), blockA.Block.Header, view).
+			On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, view).
 			Return(scriptResult, nil)
 
 		// Execute our script and expect no error

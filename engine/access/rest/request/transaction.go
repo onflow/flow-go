@@ -31,9 +31,6 @@ func (t *Transaction) Parse(raw io.Reader, chain flow.Chain) error {
 	if tx.Payer == "" {
 		return fmt.Errorf("payer not provided")
 	}
-	if len(tx.Authorizers) == 0 {
-		return fmt.Errorf("authorizers not provided")
-	}
 	if len(tx.Authorizers) > maxAuthorizers {
 		return fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizers)
 	}

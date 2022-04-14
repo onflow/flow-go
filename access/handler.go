@@ -100,7 +100,7 @@ func (h *Handler) GetLatestBlock(
 		return nil, err
 	}
 
-	return blockResponse(block)
+	return blockResponse(block, req.GetFullBlockResponse())
 }
 
 // GetBlockByHeight gets a block by height.
@@ -113,10 +113,10 @@ func (h *Handler) GetBlockByHeight(
 		return nil, err
 	}
 
-	return blockResponse(block)
+	return blockResponse(block, req.GetFullBlockResponse())
 }
 
-// GetBlockByHeight gets a block by ID.
+// GetBlockByID gets a block by ID.
 func (h *Handler) GetBlockByID(
 	ctx context.Context,
 	req *access.GetBlockByIDRequest,
@@ -131,7 +131,7 @@ func (h *Handler) GetBlockByID(
 		return nil, err
 	}
 
-	return blockResponse(block)
+	return blockResponse(block, req.GetFullBlockResponse())
 }
 
 // GetCollectionByID gets a collection by ID.
@@ -214,6 +214,25 @@ func (h *Handler) GetTransactionResult(
 	}
 
 	result, err := h.api.GetTransactionResult(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return TransactionResultToMessage(result), nil
+}
+
+// GetTransactionResultByIndex gets a transaction at a specific index for in a block that is executed,
+// pending or finalized transactions return errors
+func (h *Handler) GetTransactionResultByIndex(
+	ctx context.Context,
+	req *access.GetTransactionByIndexRequest,
+) (*access.TransactionResultResponse, error) {
+	blockID, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex())
 	if err != nil {
 		return nil, err
 	}
@@ -431,12 +450,17 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 	return executionResultToMessages(result)
 }
 
-func blockResponse(block *flow.Block) (*access.BlockResponse, error) {
-	msg, err := convert.BlockToMessage(block)
-	if err != nil {
-		return nil, err
+func blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
+	var msg *entities.Block
+	var err error
+	if fullResponse {
+		msg, err = convert.BlockToMessage(block)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		msg = convert.BlockToMessageLight(block)
 	}
-
 	return &access.BlockResponse{
 		Block: msg,
 	}, nil

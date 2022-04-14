@@ -38,43 +38,47 @@ const (
 )
 
 const (
-	ResourceUndefined                = "undefined"
-	ResourceProposal                 = "proposal"
-	ResourceHeader                   = "header"
-	ResourceFinalizedHeight          = "finalized_height"
-	ResourceIndex                    = "index"
-	ResourceIdentity                 = "identity"
-	ResourceGuarantee                = "guarantee"
-	ResourceResult                   = "result"
-	ResourceResultApprovals          = "result_approvals"
-	ResourceReceipt                  = "receipt"
-	ResourceMyReceipt                = "my_receipt"
-	ResourceCollection               = "collection"
-	ResourceApproval                 = "approval"
-	ResourceSeal                     = "seal"
-	ResourcePendingIncorporatedSeal  = "pending_incorporated_seal"
-	ResourceCommit                   = "commit"
-	ResourceTransaction              = "transaction"
-	ResourceClusterPayload           = "cluster_payload"
-	ResourceClusterProposal          = "cluster_proposal"
-	ResourceProcessedResultID        = "processed_result_id"          // verification node, finder engine // TODO: remove finder engine labels
-	ResourceDiscardedResultID        = "discarded_result_id"          // verification node, finder engine
-	ResourcePendingReceipt           = "pending_receipt"              // verification node, finder engine
-	ResourceReceiptIDsByResult       = "receipt_ids_by_result"        // verification node, finder engine
-	ResourcePendingReceiptIDsByBlock = "pending_receipt_ids_by_block" // verification node, finder engine
-	ResourcePendingResult            = "pending_result"               // verification node, match engine
-	ResourceChunkIDsByResult         = "chunk_ids_by_result"          // verification node, match engine
-	ResourcePendingChunk             = "pending_chunk"                // verification node, match engine
-	ResourcePendingBlock             = "pending_block"                // verification node, match engine
-	ResourceCachedReceipt            = "cached_receipt"               // verification node, finder engine
-	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
-	ResourceChunkStatus              = "chunk_status"                 // verification node, fetcher engine
-	ResourceChunkRequest             = "chunk_request"                // verification node, requester engine
-	ResourceChunkConsumer            = "chunk_consumer_jobs"          // verification node
-	ResourceBlockConsumer            = "block_consumer_jobs"          // verification node
-	ResourceEpochSetup               = "epoch_setup"
-	ResourceEpochCommit              = "epoch_commit"
-	ResourceEpochStatus              = "epoch_status"
+	ResourceUndefined                    = "undefined"
+	ResourceProposal                     = "proposal"
+	ResourceHeader                       = "header"
+	ResourceFinalizedHeight              = "finalized_height"
+	ResourceIndex                        = "index"
+	ResourceIdentity                     = "identity"
+	ResourceGuarantee                    = "guarantee"
+	ResourceResult                       = "result"
+	ResourceResultApprovals              = "result_approvals"
+	ResourceReceipt                      = "receipt"
+	ResourceMyReceipt                    = "my_receipt"
+	ResourceCollection                   = "collection"
+	ResourceApproval                     = "approval"
+	ResourceSeal                         = "seal"
+	ResourcePendingIncorporatedSeal      = "pending_incorporated_seal"
+	ResourceCommit                       = "commit"
+	ResourceTransaction                  = "transaction"
+	ResourceClusterPayload               = "cluster_payload"
+	ResourceClusterProposal              = "cluster_proposal"
+	ResourceProcessedResultID            = "processed_result_id"          // verification node, finder engine // TODO: remove finder engine labels
+	ResourceDiscardedResultID            = "discarded_result_id"          // verification node, finder engine
+	ResourcePendingReceipt               = "pending_receipt"              // verification node, finder engine
+	ResourceReceiptIDsByResult           = "receipt_ids_by_result"        // verification node, finder engine
+	ResourcePendingReceiptIDsByBlock     = "pending_receipt_ids_by_block" // verification node, finder engine
+	ResourcePendingResult                = "pending_result"               // verification node, match engine
+	ResourceChunkIDsByResult             = "chunk_ids_by_result"          // verification node, match engine
+	ResourcePendingChunk                 = "pending_chunk"                // verification node, match engine
+	ResourcePendingBlock                 = "pending_block"                // verification node, match engine
+	ResourceCachedReceipt                = "cached_receipt"               // verification node, finder engine
+	ResourceCachedBlockID                = "cached_block_id"              // verification node, finder engine
+	ResourceChunkStatus                  = "chunk_status"                 // verification node, fetcher engine
+	ResourceChunkRequest                 = "chunk_request"                // verification node, requester engine
+	ResourceChunkConsumer                = "chunk_consumer_jobs"          // verification node
+	ResourceBlockConsumer                = "block_consumer_jobs"          // verification node
+	ResourceEpochSetup                   = "epoch_setup"
+	ResourceEpochCommit                  = "epoch_commit"
+	ResourceEpochStatus                  = "epoch_status"
+	ResourceNetworkingReceiveCache       = "networking_received_message"        // networking layer
+	ResourcePublicNetworkingReceiveCache = "public_networking_received_message" // networking layer
+	ResourceNetworkingDnsIpCache         = "networking_dns_ip_cache"            // networking layer
+	ResourceNetworkingDnsTxtCache        = "networking_dns_txt_cache"           // networking layer
 
 	ResourceClusterBlockProposalQueue = "cluster_compliance_proposal_queue" // collection node, compliance engine
 	ResourceClusterBlockVoteQueue     = "cluster_compliance_vote_queue"     // collection node, compliance engine
@@ -90,6 +94,7 @@ const (
 	ResourceEvents                    = "events"                            // execution node
 	ResourceServiceEvents             = "service_events"                    // execution node
 	ResourceTransactionResults        = "transaction_results"               // execution node
+	ResourceTransactionResultIndices  = "transaction_result_indices"        // execution node
 )
 
 const (
