@@ -23,7 +23,7 @@ func TestProduceVote(t *testing.T) {
 	t.Run("should not vote while not a committee member", testVotingWhileNonCommitteeMember)
 }
 
-func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitteeMember bool) (*model.Proposal, *model.Vote, *Voter) {
+func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitteeMember bool) (*model.Proposal, *model.Vote, *SafetyRules) {
 	block := helper.MakeBlock(helper.WithBlockView(blockView))
 	expectVote := makeVote(block)
 

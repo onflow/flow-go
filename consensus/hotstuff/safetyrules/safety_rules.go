@@ -8,8 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Voter produces votes for the given block
-type Voter struct {
+// SafetyRules produces votes for the given block
+type SafetyRules struct {
 	signer        hotstuff.Signer
 	forks         hotstuff.ForksReader
 	persist       hotstuff.Persister
@@ -17,16 +17,16 @@ type Voter struct {
 	lastVotedView uint64             // need to keep track of the last view we voted for so we don't double vote accidentally
 }
 
-// New creates a new Voter instance
+// New creates a new SafetyRules instance
 func New(
 	signer hotstuff.Signer,
 	forks hotstuff.ForksReader,
 	persist hotstuff.Persister,
 	committee hotstuff.Committee,
 	lastVotedView uint64,
-) *Voter {
+) *SafetyRules {
 
-	return &Voter{
+	return &SafetyRules{
 		signer:        signer,
 		forks:         forks,
 		persist:       persist,
@@ -37,15 +37,15 @@ func New(
 
 // ProduceVote will make a decision on whether it will vote for the given proposal, the returned
 // error indicates whether to vote or not.
-// In order to ensure that only a safe node will be voted, Voter will ask Forks whether a vote is a safe node or not.
-// The curView is taken as input to ensure Voter will only vote for proposals at current view and prevent double voting.
+// In order to ensure that only a safe node will be voted, SafetyRules will ask Forks whether a vote is a safe node or not.
+// The curView is taken as input to ensure SafetyRules will only vote for proposals at current view and prevent double voting.
 // Returns:
 //  * (vote, nil): On the _first_ block for the current view that is safe to vote for.
 //    Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
 //  * (nil, model.NoVoteError): If the voter decides that it does not want to vote for the given block.
 //    This is a sentinel error and _expected_ during normal operation.
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-func (v *Voter) ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error) {
+func (v *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error) {
 	block := proposal.Block
 	// sanity checks:
 	if curView != block.View {
@@ -93,16 +93,16 @@ func (v *Voter) ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vo
 //  * (nil, model.NoTimeoutError): If the safety module decides that it is not safe to timeout under current conditions.
 //    This is a sentinel error and _expected_ during normal operation.
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-func (v *Voter) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+func (v *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
 	panic("to be implemented")
 }
 
 // IsSafeToVote checks if this proposal is valid in terms of voting rules, if voting for this proposal won't break safety rules.
-func (v *Voter) IsSafeToVote(proposal *model.Proposal) bool {
+func (v *SafetyRules) IsSafeToVote(proposal *model.Proposal) bool {
 	panic("to be implemented")
 }
 
 // IsSafeToTimeout checks if it's safe to timeout with proposed data, if timing out won't break safety rules.
-func (v *Voter) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) bool {
+func (v *SafetyRules) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) bool {
 	panic("to be implemented")
 }
