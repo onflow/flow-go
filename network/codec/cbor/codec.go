@@ -36,7 +36,7 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 	return &Decoder{dec: dec}
 }
 
-// Given a Golang interface 'v', return a []byte 'envelope'.
+// Encode Given a Golang interface 'v', return a []byte 'envelope'.
 // Return an error if packing the envelope fails.
 // NOTE: 'v' is the network message payload in unserialized form.
 // NOTE: 'code' is the message type.
@@ -74,9 +74,9 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	return dataBytes, nil
 }
 
-// Given a []byte 'envelope', eturn a Golang interface 'v'.
+// Decode Given a []byte 'envelope', return a Golang interface 'v'.
 // Return an error if unpacking the envelope fails.
-// NOTE: 'v' is the network message payload in unserialized form.
+// NOTE: 'v' is the network message payload in un-serialized form.
 // NOTE: 'code' is the message type.
 // NOTE: 'what' is the 'code' name for debugging / instrumentation.
 // NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
