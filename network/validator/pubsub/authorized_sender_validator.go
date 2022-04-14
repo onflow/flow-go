@@ -51,8 +51,9 @@ func initializeAuthorizedRolesMap() {
 	authorizedRolesMap[cborcodec.CodeResultApproval] = flow.RoleList{flow.RoleVerification}
 
 	// execution state synchronization
-	authorizedRolesMap[cborcodec.CodeExecutionStateSyncRequest] = flow.RoleList{flow.RoleVerification}
-	authorizedRolesMap[cborcodec.CodeExecutionStateDelta] = flow.RoleList{flow.RoleVerification}
+	// NOTE: these messages have been deprecated
+	authorizedRolesMap[cborcodec.CodeExecutionStateSyncRequest] = flow.RoleList{}
+	authorizedRolesMap[cborcodec.CodeExecutionStateDelta] = flow.RoleList{}
 
 	// data exchange for execution of blocks
 	authorizedRolesMap[cborcodec.CodeChunkDataRequest] = flow.RoleList{flow.RoleVerification}
