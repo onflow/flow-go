@@ -30,7 +30,7 @@ func (m TimeoutMode) String() string {
 	return [...]string{"ReplicaTimeout", "VoteCollectionTimeout"}[m]
 }
 
-// TimeoutObject represents intent of replica to give up current view with timeout. This concept is very similar to
+// TimeoutObject represents intent of replica to leave its current view with a timeout. This concept is very similar to
 // HotStuff vote. Valid TimeoutObject is signed by staking key.
 type TimeoutObject struct {
 	// View is the view number which is replica is timing out
@@ -40,8 +40,10 @@ type TimeoutObject struct {
 	// LastViewTC is the timeout certificate for previous view if HighestQC.View != View - 1, else nil
 	LastViewTC *flow.TimeoutCertificate
 	// SignerID is the identifier of replica that has signed this TimeoutObject
+	// SignerID must be the origin ID from networking layer, which cryptographically
+	//  authenticates the message's sender. 
 	SignerID flow.Identifier
 	// SigData is a BLS signature created by staking key signing View + HighestQC.View
 	// This signature is further aggregated in TimeoutCertificate.
-	SigData []byte
+	SigData crypto.Signature
 }

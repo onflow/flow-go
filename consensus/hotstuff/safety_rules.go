@@ -5,13 +5,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SafetyRules produces votes for the given block according to voting rules.
+// SafetyRules enforces all consensus rules that guarantee safety. It produces votes for
+// the given blocks or TimeoutObject for the givens, only if all safety rules are satisfied. 
 type SafetyRules interface {
 	// ProduceVote takes a block proposal and current view, and decides whether to vote for the block.
-	// Voting is deterministic meaning voting for same proposal will always result in same vote.
+	// Voting is deterministic meaning voting for same proposal will always result in the same vote.
 	// Returns:
 	//  * (vote, nil): On the _first_ block for the current view that is safe to vote for.
-	//    Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
+	//    Subsequently, voter does _not_ vote for any _other_  block with the same (or lower) view.
+	//    SafetyRules internally caches and persists its latest vote. As long as the SafetyRules' internal
+	//    state remains unchanged, ProduceVote will return its cached for identical inputs.   
+
 	//  * (nil, model.NoVoteError): If the safety module decides that it is not safe to vote for the given block.
 	//    This is a sentinel error and _expected_ during normal operation.
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
