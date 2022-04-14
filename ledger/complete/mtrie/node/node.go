@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // Node defines an Mtrie node
@@ -37,12 +36,6 @@ type Node struct {
 	path      ledger.Path     // the storage path (dummy value for interim nodes)
 	payload   *ledger.Payload // the payload this node is storing (leaf nodes only)
 	hashValue hash.Hash       // hash value of node (cached)
-	// TODO : Atm, we don't support trees with dynamic depth.
-	//        Instead, this should be a forest-wide constant
-	maxDepth uint16 // captures the longest path from this node to compacted leafs in the subtree
-	// TODO : migrate to book-keeping only in the tree root.
-	//        Update can just return the _change_ of regCount.
-	regCount uint64 // number of registers allocated in the subtree
 }
 
 // NewNode creates a new Node.
@@ -54,8 +47,6 @@ func NewNode(height int,
 	path ledger.Path,
 	payload *ledger.Payload,
 	hashValue hash.Hash,
-	maxDepth uint16,
-	regCount uint64,
 ) *Node {
 	n := &Node{
 		lChild:    lchild,
@@ -64,8 +55,6 @@ func NewNode(height int,
 		path:      path,
 		hashValue: hashValue,
 		payload:   payload,
-		maxDepth:  maxDepth,
-		regCount:  regCount,
 	}
 	return n
 }
@@ -79,13 +68,11 @@ func NewLeaf(path ledger.Path,
 	height int,
 ) *Node {
 	n := &Node{
-		lChild:   nil,
-		rChild:   nil,
-		height:   height,
-		path:     path,
-		payload:  payload,
-		maxDepth: 0,
-		regCount: 1,
+		lChild:  nil,
+		rChild:  nil,
+		height:  height,
+		path:    path,
+		payload: payload,
 	}
 	n.hashValue = n.computeHash()
 	return n
@@ -95,24 +82,11 @@ func NewLeaf(path ledger.Path,
 // UNCHECKED requirement:
 //  * for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
-	var lMaxDepth, rMaxDepth uint16
-	var lRegCount, rRegCount uint64
-	if lchild != nil {
-		lMaxDepth = lchild.maxDepth
-		lRegCount = lchild.regCount
-	}
-	if rchild != nil {
-		rMaxDepth = rchild.maxDepth
-		rRegCount = rchild.regCount
-	}
-
 	n := &Node{
-		lChild:   lchild,
-		rChild:   rchild,
-		height:   height,
-		payload:  nil,
-		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + 1,
-		regCount: lRegCount + rRegCount,
+		lChild:  lchild,
+		rChild:  rchild,
+		height:  height,
+		payload: nil,
 	}
 	n.hashValue = n.computeHash()
 	return n
@@ -146,11 +120,11 @@ func NewInterimCompactifiedNode(height int, lChild, rChild *Node) *Node {
 	// an empty subtrie => in total we have one allocated register, which we represent as single leaf node
 	if rChild == nil && lChild.IsLeaf() {
 		h := hash.HashInterNode(lChild.hashValue, ledger.GetDefaultHashForHeight(lChild.height))
-		return &Node{height: height, path: lChild.path, payload: lChild.payload, hashValue: h, maxDepth: 0, regCount: 1}
+		return &Node{height: height, path: lChild.path, payload: lChild.payload, hashValue: h}
 	}
 	if lChild == nil && rChild.IsLeaf() {
 		h := hash.HashInterNode(ledger.GetDefaultHashForHeight(rChild.height), rChild.hashValue)
-		return &Node{height: height, path: rChild.path, payload: rChild.payload, hashValue: h, maxDepth: 0, regCount: 1}
+		return &Node{height: height, path: rChild.path, payload: rChild.payload, hashValue: h}
 	}
 
 	// CASE (b): both children contain some allocated registers => we can't compactify; return a full interim leaf
@@ -224,17 +198,6 @@ func (n *Node) Hash() hash.Hash {
 // of edges on the longest downward path between v and a tree leaf.
 func (n *Node) Height() int {
 	return n.height
-}
-
-// MaxDepth returns the longest path from this node to compacted leafs in the subtree.
-// in contrast to the Height, this value captures compactness of the subtrie.
-func (n *Node) MaxDepth() uint16 {
-	return n.maxDepth
-}
-
-// RegCount returns number of registers allocated in the subtrie of this node.
-func (n *Node) RegCount() uint64 {
-	return n.regCount
 }
 
 // Path returns a pointer to the Node's register storage path.
