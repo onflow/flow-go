@@ -236,9 +236,7 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		codec := cborcodec.NewCodec()
-
+	fnb.Module("middleware", func(nodeConfig *NodeConfig) error {
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.BindAddr != NotSet {
 			myAddr = fnb.BaseConfig.BindAddr
@@ -278,6 +276,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			mwOpts...,
 		)
 
+		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
+		fnb.ProtocolEvents.AddConsumer(idEvents)
+
+		return nil
+	})
+
+	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
 
 		topologyFactory, err := topology.Factory(topology.Name(fnb.topologyProtocolName))
@@ -305,7 +310,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		// creates network instance
 		net, err := p2p.NewNetwork(fnb.Logger,
-			codec,
+			cborcodec.NewCodec(),
 			fnb.Me,
 			func() (network.Middleware, error) { return fnb.Middleware, nil },
 			topologyCache,
@@ -319,10 +324,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 
 		fnb.Network = net
-
-		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
-		fnb.ProtocolEvents.AddConsumer(idEvents)
-
 		return net, nil
 	})
 }
