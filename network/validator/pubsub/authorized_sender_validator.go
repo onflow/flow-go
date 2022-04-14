@@ -71,10 +71,6 @@ func initializeAuthorizedRolesMap() {
 
 	// dkg
 	authorizedRolesMap[cborcodec.CodeDKGMessage] = flow.RoleList{flow.RoleConsensus} // sn nodes for next epoch
-
-
-
-
 }
 
 // AuthorizedSenderValidator using the getIdentity func will check if the role of the sender
