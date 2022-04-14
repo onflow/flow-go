@@ -74,7 +74,7 @@ func TransactionResultsToMessage(results []*TransactionResult) *access.Transacti
 	}
 
 	return &access.TransactionResultsResponse{
-		Results: messages,
+		TransactionResults: messages,
 	}
 }
 

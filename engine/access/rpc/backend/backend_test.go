@@ -669,8 +669,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	block := unittest.BlockFixture()
 	blockId := block.ID()
 
-	suite.snapshot.On("Head").Return(block.Header, nil)
-
 	// block storage returns the corresponding block
 	suite.blocks.
 		On("ByID", blockId).
@@ -684,7 +682,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	exeEventReq := execproto.GetTransactionResultsByBlockIDRequest{
+	exeEventReq := execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
 	}
 

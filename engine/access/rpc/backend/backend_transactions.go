@@ -263,7 +263,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, convertStorageError(err)
 	}
 
-	req := execproto.GetTransactionResultsByBlockIDRequest{
+	req := execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
@@ -284,8 +284,8 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
-	results := make([]*access.TransactionResult, len(resp.Results))
-	for _, txResult := range resp.Results {
+	results := make([]*access.TransactionResult, len(resp.TransactionResults))
+	for _, txResult := range resp.TransactionResults {
 		// tx body is irrelevant to status if it's in an executed block
 		txStatus, err := b.deriveTransactionStatus(nil, true, block)
 		if err != nil {
@@ -617,7 +617,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentityList,
-	req execproto.GetTransactionResultsByBlockIDRequest,
+	req execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	var errs *multierror.Error
 	logAnyError := func() {
@@ -633,7 +633,6 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 			b.log.Debug().
 				Str("execution_node", execNode.String()).
 				Hex("block_id", req.GetBlockId()).
-				Uint32("index", req.GetIndex()).
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
 		}
@@ -648,8 +647,8 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
 	execNode *flow.Identity,
-	req execproto.GetTransactionResultsByBlockIDRequest,
-) (*execproto.GetTransactionResultResponse, error) {
+	req execproto.GetTransactionsByBlockIDRequest,
+) (*execproto.GetTransactionResultsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err

@@ -9,8 +9,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -371,8 +369,8 @@ func (h *handler) GetTransactionResultByIndex(
 
 func (h *handler) GetTransactionResultsByBlockID(
 	_ context.Context,
-	req *execution.GetTransactionResultsByBlockIDRequest,
-) (*execution.GetTransactionResultsByBlockIDResponse, error) {
+	req *execution.GetTransactionsByBlockIDRequest,
+) (*execution.GetTransactionResultsResponse, error) {
 
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
@@ -396,7 +394,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 	}
 
-	responseTxResults := make([]*entities.TransactionResult, len(txResults))
+	responseTxResults := make([]*execution.GetTransactionResultResponse, len(txResults))
 
 	eventsByTxIndex := make(map[uint32][]flow.Event, len(txResults)) //we will have at most as many buckets as tx results
 
@@ -432,7 +430,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 
 		events := convert.EventsToMessages(eventsByTxIndex[txIndex])
 
-		responseTxResults[index] = &entities.TransactionResult{
+		responseTxResults[index] = &execution.GetTransactionResultResponse{
 			StatusCode:   statusCode,
 			ErrorMessage: errMsg,
 			Events:       events,
@@ -440,7 +438,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 	}
 
 	// compose a response
-	return &execution.GetTransactionResultsByBlockIDResponse{
+	return &execution.GetTransactionResultsResponse{
 		TransactionResults: responseTxResults,
 	}, nil
 }
