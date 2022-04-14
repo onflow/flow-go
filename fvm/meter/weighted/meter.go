@@ -199,9 +199,7 @@ func WithComputationWeights(weights ExecutionEffortWeights) WeightedMeterOptions
 func WithMemoryWeights(weights ExecutionMemoryWeights) WeightedMeterOptions {
 	if int(common.MemoryKindLast)-len(weights) != 1 {
 		return func(m *Meter) {
-			for kind, weight := range weights {
-				m.memoryWeights[kind] = weight
-			}
+			m.memoryWeights = weights
 		}
 	}
 
