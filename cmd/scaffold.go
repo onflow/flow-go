@@ -308,7 +308,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 		}
 
-		// creates network instance
 		net, err := p2p.NewNetwork(fnb.Logger,
 			cborcodec.NewCodec(),
 			fnb.Me,
