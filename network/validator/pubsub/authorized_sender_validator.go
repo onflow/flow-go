@@ -17,11 +17,11 @@ func init() {
 }
 
 // authorizedRolesMap is a mapping of message type to a list of roles authorized to send them.
-var authorizedRolesMap map[cborcodec.MessageType]flow.RoleList
+var authorizedRolesMap map[uint8]flow.RoleList
 
 // initializeAuthorizedRolesMap initializes authorizedRolesMap.
 func initializeAuthorizedRolesMap() {
-	authorizedRolesMap = make(map[cborcodec.MessageType]flow.RoleList)
+	authorizedRolesMap = make(map[uint8]flow.RoleList)
 
 	authorizedRolesMap[cborcodec.CodeBlockProposal] = flow.RoleList{flow.RoleConsensus}
 }
@@ -40,14 +40,14 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 			return pubsub.ValidationReject
 		}
 
-		msgType := cborcodec.MessageType(msg.Payload[0])
+		msgType := msg.Payload[0]
 		roleList, ok := authorizedRolesMap[msgType]
 		if !ok {
 			// unknown message type
 			log.Warn().
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
-				Int("message_type", int(msgType)).
+				Uint8("message_type", msgType).
 				Msg("unknown message type does not match any code from the cbor codec")
 
 			return pubsub.ValidationReject
@@ -57,7 +57,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 			log.Warn().
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
-				Int("message_type", int(msgType)).
+				Uint8("message_type", msgType).
 				Msg("sender is not authorized to send this message type")
 
 			return pubsub.ValidationReject

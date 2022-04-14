@@ -2,12 +2,16 @@ package p2p
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/onflow/flow-go/model/messages"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine"
@@ -17,8 +21,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestTopicValidator tests that a topic validator prevents an unstaked node to send messages to any staked node
-func TestTopicValidator(t *testing.T) {
+// TestStakedValidator tests that the staked validator prevents an unstaked node from sending messages to any staked node.
+func TestStakedValidator(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	// create two staked nodes - node1 and node2
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
@@ -136,4 +140,143 @@ func TestTopicValidator(t *testing.T) {
 	}()
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
+}
+
+// TestAuthorizedSenderValidator tests that the authorized sender validator rejects messages from node roles that are not authorized
+// to send them.
+func TestAuthorizedSenderValidator(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+
+	identity3, privateKey3 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
+	an1 := createNode(t, identity3.NodeID, privateKey3, sporkId)
+
+	topic := engine.TopicFromChannel(engine.SyncCommittee, sporkId)
+
+	ids := flow.IdentityList{identity1, identity2, identity3}
+	translator, err := NewFixedTableIdentityTranslator(ids)
+	require.NoError(t, err)
+
+	// setup hooked logger
+	hookCalls := 0
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			hookCalls++
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, func(pid peer.ID) (*flow.Identity, bool) {
+		fid, err := translator.GetFlowID(pid)
+		if err != nil {
+			return &flow.Identity{}, false
+		}
+		return ids.ByNodeID(fid)
+	})
+
+	// node1 is connected to node2, and the an1 is connected to node1
+	// an1 <-> sn1 <-> sn2
+	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.host)))
+	require.NoError(t, an1.AddPeer(context.TODO(), *host.InfoFromHost(sn1.host)))
+
+	// sn1 and sn2 subscribe to the topic with the topic validator
+	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
+	require.NoError(t, err)
+	sub2, err := sn2.Subscribe(topic, authorizedSenderValidator)
+	require.NoError(t, err)
+	sub3, err := an1.Subscribe(topic)
+	require.NoError(t, err)
+
+	// assert that the nodes are connected as expected
+	require.Eventually(t, func() bool {
+		return len(sn1.pubSub.ListPeers(topic.String())) > 0 &&
+			len(sn2.pubSub.ListPeers(topic.String())) > 0 &&
+			len(an1.pubSub.ListPeers(topic.String())) > 0
+	}, 3*time.Second, 100*time.Millisecond)
+
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel5s()
+
+	// create a dummy block proposal to publish from our SN node
+	codec := cborcodec.NewCodec()
+	header := unittest.BlockHeaderFixture()
+	bz, err := codec.Encode(&messages.BlockProposal{Header: &header})
+	m1 := message.Message{
+		Payload: bz,
+	}
+	data1, err := m1.Marshal()
+	require.NoError(t, err)
+
+	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
+	// SN nodes are authorized to send block proposals
+	err = sn2.Publish(timedCtx, topic, data1)
+	require.NoError(t, err)
+
+	// sn1 gets the message
+	msg, err := sub1.Next(timedCtx)
+	require.NoError(t, err)
+	require.Equal(t, msg.Data, data1)
+
+	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
+	msg, err = sub2.Next(timedCtx)
+	require.NoError(t, err)
+	require.Equal(t, msg.Data, data1)
+
+	// an1 also gets the message
+	msg, err = sub3.Next(timedCtx)
+	require.NoError(t, err)
+	require.Equal(t, msg.Data, data1)
+
+	timedCtx, cancel2s := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel2s()
+
+	header = unittest.BlockHeaderFixture()
+	bz, err = codec.Encode(&messages.BlockProposal{Header: &header})
+	m2 := message.Message{
+		Payload: bz,
+	}
+	data2, err := m2.Marshal()
+	require.NoError(t, err)
+
+	// the access node now publishes the block proposal message, AN are not authorized to publish block proposals
+	// the message should be rejected by the topic validator on sn1
+	err = an1.Publish(timedCtx, topic, data2)
+	require.NoError(t, err)
+
+	// an1 receives its own message
+	msg, err = sub3.Next(timedCtx)
+	require.NoError(t, err)
+	require.Equal(t, msg.Data, data2)
+
+	// sn1 does NOT receive it's own message due to the topic validator
+	var wg sync.WaitGroup
+	// sn1 does NOT receive the message due to the topic validator
+	wg.Add(1)
+	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go func() {
+		msg, err = sub1.Next(timedCtx)
+		require.Error(t, err)
+		wg.Done()
+	}()
+
+	// sn2 also does not receive the message via gossip from the sn1 (event after the 1 second hearbeat)
+	wg.Add(1)
+	timedCtx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	go func() {
+		msg, err = sub2.Next(timedCtx)
+		require.Error(t, err)
+		wg.Done()
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
+
+	// due to the fact that sn1 will reject the message and log a warning sn2 will not receive the message via gossip thus
+	// hook calls should be 1
+	require.Equalf(t, 1, hookCalls, "expected a warning to be logged")
 }

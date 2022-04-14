@@ -2,11 +2,8 @@
 
 package cbor
 
-// MessageType integer representing one of the flow-go message types sent over the network
-type MessageType int
-
 const (
-	CodeMin MessageType = iota + 1
+	CodeMin = iota + 1
 
 	// consensus
 	CodeBlockProposal
