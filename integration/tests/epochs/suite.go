@@ -9,22 +9,21 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-
-	"github.com/onflow/flow-go/engine/ghost/client"
-	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,7 +40,7 @@ type nodeUpdateValidation func(ctx context.Context, env templates.Environment, r
 type Suite struct {
 	suite.Suite
 	log zerolog.Logger
-	common.TestnetStateTracker
+	lib.TestnetStateTracker
 	ctx         context.Context
 	cancel      context.CancelFunc
 	net         *testnet.FlowNetwork
@@ -66,9 +65,9 @@ func (s *Suite) SetupTest() {
 		Str("testcase", s.T().Name()).
 		Logger()
 	s.log = logger
-	s.log.Info().Msgf("================> SetupTest")
+	s.log.Info().Msg("================> SetupTest")
 	defer func() {
-		s.log.Info().Msgf("================> Finish SetupTest")
+		s.log.Info().Msg("================> Finish SetupTest")
 	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
@@ -125,16 +124,16 @@ func (s *Suite) SetupTest() {
 
 func (s *Suite) Ghost() *client.GhostClient {
 	ghost := s.net.ContainerByID(s.ghostID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
 
 func (s *Suite) TearDownTest() {
-	s.log.Info().Msgf("================> Start TearDownTest")
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
 	s.cancel()
-	s.log.Info().Msgf("================> Finish TearDownTest")
+	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to
@@ -739,4 +738,83 @@ func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templat
 	// there are only 2 SN nodes in the network now we will submit a transaction to the
 	// network to ensure the network is overall healthy.
 	s.submitSmokeTestTransaction(ctx)
+}
+
+// runTestEpochJoinAndLeave coordinates adding and removing one node with the given
+// role during the first epoch, then running the network health validation function
+// once the network has successfully transitioned into the second epoch.
+//
+// This tests:
+// * that nodes can stake and join the network at an epoch boundary
+// * that nodes can unstake and leave the network at an epoch boundary
+// * role-specific network health validation after the swap has completed
+func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth nodeUpdateValidation) {
+
+	env := utils.LocalnetEnv()
+
+	var containerToReplace *testnet.Container
+
+	// replace access_2, avoid replacing access_1 the container used for client connections
+	if role == flow.RoleAccess {
+		containerToReplace = s.net.ContainerByName("access_2")
+		require.NotNil(s.T(), containerToReplace)
+	} else {
+		// grab the first container of this node role type, this is the container we will replace
+		containerToReplace = s.getContainerToReplace(role)
+		require.NotNil(s.T(), containerToReplace)
+	}
+
+	// staking our new node and add get the corresponding container for that node
+	info, testContainer := s.StakeNewNode(s.ctx, env, role)
+
+	// use admin transaction to remove node, this simulates a node leaving the network
+	s.removeNodeFromProtocol(s.ctx, env, containerToReplace.Config.NodeID)
+
+	// wait for epoch setup phase before we start our container and pause the old container
+	s.WaitForPhase(s.ctx, flow.EpochPhaseSetup)
+
+	// get latest snapshot and start new container
+	snapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
+	require.NoError(s.T(), err)
+	testContainer.WriteRootSnapshot(snapshot)
+	testContainer.Container.Start(s.ctx)
+
+	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
+	require.NoError(s.T(), err)
+
+	// wait for 5 views after the start of the next epoch before we pause our container to replace
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+5)
+
+	//make sure container to replace removed from smart contract state
+	s.assertNodeNotApprovedOrProposed(s.ctx, env, containerToReplace.Config.NodeID)
+
+	// assert transition to second epoch happened as expected
+	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
+	s.assertEpochCounter(s.ctx, 1)
+
+	err = containerToReplace.Pause()
+	require.NoError(s.T(), err)
+
+	// wait for 5 views after pausing our container to replace before we assert healthy network
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+10)
+
+	// make sure the network is healthy after adding new node
+	checkNetworkHealth(s.ctx, env, snapshot, info)
+}
+
+// DynamicEpochTransitionSuite  is the suite used for epoch transitions tests
+// with a dynamic identity table.
+type DynamicEpochTransitionSuite struct {
+	Suite
+}
+
+func (s *DynamicEpochTransitionSuite) SetupTest() {
+	// use a longer staking auction length to accommodate staking operations for
+	// joining/leaving nodes
+	s.StakingAuctionLen = 200
+	s.DKGPhaseLen = 50
+	s.EpochLen = 380
+
+	// run the generic setup, which starts up the network
+	s.Suite.SetupTest()
 }

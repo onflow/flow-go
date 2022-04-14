@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches:
-      - master
       - 'auto-cadence-upgrade/**'
       - staging
       - trying
@@ -16,6 +15,9 @@ on:
       - 'feature/**'
       - 'v[0-9]+.[0-9]+'
 
+env:
+  GO_VERSION: 1.17
+
 jobs:
   golangci:
     name: Lint
@@ -24,16 +26,16 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.17
+        go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic
-      run: make crypto/relic/build
+      run: make crypto_setup_gopath
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v2
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.41
+        version: v1.45
         args: -v --build-tags relic
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-pkg-cache: true
@@ -44,18 +46,12 @@ jobs:
         ignore: 'relic'
   unit-test:
     name: Unit Tests
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version:
-          - 1.16
-          - 1.17
     runs-on: ubuntu-latest
     steps:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: ${{ matrix.go-version }}
+        go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run tests
@@ -66,11 +62,10 @@ jobs:
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 25
-        max_attempts: 2
+        max_attempts: 3
         command: make ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v1
-      if: ${{ matrix.go-version == '1.17' }}
       with:
         file: ./coverage.txt
         flags: unittests
@@ -81,28 +76,37 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version:
-          - 1.16
-          - 1.17
+        test-category:
+          - integration-mvp
+          - integration-ghost
+          - integration-network
+          - integration-epochs
+          - integration-access
+          - integration-collection
+          - integration-consensus
+          - integration-execution
+          - integration-verification
+    env:
+      TEST_CATEGORY: ${{ matrix.test-category }}
     runs-on: ubuntu-latest
     steps:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: ${{ matrix.go-version}}
+        go-version: ${{ env.GO_VERSION }}
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic
-      run: make crypto/relic/build
+      run: make crypto_setup_gopath
     - name: Docker build
       run: make docker-build-flow
     - name: Run tests
       if: github.actor != 'bors[bot]'
-      run: make ci-integration
+      run: ./tools/test_monitor/run-tests.sh
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 15
         max_attempts: 2
-        command: make ci-integration
+        command: ./tools/test_monitor/run-tests.sh

@@ -568,6 +568,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultProgramsCacheSize,
 		committer,
 		computation.DefaultScriptLogThreshold,
+		computation.DefaultScriptExecutionTimeLimit,
 		nil,
 		eds,
 		edCache,

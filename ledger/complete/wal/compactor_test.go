@@ -42,7 +42,7 @@ func (co *CompactorObserver) OnComplete() {
 }
 
 func Test_Compactor(t *testing.T) {
-
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky")
 	numInsPerStep := 2
 	pathByteSize := 32
 	minPayloadByteSize := 2 << 15

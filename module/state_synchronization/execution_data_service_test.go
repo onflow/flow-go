@@ -14,7 +14,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/libp2p/go-libp2p"
+	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -484,7 +484,8 @@ func TestWithNetwork(t *testing.T) {
 }
 
 func TestReprovider(t *testing.T) {
-	t.Parallel()
+	// test is flaky when run in parallel
+	// t.Parallel()
 
 	parent, cancel := context.WithCancel(context.Background())
 	defer cancel()

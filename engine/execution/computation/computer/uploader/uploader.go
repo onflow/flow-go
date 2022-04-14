@@ -53,17 +53,14 @@ func (a *AsyncUploader) Done() <-chan struct{} {
 
 func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) error {
 
-	fibRetry, err := retry.NewFibonacci(a.retryInitialTimeout)
-	if err != nil {
-		return fmt.Errorf("cannot create retry mechanism: %w", err)
-	}
-	cappedFibRetry := retry.WithMaxRetries(a.maxRetryNumber, fibRetry)
+	backoff := retry.NewFibonacci(a.retryInitialTimeout)
+	backoff = retry.WithMaxRetries(a.maxRetryNumber, backoff)
 
 	a.unit.Launch(func() {
 		a.metrics.ExecutionBlockDataUploadStarted()
 		start := time.Now()
 
-		err := retry.Do(a.unit.Ctx(), cappedFibRetry, func(ctx context.Context) error {
+		err := retry.Do(a.unit.Ctx(), backoff, func(ctx context.Context) error {
 			err := a.uploader.Upload(computationResult)
 			if err != nil {
 				a.log.Warn().Err(err).Msg("error while uploading block data, retrying")

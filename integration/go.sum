@@ -1413,8 +1413,8 @@ github.com/onflow/cadence v0.11.2/go.mod h1:8NwJGO535nnY/+QWEMDc2rhvOFChToWQ9Bg7
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
 github.com/onflow/cadence v0.17.0/go.mod h1:iR/tZpP+1YhM8iRnOBPiBIs7on5dE3hk2ZfunCRQswE=
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
-github.com/onflow/cadence v0.23.2 h1:bhAXy3IVVfCx6CJlZBKmr6G0IP4g9C7jWlFqMGmbzek=
-github.com/onflow/cadence v0.23.2/go.mod h1:Y++seAx3qsNjjZYTQhClD86D5aF951cMHVPL94Z64J8=
+github.com/onflow/cadence v0.23.3 h1:Hau2tiEyXkEt/9ZdQw+sr8CBofXwJ6rBqT7iWi/7vrM=
+github.com/onflow/cadence v0.23.3/go.mod h1:Y++seAx3qsNjjZYTQhClD86D5aF951cMHVPL94Z64J8=
 github.com/onflow/flow v0.2.4 h1:w93wtRDGeFLzjR73IaeSFCUHVv/ITExk5bfDGdvzWm8=
 github.com/onflow/flow v0.2.4/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.0 h1:S8UxLG4H2bAx9YjRjVY2/pYIFwrzlg2Q/kbFVQmkql0=
@@ -1619,8 +1619,8 @@ github.com/segmentio/fasthash v1.0.2/go.mod h1:waKX8l2N8yckOgmSsXJi7x1ZfdKZ4x7KR
 github.com/segmentio/kafka-go v0.1.0/go.mod h1:X6itGqS9L4jDletMsxZ7Dz+JFWxM6JHfPOCvTvk+EJo=
 github.com/segmentio/kafka-go v0.2.0/go.mod h1:X6itGqS9L4jDletMsxZ7Dz+JFWxM6JHfPOCvTvk+EJo=
 github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=
-github.com/sethvargo/go-retry v0.1.0 h1:8sPqlWannzcReEcYjHSNw9becsiYudcwTD7CasGjQaI=
-github.com/sethvargo/go-retry v0.1.0/go.mod h1:JzIOdZqQDNpPkQDmcqgtteAcxFLtYpNF/zJCM1ysDg8=
+github.com/sethvargo/go-retry v0.2.3 h1:oYlgvIvsju3jNbottWABtbnoLC+GDtLdBHxKWxQm/iU=
+github.com/sethvargo/go-retry v0.2.3/go.mod h1:1afjQuvh7s4gflMObvjLPaWgluLLyhA1wmVZ6KLpICw=
 github.com/shirou/gopsutil v2.20.5+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
 github.com/shirou/gopsutil/v3 v3.22.2/go.mod h1:WapW1AOOPlHyXr+yOyw3uYx36enocrtSoSBy0L5vUHY=
 github.com/shurcooL/component v0.0.0-20170202220835-f88ec8f54cc4/go.mod h1:XhFIlyj5a1fBNx5aJTbKoIq0mNaPvOagO+HjB3EtxrY=
