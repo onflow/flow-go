@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -40,11 +38,8 @@ import (
 )
 
 type VerificationConfig struct {
-	followerState protocol.MutableState
-	err           error
-	receiptLimit  uint // size of execution-receipt/result related memory pools.
-	chunkAlpha    uint // number of verifiers assigned per chunk.
-	chunkLimit    uint // size of chunk-related memory pools.
+	chunkAlpha uint // number of verifiers assigned per chunk.
+	chunkLimit uint // size of chunk-related memory pools.
 
 	requestInterval    time.Duration // time interval that requester engine tries requesting chunk data packs.
 	backoffMinInterval time.Duration // minimum time interval a chunk data pack request waits before dispatching.
@@ -54,37 +49,17 @@ type VerificationConfig struct {
 
 	blockWorkers uint64 // number of blocks processed in parallel.
 	chunkWorkers uint64 // number of chunks processed in parallel.
-
-	chunkStatuses        *stdmap.ChunkStatuses     // used in fetcher engine
-	chunkRequests        *stdmap.ChunkRequests     // used in requester engine
-	processedChunkIndex  *storage.ConsumerProgress // used in chunk consumer
-	processedBlockHeight *storage.ConsumerProgress // used in block consumer
-	chunkQueue           *storage.ChunksQueue      // used in chunk consumer
-
-	syncCore                *synchronization.Core // used in follower engine
-	pendingBlocks           *buffer.PendingBlocks // used in follower engine
-	assignerEngine          *assigner.Engine      // the assigner engine
-	fetcherEngine           *fetcher.Engine       // the fetcher engine
-	requesterEngine         *vereq.Engine         // the requester engine
-	verifierEng             *verifier.Engine      // the verifier engine
-	chunkConsumer           *chunkconsumer.ChunkConsumer
-	blockConsumer           *blockconsumer.BlockConsumer
-	finalizationDistributor *pubsub.FinalizationDistributor
-	finalizedHeader         *synceng.FinalizedHeaderCache
-
-	followerEng *followereng.Engine        // the follower engine
-	collector   module.VerificationMetrics // used to collect metrics of all engines
 }
 
 type VerificationNodeBuilder struct {
 	*cmd.FlowNodeBuilder
-	verificationConfig *VerificationConfig
+	verConf *VerificationConfig
 }
 
 func NewVerificationNodeBuilder(nodeBuilder *cmd.FlowNodeBuilder) *VerificationNodeBuilder {
 	return &VerificationNodeBuilder{
-		FlowNodeBuilder:    nodeBuilder,
-		verificationConfig: &VerificationConfig{},
+		FlowNodeBuilder: nodeBuilder,
+		verConf:         &VerificationConfig{},
 	}
 }
 
@@ -108,20 +83,15 @@ func main() {
 func (v *VerificationNodeBuilder) LoadFlags() {
 	v.FlowNodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			// TODO are these 2 properties supposed to be set here?
-			homedir, _ := os.UserHomeDir()
-			datadir := filepath.Join(homedir, ".flow", "verification")
-
-			flags.UintVar(&v.verificationConfig.receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&v.verificationConfig.chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
-			flags.UintVar(&v.verificationConfig.chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
-			flags.DurationVar(&v.verificationConfig.requestInterval, "chunk-request-interval", vereq.DefaultRequestInterval, "time interval chunk data pack request is processed")
-			flags.DurationVar(&v.verificationConfig.backoffMinInterval, "backoff-min-interval", vereq.DefaultBackoffMinInterval, "min time interval a chunk data pack request waits before dispatching")
-			flags.DurationVar(&v.verificationConfig.backoffMaxInterval, "backoff-max-interval", vereq.DefaultBackoffMaxInterval, "min time interval a chunk data pack request waits before dispatching")
-			flags.Float64Var(&v.verificationConfig.backoffMultiplier, "backoff-multiplier", vereq.DefaultBackoffMultiplier, "base of exponent in exponential backoff requesting mechanism")
-			flags.Uint64Var(&v.verificationConfig.requestTargets, "request-targets", vereq.DefaultRequestTargets, "maximum number of execution nodes a chunk data pack request is dispatched to")
-			flags.Uint64Var(&v.verificationConfig.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
-			flags.Uint64Var(&v.verificationConfig.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
+			flags.UintVar(&v.verConf.chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
+			flags.UintVar(&v.verConf.chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
+			flags.DurationVar(&v.verConf.requestInterval, "chunk-request-interval", vereq.DefaultRequestInterval, "time interval chunk data pack request is processed")
+			flags.DurationVar(&v.verConf.backoffMinInterval, "backoff-min-interval", vereq.DefaultBackoffMinInterval, "min time interval a chunk data pack request waits before dispatching")
+			flags.DurationVar(&v.verConf.backoffMaxInterval, "backoff-max-interval", vereq.DefaultBackoffMaxInterval, "min time interval a chunk data pack request waits before dispatching")
+			flags.Float64Var(&v.verConf.backoffMultiplier, "backoff-multiplier", vereq.DefaultBackoffMultiplier, "base of exponent in exponential backoff requesting mechanism")
+			flags.Uint64Var(&v.verConf.requestTargets, "request-targets", vereq.DefaultRequestTargets, "maximum number of execution nodes a chunk data pack request is dispatched to")
+			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
+			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 		})
 
 	// TODO should ValidateFlags() be called?
@@ -130,19 +100,6 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 	var (
 		followerState protocol.MutableState
-		err           error
-		receiptLimit  uint // size of execution-receipt/result related memory pools.
-		chunkAlpha    uint // number of verifiers assigned per chunk.
-		chunkLimit    uint // size of chunk-related memory pools.
-
-		requestInterval    time.Duration // time interval that requester engine tries requesting chunk data packs.
-		backoffMinInterval time.Duration // minimum time interval a chunk data pack request waits before dispatching.
-		backoffMaxInterval time.Duration // maximum time interval a chunk data pack request waits before dispatching.
-		backoffMultiplier  float64       // base of exponent in exponential backoff multiplier for backing off requests for chunk data packs.
-		requestTargets     uint64        // maximum number of execution nodes a chunk data pack request is dispatched to.
-
-		blockWorkers uint64 // number of blocks processed in parallel.
-		chunkWorkers uint64 // number of chunks processed in parallel.
 
 		chunkStatuses        *stdmap.ChunkStatuses     // used in fetcher engine
 		chunkRequests        *stdmap.ChunkRequests     // used in requester engine
@@ -168,6 +125,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 	v.FlowNodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
+			var err error
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -189,7 +147,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("chunk status memory pool", func(node *cmd.NodeConfig) error {
-			chunkStatuses = stdmap.NewChunkStatuses(chunkLimit)
+			var err error
+
+			chunkStatuses = stdmap.NewChunkStatuses(v.verConf.chunkLimit)
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkStatus, chunkStatuses.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
@@ -197,7 +157,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("chunk requests memory pool", func(node *cmd.NodeConfig) error {
-			chunkRequests = stdmap.NewChunkRequests(chunkLimit)
+			var err error
+
+			chunkRequests = stdmap.NewChunkRequests(v.verConf.chunkLimit)
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkRequest, chunkRequests.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
@@ -227,6 +189,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("pending block cache", func(node *cmd.NodeConfig) error {
+			var err error
+
 			// consensus cache for follower engine
 			pendingBlocks = buffer.NewPendingBlocks()
 
@@ -239,10 +203,14 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
+			var err error
+
 			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
+
 			rt := fvm.NewInterpreterRuntime()
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
@@ -260,6 +228,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return verifierEng, err
 		}).
 		Component("chunk consumer, requester, and fetcher engines", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
 			requesterEngine, err = vereq.New(
 				node.Logger,
 				node.State,
@@ -267,10 +236,14 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Tracer,
 				collector,
 				chunkRequests,
-				requestInterval,
+				v.verConf.requestInterval,
 				vereq.RetryAfterQualifier,
-				mempool.ExponentialUpdater(backoffMultiplier, backoffMaxInterval, backoffMinInterval),
-				requestTargets)
+				mempool.ExponentialUpdater(
+					v.verConf.backoffMultiplier,
+					v.verConf.backoffMaxInterval,
+					v.verConf.backoffMinInterval,
+				),
+				v.verConf.requestTargets)
 
 			fetcherEngine = fetcher.New(
 				node.Logger,
@@ -292,7 +265,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				processedChunkIndex,
 				chunkQueue,
 				fetcherEngine,
-				chunkWorkers)
+				v.verConf.chunkWorkers)
 
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkConsumer, chunkConsumer.Size)
 			if err != nil {
@@ -303,7 +276,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		}).
 		Component("assigner engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var chunkAssigner module.ChunkAssigner
-			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.State)
+			var err error
+
+			chunkAssigner, err = chunks.NewChunkAssigner(v.verConf.chunkAlpha, node.State)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize chunk assigner: %w", err)
 			}
@@ -322,6 +297,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		}).
 		Component("block consumer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var initBlockHeight uint64
+			var err error
 
 			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
 				node.Logger,
@@ -330,7 +306,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Blocks,
 				node.State,
 				assignerEngine,
-				blockWorkers)
+				v.verConf.blockWorkers)
 
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize block consumer: %w", err)
@@ -349,7 +325,6 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return blockConsumer, nil
 		}).
 		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
 			// initialize cleaner for DB
 			cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
@@ -407,6 +382,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return followerEng, nil
 		}).
 		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
 			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
