@@ -65,10 +65,9 @@ var (
 
 		// Tokens
 
-		common.MemoryKindTokenIdentifier:     0,
-		common.MemoryKindTokenComment:        0,
-		common.MemoryKindTokenNumericLiteral: 0,
-		common.MemoryKindTokenSyntax:         25,
+		common.MemoryKindValueToken:  41,
+		common.MemoryKindSyntaxToken: 25,
+		common.MemoryKindSpaceToken:  50,
 
 		// AST nodes
 
