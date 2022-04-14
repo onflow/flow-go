@@ -1,8 +1,6 @@
 package models
 
 import (
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -31,17 +29,14 @@ func (e *ExecutionResult) Build(exeResult *flow.ExecutionResult, link LinkGenera
 
 	for i, flowChunk := range exeResult.Chunks {
 		var chunk Chunk
-		err = chunk.Build(flowChunk)
-		if err != nil {
-			return err
-		}
+		chunk.Build(flowChunk)
 		chunks[i] = chunk
 	}
 	e.Chunks = chunks
 	return nil
 }
 
-func (c *Chunk) Build(chunk *flow.Chunk) error {
+func (c *Chunk) Build(chunk *flow.Chunk) {
 	c.BlockId = chunk.BlockID.String()
 	c.Index = util.FromUint64(chunk.Index)
 	c.CollectionIndex = util.FromUint64(uint64(chunk.CollectionIndex))
