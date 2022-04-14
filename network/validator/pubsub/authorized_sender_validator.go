@@ -94,18 +94,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 
 		msgType := msg.Payload[0]
 
-		if err := isAuthorizedNodeRole(identity.Role, msgType); err != nil {
-			log.Warn().
-				Err(err).
-				Str("peer_id", from.String()).
-				Str("role", identity.Role.String()).
-				Uint8("message_type", msgType).
-				Msg("rejecting message")
-
-			return pubsub.ValidationReject
-		}
-
-		if err := isActiveNode(identity); err != nil {
+		if err := isAuthorizedSender(identity, msgType); err != nil {
 			log.Warn().
 				Err(err).
 				Str("peer_id", from.String()).
@@ -118,6 +107,20 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 
 		return pubsub.ValidationAccept
 	}
+}
+
+func isAuthorizedSender(identity *flow.Identity, msgType uint8) error {
+	err := isAuthorizedNodeRole(identity.Role, msgType)
+	if err != nil {
+		return err
+	}
+
+	err = isActiveNode(identity.NodeID, identity.Weight, identity.Ejected)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // isAuthorizedNodeRole checks if a role is authorized to send message type
@@ -135,13 +138,13 @@ func isAuthorizedNodeRole(role flow.Role, msgType uint8) error {
 }
 
 // isActiveNode checks that the node has a weight > 0 and is not ejected
-func isActiveNode(identity *flow.Identity) error {
-	if identity.Weight <= 0 {
-		return fmt.Errorf("node %s has an invalid weight of %d is not an active node", identity.NodeID, identity.Weight)
+func isActiveNode(nodeID flow.Identifier, weight uint64,  ejected bool) error {
+	if weight <= 0 {
+		return fmt.Errorf("node %s has an invalid weight of %d is not an active node", nodeID, weight)
 	}
 
-	if identity.Ejected {
-		return fmt.Errorf("node %s is an ejected node", identity.NodeID)
+	if ejected {
+		return fmt.Errorf("node %s is an ejected node", nodeID)
 	}
 
 	return nil
