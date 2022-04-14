@@ -965,6 +965,25 @@ func (fnb *FlowNodeBuilder) Module(name string, f BuilderFunc) NodeBuilder {
 	return fnb
 }
 
+func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
+	fnb.modules = append(fnb.modules, namedModuleFunc{
+		fn:   f,
+		name: name,
+	})
+
+	for i := 0; i < len(fnb.modules)-1; i++ {
+		if fnb.modules[i].name == name {
+			if i == 0 {
+				fnb.modules = fnb.modules[1:]
+			} else {
+				fnb.modules = append(fnb.modules[:i], fnb.modules[i+1:]...)
+			}
+		}
+	}
+
+	return fnb
+}
+
 // ShutdownFunc adds a callback function that is called after all components have exited.
 func (fnb *FlowNodeBuilder) ShutdownFunc(fn func() error) NodeBuilder {
 	fnb.postShutdownFns = append(fnb.postShutdownFns, fn)
