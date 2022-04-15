@@ -6,7 +6,7 @@ import (
 )
 
 // SafetyRules enforces all consensus rules that guarantee safety. It produces votes for
-// the given blocks or TimeoutObject for the givens, only if all safety rules are satisfied.
+// the given blocks or TimeoutObject for the given views, only if all safety rules are satisfied.
 type SafetyRules interface {
 	// ProduceVote takes a block proposal and current view, and decides whether to vote for the block.
 	// Voting is deterministic meaning voting for same proposal will always result in the same vote.
