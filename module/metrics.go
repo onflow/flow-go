@@ -94,13 +94,13 @@ type CleanerMetrics interface {
 }
 
 type CacheMetrics interface {
-	// report the total number of cached items
+	// CacheEntries report the total number of cached items
 	CacheEntries(resource string, entries uint)
-	// report the number of times the queried item is found in the cache
+	// CacheHit report the number of times the queried item is found in the cache
 	CacheHit(resource string)
-	// report the number of items the queried item is not found in the cache, nor found in the database
+	// CacheNotFound records the number of times the queried item was not found in either cache or database.
 	CacheNotFound(resource string)
-	// report the number of items the queried item is not found in the cache, but found in the database
+	// CacheMiss report the number of times the queried item is not found in the cache, but found in the database.
 	CacheMiss(resource string)
 }
 
@@ -276,11 +276,14 @@ type LedgerMetrics interface {
 	// LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
 	LatestTrieRegCountDiff(number int64)
 
-	// LatestTrieMaxDepth records the maximum depth of the last created trie
-	LatestTrieMaxDepth(number uint64)
+	// LatestTrieRegSize records the size of unique register allocated (the latest created trie)
+	LatestTrieRegSize(size uint64)
 
-	// LatestTrieMaxDepthDiff records the difference between the max depth of the latest created trie and parent trie
-	LatestTrieMaxDepthDiff(number int64)
+	// LatestTrieRegSizeDiff records the difference between the size of unique register allocated of the latest created trie and parent trie
+	LatestTrieRegSizeDiff(size int64)
+
+	// LatestTrieMaxDepthTouched records the maximum depth touched of the lastest created trie
+	LatestTrieMaxDepthTouched(maxDepth uint16)
 
 	// UpdateCount increase a counter of performed updates
 	UpdateCount()
@@ -423,4 +426,39 @@ type PingMetrics interface {
 
 	// NodeInfo tracks the software version, sealed height and hotstuff view of a node
 	NodeInfo(node *flow.Identity, nodeInfo string, version string, sealedHeight uint64, hotstuffCurView uint64)
+}
+
+type HeroCacheMetrics interface {
+	// BucketAvailableSlots keeps track of number of available slots in buckets of cache.
+	BucketAvailableSlots(uint64, uint64)
+
+	// OnKeyPutSuccess is called whenever a new (key, entity) pair is successfully added to the cache.
+	OnKeyPutSuccess()
+
+	// OnKeyPutFailure is tracking the total number of unsuccessful writes caused by adding a duplicate key to the cache.
+	// A duplicate key is dropped by the cache when it is written to the cache.
+	// Note: in context of HeroCache, the key corresponds to the identifier of its entity. Hence, a duplicate key corresponds to
+	// a duplicate entity.
+	OnKeyPutFailure()
+
+	// OnKeyGetSuccess tracks total number of successful read queries.
+	// A read query is successful if the entity corresponding to its key is available in the cache.
+	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
+	OnKeyGetSuccess()
+
+	// OnKeyGetFailure tracks total number of unsuccessful read queries.
+	// A read query is unsuccessful if the entity corresponding to its key is not available in the cache.
+	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
+	OnKeyGetFailure()
+
+	// OnEntityEjectionDueToFullCapacity is called whenever adding a new (key, entity) to the cache results in ejection of another (key', entity') pair.
+	// This normally happens -- and is expected -- when the cache is full.
+	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
+	OnEntityEjectionDueToFullCapacity()
+
+	// OnEntityEjectionDueToEmergency is called whenever a bucket is found full and all of its keys are valid, i.e.,
+	// each key belongs to an existing (key, entity) pair.
+	// Hence, adding a new key to that bucket will replace the oldest valid key inside that bucket.
+	// Note: in context of HeroCache, the key corresponds to the identifier of its entity.
+	OnEntityEjectionDueToEmergency()
 }

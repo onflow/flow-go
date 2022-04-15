@@ -200,6 +200,7 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 		t.Logf("%v (%v) before starting flow network, found docker container %v with ports %v", time.Now().UTC(), t.Name(), container.Names, container.Ports)
 	}
 
+	t.Log("starting flow network")
 	net.suite.Start(ctx)
 
 	containers, err = cli.ContainerList(ctx, types.ContainerListOptions{})
@@ -715,6 +716,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("--profiler-dir=%s", profilerDir),
 				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
 				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
+				fmt.Sprintf("--herocache-metrics-collector=%t", true), // to cache integration issues with this collector (if any)
 			}, nodeConf.AdditionalFlags...),
 		},
 		HostConfig: &container.HostConfig{},
