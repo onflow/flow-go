@@ -1,10 +1,8 @@
 package stdmap_test
 
 import (
-	"os"
 	"runtime"
 	"runtime/debug"
-	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +14,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,14 +22,13 @@ import (
 // hashicorp LRU cache with 50K capacity against writing 100M entities,
 // with Garbage Collection (GC) disabled.
 func BenchmarkBaselineLRU(b *testing.B) {
-	if !experiment() {
-		b.Skip("skips benchmarking baseline LRU, set environment variable to enable")
-	}
+	unittest.SkipBenchmarkUnless(b, unittest.BENCHMARK_EXPERIMENT, "skips benchmarking baseline LRU, set environment variable to enable")
+
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 
 	limit := uint(50)
-	backData := stdmap.NewBackendWithBackData(
-		newBaselineLRU(int(limit)),
+	backData := stdmap.NewBackend(
+		stdmap.WithBackData(newBaselineLRU(int(limit))),
 		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000))
@@ -48,8 +46,14 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 	limit := uint(50_000)
 
-	backData := stdmap.NewBackendWithBackData(
-		herocache.NewCache(uint32(limit), 8, heropool.LRUEjection, unittest.Logger()),
+	backData := stdmap.NewBackend(
+		stdmap.WithBackData(
+			herocache.NewCache(
+				uint32(limit),
+				8,
+				heropool.LRUEjection,
+				unittest.Logger(),
+				metrics.NewNoopCollector())),
 		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000_000))
@@ -246,13 +250,4 @@ func (b *baselineLRU) Clear() {
 // Hash will use a merkle root hash to hash all items.
 func (b *baselineLRU) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
-}
-
-// experiment looks up environment variable to enable/disable benchmarking experiments.
-func experiment() bool {
-	val, found := os.LookupEnv("experiment")
-	if !found {
-		return false
-	}
-	return strings.ToLower(strings.Trim(val, "")) == "on"
 }

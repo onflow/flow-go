@@ -229,6 +229,14 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
+	// loop through seals and index ID -> result ID
+	for _, seal := range block.Payload.Seals {
+		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
+		if err != nil {
+			return fmt.Errorf("could not index block for execution result: %w", err)
+		}
+	}
+
 	// queue requesting each of the collections from the collection node
 	e.requestCollections(block.Payload.Guarantees)
 
@@ -275,14 +283,6 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 	err := e.executionReceipts.Store(r)
 	if err != nil {
 		return fmt.Errorf("failed to store execution receipt: %w", err)
-	}
-
-	// TODO - handle possibly conflicting execution results in a proper way
-	// for example, for unsealed blocks any ER is valid, but for sealed blocks
-	// there should match the seal data.
-	err = e.executionResults.ForceIndex(r.ExecutionResult.BlockID, r.ExecutionResult.ID())
-	if err != nil {
-		return fmt.Errorf("failed to index execution result: %w", err)
 	}
 
 	e.trackExecutedMetricForReceipt(r)

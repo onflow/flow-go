@@ -276,6 +276,23 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	return &bh, nil
 }
 
+func BlockToMessageLight(h *flow.Block) *entities.Block {
+	id := h.ID()
+
+	parentID := h.Header.ParentID
+	t := timestamppb.New(h.Header.Timestamp)
+	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
+
+	return &entities.Block{
+		Id:                   id[:],
+		Height:               h.Header.Height,
+		ParentId:             parentID[:],
+		Timestamp:            t,
+		CollectionGuarantees: cg,
+		Signatures:           [][]byte{h.Header.ParentVoterSigData},
+	}
+}
+
 func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	payload, err := PayloadFromMessage(m)
 	if err != nil {

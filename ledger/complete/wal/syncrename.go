@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/rs/zerolog"
 )
 
 type WriterSeekerCloser interface {
@@ -19,6 +21,7 @@ type WriterSeekerCloser interface {
 // to target one as the last step. This help avoid situation when writing is
 // interrupted  and unusable file but with target name exists.
 type SyncOnCloseRenameFile struct {
+	logger     *zerolog.Logger
 	file       *os.File
 	targetName string
 	savedError error // savedError is the first error returned from Write.  Close() renames temp file to target file only if savedError is nil.
@@ -58,6 +61,11 @@ func (s *SyncOnCloseRenameFile) Close() error {
 	err = os.Rename(s.file.Name(), s.targetName)
 	if err != nil {
 		return fmt.Errorf("error while renaming from %s to %s: %w", s.file.Name(), s.targetName, err)
+	}
+
+	err = requestDropFromOSFileCache(s.targetName, s.logger)
+	if err != nil {
+		return fmt.Errorf("error while requesting drop of %s from OS file cache : %w", s.targetName, err)
 	}
 
 	return nil

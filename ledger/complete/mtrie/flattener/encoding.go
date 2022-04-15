@@ -22,19 +22,21 @@ const (
 const (
 	encNodeTypeSize      = 1
 	encHeightSize        = 2
-	encMaxDepthSize      = 2
 	encRegCountSize      = 8
+	encRegSizeSize       = 8
 	encHashSize          = hash.HashLen
 	encPathSize          = ledger.PathLen
 	encNodeIndexSize     = 8
 	encPayloadLengthSize = 4
+
+	encodedTrieSize = encNodeIndexSize + encRegCountSize + encRegSizeSize + encHashSize
 )
+
+const payloadEncodingVersion = 1
 
 // encodeLeafNode encodes leaf node in the following format:
 // - node type (1 byte)
 // - height (2 bytes)
-// - max depth (2 bytes)
-// - reg count (8 bytes)
 // - hash (32 bytes)
 // - path (32 bytes)
 // - payload (4 bytes + n bytes)
@@ -48,12 +50,10 @@ const (
 // before scratch buffer is used again.
 func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
-	encPayloadSize := encoding.EncodedPayloadLengthWithoutPrefix(n.Payload())
+	encPayloadSize := encoding.EncodedPayloadLengthWithoutPrefix(n.Payload(), payloadEncodingVersion)
 
 	encodedNodeSize := encNodeTypeSize +
 		encHeightSize +
-		encMaxDepthSize +
-		encRegCountSize +
 		encHashSize +
 		encPathSize +
 		encPayloadLengthSize +
@@ -78,14 +78,6 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 	binary.BigEndian.PutUint16(buf[pos:], uint16(n.Height()))
 	pos += encHeightSize
 
-	// Encode max depth (2 bytes Big Endian)
-	binary.BigEndian.PutUint16(buf[pos:], n.MaxDepth())
-	pos += encMaxDepthSize
-
-	// Encode reg count (8 bytes Big Endian)
-	binary.BigEndian.PutUint64(buf[pos:], n.RegCount())
-	pos += encRegCountSize
-
 	// Encode hash (32 bytes hashValue)
 	hash := n.Hash()
 	copy(buf[pos:], hash[:])
@@ -102,7 +94,7 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 
 	// EncodeAndAppendPayloadWithoutPrefix appends encoded payload to the resliced buf.
 	// Returned buf is resliced to include appended payload.
-	buf = encoding.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload())
+	buf = encoding.EncodeAndAppendPayloadWithoutPrefix(buf[:pos], n.Payload(), payloadEncodingVersion)
 
 	return buf
 }
@@ -110,8 +102,6 @@ func encodeLeafNode(n *node.Node, scratch []byte) []byte {
 // encodeInterimNode encodes interim node in the following format:
 // - node type (1 byte)
 // - height (2 bytes)
-// - max depth (2 bytes)
-// - reg count (8 bytes)
 // - hash (32 bytes)
 // - lchild index (8 bytes)
 // - rchild index (8 bytes)
@@ -126,8 +116,6 @@ func encodeInterimNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scr
 
 	const encodedNodeSize = encNodeTypeSize +
 		encHeightSize +
-		encMaxDepthSize +
-		encRegCountSize +
 		encHashSize +
 		encNodeIndexSize +
 		encNodeIndexSize
@@ -150,14 +138,6 @@ func encodeInterimNode(n *node.Node, lchildIndex uint64, rchildIndex uint64, scr
 	// Encode height (2 bytes Big Endian)
 	binary.BigEndian.PutUint16(buf[pos:], uint16(n.Height()))
 	pos += encHeightSize
-
-	// Encode max depth (2 bytes Big Endian)
-	binary.BigEndian.PutUint16(buf[pos:], n.MaxDepth())
-	pos += encMaxDepthSize
-
-	// Encode reg count (8 bytes Big Endian)
-	binary.BigEndian.PutUint64(buf[pos:], n.RegCount())
-	pos += encRegCountSize
 
 	// Encode hash (32 bytes hashValue)
 	h := n.Hash()
@@ -204,11 +184,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	}
 
 	// fixLengthSize is the size of shared data of leaf node and interim node
-	const fixLengthSize = encNodeTypeSize +
-		encHeightSize +
-		encMaxDepthSize +
-		encRegCountSize +
-		encHashSize
+	const fixLengthSize = encNodeTypeSize + encHeightSize + encHashSize
 
 	_, err := io.ReadFull(reader, scratch[:fixLengthSize])
 	if err != nil {
@@ -228,14 +204,6 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	// Decode height (2 bytes)
 	height := binary.BigEndian.Uint16(scratch[pos:])
 	pos += encHeightSize
-
-	// Decode max depth (2 bytes)
-	maxDepth := binary.BigEndian.Uint16(scratch[pos:])
-	pos += encMaxDepthSize
-
-	// Decode reg count (8 bytes)
-	regCount := binary.BigEndian.Uint64(scratch[pos:])
-	pos += encRegCountSize
 
 	// Decode and create hash.Hash (32 bytes)
 	nodeHash, err := hash.ToHash(scratch[pos : pos+encHashSize])
@@ -264,7 +232,7 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 			return nil, fmt.Errorf("failed to read and decode payload of serialized node: %w", err)
 		}
 
-		node := node.NewNode(int(height), nil, nil, path, payload, nodeHash, maxDepth, regCount)
+		node := node.NewNode(int(height), nil, nil, path, payload, nodeHash)
 		return node, nil
 	}
 
@@ -297,58 +265,55 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 		return nil, fmt.Errorf("failed to find right child node of serialized node: %w", err)
 	}
 
-	n := node.NewNode(int(height), lchild, rchild, ledger.DummyPath, nil, nodeHash, maxDepth, regCount)
+	n := node.NewNode(int(height), lchild, rchild, ledger.DummyPath, nil, nodeHash)
 	return n, nil
 }
 
 // EncodeTrie encodes trie in the following format:
 // - root node index (8 byte)
+// - allocated reg count (8 byte)
+// - allocated reg size (8 byte)
 // - root node hash (32 bytes)
 // Scratch buffer is used to avoid allocs.
 // WARNING: The returned buffer is likely to share the same underlying array as
 // the scratch buffer. Caller is responsible for copying or using returned buffer
 // before scratch buffer is used again.
-func EncodeTrie(rootNode *node.Node, rootIndex uint64, scratch []byte) []byte {
-
-	const encodedTrieSize = encNodeIndexSize + encHashSize
-
-	// Get root hash
-	var rootHash ledger.RootHash
-	if rootNode == nil {
-		rootHash = trie.EmptyTrieRootHash()
-	} else {
-		rootHash = ledger.RootHash(rootNode.Hash())
-	}
-
+func EncodeTrie(trie *trie.MTrie, rootIndex uint64, scratch []byte) []byte {
+	buf := scratch
 	if len(scratch) < encodedTrieSize {
-		scratch = make([]byte, encodedTrieSize)
+		buf = make([]byte, encodedTrieSize)
 	}
 
 	pos := 0
 
 	// Encode root node index (8 bytes Big Endian)
-	binary.BigEndian.PutUint64(scratch, rootIndex)
+	binary.BigEndian.PutUint64(buf, rootIndex)
 	pos += encNodeIndexSize
 
+	// Encode trie reg count (8 bytes Big Endian)
+	binary.BigEndian.PutUint64(buf[pos:], trie.AllocatedRegCount())
+	pos += encRegCountSize
+
+	// Encode trie reg size (8 bytes Big Endian)
+	binary.BigEndian.PutUint64(buf[pos:], trie.AllocatedRegSize())
+	pos += encRegSizeSize
+
 	// Encode hash (32-bytes hashValue)
-	copy(scratch[pos:], rootHash[:])
+	rootHash := trie.RootHash()
+	copy(buf[pos:], rootHash[:])
 	pos += encHashSize
 
-	return scratch[:pos]
+	return buf[:pos]
 }
 
 // ReadTrie reconstructs a trie from data read from reader.
 func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*trie.MTrie, error) {
 
-	// encodedTrieSize is a failsafe and is only used when len(scratch) is much smaller
-	// than expected (4096 by default).
-	const encodedTrieSize = encNodeIndexSize + encHashSize
-
 	if len(scratch) < encodedTrieSize {
 		scratch = make([]byte, encodedTrieSize)
 	}
 
-	// Read encoded trie (8 + 32 bytes)
+	// Read encoded trie
 	_, err := io.ReadFull(reader, scratch[:encodedTrieSize])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read serialized trie: %w", err)
@@ -359,6 +324,14 @@ func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	// Decode root node index
 	rootIndex := binary.BigEndian.Uint64(scratch)
 	pos += encNodeIndexSize
+
+	// Decode trie reg count (8 bytes)
+	regCount := binary.BigEndian.Uint64(scratch[pos:])
+	pos += encRegCountSize
+
+	// Decode trie reg size (8 bytes)
+	regSize := binary.BigEndian.Uint64(scratch[pos:])
+	pos += encRegSizeSize
 
 	// Decode root node hash
 	readRootHash, err := hash.ToHash(scratch[pos : pos+encHashSize])
@@ -371,7 +344,7 @@ func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 		return nil, fmt.Errorf("failed to find root node of serialized trie: %w", err)
 	}
 
-	mtrie, err := trie.NewMTrie(rootNode)
+	mtrie, err := trie.NewMTrie(rootNode, regCount, regSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to restore serialized trie: %w", err)
 	}
@@ -413,7 +386,7 @@ func readPayloadFromReader(reader io.Reader, scratch []byte) (*ledger.Payload, e
 	}
 
 	// Decode and copy payload
-	payload, err := encoding.DecodePayloadWithoutPrefix(scratch, false)
+	payload, err := encoding.DecodePayloadWithoutPrefix(scratch, false, payloadEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode payload: %w", err)
 	}

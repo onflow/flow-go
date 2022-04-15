@@ -22,14 +22,9 @@ func (c *TransactionAccountFrozenChecker) Process(
 	sth *state.StateHolder,
 	_ *programs.Programs,
 ) error {
-	var err error
-	sth.DisableLimitEnforcement()
-
-	err = c.checkAccountNotFrozen(proc.Transaction, sth)
-
-	sth.EnableLimitEnforcement()
-
-	return err
+	sth.DisableAllLimitEnforcements()
+	defer sth.EnableAllLimitEnforcements()
+	return c.checkAccountNotFrozen(proc.Transaction, sth)
 }
 
 func (c *TransactionAccountFrozenChecker) checkAccountNotFrozen(
