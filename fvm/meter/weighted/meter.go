@@ -196,16 +196,6 @@ func WithComputationWeights(weights ExecutionEffortWeights) WeightedMeterOptions
 
 // WithMemoryWeights sets the weights for the memory intensities
 func WithMemoryWeights(weights ExecutionMemoryWeights) WeightedMeterOptions {
-	// Replace some weights
-	if int(common.MemoryKindLast)-len(weights) != 1 {
-		return func(m *Meter) {
-			for kind, weight := range weights {
-				m.memoryWeights[kind] = weight
-			}
-		}
-	}
-
-	// Replace all weights
 	return func(m *Meter) {
 		m.memoryWeights = weights
 	}
@@ -294,13 +284,7 @@ func (m *Meter) TotalComputationLimit() uint {
 
 // SetMemoryWeights sets the memory weights
 func (m *Meter) SetMemoryWeights(weights ExecutionMemoryWeights) {
-	if int(common.MemoryKindLast)-len(weights) != 1 {
-		for kind, weight := range weights {
-			m.memoryWeights[kind] = weight
-		}
-	} else {
-		m.memoryWeights = weights
-	}
+	m.memoryWeights = weights
 }
 
 // MeterMemory captures memory usage and returns an error if it goes beyond the limit
