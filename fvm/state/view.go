@@ -13,9 +13,10 @@ type View interface {
 	Ledger
 }
 
-// Rename this to Storage
-// remove reference to flow.RegisterValue and use byte[]
-// A Ledger is the storage interface used by the virtual machine to read and write register values.
+// Ledger is the storage interface used by the virtual machine to read and write register values.
+//
+// TODO Rename this to Storage
+// and remove reference to flow.RegisterValue and use byte[]
 type Ledger interface {
 	Set(owner, controller, key string, value flow.RegisterValue) error
 	Get(owner, controller, key string) (flow.RegisterValue, error)

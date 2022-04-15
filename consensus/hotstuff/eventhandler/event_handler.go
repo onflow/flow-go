@@ -25,7 +25,7 @@ type EventHandler struct {
 	communicator   hotstuff.Communicator
 	committee      hotstuff.Committee
 	voteAggregator hotstuff.VoteAggregator
-	voter          hotstuff.Voter
+	voter          hotstuff.SafetyRules
 	validator      hotstuff.Validator
 	notifier       hotstuff.Consumer
 	ownProposal    flow.Identifier
@@ -43,7 +43,7 @@ func NewEventHandler(
 	communicator hotstuff.Communicator,
 	committee hotstuff.Committee,
 	voteAggregator hotstuff.VoteAggregator,
-	voter hotstuff.Voter,
+	voter hotstuff.SafetyRules,
 	validator hotstuff.Validator,
 	notifier hotstuff.Consumer,
 ) (*EventHandler, error) {
@@ -375,7 +375,11 @@ func (e *EventHandler) ownVote(block *model.Block, curView uint64, nextLeader fl
 		Logger()
 
 	// voter performs all the checks to decide whether to vote for this block or not.
-	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
+	// TODO(active-pacemaker): fix proposal SigData, for now it is nil.
+	ownVote, err := e.voter.ProduceVote(&model.Proposal{
+		Block:   block,
+		SigData: nil,
+	}, curView)
 	if err != nil {
 		if !model.IsNoVoteError(err) {
 			// unknown error, exit the event loop

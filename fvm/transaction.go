@@ -47,7 +47,7 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 	defer func() {
 		if r := recover(); r != nil {
 
-			if strings.Contains(fmt.Sprintf("%v", r), "[Error Code: 1106]") {
+			if strings.Contains(fmt.Sprintf("%v", r), errors.ErrCodeLedgerIntractionLimitExceededError.String()) {
 				ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("VM LedgerIntractionLimitExceeded panic")
 				proc.Err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
 				return
@@ -78,4 +78,37 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 	}
 
 	return nil
+}
+
+func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
+	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
+	// TODO replace tx.Gas with individual limits for computation and memory
+
+	// decide computation limit
+	computationLimit := proc.Transaction.GasLimit
+	// if the computation limit is set to zero by user, fallback to the gas limit set by the context
+	if computationLimit == 0 {
+		computationLimit = ctx.ComputationLimit
+		// if the context computation limit is also zero, fallback to the default computation limit
+		if computationLimit == 0 {
+			computationLimit = DefaultComputationLimit
+		}
+	}
+	return computationLimit
+}
+
+func (proc *TransactionProcedure) MemoryLimit(ctx Context) uint64 {
+	// TODO for BFT (enforce max computation limit, already checked by collection nodes)
+	// TODO let user select a lower limit for memory (when its part of fees)
+
+	memoryLimit := uint64(DefaultMemoryLimit) // TODO use the one set by tx
+	// if the memory limit is set to zero by user, fallback to the gas limit set by the context
+	if memoryLimit == 0 {
+		memoryLimit = ctx.MemoryLimit
+		// if the context memory limit is also zero, fallback to the default memory limit
+		if memoryLimit == 0 {
+			memoryLimit = DefaultMemoryLimit
+		}
+	}
+	return memoryLimit
 }

@@ -109,10 +109,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 
 	// this backoff configuration will never terminate on its own, but the
 	// request logic will exit when we exit the EpochSetup phase
-	backoff, err := retry.NewExponential(retryDuration)
-	if err != nil {
-		log.Fatal().Err(err).Msg("create retry mechanism")
-	}
+	backoff := retry.NewExponential(retryDuration)
 	backoff = retry.WithCappedDuration(retryDurationMax, backoff)
 	backoff = retry.WithJitterPercent(retryJitterPercent, backoff)
 

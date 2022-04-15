@@ -117,9 +117,9 @@ func (t *testNodeList) networks() []network.Network {
 	return nets
 }
 
-func TestEpochTransitionTestSuite(t *testing.T) {
-	// Test is flaky, print it in order to avoid the unused linting error
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, fmt.Sprintf("test is flaky: %v", &MutableIdentityTableSuite{}))
+func TestMutableIdentityTable(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
+	suite.Run(t, new(MutableIdentityTableSuite))
 }
 
 // signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)
@@ -178,7 +178,11 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 
 	// create the ids, middlewares and networks
 	ids, mws, nets, _ := GenerateIDsMiddlewaresNetworks(
-		ctx, suite.T(), count, suite.logger, 100, nil,
+		ctx,
+		suite.T(),
+		count,
+		suite.logger,
+		nil,
 	)
 	suite.cancels = append(suite.cancels, cancel)
 

@@ -49,6 +49,20 @@ func (_m *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.Hea
 	return r0
 }
 
+// HasReceipt provides a mock function with given fields: receipt
+func (_m *ExecutionTree) HasReceipt(receipt *flow.ExecutionReceipt) bool {
+	ret := _m.Called(receipt)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt) bool); ok {
+		r0 = rf(receipt)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // LowestHeight provides a mock function with given fields:
 func (_m *ExecutionTree) LowestHeight() uint64 {
 	ret := _m.Called()
