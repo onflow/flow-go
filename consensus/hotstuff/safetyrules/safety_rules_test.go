@@ -1,4 +1,4 @@
-package voter
+package safetyrules
 
 import (
 	"testing"
@@ -23,7 +23,7 @@ func TestProduceVote(t *testing.T) {
 	t.Run("should not vote while not a committee member", testVotingWhileNonCommitteeMember)
 }
 
-func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitteeMember bool) (*model.Block, *model.Vote, *Voter) {
+func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitteeMember bool) (*model.Proposal, *model.Vote, *SafetyRules) {
 	block := helper.MakeBlock(helper.WithBlockView(blockView))
 	expectVote := makeVote(block)
 
@@ -46,7 +46,10 @@ func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitte
 	}
 
 	voter := New(signer, forks, persist, committee, lastVotedView)
-	return block, expectVote, voter
+	return &model.Proposal{
+		Block:   block,
+		SigData: nil,
+	}, expectVote, voter
 }
 
 func testVoterOK(t *testing.T) {
@@ -56,7 +59,7 @@ func testVoterOK(t *testing.T) {
 	block, expectVote, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	// produce vote
-	vote, err := voter.ProduceVoteIfVotable(block, curView)
+	vote, err := voter.ProduceVote(block, curView)
 
 	require.NoError(t, err)
 	require.Equal(t, vote, expectVote)
@@ -69,7 +72,7 @@ func testUnsafe(t *testing.T) {
 	// create voter
 	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
-	_, err := voter.ProduceVoteIfVotable(block, curView)
+	_, err := voter.ProduceVote(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not safe")
 	require.True(t, model.IsNoVoteError(err))
@@ -82,7 +85,7 @@ func testBelowVote(t *testing.T) {
 	// create voter
 	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
-	_, err := voter.ProduceVoteIfVotable(block, curView)
+	_, err := voter.ProduceVote(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "expecting block for current view")
 	require.False(t, model.IsNoVoteError(err))
@@ -95,7 +98,7 @@ func testAboveVote(t *testing.T) {
 	// create voter
 	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
-	_, err := voter.ProduceVoteIfVotable(block, curView)
+	_, err := voter.ProduceVote(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "expecting block for current view")
 	require.False(t, model.IsNoVoteError(err))
@@ -108,7 +111,7 @@ func testEqualLastVotedView(t *testing.T) {
 	// create voter
 	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
-	_, err := voter.ProduceVoteIfVotable(block, curView)
+	_, err := voter.ProduceVote(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must be larger than the last voted view")
 	require.False(t, model.IsNoVoteError(err))
@@ -121,7 +124,7 @@ func testBelowLastVotedView(t *testing.T) {
 	// create voter
 	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
-	_, err := voter.ProduceVoteIfVotable(block, curView)
+	_, err := voter.ProduceVote(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must be larger than the last voted view")
 	require.False(t, model.IsNoVoteError(err))
@@ -134,11 +137,11 @@ func testVotingAgain(t *testing.T) {
 	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	// produce vote
-	_, err := voter.ProduceVoteIfVotable(block, curView)
+	_, err := voter.ProduceVote(block, curView)
 	require.NoError(t, err)
 
 	// produce vote again for the same view
-	_, err = voter.ProduceVoteIfVotable(block, curView)
+	_, err = voter.ProduceVote(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must be larger than the last voted view")
 	require.False(t, model.IsNoVoteError(err))
@@ -151,7 +154,7 @@ func testVotingWhileNonCommitteeMember(t *testing.T) {
 	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	// produce vote
-	_, err := voter.ProduceVoteIfVotable(block, curView)
+	_, err := voter.ProduceVote(block, curView)
 
 	require.Error(t, err)
 	require.True(t, model.IsNoVoteError(err))
