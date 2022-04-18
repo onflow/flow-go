@@ -24,7 +24,7 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 	return false
 }
 
-type TimeoutObjectProcessor struct {
+type TimeoutProcessor struct {
 	view             uint64
 	highQCViews      map[uint64]struct{}
 	highestQC        *flow.QuorumCertificate
@@ -32,8 +32,8 @@ type TimeoutObjectProcessor struct {
 	tcTracker        accumulatedWeightTracker
 }
 
-func NewTimeoutObjectProcessor(view uint64, totalWeight uint64, onPartialTCCreated hotstuff.OnPartialTCCreated) *TimeoutObjectProcessor {
-	return &TimeoutObjectProcessor{
+func NewTimeoutProcessor(view uint64, totalWeight uint64, onPartialTCCreated hotstuff.OnPartialTCCreated) *TimeoutProcessor {
+	return &TimeoutProcessor{
 		partialTCTracker: accumulatedWeightTracker{
 			minRequiredWeight:   hotstuff.ComputeWeightThresholdForHonestMajority(totalWeight),
 			done:                *atomic.NewBool(false),
@@ -57,7 +57,7 @@ func NewTimeoutObjectProcessor(view uint64, totalWeight uint64, onPartialTCCreat
 // * VoteForIncompatibleViewError - submitted vote for incompatible view
 // * model.InvalidVoteError - submitted vote with invalid signature
 // All other errors should be treated as exceptions.
-func (p *TimeoutObjectProcessor) Process(timeout *model.TimeoutObject) error {
+func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	if p.tcTracker.done.Load() {
 		return nil
 	}
@@ -70,7 +70,7 @@ func (p *TimeoutObjectProcessor) Process(timeout *model.TimeoutObject) error {
 	return nil
 }
 
-func (p *TimeoutObjectProcessor) buildTC() (*flow.TimeoutCertificate, error) {
+func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	return &flow.TimeoutCertificate{
 		View:          p.view,
 		TOHighQCViews: nil,
