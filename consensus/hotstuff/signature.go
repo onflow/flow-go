@@ -134,14 +134,13 @@ type WeightedMultiMessageSignatureAggregator interface {
 	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
 
-	// Aggregate aggregates the signatures and returns the aggregated signature.
-	// The function performs a final verification and errors if the aggregated
-	// signature is not valid. This is required for the function safety since
-	// `TrustedAdd` allows adding invalid signatures.
+	// UnsafeAggregate aggregates the signatures and returns the aggregated signature.
+	// The function DOES NOT perform a final verification of aggregated
+	// signature. This aggregated signature needs to be verified against messages that were submitted
+	// in `TrustedAdd`.
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
-	//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
-	Aggregate() ([]flow.Identifier, []byte, error)
+	UnsafeAggregate() ([]flow.Identifier, []byte, error)
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the

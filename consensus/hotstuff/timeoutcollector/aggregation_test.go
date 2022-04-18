@@ -1,7 +1,6 @@
 package timeoutcollector
 
 import (
-	"crypto/rand"
 	"sync"
 	"testing"
 
@@ -33,16 +32,12 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	// create keys, identities and signatures
 	ids := make([]*flow.Identity, 0, signersNumber)
 	pks := make([]crypto.PublicKey, 0, signersNumber)
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
 	for i := 0; i < signersNumber; i++ {
 		identity := unittest.IdentityFixture()
 		// id
 		ids = append(ids, identity)
 		// keys
-		_, err := rand.Read(seed)
-		require.NoError(t, err)
-		sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
-		require.NoError(t, err)
+		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
 		pks = append(pks, sk.PublicKey())
 		msg := identity.NodeID[:]
 		// signatures
@@ -68,11 +63,7 @@ func TestNewMultiMessageSigAggregator(t *testing.T) {
 	_, err := NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{nil}, tag)
 	require.Error(t, err)
 	// wrong key type
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
-	_, err = rand.Read(seed)
-	require.NoError(t, err)
-	sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
-	require.NoError(t, err)
+	sk := unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 	pk := sk.PublicKey()
 	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk}, tag)
 	require.Error(t, err)
@@ -80,8 +71,7 @@ func TestNewMultiMessageSigAggregator(t *testing.T) {
 	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{}, []crypto.PublicKey{}, tag)
 	require.Error(t, err)
 	// mismatching input lengths
-	sk, err = crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
-	require.NoError(t, err)
+	sk = unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
 	pk = sk.PublicKey()
 	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk, pk}, tag)
 	require.Error(t, err)

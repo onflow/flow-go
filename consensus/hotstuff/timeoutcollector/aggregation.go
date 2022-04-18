@@ -143,7 +143,7 @@ func (a *WeightedMultiMessageSignatureAggregator) TotalWeight() uint64 {
 	return a.totalWeight
 }
 
-// Aggregate aggregates the signatures and returns the aggregated signature.
+// UnsafeAggregate aggregates the signatures and returns the aggregated signature.
 // The function performs a final verification and errors if the aggregated signature is not valid. This is
 // required for the function safety since "TrustedAdd" allows adding invalid signatures.
 // The function errors with:
@@ -151,7 +151,7 @@ func (a *WeightedMultiMessageSignatureAggregator) TotalWeight() uint64 {
 //  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 // The function is thread-safe.
 //
-func (a *WeightedMultiMessageSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+func (a *WeightedMultiMessageSignatureAggregator) UnsafeAggregate() ([]flow.Identifier, []byte, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
@@ -181,14 +181,6 @@ func (a *WeightedMultiMessageSignatureAggregator) Aggregate() ([]flow.Identifier
 			return nil, nil, model.NewInvalidSignatureIncludedErrorf("signatures with invalid structure were included via TrustedAdd: %w", err)
 		}
 		return nil, nil, fmt.Errorf("BLS signature aggregation failed: %w", err)
-	}
-
-	valid, err := crypto.VerifyBLSSignatureManyMessages(pks, aggSignature, messages, hashers)
-	if err != nil {
-		return nil, nil, fmt.Errorf("signature verification failed: %w", err)
-	}
-	if !valid {
-		return nil, nil, model.NewInvalidSignatureIncludedErrorf("invalid signature(s) have been included via TrustedAdd")
 	}
 
 	return signerIDs, aggSignature, nil
