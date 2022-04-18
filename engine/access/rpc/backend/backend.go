@@ -309,11 +309,11 @@ func executionNodesForBlockID(
 		receiptCnt := len(executorIDs)
 		// if less than minExecutionNodesCnt execution receipts have been received so far, then throw an error
 		if receiptCnt < minExecutionNodesCnt {
-			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+			executionNodes, err := state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
 			if err != nil {
 				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 			}
-			executorIDs = newExecutorIDs.NodeIDs()
+			return executionNodes.Sample(maxExecutionNodesCnt), nil
 		}
 	}
 
