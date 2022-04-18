@@ -194,6 +194,29 @@ func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Iden
 	return tx, nil
 }
 
+func (b *backendTransactions) GetTransactionsByBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+) ([]*flow.TransactionBody, error) {
+	var transactions []*flow.TransactionBody
+
+	block, err := b.blocks.ByID(blockID)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := b.collections.ByID(guarantee.CollectionID)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
+
+		transactions = append(transactions, collection.Transactions...)
+	}
+
+	return transactions, nil
+}
+
 func (b *backendTransactions) GetTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -648,6 +671,50 @@ func (b *backendTransactions) tryGetTransactionResult(
 	}
 	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
+	return resp, err
+}
+
+func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
+	ctx context.Context,
+	execNodes flow.IdentityList,
+	req execproto.GetTransactionsByBlockIDRequest,
+) (*execproto.GetTransactionResultsResponse, error) {
+	var errs *multierror.Error
+	logAnyError := func() {
+		errToReturn := errs.ErrorOrNil()
+		if errToReturn != nil {
+			b.log.Err(errToReturn).Msg("failed to get transaction results from execution nodes")
+		}
+	}
+	defer logAnyError()
+	for _, execNode := range execNodes {
+		resp, err := b.tryGetTransactionResultsByBlockID(ctx, execNode, req)
+		if err == nil {
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", req.GetBlockId()).
+				Msg("Successfully got transaction results from any node")
+			return resp, nil
+		}
+		if status.Code(err) == codes.NotFound {
+			return nil, err
+		}
+		errs = multierror.Append(errs, err)
+	}
+	return nil, errs.ErrorOrNil()
+}
+
+func (b *backendTransactions) tryGetTransactionResultsByBlockID(
+	ctx context.Context,
+	execNode *flow.Identity,
+	req execproto.GetTransactionsByBlockIDRequest,
+) (*execproto.GetTransactionResultsResponse, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
 	return resp, err
 }
 
