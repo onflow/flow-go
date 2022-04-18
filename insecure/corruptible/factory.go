@@ -21,7 +21,6 @@ import (
 )
 
 const networkingProtocolTCP = "tcp"
-const CorruptibleConduitFactoryDefaultPort = 5555
 
 // ConduitFactory implements a corruptible conduit factory, that creates corruptible conduits and acts as their master.
 // A remote attacker can register itself to this conduit factory.

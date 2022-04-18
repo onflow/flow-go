@@ -15,7 +15,12 @@ const CorruptibleConduitFactoryPort = "4300"
 // CorruptedNodeBuilder corrupted node builder creates a general flow node builder with corruptible conduit factory.
 type CorruptedNodeBuilder struct {
 	*cmd.FlowNodeBuilder
-	ccf *corruptible.ConduitFactory
+}
+
+func NewCorruptedNodeBuilder(role string) *CorruptedNodeBuilder {
+	return &CorruptedNodeBuilder{
+		FlowNodeBuilder: cmd.FlowNode(role),
+	}
 }
 
 func (cnb *CorruptedNodeBuilder) Initialize() error {
@@ -30,7 +35,7 @@ func (cnb *CorruptedNodeBuilder) Initialize() error {
 }
 
 func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
-	cnb.Component("corruptible-conduit-factory", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	cnb.OverrideComponent(cmd.ConduitFactoryComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		host, _, err := net.SplitHostPort(node.BindAddr)
 		if err != nil {
 			return nil, fmt.Errorf("could not extract host address: %w", err)
@@ -39,13 +44,13 @@ func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
 		address := net.JoinHostPort(host, CorruptibleConduitFactoryPort)
 		ccf := corruptible.NewCorruptibleConduitFactory(cnb.Logger, cnb.RootChainID, cnb.NodeID, cnb.CodecFactory(), address)
 
-		cnb.ccf = ccf
+		cnb.ConduitFactory = ccf
 		return ccf, nil
 	})
 }
 
 func (cnb *CorruptedNodeBuilder) overrideCorruptedNetwork() {
-	cnb.OverrideComponent("network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return cnb.InitFlowNetworkWithConduitFactory(node, cnb.ccf)
+	cnb.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return cnb.InitFlowNetworkWithConduitFactory(node, cnb.ConduitFactory)
 	})
 }

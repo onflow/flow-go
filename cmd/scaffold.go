@@ -61,6 +61,11 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const (
+	NetworkComponent        = "network"
+	ConduitFactoryComponent = "conduit-factory"
+)
+
 type Metrics struct {
 	Network        module.NetworkMetrics
 	Engine         module.EngineMetrics
@@ -286,8 +291,14 @@ func (fnb *FlowNodeBuilder) EnqueueLibP2pMiddlewareInit() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return fnb.InitFlowNetworkWithConduitFactory(node, conduit.NewDefaultConduitFactory())
+	fnb.Component(ConduitFactoryComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		cf := conduit.NewDefaultConduitFactory()
+		fnb.ConduitFactory = cf
+
+		return cf, nil
+	})
+	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
 	})
 }
 
