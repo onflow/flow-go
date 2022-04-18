@@ -223,7 +223,7 @@ func (h *Handler) GetTransactionResult(
 
 func (h *Handler) GetTransactionResultsByBlockID(
 	ctx context.Context,
-	req *access.GetTransactionResultsByBlockIDRequest,
+	req *access.GetTransactionsByBlockIDRequest,
 ) (*access.TransactionResultsResponse, error) {
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
@@ -236,6 +236,25 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	}
 
 	return TransactionResultsToMessage(results), nil
+}
+
+func (h *Handler) GetTransactionsByBlockID(
+	ctx context.Context,
+	req *access.GetTransactionsByBlockIDRequest,
+) (*access.TransactionsResponse, error) {
+	id, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	transactions, err := h.api.GetTransactionsByBlockID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.TransactionsResponse{
+		Transactions: convert.TransactionsToMessages(transactions),
+	}, nil
 }
 
 // GetTransactionResultByIndex gets a transaction at a specific index for in a block that is executed,

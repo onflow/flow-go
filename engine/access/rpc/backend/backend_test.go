@@ -684,7 +684,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	exeEventReq := execproto.GetTransactionResultsByBlockIDRequest{
+	exeEventReq := execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockId[:],
 	}
 

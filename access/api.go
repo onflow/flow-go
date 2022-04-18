@@ -27,6 +27,7 @@ type API interface {
 
 	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
+	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
 	GetTransactionResult(ctx context.Context, id flow.Identifier) (*TransactionResult, error)
 	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32) (*TransactionResult, error)
 	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*TransactionResult, error)
@@ -61,11 +62,13 @@ type TransactionResult struct {
 
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
 	return &access.TransactionResultResponse{
-		Status:       entities.TransactionStatus(result.Status),
-		StatusCode:   uint32(result.StatusCode),
-		ErrorMessage: result.ErrorMessage,
-		Events:       convert.EventsToMessages(result.Events),
-		BlockId:      result.BlockID[:],
+		Status:        entities.TransactionStatus(result.Status),
+		StatusCode:    uint32(result.StatusCode),
+		ErrorMessage:  result.ErrorMessage,
+		Events:        convert.EventsToMessages(result.Events),
+		BlockId:       result.BlockID[:],
+		TransactionId: result.TransactionID[:],
+		CollectionId:  result.CollectionID[:],
 	}
 }
 
@@ -76,7 +79,7 @@ func TransactionResultsToMessage(results []*TransactionResult) *access.Transacti
 	}
 
 	return &access.TransactionResultsResponse{
-		Results: messages,
+		TransactionResults: messages,
 	}
 }
 
