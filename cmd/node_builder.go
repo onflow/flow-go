@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/module/compliance"
 
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/fvm"
@@ -153,6 +154,9 @@ type BaseConfig struct {
 	HeroCacheMetricsEnable          bool
 	SyncCoreConfig                  synchronization.Config
 	CodecFactory                    func() network.Codec
+	// ComplianceConfig configures either the compliance engine (consensus nodes)
+	// or the follower engine (all other node roles)
+	ComplianceConfig compliance.Config
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -235,5 +239,6 @@ func DefaultBaseConfig() *BaseConfig {
 		HeroCacheMetricsEnable:          false,
 		SyncCoreConfig:                  synchronization.DefaultConfig(),
 		CodecFactory:                    func() network.Codec { return cbor.NewCodec() },
+		ComplianceConfig:                compliance.DefaultConfig(),
 	}
 }

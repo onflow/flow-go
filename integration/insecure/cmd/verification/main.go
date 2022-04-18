@@ -6,6 +6,7 @@ import (
 )
 
 func main() {
+	// TODO: use corrupted verification builder when available.
 	verificationBuilder := cmd.NewVerificationNodeBuilder(cmd.FlowNode(flow.RoleVerification.String()))
 	verificationBuilder.LoadFlags()
 
