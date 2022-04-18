@@ -2078,6 +2078,20 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		expectedList := preferredENs
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
 	})
+
+	suite.Run("insufficient receipts return random ENs in state", func() {
+		// return no receipts at all attempts
+		totalENs := 5
+		attempt1Receipts = flow.ExecutionReceiptList{}
+		attempt2Receipts = flow.ExecutionReceiptList{}
+		attempt3Receipts = flow.ExecutionReceiptList{}
+		availableExecNodes := unittest.IdentityListFixture(totalENs, unittest.WithRole(flow.RoleExecution))
+		suite.snapshot.On("Identities", mock.Anything).Return(availableExecNodes)
+		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
+		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
+		require.NoError(suite.T(), err)
+		require.Equal(suite.T(), len(actualList), maxExecutionNodesCnt)
+	})
 }
 
 // TestExecuteScriptOnExecutionNode tests the method backend.scripts.executeScriptOnExecutionNode for script execution
