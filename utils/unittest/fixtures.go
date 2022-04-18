@@ -197,6 +197,14 @@ func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
 	return proposal
 }
 
+func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
+	proposal := &messages.ClusterBlockProposal{
+		Header:  block.Header,
+		Payload: block.Payload,
+	}
+	return proposal
+}
+
 func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
 	pending := flow.PendingBlock{
 		OriginID: block.Header.ProposerID,
