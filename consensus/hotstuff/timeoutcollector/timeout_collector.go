@@ -4,19 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 )
 
 type TimeoutCollector struct {
-	log           zerolog.Logger
 	notifier      hotstuff.Consumer
-	validator     hotstuff.Validator
-	finalizer     forks.Finalizer
 	timeoutsCache *TimeoutObjectsCache // to track double timeout and timeout equivocation
 	processor     *TimeoutProcessor
 
