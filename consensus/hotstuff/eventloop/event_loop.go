@@ -196,7 +196,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 
 			err := el.eventHandler.OnTCConstructed(tc)
 
-			// measure how long it takes for a QC to be processed
+			// measure how long it takes for a TC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnTC)
 
 			if err != nil {
