@@ -1,6 +1,7 @@
 package badger_test
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -72,6 +73,12 @@ func TestEventStoreRetrieve(t *testing.T) {
 		require.Len(t, actual, 1)
 		require.Contains(t, actual, evt1_1)
 
+		// retrieve by blockID and transaction index
+		actual, err = store.ByBlockIDTransactionIndex(blockID, 1)
+		require.NoError(t, err)
+		require.Len(t, actual, 1)
+		require.Contains(t, actual, evt1_2)
+
 		// test loading from database
 
 		newStore := badgerstorage.NewEvents(metrics, db)
@@ -91,6 +98,7 @@ func TestEventRetrieveWithoutStore(t *testing.T) {
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
+		txIndex := rand.Uint32()
 
 		// retrieve by blockID
 		events, err := store.ByBlockID(blockID)
@@ -104,6 +112,11 @@ func TestEventRetrieveWithoutStore(t *testing.T) {
 
 		// retrieve by blockID and transaction id
 		events, err = store.ByBlockIDTransactionID(blockID, txID)
+		require.NoError(t, err)
+		require.True(t, len(events) == 0)
+
+		// retrieve by blockID and transaction id
+		events, err = store.ByBlockIDTransactionIndex(blockID, txIndex)
 		require.NoError(t, err)
 		require.True(t, len(events) == 0)
 

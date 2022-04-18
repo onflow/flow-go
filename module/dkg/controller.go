@@ -286,7 +286,7 @@ func (c *Controller) doBackgroundWork() {
 		select {
 		case msg := <-privateMsgCh:
 			c.dkgLock.Lock()
-			err := c.dkg.HandlePrivateMsg(int(msg.Orig), msg.Data)
+			err := c.dkg.HandlePrivateMsg(int(msg.CommitteeMemberIndex), msg.Data)
 			c.dkgLock.Unlock()
 			if err != nil {
 				c.log.Err(err).Msg("error processing DKG private message")
@@ -318,7 +318,7 @@ func (c *Controller) doBackgroundWork() {
 			}
 
 			c.dkgLock.Lock()
-			err := c.dkg.HandleBroadcastMsg(int(msg.Orig), msg.Data)
+			err := c.dkg.HandleBroadcastMsg(int(msg.CommitteeMemberIndex), msg.Data)
 			c.dkgLock.Unlock()
 			if err != nil {
 				c.log.Err(err).Msg("error processing DKG broadcast message")

@@ -35,10 +35,13 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -135,7 +138,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
-	fnb.flags.IntVar(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultCacheSize,
+	fnb.flags.Uint32Var(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultReceiveCacheSize,
 		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
@@ -151,6 +154,16 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in which the node will check if it can start")
 
 	fnb.flags.BoolVar(&fnb.BaseConfig.InsecureSecretsDB, "insecure-secrets-db", false, "allow the node to start up without an secrets DB encryption key")
+	fnb.flags.BoolVar(&fnb.BaseConfig.HeroCacheMetricsEnable, "herocache-metrics-collector", false, "enables herocache metrics collection")
+
+	// sync core flags
+	fnb.flags.DurationVar(&fnb.BaseConfig.SyncCoreConfig.RetryInterval, "sync-retry-interval", defaultConfig.SyncCoreConfig.RetryInterval, "the initial interval before we retry a sync request, uses exponential backoff")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.Tolerance, "sync-tolerance", defaultConfig.SyncCoreConfig.Tolerance, "determines how big of a difference in block heights we tolerate before actively syncing with range requests")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxAttempts, "sync-max-attempts", defaultConfig.SyncCoreConfig.MaxAttempts, "the maximum number of attempts we make for each requested block/height before discarding")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize, "sync-max-size", defaultConfig.SyncCoreConfig.MaxSize, "the maximum number of blocks we request in the same block request message")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
+
+	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -199,7 +212,26 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 
 func (fnb *FlowNodeBuilder) EnqueueResolver() {
 	fnb.Component("resolver", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		resolver := dns.NewResolver(dns.DefaultCacheSize, node.Logger, fnb.Metrics.Network, dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+		var dnsIpCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		var dnsTxtCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if fnb.HeroCacheMetricsEnable {
+			dnsIpCacheMetricsCollector = metrics.NetworkDnsIpCacheMetricsFactory(fnb.MetricsRegisterer)
+			dnsTxtCacheMetricsCollector = metrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegisterer)
+		}
+
+		cache := herocache.NewDNSCache(
+			dns.DefaultCacheSize,
+			node.Logger,
+			dnsIpCacheMetricsCollector,
+			dnsTxtCacheMetricsCollector,
+		)
+
+		resolver := dns.NewResolver(
+			node.Logger,
+			fnb.Metrics.Network,
+			cache,
+			dns.WithTTL(fnb.BaseConfig.DNSCacheTTL))
+
 		fnb.Resolver = resolver
 		return resolver, nil
 	})
@@ -260,16 +292,29 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		}
 		topologyCache := topology.NewCache(fnb.Logger, top)
 
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if fnb.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
+		}
+		receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
+			fnb.Logger,
+			heroCacheCollector)
+
+		err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+		if err != nil {
+			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+		}
+
 		// creates network instance
 		net, err := p2p.NewNetwork(fnb.Logger,
 			codec,
 			fnb.Me,
 			func() (network.Middleware, error) { return fnb.Middleware, nil },
-			fnb.NetworkReceivedMessageCacheSize,
 			topologyCache,
 			subscriptionManager,
 			fnb.Metrics.Network,
 			fnb.IdentityProvider,
+			receiveCache,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -1002,6 +1047,12 @@ func WithMetricsEnabled(enabled bool) Option {
 	}
 }
 
+func WithSyncCoreConfig(syncConfig synchronization.Config) Option {
+	return func(config *BaseConfig) {
+		config.SyncCoreConfig = syncConfig
+	}
+}
+
 func WithLogLevel(level string) Option {
 	return func(config *BaseConfig) {
 		config.level = level
@@ -1078,6 +1129,8 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return storageCommands.NewReadResultsCommand(config.State, config.Storage.Results)
 	}).AdminCommand("read-seals", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
+	}).AdminCommand("get-latest-identity", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewGetIdentityCommand(config.IdentityProvider)
 	})
 }
 
