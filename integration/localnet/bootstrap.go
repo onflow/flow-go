@@ -726,6 +726,10 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 }
 
 func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
+<<<<<<< HEAD
+=======
+
+>>>>>>> ce5cc9a0a1eb703a2acf13006f5417787cd53a35
 	if observerCount == 0 {
 		return dockerServices
 	}
@@ -739,11 +743,14 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 		panic(fmt.Sprintf("No more than %d observers are permitted within localnet", DefaultMaxObservers))
 	}
 
+<<<<<<< HEAD
 	agPublicKey, err := getAccessGatewayPublicKey(flowNodeContainerConfigs)
 	if err != nil {
 		panic(err)
 	}
 	
+=======
+>>>>>>> ce5cc9a0a1eb703a2acf13006f5417787cd53a35
 	for i := 0; i < observerCount; i++ {
 		observerName := fmt.Sprintf("%s_%d", DefaultObserverName, i+1)
 		profilerDir := prepareObserverProfilerFolder(observerName)
