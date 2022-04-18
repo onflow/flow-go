@@ -4,14 +4,30 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 )
 
 type TimeoutCollector struct {
-	timeoutsCache *TimeoutObjectsCache
-	processor     *TimeoutVoteProcessor
+	log           zerolog.Logger
 	notifier      hotstuff.Consumer
+	validator     hotstuff.Validator
+	finalizer     forks.Finalizer
+	timeoutsCache *TimeoutObjectsCache // to track double timeout and timeout equivocation
+	processor     *TimeoutProcessor
+
+	// a callback that will be used to notify PaceMaker
+	// about timeout for higher view that we are aware of
+	onNewQCDiscovered hotstuff.OnNewQCDiscovered
+	onNewTCDiscovered hotstuff.OnNewTCDiscovered
+	// highest QC that was reported
+	highestReportedQCTimeout counters.StrictMonotonousCounter
+	// highest TC that was reported
+	highestReportedTCTimeout counters.StrictMonotonousCounter
 }
 
 func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
@@ -28,10 +44,32 @@ func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 		return fmt.Errorf("internal error adding timeout %v to cache for view: %d: %w", timeout.ID(), timeout.View, err)
 	}
 
-	err = c.processor.Process(timeout)
+	err = c.processTimeout(timeout)
 	if err != nil {
 		return fmt.Errorf("internal error processing TO %v for view: %d: %w", timeout.ID(), timeout.View, err)
 	}
+	return nil
+}
+
+func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
+	err := c.processor.Process(timeout)
+	if err != nil {
+		if model.IsInvalidTimeoutError(err) {
+			// invalid signature, potentially slashing challenge
+			// notify about invalid timeout
+			return nil
+		}
+		return fmt.Errorf("internal error while processing timeout: %w", err)
+	}
+
+	if c.highestReportedQCTimeout.Set(timeout.HighestQC.View) {
+		c.onNewQCDiscovered(timeout.HighestQC)
+	}
+
+	if c.highestReportedTCTimeout.Set(timeout.LastViewTC.View) {
+		c.onNewTCDiscovered(timeout.LastViewTC)
+	}
+
 	return nil
 }
 

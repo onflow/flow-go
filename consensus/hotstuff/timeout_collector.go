@@ -12,6 +12,12 @@ type OnTCCreated func(tc *flow.TimeoutCertificate)
 // some view
 type OnPartialTCCreated func(view uint64)
 
+// OnNewQCDiscovered is a callback which will be called to notify about new validated QC
+type OnNewQCDiscovered func(*flow.QuorumCertificate)
+
+// OnNewTCDiscovered is a callback which will be called to notify about new validated TC
+type OnNewTCDiscovered func(*flow.TimeoutCertificate)
+
 // TimeoutCollector collects all timeout objects for a specified view. On the happy path, it
 // generates a TimeoutCertificate when enough timeouts have been collected.
 type TimeoutCollector interface {

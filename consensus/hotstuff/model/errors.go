@@ -296,3 +296,32 @@ func NewDoubleTimeoutErrorf(firstTimeout, conflictingTimeout *TimeoutObject, msg
 		err:                fmt.Errorf(msg, args...),
 	}
 }
+
+// InvalidTimeoutError indicates that the timeout object with identifier `TimeoutID` is invalid
+type InvalidTimeoutError struct {
+	TimeoutID flow.Identifier
+	View      uint64
+	Err       error
+}
+
+func NewInvalidTimeoutErrorf(timeout *TimeoutObject, msg string, args ...interface{}) error {
+	return InvalidTimeoutError{
+		TimeoutID: timeout.ID(),
+		View:      timeout.View,
+		Err:       fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidTimeoutError) Error() string {
+	return fmt.Sprintf("invalid timeout %x for view %d: %s", e.TimeoutID, e.View, e.Err.Error())
+}
+
+// IsInvalidTimeoutError returns whether an error is InvalidVoteError
+func IsInvalidTimeoutError(err error) bool {
+	var e InvalidTimeoutError
+	return errors.As(err, &e)
+}
+
+func (e InvalidTimeoutError) Unwrap() error {
+	return e.Err
+}
