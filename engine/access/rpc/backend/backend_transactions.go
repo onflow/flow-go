@@ -269,11 +269,12 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	return &access.TransactionResult{
-		Status:       txStatus,
-		StatusCode:   uint(statusCode),
-		Events:       events,
-		ErrorMessage: txError,
-		BlockID:      blockID,
+		Status:        txStatus,
+		StatusCode:    uint(statusCode),
+		Events:        events,
+		ErrorMessage:  txError,
+		BlockID:       blockID,
+		TransactionID: txID,
 	}, nil
 }
 
@@ -316,10 +317,6 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		}
 
 		for _, txID := range collection.Transactions {
-			if i >= len(resp.TransactionResults) {
-				return nil, status.Errorf(codes.Internal, "number of results returned by execution node is less than the number of collections in the block")
-			}
-
 			txResult := resp.TransactionResults[i]
 			// tx body is irrelevant to status if it's in an executed block
 			txStatus, err := b.deriveTransactionStatus(nil, true, block)
