@@ -43,7 +43,7 @@ const (
 	DefaultProfiler          = false
 	DefaultConsensusDelay    = 800 * time.Millisecond
 	DefaultCollectionDelay   = 950 * time.Millisecond
-	FlowAPIPort              = 3569
+	AccessAPIPort            = 3569
 	AccessPubNetworkPort     = 1234
 	ExecutionAPIPort         = 3600
 	MetricsPort              = 8080
@@ -133,7 +133,6 @@ func main() {
 		panic(err)
 	}
 
-	// Generate the Observer services docker-compose-nodes.yml
 	dockerServices = prepareObserverServices(dockerServices, flowNodeContainerConfigs)
 
 	err = writeDockerComposeConfig(dockerServices)
@@ -158,7 +157,7 @@ func displayFlowNetworkConf(flowNetworkConf testnet.NetworkConfig) {
 
 func displayPortAssignments() {
 	for i := 0; i < accessCount; i++ {
-		fmt.Printf("Access %d Flow API will be accessible at localhost:%d\n", i+1, FlowAPIPort+i)
+		fmt.Printf("Access %d Flow API will be accessible at localhost:%d\n", i+1, AccessAPIPort+i)
 		fmt.Printf("Access %d public libp2p access will be accessible at localhost:%d\n\n", i+1, AccessPubNetworkPort+i)
 	}
 	for i := 0; i < executionCount; i++ {
@@ -166,7 +165,7 @@ func displayPortAssignments() {
 	}
 	fmt.Println()
 	for i := 0; i < observerCount; i++ {
-		fmt.Printf("Observer %d Flow API will be accessible at localhost:%d\n", i+1, (accessCount*2)+(FlowAPIPort)+2*i)
+		fmt.Printf("Observer %d Flow API will be accessible at localhost:%d\n", i+1, (accessCount*2)+(AccessAPIPort)+2*i)
 	}
 }
 
@@ -500,8 +499,8 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 
 	service.Ports = []string{
 		fmt.Sprintf("%d:%d", AccessPubNetworkPort+i, AccessPubNetworkPort),
-		fmt.Sprintf("%d:%d", FlowAPIPort+2*i, RPCPort),
-		fmt.Sprintf("%d:%d", FlowAPIPort+(2*i+1), SecuredRPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+2*i, RPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+(2*i+1), SecuredRPCPort),
 	}
 
 	return service
@@ -624,9 +623,6 @@ func prepareObserverProfilerFolder(observerName string) string {
 }
 
 func prepareObserverDataFolder(observerName string) string {
-	//for i := 0; i < observerCount; i++ {
-	//	observerName := fmt.Sprintf("%s_%d", DefaultObserverName, i+1)
-	// Create a data folder (on the host) for the named Observer
 	dataDir := getObserverDataDir(observerName)
 	err := os.MkdirAll(dataDir, 0755)
 	if err != nil && !os.IsExist(err) {
@@ -723,16 +719,16 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 		// the same from the guest's perspective, the host port numbering accounts for the presence
 		// of multiple pairs of listeners on the host to avoid port collisions. Observer listener pairs
 		// are numbered just after the Access listeners on the host network by prior convention
-		fmt.Sprintf("%d:%d", (accessCount*2)+FlowAPIPort+(2*i), RPCPort),
-		fmt.Sprintf("%d:%d", (accessCount*2)+FlowAPIPort+(2*i)+1, SecuredRPCPort),
+		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i), RPCPort),
+		fmt.Sprintf("%d:%d", (accessCount*2)+AccessAPIPort+(2*i)+1, SecuredRPCPort),
 	}
 	return observerService
 }
 
 func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs []testnet.ContainerConfig) Services {
-	agPublicKey, err := getAccessGatewayPublicKey(flowNodeContainerConfigs)
-	if err != nil {
-		panic(err)
+
+	if observerCount == 0 {
+		return dockerServices
 	}
 
 	if accessCount < 1 {
@@ -744,22 +740,21 @@ func prepareObserverServices(dockerServices Services, flowNodeContainerConfigs [
 		panic(fmt.Sprintf("No more than %d observers are permitted within localnet", DefaultMaxObservers))
 	}
 
-	if observerCount > 0 {
-		for i := 0; i < observerCount; i++ {
-			observerName := fmt.Sprintf("%s_%d", DefaultObserverName, i+1)
-			profilerDir := prepareObserverProfilerFolder(observerName)
-			dataDir := prepareObserverDataFolder(observerName)
-			observerService := prepareObserverService(i, observerName, agPublicKey, profilerDir, dataDir)
+	for i := 0; i < observerCount; i++ {
+		observerName := fmt.Sprintf("%s_%d", DefaultObserverName, i+1)
+		profilerDir := prepareObserverProfilerFolder(observerName)
+		dataDir := prepareObserverDataFolder(observerName)
+		observerService := prepareObserverService(i, observerName, agPublicKey, profilerDir, dataDir)
 
-			// Add a docker container for this named Observer
-			dockerServices[observerName] = observerService
+		// Add a docker container for this named Observer
+		dockerServices[observerName] = observerService
 
-			// Generate observer private key (localnet only, not for production)
-			writeObserverPrivateKey(observerName)
-		}
-		fmt.Println()
-		fmt.Println("Observer services bootstrapping data generated...")
-		fmt.Printf("Access Gateway (%s) public network libp2p key: %s\n\n", DefaultAccessGatewayName, agPublicKey)
+		// Generate observer private key (localnet only, not for production)
+		writeObserverPrivateKey(observerName)
 	}
+	fmt.Println()
+	fmt.Println("Observer services bootstrapping data generated...")
+	fmt.Printf("Access Gateway (%s) public network libp2p key: %s\n\n", DefaultAccessGatewayName, agPublicKey)
+
 	return dockerServices
 }
