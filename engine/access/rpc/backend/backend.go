@@ -400,11 +400,11 @@ func executionNodesForBlockID(
 		receiptCnt := len(executorIDs)
 		// if less than minExecutionNodesCnt execution receipts have been received so far, then return random ENs
 		if receiptCnt < minExecutionNodesCnt {
-			executionNodes, err := state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
 			if err != nil {
 				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 			}
-			return executionNodes.Sample(maxExecutionNodesCnt), nil
+			executorIDs = newExecutorIDs.NodeIDs()
 		}
 	}
 
@@ -419,7 +419,7 @@ func executionNodesForBlockID(
 
 	if len(executionIdentitiesRandom) == 0 {
 		return flow.IdentityList{},
-			fmt.Errorf("no matching execution node could for block ID %v", blockID)
+			fmt.Errorf("no matching execution node found for block ID %v", blockID)
 	}
 
 	return executionIdentitiesRandom, nil
