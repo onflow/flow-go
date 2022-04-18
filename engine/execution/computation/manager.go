@@ -43,7 +43,7 @@ type VirtualMachine interface {
 }
 
 type ComputationManager interface {
-	ExecuteScript([]byte, [][]byte, *flow.Header, state.View) ([]byte, error)
+	ExecuteScript(context.Context, []byte, [][]byte, *flow.Header, state.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
 		block *entity.ExecutableBlock,
@@ -53,23 +53,25 @@ type ComputationManager interface {
 }
 
 var DefaultScriptLogThreshold = 1 * time.Second
+var DefaultScriptExecutionTimeLimit = 10 * time.Second
 
 const MaxScriptErrorMessageSize = 1000 // 1000 chars
 
 // Manager manages computation and execution
 type Manager struct {
-	log                zerolog.Logger
-	metrics            module.ExecutionMetrics
-	me                 module.Local
-	protoState         protocol.State
-	vm                 VirtualMachine
-	vmCtx              fvm.Context
-	blockComputer      computer.BlockComputer
-	programsCache      *ProgramsCache
-	scriptLogThreshold time.Duration
-	uploaders          []uploader.Uploader
-	eds                state_synchronization.ExecutionDataService
-	edCache            state_synchronization.ExecutionDataCIDCache
+	log                      zerolog.Logger
+	metrics                  module.ExecutionMetrics
+	me                       module.Local
+	protoState               protocol.State
+	vm                       VirtualMachine
+	vmCtx                    fvm.Context
+	blockComputer            computer.BlockComputer
+	programsCache            *ProgramsCache
+	scriptLogThreshold       time.Duration
+	scriptExecutionTimeLimit time.Duration
+	uploaders                []uploader.Uploader
+	eds                      state_synchronization.ExecutionDataService
+	edCache                  state_synchronization.ExecutionDataCIDCache
 }
 
 func New(
@@ -83,6 +85,7 @@ func New(
 	programsCacheSize uint,
 	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
+	scriptExecutionTimeLimit time.Duration,
 	uploaders []uploader.Uploader,
 	eds state_synchronization.ExecutionDataService,
 	edCache state_synchronization.ExecutionDataCIDCache,
@@ -108,18 +111,19 @@ func New(
 	}
 
 	e := Manager{
-		log:                log,
-		metrics:            metrics,
-		me:                 me,
-		protoState:         protoState,
-		vm:                 vm,
-		vmCtx:              vmCtx,
-		blockComputer:      blockComputer,
-		programsCache:      programsCache,
-		scriptLogThreshold: scriptLogThreshold,
-		uploaders:          uploaders,
-		eds:                eds,
-		edCache:            edCache,
+		log:                      log,
+		metrics:                  metrics,
+		me:                       me,
+		protoState:               protoState,
+		vm:                       vm,
+		vmCtx:                    vmCtx,
+		blockComputer:            blockComputer,
+		programsCache:            programsCache,
+		scriptLogThreshold:       scriptLogThreshold,
+		scriptExecutionTimeLimit: scriptExecutionTimeLimit,
+		uploaders:                uploaders,
+		eds:                      eds,
+		edCache:                  edCache,
 	}
 
 	return &e, nil
@@ -133,7 +137,13 @@ func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Pro
 	return blockPrograms.ChildPrograms()
 }
 
-func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view state.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(
+	ctx context.Context,
+	code []byte,
+	arguments [][]byte,
+	blockHeader *flow.Header,
+	view state.View,
+) ([]byte, error) {
 
 	startedAt := time.Now()
 
@@ -147,10 +157,11 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 		e.log.Info().Uint32("trackerID", trackerID).Msg("script execution is complete")
 	}()
 
+	requestCtx, cancel := context.WithTimeout(ctx, e.scriptExecutionTimeLimit)
+	defer cancel()
+
+	script := fvm.NewScriptWithContextAndArgs(code, requestCtx, arguments...)
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
-
-	script := fvm.Script(code).WithArguments(arguments...)
-
 	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
 	err := func() (err error) {
@@ -301,7 +312,8 @@ func (e *Manager) ComputeBlock(
 		Msg("computed block result")
 
 	e.edCache.Insert(block.Block.Header, blobTree)
-	result.ExecutionDataID = rootID
+	e.log.Info().Hex("block_id", logging.Entity(block.Block)).Hex("execution_data_id", rootID[:]).Msg("execution data ID computed")
+	// result.ExecutionDataID = rootID
 
 	return result, nil
 }

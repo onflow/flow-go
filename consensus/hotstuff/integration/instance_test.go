@@ -66,7 +66,7 @@ type Instance struct {
 	producer   *blockproducer.BlockProducer
 	forks      *forks.Forks
 	aggregator *voteaggregator.VoteAggregator
-	voter      *safetyrules.Voter
+	voter      *safetyrules.SafetyRules
 	validator  *validator.Validator
 
 	// main logic

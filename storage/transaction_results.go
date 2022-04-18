@@ -10,4 +10,6 @@ type TransactionResults interface {
 
 	// ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
 	ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.TransactionResult, error)
+
+	ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error)
 }

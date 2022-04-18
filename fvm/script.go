@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -14,35 +15,57 @@ import (
 	"github.com/onflow/flow-go/model/hash"
 )
 
-func Script(code []byte) *ScriptProcedure {
-	scriptHash := hash.DefaultHasher.ComputeHash(code)
-
-	return &ScriptProcedure{
-		Script: code,
-		ID:     flow.HashToID(scriptHash),
-	}
-}
-
 type ScriptProcedure struct {
-	ID        flow.Identifier
-	Script    []byte
-	Arguments [][]byte
-	Value     cadence.Value
-	Logs      []string
-	Events    []flow.Event
-	GasUsed   uint64
-	Err       errors.Error
+	ID             flow.Identifier
+	Script         []byte
+	Arguments      [][]byte
+	RequestContext context.Context
+	Value          cadence.Value
+	Logs           []string
+	Events         []flow.Event
+	GasUsed        uint64
+	Err            errors.Error
 }
 
 type ScriptProcessor interface {
 	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) error
 }
 
+func Script(code []byte) *ScriptProcedure {
+	scriptHash := hash.DefaultHasher.ComputeHash(code)
+
+	return &ScriptProcedure{
+		Script:         code,
+		ID:             flow.HashToID(scriptHash),
+		RequestContext: context.Background(),
+	}
+}
+
 func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	return &ScriptProcedure{
-		ID:        proc.ID,
-		Script:    proc.Script,
-		Arguments: args,
+		ID:             proc.ID,
+		Script:         proc.Script,
+		RequestContext: proc.RequestContext,
+		Arguments:      args,
+	}
+}
+
+func (proc *ScriptProcedure) WithRequestContext(reqContext context.Context) *ScriptProcedure {
+	return &ScriptProcedure{
+		ID:             proc.ID,
+		Script:         proc.Script,
+		RequestContext: reqContext,
+		Arguments:      proc.Arguments,
+	}
+}
+
+func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args ...[]byte) *ScriptProcedure {
+	scriptHash := hash.DefaultHasher.ComputeHash(code)
+	return &ScriptProcedure{
+		ID:             flow.HashToID(scriptHash),
+		Script:         code,
+		RequestContext: reqContext,
+		Arguments:      args,
 	}
 }
 
@@ -65,6 +88,24 @@ func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	return nil
 }
 
+func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
+	computationLimit := ctx.ComputationLimit
+	// if ctx.ComputationLimit is also zero, fallback to the default computation limit
+	if computationLimit == 0 {
+		computationLimit = DefaultComputationLimit
+	}
+	return computationLimit
+}
+
+func (proc *ScriptProcedure) MemoryLimit(ctx Context) uint64 {
+	memoryLimit := ctx.MemoryLimit
+	// if ctx.MemoryLimit is also zero, fallback to the default memory limit
+	if memoryLimit == 0 {
+		memoryLimit = DefaultMemoryLimit
+	}
+	return memoryLimit
+}
+
 type ScriptInvoker struct{}
 
 func NewScriptInvoker() ScriptInvoker {
@@ -78,7 +119,7 @@ func (i ScriptInvoker) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env := NewScriptEnvironment(ctx, vm, sth, programs)
+	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
 	location := common.ScriptLocation(proc.ID[:])
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
@@ -98,6 +139,6 @@ func (i ScriptInvoker) Process(
 	proc.Value = value
 	proc.Logs = env.Logs()
 	proc.Events = env.Events()
-	proc.GasUsed = env.GetComputationUsed()
+	proc.GasUsed = env.ComputationUsed()
 	return nil
 }

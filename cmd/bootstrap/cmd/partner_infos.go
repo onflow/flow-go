@@ -116,7 +116,7 @@ func getFlowClient() *client.Client {
 		insecureClient = false
 	}
 
-	config, err := common.NewFlowClientConfig(flagANAddress, strings.TrimPrefix(flagANNetworkKey, "0x"), insecureClient)
+	config, err := common.NewFlowClientConfig(flagANAddress, strings.TrimPrefix(flagANNetworkKey, "0x"), flow.ZeroID, insecureClient)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not get flow client config with address (%s) and network key (%s)", flagANAddress, flagANNetworkKey)
 	}
