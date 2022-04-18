@@ -194,6 +194,29 @@ func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Iden
 	return tx, nil
 }
 
+func (b *backendTransactions) GetTransactionsByBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+) ([]*flow.TransactionBody, error) {
+	var transactions []*flow.TransactionBody
+
+	block, err := b.blocks.ByID(blockID)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := b.collections.ByID(guarantee.CollectionID)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
+
+		transactions = append(transactions, collection.Transactions...)
+	}
+
+	return transactions, nil
+}
+
 func (b *backendTransactions) GetTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -657,7 +680,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	logAnyError := func() {
 		errToReturn := errs.ErrorOrNil()
 		if errToReturn != nil {
-			b.log.Info().Err(errToReturn).Msg("failed to get transaction results from execution nodes")
+			b.log.Err(errToReturn).Msg("failed to get transaction results from execution nodes")
 		}
 	}
 	defer logAnyError()
