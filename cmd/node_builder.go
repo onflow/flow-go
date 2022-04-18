@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -151,6 +152,7 @@ type BaseConfig struct {
 	TopologyEdgeProbability         float64
 	HeroCacheMetricsEnable          bool
 	SyncCoreConfig                  synchronization.Config
+	CodecFactory                    func() network.Codec
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -232,5 +234,6 @@ func DefaultBaseConfig() *BaseConfig {
 		TopologyEdgeProbability:         topology.MaximumEdgeProbability,
 		HeroCacheMetricsEnable:          false,
 		SyncCoreConfig:                  synchronization.DefaultConfig(),
+		CodecFactory:                    func() network.Codec { return cbor.NewCodec() },
 	}
 }

@@ -42,7 +42,6 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -317,7 +316,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	net, err := p2p.NewNetwork(fnb.Logger,
-		cborcodec.NewCodec(),
+		fnb.CodecFactory(),
 		fnb.Me,
 		func() (network.Middleware, error) { return fnb.Middleware, nil },
 		topologyCache,
