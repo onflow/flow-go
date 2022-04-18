@@ -28,6 +28,10 @@ func NewTimeoutCertificateBuilder(view uint64) *TimeoutCertificateBuilder {
 	}
 }
 
+func (b *TimeoutCertificateBuilder) View() uint64 {
+	return b.view
+}
+
 // Add adds information about timeout into local cache
 // CAUTION: doesn't perform any validation including deduplication.
 func (b *TimeoutCertificateBuilder) Add(timeout *model.TimeoutObject) {

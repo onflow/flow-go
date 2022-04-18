@@ -1,6 +1,7 @@
 package timeoutcollector
 
 import (
+	"fmt"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -8,9 +9,12 @@ import (
 )
 
 type accumulatedWeightTracker struct {
-	minRequiredWeight   uint64
-	done                atomic.Bool
-	onWeightAccumulated func()
+	minRequiredWeight uint64
+	done              atomic.Bool
+}
+
+func (t *accumulatedWeightTracker) Done() bool {
+	return t.done.Load()
 }
 
 func (t *accumulatedWeightTracker) Track(weight uint64) bool {
@@ -18,32 +22,35 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 		return false
 	}
 	if t.done.CAS(false, true) {
-		t.onWeightAccumulated()
 		return true
 	}
 	return false
 }
 
 type TimeoutProcessor struct {
-	view             uint64
-	highQCViews      map[uint64]struct{}
-	highestQC        *flow.QuorumCertificate
-	partialTCTracker accumulatedWeightTracker
-	tcTracker        accumulatedWeightTracker
+	validator          hotstuff.Validator
+	partialTCTracker   accumulatedWeightTracker
+	tcTracker          accumulatedWeightTracker
+	tcBuilder          *TimeoutCertificateBuilder
+	onPartialTCCreated hotstuff.OnPartialTCCreated
+	onTCCreated        hotstuff.OnTCCreated
 }
 
-func NewTimeoutProcessor(view uint64, totalWeight uint64, onPartialTCCreated hotstuff.OnPartialTCCreated) *TimeoutProcessor {
+func NewTimeoutProcessor(view uint64, totalWeight uint64,
+	onPartialTCCreated hotstuff.OnPartialTCCreated,
+	onTCCreated hotstuff.OnTCCreated,
+) *TimeoutProcessor {
 	return &TimeoutProcessor{
 		partialTCTracker: accumulatedWeightTracker{
-			minRequiredWeight:   hotstuff.ComputeWeightThresholdForHonestMajority(totalWeight),
-			done:                *atomic.NewBool(false),
-			onWeightAccumulated: func() { onPartialTCCreated(view) },
+			minRequiredWeight: hotstuff.ComputeWeightThresholdForHonestMajority(totalWeight),
+			done:              *atomic.NewBool(false),
 		},
 		tcTracker: accumulatedWeightTracker{
-			minRequiredWeight:   hotstuff.ComputeWeightThresholdForBuildingQC(totalWeight),
-			done:                *atomic.NewBool(false),
-			onWeightAccumulated: func() {},
+			minRequiredWeight: hotstuff.ComputeWeightThresholdForBuildingQC(totalWeight),
+			done:              *atomic.NewBool(false),
 		},
+		onPartialTCCreated: onPartialTCCreated,
+		onTCCreated:        onTCCreated,
 	}
 }
 
@@ -58,24 +65,60 @@ func NewTimeoutProcessor(view uint64, totalWeight uint64, onPartialTCCreated hot
 // * model.InvalidVoteError - submitted vote with invalid signature
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
-	if p.tcTracker.done.Load() {
+	if p.tcTracker.Done() {
 		return nil
 	}
 
-	p.highQCViews[timeout.HighestQC.View] = struct{}{}
-	if p.highestQC.View < timeout.HighestQC.View {
-		p.highestQC = timeout.HighestQC
+	err := p.validateTimeout(timeout)
+	if err != nil {
+		// handle error
 	}
+
+	//msg := hotstuff.MakeTimeoutMessage(timeout.View, timeout.HighestQC.View)
+
+	totalWeight := uint64(0)
+	//totalWeight, err := p.sigAggregator.TrustedAdd(timeout.SignerID, timeout.SigData, msg)
+	//if err != nil {
+	//	// handle error
+	//}
+
+	p.tcBuilder.Add(timeout)
+
+	if p.partialTCTracker.Track(totalWeight) {
+		p.onPartialTCCreated(p.tcBuilder.View())
+	}
+
+	// checking of conditions for building TC are satisfied
+	// At this point, we have enough signatures to build a TC. Another routine
+	// might just be at this point. To avoid duplicate work, only one routine can pass:
+	if !p.tcTracker.Track(totalWeight) {
+		return nil
+	}
+
+	tc, err := p.buildTC()
+	if err != nil {
+		return fmt.Errorf("internal error constructing TC: %w", err)
+	}
+	p.onTCCreated(tc)
 
 	return nil
 }
 
+func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
+	panic("implement me")
+}
+
 func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
-	return &flow.TimeoutCertificate{
-		View:          p.view,
-		TOHighQCViews: nil,
-		TOHighestQC:   nil,
-		SignerIDs:     nil,
-		SigData:       nil,
-	}, nil
+	signers, aggregatedSig, err := p.sigAggregator.UnsafeAggregate()
+	if err != nil {
+		return nil, fmt.Errorf("could not aggregate multi message signature: %w", err)
+	}
+
+	tc := p.tcBuilder.Build(signers, aggregatedSig)
+	err = p.validator.ValidateTC(tc)
+	if err != nil {
+		return nil, fmt.Errorf("constructed TC is invalid: %w", err)
+	}
+
+	return tc, nil
 }
