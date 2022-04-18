@@ -246,11 +246,12 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	return &access.TransactionResult{
-		Status:       txStatus,
-		StatusCode:   uint(statusCode),
-		Events:       events,
-		ErrorMessage: txError,
-		BlockID:      blockID,
+		Status:        txStatus,
+		StatusCode:    uint(statusCode),
+		Events:        events,
+		ErrorMessage:  txError,
+		BlockID:       blockID,
+		TransactionID: txID,
 	}, nil
 }
 
@@ -263,17 +264,16 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, convertStorageError(err)
 	}
 
-	req := execproto.GetTransactionResultsByBlockIDRequest{
+	req := execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		// TODO: update this section to incorporate the new fallback logic
 		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
 		if isInsufficientExecReceipts {
 			return nil, status.Errorf(codes.NotFound, err.Error())
 		}
-		return nil, status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to retrieve results from any execution node: %v", err)
 	}
 
 	resp, err := b.getTransactionResultsByBlockIDFromAnyExeNode(ctx, execNodes, req)
@@ -284,8 +284,40 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
-	results := make([]*access.TransactionResult, len(resp.Results))
-	for _, txResult := range resp.Results {
+	results := make([]*access.TransactionResult, len(resp.TransactionResults))
+	i := 0
+
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := b.collections.LightByID(guarantee.CollectionID)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
+
+		for _, txID := range collection.Transactions {
+			txResult := resp.TransactionResults[i]
+			// tx body is irrelevant to status if it's in an executed block
+			txStatus, err := b.deriveTransactionStatus(nil, true, block)
+			if err != nil {
+				return nil, convertStorageError(err)
+			}
+
+			results = append(results, &access.TransactionResult{
+				Status:        txStatus,
+				StatusCode:    uint(txResult.GetStatusCode()),
+				Events:        convert.MessagesToEvents(txResult.GetEvents()),
+				ErrorMessage:  txResult.GetErrorMessage(),
+				BlockID:       blockID,
+				TransactionID: txID,
+				CollectionID:  guarantee.CollectionID,
+			})
+
+			i++
+		}
+	}
+
+	// system chunk transactions
+	for i < len(resp.TransactionResults) {
+		txResult := resp.TransactionResults[i]
 		// tx body is irrelevant to status if it's in an executed block
 		txStatus, err := b.deriveTransactionStatus(nil, true, block)
 		if err != nil {
@@ -299,6 +331,8 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			ErrorMessage: txResult.GetErrorMessage(),
 			BlockID:      blockID,
 		})
+
+		i++
 	}
 
 	return results, nil
@@ -617,7 +651,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
 	execNodes flow.IdentityList,
-	req execproto.GetTransactionResultsByBlockIDRequest,
+	req execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	var errs *multierror.Error
 	logAnyError := func() {
@@ -633,7 +667,6 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 			b.log.Debug().
 				Str("execution_node", execNode.String()).
 				Hex("block_id", req.GetBlockId()).
-				Uint32("index", req.GetIndex()).
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
 		}
@@ -648,8 +681,8 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
 	execNode *flow.Identity,
-	req execproto.GetTransactionResultsByBlockIDRequest,
-) (*execproto.GetTransactionResultResponse, error) {
+	req execproto.GetTransactionsByBlockIDRequest,
+) (*execproto.GetTransactionResultsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err

@@ -50,11 +50,13 @@ type API interface {
 
 // TODO: Combine this with flow.TransactionResult?
 type TransactionResult struct {
-	Status       flow.TransactionStatus
-	StatusCode   uint
-	Events       []flow.Event
-	ErrorMessage string
-	BlockID      flow.Identifier
+	Status        flow.TransactionStatus
+	StatusCode    uint
+	Events        []flow.Event
+	ErrorMessage  string
+	BlockID       flow.Identifier
+	TransactionID flow.Identifier
+	CollectionID  flow.Identifier
 }
 
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
@@ -81,11 +83,13 @@ func TransactionResultsToMessage(results []*TransactionResult) *access.Transacti
 func MessageToTransactionResult(message *access.TransactionResultResponse) *TransactionResult {
 
 	return &TransactionResult{
-		Status:       flow.TransactionStatus(message.Status),
-		StatusCode:   uint(message.StatusCode),
-		ErrorMessage: message.ErrorMessage,
-		Events:       convert.MessagesToEvents(message.Events),
-		BlockID:      flow.HashToID(message.BlockId),
+		Status:        flow.TransactionStatus(message.Status),
+		StatusCode:    uint(message.StatusCode),
+		ErrorMessage:  message.ErrorMessage,
+		Events:        convert.MessagesToEvents(message.Events),
+		BlockID:       flow.HashToID(message.BlockId),
+		TransactionID: flow.HashToID(message.TransactionId),
+		CollectionID:  flow.HashToID(message.CollectionId),
 	}
 }
 
