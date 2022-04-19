@@ -283,6 +283,9 @@ func (fnb *FlowNodeBuilder) EnqueueLibP2pMiddlewareInit() {
 			mwOpts...,
 		)
 
+		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
+		fnb.ProtocolEvents.AddConsumer(idEvents)
+
 		return nil
 	})
 }
@@ -341,9 +344,6 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	}
 
 	fnb.Network = net
-
-	idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
-	fnb.ProtocolEvents.AddConsumer(idEvents)
 
 	return net, nil
 }

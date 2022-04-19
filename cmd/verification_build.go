@@ -9,7 +9,7 @@ import (
 	flowconsensus "github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recoveryprotocol "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -26,13 +26,13 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/compliance"
-	"github.com/onflow/flow-go/module/finalizer/consensus"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
-	badger2 "github.com/onflow/flow-go/state/protocol/badger"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage/badger"
 )
@@ -53,13 +53,13 @@ type VerificationConfig struct {
 
 type VerificationNodeBuilder struct {
 	*FlowNodeBuilder
-	verConf *VerificationConfig
+	verConf VerificationConfig
 }
 
 func NewVerificationNodeBuilder(nodeBuilder *FlowNodeBuilder) *VerificationNodeBuilder {
 	return &VerificationNodeBuilder{
 		FlowNodeBuilder: nodeBuilder,
-		verConf:         &VerificationConfig{},
+		verConf:         VerificationConfig{},
 	}
 }
 
@@ -109,11 +109,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			var err error
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badger2.State)
+			state, ok := node.State.(*badgerState.State)
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
-			followerState, err = badger2.NewFollowerState(
+			followerState, err = badgerState.NewFollowerState(
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
@@ -315,7 +315,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := consensus.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -325,7 +325,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
-			packer := signature.NewConsensusSigDataPacker(committee)
+			packer := hotsignature.NewConsensusSigDataPacker(committee)
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, packer)
 
