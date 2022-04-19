@@ -66,6 +66,7 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 			return fmt.Errorf("could not handle execution receipt event: %w", err)
 		}
 	case *messages.ChunkDataRequest:
+		// orchestrator received chunk data request from VN after VN assigned a chunk, and VN now requesting that chunk to verify it.
 		if err := o.handleChunkDataPackRequestEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack request event: %w", err)
 		}
