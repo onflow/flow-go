@@ -1380,6 +1380,7 @@ import (
 	netcache "github.com/onflow/flow-go/network/cache"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
@@ -1574,95 +1575,106 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		codec := cborcodec.NewCodec()
+	fnb.Component("conduit-factory", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		cf := conduit.NewDefaultConduitFactory()
+		fnb.ConduitFactory = cf
 
-		myAddr := fnb.NodeConfig.Me.Address()
-		if fnb.BaseConfig.BindAddr != NotSet {
-			myAddr = fnb.BaseConfig.BindAddr
-		}
-
-		libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
-			fnb.Logger,
-			myAddr,
-			fnb.NetworkKey,
-			fnb.SporkID,
-			fnb.IdentityProvider,
-			fnb.Metrics.Network,
-			fnb.Resolver,
-			fnb.BaseConfig.NodeRole,
-		)
-
-		var mwOpts []p2p.MiddlewareOption
-		if len(fnb.MsgValidators) > 0 {
-			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
-		}
-
-		// run peer manager with the specified interval and let is also prune connections
-		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
-		mwOpts = append(mwOpts,
-			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
-		)
-
-		fnb.Middleware = p2p.NewMiddleware(
-			fnb.Logger,
-			libP2PNodeFactory,
-			fnb.Me.NodeID(),
-			fnb.Metrics.Network,
-			fnb.SporkID,
-			fnb.BaseConfig.UnicastMessageTimeout,
-			fnb.IDTranslator,
-			mwOpts...,
-		)
-
-		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-
-		topologyFactory, err := topology.Factory(topology.Name(fnb.TopologyProtocolName))
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.TopologyProtocolName, err)
-		}
-		top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.TopologyEdgeProbability)
-		if err != nil {
-			return nil, fmt.Errorf("could not create topology: %w", err)
-		}
-		topologyCache := topology.NewCache(fnb.Logger, top)
-
-		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-		if fnb.HeroCacheMetricsEnable {
-			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
-		}
-		receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
-			fnb.Logger,
-			heroCacheCollector)
-
-		err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
-		if err != nil {
-			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
-		}
-
-		// creates network instance
-		net, err := p2p.NewNetwork(fnb.Logger,
-			codec,
-			fnb.Me,
-			func() (network.Middleware, error) { return fnb.Middleware, nil },
-			topologyCache,
-			subscriptionManager,
-			fnb.Metrics.Network,
-			fnb.IdentityProvider,
-			receiveCache,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize network: %w", err)
-		}
-
-		fnb.Network = net
-
-		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
-		fnb.ProtocolEvents.AddConsumer(idEvents)
-
-		return net, nil
+		return cf, nil
 	})
+	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+		return fnb.InitFlowNetworkWithConduitFactory(node, fnb.ConduitFactory)
+	})
+}
+
+func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
+	codec := cborcodec.NewCodec()
+
+	myAddr := fnb.NodeConfig.Me.Address()
+	if fnb.BaseConfig.BindAddr != NotSet {
+		myAddr = fnb.BaseConfig.BindAddr
+	}
+
+	libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
+		fnb.Logger,
+		myAddr,
+		fnb.NetworkKey,
+		fnb.SporkID,
+		fnb.IdentityProvider,
+		fnb.Metrics.Network,
+		fnb.Resolver,
+		fnb.BaseConfig.NodeRole,
+	)
+
+	var mwOpts []p2p.MiddlewareOption
+	if len(fnb.MsgValidators) > 0 {
+		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
+	}
+
+	// run peer manager with the specified interval and let is also prune connections
+	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
+	mwOpts = append(mwOpts,
+		p2p.WithPeerManager(peerManagerFactory),
+		p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+	)
+
+	fnb.Middleware = p2p.NewMiddleware(
+		fnb.Logger,
+		libP2PNodeFactory,
+		fnb.Me.NodeID(),
+		fnb.Metrics.Network,
+		fnb.SporkID,
+		fnb.BaseConfig.UnicastMessageTimeout,
+		fnb.IDTranslator,
+		mwOpts...,
+	)
+
+	subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
+
+	topologyFactory, err := topology.Factory(topology.Name(fnb.TopologyProtocolName))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve topology factory for %s: %w", fnb.TopologyProtocolName, err)
+	}
+	top, err := topologyFactory(fnb.NodeID, fnb.Logger, fnb.State, fnb.TopologyEdgeProbability)
+	if err != nil {
+		return nil, fmt.Errorf("could not create topology: %w", err)
+	}
+	topologyCache := topology.NewCache(fnb.Logger, top)
+
+	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+	if fnb.HeroCacheMetricsEnable {
+		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
+	}
+	receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
+		fnb.Logger,
+		heroCacheCollector)
+
+	err = node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+	if err != nil {
+		return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+	}
+
+	// creates network instance
+	net, err := p2p.NewNetwork(fnb.Logger,
+		codec,
+		fnb.Me,
+		func() (network.Middleware, error) { return fnb.Middleware, nil },
+		topologyCache,
+		subscriptionManager,
+		fnb.Metrics.Network,
+		fnb.IdentityProvider,
+		receiveCache,
+		p2p.WithConduitFactory(cf),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize network: %w", err)
+	}
+
+	fnb.Network = net
+
+	idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
+	fnb.ProtocolEvents.AddConsumer(idEvents)
+
+	return net, nil
 }
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
