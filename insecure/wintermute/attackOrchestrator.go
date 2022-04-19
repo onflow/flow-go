@@ -62,6 +62,7 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 	switch protocolEvent := event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
+		// orchestrator received execution receipt from EN after EN executed a block.
 		if err := o.handleExecutionReceiptEvent(event); err != nil {
 			return fmt.Errorf("could not handle execution receipt event: %w", err)
 		}
