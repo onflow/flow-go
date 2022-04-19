@@ -57,8 +57,8 @@ func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 		if errors.Is(err, ErrRepeatedTimeout) {
 			return nil
 		}
-		if _, isDoubleTimeoutErr := model.AsDoubleTimeoutError(err); isDoubleTimeoutErr {
-			// TODO(active-pacemaker): report to notifier
+		if doubleTimeoutErr, isDoubleTimeoutErr := model.AsDoubleTimeoutError(err); isDoubleTimeoutErr {
+			c.notifier.OnDoubleTimeoutDetected(doubleTimeoutErr.FirstTimeout, doubleTimeoutErr.ConflictingTimeout)
 			return nil
 		}
 		return fmt.Errorf("internal error adding timeout %v to cache for view: %d: %w", timeout.ID(), timeout.View, err)
@@ -78,8 +78,7 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	err := c.processor.Process(timeout)
 	if err != nil {
 		if model.IsInvalidTimeoutError(err) {
-			// invalid signature, potentially slashing challenge
-			// notify about invalid timeout
+			c.notifier.OnInvalidTimeoutDetected(timeout)
 			return nil
 		}
 		return fmt.Errorf("internal error while processing timeout: %w", err)
