@@ -28,6 +28,7 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 }
 
 type TimeoutProcessor struct {
+	view               uint64
 	validator          hotstuff.Validator
 	partialTCTracker   accumulatedWeightTracker
 	tcTracker          accumulatedWeightTracker
@@ -35,6 +36,8 @@ type TimeoutProcessor struct {
 	onPartialTCCreated hotstuff.OnPartialTCCreated
 	onTCCreated        hotstuff.OnTCCreated
 }
+
+var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 
 func NewTimeoutProcessor(view uint64, totalWeight uint64,
 	onPartialTCCreated hotstuff.OnPartialTCCreated,
@@ -60,11 +63,14 @@ func NewTimeoutProcessor(view uint64, totalWeight uint64,
 // to create a TC or a partial TC we will immediately do this and submit it
 // via callback for further processing.
 // Expected error returns during normal operations:
-// * VoteForIncompatibleBlockError - submitted vote for incompatible block
-// * VoteForIncompatibleViewError - submitted vote for incompatible view
-// * model.InvalidVoteError - submitted vote with invalid signature
+// * hotstuff.TimeoutForIncompatibleViewError - submitted timeout for incompatible view
+// * model.InvalidTimeoutError - submitted invalid timeout(invalid structure or invalid signature)
 // All other errors should be treated as exceptions.
 func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
+	if p.view != timeout.View {
+		return fmt.Errorf("received incompatible timeout, expected %d got %d", p.view, timeout.View)
+	}
+
 	if p.tcTracker.Done() {
 		return nil
 	}

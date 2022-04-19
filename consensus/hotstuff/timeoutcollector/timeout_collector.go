@@ -12,7 +12,7 @@ import (
 type TimeoutCollector struct {
 	notifier      hotstuff.Consumer
 	timeoutsCache *TimeoutObjectsCache // to track double timeout and timeout equivocation
-	processor     *TimeoutProcessor
+	processor     hotstuff.TimeoutProcessor
 
 	// a callback that will be used to notify PaceMaker
 	// about timeout for higher view that we are aware of
@@ -23,6 +23,8 @@ type TimeoutCollector struct {
 	// highest TC that was reported
 	highestReportedTCTimeout counters.StrictMonotonousCounter
 }
+
+var _ hotstuff.TimeoutCollector = (*TimeoutCollector)(nil)
 
 func (c *TimeoutCollector) AddTimeout(timeout *model.TimeoutObject) error {
 	// cache timeout
