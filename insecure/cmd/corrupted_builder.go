@@ -51,7 +51,7 @@ func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
 		return ccf, nil
 	})
 
-	cnb.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, cnb.ConduitFactory)
+	cnb.FlowNodeBuilder.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, cnb.FlowNodeBuilder.ConduitFactory)
 	})
 }
