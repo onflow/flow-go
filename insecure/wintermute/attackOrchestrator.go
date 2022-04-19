@@ -132,7 +132,7 @@ func (o *Orchestrator) handleExecutionReceiptEvent(receiptEvent *insecure.Event)
 		if receipt.ExecutionResult.ID() == o.state.originalResult.ID() {
 			// receipt contains the original result that has been corrupted.
 			// corrupted result must have already been sent to this node, so
-			// just discards it.
+			// just discard it.
 			lg.Info().Msg("receipt event discarded")
 			return nil
 		}
