@@ -57,13 +57,17 @@ type NodeBuilder interface {
 	// InitIDProviders initializes the ID providers needed by various components
 	InitIDProviders()
 
-	// EnqueueNetworkInit enqueues the default network component with the given context
+	// EnqueueLibP2pMiddlewareInit enqueues the default middleware and libp2p node (networking layer dependencies).
+	// Note: this method must be invoked prior to EnqueueNetworkInit.
 	EnqueueLibP2pMiddlewareInit()
 
-	// EnqueueMetricsServerInit enqueues the metrics component
+	// EnqueueNetworkInit enqueues the default networking layer.
+	EnqueueNetworkInit()
+
+	// EnqueueMetricsServerInit enqueues the metrics component.
 	EnqueueMetricsServerInit()
 
-	// Enqueues the Tracer component
+	// EnqueueTracer enqueues the Tracer component.
 	EnqueueTracer()
 
 	// Module enables setting up dependencies of the engine with the builder context
