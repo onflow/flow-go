@@ -36,7 +36,7 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 	return &Decoder{dec: dec}
 }
 
-// Encode Given a Golang interface 'v', return a []byte 'envelope'.
+// Encode will, given a Golang interface 'v', return a []byte 'envelope'.
 // Return an error if packing the envelope fails.
 // NOTE: 'v' is the network message payload in unserialized form.
 // NOTE: 'code' is the message type.
