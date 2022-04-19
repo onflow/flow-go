@@ -310,6 +310,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 	if fnb.HeroCacheMetricsEnable {
 		heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(fnb.MetricsRegisterer)
 	}
+
 	receiveCache := netcache.NewHeroReceiveCache(fnb.NetworkReceivedMessageCacheSize,
 		fnb.Logger,
 		heroCacheCollector)
