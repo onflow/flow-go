@@ -112,11 +112,19 @@ func (RawStorable) Walk(*interpreter.Interpreter, func(interpreter.Value)) {
 	// NO-OP
 }
 
-func (RawStorable) DynamicType(_ *interpreter.Interpreter, _ interpreter.SeenReferences) interpreter.DynamicType {
+func (RawStorable) StaticType(_ *interpreter.Interpreter) interpreter.StaticType {
 	panic("unreachable")
 }
 
-func (RawStorable) StaticType() interpreter.StaticType {
+func (RawStorable) IsImportable(_ *interpreter.Interpreter) bool {
+	panic("unreachable")
+}
+
+func (RawStorable) ConformsToStaticType(_ *interpreter.Interpreter,
+	_ func() interpreter.LocationRange,
+	_ interpreter.StaticType,
+	_ interpreter.TypeConformanceResults,
+) bool {
 	panic("unreachable")
 }
 
@@ -125,15 +133,6 @@ func (RawStorable) String() string {
 }
 
 func (v RawStorable) RecursiveString(_ interpreter.SeenReferences) string {
-	panic("unreachable")
-}
-
-func (v RawStorable) ConformsToDynamicType(
-	_ *interpreter.Interpreter,
-	_ func() interpreter.LocationRange,
-	dynamicType interpreter.DynamicType,
-	_ interpreter.TypeConformanceResults,
-) bool {
 	panic("unreachable")
 }
 
@@ -234,7 +233,7 @@ func (m *OrderedMapMigration) migrate(storagePayloads []ledger.Payload) ([]ledge
 			if err != nil {
 				panic(err)
 			}
-			storageMap := m.NewStorage.GetStorageMap(address, domain)
+			storageMap := m.NewStorage.GetStorageMap(address, domain, true)
 			for _, pair := range keyValuePairs {
 				storageMap.SetValue(
 					m.Interpreter,
