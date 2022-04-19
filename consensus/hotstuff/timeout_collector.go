@@ -28,7 +28,8 @@ type OnNewTCDiscovered func(*flow.TimeoutCertificate)
 type TimeoutCollector interface {
 	// AddTimeout adds a timeout object to the collector
 	// When f+1 TOs will be collected then callback for partial TC will be triggered,
-	// after collecting 2f+1 TOs a TC will be created and passed to the EventLoop
+	// after collecting 2f+1 TOs a TC will be created and passed to the EventLoop.
+	// All errors propagated to caller are exceptions.
 	AddTimeout(timeoutObject *model.TimeoutObject) error
 
 	// View returns the view that this instance is collecting timeouts for.
