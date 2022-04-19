@@ -176,7 +176,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 		SetSigAlgo(sdkcrypto.ECDSA_P256).
 		SetHashAlgo(sdkcrypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
-	accountID := accountKey.PublicKey.String()
+	accountID := netID.NodeID.String()
 	accountSigner := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -328,9 +328,9 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 
 	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
 	require.NoError(s.T(), err)
-	valueAccountPubKey, err := cadence.NewString(node.account.accountKey.PublicKey.String())
+	nodeID, err := cadence.NewString(node.account.accountID)
 	require.NoError(s.T(), err)
-	err = createParticipantTx.AddArgument(valueAccountPubKey)
+	err = createParticipantTx.AddArgument(nodeID)
 	require.NoError(s.T(), err)
 
 	_, err = s.prepareAndSubmit(createParticipantTx,
