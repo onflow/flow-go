@@ -662,6 +662,63 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.assertAllExpectations()
 }
 
+func (suite *Suite) TestGetTransactionResultsByBlockID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockId := block.ID()
+
+	// block storage returns the corresponding block
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	exeEventReq := execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+
+	exeEventResp := execproto.GetTransactionResultsResponse{}
+
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		connFactory, // the connection factory should be used to get the execution node client
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+	)
+	suite.execClient.
+		On("GetTransactionResultsByBlockID", ctx, &exeEventReq).
+		Return(&exeEventResp, nil).
+		Once()
+
+	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId)
+	suite.checkResponse(result, err)
+
+	suite.assertAllExpectations()
+}
+
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
 // when the protocol state is updated
 func (suite *Suite) TestTransactionStatusTransition() {
