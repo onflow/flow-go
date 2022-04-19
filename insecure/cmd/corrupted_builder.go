@@ -1,4 +1,4 @@
-package insecure
+package cmd
 
 import (
 	"fmt"
@@ -29,7 +29,6 @@ func (cnb *CorruptedNodeBuilder) Initialize() error {
 	}
 
 	cnb.enqueueCorruptibleConduitFactory() // initializes corrupted conduit factory (ccf).
-	cnb.overrideCorruptedNetwork()         // initializes network with ccf.
 
 	return nil
 }
@@ -47,9 +46,7 @@ func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
 		cnb.ConduitFactory = ccf
 		return ccf, nil
 	})
-}
 
-func (cnb *CorruptedNodeBuilder) overrideCorruptedNetwork() {
 	cnb.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return cnb.InitFlowNetworkWithConduitFactory(node, cnb.ConduitFactory)
 	})

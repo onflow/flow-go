@@ -1020,25 +1020,6 @@ func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuild
 	return fnb
 }
 
-// OverrideModule adds given builder function to the modules set of the node builder. If a builder function with that name
-// already exists, it will be overridden.
-func (fnb *FlowNodeBuilder) OverrideModule(name string, f BuilderFunc) NodeBuilder {
-	for i := 0; i < len(fnb.modules); i++ {
-		if fnb.modules[i].name == name {
-			// found module with the name, override it.
-			fnb.modules[i] = namedModuleFunc{
-				fn:   f,
-				name: name,
-			}
-
-			return fnb
-		}
-	}
-
-	// no module found with the same name, just adding it.
-	return fnb.Module(name, f)
-}
-
 // OverrideComponent adds given builder function to the components set of the node builder. If a builder function with that name
 // already exists, it will be overridden.
 func (fnb *FlowNodeBuilder) OverrideComponent(name string, f ReadyDoneFactory) NodeBuilder {
