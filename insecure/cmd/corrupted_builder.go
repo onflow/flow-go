@@ -34,20 +34,24 @@ func (cnb *CorruptedNodeBuilder) Initialize() error {
 }
 
 func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
-	cnb.OverrideComponent(cmd.ConduitFactoryComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	cnb.FlowNodeBuilder.OverrideComponent(cmd.ConduitFactoryComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		host, _, err := net.SplitHostPort(node.BindAddr)
 		if err != nil {
 			return nil, fmt.Errorf("could not extract host address: %w", err)
 		}
 
 		address := net.JoinHostPort(host, CorruptibleConduitFactoryPort)
-		ccf := corruptible.NewCorruptibleConduitFactory(cnb.Logger, cnb.RootChainID, cnb.NodeID, cnb.CodecFactory(), address)
+		ccf := corruptible.NewCorruptibleConduitFactory(
+			cnb.FlowNodeBuilder.Logger,
+			cnb.FlowNodeBuilder.RootChainID,
+			cnb.FlowNodeBuilder.NodeID,
+			cnb.FlowNodeBuilder.CodecFactory(), address)
 
-		cnb.ConduitFactory = ccf
+		cnb.FlowNodeBuilder.ConduitFactory = ccf
 		return ccf, nil
 	})
 
 	cnb.OverrideComponent(cmd.NetworkComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return cnb.InitFlowNetworkWithConduitFactory(node, cnb.ConduitFactory)
+		return cnb.FlowNodeBuilder.InitFlowNetworkWithConduitFactory(node, cnb.ConduitFactory)
 	})
 }
