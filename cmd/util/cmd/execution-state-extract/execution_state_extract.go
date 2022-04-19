@@ -59,7 +59,7 @@ func extractExecutionState(
 
 	var migrations []ledger.Migration
 	var rs []ledger.Reporter
-	var newState ledger.State
+	newState := ledger.State(targetHash)
 
 	if migrate {
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
@@ -104,7 +104,7 @@ func extractExecutionState(
 	}
 
 	newState, err = led.ExportCheckpointAt(
-		ledger.State(targetHash),
+		newState,
 		migrations,
 		rs,
 		complete.DefaultPathFinderVersion,
