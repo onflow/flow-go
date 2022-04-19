@@ -342,9 +342,9 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 		"orchestrator could not send corrupted attestations on time")
 }
 
-// TestBouncingBackChunkDataRequests evaluates when no attacks yet conducted, all chunk data pack requests from corrupted
+// TestPassingThroughChunkDataRequests evaluates when no attacks yet conducted, all chunk data pack requests from corrupted
 // verification nodes are passed through.
-func TestBouncingBackChunkDataRequests(t *testing.T) {
+func TestPassingThroughChunkDataRequests(t *testing.T) {
 	totalChunks := 10
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 	corruptedVerIds := flow.IdentifierList(
@@ -414,15 +414,15 @@ func TestBouncingBackChunkDataRequests(t *testing.T) {
 		"orchestrator could not send corrupted attestations on time")
 }
 
-// TestBouncingBackChunkDataResponse_NoAttack evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
+// TestPassingThroughChunkDataResponse_NoAttack evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
 // orchestrator. In this test, the state of orchestrator is set to nil meaning no attack has been conducted yet.
-func TestBouncingBackChunkDataResponse_NoAttack(t *testing.T) {
-	testBouncingBackChunkDataResponse(t, nil)
+func TestPassingThroughChunkDataResponse_NoAttack(t *testing.T) {
+	testPassingThroughChunkDataResponse(t, nil)
 }
 
-// TestBouncingBackChunkDataResponse_WithAttack evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
+// TestPassingThroughChunkDataResponse_WithAttack evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
 // orchestrator. In this test, the state of orchestrator is set, meaning an attack has already been conducted.
-func TestBouncingBackChunkDataResponse_WithAttack(t *testing.T) {
+func TestPassingThroughChunkDataResponse_WithAttack(t *testing.T) {
 	originalResult := unittest.ExecutionResultFixture()
 	corruptedResult := unittest.ExecutionResultFixture(unittest.WithChunks(1))
 	state := &attackState{
@@ -430,12 +430,12 @@ func TestBouncingBackChunkDataResponse_WithAttack(t *testing.T) {
 		corruptedResult: corruptedResult,
 	}
 
-	testBouncingBackChunkDataResponse(t, state)
+	testPassingThroughChunkDataResponse(t, state)
 }
 
-// testBouncingBackChunkDataResponse evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
+// testPassingThroughChunkDataResponse evaluates all chunk data pack responses that do not match the corrupted chunk are passed through by
 //orchestrator.
-func testBouncingBackChunkDataResponse(t *testing.T, state *attackState) {
+func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 	totalChunks := 10
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 	verIds := flow.IdentifierList(allIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs())
