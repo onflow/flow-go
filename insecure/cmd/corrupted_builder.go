@@ -12,7 +12,7 @@ import (
 // CorruptibleConduitFactoryPort is the port number that gRPC server of the conduit factory of corrupted nodes is listening on.
 const CorruptibleConduitFactoryPort = "4300"
 
-// CorruptedNodeBuilder corrupted node builder creates a general flow node builder with corruptible conduit factory.
+// CorruptedNodeBuilder creates a general flow node builder with corruptible conduit factory.
 type CorruptedNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 }

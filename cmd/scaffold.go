@@ -42,7 +42,6 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -256,8 +255,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 }
 
 func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, cf network.ConduitFactory) (network.Network, error) {
-	codec := cborcodec.NewCodec()
-
 	myAddr := fnb.NodeConfig.Me.Address()
 	if fnb.BaseConfig.BindAddr != NotSet {
 		myAddr = fnb.BaseConfig.BindAddr
@@ -324,7 +321,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 
 	// creates network instance
 	net, err := p2p.NewNetwork(fnb.Logger,
-		codec,
+		fnb.CodecFactory(),
 		fnb.Me,
 		func() (network.Middleware, error) { return fnb.Middleware, nil },
 		topologyCache,
