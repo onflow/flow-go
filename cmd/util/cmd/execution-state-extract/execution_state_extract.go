@@ -59,7 +59,7 @@ func extractExecutionState(
 
 	var migrations []ledger.Migration
 	var rs map[string]ledger.Reporter
-	extractionReportName := ""
+	extractionReportName := "extractionReport"
 	newState := ledger.State(targetHash)
 
 	if migrate {
