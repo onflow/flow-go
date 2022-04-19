@@ -3699,7 +3699,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			for _, event := range tx.Events {
 				// the fee deduction event should only contain the max gas worth of execution effort.
 				if strings.Contains(string(event.Type), "FlowFees.FeesDeducted") {
-					ev, err := jsoncdc.Decode(event.Payload)
+					ev, err := jsoncdc.Decode(nil, event.Payload)
 					require.NoError(t, err)
 					assert.Equal(t, maxExecutionEffort, ev.(cadence.Event).Fields[2].ToGoValue().(uint64))
 				}
