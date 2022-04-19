@@ -254,6 +254,93 @@ func (b *backendTransactions) GetTransactionResult(
 	}, nil
 }
 
+func (b *backendTransactions) GetTransactionResultsByBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+) ([]*access.TransactionResult, error) {
+	block, err := b.blocks.ByID(blockID)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	req := execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockID[:],
+	}
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	if err != nil {
+		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
+		if isInsufficientExecReceipts {
+			return nil, status.Errorf(codes.NotFound, err.Error())
+		}
+		return nil, status.Errorf(codes.Internal, "failed to retrieve results from any execution node: %v", err)
+	}
+
+	resp, err := b.getTransactionResultsByBlockIDFromAnyExeNode(ctx, execNodes, req)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, err
+		}
+		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+	}
+
+	results := make([]*access.TransactionResult, len(resp.TransactionResults))
+	i := 0
+
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := b.collections.LightByID(guarantee.CollectionID)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
+
+		for _, txID := range collection.Transactions {
+			if i >= len(resp.TransactionResults) {
+				return nil, status.Errorf(codes.Internal, "number of results returned by execution node is less than the number of collections in the block")
+			}
+
+			txResult := resp.TransactionResults[i]
+			// tx body is irrelevant to status if it's in an executed block
+			txStatus, err := b.deriveTransactionStatus(nil, true, block)
+			if err != nil {
+				return nil, convertStorageError(err)
+			}
+
+			results = append(results, &access.TransactionResult{
+				Status:        txStatus,
+				StatusCode:    uint(txResult.GetStatusCode()),
+				Events:        convert.MessagesToEvents(txResult.GetEvents()),
+				ErrorMessage:  txResult.GetErrorMessage(),
+				BlockID:       blockID,
+				TransactionID: txID,
+				CollectionID:  guarantee.CollectionID,
+			})
+
+			i++
+		}
+	}
+
+	// system chunk transactions
+	for i < len(resp.TransactionResults) {
+		txResult := resp.TransactionResults[i]
+		// tx body is irrelevant to status if it's in an executed block
+		txStatus, err := b.deriveTransactionStatus(nil, true, block)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
+
+		results = append(results, &access.TransactionResult{
+			Status:       txStatus,
+			StatusCode:   uint(txResult.GetStatusCode()),
+			Events:       convert.MessagesToEvents(txResult.GetEvents()),
+			ErrorMessage: txResult.GetErrorMessage(),
+			BlockID:      blockID,
+		})
+
+		i++
+	}
+
+	return results, nil
+}
+
 // GetTransactionResultByIndex returns TransactionsResults for an index in a block that is executed,
 // pending or finalized transactions return errors
 func (b *backendTransactions) GetTransactionResultByIndex(
