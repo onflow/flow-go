@@ -8,7 +8,7 @@ import (
 
 func main() {
 	verificationBuilder := cmd.NewVerificationNodeBuilder(
-		insecure.NewCorruptedNodeBuilder(flow.RoleExecution.String()).FlowNodeBuilder)
+		insecure.NewCorruptedNodeBuilder(flow.RoleVerification.String()).FlowNodeBuilder)
 	verificationBuilder.LoadFlags()
 
 	if err := verificationBuilder.FlowNodeBuilder.Initialize(); err != nil {

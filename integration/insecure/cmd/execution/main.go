@@ -2,23 +2,23 @@ package main
 
 import (
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/integration/insecure"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func main() {
-	// TODO: use corrupted execution builder when available.
-	verificationBuilder := cmd.NewVerificationNodeBuilder(cmd.FlowNode(flow.RoleVerification.String()))
-	verificationBuilder.LoadFlags()
+	exeBuilder := cmd.NewExecutionNodeBuilder(insecure.NewCorruptedNodeBuilder(flow.RoleExecution.String()).FlowNodeBuilder)
+	exeBuilder.LoadFlags()
 
-	if err := verificationBuilder.FlowNodeBuilder.Initialize(); err != nil {
-		verificationBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+	if err := exeBuilder.FlowNodeBuilder.Initialize(); err != nil {
+		exeBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
-	verificationBuilder.LoadComponentsAndModules()
+	exeBuilder.LoadComponentsAndModules()
 
-	node, err := verificationBuilder.FlowNodeBuilder.Build()
+	node, err := exeBuilder.FlowNodeBuilder.Build()
 	if err != nil {
-		verificationBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		exeBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 	node.Run()
 }
