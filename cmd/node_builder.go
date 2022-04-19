@@ -57,10 +57,6 @@ type NodeBuilder interface {
 	// InitIDProviders initializes the ID providers needed by various components
 	InitIDProviders()
 
-	// EnqueueLibP2pMiddlewareInit enqueues the default middleware and libp2p node (networking layer dependencies).
-	// Note: this method must be invoked prior to EnqueueNetworkInit.
-	// EnqueueLibP2pMiddlewareInit()
-
 	// EnqueueNetworkInit enqueues the default networking layer.
 	EnqueueNetworkInit()
 
