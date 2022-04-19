@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/go-yaml/yaml"
+	"github.com/plus3it/gorecurcopy"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/cmd/build"
@@ -19,7 +21,6 @@ import (
 	testnet "github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/plus3it/gorecurcopy"
 )
 
 const (
