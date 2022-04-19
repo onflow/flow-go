@@ -56,6 +56,18 @@ var (
 		common.MemoryKindBoundFunction:           25,
 		common.MemoryKindBigInt:                  50,
 
+		common.MemoryKindPrimitiveStaticType:     8,
+		common.MemoryKindCompositeStaticType:     17,
+		common.MemoryKindInterfaceStaticType:     17,
+		common.MemoryKindVariableSizedStaticType: 17,
+		common.MemoryKindConstantSizedStaticType: 25,
+		common.MemoryKindDictionaryStaticType:    33,
+		common.MemoryKindOptionalStaticType:      17,
+		common.MemoryKindRestrictedStaticType:    41,
+		common.MemoryKindReferenceStaticType:     41,
+		common.MemoryKindCapabilityStaticType:    17,
+		common.MemoryKindFunctionStaticType:      9,
+
 		// Misc
 
 		common.MemoryKindRawString:       9,
