@@ -231,7 +231,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 
 	// loop through seals and index ID -> result ID
 	for _, seal := range block.Payload.Seals {
-		err := e.executionResults.Index(blockID, seal.ResultID)
+		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not index block for execution result: %w", err)
 		}
