@@ -1622,6 +1622,18 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			require.ElementsMatch(suite.T(), actualList, expectedENs)
 		}
 	}
+	// if we don't find sufficient receipts, executionNodesForBlockID should return a list of random ENs
+	suite.Run("insufficient receipts return random ENs in state", func() {
+		// return no receipts at all attempts
+		attempt1Receipts = flow.ExecutionReceiptList{}
+		attempt2Receipts = flow.ExecutionReceiptList{}
+		attempt3Receipts = flow.ExecutionReceiptList{}
+		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
+		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
+		require.NoError(suite.T(), err)
+		require.Equal(suite.T(), len(actualList), maxExecutionNodesCnt)
+	})
+
 	// if no preferred or fixed ENs are specified, the ExecutionNodesForBlockID function should
 	// return the exe node list without a filter
 	suite.Run("no preferred or fixed ENs", func() {
