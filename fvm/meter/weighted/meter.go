@@ -196,12 +196,6 @@ func WithComputationWeights(weights ExecutionEffortWeights) WeightedMeterOptions
 
 // WithMemoryWeights sets the weights for the memory intensities
 func WithMemoryWeights(weights ExecutionMemoryWeights) WeightedMeterOptions {
-	if int(common.MemoryKindLast)-len(weights) != 1 {
-		return func(m *Meter) {
-			m.memoryWeights = weights
-		}
-	}
-
 	return func(m *Meter) {
 		m.memoryWeights = weights
 	}
