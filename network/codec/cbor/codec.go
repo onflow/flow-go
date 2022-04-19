@@ -74,7 +74,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	return dataBytes, nil
 }
 
-// Decode Given a []byte 'envelope', return a Golang interface 'v'.
+// Decode will, given a []byte 'envelope', return a Golang interface 'v'.
 // Return an error if unpacking the envelope fails.
 // NOTE: 'v' is the network message payload in un-serialized form.
 // NOTE: 'code' is the message type.
