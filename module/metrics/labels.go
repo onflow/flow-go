@@ -95,6 +95,7 @@ const (
 	ResourceServiceEvents             = "service_events"                    // execution node
 	ResourceTransactionResults        = "transaction_results"               // execution node
 	ResourceTransactionResultIndices  = "transaction_result_indices"        // execution node
+	ResourceTransactionResultByBlock  = "transaction_result_by_block"       // execution node
 )
 
 const (
