@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/onflow/flow-go/crypto"
@@ -52,4 +53,8 @@ type TimeoutObject struct {
 // ID returns the identifier for the vote.
 func (t *TimeoutObject) ID() flow.Identifier {
 	return flow.MakeID(t)
+}
+
+func (t *TimeoutObject) String() string {
+	return fmt.Sprintf("View: %d, HighestQC.View: %d, LastViewTC: %v", t.View, t.HighestQC.View, t.LastViewTC)
 }

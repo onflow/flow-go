@@ -172,3 +172,19 @@ func (p *Distributor) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidPro
 		subscriber.OnVoteForInvalidBlockDetected(vote, invalidProposal)
 	}
 }
+
+func (p *Distributor) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, altTimeout *model.TimeoutObject) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnDoubleTimeoutDetected(timeout, altTimeout)
+	}
+}
+
+func (p *Distributor) OnInvalidTimeoutDetected(timeout *model.TimeoutObject) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnInvalidTimeoutDetected(timeout)
+	}
+}

@@ -107,3 +107,8 @@ func (p *FinalizationDistributor) OnDoubleVotingDetected(*model.Vote, *model.Vot
 func (p *FinalizationDistributor) OnInvalidVoteDetected(*model.Vote) {}
 
 func (p *FinalizationDistributor) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}
+
+func (p *FinalizationDistributor) OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject) {
+}
+
+func (p *FinalizationDistributor) OnInvalidTimeoutDetected(*model.TimeoutObject) {}

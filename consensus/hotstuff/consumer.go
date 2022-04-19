@@ -153,6 +153,20 @@ type Consumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal)
+
+	// OnDoubleTimeoutDetected notifications are produced by the Timeout Aggregation logic
+	// whenever a double timeout (same replica producing two different timeouts at the same view) was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnDoubleTimeoutDetected(*model.TimeoutObject, *model.TimeoutObject)
+
+	// OnInvalidTimeoutDetected notifications are produced by the Timeout Aggregation logic
+	// whenever an invalid timeout was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnInvalidTimeoutDetected(*model.TimeoutObject)
 }
 
 // QCCreatedConsumer consumes outbound notifications produced by HotStuff and its components.
