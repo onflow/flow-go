@@ -307,7 +307,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
-	results := make([]*access.TransactionResult, len(resp.TransactionResults))
+	results := make([]*access.TransactionResult, 0, len(resp.TransactionResults))
 	i := 0
 
 	for _, guarantee := range block.Payload.Guarantees {
