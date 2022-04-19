@@ -25,6 +25,7 @@ type ExportReport struct {
 	EpochCounter            uint64
 	PreviousStateCommitment flow.StateCommitment
 	CurrentStateCommitment  flow.StateCommitment
+	ReportSucceeded         bool
 }
 
 // ExportReporter writes data that can be leveraged outside of extraction
@@ -55,18 +56,24 @@ func (e *ExportReporter) Name() string {
 
 func (e *ExportReporter) Report(payload []ledger.Payload) error {
 	script, _, err := ExecuteCurrentEpochScript(e.chain, payload)
+	failedExportReport := ExportReport{
+		ReportSucceeded: true,
+	}
+	failedReport, _ := json.MarshalIndent(failedExportReport, "", " ")
 
 	if err != nil {
 		e.logger.
 			Error().
 			Err(err).
 			Msg("error running GetCurrentEpochCounter script")
-		
+
+		_ = ioutil.WriteFile("export_report.json", failedReport, 0644)
 		// Safely exit and move on to next reporter so we do not block other reporters
 		return nil
 	}
 
 	if script.Err != nil && script.Value == nil {
+		_ = ioutil.WriteFile("export_report.json", failedReport, 0644)
 		e.logger.
 			Error().
 			Err(script.Err).
@@ -86,6 +93,7 @@ func (e *ExportReporter) Report(payload []ledger.Payload) error {
 		EpochCounter:            script.Value.ToGoValue().(uint64),
 		PreviousStateCommitment: e.getBeforeMigrationSCFunc(),
 		CurrentStateCommitment:  e.getAfterMigrationSCFunc(),
+		ReportSucceeded:         true,
 	}
 	file, _ := json.MarshalIndent(report, "", " ")
 	e.logger.

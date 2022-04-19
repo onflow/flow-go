@@ -1,8 +1,10 @@
 package complete
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -265,7 +267,8 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 func (l *Ledger) ExportCheckpointAt(
 	state ledger.State,
 	migrations []ledger.Migration,
-	reporters []ledger.Reporter,
+	reporters map[string]ledger.Reporter,
+	extractionReportName string,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
 ) (ledger.State, error) {
@@ -353,6 +356,15 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
 
+	// If defined, run extraction report BEFORE writing checkpoint file
+	// This is used to optmize the spork process
+	if extractionReport, ok := reporters[extractionReportName]; ok {
+		stateCommittment, err := runReport(extractionReport, payloads, l.logger)
+		if err != nil {
+			return stateCommittment, err
+		}
+	}
+
 	l.logger.Info().Msg("creating a checkpoint for the new trie")
 
 	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
@@ -363,6 +375,14 @@ func (l *Ledger) ExportCheckpointAt(
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
 	err = wal.StoreCheckpoint(writer, newTrie)
+
+	// Writing the checkpoint takes time to write and copy.
+	// Without relying on an exit code or stdout, we need to know when the copy is complete.
+	writeStatusFileErr := writeStatusFile("checkpoint_status.json", err)
+	if writeStatusFileErr != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to write checkpoint status file: %w", writeStatusFileErr)
+	}
+
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
@@ -374,21 +394,9 @@ func (l *Ledger) ExportCheckpointAt(
 
 	// run reporters
 	for _, reporter := range reporters {
-		l.logger.Info().
-			Str("name", reporter.Name()).
-			Msg("starting reporter")
-
-		start := time.Now()
-		err = reporter.Report(payloads)
-		elapsed := time.Since(start)
-
-		l.logger.Info().
-			Str("timeTaken", elapsed.String()).
-			Str("name", reporter.Name()).
-			Msg("reporter done")
+		stateCommittment, err := runReport(reporter, payloads, l.logger)
 		if err != nil {
-			return ledger.State(hash.DummyHash),
-				fmt.Errorf("error running reporter (%s): %w", reporter.Name(), err)
+			return stateCommittment, err
 		}
 	}
 
@@ -432,4 +440,31 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 		}
 	}
 	return nil
+}
+
+func runReport(r ledger.Reporter, p []ledger.Payload, l zerolog.Logger) (ledger.State, error) {
+	l.Info().
+		Str("name", r.Name()).
+		Msg("starting reporter")
+
+	start := time.Now()
+	err := r.Report(p)
+	elapsed := time.Since(start)
+
+	l.Info().
+		Str("timeTaken", elapsed.String()).
+		Str("name", r.Name()).
+		Msg("reporter done")
+	if err != nil {
+		return ledger.State(hash.DummyHash),
+			fmt.Errorf("error running reporter (%s): %w", r.Name(), err)
+	}
+	return ledger.State(hash.DummyHash), nil
+}
+
+func writeStatusFile(fileName string, e error) error {
+	checkpointStatus := map[string]bool{"succeeded": e == nil}
+	checkpointStatusJson, _ := json.MarshalIndent(checkpointStatus, "", " ")
+	err := ioutil.WriteFile(fileName, checkpointStatusJson, 0644)
+	return err
 }
