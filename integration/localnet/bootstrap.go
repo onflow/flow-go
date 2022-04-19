@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/go-yaml/yaml"
-	"github.com/plus3it/gorecurcopy
-	
+	"github.com/plus3it/gorecurcopy"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/cmd/build"
