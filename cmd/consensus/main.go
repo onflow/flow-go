@@ -47,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	chmodule "github.com/onflow/flow-go/module/chunks"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -657,13 +658,21 @@ func main() {
 				mutableState,
 				proposals,
 				syncCore,
-				hotstuffModules.Aggregator)
+				hotstuffModules.Aggregator,
+				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
 			}
 
 			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, complianceCore)
+			comp, err = compliance.NewEngine(
+				node.Logger,
+				node.Network,
+				node.Me,
+				prov,
+				complianceCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
