@@ -270,8 +270,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		checkResult   func(t *testing.T, cr *execution.ComputationResult)
 	}
 
-	txFees := uint64(1_0000)
-	fundingAmount := uint64(1_0000_0000)
+	txFees := uint64(1_000)
+	fundingAmount := uint64(100_000_000)
 	transferAmount := uint64(123_456)
 
 	testCases := []testCase{

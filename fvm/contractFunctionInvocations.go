@@ -33,7 +33,7 @@ func DeductTransactionFeesInvocation(
 			},
 			systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
 			[]interpreter.Value{
-				interpreter.NewUnmeteredAddressValue(payer.Bytes()),
+				interpreter.NewUnmeteredAddressValueFromBytes(payer.Bytes()),
 				interpreter.UFix64Value(inclusionEffort),
 				interpreter.UFix64Value(executionEffort),
 			},
