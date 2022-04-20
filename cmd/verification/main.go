@@ -6,7 +6,8 @@ import (
 )
 
 func main() {
-	verificationBuilder := cmd.NewVerificationNodeBuilder(cmd.FlowNode(flow.RoleVerification.String()))
+	verificationBuilder := cmd.NewVerificationNodeBuilder(
+		cmd.FlowNode(flow.RoleVerification.String()))
 	verificationBuilder.LoadFlags()
 
 	if err := verificationBuilder.FlowNodeBuilder.Initialize(); err != nil {
