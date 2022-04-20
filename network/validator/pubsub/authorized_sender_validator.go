@@ -76,7 +76,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 		Logger()
 
 	// use cbor codec to add explicit dependency on cbor encoded messages adding the message type
-	// to the first byte of the message payload.
+	// to the first byte of the message payload, this adds safety against changing codec without updating this validator
 	codec := cborcodec.NewCodec()
 
 	return func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult {
@@ -86,8 +86,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 			return pubsub.ValidationReject
 		}
 
-		// attempt to decode the flow message type from encoded payload for logging purposes
-		// adds safety against changing codec without updating this validator
+		// attempt to decode the flow message type from encoded payload
 		code, what, err := codec.DecodeMsgType(msg.Payload)
 		if err != nil {
 			log.Warn().
