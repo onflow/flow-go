@@ -91,7 +91,15 @@ transaction(publicKey: [UInt8], count: Int, initialTokenAmount: UFix64) {
     var i = 0
     while i < count {
       let account = AuthAccount(payer: signer)
-      account.addPublicKey(publicKey)
+      let publicKey2 = PublicKey(
+        publicKey: publicKey,
+        signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+      )
+      account.keys.add(
+        publicKey: publicKey2,
+        hashAlgorithm: HashAlgorithm.SHA3_256,
+        weight: 1000.0
+      )
 
 	  let receiver = account.getCapability(/public/flowTokenReceiver)
         .borrow<&{FungibleToken.Receiver}>()
