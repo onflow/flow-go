@@ -444,19 +444,30 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	ctx := context.Background()
 
 	gs.sequenceNumbers = make([]uint64, TotalAccounts)
-	publicKeysStr := strings.Builder{}
-	accountKeyBytes := gs.rootAcctKey.Encode()
+	publicKeyBytes := gs.rootAcctKey.PublicKey.Encode()
 
-	for i := 0; i < TotalAccounts; i++ {
-		publicKeysStr.WriteString("signer.addPublicKey(publicKey)\n")
-	}
 	script := fmt.Sprintf(`
-	transaction(publicKey: [UInt8]) {
-		prepare(signer: AuthAccount) {
-			%s
-		}
-	}
-`, publicKeysStr.String())
+      transaction(counts: Int, key: [UInt8]) {
+        prepare(signer: AuthAccount) {
+          var i = 0
+          while i < counts {
+            i = i + 1
+            let acct = AuthAccount(payer: signer)
+            let publicKey = PublicKey(
+              publicKey: key,
+              signatureAlgorithm: SignatureAlgorithm.%s
+            )
+            signer.keys.add(
+              publicKey: publicKey,
+              hashAlgorithm: HashAlgorithm.%s,
+              weight: 1000.0
+            )
+	      }
+        }
+      }
+	}`,
+		gs.rootAcctKey.SigAlgo.String(),
+		gs.rootAcctKey.HashAlgo.String())
 
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
@@ -465,7 +476,10 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
-	err := addKeysTx.AddArgument(bytesToCadenceArray(accountKeyBytes))
+	err := addKeysTx.AddArgument(cadence.NewInt(TotalAccounts))
+	handle(err)
+
+	err = addKeysTx.AddArgument(bytesToCadenceArray(publicKeyBytes))
 	handle(err)
 
 	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.Index, gs.rootSigner)

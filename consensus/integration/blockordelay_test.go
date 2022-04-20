@@ -1,3 +1,4 @@
+//go:build timesensitivetest
 // +build timesensitivetest
 
 package integration_test
