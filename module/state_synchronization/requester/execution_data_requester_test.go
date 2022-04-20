@@ -329,7 +329,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		suite.db = db
 
-		pauseHeight := uint64(5)
+		pauseHeight := uint64(10)
 		maxSearchAhead := uint64(50)
 
 		// Downloads will succeed immediately for all blocks except pauseHeight, which will hang
@@ -338,10 +338,10 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
 
 		testData := suite.generateTestData(suite.run.blockCount, generate(suite.run.blockCount))
 		testData.maxSearchAhead = maxSearchAhead
+		testData.waitTimeout = time.Second * 10
 
 		// calculate the expected number of blocks that should be downloaded before resuming
-		// there are 3 unsealed blocks in the test data, and the pause block isn't counted
-		expectedDownloads := maxSearchAhead + pauseHeight - 2
+		expectedDownloads := maxSearchAhead + pauseHeight - 1
 
 		edr, fd := suite.prepareRequesterTest(testData)
 		fetchedExecutionData := suite.runRequesterTestPauseResume(edr, fd, testData, int(expectedDownloads), func() { close(pause) })
@@ -456,6 +456,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_
 	// confirm the expected number of downloads were attempted
 	suite.eds.AssertNumberOfCalls(suite.T(), "Get", expectedDownloads)
 
+	suite.T().Log("Resuming")
 	resume()
 
 	// Pause until we've received all of the expected notifications

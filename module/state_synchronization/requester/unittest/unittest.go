@@ -162,7 +162,7 @@ func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions 
 
 func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlockHeaderMockOptions {
 	return func(blocks *storagemock.Headers) {
-		blocks.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
+		blocks.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 			func(blockID flow.Identifier) *flow.Header {
 				return blocksByID[blockID].Header
 			},

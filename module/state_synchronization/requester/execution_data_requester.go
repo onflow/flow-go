@@ -477,6 +477,8 @@ func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.Signal
 	}
 
 	e.processNotification(ctx, entry)
+
+	e.status.Notified(entry.Height)
 	complete()
 }
 

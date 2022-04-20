@@ -242,6 +242,7 @@ func (suite *StatusSuite) TestCache() {
 			entry, err := status.JobToBlockEntry(job)
 			assert.NoError(suite.T(), err)
 
+			suite.status.Notified(entry.Height)
 			notified = append(notified, entry.Height)
 			if entry.ExecutionData != nil {
 				cached++
@@ -304,10 +305,14 @@ func (suite *StatusSuite) TestAtIndex() {
 		assert.NoErrorf(suite.T(), err, "error returned for job at index %d", entry1.Height)
 		assertJobIsEntry(suite.T(), entry1, job)
 
+		suite.status.Notified(entry1.Height)
+
 		// Notify for entry2
 		job, err = suite.status.AtIndex(entry2.Height)
 		assert.NoErrorf(suite.T(), err, "error returned for job at index %d", entry2.Height)
 		assertJobIsEntry(suite.T(), entry2, job)
+
+		suite.status.Notified(entry2.Height)
 
 		// Next entry isn't available
 		job, err = suite.status.AtIndex(entry3.Height)
@@ -338,6 +343,8 @@ func (suite *StatusSuite) TestAtIndex() {
 
 			entry, err := status.JobToBlockEntry(job)
 			assert.NoError(suite.T(), err)
+
+			suite.status.Notified(entry.Height)
 
 			heights = append(heights, entry.Height)
 			height++
@@ -408,6 +415,8 @@ func (suite *StatusSuite) TestHead() {
 		_, err := suite.status.AtIndex(entry1.Height)
 		assert.NoError(suite.T(), err)
 
+		suite.status.Notified(entry1.Height)
+
 		// Next available should be incremented
 		check(entry2.Height)
 	})
@@ -467,8 +476,10 @@ func (suite *StatusSuite) TestNextNotificationHeight() {
 
 		job, err := suite.status.AtIndex(height)
 		assert.NoError(suite.T(), err)
-
 		assertJobIsEntry(suite.T(), expected, job)
+
+		suite.status.Notified(expected.Height)
+
 		assert.Equal(suite.T(), expected.Height+1, suite.status.NextNotificationHeight())
 	})
 

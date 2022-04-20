@@ -1,7 +1,6 @@
 package status
 
 import (
-	"container/heap"
 	"errors"
 	"fmt"
 	"sync"
@@ -17,21 +16,20 @@ type Status struct {
 	// The highest block height for which notifications have been sent
 	lastNotified uint64
 
-	// The highest block height whose ExecutionData has been fetched
-	lastReceived uint64
-
 	// The error that caused the requester to halt, or nil if it is not halted
 	halted error
 
 	// Maximum number of blocks within the notification heap that can have ExecutionData
 	maxCachedEntries uint64
 
+	// Blocks that have been downloaded, but not yet notified
+	fetched map[uint64]*BlockEntry
+
 	// ConsumerProgress datastore where the requester's state is persisted
 	progress storage.ConsumerProgress
 
-	heap *NotificationHeap
-	mu   sync.RWMutex
-	log  zerolog.Logger
+	mu  sync.RWMutex
+	log zerolog.Logger
 }
 
 var _ module.Jobs = (*Status)(nil)
@@ -40,7 +38,7 @@ var _ module.Jobs = (*Status)(nil)
 func New(log zerolog.Logger, maxCachedEntries uint64, progress storage.ConsumerProgress) *Status {
 	return &Status{
 		log:      log,
-		heap:     &NotificationHeap{},
+		fetched:  make(map[uint64]*BlockEntry),
 		progress: progress,
 
 		maxCachedEntries: maxCachedEntries,
@@ -71,7 +69,6 @@ func (s *Status) Load() error {
 
 	// processing restarts after a fresh boot.
 	s.lastNotified = lastNotified
-	s.lastReceived = lastNotified
 
 	// Note: only the error message is preserved between loads, not the type.
 	s.halted = halted
@@ -95,11 +92,17 @@ func (s *Status) Fetched(entry *BlockEntry) {
 		entry.ExecutionData = nil
 	}
 
-	heap.Push(s.heap, entry)
+	s.fetched[entry.Height] = entry
+}
 
-	// Only track the highest height
-	if entry.Height > s.lastReceived {
-		s.lastReceived = entry.Height
+// Notified marks a block height as notified
+func (s *Status) Notified(index uint64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.fetched[index]; ok {
+		delete(s.fetched, index)
+		s.lastNotified = index
 	}
 }
 
@@ -140,30 +143,6 @@ func (s *Status) NextNotificationHeight() uint64 {
 	return s.nextHeight()
 }
 
-// nextNotification returns the BlockEntry for the next notification to send and marks it as notified.
-// If the next notification is available, it returns the BlockEntry and true. Otherwise, it returns
-// nil and false.
-func (s *Status) nextNotification() (*BlockEntry, bool) {
-	var entry *BlockEntry
-	next := s.nextHeight()
-
-	// Remove any entries for the next height or below. This ensures duplicate or unexpected heights
-	// below the tracked heights are removed. If there are duplicate entries for the same height, the
-	// last entry popped from the heap will be returned.
-	for s.heap.Len() > 0 && s.heap.PeekMin().Height <= next {
-		entry = heap.Pop(s.heap).(*BlockEntry)
-	}
-
-	if entry == nil || entry.Height != next {
-		return nil, false
-	}
-
-	// Now we have the next height to notify
-	s.lastNotified = entry.Height
-
-	return entry, true
-}
-
 func (s *Status) nextHeight() uint64 {
 	return s.lastNotified + 1
 }
@@ -173,7 +152,7 @@ func (s *Status) OutstandingNotifications() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.heap.Len()
+	return len(s.fetched)
 }
 
 // AtIndex returns the notification job at the given index.
@@ -181,18 +160,16 @@ func (s *Status) OutstandingNotifications() int {
 // Since notifications are sent sequentially, there is only ever a single job available, which is
 // the next height to notify, iff it's ready.
 func (s *Status) AtIndex(index uint64) (module.Job, error) {
-	// This needs a write lock since it may modify the heap
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	// make sure the requested index is for the next height
-	next := s.nextHeight()
-	if next != index {
+	// only return new jobs for the next height
+	if index != s.nextHeight() {
 		return nil, storage.ErrNotFound
 	}
 
-	// check if the next height is ready
-	entry, ok := s.nextNotification()
+	// make sure the next height is available
+	entry, ok := s.fetched[index]
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
@@ -206,13 +183,8 @@ func (s *Status) Head() (uint64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	min := s.heap.PeekMin()
-	if min == nil {
-		return 0, storage.ErrNotFound
-	}
-
 	next := s.nextHeight()
-	if next != min.Height {
+	if _, ok := s.fetched[next]; !ok {
 		return 0, storage.ErrNotFound
 	}
 
