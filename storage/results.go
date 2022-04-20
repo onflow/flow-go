@@ -28,7 +28,7 @@ type ExecutionResults interface {
 	ForceIndex(blockID flow.Identifier, resultID flow.Identifier) error
 
 	// BatchIndex indexes an execution result by block ID in a given batch
-	BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch BatchStorage) error
+	BatchIndex(blockID flow.Identifier, resultID flow.Identifier, ForceIndex bool, batch BatchStorage) error
 
 	// ByBlockID retrieves an execution result by block ID.
 	ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error)

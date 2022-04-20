@@ -3,6 +3,8 @@
 package operation
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -68,4 +70,31 @@ func LookupTransactionResultsByBlockIDUsingIndex(blockID flow.Identifier, txResu
 	}
 
 	return traverse(makePrefix(codeTransactionResultIndex, blockID), txErrIterFunc)
+}
+
+// RemoveTransactionResultsByBlockID removes the transaction results for the given blockID
+func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		var txResults []flow.TransactionResult
+
+		err := SkipNonExist(LookupTransactionResultsByBlockID(blockID, &txResults))(txn)
+		// don't return error if there is no result for the block
+		if err != nil {
+			return fmt.Errorf("could not find transaction results for block: %v, %w", blockID, err)
+		}
+
+		for _, result := range txResults {
+			err := RemoveTransactionResult(blockID, result.TransactionID)(txn)
+			if err != nil {
+				return fmt.Errorf("could not remove transaction result for block %v: %w", blockID, err)
+			}
+		}
+
+		return nil
+	}
+}
+
+// RemoveTransactionResult removes the transaction result by blockID and transaction result ID
+func RemoveTransactionResult(blockID flow.Identifier, transactionResultID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeTransactionResult, blockID, transactionResultID))
 }
