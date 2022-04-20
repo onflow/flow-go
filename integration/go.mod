@@ -17,13 +17,13 @@ require (
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.21.3-0.20220317173919-b23d45bcd67d
+	github.com/onflow/cadence v0.21.3-0.20220419065337-d5202c162010
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220413172500-d89ca96e6db3
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220413172500-d89ca96e6db3
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.24.0
+	github.com/onflow/flow-go-sdk v0.24.1-0.20220419204316-4f7efebeb2e9
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.2.4
 	github.com/plus3it/gorecurcopy v0.0.1
