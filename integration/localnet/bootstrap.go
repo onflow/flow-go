@@ -711,10 +711,25 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			"BINSTAT_DMP_PATH",
 		},
 	}
-	// observer services rely on the access gateway
-	observerService.DependsOn = []string{
-		fmt.Sprintf(DefaultAccessGatewayName),
+	observerService.DependsOn = []string{}
+	if i == 0 {
+		observerService.Build = Build{
+			Context:    "../../",
+			Dockerfile: "cmd/Dockerfile",
+			Args: map[string]string{
+				"TARGET":  "access", // hardcoded to access for now until we make it a separate cmd
+				"VERSION": build.Semver(),
+				"COMMIT":  build.Commit(),
+				"GOARCH":  runtime.GOARCH,
+			},
+			Target: "production",
+		}
+	} else {
+		// remaining services of this role must depend on first service
+		observerService.DependsOn = append(observerService.DependsOn, fmt.Sprintf("%s_1", DefaultObserverName))
 	}
+	// observer services rely on the access gateway
+	observerService.DependsOn = append(observerService.DependsOn, DefaultAccessGatewayName)
 	observerService.Ports = []string{
 		// Flow API ports come in pairs, open and secure. While the guest port is always
 		// the same from the guest's perspective, the host port numbering accounts for the presence
