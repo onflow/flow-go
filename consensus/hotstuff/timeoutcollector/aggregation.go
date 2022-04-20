@@ -17,12 +17,6 @@ type signerInfo struct {
 	weight uint64
 }
 
-// sigInfo holds signature and message submitted by some signer
-type sigInfo struct {
-	sig crypto.Signature
-	msg []byte
-}
-
 // WeightedMultiMessageSignatureAggregator implements consensus/hotstuff.WeightedMultiMessageSignatureAggregator.
 // It aggregates BLS signatures for many messages from different signers.
 // Only public keys needs to be agreed upon upfront.
@@ -33,9 +27,9 @@ type sigInfo struct {
 type WeightedMultiMessageSignatureAggregator struct {
 	lock          sync.RWMutex
 	hasher        hash.Hasher
-	idToInfo      map[flow.Identifier]signerInfo // auxiliary map to lookup signer weight and public key (only gets updated by constructor)
-	idToSignature map[flow.Identifier]sigInfo    // signatures indexed by the signer ID
-	totalWeight   uint64                         // total accumulated weight
+	idToInfo      map[flow.Identifier]signerInfo       // auxiliary map to lookup signer weight and public key (only gets updated by constructor)
+	idToSignature map[flow.Identifier]crypto.Signature // signatures indexed by the signer ID
+	totalWeight   uint64                               // total accumulated weight
 }
 
 var _ hotstuff.WeightedMultiMessageSignatureAggregator = (*WeightedMultiMessageSignatureAggregator)(nil)
@@ -51,28 +45,23 @@ var _ hotstuff.WeightedMultiMessageSignatureAggregator = (*WeightedMultiMessageS
 // A multi message sig aggregator is used for one aggregation only. A new instance should be used for each
 // signature aggregation task in the protocol.
 func NewWeightedMultiMessageSigAggregator(ids flow.IdentityList, // list of all authorized signers
-	pks []crypto.PublicKey, // list of corresponding public keys used for signature verifications
 	dsTag string, // domain separation tag used by the signature
 ) (*WeightedMultiMessageSignatureAggregator, error) {
-	if len(ids) != len(pks) {
-		return nil, fmt.Errorf("keys length %d and identities length %d do not match", len(pks), len(ids))
-	}
-
-	if len(pks) == 0 {
-		return nil, fmt.Errorf("number of participants must be larger than 0, got %d", len(pks))
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("number of participants must be larger than 0, got %d", len(ids))
 	}
 	// sanity check for BLS keys
-	for i, key := range pks {
-		if key == nil || key.Algorithm() != crypto.BLSBLS12381 {
+	for i, identity := range ids {
+		if identity.StakingPubKey.Algorithm() != crypto.BLSBLS12381 {
 			return nil, fmt.Errorf("key at index %d is not a BLS key", i)
 		}
 	}
 
 	// build the internal map for a faster look-up
 	idToInfo := make(map[flow.Identifier]signerInfo)
-	for i, id := range ids {
+	for _, id := range ids {
 		idToInfo[id.NodeID] = signerInfo{
-			pk:     pks[i],
+			pk:     id.StakingPubKey,
 			weight: id.Weight,
 		}
 	}
@@ -80,7 +69,7 @@ func NewWeightedMultiMessageSigAggregator(ids flow.IdentityList, // list of all 
 	return &WeightedMultiMessageSignatureAggregator{
 		hasher:        crypto.NewBLSKMAC(dsTag),
 		idToInfo:      idToInfo,
-		idToSignature: make(map[flow.Identifier]sigInfo),
+		idToSignature: make(map[flow.Identifier]crypto.Signature),
 	}, nil
 }
 
@@ -126,10 +115,7 @@ func (a *WeightedMultiMessageSignatureAggregator) TrustedAdd(signerID flow.Ident
 		return a.totalWeight, model.NewDuplicatedSignerErrorf("signature from %v was already added", signerID)
 	}
 
-	a.idToSignature[signerID] = sigInfo{
-		sig: sig,
-		msg: msg,
-	}
+	a.idToSignature[signerID] = sig
 	a.totalWeight += info.weight
 
 	return a.totalWeight, nil
@@ -144,12 +130,12 @@ func (a *WeightedMultiMessageSignatureAggregator) TotalWeight() uint64 {
 }
 
 // UnsafeAggregate aggregates the signatures and returns the aggregated signature.
-// The function performs a final verification and errors if the aggregated signature is not valid. This is
-// required for the function safety since "TrustedAdd" allows adding invalid signatures.
-// The function errors with:
+// The function DOES NOT perform a final verification of aggregated
+// signature. This aggregated signature needs to be verified against messages that were submitted
+// in `TrustedAdd`.
+// Expected errors during normal operations:
 //  - model.InsufficientSignaturesError if no signatures have been added yet
-//  - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
-// The function is thread-safe.
+// This function is thread-safe
 //
 func (a *WeightedMultiMessageSignatureAggregator) UnsafeAggregate() ([]flow.Identifier, []byte, error) {
 	a.lock.RLock()
@@ -161,8 +147,8 @@ func (a *WeightedMultiMessageSignatureAggregator) UnsafeAggregate() ([]flow.Iden
 	}
 	signatures := make([]crypto.Signature, 0, sharesNum)
 	signerIDs := make([]flow.Identifier, 0, sharesNum)
-	for id, info := range a.idToSignature {
-		signatures = append(signatures, info.sig)
+	for id, sig := range a.idToSignature {
+		signatures = append(signatures, sig)
 		signerIDs = append(signerIDs, id)
 	}
 

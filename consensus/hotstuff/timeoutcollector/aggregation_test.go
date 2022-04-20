@@ -33,22 +33,22 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	ids := make([]*flow.Identity, 0, signersNumber)
 	pks := make([]crypto.PublicKey, 0, signersNumber)
 	for i := 0; i < signersNumber; i++ {
-		identity := unittest.IdentityFixture()
+		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
+		identity := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
 		// id
 		ids = append(ids, identity)
 		// keys
-		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
-		pks = append(pks, sk.PublicKey())
 		msg := identity.NodeID[:]
 		// signatures
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
 		sigs = append(sigs, sig)
 
+		pks = append(pks, identity.StakingPubKey)
 		msgs = append(msgs, msg)
 		hashers = append(hashers, hasher)
 	}
-	aggregator, err := NewWeightedMultiMessageSigAggregator(ids, pks, tag)
+	aggregator, err := NewWeightedMultiMessageSigAggregator(ids, tag)
 	require.NoError(t, err)
 	return aggregator, ids, pks, sigs, msgs, hashers
 }
@@ -58,22 +58,13 @@ func createAggregationData(t *testing.T, signersNumber int) (
 func TestNewMultiMessageSigAggregator(t *testing.T) {
 	tag := "random_tag"
 
-	signer := unittest.IdentityFixture()
-	// identity with empty key
-	_, err := NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{nil}, tag)
-	require.Error(t, err)
-	// wrong key type
 	sk := unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
-	pk := sk.PublicKey()
-	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk}, tag)
+	signer := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
+	// wrong key type
+	_, err := NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, tag)
 	require.Error(t, err)
 	// empty signers
-	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{}, []crypto.PublicKey{}, tag)
-	require.Error(t, err)
-	// mismatching input lengths
-	sk = unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
-	pk = sk.PublicKey()
-	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk, pk}, tag)
+	_, err = NewWeightedMultiMessageSigAggregator(flow.IdentityList{}, tag)
 	require.Error(t, err)
 }
 
@@ -105,7 +96,7 @@ func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 	}
 
 	wg.Wait()
-	signers, agg, err := aggregator.Aggregate()
+	signers, agg, err := aggregator.UnsafeAggregate()
 	require.NoError(t, err)
 	ok, err := crypto.VerifyBLSSignatureManyMessages(pks[subSet:], agg, msgs[subSet:], hashers[subSet:])
 	require.NoError(t, err)
@@ -126,7 +117,7 @@ func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 		// test TotalWeight
 		require.Equal(t, expectedWeight, aggregator.TotalWeight())
 	}
-	signers, agg, err = aggregator.Aggregate()
+	signers, agg, err = aggregator.UnsafeAggregate()
 	require.NoError(t, err)
 	ok, err = crypto.VerifyBLSSignatureManyMessages(pks, agg, msgs, hashers)
 	require.NoError(t, err)
@@ -195,11 +186,15 @@ func TestMultiMessageSignatureAggregator_Aggregate(t *testing.T) {
 	signersNum := 20
 
 	t.Run("invalid signature", func(t *testing.T) {
-		aggregator, ids, _, sigs, msgs, _ := createAggregationData(t, signersNum)
-		// corrupt sigs[0]
-		sigs[0][4] ^= 1
+		var err error
+		aggregator, ids, pks, sigs, msgs, hashers := createAggregationData(t, signersNum)
+		// replace sig with random one
+		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
+		sigs[0], err = sk.Sign([]byte("dummy"), hashers[0])
+		require.NoError(t, err)
+
 		// test Verify
-		err := aggregator.Verify(ids[0].NodeID, sigs[0], msgs[0])
+		err = aggregator.Verify(ids[0].NodeID, sigs[0], msgs[0])
 		require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 		// add signatures for aggregation including corrupt sigs[0]
@@ -210,17 +205,19 @@ func TestMultiMessageSignatureAggregator_Aggregate(t *testing.T) {
 			expectedWeight += ids[i].Weight
 			require.Equal(t, expectedWeight, weight)
 		}
-		signers, agg, err := aggregator.Aggregate()
-		require.True(t, model.IsInvalidSignatureIncludedError(err))
-		require.Nil(t, agg)
-		require.Nil(t, signers)
+		_, agg, err := aggregator.UnsafeAggregate()
+		require.NoError(t, err)
+
+		ok, err := crypto.VerifyBLSSignatureManyMessages(pks, agg, msgs, hashers)
+		require.NoError(t, err)
+		require.False(t, ok)
 	})
 
 	t.Run("aggregating empty set of signatures", func(t *testing.T) {
 		aggregator, _, _, _, _, _ := createAggregationData(t, signersNum)
 
 		// no signatures were added => aggregate should error with
-		signers, agg, err := aggregator.Aggregate()
+		signers, agg, err := aggregator.UnsafeAggregate()
 		require.True(t, model.IsInsufficientSignaturesError(err))
 		require.Nil(t, agg)
 		require.Nil(t, signers)
@@ -233,7 +230,7 @@ func TestMultiMessageSignatureAggregator_Aggregate(t *testing.T) {
 		_, err = aggregator.TrustedAdd(unittest.IdentifierFixture(), unittest.SignatureFixture(), []byte("random-msg"))
 		require.True(t, model.IsInvalidSignerError(err))
 
-		signers, agg, err = aggregator.Aggregate()
+		signers, agg, err = aggregator.UnsafeAggregate()
 		require.True(t, model.IsInsufficientSignaturesError(err))
 		require.Nil(t, agg)
 		require.Nil(t, signers)
