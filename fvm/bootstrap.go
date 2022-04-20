@@ -96,7 +96,7 @@ var DefaultTransactionFees = func() BootstrapProcedureFeeParameters {
 	if err != nil {
 		panic(fmt.Errorf("invalid default fee surge factor: %w", err))
 	}
-	inclusionEffortCost, err := cadence.NewUFix64("0.0001")
+	inclusionEffortCost, err := cadence.NewUFix64("0.00001")
 	if err != nil {
 		panic(fmt.Errorf("invalid default fee effort cost: %w", err))
 	}
