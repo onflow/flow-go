@@ -1871,7 +1871,6 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 // DKGMessageFixture creates a single DKG message with random fields
 func DKGMessageFixture() *messages.DKGMessage {
 	return &messages.DKGMessage{
-		Orig:          uint64(rand.Int()),
 		Data:          RandomBytes(10),
 		DKGInstanceID: fmt.Sprintf("test-dkg-instance-%d", uint64(rand.Int())),
 	}
@@ -1880,8 +1879,10 @@ func DKGMessageFixture() *messages.DKGMessage {
 // DKGBroadcastMessageFixture creates a single DKG broadcast message with random fields
 func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	return &messages.BroadcastDKGMessage{
-		DKGMessage: *DKGMessageFixture(),
-		Signature:  SignatureFixture(),
+		DKGMessage:           *DKGMessageFixture(),
+		CommitteeMemberIndex: uint64(rand.Int()),
+		NodeID:               IdentifierFixture(),
+		Signature:            SignatureFixture(),
 	}
 }
 

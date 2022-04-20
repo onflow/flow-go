@@ -152,7 +152,7 @@ func (r *FungibleTokenTracker) worker(
 
 		inter := &interpreter.Interpreter{}
 		for _, domain := range domains {
-			storageMap := storage.GetStorageMap(owner, domain, false)
+			storageMap := storage.GetStorageMap(owner, domain, true)
 			itr := storageMap.Iterator(inter)
 			key, value := itr.Next()
 			for value != nil {
