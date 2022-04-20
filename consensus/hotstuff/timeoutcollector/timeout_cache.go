@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	// ErrRepeatedTimeout is emitted, when we receive a timeout object for the same block
+	// ErrRepeatedTimeout is emitted, when we receive an identical timeout object for the same block
 	// from the same voter multiple times. This error does _not_ indicate
 	// equivocation.
 	ErrRepeatedTimeout            = errors.New("duplicated timeout")
