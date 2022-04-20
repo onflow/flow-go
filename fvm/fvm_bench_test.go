@@ -212,23 +212,39 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 	accounts := make([]TestBenchAccount, 0)
 	serviceAddress := b.Chain(tb).ServiceAddress()
 
-	accontCreationScript := `
-		transaction(publicKey: [UInt8]) {
-			prepare(signer: AuthAccount) {
+	accountCreationScript := `
+        transaction(publicKey: [UInt8]) {
+            prepare(signer: AuthAccount) {
 				let acct = AuthAccount(payer: signer)
-				acct.addPublicKey(publicKey)
-			}
-		}
-	`
+                let publicKey2 = PublicKey(
+                    publicKey: publicKey,
+                    signatureAlgorithm: SignatureAlgorithm.%s
+                )
+                acct.keys.add(
+                    publicKey: publicKey2,
+                    hashAlgorithm: HashAlgorithm.%s,
+                    weight: %d.0
+                )
+            }
+        }`
 
 	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
-		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
+		encAccountKey := accountKey.PublicKey.Encode()
 		cadAccountKey := testutil.BytesToCadenceArray(encAccountKey)
 		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
 
+		script := []byte(
+			fmt.Sprintf(
+				accountCreationScript,
+				accountKey.SignAlgo.String(),
+				accountKey.HashAlgo.String(),
+				accountKey.Weight,
+			),
+		)
+
 		txBody := flow.NewTransactionBody().
-			SetScript([]byte(accontCreationScript)).
+			SetScript(script).
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(serviceAddress).
 			SetProposalKey(serviceAddress, 0, b.ServiceAccount(tb).RetAndIncSeqNumber()).
