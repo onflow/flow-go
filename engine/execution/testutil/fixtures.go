@@ -443,18 +443,3 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 
 	return cadence.NewArray(values)
 }
-
-// CreateRemoveAccountKeyTransaction generates a tx that removes a key from an account.
-func CreateRemoveAccountKeyTransaction(index int) *flow.TransactionBody {
-	script := fmt.Sprintf(`
-		transaction {
-		  prepare(signer: AuthAccount) {
-	    	signer.removePublicKey(%d)
-		  }
-		}
-	`, index)
-
-	return &flow.TransactionBody{
-		Script: []byte(script),
-	}
-}
