@@ -52,7 +52,7 @@ var _ hotstuff.WeightedMultiMessageSignatureAggregator = (*WeightedMultiMessageS
 // signature aggregation task in the protocol.
 func NewWeightedMultiMessageSigAggregator(ids flow.IdentityList, // list of all authorized signers
 	pks []crypto.PublicKey, // list of corresponding public keys used for signature verifications
-	dsTag string, // domain separation tag used by the signature) *WeightedMultiMessageSignatureAggregator
+	dsTag string, // domain separation tag used by the signature
 ) (*WeightedMultiMessageSignatureAggregator, error) {
 	if len(ids) != len(pks) {
 		return nil, fmt.Errorf("keys length %d and identities length %d do not match", len(pks), len(ids))
@@ -159,16 +159,10 @@ func (a *WeightedMultiMessageSignatureAggregator) UnsafeAggregate() ([]flow.Iden
 	if sharesNum == 0 {
 		return nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures")
 	}
-	pks := make([]crypto.PublicKey, 0, sharesNum)
-	messages := make([][]byte, 0, sharesNum)
 	signatures := make([]crypto.Signature, 0, sharesNum)
-	hashers := make([]hash.Hasher, 0, sharesNum)
 	signerIDs := make([]flow.Identifier, 0, sharesNum)
 	for id, info := range a.idToSignature {
-		pks = append(pks, a.idToInfo[id].pk)
-		messages = append(messages, info.msg)
 		signatures = append(signatures, info.sig)
-		hashers = append(hashers, a.hasher)
 		signerIDs = append(signerIDs, id)
 	}
 
