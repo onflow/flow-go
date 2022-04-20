@@ -368,13 +368,12 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 // CreateAddAnAccountKeyMultipleTimesTransaction generates a tx that adds a key several times to an account.
 // this can be used to exhaust an account's storage.
 func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBody {
-	script := []byte(`
+	script := []byte(fmt.Sprintf(`
       transaction(counts: Int, key: [UInt8]) {
         prepare(signer: AuthAccount) {
           var i = 0
           while i < counts {
             i = i + 1
-            let acct = AuthAccount(payer: signer)
             let publicKey2 = PublicKey(
               publicKey: key,
               signatureAlgorithm: SignatureAlgorithm.%s
@@ -387,7 +386,7 @@ func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flo
 	      }
         }
       }
-   	`)
+   	`, accountKey.SignAlgo.String(), accountKey.HashAlgo.String()))
 
 	arg1, err := jsoncdc.Encode(cadence.NewInt(counts))
 	require.NoError(t, err)

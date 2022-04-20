@@ -3,7 +3,6 @@ module github.com/onflow/flow-go/integration
 go 1.16
 
 require (
-	cloud.google.com/go/iam v0.3.0 // indirect
 	github.com/DataDog/zstd v1.4.8 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/dapperlabs/testingdock v0.4.4
