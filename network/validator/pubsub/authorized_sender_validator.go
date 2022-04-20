@@ -85,6 +85,10 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 		Str("component", "authorized_sender_validator").
 		Logger()
 
+	// use cbor codec to add explicit dependency on cbor encoded messages adding the message type
+	// to the first byte of the message payload.
+	codec := cborcodec.NewCodec()
+
 	return func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult {
 		identity, ok := getIdentity(from)
 		if !ok {
@@ -92,14 +96,23 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 			return pubsub.ValidationReject
 		}
 
-		msgType := msg.Payload[0]
-
-		if err := isAuthorizedSender(identity, msgType); err != nil {
+		// attempt to decode the flow message type from encoded payload
+		msgTypeCode, what, err := codec.DecodeMsgType(msg.Payload)
+		if err != nil {
 			log.Warn().
 				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
-				Uint8("message_type", msgType).
+				Msg("rejecting message")
+			return pubsub.ValidationReject
+		}
+
+		if err := isAuthorizedSender(identity, msgTypeCode); err != nil {
+			log.Warn().
+				Err(err).
+				Str("peer_id", from.String()).
+				Str("role", identity.Role.String()).
+				Str("message_type", what).
 				Msg("rejecting message")
 
 			return pubsub.ValidationReject
@@ -110,8 +123,8 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 }
 
 // isAuthorizedSender checks if node is an authorized role and is not ejected
-func isAuthorizedSender(identity *flow.Identity, msgType uint8) error {
-	roleList, ok := authorizedRolesMap[msgType]
+func isAuthorizedSender(identity *flow.Identity, msgTypeCode uint8) error {
+	roleList, ok := authorizedRolesMap[msgTypeCode]
 	if !ok {
 		return fmt.Errorf("unknown message type does not match any code from the cbor codec")
 	}

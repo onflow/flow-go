@@ -103,3 +103,17 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	return v, nil
 }
+
+// DecodeMsgType is a helper func that returns the first byte of cbor encoded data which
+// corresponds to the message type. This allows users of the codec to have an explicit dependency
+// on this specific property of encoding with the cbor codec. You should not directly interpret
+// the message type in code. i:e msgType := data[0], instead use this func.
+func (c *Codec) DecodeMsgType(data []byte) (byte, string, error) {
+	code := data[0]
+	what, err := switchenv2what(code)
+	if err != nil {
+		return byte(0), "", fmt.Errorf("could not decode message type check encoding: %w", err)
+	}
+
+	return code, what, nil
+}
