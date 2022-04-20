@@ -6,6 +6,8 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	channels "github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -18,69 +20,56 @@ func init() {
 	initializeAuthorizedRolesMap()
 }
 
-// authorizedRolesMap is a mapping of message type to a list of roles authorized to send them.
-var authorizedRolesMap map[uint8]flow.RoleList
+// channelToMsgCodes is a mapping of network channels to codes of the messages communicated on them. This will be used to check the list of authorized roles associated with the channel
+var channelToMsgCodes map[network.Channel][]uint8
 
-// initializeAuthorizedRolesMap initializes authorizedRolesMap.
+// initializeAuthorizedRolesMap initializes channelToMsgCodes.
 func initializeAuthorizedRolesMap() {
-	authorizedRolesMap = make(map[uint8]flow.RoleList)
+	channelToMsgCodes = make(map[network.Channel][]uint8)
 
 	// consensus
-	authorizedRolesMap[cborcodec.CodeBlockProposal] = flow.RoleList{flow.RoleConsensus}
-	authorizedRolesMap[cborcodec.CodeBlockVote] = flow.RoleList{flow.RoleConsensus}
+	channelToMsgCodes[channels.ConsensusCommittee] = []uint8{cborcodec.CodeBlockProposal, cborcodec.CodeBlockVote}
 
 	// protocol state sync
-	authorizedRolesMap[cborcodec.CodeSyncRequest] = flow.Roles()
-	authorizedRolesMap[cborcodec.CodeSyncResponse] = flow.Roles()
-	authorizedRolesMap[cborcodec.CodeRangeRequest] = flow.Roles()
-	authorizedRolesMap[cborcodec.CodeBatchRequest] = flow.Roles()
-	authorizedRolesMap[cborcodec.CodeBlockResponse] = flow.Roles()
-
-	// cluster consensus
-	authorizedRolesMap[cborcodec.CodeClusterBlockProposal] = flow.RoleList{flow.RoleCollection}
-	authorizedRolesMap[cborcodec.CodeClusterBlockVote] = flow.RoleList{flow.RoleCollection}
-	authorizedRolesMap[cborcodec.CodeClusterBlockResponse] = flow.RoleList{flow.RoleCollection}
+	channelToMsgCodes[channels.SyncCommittee] = []uint8{cborcodec.CodeSyncRequest, cborcodec.CodeSyncResponse, cborcodec.CodeRangeRequest, cborcodec.CodeBatchRequest, cborcodec.CodeBlockResponse}
 
 	// collections, guarantees & transactions
-	authorizedRolesMap[cborcodec.CodeCollectionGuarantee] = flow.RoleList{flow.RoleCollection}
-	authorizedRolesMap[cborcodec.CodeTransactionBody] = flow.RoleList{flow.RoleCollection}
-	authorizedRolesMap[cborcodec.CodeTransaction] = flow.RoleList{flow.RoleCollection}
+	channelToMsgCodes[channels.PushGuarantees] = []uint8{cborcodec.CodeCollectionGuarantee}
+	channelToMsgCodes[channels.ReceiveGuarantees] = channelToMsgCodes[channels.PushGuarantees]
+
+	channelToMsgCodes[channels.PushTransactions] = []uint8{cborcodec.CodeTransactionBody, cborcodec.CodeTransaction}
+	channelToMsgCodes[channels.ReceiveTransactions] = channelToMsgCodes[channels.PushTransactions]
 
 	// core messages for execution & verification
-	authorizedRolesMap[cborcodec.CodeExecutionReceipt] = flow.RoleList{flow.RoleExecution}
-	authorizedRolesMap[cborcodec.CodeResultApproval] = flow.RoleList{flow.RoleVerification}
+	channelToMsgCodes[channels.PushReceipts] = []uint8{cborcodec.CodeExecutionReceipt}
+	channelToMsgCodes[channels.ReceiveReceipts] = channelToMsgCodes[channels.PushReceipts]
 
-	// execution state synchronization
-	// NOTE: these messages have been deprecated
-	authorizedRolesMap[cborcodec.CodeExecutionStateSyncRequest] = flow.RoleList{}
-	authorizedRolesMap[cborcodec.CodeExecutionStateDelta] = flow.RoleList{}
+	channelToMsgCodes[channels.PushApprovals] = []uint8{cborcodec.CodeResultApproval}
+	channelToMsgCodes[channels.ReceiveApprovals] = channelToMsgCodes[channels.PushApprovals]
 
 	// data exchange for execution of blocks
-	authorizedRolesMap[cborcodec.CodeChunkDataRequest] = flow.RoleList{flow.RoleVerification}
-	authorizedRolesMap[cborcodec.CodeChunkDataResponse] = flow.RoleList{flow.RoleExecution}
+	channelToMsgCodes[channels.ProvideChunks] = []uint8{cborcodec.CodeChunkDataRequest, cborcodec.CodeChunkDataResponse}
 
 	// result approvals
-	authorizedRolesMap[cborcodec.CodeApprovalRequest] = flow.RoleList{flow.RoleConsensus}
-	authorizedRolesMap[cborcodec.CodeApprovalResponse] = flow.RoleList{flow.RoleVerification}
+	channelToMsgCodes[channels.ProvideApprovalsByChunk] = []uint8{cborcodec.CodeApprovalRequest, cborcodec.CodeApprovalResponse}
 
-	// generic entity exchange engines
-	authorizedRolesMap[cborcodec.CodeEntityRequest] = flow.RoleList{flow.RoleAccess, flow.RoleConsensus, flow.RoleCollection} // only staked access nodes
-	authorizedRolesMap[cborcodec.CodeEntityResponse] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
-
-	// testing
-	authorizedRolesMap[cborcodec.CodeEcho] = flow.Roles()
+	// generic entity exchange engines all use EntityRequest and EntityResponse
+	channelToMsgCodes[channels.RequestChunks] = []uint8{cborcodec.CodeEntityRequest, cborcodec.CodeEntityResponse}
+	channelToMsgCodes[channels.RequestCollections] = channelToMsgCodes[channels.RequestChunks]
+	channelToMsgCodes[channels.RequestApprovalsByChunk] = channelToMsgCodes[channels.RequestChunks]
+	channelToMsgCodes[channels.RequestReceiptsByBlockID] = channelToMsgCodes[channels.RequestChunks]
 
 	// dkg
-	authorizedRolesMap[cborcodec.CodeDKGMessage] = flow.RoleList{flow.RoleConsensus} // sn nodes for next epoch
+	channelToMsgCodes[channels.DKGCommittee] = []uint8{cborcodec.CodeDKGMessage}
 }
 
 // AuthorizedSenderValidator using the getIdentity func will check if the role of the sender
-// is part of the authorized roles list for the type of message being sent. A node is considered
+// is part of the authorized roles list for the channel being communicated on. A node is considered
 // to be authorized to send a message if all of the following are true.
-// 1. The message type is a known message type (initialized in the authorizedRolesMap).
-// 2. The authorized roles list for the message type contains the senders role.
+// 1. The message type is a known message type (can be decoded with cbor codec).
+// 2. The authorized roles list for the channel contains the senders role.
 // 3. The node is not ejected
-func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
+func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
 		Logger()
@@ -96,8 +85,9 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 			return pubsub.ValidationReject
 		}
 
-		// attempt to decode the flow message type from encoded payload
-		msgTypeCode, what, err := codec.DecodeMsgType(msg.Payload)
+		// attempt to decode the flow message type from encoded payload for logging purposes
+		// adds safety against changing codec without updating this validator
+		code, what, err := codec.DecodeMsgType(msg.Payload)
 		if err != nil {
 			log.Warn().
 				Err(err).
@@ -107,12 +97,13 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 			return pubsub.ValidationReject
 		}
 
-		if err := isAuthorizedSender(identity, msgTypeCode); err != nil {
+		if err := isAuthorizedSender(identity, channel, code); err != nil {
 			log.Warn().
 				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
 				Str("message_type", what).
+				Str("network_channel", channel.String()).
 				Msg("rejecting message")
 
 			return pubsub.ValidationReject
@@ -123,13 +114,14 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 }
 
 // isAuthorizedSender checks if node is an authorized role and is not ejected
-func isAuthorizedSender(identity *flow.Identity, msgTypeCode uint8) error {
-	roleList, ok := authorizedRolesMap[msgTypeCode]
-	if !ok {
-		return fmt.Errorf("unknown message type does not match any code from the cbor codec")
+func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code uint8) error {
+	// get authorized roles list
+	roles, err := getRoles(channel, code)
+	if err != nil {
+		return err
 	}
 
-	if !roleList.Contains(identity.Role) {
+	if !roles.Contains(identity.Role) {
 		return fmt.Errorf("sender is not authorized to send this message type")
 	}
 
@@ -138,4 +130,59 @@ func isAuthorizedSender(identity *flow.Identity, msgTypeCode uint8) error {
 	}
 
 	return nil
+}
+
+// getRoles returns list of authorized roles for the channel associated with the message code provided
+func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error) {
+	// echo messages can be sent by anyone
+	if msgTypeCode == cborcodec.CodeEcho {
+		return flow.Roles(), nil
+	}
+
+	// cluster channels have a dynamic channel name
+	if msgTypeCode == cborcodec.CodeClusterBlockProposal || msgTypeCode == cborcodec.CodeClusterBlockVote || msgTypeCode == cborcodec.CodeClusterBlockResponse {
+		return channels.ClusterChannelRoles(channel), nil
+	}
+
+	// get message type codes for all messages communicated on the channel
+	codes, ok := channelToMsgCodes[channel]
+	if !ok {
+		return nil, fmt.Errorf("could not get message codes for unknown channel")
+	}
+
+	// check if message type code is in list of codes corresponding to channel
+	if !containsCode(codes, msgTypeCode) {
+		return nil, fmt.Errorf("invalid message type being sent on channel")
+	}
+
+	// get authorized list of roles for channel
+	roles, ok := channels.RolesByChannel(channel)
+	if !ok {
+		return nil, fmt.Errorf("could not get roles for channel")
+	}
+
+	return roles, nil
+}
+
+func containsCode(codes []uint8, code uint8) bool {
+	for _, c := range codes {
+		if c == code {
+			return true
+		}
+	}
+
+	return false
+}
+
+// rolesByMsgType returns the authorized roles list for messages that do not have a direct channel mapping
+func rolesByMsgCode(channel network.Channel, code uint8) (flow.RoleList, error) {
+	if code == cborcodec.CodeEcho {
+		// all roles can send echo message
+		return flow.Roles(), nil
+	} else if code == cborcodec.CodeClusterBlockProposal || code == cborcodec.CodeClusterBlockVote || code == cborcodec.CodeClusterBlockResponse {
+		// will return roles list based on channel prefix for cluster channels
+		return channels.ClusterChannelRoles(channel), nil
+	} else {
+		return nil, fmt.Errorf("unknown message type %d on channel %s", code, channel)
+	}
 }

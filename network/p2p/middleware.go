@@ -501,7 +501,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
 			psValidator.StakedValidator(m.ov.Identity),
-			psValidator.AuthorizedSenderValidator(m.log, m.ov.Identity),
+			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
 		)
 	}
 

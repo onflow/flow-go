@@ -156,9 +156,9 @@ const (
 	ExecutionDataService = network.Channel("execution-data-service")
 )
 
-// initializeChannelRoleMap initializes an instance of channelRoleMap and populates it with the channels and their
+// initializeChannelRoleMap initializes an instance of channelRoleMap and populates it
+// with the channels and their corresponding list of authorized roles.
 // Note: Please update this map, if a new channel is defined or a the roles subscribing to a channel have changed
-// corresponding list of roles.
 func initializeChannelRoleMap() {
 	channelRoleMap = make(map[network.Channel]flow.RoleList)
 
@@ -213,7 +213,7 @@ func initializeChannelRoleMap() {
 }
 
 // ClusterChannelRoles returns the list of roles that are involved in the given cluster-based channel.
-func ClusterChannelRoles(clusterChannel network.Channel) flow.RoleList {
+func  ClusterChannelRoles(clusterChannel network.Channel) flow.RoleList {
 	if prefix, ok := clusterChannelPrefix(clusterChannel); ok {
 		return clusterChannelPrefixRoleMap[prefix]
 	}
