@@ -213,7 +213,7 @@ func initializeChannelRoleMap() {
 }
 
 // ClusterChannelRoles returns the list of roles that are involved in the given cluster-based channel.
-func  ClusterChannelRoles(clusterChannel network.Channel) flow.RoleList {
+func ClusterChannelRoles(clusterChannel network.Channel) flow.RoleList {
 	if prefix, ok := clusterChannelPrefix(clusterChannel); ok {
 		return clusterChannelPrefixRoleMap[prefix]
 	}

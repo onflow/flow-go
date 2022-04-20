@@ -6,9 +6,10 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/rs/zerolog"
+
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/network"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
@@ -172,17 +173,4 @@ func containsCode(codes []uint8, code uint8) bool {
 	}
 
 	return false
-}
-
-// rolesByMsgType returns the authorized roles list for messages that do not have a direct channel mapping
-func rolesByMsgCode(channel network.Channel, code uint8) (flow.RoleList, error) {
-	if code == cborcodec.CodeEcho {
-		// all roles can send echo message
-		return flow.Roles(), nil
-	} else if code == cborcodec.CodeClusterBlockProposal || code == cborcodec.CodeClusterBlockVote || code == cborcodec.CodeClusterBlockResponse {
-		// will return roles list based on channel prefix for cluster channels
-		return channels.ClusterChannelRoles(channel), nil
-	} else {
-		return nil, fmt.Errorf("unknown message type %d on channel %s", code, channel)
-	}
 }

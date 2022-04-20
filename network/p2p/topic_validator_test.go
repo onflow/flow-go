@@ -155,7 +155,7 @@ func TestAuthorizedSenderValidator_UnAuthorized(t *testing.T) {
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
-	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel,func(pid peer.ID) (*flow.Identity, bool) {
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
