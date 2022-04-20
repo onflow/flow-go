@@ -366,7 +366,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
 	}
 	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-	systemTxStatus, err := b.deriveTransactionStatus(nil, true, block)
+	systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
