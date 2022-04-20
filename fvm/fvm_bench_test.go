@@ -230,8 +230,6 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 
 	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
-		// TODO did we stop supporting bytes-encoded AccountPublicKey as an argument? Or should this line be kept?
-		//encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
 		encAccountKey := accountKey.PublicKey.Encode()
 		cadAccountKey := testutil.BytesToCadenceArray(encAccountKey)
 		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)

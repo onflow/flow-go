@@ -179,26 +179,42 @@ func CreateAccountsWithSimpleAddresses(
 
 	var accounts []flow.Address
 
-	script := []byte(`
-	  transaction(publicKey: [UInt8]) {
-	    prepare(signer: AuthAccount) {
-	  	  let acct = AuthAccount(payer: signer)
-	  	  acct.addPublicKey(publicKey)
-	    }
-	  }
-	`)
+	scriptTemplate := `
+        transaction(publicKey: [UInt8]) {
+            prepare(signer: AuthAccount) {
+                let acct = AuthAccount(payer: signer)
+                let publicKey2 = PublicKey(
+                    publicKey: publicKey,
+                    signatureAlgorithm: SignatureAlgorithm.%s
+                )
+                acct.keys.add(
+                    publicKey: publicKey2,
+                    hashAlgorithm: HashAlgorithm.%s,
+                    weight: %d.0
+                )
+            }
+	    }`
 
 	serviceAddress := chain.ServiceAddress()
 
 	for i, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
-		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		cadAccountKey := BytesToCadenceArray(encAccountKey)
-		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
+		encPublicKey := accountKey.PublicKey.Encode()
+		cadPublicKey := BytesToCadenceArray(encPublicKey)
+		encCadPublicKey, _ := jsoncdc.Encode(cadPublicKey)
+
+		script := []byte(
+			fmt.Sprintf(
+				scriptTemplate,
+				accountKey.SignAlgo.String(),
+				accountKey.HashAlgo.String(),
+				accountKey.Weight,
+			),
+		)
 
 		txBody := flow.NewTransactionBody().
 			SetScript(script).
-			AddArgument(encCadAccountKey).
+			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody, uint32(i))
@@ -270,23 +286,35 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
-
-	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
+	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()
+	cadPublicKey := BytesToCadenceArray(encPublicKey)
+	encCadPublicKey, err := jsoncdc.Encode(cadPublicKey)
 	require.NoError(t, err)
 
 	// define the cadence script
 	script := fmt.Sprintf(`
-		transaction {
-		  prepare(signer: AuthAccount) {
-			let acct = AuthAccount(payer: signer)
-			acct.addPublicKey("%s".decodeHex())
-		  }
-		}
-	`, hex.EncodeToString(keyBytes))
+        transaction(publicKey: [UInt8]) {
+            prepare(signer: AuthAccount) {
+				let acct = AuthAccount(payer: signer)
+                let publicKey2 = PublicKey(
+                    publicKey: publicKey,
+                    signatureAlgorithm: SignatureAlgorithm.%s
+                )
+                acct.keys.add(
+                    publicKey: publicKey2,
+                    hashAlgorithm: HashAlgorithm.%s,
+                    weight: 1000.0
+                )
+            }
+	    }`,
+		accountKey.SignAlgo.String(),
+		accountKey.HashAlgo.String(),
+	)
 
 	// create the transaction to create the account
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(script)).
+		AddArgument(encCadPublicKey).
 		AddAuthorizer(chain.ServiceAddress())
 
 	return accountKey, tx
@@ -298,27 +326,40 @@ func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.Acco
 func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int) (flow.AccountPrivateKey, *flow.TransactionBody) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
-
-	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
+	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()
+	cadPublicKey := BytesToCadenceArray(encPublicKey)
+	encCadPublicKey, err := jsoncdc.Encode(cadPublicKey)
 	require.NoError(t, err)
 
 	// define the cadence script
 	script := fmt.Sprintf(`
-      transaction {
-		prepare(signer: AuthAccount) {
-		  var i = 0
-		  while i < %d {
-			let account = AuthAccount(payer: signer)
-			account.addPublicKey("%s".decodeHex())
-			i = i + 1
-		  }
-		}
-	  }
-	`, n, hex.EncodeToString(keyBytes))
+        transaction(publicKey: [UInt8]) {
+            prepare(signer: AuthAccount) {
+                var i = 0
+                while i < %d {
+                    let account = AuthAccount(payer: signer)
+                    let publicKey2 = PublicKey(
+                        publicKey: publicKey,
+                        signatureAlgorithm: SignatureAlgorithm.%s
+                    )
+                    account.keys.add(
+                        publicKey: publicKey2,
+                        hashAlgorithm: HashAlgorithm.%s,
+                        weight: 1000.0
+                    )
+                    i = i + 1
+                }
+            }
+	    }`,
+		n,
+		accountKey.SignAlgo.String(),
+		accountKey.HashAlgo.String(),
+	)
 
 	// create the transaction to create the account
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(script)).
+		AddArgument(encCadPublicKey).
 		AddAuthorizer(chain.ServiceAddress())
 
 	return accountKey, tx
@@ -327,29 +368,37 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 // CreateAddAnAccountKeyMultipleTimesTransaction generates a tx that adds a key several times to an account.
 // this can be used to exhaust an account's storage.
 func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBody {
-	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
-	require.NoError(t, err)
-
 	script := []byte(`
-        transaction(counts: Int, key: [UInt8]) {
-          prepare(signer: AuthAccount) {
-			var i = 0
-			while i < counts {
-				i = i + 1
-				signer.addPublicKey(key)
-			}
-          }
+      transaction(counts: Int, key: [UInt8]) {
+        prepare(signer: AuthAccount) {
+          var i = 0
+          while i < counts {
+            i = i + 1
+            let acct = AuthAccount(payer: signer)
+            let publicKey2 = PublicKey(
+              publicKey: key,
+              signatureAlgorithm: SignatureAlgorithm.%s
+            )
+            signer.keys.add(
+              publicKey: publicKey2,
+              hashAlgorithm: HashAlgorithm.%s,
+              weight: 1000.0
+            )
+	      }
         }
+      }
    	`)
 
 	arg1, err := jsoncdc.Encode(cadence.NewInt(counts))
 	require.NoError(t, err)
 
-	arg2, err := jsoncdc.Encode(bytesToCadenceArray(keyBytes))
+	encPublicKey := accountKey.PublicKey(1000).PublicKey.Encode()
+	cadPublicKey := BytesToCadenceArray(encPublicKey)
+	arg2, err := jsoncdc.Encode(cadPublicKey)
 	require.NoError(t, err)
 
 	addKeysTx := &flow.TransactionBody{
-		Script: []byte(script),
+		Script: script,
 	}
 	addKeysTx = addKeysTx.AddArgument(arg1).AddArgument(arg2)
 	return addKeysTx
@@ -357,13 +406,21 @@ func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flo
 
 // CreateAddAccountKeyTransaction generates a tx that adds a key to an account.
 func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivateKey) *flow.TransactionBody {
-	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
-	require.NoError(t, err)
+	keyBytes := accountKey.PublicKey(1000).PublicKey.Encode()
 
 	script := []byte(`
         transaction(key: [UInt8]) {
           prepare(signer: AuthAccount) {
-            signer.addPublicKey(key)
+            let acct = AuthAccount(payer: signer)
+            let publicKey2 = PublicKey(
+              publicKey: key,
+              signatureAlgorithm: SignatureAlgorithm.%s
+            )
+            signer.keys.add(
+              publicKey: publicKey2,
+              hashAlgorithm: HashAlgorithm.%s,
+              weight: %d.0
+            )
           }
         }
    	`)
@@ -372,7 +429,7 @@ func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivat
 	require.NoError(t, err)
 
 	addKeysTx := &flow.TransactionBody{
-		Script: []byte(script),
+		Script: script,
 	}
 	addKeysTx = addKeysTx.AddArgument(arg)
 
