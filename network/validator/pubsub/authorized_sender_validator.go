@@ -18,14 +18,14 @@ import (
 
 func init() {
 	// initialize the authorized roles map the first time this package is imported.
-	initializeAuthorizedRolesMap()
+	initializeChannelToMsgCodesMap()
 }
 
 // channelToMsgCodes is a mapping of network channels to codes of the messages communicated on them. This will be used to check the list of authorized roles associated with the channel
 var channelToMsgCodes map[network.Channel][]uint8
 
-// initializeAuthorizedRolesMap initializes channelToMsgCodes.
-func initializeAuthorizedRolesMap() {
+// initializeChannelToMsgCodesMap initializes channelToMsgCodes.
+func initializeChannelToMsgCodesMap() {
 	channelToMsgCodes = make(map[network.Channel][]uint8)
 
 	// consensus
@@ -55,7 +55,7 @@ func initializeAuthorizedRolesMap() {
 	channelToMsgCodes[channels.ProvideApprovalsByChunk] = []uint8{cborcodec.CodeApprovalRequest, cborcodec.CodeApprovalResponse}
 
 	// generic entity exchange engines all use EntityRequest and EntityResponse
-	channelToMsgCodes[channels.RequestChunks] = []uint8{cborcodec.CodeEntityRequest, cborcodec.CodeEntityResponse}
+	channelToMsgCodes[channels.RequestChunks] = []uint8{cborcodec.CodeEntityRequest, cborcodec.CodeEntityResponse, cborcodec.CodeChunkDataRequest, cborcodec.CodeChunkDataResponse}
 	channelToMsgCodes[channels.RequestCollections] = channelToMsgCodes[channels.RequestChunks]
 	channelToMsgCodes[channels.RequestApprovalsByChunk] = channelToMsgCodes[channels.RequestChunks]
 	channelToMsgCodes[channels.RequestReceiptsByBlockID] = channelToMsgCodes[channels.RequestChunks]
