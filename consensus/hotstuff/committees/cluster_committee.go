@@ -31,6 +31,7 @@ type Cluster struct {
 	initialClusterMembers flow.IdentityList
 }
 
+var _ hotstuff.VoterCommittee = (*Cluster)(nil)
 var _ hotstuff.Committee = (*Cluster)(nil)
 
 func NewClusterCommittee(
@@ -61,7 +62,7 @@ func NewClusterCommittee(
 	return com, nil
 }
 
-func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (c *Cluster) IdentitiesByBlock(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 
 	// first retrieve the cluster block payload
 	payload, err := c.payloads.ByBlockID(blockID)
@@ -85,7 +86,7 @@ func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilt
 	return identities, err
 }
 
-func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
+func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 
 	// first retrieve the cluster block payload
 	payload, err := c.payloads.ByBlockID(blockID)
@@ -119,6 +120,22 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 	return identity, nil
 }
 
+// IdentitiesByEpoch returns the initial cluster members for this epoch. Since clusters
+// only exist for one epoch, we don't need to check the view.
+func (c *Cluster) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
+	return c.initialClusterMembers.Filter(selector), nil
+}
+
+// IdentityByEpoch returns the node from the initial cluster members for this epoch.
+// Since clusters only exist for one epoch, we don't need to check the view.
+func (c *Cluster) IdentityByEpoch(_ uint64, nodeID flow.Identifier) (*flow.Identity, error) {
+	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
+	if !ok {
+		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
+	}
+	return identity, nil
+}
+
 func (c *Cluster) LeaderForView(view uint64) (flow.Identifier, error) {
 	return c.selection.LeaderForView(view)
 }
@@ -127,6 +144,6 @@ func (c *Cluster) Self() flow.Identifier {
 	return c.me
 }
 
-func (c *Cluster) DKG(_ flow.Identifier) (hotstuff.DKG, error) {
+func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 	panic("queried DKG of cluster committee")
 }
