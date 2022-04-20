@@ -35,7 +35,9 @@ type BootstrapProcedure struct {
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
 
-	transactionFees BootstrapProcedureFeeParameters
+	transactionFees        BootstrapProcedureFeeParameters
+	executionEffortWeights weightedMeter.ExecutionEffortWeights
+	executionMemoryWeights weightedMeter.ExecutionMemoryWeights
 
 	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
@@ -93,7 +95,7 @@ var DefaultTransactionFees = func() BootstrapProcedureFeeParameters {
 	if err != nil {
 		panic(fmt.Errorf("invalid default fee surge factor: %w", err))
 	}
-	inclusionEffortCost, err := cadence.NewUFix64("0.0001")
+	inclusionEffortCost, err := cadence.NewUFix64("0.00001")
 	if err != nil {
 		panic(fmt.Errorf("invalid default fee effort cost: %w", err))
 	}
@@ -118,6 +120,20 @@ func WithAccountCreationFee(fee cadence.UFix64) BootstrapProcedureOption {
 func WithTransactionFee(fees BootstrapProcedureFeeParameters) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.transactionFees = fees
+		return bp
+	}
+}
+
+func WithExecutionEffortWeights(weights weightedMeter.ExecutionEffortWeights) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.executionEffortWeights = weights
+		return bp
+	}
+}
+
+func WithExecutionMemoryWeights(weights weightedMeter.ExecutionMemoryWeights) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.executionMemoryWeights = weights
 		return bp
 	}
 }
@@ -225,6 +241,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 		b.transactionFees.InclusionEffortCost,
 		b.transactionFees.ExecutionEffortCost,
 	)
+
+	b.setupExecutionWeights(service)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
@@ -555,6 +573,65 @@ func (b *BootstrapProcedure) setupFees(service, flowFees flow.Address, surgeFact
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup fees: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setupExecutionWeights(service flow.Address) {
+	// if executionEffortWeights were not set skip this part and just use the defaults.
+	if b.executionEffortWeights != nil {
+		b.setupExecutionEffortWeights(service)
+	}
+	// if executionMemoryWeights were not set skip this part and just use the defaults.
+	if b.executionMemoryWeights != nil {
+		b.setupExecutionMemoryWeights(service)
+	}
+}
+
+func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address) {
+	weights := b.executionEffortWeights
+
+	uintWeights := make(map[uint]uint64, len(weights))
+	for i, weight := range weights {
+		uintWeights[uint(i)] = weight
+	}
+
+	tb, err := blueprints.SetExecutionEffortWeightsTransaction(service, uintWeights)
+	if err != nil {
+		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
+	}
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			tb,
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to setup execution effort weights: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setupExecutionMemoryWeights(service flow.Address) {
+	weights := b.executionMemoryWeights
+
+	uintWeights := make(map[uint]uint64, len(weights))
+	for i, weight := range weights {
+		uintWeights[uint(i)] = weight
+	}
+
+	tb, err := blueprints.SetExecutionMemoryWeightsTransaction(service, uintWeights)
+	if err != nil {
+		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
+	}
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			tb,
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to setup execution effort weights: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(
