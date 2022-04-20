@@ -115,16 +115,17 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 }
 
 func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
-	signers, aggregatedSig, err := p.sigAggregator.UnsafeAggregate()
-	if err != nil {
-		return nil, fmt.Errorf("could not aggregate multi message signature: %w", err)
-	}
+	panic("implement me")
+	//signers, aggregatedSig, err := p.sigAggregator.UnsafeAggregate()
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not aggregate multi message signature: %w", err)
+	//}
+	//
+	//tc := p.tcBuilder.Build(signers, aggregatedSig)
+	//err = p.validator.ValidateTC(tc)
+	//if err != nil {
+	//	return nil, fmt.Errorf("constructed TC is invalid: %w", err)
+	//}
 
-	tc := p.tcBuilder.Build(signers, aggregatedSig)
-	err = p.validator.ValidateTC(tc)
-	if err != nil {
-		return nil, fmt.Errorf("constructed TC is invalid: %w", err)
-	}
-
-	return tc, nil
+	//return tc, nil
 }

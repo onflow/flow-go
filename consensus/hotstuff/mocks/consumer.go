@@ -25,6 +25,11 @@ func (_m *Consumer) OnDoubleProposeDetected(_a0 *model.Block, _a1 *model.Block) 
 	_m.Called(_a0, _a1)
 }
 
+// OnDoubleTimeoutDetected provides a mock function with given fields: _a0, _a1
+func (_m *Consumer) OnDoubleTimeoutDetected(_a0 *model.TimeoutObject, _a1 *model.TimeoutObject) {
+	_m.Called(_a0, _a1)
+}
+
 // OnDoubleVotingDetected provides a mock function with given fields: _a0, _a1
 func (_m *Consumer) OnDoubleVotingDetected(_a0 *model.Vote, _a1 *model.Vote) {
 	_m.Called(_a0, _a1)
@@ -48,6 +53,11 @@ func (_m *Consumer) OnFinalizedBlock(_a0 *model.Block) {
 // OnForkChoiceGenerated provides a mock function with given fields: _a0, _a1
 func (_m *Consumer) OnForkChoiceGenerated(_a0 uint64, _a1 *flow.QuorumCertificate) {
 	_m.Called(_a0, _a1)
+}
+
+// OnInvalidTimeoutDetected provides a mock function with given fields: _a0
+func (_m *Consumer) OnInvalidTimeoutDetected(_a0 *model.TimeoutObject) {
+	_m.Called(_a0)
 }
 
 // OnInvalidVoteDetected provides a mock function with given fields: _a0
