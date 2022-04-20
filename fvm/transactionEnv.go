@@ -118,25 +118,42 @@ func (e *TransactionEnv) setMeteringWeights() error {
 		return nil
 	}
 
-	computationWeights, memoryWeights, err := getExecutionWeights(e, e.accounts)
+	computationWeights, err := getExecutionEffortWeights(e, e.accounts)
 	err, fatal := errors.SplitErrorTypes(err)
 	if fatal != nil {
 		e.ctx.Logger.
 			Error().
 			Err(fatal).
-			Msg("error getting execution weights")
+			Msg("error getting execution effort weights")
 		return fatal
 	}
 	if err != nil {
 		e.ctx.Logger.
 			Info().
 			Err(err).
-			Msg("could not set execution weights. Using defaults")
-		return nil
+			Msg("could not set execution effort weights. Using defaults")
+	} else {
+		m.SetComputationWeights(computationWeights)
 	}
 
-	m.SetComputationWeights(computationWeights)
-	m.SetMemoryWeights(memoryWeights)
+	memoryWeights, err := getExecutionMemoryWeights(e, e.accounts)
+	err, fatal = errors.SplitErrorTypes(err)
+	if fatal != nil {
+		e.ctx.Logger.
+			Error().
+			Err(fatal).
+			Msg("error getting execution memory weights")
+		return fatal
+	}
+	if err != nil {
+		e.ctx.Logger.
+			Info().
+			Err(err).
+			Msg("could not set execution memory weights. Using defaults")
+	} else {
+		m.SetMemoryWeights(memoryWeights)
+	}
+
 	return nil
 }
 

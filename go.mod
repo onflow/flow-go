@@ -3,6 +3,7 @@ module github.com/onflow/flow-go
 go 1.16
 
 require (
+	cloud.google.com/go/iam v0.3.0 // indirect
 	cloud.google.com/go/storage v1.16.0
 	github.com/antihax/optional v1.0.0
 	github.com/aws/aws-sdk-go-v2/config v1.8.0
@@ -58,12 +59,12 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.3.0
-	github.com/onflow/cadence v0.21.3-0.20220317173919-b23d45bcd67d
+	github.com/onflow/cadence v0.21.3-0.20220419065337-d5202c162010
 	github.com/onflow/flow v0.2.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.1-0.20220324190025-40b5faa37e17
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.1-0.20220324190025-40b5faa37e17
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220413172500-d89ca96e6db3
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220413172500-d89ca96e6db3
 	github.com/onflow/flow-emulator v0.20.3
-	github.com/onflow/flow-go-sdk v0.24.0
+	github.com/onflow/flow-go-sdk v0.24.1-0.20220419204316-4f7efebeb2e9
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.2.4
 	github.com/opentracing/opentracing-go v1.2.0
@@ -91,13 +92,11 @@ require (
 	go.uber.org/multierr v1.7.0
 	golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
 	golang.org/x/text v0.3.7
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
-	google.golang.org/api v0.63.0
-	google.golang.org/genproto v0.0.0-20220211171837-173942840c17
+	google.golang.org/api v0.70.0
+	google.golang.org/genproto v0.0.0-20220222213610-43724f9ea8cf
 	google.golang.org/grpc v1.44.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.27.1
@@ -106,7 +105,3 @@ require (
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
-
-replace github.com/onflow/cadence => ../cadence
-
-replace github.com/onflow/flow-go-sdk => ../flow-go-sdk
