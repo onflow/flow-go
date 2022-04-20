@@ -214,6 +214,13 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
+	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
+	if err != nil {
+		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+	}
+
+	transactions = append(transactions, systemTx)
+
 	return transactions, nil
 }
 
