@@ -184,7 +184,7 @@ func TestAuthorizedSenderValidator_UnAuthorized(t *testing.T) {
 			len(an1.pubSub.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
-	timedCtx, cancel5s := context.WithTimeout(context.Background(), 1000*time.Second)
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
@@ -285,7 +285,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 			len(sn2.pubSub.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
-	timedCtx, cancel5s := context.WithTimeout(context.Background(), 1000*time.Second)
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
@@ -364,7 +364,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 			len(an1.pubSub.ListPeers(topic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
-	timedCtx, cancel5s := context.WithTimeout(context.Background(), 1000*time.Second)
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
 	header := unittest.BlockHeaderFixture()
