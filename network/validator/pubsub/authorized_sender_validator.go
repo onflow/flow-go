@@ -79,7 +79,7 @@ func initializeAuthorizedRolesMap() {
 // to be authorized to send a message if all of the following are true.
 // 1. The message type is a known message type (initialized in the authorizedRolesMap).
 // 2. The authorized roles list for the message type contains the senders role.
-// 3. The node has a weight > 0 and is not ejected
+// 3. The node is not ejected
 func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
