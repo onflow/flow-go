@@ -1,4 +1,3 @@
-
 # The short Git commit hash
 SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
@@ -251,6 +250,13 @@ docker-build-execution-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/execution-debug:latest" -t "$(CONTAINER_REGISTRY)/execution-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-debug:$(IMAGE_TAG)" .
 
+# build corrupted execution node for BFT testing
+.PHONY: docker-build-execution-corrupted
+docker-build-execution-corrupted:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
+
 .PHONY: docker-build-verification
 docker-build-verification:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
@@ -261,6 +267,13 @@ docker-build-verification:
 docker-build-verification-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/verification-debug:latest" -t "$(CONTAINER_REGISTRY)/verification-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-debug:$(IMAGE_TAG)" .
+
+# build corrupted verification node for BFT testing
+.PHONY: docker-build-verification-corrupted
+docker-build-verification-corrupted:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access
 docker-build-access:
