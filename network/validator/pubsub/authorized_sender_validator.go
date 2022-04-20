@@ -109,42 +109,19 @@ func AuthorizedSenderValidator(log zerolog.Logger, getIdentity func(peer.ID) (*f
 	}
 }
 
+// isAuthorizedSender checks if node is an authorized role and is not ejected
 func isAuthorizedSender(identity *flow.Identity, msgType uint8) error {
-	err := isAuthorizedNodeRole(identity.Role, msgType)
-	if err != nil {
-		return err
-	}
-
-	err = isActiveNode(identity.NodeID, identity.Weight, identity.Ejected)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// isAuthorizedNodeRole checks if a role is authorized to send message type
-func isAuthorizedNodeRole(role flow.Role, msgType uint8) error {
 	roleList, ok := authorizedRolesMap[msgType]
 	if !ok {
 		return fmt.Errorf("unknown message type does not match any code from the cbor codec")
 	}
 
-	if !roleList.Contains(role) {
+	if !roleList.Contains(identity.Role) {
 		return fmt.Errorf("sender is not authorized to send this message type")
 	}
 
-	return nil
-}
-
-// isActiveNode checks that the node has a weight > 0 and is not ejected
-func isActiveNode(nodeID flow.Identifier, weight uint64, ejected bool) error {
-	if weight <= 0 {
-		return fmt.Errorf("node %s has an invalid weight of %d is not an active node", nodeID, weight)
-	}
-
-	if ejected {
-		return fmt.Errorf("node %s is an ejected node", nodeID)
+	if identity.Ejected {
+		return fmt.Errorf("node %s is an ejected node", identity.NodeID)
 	}
 
 	return nil
