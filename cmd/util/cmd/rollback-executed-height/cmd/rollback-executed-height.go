@@ -135,7 +135,7 @@ func removeExecutionResultsFromHeight(
 		}
 
 		finalRemoved++
-		log.Info().Msgf("result at height :%v has been removed. progress (%v/%v)", height, finalRemoved, total)
+		log.Info().Msgf("result at height %v has been removed. progress (%v/%v)", height, finalRemoved, total)
 	}
 
 	// removing for pending blocks
