@@ -2,6 +2,7 @@ package jobqueue
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -275,6 +276,10 @@ func (j *MockJobs) PushN(n int64) error {
 // deterministically compute the JobID from index
 func JobIDAtIndex(index uint64) module.JobID {
 	return module.JobID(fmt.Sprintf("%v", index))
+}
+
+func JobIDToIndex(id module.JobID) (uint64, error) {
+	return strconv.ParseUint(string(id), 10, 64)
 }
 
 // JobMaker is a test helper.
