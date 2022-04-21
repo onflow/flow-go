@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -336,6 +337,13 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 
+		t.Run("advise to evict checkpoints from page cache", func(t *testing.T) {
+			evictedFileNames, err := wal.EvictAllCheckpointsFromLinuxPageCache(dir, nil)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(evictedFileNames))
+			require.Equal(t, path.Join(dir, "checkpoint.00000010"), evictedFileNames[0])
+		})
+
 		t.Run("corrupted checkpoints are skipped", func(t *testing.T) {
 
 			f6, err := mtrie.NewForest(size*10, metricsCollector, nil)
@@ -418,6 +426,7 @@ func Test_Checkpointing(t *testing.T) {
 			}
 
 		})
+
 	})
 }
 

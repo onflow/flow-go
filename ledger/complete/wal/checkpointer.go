@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -775,6 +776,44 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 	return tries, nil
 }
 
+// EvictAllCheckpointsFromLinuxPageCache advises Linux to evict all checkpoint files
+// in dir from Linux page cache.  It returns list of files that Linux was
+// successfully advised to evict and first error encountered (if any).
+// Even after error advising eviction, it continues to advise eviction of remaining files.
+func EvictAllCheckpointsFromLinuxPageCache(dir string, logger *zerolog.Logger) ([]string, error) {
+	var err error
+	matches, err := filepath.Glob(filepath.Join(dir, checkpointFilenamePrefix+"*"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to enumerate checkpoints: %w", err)
+	}
+	evictedFileNames := make([]string, 0, len(matches))
+	for _, fn := range matches {
+		base := filepath.Base(fn)
+		if !strings.HasPrefix(base, checkpointFilenamePrefix) {
+			continue
+		}
+		justNumber := base[len(checkpointFilenamePrefix):]
+		_, err := strconv.Atoi(justNumber)
+		if err != nil {
+			continue
+		}
+		evictErr := evictFileFromLinuxPageCacheByName(fn, false, logger)
+		if evictErr != nil {
+			if err == nil {
+				err = evictErr // Save first evict error encountered
+			}
+			if logger != nil {
+				logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", fn, err)
+			}
+			continue
+		}
+		evictedFileNames = append(evictedFileNames, fn)
+	}
+	// return the first error encountered
+	return evictedFileNames, err
+}
+
+// evictFileFromLinuxPageCacheByName advises Linux to evict the file from Linux page cache.
 func evictFileFromLinuxPageCacheByName(fileName string, fsync bool, logger *zerolog.Logger) error {
 	f, err := os.Open(fileName)
 	if err != nil {
