@@ -2,7 +2,6 @@ package epochs
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -149,7 +148,7 @@ type StakedNodeOperationInfo struct {
 	StakingKey              sdkcrypto.PrivateKey
 	MachineAccountAddress   sdk.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
-	MachineAccountPublicKey flow.AccountPublicKey
+	MachineAccountPublicKey sdk.AccountKey
 	ContainerName           string
 }
 
@@ -194,13 +193,6 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
-	// if node has a machine account key encode it
-	var encMachinePubKey []byte
-	if machineAccountKey != nil {
-		encMachinePubKey, err = flow.EncodeRuntimeAccountPublicKey(machineAccountPubKey)
-		require.NoError(s.T(), err)
-	}
-
 	containerName := s.getTestContainerName(role)
 
 	// register node using staking collection
@@ -215,7 +207,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		strings.TrimPrefix(networkingKey.PublicKey().String(), "0x"),
 		strings.TrimPrefix(stakingKey.PublicKey().String(), "0x"),
 		fmt.Sprintf("%f", stakeAmount),
-		hex.EncodeToString(encMachinePubKey),
+		machineAccountPubKey,
 	)
 
 	require.NoError(s.T(), err)
@@ -292,7 +284,7 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	networkingKey,
 	stakingKey,
 	machineAccountKey crypto.PrivateKey,
-	machineAccountPubKey flow.AccountPublicKey,
+	machineAccountPubKey sdk.AccountKey,
 ) {
 	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 	networkingKey = unittest.NetworkingPrivKeyFixture()
@@ -302,9 +294,9 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
 		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 
-		machineAccountPubKey = flow.AccountPublicKey{
+		machineAccountPubKey = sdk.AccountKey{
 			PublicKey: machineAccountKey.PublicKey(),
-			SignAlgo:  machineAccountKey.PublicKey().Algorithm(),
+			SigAlgo:   machineAccountKey.PublicKey().Algorithm(),
 			HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
 			Weight:    1000,
 		}
@@ -367,7 +359,7 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	networkingKey string,
 	stakingKey string,
 	amount string,
-	machineKey string,
+	machineKey sdk.AccountKey,
 ) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
