@@ -48,6 +48,9 @@ func initializeChannelToMsgCodesMap() {
 	channelToMsgCodes[channels.PushApprovals] = []uint8{cborcodec.CodeResultApproval}
 	channelToMsgCodes[channels.ReceiveApprovals] = channelToMsgCodes[channels.PushApprovals]
 
+	channelToMsgCodes[channels.PushBlocks] = []uint8{cborcodec.CodeBlockProposal}
+	channelToMsgCodes[channels.ReceiveBlocks] = channelToMsgCodes[channels.PushBlocks]
+
 	// data exchange for execution of blocks
 	channelToMsgCodes[channels.ProvideChunks] = []uint8{cborcodec.CodeChunkDataRequest, cborcodec.CodeChunkDataResponse}
 
