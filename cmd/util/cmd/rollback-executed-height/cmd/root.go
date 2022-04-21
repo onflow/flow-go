@@ -12,10 +12,10 @@ var (
 	flagDatadir string
 )
 
-// run with `./remove-execution-fork --datadir /var/flow/data/protocol`
+// run with `./rollback-executed-height --datadir /var/flow/data/protocol --height 100`
 var rootCmd = &cobra.Command{
-	Use:   "remove-execution-result",
-	Short: "remove execution result",
+	Use:   "rollback-executed-height",
+	Short: "rollback executed height",
 	Run:   run,
 }
 

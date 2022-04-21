@@ -29,7 +29,7 @@ func init() {
 	// execution results from height + 1 will be removed
 	Cmd.Flags().Uint64Var(&flagHeight, "height", 0,
 		"the height of the block to update the highest executed height")
-	_ = Cmd.MarkFlagRequired("from-height")
+	_ = Cmd.MarkFlagRequired("height")
 
 	Cmd.Flags().StringVar(&flagDataDir, "datadir", "",
 		"directory that stores the protocol state")
@@ -90,7 +90,7 @@ func removeExecutionResultsFromHeight(
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	fromHeight uint64) error {
-	log.Info().Msgf("removing results for blocks from height: %v", flagHeight)
+	log.Info().Msgf("removing results for blocks from height: %v", fromHeight)
 
 	root, err := protoState.Params().Root()
 	if err != nil {
