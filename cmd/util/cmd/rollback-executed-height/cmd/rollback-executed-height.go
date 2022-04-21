@@ -42,18 +42,19 @@ func run(*cobra.Command, []string) {
 		Uint64("height", flagHeight).
 		Msg("flags")
 
-	if height == 0 {
+	if flagHeight == 0 {
 		// this would be a mistake that the height flag is used but no height value
 		// was specified, so the default value 0 is used.
-		log.Fatal().Err(err).Msg("height must be above 0")
+		log.Fatal().Msg("height must be above 0")
 	}
 
+	var err error
 	db := common.InitStorage(flagDataDir)
 	storages := common.InitStorages(db)
 	state, err := common.InitProtocolState(db, storages)
 
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not init states")
+		log.Fatal().Msg("could not init states")
 	}
 
 	err = removeExecutionResultsFromHeight(
@@ -69,6 +70,9 @@ func run(*cobra.Command, []string) {
 	}
 
 	header, err := state.AtHeight(flagHeight).Head()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get block header at height %v", flagHeight)
+	}
 
 	err = storages.Headers.RollbackExecutedBlock(header)
 	if err != nil {
