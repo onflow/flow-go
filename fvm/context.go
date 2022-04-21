@@ -1,8 +1,9 @@
 package fvm
 
 import (
-	"github.com/rs/zerolog"
 	"math"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/handler"
