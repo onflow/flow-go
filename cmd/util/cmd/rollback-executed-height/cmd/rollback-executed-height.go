@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger"
 )
 
 var (
@@ -54,7 +55,13 @@ func run(*cobra.Command, []string) {
 	state, err := common.InitProtocolState(db, storages)
 
 	if err != nil {
-		log.Fatal().Msg("could not init states")
+		log.Fatal().Err(err).Msg("could not init states")
+	}
+
+	// cast into storage module
+	headers, ok := storages.Headers.(*badger.Headers)
+	if !ok {
+		log.Fatal().Msg("could not use badger.Headers as storage.Headers")
 	}
 
 	err = removeExecutionResultsFromHeight(
@@ -74,7 +81,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("could not get block header at height %v", flagHeight)
 	}
 
-	err = storages.Headers.RollbackExecutedBlock(header)
+	err = headers.RollbackExecutedBlock(header)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not roll back executed block at height %v", flagHeight)
 	}

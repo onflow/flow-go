@@ -262,20 +262,6 @@ func (mr *MockHeadersMockRecorder) IndexByChunkID(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).IndexByChunkID), arg0, arg1)
 }
 
-// RollbackExecutedBlock mocks base method
-func (m *MockHeaders) RollbackExecutedBlock(arg0 *flow.Header) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RollbackExecutedBlock", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RollbackExecutedBlock indicates an expected call of RollbackExecutedBlock
-func (mr *MockHeadersMockRecorder) RollbackExecutedBlock(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RollbackExecutedBlock", reflect.TypeOf((*MockHeaders)(nil).RollbackExecutedBlock), arg0)
-}
-
 // Store mocks base method
 func (m *MockHeaders) Store(arg0 *flow.Header) error {
 	m.ctrl.T.Helper()
