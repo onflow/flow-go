@@ -22,7 +22,7 @@ require (
 	github.com/onflow/flow-go v0.25.8-0.20220420171205-833e2e8849b1 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.24.1-0.20220421152843-9ce4d554036e
 	github.com/onflow/flow-go/crypto v0.24.3
-	github.com/onflow/flow/protobuf/go/flow v0.2.4
+	github.com/onflow/flow/protobuf/go/flow v0.2.5
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.26.1
 	github.com/stretchr/testify v1.7.1-0.20210824115523-ab6dc3262822

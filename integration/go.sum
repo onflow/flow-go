@@ -1430,8 +1430,8 @@ github.com/onflow/cadence v0.11.2/go.mod h1:8NwJGO535nnY/+QWEMDc2rhvOFChToWQ9Bg7
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
 github.com/onflow/cadence v0.21.3-0.20220419065337-d5202c162010 h1:/TR8ApVEgeF3jDI0sFnWa+g6TYrcWvOx0/OLnaaeR9g=
 github.com/onflow/cadence v0.21.3-0.20220419065337-d5202c162010/go.mod h1:vNIxF13e1Ty50KnkQSm6LVwvxGGLTQ4kpldvTL+2S6s=
-github.com/onflow/flow v0.2.4 h1:w93wtRDGeFLzjR73IaeSFCUHVv/ITExk5bfDGdvzWm8=
-github.com/onflow/flow v0.2.4/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
+github.com/onflow/flow v0.2.5 h1:d1LCeE+w+ef4QAC0zEAxfJn+N09bNKL8zXnfrihiSrs=
+github.com/onflow/flow v0.2.5/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220413172500-d89ca96e6db3 h1:VBOuH/JhcR/Zy+W2ZaS+imp7xSFyO9sfJfUMeMcqgNc=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220413172500-d89ca96e6db3/go.mod h1:T6yhM+kWrFxiP6F3hh8lh9DcocHfmv48P4ITnjLhKSk=
 github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220413172500-d89ca96e6db3 h1:Au2dWIIUbPJWVDRR9yCcT+gtQVKda+qPJawjvGB0G/I=
@@ -1453,8 +1453,8 @@ github.com/onflow/flow-nft/lib/go/contracts v0.0.0-20210915191154-12ee8c507a0e/g
 github.com/onflow/flow/protobuf/go/flow v0.1.8/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.1.9/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.2.2/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
-github.com/onflow/flow/protobuf/go/flow v0.2.4 h1:4+/JBD8SKh/6o+LeFgOeI3snnYYpsgdZdyhZ6UXj3xw=
-github.com/onflow/flow/protobuf/go/flow v0.2.4/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
+github.com/onflow/flow/protobuf/go/flow v0.2.5 h1:IzkN5f3w/qFN2Mshc1I0yNgnT+YbFE5Htz/h8t/VL4c=
+github.com/onflow/flow/protobuf/go/flow v0.2.5/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onflow/fusd/lib/go/contracts v0.0.0-20211021081023-ae9de8fb2c7e/go.mod h1:CRX9eXtc9zHaRVTW1Xh4Cf5pZgKkQuu1NuSEVyHXr/0=
 github.com/onflow/sdks v0.4.2 h1:UdnXOdcIPIdD02n2SxQVGTJBAxGqJBgOkThxI3/IDnk=
 github.com/onflow/sdks v0.4.2/go.mod h1:F0dj0EyHC55kknLkeD10js4mo14yTdMotnWMslPirrU=
