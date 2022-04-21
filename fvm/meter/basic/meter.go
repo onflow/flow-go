@@ -43,9 +43,9 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 }
 
 // MergeMeter merges the input meter into the current meter and checks for the limits
-func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
+func (m *Meter) MergeMeter(child interfaceMeter.Meter, enforceLimits bool) error {
 	m.computationUsed = m.computationUsed + child.TotalComputationUsed()
-	if m.computationUsed > m.computationLimit {
+	if enforceLimits && m.computationUsed > m.computationLimit {
 		return errors.NewComputationLimitExceededError(uint64(m.computationLimit))
 	}
 	for key, intensity := range child.ComputationIntensities() {
@@ -53,7 +53,7 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 	}
 
 	m.memoryUsed = m.memoryUsed + child.TotalMemoryUsed()
-	if m.memoryUsed > m.memoryLimit {
+	if enforceLimits && m.memoryUsed > m.memoryLimit {
 		return errors.NewMemoryLimitExceededError(uint64(m.memoryLimit))
 	}
 	for key, intensity := range child.MemoryIntensities() {

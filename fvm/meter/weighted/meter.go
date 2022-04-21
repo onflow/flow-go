@@ -226,7 +226,7 @@ func (m *Meter) NewChild() interfaceMeter.Meter {
 }
 
 // MergeMeter merges the input meter into the current meter and checks for the limits
-func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
+func (m *Meter) MergeMeter(child interfaceMeter.Meter, enforceLimits bool) error {
 
 	var childComputationUsed uint64
 	if basic, ok := child.(*Meter); ok {
@@ -235,8 +235,8 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 		childComputationUsed = uint64(child.TotalComputationUsed()) << MeterExecutionInternalPrecisionBytes
 	}
 	m.computationUsed = m.computationUsed + childComputationUsed
-	if m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(m.computationLimit)
+	if enforceLimits && m.computationUsed > m.computationLimit {
+		return errors.NewComputationLimitExceededError(uint64(m.TotalComputationLimit()))
 	}
 
 	for key, intensity := range child.ComputationIntensities() {
@@ -250,8 +250,8 @@ func (m *Meter) MergeMeter(child interfaceMeter.Meter) error {
 		childMemoryUsed = uint64(child.TotalMemoryUsed())
 	}
 	m.memoryUsed = m.memoryUsed + childMemoryUsed
-	if m.memoryUsed > m.memoryLimit {
-		return errors.NewMemoryLimitExceededError(m.memoryLimit)
+	if enforceLimits && m.memoryUsed > m.memoryLimit {
+		return errors.NewMemoryLimitExceededError(uint64(m.TotalMemoryLimit()))
 	}
 
 	for key, intensity := range child.MemoryIntensities() {
@@ -274,7 +274,7 @@ func (m *Meter) MeterComputation(kind common.ComputationKind, intensity uint) er
 	}
 	m.computationUsed += w * uint64(intensity)
 	if m.computationUsed > m.computationLimit {
-		return errors.NewComputationLimitExceededError(m.computationLimit)
+		return errors.NewComputationLimitExceededError(uint64(m.TotalComputationLimit()))
 	}
 	return nil
 }
@@ -308,7 +308,7 @@ func (m *Meter) MeterMemory(kind common.MemoryKind, intensity uint) error {
 	}
 	m.memoryUsed += w * uint64(intensity)
 	if m.memoryUsed > m.memoryLimit {
-		return errors.NewMemoryLimitExceededError(m.memoryLimit)
+		return errors.NewMemoryLimitExceededError(uint64(m.TotalMemoryLimit()))
 	}
 	return nil
 }

@@ -44,7 +44,7 @@ type MeteredMemoryIntensities map[common.MemoryKind]uint
 type Meter interface {
 	// merge child funcionality
 	NewChild() Meter
-	MergeMeter(child Meter) error
+	MergeMeter(child Meter, enforceLimits bool) error
 
 	// computation metering
 	MeterComputation(kind common.ComputationKind, intensity uint) error

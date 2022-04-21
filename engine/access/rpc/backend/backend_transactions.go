@@ -194,6 +194,36 @@ func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Iden
 	return tx, nil
 }
 
+func (b *backendTransactions) GetTransactionsByBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+) ([]*flow.TransactionBody, error) {
+	var transactions []*flow.TransactionBody
+
+	block, err := b.blocks.ByID(blockID)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := b.collections.ByID(guarantee.CollectionID)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
+
+		transactions = append(transactions, collection.Transactions...)
+	}
+
+	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
+	if err != nil {
+		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+	}
+
+	transactions = append(transactions, systemTx)
+
+	return transactions, nil
+}
+
 func (b *backendTransactions) GetTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
@@ -246,12 +276,100 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	return &access.TransactionResult{
-		Status:       txStatus,
-		StatusCode:   uint(statusCode),
-		Events:       events,
-		ErrorMessage: txError,
-		BlockID:      blockID,
+		Status:        txStatus,
+		StatusCode:    uint(statusCode),
+		Events:        events,
+		ErrorMessage:  txError,
+		BlockID:       blockID,
+		TransactionID: txID,
 	}, nil
+}
+
+func (b *backendTransactions) GetTransactionResultsByBlockID(
+	ctx context.Context,
+	blockID flow.Identifier,
+) ([]*access.TransactionResult, error) {
+	block, err := b.blocks.ByID(blockID)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	req := execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockID[:],
+	}
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	if err != nil {
+		_, isInsufficientExecReceipts := err.(*InsufficientExecutionReceipts)
+		if isInsufficientExecReceipts {
+			return nil, status.Errorf(codes.NotFound, err.Error())
+		}
+		return nil, status.Errorf(codes.Internal, "failed to retrieve results from any execution node: %v", err)
+	}
+
+	resp, err := b.getTransactionResultsByBlockIDFromAnyExeNode(ctx, execNodes, req)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, err
+		}
+		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+	}
+
+	results := make([]*access.TransactionResult, 0, len(resp.TransactionResults))
+	i := 0
+
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := b.collections.LightByID(guarantee.CollectionID)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
+
+		for _, txID := range collection.Transactions {
+			if i >= len(resp.TransactionResults) {
+				return nil, status.Errorf(codes.Internal, "number of results returned by execution node is less than the number of collections in the block")
+			}
+
+			txResult := resp.TransactionResults[i]
+			// tx body is irrelevant to status if it's in an executed block
+			txStatus, err := b.deriveTransactionStatus(nil, true, block)
+			if err != nil {
+				return nil, convertStorageError(err)
+			}
+
+			results = append(results, &access.TransactionResult{
+				Status:        txStatus,
+				StatusCode:    uint(txResult.GetStatusCode()),
+				Events:        convert.MessagesToEvents(txResult.GetEvents()),
+				ErrorMessage:  txResult.GetErrorMessage(),
+				BlockID:       blockID,
+				TransactionID: txID,
+				CollectionID:  guarantee.CollectionID,
+			})
+
+			i++
+		}
+	}
+
+	// system chunk transactions
+	for i < len(resp.TransactionResults) {
+		txResult := resp.TransactionResults[i]
+		// tx body is irrelevant to status if it's in an executed block
+		txStatus, err := b.deriveTransactionStatus(nil, true, block)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
+
+		results = append(results, &access.TransactionResult{
+			Status:       txStatus,
+			StatusCode:   uint(txResult.GetStatusCode()),
+			Events:       convert.MessagesToEvents(txResult.GetEvents()),
+			ErrorMessage: txResult.GetErrorMessage(),
+			BlockID:      blockID,
+		})
+
+		i++
+	}
+
+	return results, nil
 }
 
 // GetTransactionResultByIndex returns TransactionsResults for an index in a block that is executed,
@@ -561,6 +679,50 @@ func (b *backendTransactions) tryGetTransactionResult(
 	}
 	defer closer.Close()
 	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
+	return resp, err
+}
+
+func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
+	ctx context.Context,
+	execNodes flow.IdentityList,
+	req execproto.GetTransactionsByBlockIDRequest,
+) (*execproto.GetTransactionResultsResponse, error) {
+	var errs *multierror.Error
+	logAnyError := func() {
+		errToReturn := errs.ErrorOrNil()
+		if errToReturn != nil {
+			b.log.Err(errToReturn).Msg("failed to get transaction results from execution nodes")
+		}
+	}
+	defer logAnyError()
+	for _, execNode := range execNodes {
+		resp, err := b.tryGetTransactionResultsByBlockID(ctx, execNode, req)
+		if err == nil {
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", req.GetBlockId()).
+				Msg("Successfully got transaction results from any node")
+			return resp, nil
+		}
+		if status.Code(err) == codes.NotFound {
+			return nil, err
+		}
+		errs = multierror.Append(errs, err)
+	}
+	return nil, errs.ErrorOrNil()
+}
+
+func (b *backendTransactions) tryGetTransactionResultsByBlockID(
+	ctx context.Context,
+	execNode *flow.Identity,
+	req execproto.GetTransactionsByBlockIDRequest,
+) (*execproto.GetTransactionResultsResponse, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, &req)
 	return resp, err
 }
 

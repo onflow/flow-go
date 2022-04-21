@@ -61,7 +61,7 @@ require (
 	github.com/onflow/flow-emulator v0.30.1-0.20220421153717-0a0abc4d580b
 	github.com/onflow/flow-go-sdk v0.24.1-0.20220421152843-9ce4d554036e
 	github.com/onflow/flow-go/crypto v0.24.3
-	github.com/onflow/flow/protobuf/go/flow v0.2.4
+	github.com/onflow/flow/protobuf/go/flow v0.2.5
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1

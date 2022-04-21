@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -3466,24 +3467,6 @@ func TestTransactionFeeDeduction(t *testing.T) {
 }
 
 func TestSettingExecutionWeights(t *testing.T) {
-	setExecutionEffortWeights := func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs, newWeights map[uint]uint64) {
-
-		txBody, err := blueprints.SetExecutionEffortWeightsTransaction(chain.ServiceAddress(), newWeights)
-		require.NoError(t, err)
-		txBody.
-			SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress())
-
-		err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
-		require.NoError(t, err)
-
-		tx := fvm.Transaction(txBody, 0)
-		err = vm.Run(ctx, tx, view, programs)
-		require.NoError(t, err)
-
-		assert.NoError(t, tx.Err)
-	}
-
 	t.Run("transaction should fail with high weights", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -3495,9 +3478,6 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
-				uint(common.ComputationKindLoop): 100_000 << weightedMeter.MeterInternalPrecisionBytes,
-			})
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -3510,11 +3490,11 @@ func TestSettingExecutionWeights(t *testing.T) {
                   }
                 }
 			`)).
-				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress())
 
-			err := testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, 0)
@@ -3572,10 +3552,6 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
-				uint(meter.ComputationKindCreateAccount): (fvm.DefaultComputationLimit + 1) << weightedMeter.MeterInternalPrecisionBytes,
-			})
-
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -3584,11 +3560,11 @@ func TestSettingExecutionWeights(t *testing.T) {
                   }
                 }
 			`)).
-				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress())
 
-			err := testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, 0)
@@ -3610,9 +3586,6 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
-				uint(meter.ComputationKindCreateAccount): 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
-			})
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
@@ -3622,11 +3595,11 @@ func TestSettingExecutionWeights(t *testing.T) {
                   }
                 }
 			`)).
-				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress())
 
-			err := testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, 0)
@@ -3648,10 +3621,6 @@ func TestSettingExecutionWeights(t *testing.T) {
 		),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-			setExecutionEffortWeights(t, vm, chain, ctx, view, programs, map[uint]uint64{
-				uint(meter.ComputationKindCreateAccount): 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
-			})
-
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
@@ -3660,11 +3629,11 @@ func TestSettingExecutionWeights(t *testing.T) {
                   }
                 }
 			`)).
-				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress())
 
-			err := testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
 			tx := fvm.Transaction(txBody, 0)

@@ -3,6 +3,8 @@ package convert_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -38,4 +40,30 @@ func TestConvertAccountKey(t *testing.T) {
 	assert.Equal(t, accountKey, *converted)
 	assert.Equal(t, accountKey.PublicKey, converted.PublicKey)
 	assert.Equal(t, accountKey.Revoked, converted.Revoked)
+}
+
+func TestConvertEvents(t *testing.T) {
+
+	t.Run("empty", func(t *testing.T) {
+		messages := convert.EventsToMessages(nil)
+		assert.Len(t, messages, 0)
+	})
+
+	t.Run("simple", func(t *testing.T) {
+
+		txID := unittest.IdentifierFixture()
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
+
+		messages := convert.EventsToMessages([]flow.Event{event})
+
+		require.Len(t, messages, 1)
+
+		message := messages[0]
+
+		require.Equal(t, event.EventIndex, message.EventIndex)
+		require.Equal(t, event.TransactionIndex, message.TransactionIndex)
+		require.Equal(t, event.Payload, message.Payload)
+		require.Equal(t, event.TransactionID[:], message.TransactionId)
+		require.Equal(t, string(event.Type), message.Type)
+	})
 }
