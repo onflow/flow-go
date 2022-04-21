@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"github.com/rs/zerolog"
+	"math"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/handler"
@@ -60,9 +61,9 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	DefaultComputationLimit             = 100_000           // 100K
-	DefaultMemoryLimit                  = 1_000_000_000_000 // 1T
-	DefaultEventCollectionByteSizeLimit = 256_000           // 256KB
+	DefaultComputationLimit             = 100_000        // 100K
+	DefaultMemoryLimit                  = math.MaxUint64 //
+	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
 	DefaultMaxNumOfTxRetries            = 3
 )
 
