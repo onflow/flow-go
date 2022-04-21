@@ -3,11 +3,9 @@ module github.com/onflow/flow-go/integration
 go 1.16
 
 require (
-	github.com/DataDog/zstd v1.4.8 // indirect
-	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
 	github.com/dapperlabs/testingdock v0.4.4
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
-	github.com/dgraph-io/badger/v2 v2.2007.3
+	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
@@ -16,18 +14,17 @@ require (
 	github.com/go-openapi/strfmt v0.20.1 // indirect
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/onflow/cadence v0.21.3-0.20220419065337-d5202c162010
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220413172500-d89ca96e6db3
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220413172500-d89ca96e6db3
-	github.com/onflow/flow-emulator v0.20.3
+	github.com/onflow/flow-emulator v0.30.1-0.20220421153717-0a0abc4d580b
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
-	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.24.1-0.20220419204316-4f7efebeb2e9
+	github.com/onflow/flow-go v0.25.8-0.20220420171205-833e2e8849b1 // replaced by version on-disk
+	github.com/onflow/flow-go-sdk v0.24.1-0.20220421152843-9ce4d554036e
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.2.4
 	github.com/plus3it/gorecurcopy v0.0.1
-	github.com/rs/zerolog v1.21.0
+	github.com/rs/zerolog v1.26.1
 	github.com/stretchr/testify v1.7.1-0.20210824115523-ab6dc3262822
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
