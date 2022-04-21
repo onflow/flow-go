@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -422,9 +420,13 @@ func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, err
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
 	}
 	defer func() {
-		_ = file.Close()
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil && logger != nil {
+			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
 
-		_ = requestDropFromOSFileCache(filepath, logger)
+		_ = file.Close()
 	}()
 
 	return readCheckpoint(file)
@@ -773,50 +775,37 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 	return tries, nil
 }
 
-// requestDropFromOSFileCache requests the specified file be dropped from OS file cache.
-// The use case is when a new checkpoint is loaded or created, OS file cache can hold the entire
-// checkpoint file in memory until requestDropFromOSFileCache() causes it to be dropped from
-// the file cache.  Not calling requestDropFromOSFileCache() causes two checkpoint files
-// to be cached by the OS file cache for each checkpointing, eventually caching hundreds of GB.
-// CAUTION: Returns nil without doing anything if GOOS != linux.
-func requestDropFromOSFileCache(fileName string, logger *zerolog.Logger) error {
-	if runtime.GOOS != "linux" {
-		return nil
+func evictFileFromLinuxPageCacheByName(fileName string, fsync bool, logger *zerolog.Logger) error {
+	f, err := os.Open(fileName)
+	if err != nil {
+		return err
 	}
+	defer f.Close()
 
-	// Try using /bin/dd (Debian, Ubuntu, etc.)
-	cmdFileName := "/bin/dd"
+	return evictFileFromLinuxPageCache(f, fsync, logger)
+}
 
-	// If /bin/dd isn't found, then try /usr/bin/dd (OpenSUSE Leap, etc.)
-	_, err := os.Stat(cmdFileName)
-	if os.IsNotExist(err) {
-		cmdFileName = "/usr/bin/dd"
-		_, err := os.Stat(cmdFileName)
-		if os.IsNotExist(err) {
-			return fmt.Errorf("required program dd not found in /bin/ and /usr/bin/")
-		}
+// evictFileFromLinuxPageCache advises Linux to evict a file from Linux page cache.
+// A use case is when a new checkpoint is loaded or created, Linux may cache big
+// checkpoint files in memory until evictFileFromLinuxPageCache causes them to be
+// evicted from the Linux page cache.  Not calling eviceFileFromLinuxPageCache()
+// causes two checkpoint files to be cached for each checkpointing, eventually
+// caching hundreds of GB.
+// CAUTION: no-op when GOOS != linux.
+func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger) error {
+	err := fadviseNoLinuxPageCache(f.Fd(), fsync)
+	if err != nil {
+		return err
 	}
-
-	// Remove some special chars from fileName just in case.
-	// Regex would be shorter but not as easy to read.
-	s := strings.ReplaceAll(fileName, " ", "")
-	s = strings.ReplaceAll(s, ";", "")
-	s = strings.ReplaceAll(s, "$", "")
-	s = strings.ReplaceAll(s, "|", "")
-	s = strings.ReplaceAll(s, ">", "")
-	s = strings.ReplaceAll(s, "<", "")
-	s = strings.ReplaceAll(s, "*", "")
-
-	_, err = os.Stat(s)
-	if os.IsNotExist(err) {
-		return fmt.Errorf("sanitized filename %s does not exist", s)
-	}
-
-	cmd := exec.Command(cmdFileName, "if="+s, "iflag=nocache", "count=0")
 
 	if logger != nil {
-		logger.Info().Msgf("run %q to drop file from OS file cache", cmd.String())
+		fstat, err := f.Stat()
+		if err == nil {
+			fsize := fstat.Size()
+			logger.Info().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
+		} else {
+			logger.Info().Msgf("advised Linux to evict file %s from page cache", f.Name())
+		}
 	}
-
-	return cmd.Run()
+	return nil
 }

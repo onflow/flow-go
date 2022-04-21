@@ -53,6 +53,13 @@ func (s *SyncOnCloseRenameFile) Close() error {
 		return fmt.Errorf("cannot sync file %s: %w", s.file.Name(), err)
 	}
 
+	// s.file.Sync() was already called, so we pass fsync=false
+	err = evictFileFromLinuxPageCache(s.file, false, s.logger)
+	if err != nil && s.logger != nil {
+		s.logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", s.targetName, err)
+		// No need to return this error because we're only "advising" Linux to evict a file from cache.
+	}
+
 	err = s.file.Close()
 	if err != nil {
 		return fmt.Errorf("error while closing file %s: %w", s.file.Name(), err)
@@ -61,11 +68,6 @@ func (s *SyncOnCloseRenameFile) Close() error {
 	err = os.Rename(s.file.Name(), s.targetName)
 	if err != nil {
 		return fmt.Errorf("error while renaming from %s to %s: %w", s.file.Name(), s.targetName, err)
-	}
-
-	err = requestDropFromOSFileCache(s.targetName, s.logger)
-	if err != nil {
-		return fmt.Errorf("error while requesting drop of %s from OS file cache : %w", s.targetName, err)
 	}
 
 	return nil
