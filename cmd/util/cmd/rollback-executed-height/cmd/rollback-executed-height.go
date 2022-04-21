@@ -166,6 +166,7 @@ func removeForBlockID(
 	blockID flow.Identifier) error {
 	result, err := results.ByBlockID(blockID)
 	if errors.Is(err, storage.ErrNotFound) {
+		log.Info().Msgf("result not found for block %v", blockID)
 		return nil
 	}
 
@@ -178,6 +179,7 @@ func removeForBlockID(
 		chunkID := chunk.ID()
 		err := chunks.Remove(chunkID)
 		if errors.Is(err, storage.ErrNotFound) {
+			log.Warn().Msgf("chunk %v not found for block %v", chunkID, blockID)
 			continue
 		}
 
@@ -189,9 +191,11 @@ func removeForBlockID(
 	// remove commits
 	err = commits.RemoveByBlockID(blockID)
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not remove by block ID: %v, %w", blockID, err)
 		}
+
+		log.Warn().Msgf("statecommitment not found for block %v", blockID)
 	}
 
 	// remove transaction results
@@ -200,6 +204,8 @@ func removeForBlockID(
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not remove transaction results by BlockID: %v, %w", blockID, err)
 		}
+
+		log.Warn().Msgf("transactionResults not found for block %v", blockID)
 	}
 
 	return nil
