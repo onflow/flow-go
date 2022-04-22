@@ -16,7 +16,4 @@ type TransactionResults interface {
 
 	// ByBlockID gets all transaction results for a block, ordered by transaction index
 	ByBlockID(id flow.Identifier) ([]flow.TransactionResult, error)
-
-	// RemoveByBlockID removes transaction results by block ID
-	RemoveByBlockID(blockID flow.Identifier) error
 }

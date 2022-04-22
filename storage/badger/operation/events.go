@@ -48,6 +48,14 @@ func LookupEventsByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 	return traverse(makePrefix(codeEvent, blockID), iterationFunc)
 }
 
+func RemoveServiceEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) error {
+	return removeByPrefix(makePrefix(codeServiceEvent, blockID))
+}
+
+func RemoveEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) error {
+	return removeByPrefix(makePrefix(codeEvent, blockID))
+}
+
 // eventIterationFunc returns an in iteration function which returns all events found during traversal or iteration
 func eventIterationFunc(events *[]flow.Event) func() (checkFunc, createFunc, handleFunc) {
 	return func() (checkFunc, createFunc, handleFunc) {

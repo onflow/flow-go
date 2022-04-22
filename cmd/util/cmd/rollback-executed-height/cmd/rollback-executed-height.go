@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
@@ -49,27 +50,33 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("height must be above 0")
 	}
 
-	var err error
 	db := common.InitStorage(flagDataDir)
 	storages := common.InitStorages(db)
 	state, err := common.InitProtocolState(db, storages)
-
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not init states")
+		log.Fatal().Err(err).Msg("could not init protocol states")
 	}
 
-	// cast into storage module
-	headers, ok := storages.Headers.(*badger.Headers)
-	if !ok {
-		log.Fatal().Msg("could not use badger.Headers as storage.Headers")
-	}
+	metrics := &metrics.NoopCollector{}
+	transactionResults := badger.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
+	commits := badger.NewCommits(metrics, db)
+	chunkDataPacks := badger.NewChunkDataPacks(metrics, db, badger.NewCollections(db, badger.NewTransactions(metrics, db)), badger.DefaultCacheSize)
+	results := badger.NewExecutionResults(metrics, db)
+	receipts := badger.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
+	myReceipts := badger.NewMyExecutionReceipts(metrics, db, receipts)
+	headers := badger.NewHeaders(metrics, db)
+	events := badger.NewEvents(metrics, db)
+	serviceEvents := badger.NewServiceEvents(metrics, db)
 
 	err = removeExecutionResultsFromHeight(
 		state,
-		storages.TransactionResults,
-		storages.Commits,
-		storages.ChunkDataPacks,
-		storages.Results,
+		transactionResults,
+		commits,
+		chunkDataPacks,
+		results,
+		myReceipts,
+		events,
+		serviceEvents,
 		flagHeight+1)
 
 	if err != nil {
@@ -92,10 +99,13 @@ func run(*cobra.Command, []string) {
 
 func removeExecutionResultsFromHeight(
 	protoState protocol.State,
-	transactionResults storage.TransactionResults,
-	commits storage.Commits,
-	chunkDataPacks storage.ChunkDataPacks,
-	results storage.ExecutionResults,
+	transactionResults *badger.TransactionResults,
+	commits *badger.Commits,
+	chunkDataPacks *badger.ChunkDataPacks,
+	results *badger.ExecutionResults,
+	myReceipts *badger.MyExecutionReceipts,
+	events *badger.Events,
+	serviceEvents *badger.ServiceEvents,
 	fromHeight uint64) error {
 	log.Info().Msgf("removing results for blocks from height: %v", fromHeight)
 
@@ -129,7 +139,7 @@ func removeExecutionResultsFromHeight(
 
 		blockID := head.ID()
 
-		err = removeForBlockID(commits, transactionResults, results, chunkDataPacks, blockID)
+		err = removeForBlockID(commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, blockID)
 		if err != nil {
 			return fmt.Errorf("could not remove result for finalized block: %v, %w", blockID, err)
 		}
@@ -148,14 +158,14 @@ func removeExecutionResultsFromHeight(
 	total = len(pendings)
 
 	for _, pending := range pendings {
-		err = removeForBlockID(commits, transactionResults, results, chunkDataPacks, pending)
+		err = removeForBlockID(commits, transactionResults, results, chunkDataPacks, myReceipts, events, serviceEvents, pending)
 
 		if err != nil {
-			return fmt.Errorf("could not remove result for pending block: %v, %w", pending, err)
+			return fmt.Errorf("could not remove result for pending block %v: %w", pending, err)
 		}
 
 		pendingRemoved++
-		log.Info().Msgf("result for pending block :%v has been removed. progress (%v/%v) ", pending, pendingRemoved, total)
+		log.Info().Msgf("result for pending block %v has been removed. progress (%v/%v) ", pending, pendingRemoved, total)
 	}
 
 	log.Info().Msgf("removed height from %v. removed for %v finalized blocks, and %v pending blocks",
@@ -166,10 +176,13 @@ func removeExecutionResultsFromHeight(
 
 // removeForBlockID remove block execution related data for a given block.
 func removeForBlockID(
-	commits storage.Commits,
-	transactionResults storage.TransactionResults,
-	results storage.ExecutionResults,
-	chunks storage.ChunkDataPacks,
+	commits *badger.Commits,
+	transactionResults *badger.TransactionResults,
+	results *badger.ExecutionResults,
+	chunks *badger.ChunkDataPacks,
+	myReceipts *badger.MyExecutionReceipts,
+	events *badger.Events,
+	serviceEvents *badger.ServiceEvents,
 	blockID flow.Identifier,
 ) error {
 	result, err := results.ByBlockID(blockID)
@@ -200,7 +213,7 @@ func removeForBlockID(
 	err = commits.RemoveByBlockID(blockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("could not remove by block ID: %v, %w", blockID, err)
+			return fmt.Errorf("could not remove by block ID %v: %w", blockID, err)
 		}
 
 		log.Warn().Msgf("statecommitment not found for block %v", blockID)
@@ -209,11 +222,29 @@ func removeForBlockID(
 	// remove transaction results
 	err = transactionResults.RemoveByBlockID(blockID)
 	if err != nil {
+		return fmt.Errorf("could not remove transaction results by BlockID %v: %w", blockID, err)
+	}
+
+	// remove own execution results index
+	err = myReceipts.RemoveByBlockID(blockID)
+	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("could not remove transaction results by BlockID: %v, %w", blockID, err)
+			return fmt.Errorf("could not remove own result by BlockID %v: %w", blockID, err)
 		}
 
-		log.Warn().Msgf("transactionResults not found for block %v", blockID)
+		log.Warn().Msgf("own result not found for block %v", blockID)
+	}
+
+	// remove events
+	err = events.RemoveByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not remove events by BlockID %v: %w", blockID, err)
+	}
+
+	// remove service events
+	err = serviceEvents.RemoveByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not remove service events by blockID %v: %w", blockID, err)
 	}
 
 	return nil

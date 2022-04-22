@@ -29,6 +29,7 @@ func LookupStateCommitment(blockID flow.Identifier, commit *flow.StateCommitment
 	return retrieve(makePrefix(codeCommit, blockID), commit)
 }
 
+// RemoveStateCommitment removes the state commitment by block ID
 func RemoveStateCommitment(blockID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeCommit, blockID))
 }
