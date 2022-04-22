@@ -16,13 +16,13 @@ type ExecutionResults struct {
 	mock.Mock
 }
 
-// BatchIndex provides a mock function with given fields: blockID, resultID, ForceIndex, batch
-func (_m *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, ForceIndex bool, batch storage.BatchStorage) error {
-	ret := _m.Called(blockID, resultID, ForceIndex, batch)
+// BatchIndex provides a mock function with given fields: blockID, resultID, batch
+func (_m *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {
+	ret := _m.Called(blockID, resultID, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, bool, storage.BatchStorage) error); ok {
-		r0 = rf(blockID, resultID, ForceIndex, batch)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, storage.BatchStorage) error); ok {
+		r0 = rf(blockID, resultID, batch)
 	} else {
 		r0 = ret.Error(0)
 	}
