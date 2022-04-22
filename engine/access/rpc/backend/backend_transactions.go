@@ -16,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -214,6 +215,13 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 		transactions = append(transactions, collection.Transactions...)
 	}
 
+	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
+	if err != nil {
+		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+	}
+
+	transactions = append(transactions, systemTx)
+
 	return transactions, nil
 }
 
@@ -307,8 +315,12 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
-	results := make([]*access.TransactionResult, len(resp.TransactionResults))
+	results := make([]*access.TransactionResult, 0, len(resp.TransactionResults))
 	i := 0
+	errInsufficientResults := status.Errorf(
+		codes.Internal,
+		"number of transaction results returned by execution node is less than the number of transactions in the block",
+	)
 
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := b.collections.LightByID(guarantee.CollectionID)
@@ -318,7 +330,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 
 		for _, txID := range collection.Transactions {
 			if i >= len(resp.TransactionResults) {
-				return nil, status.Errorf(codes.Internal, "number of results returned by execution node is less than the number of collections in the block")
+				return nil, errInsufficientResults
 			}
 
 			txResult := resp.TransactionResults[i]
@@ -342,25 +354,31 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		}
 	}
 
-	// system chunk transactions
-	for i < len(resp.TransactionResults) {
-		txResult := resp.TransactionResults[i]
-		// tx body is irrelevant to status if it's in an executed block
-		txStatus, err := b.deriveTransactionStatus(nil, true, block)
-		if err != nil {
-			return nil, convertStorageError(err)
-		}
-
-		results = append(results, &access.TransactionResult{
-			Status:       txStatus,
-			StatusCode:   uint(txResult.GetStatusCode()),
-			Events:       convert.MessagesToEvents(txResult.GetEvents()),
-			ErrorMessage: txResult.GetErrorMessage(),
-			BlockID:      blockID,
-		})
-
-		i++
+	// system chunk transaction
+	if i >= len(resp.TransactionResults) {
+		return nil, errInsufficientResults
+	} else if i < len(resp.TransactionResults)-1 {
+		return nil, status.Errorf(codes.Internal, "number of transaction results returned by execution node is more than the number of transactions in the block")
 	}
+
+	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
+	if err != nil {
+		return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+	}
+	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
+	systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	results = append(results, &access.TransactionResult{
+		Status:        systemTxStatus,
+		StatusCode:    uint(systemTxResult.GetStatusCode()),
+		Events:        convert.MessagesToEvents(systemTxResult.GetEvents()),
+		ErrorMessage:  systemTxResult.GetErrorMessage(),
+		BlockID:       blockID,
+		TransactionID: systemTx.ID(),
+	})
 
 	return results, nil
 }
