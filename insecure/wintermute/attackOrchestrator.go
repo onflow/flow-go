@@ -19,8 +19,8 @@ import (
 // The attack logic works as follows:
 // 1. Orchestrator corrupts the result of the first incoming execution receipt from any of the corrupted execution node.
 // 2. Orchestrator sends the corrupted execution result to all corrupted execution nodes.
-// 3. If Orchestrator receives any chunk data pack request for a corrupted chunk from a corrupted verification node, it replies it with an attestation
-//    for that chunk.
+// 3. If Orchestrator receives any chunk data pack request for a corrupted chunk from a corrupted verification node, it prompts the verifier to approve that chunk by sending it an attestation
+//    for that corrupted chunk.
 // 4. If Orchestrator receives any chunk data pack response from a corrupted execution node to an honest verification node, it drops the response
 //    if it is for one of the corrupted chunks.
 // 5. Any other incoming messages to the orchestrator are passed through, i.e., are sent as they are in the original Flow network without any tampering.
