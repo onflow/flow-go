@@ -41,17 +41,3 @@ func InsertProcessedIndex(jobName string, processed uint64) func(*badger.Txn) er
 func SetProcessedIndex(jobName string, processed uint64) func(*badger.Txn) error {
 	return update(makePrefix(codeJobConsumerProcessed, jobName), processed)
 }
-
-// RetrieveHalted returns the halted error of the consumer
-func RetrieveHalted(jobName string, errMsg *string) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeJobQueueHalted, jobName), errMsg)
-}
-
-func InsertHalted(jobName string, errMsg string) func(*badger.Txn) error {
-	return insert(makePrefix(codeJobQueueHalted, jobName), errMsg)
-}
-
-// SetHalted updates the halted error of the consumer
-func SetHalted(jobName string, errMsg string) func(*badger.Txn) error {
-	return update(makePrefix(codeJobQueueHalted, jobName), errMsg)
-}

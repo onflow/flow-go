@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
+	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
@@ -100,9 +100,6 @@ const (
 	fetchWorkers = 4
 )
 
-// ErrRequesterHalted is returned when an invalid ExectutionData is encountered
-var ErrRequesterHalted = errors.New("requester was halted due to invalid data")
-
 // ExecutionDataConfig contains configuration options for the ExecutionDataRequester
 type ExecutionDataConfig struct {
 	// The first block height for which to request ExecutionData
@@ -135,14 +132,15 @@ type executionDataRequester struct {
 	bs      network.BlobService
 	eds     state_synchronization.ExecutionDataService
 	metrics module.ExecutionDataRequesterMetrics
+	config  ExecutionDataConfig
 	log     zerolog.Logger
 
 	// Local db objects
 	headers storage.Headers
 	results storage.ExecutionResults
 
-	status *status.Status
-	config ExecutionDataConfig
+	// ExecutionData Jobs reader and cache for notificationConsumer
+	executionDataCache *jobs.ExecutionDataReader
 
 	// Notifiers for queue consumers
 	finalizationNotifier engine.Notifier
@@ -189,15 +187,25 @@ func New(
 	rootHeight := e.config.StartBlockHeight - 1
 
 	var err error
+
+	// jobqueue Jobs object that tracks sealed blocks by height. This is used by the blockConsumer
+	// to get a sequential list of sealed blocks.
+	sealedBlockReader := jobs.NewSealedBlockReader(state, headers)
+
+	// jobqueue Consumer that listens for block finalization events, then checks if there are new
+	// sealed blocks. If there are, it starts at most `fetchWorkers` number of workers to process them.
+	// when a sealed block's execution data has been downloaded, it persists the highest consecutive
+	// downloaded height. That way, if the node crashes, it has a record of the lowest missing height,
+	// and can resume from there.
 	e.blockConsumer, err = jobqueue.NewReadyDoneAwareConsumer(
 		log.With().Str("module", "block_consumer").Logger(),
-		processedHeight,
-		status.NewSealedBlockReader(state, headers), // when a block is finalized, we read new sealed blocks
-		e.processBlockJob,
-		e.finalizationNotifier.Channel(),
-		rootHeight,
-		fetchWorkers,
-		e.config.MaxSearchAhead,
+		processedHeight,                  // read and persist the downloaded height
+		sealedBlockReader,                // read sealed blocks by height
+		e.processBlockJob,                // process the sealed block job to download its execution data
+		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
+		rootHeight,                       // initial "last processed" height for empty db
+		fetchWorkers,                     // the number of concurrent workers
+		e.config.MaxSearchAhead,          // max number of unsent notifications to allow before pausing new fetches
 		// notifies notificationConsumer when new ExecutionData blobs are available
 		func(module.JobID) { executionDataNotifier.Notify() },
 	)
@@ -205,21 +213,29 @@ func New(
 		return nil, fmt.Errorf("failed to create block consumer: %w", err)
 	}
 
-	e.status = status.New(
-		log.With().Str("module", "requester_status").Logger(),
-		cfg.MaxCachedEntries,
-		processedNotifications,
+	// jobqueue Jobs object tracks downloaded execution data by height. This is used by the
+	// notificationConsumer to get downloaded execution data. It also  maintains a cache of the
+	// downloaded execution data to reduce disk reads.
+	e.executionDataCache = jobs.NewExecutionDataReader(
+		e.config.MaxCachedEntries,          // max number of ExecutionData objects to cache
+		e.blockConsumer.LastProcessedIndex, // method to get the highest consecutive height to notify
+		e.getExecutionData,                 // method to get execution data from the db
 	)
 
+	// jobqueue Consumer that listens for notifications from the block consumer, and sends
+	// OnExecutionDataFetched notifications for downloaded execution data. It sends notifications
+	// in consecutively order. When a notification is sent, it persists the highest consecutive
+	// notified height. That way, if the node crashes, it can resume sending notifications without
+	// gaps and with minimal state
 	e.notificationConsumer, err = jobqueue.NewReadyDoneAwareConsumer(
-		log.With().Str("module", "notification_consumer").Logger(),
-		processedNotifications,
-		e.status,
-		e.processNotificationJob,
-		executionDataNotifier.Channel(),
-		rootHeight,
-		1, // always use a single worker
-		0, // search ahead limit controlled by worker count
+		e.log.With().Str("module", "notification_consumer").Logger(),
+		processedNotifications,          // read and persist the notified height
+		e.executionDataCache,            // read execution data by height
+		e.processNotificationJob,        // process the job to send notifications for an execution data
+		executionDataNotifier.Channel(), // listen for notifications from the block consumer
+		rootHeight,                      // initial "last processed" height for empty db
+		1,                               // always use a single worker
+		0,                               // search ahead limit controlled by worker count
 		// kick notifier to make sure we scan until the last available notification
 		func(module.JobID) { executionDataNotifier.Notify() },
 	)
@@ -258,37 +274,19 @@ func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_sync
 // runBootstrap runs the main process that processes finalized block notifications and requests
 // ExecutionData for each block seal
 func (e *executionDataRequester) runBootstrap(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	// needs state from notificationConsumer
-	err := util.WaitClosed(ctx, e.notificationConsumer.Ready())
+	err := util.WaitClosed(ctx, e.eds.Ready())
 	if err != nil {
 		return // context cancelled
 	}
 
-	// Load previous requester state
-	err = e.status.Load()
-	if err != nil {
-		e.log.Error().Err(err).Msg("failed to load notification state. using defaults")
-	}
-
-	// Requester came up halted.
-	haltErr := e.status.Halted()
-	if haltErr != nil {
-		e.log.Error().Err(haltErr).Msg("HALTING REQUESTER: requester was halted on a previous run due to invalid data")
-		// By returning before ready, the blockConsumer will not start, effectively disabling the
-		// component.
-		return
-	}
-
-	e.log.Debug().Msgf("starting with LastNotified: %d", e.status.LastNotified())
-
-	err = util.WaitClosed(ctx, e.eds.Ready())
+	err = util.WaitClosed(ctx, e.notificationConsumer.Ready())
 	if err != nil {
 		return // context cancelled
 	}
 
 	// only run datastore check if enabled
 	if e.config.CheckEnabled {
-		err = e.checkDatastore(ctx, e.status.LastNotified())
+		err = e.checkDatastore(ctx, e.notificationConsumer.LastProcessedIndex())
 
 		// Any error should crash the component
 		if err != nil {
@@ -319,15 +317,23 @@ func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerCont
 
 // runNotificationConsumer runs the notificationConsumer component
 func (e *executionDataRequester) runNotificationConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	e.executionDataCache.Start(ctx)
+
+	err := util.WaitClosed(ctx, e.executionDataCache.Ready())
+	if err != nil {
+		<-e.executionDataCache.Done()
+		return // context cancelled
+	}
 
 	e.notificationConsumer.Start(ctx)
 
-	err := util.WaitClosed(ctx, e.notificationConsumer.Ready())
+	err = util.WaitClosed(ctx, e.notificationConsumer.Ready())
 	if err == nil {
 		ready()
 	}
 
 	<-e.notificationConsumer.Done()
+	<-e.executionDataCache.Done()
 }
 
 // Fetch Worker Methods
@@ -336,12 +342,12 @@ func (e *executionDataRequester) runNotificationConsumer(ctx irrecoverable.Signa
 // for the given block height.
 func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerContext, job module.Job, complete func()) {
 	// convert job into a block entry
-	header, err := status.JobToBlock(job)
+	header, err := jobs.JobToBlock(job)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	request := &status.BlockEntry{
+	request := &jobs.BlockEntry{
 		BlockID: header.ID(),
 		Height:  header.Height,
 	}
@@ -351,17 +357,18 @@ func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerConte
 		complete()
 	}
 
-	// all errors are thrown as irrecoverable errors except context cancellation
+	// errors are thrown as irrecoverable errors except context cancellation, and invalid blobs
+	// invalid blobs are logged, and never completed, which will halt downloads after maxSearchAhead
+	// is reached.
 }
 
 // processSealedHeight downloads ExecutionData for the given block height.
 // If the download fails, it will retry forever, using exponential backoff.
-func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerContext, request *status.BlockEntry) error {
+func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerContext, request *jobs.BlockEntry) error {
 	backoff := retry.NewExponential(e.config.RetryDelay)
 	backoff = retry.WithCappedDuration(e.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
 
-	// the only error returned is ctx.Err()
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
@@ -372,11 +379,16 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 		// download execution data for the block
 		err := e.processFetchRequest(ctx, request)
 
+		// don't retry if the blob was invalid
+		if isInvalidBlobError(err) {
+			return err
+		}
+
 		return retry.RetryableError(err)
 	})
 }
 
-func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, request *status.BlockEntry) error {
+func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, request *jobs.BlockEntry) error {
 	logger := e.log.With().
 		Str("block_id", request.BlockID.String()).
 		Uint64("height", request.Height).
@@ -399,16 +411,8 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 			Str("execution_data_id", result.ExecutionDataID.String()).
 			Msg("HALTING REQUESTER: invalid execution data found")
 
-		haltErr := &status.RequesterHaltedError{
-			ExecutionDataID: result.ExecutionDataID,
-			BlockID:         request.BlockID,
-			Height:          request.Height,
-			Err:             err,
-		}
-
-		e.status.Halt(haltErr)
 		e.metrics.Halted()
-		ctx.Throw(err)
+		return err
 	}
 
 	// Some or all of the blob was missing or corrupt. retry
@@ -429,9 +433,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("Fetched execution data")
 
-	request.ExecutionData = executionData
-
-	e.status.Fetched(request)
+	e.executionDataCache.Add(request.Height, executionData)
 
 	return nil
 }
@@ -471,44 +473,26 @@ func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.Si
 
 func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.SignalerContext, job module.Job, complete func()) {
 	// convert job into a block entry
-	entry, err := status.JobToBlockEntry(job)
+	entry, err := jobs.JobToBlockEntry(job)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to convert job to entry: %w", err))
 	}
 
 	e.processNotification(ctx, entry)
-
-	e.status.Notified(entry.Height)
 	complete()
 }
 
-func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, entry *status.BlockEntry) {
+func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, entry *jobs.BlockEntry) {
 	e.log.Debug().Msgf("notifying for block %d", entry.Height)
-
-	// ExecutionData may have been purged from the cache, look it up again
-	if entry.ExecutionData == nil {
-		e.log.Debug().Msgf("execution data not in cache for block %d", entry.Height)
-
-		result, err := e.results.ByBlockID(entry.BlockID)
-		if err != nil {
-			ctx.Throw(fmt.Errorf("failed to lookup execution result for block: %w", err))
-		}
-
-		entry.ExecutionData, err = e.eds.Get(ctx, result.ExecutionDataID)
-
-		if err != nil {
-			// At this point the data has been downloaded and validated, so it should be available
-			ctx.Throw(fmt.Errorf("failed to get execution data for block: %w", err))
-		}
-	}
 
 	// send notifications
 	e.notifyConsumers(entry.ExecutionData)
+
 	e.metrics.NotificationSent(entry.Height)
+	e.executionDataCache.Remove(entry.Height)
 }
 
 func (e *executionDataRequester) notifyConsumers(executionData *state_synchronization.ExecutionData) {
-
 	e.consumerMu.RLock()
 	defer e.consumerMu.RUnlock()
 
@@ -517,9 +501,46 @@ func (e *executionDataRequester) notifyConsumers(executionData *state_synchroniz
 	}
 }
 
+// getExecutionData returns the ExecutionData for the given block height.
+// This is used by the execution data reader to get the ExecutionData for a block.
+func (e *executionDataRequester) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*state_synchronization.ExecutionData, error) {
+	header, err := e.headers.ByHeight(height)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup header for height %d: %w", height, err)
+	}
+
+	result, err := e.results.ByBlockID(header.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup execution result for block %s: %w", header.ID(), err)
+	}
+
+	ctx, cancel := context.WithTimeout(signalCtx, e.config.FetchTimeout)
+	defer cancel()
+
+	executionData, err := e.eds.Get(ctx, result.ExecutionDataID)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)
+	}
+
+	return executionData, nil
+}
+
 // Bootstrap Methods
 
 func (e *executionDataRequester) checkDatastore(ctx irrecoverable.SignalerContext, lastHeight uint64) error {
+	if e.config.StartBlockHeight >= lastHeight {
+		e.log.Info().Msg("skipping datastore check. no blocks in datastore")
+		return nil
+	}
+
+	logger := e.log.With().Str("module", "check_datastore").Logger()
+
+	logger.Info().
+		Uint64("start_height", e.config.StartBlockHeight).
+		Uint64("end_height", lastHeight).
+		Msg("starting check")
+
 	// we're only interested in inspecting blobs that exist in our local db, so create an
 	// ExecutionDataService that only uses the local datastore
 	localEDS, err := initLocalExecutionDataService(ctx, e.ds, e.log)
@@ -549,7 +570,12 @@ func (e *executionDataRequester) checkDatastore(ctx irrecoverable.SignalerContex
 			return fmt.Errorf("failed to lookup execution result for block %d: %w", block.ID(), err)
 		}
 
-		exists, err := e.checkExecutionData(ctx, localEDS, result.ExecutionDataID)
+		checkLogger := logger.With().
+			Uint64("height", height).
+			Str("execution_data_id", result.ExecutionDataID.String()).
+			Logger()
+
+		exists, err := e.checkExecutionData(ctx, checkLogger, localEDS, result.ExecutionDataID)
 
 		if err != nil {
 			return err
@@ -560,23 +586,33 @@ func (e *executionDataRequester) checkDatastore(ctx irrecoverable.SignalerContex
 			// TODO: ideally, this should push a job into the blockConsumer's queue for the worker
 			// pool to consume. However, the jobqueue doesn't currently have a convenient way to
 			// push work into the queue.
-			e.processSealedHeight(ctx, &status.BlockEntry{
+			err = e.processSealedHeight(ctx, &jobs.BlockEntry{
 				BlockID: block.ID(),
 				Height:  height,
 			})
+			if err != nil && err != ctx.Err() {
+				return fmt.Errorf("failed to redownload execution data for height %d: %w", height, err)
+			}
 		}
 	}
+
+	logger.Info().
+		Uint64("start_height", e.config.StartBlockHeight).
+		Uint64("end_height", lastHeight).
+		Uint64("total_checked", lastHeight-e.config.StartBlockHeight+1).
+		Msg("datastore check successful")
 
 	return nil
 }
 
-func (e *executionDataRequester) checkExecutionData(ctx irrecoverable.SignalerContext, localEDS state_synchronization.ExecutionDataService, rootID flow.Identifier) (bool, error) {
+func (e *executionDataRequester) checkExecutionData(ctx irrecoverable.SignalerContext, logger zerolog.Logger, localEDS state_synchronization.ExecutionDataService, rootID flow.Identifier) (bool, error) {
 	invalidCIDs, ok := localEDS.Check(ctx, rootID)
 
 	// Check returns a list of CIDs with the corresponding errors encountered while retrieving their
 	// data from the local datastore.
 
 	if ok {
+		logger.Debug().Msg("check ok")
 		return true, nil
 	}
 
@@ -590,6 +626,7 @@ func (e *executionDataRequester) checkExecutionData(ctx irrecoverable.SignalerCo
 
 		// Not Found, just report and continue
 		if errors.Is(err, blockservice.ErrNotFound) {
+			logger.Info().Str("cid", cid.String()).Msg("blob not found")
 			missing = true
 			continue
 		}
@@ -597,6 +634,7 @@ func (e *executionDataRequester) checkExecutionData(ctx irrecoverable.SignalerCo
 		// The blob's hash didn't match. This is a special case where the data was corrupted on
 		// disk. Delete and refetch
 		if errors.Is(err, blockstore.ErrHashMismatch) {
+			logger.Info().Str("cid", cid.String()).Msg("blob corrupt. deleting")
 			if err := e.bs.DeleteBlob(ctx, cid); err != nil {
 				return false, fmt.Errorf("failed to delete corrupted CID %s from rootCID %s: %w", cid, rootID, err)
 			}
@@ -612,7 +650,7 @@ func (e *executionDataRequester) checkExecutionData(ctx irrecoverable.SignalerCo
 	return missing, errs.ErrorOrNil()
 }
 
-// localExecutionDataService returns an ExecutionDataService that's configured to use only the local
+// initLocalExecutionDataService returns an ExecutionDataService that's configured to use only the local
 // datastore, and to rehash blobs on read. This is used to check the validity of blobs that exist in
 // the local db.
 func initLocalExecutionDataService(ctx irrecoverable.SignalerContext, ds datastore.Batching, log zerolog.Logger) (state_synchronization.ExecutionDataService, error) {
@@ -647,17 +685,4 @@ func isInvalidBlobError(err error) bool {
 func isBlobNotFoundError(err error) bool {
 	var blobNotFoundError *state_synchronization.BlobNotFoundError
 	return errors.As(err, &blobNotFoundError)
-}
-
-func RequesterHaltedHandler(err error) component.ErrorHandlingResult {
-	var requesterHaltedError *status.RequesterHaltedError
-	if errors.As(err, &requesterHaltedError) {
-		// the requester is halted and should remain disabled, but the node can continue
-		// to operate safely. after the node starts back up, it will detect that it was
-		// previously halted and won't start.
-		return component.ErrorHandlingRestart
-	}
-
-	// all other errors are unhandled
-	return component.ErrorHandlingStop
 }

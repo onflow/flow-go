@@ -7,15 +7,15 @@ import (
 	"github.com/onflow/flow-go/module/util"
 )
 
-// ReadyDoneAwareWorker implements the jobqueue.Worker interface, and wraps the processing to make it
+// WorkerPool implements the jobqueue.Worker interface, and wraps the processing to make it
 // compatible with the Component interface.
-type ReadyDoneAwareWorker struct {
+type WorkerPool struct {
 	component.Component
 
 	cm        *component.ComponentManager
 	processor JobProcessor
 	notify    NotifyDone
-	ch        chan *work
+	ch        chan module.Job
 }
 
 // JobProcessor is called by the worker to execute each job. It should only return when the job has
@@ -36,17 +36,12 @@ type JobProcessor func(irrecoverable.SignalerContext, module.Job, func())
 // the job is done.
 type NotifyDone func(module.JobID)
 
-type work struct {
-	job  module.Job
-	done chan struct{}
-}
-
-// NewReadyDoneAwareWorker returns a new ReadyDoneAwareWorker
-func NewReadyDoneAwareWorker(processor JobProcessor, notify NotifyDone, workers uint64) *ReadyDoneAwareWorker {
-	w := &ReadyDoneAwareWorker{
+// NewWorkerPool returns a new WorkerPool
+func NewWorkerPool(processor JobProcessor, notify NotifyDone, workers uint64) *WorkerPool {
+	w := &WorkerPool{
 		processor: processor,
 		notify:    notify,
-		ch:        make(chan *work),
+		ch:        make(chan module.Job),
 	}
 
 	builder := component.NewComponentManagerBuilder()
@@ -65,29 +60,17 @@ func NewReadyDoneAwareWorker(processor JobProcessor, notify NotifyDone, workers 
 }
 
 // Run executes the worker's JobProcessor for the provided job.
-func (w *ReadyDoneAwareWorker) Run(job module.Job) error {
+// Run is non-blocking.
+func (w *WorkerPool) Run(job module.Job) error {
 	// don't accept new jobs after shutdown is signalled
 	if util.CheckClosed(w.cm.ShutdownSignal()) {
 		return nil
 	}
 
-	work := &work{
-		job:  job,
-		done: make(chan struct{}),
-	}
-
-	// the consumer should only call Run if there are available workers, but just in case block
 	select {
 	case <-w.cm.ShutdownSignal():
 		return nil
-	case w.ch <- work:
-	}
-
-	// Run is expected to be blocking, so wait until the work is done.
-	select {
-	case <-w.cm.ShutdownSignal():
-		return nil
-	case <-work.done:
+	case w.ch <- job:
 	}
 
 	return nil
@@ -95,16 +78,15 @@ func (w *ReadyDoneAwareWorker) Run(job module.Job) error {
 
 // workerLoop processes incoming jobs passed via the Run method. The job execution is wrapped in a
 // goroutine to support passing the worker's irrecoverable.SignalerContext into the processor.
-func (w *ReadyDoneAwareWorker) workerLoop(ctx irrecoverable.SignalerContext) {
+func (w *WorkerPool) workerLoop(ctx irrecoverable.SignalerContext) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case work := <-w.ch:
-			w.processor(ctx, work.job, func() {
-				w.notify(work.job.ID())
+		case job := <-w.ch:
+			w.processor(ctx, job, func() {
+				w.notify(job.ID())
 			})
-			close(work.done)
 		}
 	}
 }

@@ -35,6 +35,9 @@ type JobConsumer interface {
 	// It blocks until the existing worker finish processing the job
 	Stop()
 
+	// LastProcessedIndex returns the last processed job index
+	LastProcessedIndex() uint64
+
 	// NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take
 	// the next job from the job queue if there are workers available. It returns the last processed job index.
 	NotifyJobIsDone(JobID) uint64

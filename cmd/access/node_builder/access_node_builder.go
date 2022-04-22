@@ -463,7 +463,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 			return builder.ExecutionDataService, nil
 		}).
-		RestartableComponent("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
 			if builder.executionDataConfig.StartBlockHeight > 0 {
 				if builder.executionDataConfig.StartBlockHeight <= builder.RootBlock.Header.Height {
@@ -514,7 +514,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.ExecutionDataRequester = edr
 
 			return builder.ExecutionDataRequester, nil
-		}, edrequester.RequesterHaltedHandler)
+		})
 
 	return builder
 }

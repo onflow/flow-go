@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
+	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -95,9 +95,9 @@ func MockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 	return bex
 }
 
-func BlockEntryFixture(height uint64) *status.BlockEntry {
+func BlockEntryFixture(height uint64) *jobs.BlockEntry {
 	blockID := unittest.IdentifierFixture()
-	return &status.BlockEntry{
+	return &jobs.BlockEntry{
 		BlockID: blockID,
 		Height:  height,
 		ExecutionData: &state_synchronization.ExecutionData{

@@ -1,4 +1,4 @@
-package status_test
+package jobs_test
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization/requester/status"
+	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -17,7 +17,7 @@ import (
 // TestSealedBlockReader evaluates that block reader correctly reads stored finalized blocks from the blocks storage and
 // protocol state.
 func TestSealedBlockReader(t *testing.T) {
-	withReader(t, 10, func(reader *status.SealedBlockReader, blocks []*flow.Block) {
+	withReader(t, 10, func(reader *jobs.SealedBlockReader, blocks []*flow.Block) {
 		// the last block seals its parent
 		lastSealedBlock := blocks[len(blocks)-2]
 
@@ -34,7 +34,7 @@ func TestSealedBlockReader(t *testing.T) {
 			job, err := reader.AtIndex(index)
 			assert.NoError(t, err)
 
-			retrieved, err := status.JobToBlock(job)
+			retrieved, err := jobs.JobToBlock(job)
 			assert.NoError(t, err)
 			assert.Equal(t, actual.ID(), retrieved.ID())
 		}
@@ -52,7 +52,7 @@ func TestSealedBlockReader(t *testing.T) {
 func withReader(
 	t *testing.T,
 	blockCount int,
-	withBlockReader func(*status.SealedBlockReader, []*flow.Block),
+	withBlockReader func(*jobs.SealedBlockReader, []*flow.Block),
 ) {
 	require.Equal(t, blockCount%2, 0, "block count for this test should be even")
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -76,7 +76,7 @@ func withReader(
 		state := synctest.MockProtocolState(synctest.WithSnapshot(snapshot))
 		headerStorage := synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 
-		reader := status.NewSealedBlockReader(state, headerStorage)
+		reader := jobs.NewSealedBlockReader(state, headerStorage)
 
 		withBlockReader(reader, blocks)
 	})

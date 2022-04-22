@@ -136,6 +136,11 @@ func (c *Consumer) Size() uint {
 	return uint(len(c.processings))
 }
 
+// LastProcessedIndex returns the last processed job index
+func (c *Consumer) LastProcessedIndex() uint64 {
+	return c.processedIndex
+}
+
 // NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take
 // the next job from the job queue if there are workers available. It returns the last processed job index.
 func (c *Consumer) NotifyJobIsDone(jobID module.JobID) uint64 {

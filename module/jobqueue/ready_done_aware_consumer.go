@@ -14,13 +14,12 @@ import (
 type ReadyDoneAwareConsumer struct {
 	component.Component
 
-	cm           *component.ComponentManager
-	consumer     module.JobConsumer
-	jobs         module.Jobs
-	workSignal   <-chan struct{}
-	defaultIndex uint64
-	notifier     NotifyDone
-	log          zerolog.Logger
+	cm         *component.ComponentManager
+	consumer   module.JobConsumer
+	jobs       module.Jobs
+	workSignal <-chan struct{}
+	notifier   NotifyDone
+	log        zerolog.Logger
 }
 
 // NewReadyDoneAwareConsumer creates a new ReadyDoneAwareConsumer consumer
@@ -37,14 +36,14 @@ func NewReadyDoneAwareConsumer(
 ) (*ReadyDoneAwareConsumer, error) {
 
 	c := &ReadyDoneAwareConsumer{
-		defaultIndex: defaultIndex,
-		workSignal:   workSignal,
-		notifier:     notifier,
-		jobs:         jobs,
-		log:          log,
+		workSignal: workSignal,
+		notifier:   notifier,
+		jobs:       jobs,
+		log:        log,
 	}
 
-	worker := NewReadyDoneAwareWorker(
+	// create a worker pool with maxProcessing workers to process jobs
+	worker := NewWorkerPool(
 		processor,
 		func(id module.JobID) { c.NotifyJobIsDone(id) },
 		maxProcessing,
@@ -55,9 +54,9 @@ func NewReadyDoneAwareConsumer(
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			worker.Start(ctx)
 			<-worker.Ready()
-			c.log.Info().Msg("job consumer starting")
 
-			err := c.consumer.Start(c.defaultIndex)
+			c.log.Info().Msg("job consumer starting")
+			err := c.consumer.Start(defaultIndex)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not start consumer: %w", err))
 			}
@@ -89,14 +88,14 @@ func NewReadyDoneAwareConsumer(
 // processing a (block) job.
 func (c *ReadyDoneAwareConsumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 	// notify wrapped consumer that job is complete
-	c.defaultIndex = c.consumer.NotifyJobIsDone(jobID)
+	processedIndex := c.consumer.NotifyJobIsDone(jobID)
 
 	// notify instantiator that job is complete
 	if c.notifier != nil {
 		c.notifier(jobID)
 	}
 
-	return c.defaultIndex
+	return processedIndex
 }
 
 // Size returns number of in-memory block jobs that block consumer is processing.
@@ -109,7 +108,13 @@ func (c *ReadyDoneAwareConsumer) Head() (uint64, error) {
 	return c.jobs.Head()
 }
 
+// LastProcessedIndex returns the last processed job index
+func (c *ReadyDoneAwareConsumer) LastProcessedIndex() uint64 {
+	return c.consumer.LastProcessedIndex()
+}
+
 func (c *ReadyDoneAwareConsumer) processingLoop(ctx irrecoverable.SignalerContext) {
+	c.log.Debug().Msg("listening for new jobs")
 	for {
 		select {
 		case <-ctx.Done():

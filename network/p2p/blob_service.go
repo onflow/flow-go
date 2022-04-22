@@ -138,7 +138,9 @@ func (bs *blobService) shutdownHandler(ctx irrecoverable.SignalerContext, ready 
 		err = multierror.Append(err, bs.reprovider.Close())
 	}
 
-	err = multierror.Append(err, bs.blockService.Close())
+	if bs.config.BitswapNetwork != nil {
+		err = multierror.Append(err, bs.blockService.Close())
+	}
 
 	if err.ErrorOrNil() != nil {
 		ctx.Throw(err)
