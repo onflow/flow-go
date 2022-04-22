@@ -49,11 +49,10 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)
 			chunkDataPacks := new(storage.ChunkDataPacks)
 
 			results := new(storage.ExecutionResults)
-			receipts := new(storage.ExecutionReceipts)
 			myReceipts := new(storage.MyExecutionReceipts)
 
 			es := state.NewExecutionState(
-				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, receipts, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
 			)
 
 			f(t, es, ls)

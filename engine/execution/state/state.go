@@ -84,7 +84,6 @@ type state struct {
 	collections        storage.Collections
 	chunkDataPacks     storage.ChunkDataPacks
 	results            storage.ExecutionResults
-	receipts           storage.ExecutionReceipts
 	myReceipts         storage.MyExecutionReceipts
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
@@ -109,7 +108,6 @@ func NewExecutionState(
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
-	receipts storage.ExecutionReceipts,
 	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
@@ -126,7 +124,6 @@ func NewExecutionState(
 		collections:        collections,
 		chunkDataPacks:     chunkDataPacks,
 		results:            results,
-		receipts:           receipts,
 		myReceipts:         myReceipts,
 		events:             events,
 		serviceEvents:      serviceEvents,
