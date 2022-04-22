@@ -55,7 +55,7 @@ func (s *SyncOnCloseRenameFile) Close() error {
 
 	// s.file.Sync() was already called, so we pass fsync=false
 	err = evictFileFromLinuxPageCache(s.file, false, s.logger)
-	if err != nil && s.logger != nil {
+	if err != nil {
 		s.logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", s.targetName, err)
 		// No need to return this error because we're only "advising" Linux to evict a file from cache.
 	}

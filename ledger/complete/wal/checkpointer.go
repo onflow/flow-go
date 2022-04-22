@@ -422,7 +422,7 @@ func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, err
 	}
 	defer func() {
 		evictErr := evictFileFromLinuxPageCache(file, false, logger)
-		if evictErr != nil && logger != nil {
+		if evictErr != nil {
 			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", filepath, evictErr)
 			// No need to return this error because it's possible to continue normal operations.
 		}
@@ -802,9 +802,7 @@ func EvictAllCheckpointsFromLinuxPageCache(dir string, logger *zerolog.Logger) (
 			if err == nil {
 				err = evictErr // Save first evict error encountered
 			}
-			if logger != nil {
-				logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", fn, err)
-			}
+			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", fn, err)
 			continue
 		}
 		evictedFileNames = append(evictedFileNames, fn)
@@ -837,14 +835,12 @@ func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger)
 		return err
 	}
 
-	if logger != nil {
-		fstat, err := f.Stat()
-		if err == nil {
-			fsize := fstat.Size()
-			logger.Info().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
-		} else {
-			logger.Info().Msgf("advised Linux to evict file %s from page cache", f.Name())
-		}
+	fstat, err := f.Stat()
+	if err == nil {
+		fsize := fstat.Size()
+		logger.Info().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
+	} else {
+		logger.Info().Msgf("advised Linux to evict file %s from page cache", f.Name())
 	}
 	return nil
 }

@@ -338,7 +338,8 @@ func Test_Checkpointing(t *testing.T) {
 		})
 
 		t.Run("advise to evict checkpoints from page cache", func(t *testing.T) {
-			evictedFileNames, err := wal.EvictAllCheckpointsFromLinuxPageCache(dir, nil)
+			logger := zerolog.Nop()
+			evictedFileNames, err := wal.EvictAllCheckpointsFromLinuxPageCache(dir, &logger)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(evictedFileNames))
 			require.Equal(t, path.Join(dir, "checkpoint.00000010"), evictedFileNames[0])
@@ -543,7 +544,8 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		file.Close()
 
 		t.Run("works without data modification", func(t *testing.T) {
-			tries, err := realWAL.LoadCheckpoint(filepath, nil)
+			logger := zerolog.Nop()
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(tries))
 			require.Equal(t, updatedTrie, tries[0])
@@ -560,7 +562,8 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 			err = os.WriteFile(filepath, b, 0644)
 			require.NoError(t, err)
 
-			tries, err := realWAL.LoadCheckpoint(filepath, nil)
+			logger := zerolog.Nop()
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
 			require.Error(t, err)
 			require.Nil(t, tries)
 			require.Contains(t, err.Error(), "checksum")
