@@ -54,7 +54,7 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
-// the attacker instead of dispatching them to the network.
+// the attack Orchestrator instead of dispatching them directly to the network. The Orchestrator completely determines what the corrupted conduit should send to the network. 
 func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
 	o.Lock()
 	defer o.Unlock()
