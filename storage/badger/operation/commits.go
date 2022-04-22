@@ -19,7 +19,7 @@ func IndexStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) 
 //
 // State commitments are keyed by the block whose execution results in the state with the given commit.
 func BatchIndexStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) func(batch *badger.WriteBatch) error {
-	return batchInsert(makePrefix(codeCommit, blockID), commit)
+	return batchWrite(makePrefix(codeCommit, blockID), commit)
 }
 
 // LookupStateCommitment gets a state commitment keyed by block ID

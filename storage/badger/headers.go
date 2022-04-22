@@ -199,7 +199,9 @@ func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 
 		// only rollback if the given height is below the current executed height
 		if header.Height >= highest.Height {
-			return nil
+			return fmt.Errorf("cannot roolback. expect the target height %v to be lower than highest executed height %v, but actually is not",
+				header.Height, highest.Height,
+			)
 		}
 
 		err = operation.UpdateExecutedBlock(header.ID())(txn)

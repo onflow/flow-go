@@ -170,7 +170,8 @@ func removeForBlockID(
 	transactionResults storage.TransactionResults,
 	results storage.ExecutionResults,
 	chunks storage.ChunkDataPacks,
-	blockID flow.Identifier) error {
+	blockID flow.Identifier,
+) error {
 	result, err := results.ByBlockID(blockID)
 	if errors.Is(err, storage.ErrNotFound) {
 		log.Info().Msgf("result not found for block %v", blockID)

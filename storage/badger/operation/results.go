@@ -13,7 +13,7 @@ func InsertExecutionResult(result *flow.ExecutionResult) func(*badger.Txn) error
 
 // BatchInsertExecutionResult inserts an execution result by ID.
 func BatchInsertExecutionResult(result *flow.ExecutionResult) func(batch *badger.WriteBatch) error {
-	return batchInsert(makePrefix(codeExecutionResult, result.ID()), result)
+	return batchWrite(makePrefix(codeExecutionResult, result.ID()), result)
 }
 
 // RetrieveExecutionResult retrieves a transaction by fingerprint.
@@ -33,12 +33,12 @@ func ReindexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) f
 
 // BatchIndexExecutionResult inserts an execution result ID keyed by block ID into a batch
 func BatchIndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(batch *badger.WriteBatch) error {
-	return batchInsert(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
+	return batchWrite(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
 // BatchReindexExecutionResult inserts an execution result ID keyed by block ID into a batch
 func BatchReindexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(batch *badger.WriteBatch) error {
-	return batchUpdate(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
+	return batchWrite(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
 // LookupExecutionResult finds execution result ID by block

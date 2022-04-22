@@ -15,11 +15,11 @@ func InsertTransactionResult(blockID flow.Identifier, transactionResult *flow.Tr
 }
 
 func BatchInsertTransactionResult(blockID flow.Identifier, transactionResult *flow.TransactionResult) func(batch *badger.WriteBatch) error {
-	return batchInsert(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
+	return batchWrite(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
 func BatchIndexTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) func(batch *badger.WriteBatch) error {
-	return batchInsert(makePrefix(codeTransactionResultIndex, blockID, txIndex), transactionResult)
+	return batchWrite(makePrefix(codeTransactionResultIndex, blockID, txIndex), transactionResult)
 }
 
 func RetrieveTransactionResult(blockID flow.Identifier, transactionID flow.Identifier, transactionResult *flow.TransactionResult) func(*badger.Txn) error {
@@ -75,26 +75,13 @@ func LookupTransactionResultsByBlockIDUsingIndex(blockID flow.Identifier, txResu
 // RemoveTransactionResultsByBlockID removes the transaction results for the given blockID
 func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
-		var txResults []flow.TransactionResult
 
-		err := SkipNonExist(LookupTransactionResultsByBlockID(blockID, &txResults))(txn)
-		// don't return error if there is no result for the block
+		prefix := makePrefix(codeTransactionResult, blockID)
+		err := removeByPrefix(prefix)(txn)
 		if err != nil {
-			return fmt.Errorf("could not find transaction results for block: %v, %w", blockID, err)
-		}
-
-		for _, result := range txResults {
-			err := RemoveTransactionResult(blockID, result.TransactionID)(txn)
-			if err != nil {
-				return fmt.Errorf("could not remove transaction result for block %v: %w", blockID, err)
-			}
+			return fmt.Errorf("could not remove transaction results for block %v: %w", blockID, err)
 		}
 
 		return nil
 	}
-}
-
-// RemoveTransactionResult removes the transaction result by blockID and transaction result ID
-func RemoveTransactionResult(blockID flow.Identifier, transactionResultID flow.Identifier) func(*badger.Txn) error {
-	return remove(makePrefix(codeTransactionResult, blockID, transactionResultID))
 }
