@@ -97,6 +97,8 @@ func run(*cobra.Command, []string) {
 
 }
 
+// use badger instances directly instead of stroage interfaces so that the interface don't
+// need to include the Remove methods
 func removeExecutionResultsFromHeight(
 	protoState protocol.State,
 	transactionResults *badger.TransactionResults,
