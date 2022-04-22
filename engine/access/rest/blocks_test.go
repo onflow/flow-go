@@ -254,20 +254,13 @@ func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, 
 			"collection_guarantees": [],
 			"block_seals": []
 		},
-		"execution_result": {
-			"id": "%s",
-			"block_id": "%s",
-			"events": [],
-			"_links": {
-				"_self": "%s"
-			}
-		},
+		"execution_result": %s,
 		"_expandable": {},
 		"_links": {
 			"_self": "%s"
 		}
 	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
-			util.ToBase64(block.Header.ParentVoterSigData), execResultID, execResult.BlockID, execLink, blockLink)
+			util.ToBase64(block.Header.ParentVoterSigData), executionResultExpectedStr(execResult), blockLink)
 	}
 
 	return fmt.Sprintf(`
