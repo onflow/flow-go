@@ -228,13 +228,13 @@ func removeForBlockID(
 	}
 
 	// remove own execution results index
-	err = myReceipts.RemoveByBlockID(blockID)
+	err = myReceipts.RemoveIndexByBlockID(blockID)
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("could not remove own result by BlockID %v: %w", blockID, err)
+			return fmt.Errorf("could not remove own receipt by BlockID %v: %w", blockID, err)
 		}
 
-		log.Warn().Msgf("own result not found for block %v", blockID)
+		log.Warn().Msgf("own receipt not found for block %v", blockID)
 	}
 
 	// remove events
@@ -247,6 +247,16 @@ func removeForBlockID(
 	err = serviceEvents.RemoveByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not remove service events by blockID %v: %w", blockID, err)
+	}
+
+	// remove execution result index
+	err = results.RemoveIndexByBlockID(blockID)
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("could not remove result by BlockID %v: %w", blockID, err)
+		}
+
+		log.Warn().Msgf("result not found for block %v", blockID)
 	}
 
 	return nil

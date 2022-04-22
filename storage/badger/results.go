@@ -20,6 +20,8 @@ type ExecutionResults struct {
 	cache *Cache
 }
 
+var _ storage.ExecutionResults = (*ExecutionResults)(nil)
+
 func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *ExecutionResults {
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
@@ -113,25 +115,9 @@ func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storag
 	return operation.BatchInsertExecutionResult(result)(writeBatch)
 }
 
-func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, forceReindex bool, batch storage.BatchStorage) error {
+func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
-	if forceReindex {
-		return operation.BatchReindexExecutionResult(blockID, resultID)(writeBatch)
-	}
-
-	err := operation.BatchIndexExecutionResult(blockID, resultID)(writeBatch)
-	if err == nil {
-		return nil
-	}
-
-	if errors.Is(err, storage.ErrAlreadyExists) {
-		return storage.NewResultAlreadyExistsErrorf(
-			fmt.Sprintf("result %v for block %v already exists",
-				resultID,
-				blockID), blockID, resultID, err)
-	}
-
-	return err
+	return operation.BatchIndexExecutionResult(blockID, resultID)(writeBatch)
 }
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
@@ -167,4 +153,8 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
 	return r.byBlockID(blockID)(tx)
+}
+
+func (r *ExecutionResults) RemoveIndexByBlockID(blockID flow.Identifier) error {
+	return r.db.Update(operation.SkipNonExist(operation.RemoveExecutionResultIndex(blockID)))
 }

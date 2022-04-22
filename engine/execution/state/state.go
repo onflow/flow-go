@@ -403,8 +403,7 @@ func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, e
 		return fmt.Errorf("cannot store execution result: %w", err)
 	}
 
-	// it overwrites the index if exists already
-	err = s.results.BatchIndex(blockID, executionResult.ID(), forceReindex, batch)
+	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot index execution result: %w", err)
 	}

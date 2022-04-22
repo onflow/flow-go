@@ -36,12 +36,12 @@ func BatchIndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier
 	return batchWrite(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
-// BatchReindexExecutionResult inserts an execution result ID keyed by block ID into a batch
-func BatchReindexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(batch *badger.WriteBatch) error {
-	return batchWrite(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
-}
-
 // LookupExecutionResult finds execution result ID by block
 func LookupExecutionResult(blockID flow.Identifier, resultID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
+}
+
+// RemoveExecutionResultIndex removes execution result indexed by the given blockID
+func RemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeIndexExecutionResultByBlock, blockID))
 }
