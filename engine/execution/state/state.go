@@ -538,11 +538,11 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	err := s.db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveExecutedBlock(&blockID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not lookup executed block: %w", err)
+			return fmt.Errorf("could not lookup executed block %v: %w", blockID, err)
 		}
 		err = operation.RetrieveHeader(blockID, &highest)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve executed header: %w", err)
+			return fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
 		}
 		return nil
 	})

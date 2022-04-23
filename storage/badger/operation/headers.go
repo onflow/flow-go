@@ -73,6 +73,11 @@ func LookupBlockIDByChunkID(chunkID flow.Identifier, blockID *flow.Identifier) f
 	return retrieve(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
 }
 
+// RemoveBlockIDByChunkID removes chunkID-blockID index by chunkID
+func RemoveBlockIDByChunkID(chunkID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeIndexBlockByChunkID, chunkID))
+}
+
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
 // them to the `found` slice if `filter` returned true
 func FindHeaders(filter func(header *flow.Header) bool, found *[]flow.Header) func(*badger.Txn) error {

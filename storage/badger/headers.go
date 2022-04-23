@@ -181,6 +181,10 @@ func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch s
 	return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
 }
 
+func (h *Headers) RemoveChunkBlockIndexByChunkID(chunkID flow.Identifier) error {
+	return h.db.Update(operation.RemoveBlockIDByChunkID(chunkID))
+}
+
 // RollbackExecutedBlock update the executed block header to the given header.
 // only useful for execution node to roll back executed block height
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
