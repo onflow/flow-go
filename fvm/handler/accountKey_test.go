@@ -188,6 +188,7 @@ func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint64, _ flow.AccountPubli
 }
 func (f FakeAccounts) GetContractNames(_ flow.Address) ([]string, error)             { return nil, nil }
 func (f FakeAccounts) GetContract(_ string, _ flow.Address) ([]byte, error)          { return nil, nil }
+func (f FakeAccounts) ContractExists(_ string, _ flow.Address) (bool, error)         { return false, nil }
 func (f FakeAccounts) SetContract(_ string, _ flow.Address, _ []byte) error          { return nil }
 func (f FakeAccounts) DeleteContract(_ string, _ flow.Address) error                 { return nil }
 func (f FakeAccounts) Create(_ []flow.AccountPublicKey, _ flow.Address) error        { return nil }
