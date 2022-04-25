@@ -213,7 +213,11 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 		}
 	}
 
-	// no result corruption yet conducted, hence passing through the chunk data request.
+	// passing through the chunk data request unaltered because either:
+	// 1) result corruption hasn't happened yet OR
+	// 2) result corruption happened for a previous chunk and subsequent chunks will not be corrupted (since only the first chunk is corrupted)
+	// Therefore, chunk data request is for an honest result, hence the corrupted verifier can follow
+	// the protocol and send its honest chunk data request.
 	err := o.network.Send(chunkDataPackRequestEvent)
 	if err != nil {
 		return fmt.Errorf("could not send chunk data request: %w", err)
