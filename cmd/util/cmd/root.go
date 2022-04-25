@@ -17,6 +17,7 @@ import (
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
+	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 )
 
@@ -60,6 +61,7 @@ func addCommands() {
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)
 	rootCmd.AddCommand(epochs.RootCmd)
 	rootCmd.AddCommand(edbs.RootCmd)
+	rootCmd.AddCommand(index_er.RootCmd)
 }
 
 func initConfig() {

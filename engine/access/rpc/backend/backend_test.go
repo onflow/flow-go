@@ -663,7 +663,9 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 }
 
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
+	head := unittest.BlockHeaderFixture()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Head").Return(&head, nil)
 
 	ctx := context.Background()
 	block := unittest.BlockFixture()
@@ -686,7 +688,9 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		BlockId: blockId[:],
 	}
 
-	exeEventResp := execproto.GetTransactionResultsResponse{}
+	exeEventResp := execproto.GetTransactionResultsResponse{
+		TransactionResults: []*execproto.GetTransactionResultResponse{{}},
+	}
 
 	backend := New(
 		suite.state,

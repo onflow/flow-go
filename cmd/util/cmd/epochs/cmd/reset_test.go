@@ -112,7 +112,7 @@ func TestReset_LocalSnapshot(t *testing.T) {
 // root snapshot downloaded from GCP.
 func TestReset_BucketSnapshot(t *testing.T) {
 	// this test is skipped, as it requires an internet connection
-	t.SkipNow()
+	unittest.SkipUnless(t, unittest.TEST_REQUIRES_GCP_ACCESS, "requires an internet connection")
 
 	// should output tx arguments to stdout
 	t.Run("happy path", func(t *testing.T) {
