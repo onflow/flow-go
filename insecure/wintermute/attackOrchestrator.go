@@ -261,7 +261,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 		}
 	}
 
-	// no result corruption yet conducted, hence passing through the chunk data request.
+	// chunk data response is for an honest result (or before an attack has started), hence the corrupted execution node can follow the protocol and send (pass through) its honest response
 	err := o.network.Send(chunkDataPackReplyEvent)
 	if err != nil {
 		return fmt.Errorf("could not passed through chunk data reply: %w", err)
