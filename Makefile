@@ -32,10 +32,15 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
-.PHONY: crypto/relic/build
-crypto/relic/build:
-# setup the crypto package under the GOPATH, needed to test packages importing flow-go/crypto
+# setup the crypto package under the GOPATH: needed to test packages importing flow-go/crypto
+.PHONY: crypto_setup_gopath
+crypto_setup_gopath:
 	bash crypto_setup.sh
+
+# setup the crypto package in the current repo folder: needed to test the crypto package itself in `unittest` target
+.PHONY: crypto_setup_tests
+crypto_setup_tests:
+	$(MAKE) -C crypto setup
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
@@ -43,25 +48,30 @@ cmd/collection/collection:
 cmd/util/util:
 	go build -o cmd/util/util --tags relic cmd/util/main.go
 
+############################################################################################
+# CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR
+
+.PHONY: unittest-main
+unittest-main:
+	# test all packages with Relic library enabled
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
     GO111MODULE=on go install github.com/vektra/mockery/cmd/mockery@v1.1.2; \
     GO111MODULE=on go install github.com/golang/mock/mockgen@v1.3.1;
 
+############################################################################################
+
 .PHONY: install-tools
-install-tools: crypto/relic/build check-go-version install-mock-generators
+install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.45.2; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go install github.com/gogo/protobuf/protoc-gen-gofast@latest; \
 	GO111MODULE=on go install golang.org/x/tools/cmd/stringer@master;
-
-.PHONY: unittest-main
-unittest-main:
-	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
 
 .PHONY: unittest
 unittest: unittest-main
@@ -94,6 +104,11 @@ ifeq ($(COVER), true)
 	# coverage.zip will automatically be picked up by teamcity
 	zip coverage.zip index.html
 endif
+
+.PHONY: generate-openapi
+generate-openapi:
+	swagger-codegen generate -l go -i https://raw.githubusercontent.com/onflow/flow/master/openapi/access.yaml -D packageName=models,modelDocs=false,models -o engine/access/rest/models;
+	go fmt ./engine/access/rest/models
 
 .PHONY: generate
 generate: generate-proto generate-mocks
@@ -170,7 +185,7 @@ ci: install-tools tidy test # lint coverage
 
 # Runs integration tests
 .PHONY: ci-integration
-ci-integration: crypto/relic/build
+ci-integration: crypto_setup_gopath
 	$(MAKE) -C integration ci-integration-test
 
 # Runs benchmark tests
