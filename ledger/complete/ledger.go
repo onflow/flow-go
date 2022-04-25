@@ -359,9 +359,9 @@ func (l *Ledger) ExportCheckpointAt(
 	// If defined, run extraction report BEFORE writing checkpoint file
 	// This is used to optmize the spork process
 	if extractionReport, ok := reporters[extractionReportName]; ok {
-		stateCommittment, err := runReport(extractionReport, payloads, l.logger)
+		err := runReport(extractionReport, payloads, l.logger)
 		if err != nil {
-			return stateCommittment, err
+			return ledger.State(hash.DummyHash), err
 		}
 	}
 
