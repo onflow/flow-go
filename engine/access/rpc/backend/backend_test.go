@@ -372,66 +372,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		nil,
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
-		DefaultSnapshotHistoryLimit,
-	)
-	suite.execClient.
-		On("GetTransactionResultsByBlockID", ctx, &exeEventReq).
-		Return(&exeEventResp, nil).
-		Once()
-
-	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId)
-	suite.checkResponse(result, err)
-
-	suite.assertAllExpectations()
-}
-
-func (suite *Suite) TestGetTransactionResultsByBlockID() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-
-	ctx := context.Background()
-	block := unittest.BlockFixture()
-	blockId := block.ID()
-
-	suite.snapshot.On("Head").Return(block.Header, nil)
-
-	// block storage returns the corresponding block
-	suite.blocks.
-		On("ByID", blockId).
-		Return(&block, nil)
-
-	_, fixedENIDs := suite.setupReceipts(&block)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-
-	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	exeEventReq := execproto.GetTransactionResultsByBlockIDRequest{
-		BlockId: blockId[:],
-	}
-
-	exeEventResp := execproto.GetTransactionResultsResponse{}
-
-	backend := New(
-		suite.state,
-		nil,
-		nil,
-		suite.blocks,
-		suite.headers,
-		suite.collections,
-		suite.transactions,
-		suite.receipts,
-		suite.results,
-		suite.chainID,
-		metrics.NewNoopCollector(),
-		connFactory, // the connection factory should be used to get the execution node client
-		false,
-		DefaultMaxHeightRange,
-		nil,
-		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
-		suite.log,
-		DefaultSnapshotHistoryLimit,
 	)
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, &exeEventReq).
@@ -1804,20 +1744,6 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		preferredENs := allExecutionNodes[0:2]
 		expectedList := preferredENs
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
-	})
-
-	suite.Run("insufficient receipts return random ENs in state", func() {
-		// return no receipts at all attempts
-		totalENs := 5
-		attempt1Receipts = flow.ExecutionReceiptList{}
-		attempt2Receipts = flow.ExecutionReceiptList{}
-		attempt3Receipts = flow.ExecutionReceiptList{}
-		availableExecNodes := unittest.IdentityListFixture(totalENs, unittest.WithRole(flow.RoleExecution))
-		suite.snapshot.On("Identities", mock.Anything).Return(availableExecNodes)
-		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
-		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
-		require.NoError(suite.T(), err)
-		require.Equal(suite.T(), len(actualList), maxExecutionNodesCnt)
 	})
 }
 

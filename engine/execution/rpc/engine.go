@@ -9,8 +9,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -366,82 +364,6 @@ func (h *handler) GetTransactionResultByIndex(
 		StatusCode:   statusCode,
 		ErrorMessage: errMsg,
 		Events:       events,
-	}, nil
-}
-
-func (h *handler) GetTransactionResultsByBlockID(
-	_ context.Context,
-	req *execution.GetTransactionResultsByBlockIDRequest,
-) (*execution.GetTransactionResultsByBlockIDResponse, error) {
-
-	reqBlockID := req.GetBlockId()
-	blockID, err := convert.BlockID(reqBlockID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get all tx results
-	txResults, err := h.transactionResults.ByBlockID(blockID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Error(codes.NotFound, "transaction results not found")
-		}
-
-		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
-	}
-
-	// get all events for a block
-	blockEvents, err := h.events.ByBlockID(blockID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
-	}
-
-	responseTxResults := make([]*entities.TransactionResult, len(txResults))
-
-	eventsByTxIndex := make(map[uint32][]flow.Event, len(txResults)) //we will have at most as many buckets as tx results
-
-	// re-partition events by tx index
-	// it's not documented but events are stored indexed by (blockID, event.TransactionID, event.TransactionIndex, event.EventIndex)
-	// hence they should keep order within a transaction, so we don't sort resulting events slices
-	for _, event := range blockEvents {
-		eventsByTxIndex[event.TransactionIndex] = append(eventsByTxIndex[event.TransactionIndex], event)
-	}
-
-	// match tx results with events
-	for index, txResult := range txResults {
-		var statusCode uint32 = 0
-		errMsg := ""
-
-		txIndex := uint32(index)
-
-		if txResult.ErrorMessage != "" {
-			cadenceErrMessage := txResult.ErrorMessage
-			if !utf8.ValidString(cadenceErrMessage) {
-				h.log.Warn().
-					Str("block_id", blockID.String()).
-					Uint32("index", txIndex).
-					Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
-					Msg("invalid character in Cadence error message")
-				// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
-				cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
-			}
-
-			statusCode = 1 // for now a statusCode of 1 indicates an error and 0 indicates no error
-			errMsg = cadenceErrMessage
-		}
-
-		events := convert.EventsToMessages(eventsByTxIndex[txIndex])
-
-		responseTxResults[index] = &entities.TransactionResult{
-			StatusCode:   statusCode,
-			ErrorMessage: errMsg,
-			Events:       events,
-		}
-	}
-
-	// compose a response
-	return &execution.GetTransactionResultsByBlockIDResponse{
-		TransactionResults: responseTxResults,
 	}, nil
 }
 

@@ -62,11 +62,13 @@ type TransactionResult struct {
 
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
 	return &access.TransactionResultResponse{
-		Status:       entities.TransactionStatus(result.Status),
-		StatusCode:   uint32(result.StatusCode),
-		ErrorMessage: result.ErrorMessage,
-		Events:       convert.EventsToMessages(result.Events),
-		BlockId:      result.BlockID[:],
+		Status:        entities.TransactionStatus(result.Status),
+		StatusCode:    uint32(result.StatusCode),
+		ErrorMessage:  result.ErrorMessage,
+		Events:        convert.EventsToMessages(result.Events),
+		BlockId:       result.BlockID[:],
+		TransactionId: result.TransactionID[:],
+		CollectionId:  result.CollectionID[:],
 	}
 }
 
@@ -77,7 +79,7 @@ func TransactionResultsToMessage(results []*TransactionResult) *access.Transacti
 	}
 
 	return &access.TransactionResultsResponse{
-		Results: messages,
+		TransactionResults: messages,
 	}
 }
 
