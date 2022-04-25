@@ -38,3 +38,8 @@ func (_m *CorruptedNodeConnector) Connect(_a0 context.Context, _a1 flow.Identifi
 
 	return r0, r1
 }
+
+// WithAttackerAddress provides a mock function with given fields: _a0
+func (_m *CorruptedNodeConnector) WithAttackerAddress(_a0 string) {
+	_m.Called(_a0)
+}

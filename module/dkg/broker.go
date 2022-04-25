@@ -1,7 +1,6 @@
 package dkg
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -59,17 +58,17 @@ type Broker struct {
 	config                    BrokerConfig
 	log                       zerolog.Logger
 	unit                      *engine.Unit
-	dkgInstanceID             string                     // unique identifier of the current dkg run (prevent replay attacks)
-	committee                 flow.IdentityList          // identities of DKG members
-	me                        module.Local               // used for signing broadcast messages
-	myIndex                   int                        // index of this instance in the committee
-	dkgContractClients        []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
-	lastSuccessfulClientIndex int                        // index of the contract client that was last successful during retries
-	tunnel                    *BrokerTunnel              // channels through which the broker communicates with the network engine
-	privateMsgCh              chan messages.DKGMessage   // channel to forward incoming private messages to consumers
-	broadcastMsgCh            chan messages.DKGMessage   // channel to forward incoming broadcast messages to consumers
-	messageOffset             uint                       // offset for next broadcast messages to fetch
-	shutdownCh                chan struct{}              // channel to stop the broker from listening
+	dkgInstanceID             string                            // unique identifier of the current dkg run (prevent replay attacks)
+	committee                 flow.IdentityList                 // identities of DKG members
+	me                        module.Local                      // used for signing broadcast messages
+	myIndex                   int                               // index of this instance in the committee
+	dkgContractClients        []module.DKGContractClient        // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
+	lastSuccessfulClientIndex int                               // index of the contract client that was last successful during retries
+	tunnel                    *BrokerTunnel                     // channels through which the broker communicates with the network engine
+	privateMsgCh              chan messages.PrivDKGMessageIn    // channel to forward incoming private messages to consumers
+	broadcastMsgCh            chan messages.BroadcastDKGMessage // channel to forward incoming broadcast messages to consumers
+	messageOffset             uint                              // offset for next broadcast messages to fetch
+	shutdownCh                chan struct{}                     // channel to stop the broker from listening
 
 	broadcasts uint // broadcasts counts the number of attempted broadcasts
 
@@ -108,8 +107,8 @@ func NewBroker(
 		myIndex:            myIndex,
 		dkgContractClients: dkgContractClients,
 		tunnel:             tunnel,
-		privateMsgCh:       make(chan messages.DKGMessage),
-		broadcastMsgCh:     make(chan messages.DKGMessage),
+		privateMsgCh:       make(chan messages.PrivDKGMessageIn),
+		broadcastMsgCh:     make(chan messages.BroadcastDKGMessage),
 		shutdownCh:         make(chan struct{}),
 	}
 
@@ -135,7 +134,7 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 		return
 	}
 	dkgMessageOut := messages.PrivDKGMessageOut{
-		DKGMessage: messages.NewDKGMessage(b.myIndex, data, b.dkgInstanceID),
+		DKGMessage: messages.NewDKGMessage(data, b.dkgInstanceID),
 		DestID:     b.committee[dest].NodeID,
 	}
 	b.tunnel.SendOut(dkgMessageOut)
@@ -166,10 +165,7 @@ func (b *Broker) Broadcast(data []byte) {
 			log.Fatal().Err(err).Msg("failed to create broadcast message")
 		}
 
-		backoff, err := retry.NewExponential(b.config.RetryInitialWait)
-		if err != nil {
-			log.Fatal().Err(err).Msg("create retry mechanism")
-		}
+		backoff := retry.NewExponential(b.config.RetryInitialWait)
 		backoff = retry.WithMaxRetries(b.config.PublishMaxRetries, backoff)
 		backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
@@ -222,10 +218,7 @@ func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.Public
 		pubKeys = make([]crypto.PublicKey, len(b.committee))
 	}
 
-	backoff, err := retry.NewExponential(b.config.RetryInitialWait)
-	if err != nil {
-		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
-	}
+	backoff := retry.NewExponential(b.config.RetryInitialWait)
 	backoff = retry.WithMaxRetries(b.config.PublishMaxRetries, backoff)
 	backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
@@ -237,7 +230,7 @@ func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.Public
 	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
 	attempts := 1
-	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
+	err := retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 		err := dkgContractClient.SubmitResult(groupKey, pubKeys)
 		if err != nil {
 			b.log.Error().Err(err).Msgf("error submitting DKG result, retrying (attempt %d)", attempts)
@@ -283,13 +276,13 @@ func (b *Broker) FlagMisbehavior(node int, log string) {
 
 // GetPrivateMsgCh returns the channel through which consumers can receive
 // incoming private DKG messages.
-func (b *Broker) GetPrivateMsgCh() <-chan messages.DKGMessage {
+func (b *Broker) GetPrivateMsgCh() <-chan messages.PrivDKGMessageIn {
 	return b.privateMsgCh
 }
 
 // GetBroadcastMsgCh returns the channel through which consumers can receive
 // incoming broadcast DKG messages.
-func (b *Broker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
+func (b *Broker) GetBroadcastMsgCh() <-chan messages.BroadcastDKGMessage {
 	return b.broadcastMsgCh
 }
 
@@ -304,10 +297,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	b.pollLock.Lock()
 	defer b.pollLock.Unlock()
 
-	backoff, err := retry.NewExponential(b.config.RetryInitialWait)
-	if err != nil {
-		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
-	}
+	backoff := retry.NewExponential(b.config.RetryInitialWait)
 	backoff = retry.WithMaxRetries(b.config.ReadMaxRetries, backoff)
 	backoff = retry.WithJitterPercent(b.config.RetryJitterPct, backoff)
 
@@ -319,6 +309,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
 
 	var msgs []messages.BroadcastDKGMessage
+	var err error
 	attempt := 1
 	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 		msgs, err = dkgContractClient.ReadBroadcast(b.messageOffset, referenceBlock)
@@ -340,6 +331,14 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	}
 
 	for _, msg := range msgs {
+		// set the CommitteeMemberIndex field for the message
+		memberIndex, ok := b.committee.GetIndex(msg.NodeID)
+		if !ok {
+			b.log.Error().Msgf("broadcast message from node with id (%v) does not match the ID of any committee member", msg.NodeID)
+			continue
+		}
+		msg.CommitteeMemberIndex = uint64(memberIndex)
+
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
 			b.log.Error().Err(err).Msg("unable to verify broadcast message")
@@ -350,7 +349,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 			continue
 		}
 		b.log.Debug().Msgf("forwarding broadcast message to controller")
-		b.broadcastMsgCh <- msg.DKGMessage
+		b.broadcastMsgCh <- msg
 	}
 
 	// update message offset to use for future polls, this avoids forwarding the
@@ -412,35 +411,31 @@ func (b *Broker) listen() {
 	}
 }
 
-// onPrivateMessage verifies the integrity of an incoming message and forwards
+// onPrivateMessage verifies the integrity of an incoming message, sets the CommitteeMemberIndex and forwards
 // it to consumers via the msgCh.
 func (b *Broker) onPrivateMessage(originID flow.Identifier, msg messages.DKGMessage) {
-	err := b.checkMessageInstanceAndOrigin(msg)
+	memberIndex, ok := b.committee.GetIndex(originID)
+	if !ok {
+		b.log.Error().Msgf("bad message: OriginID (%v) does not match the NodeID of any committee member", originID)
+		return
+	}
+
+	err := b.hasValidDKGInstanceID(msg)
 	if err != nil {
 		b.log.Err(err).Msg("bad message")
 		return
 	}
-	// check that the message's origin matches the sender's flow identifier
-	nodeID := b.committee[msg.Orig].NodeID
-	if !bytes.Equal(nodeID[:], originID[:]) {
-		b.log.Error().Msgf("bad message: OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, nodeID)
-		return
-	}
-	b.privateMsgCh <- msg
+
+	b.privateMsgCh <- messages.PrivDKGMessageIn{DKGMessage: msg, OriginID: originID, CommitteeMemberIndex: uint64(memberIndex)}
 }
 
-// checkMessageInstanceAndOrigin returns an error if the message's dkgInstanceID
-// does not correspond to the current instance, or if the message's origin index
-// is out of range with respect to the committee list.
-func (b *Broker) checkMessageInstanceAndOrigin(msg messages.DKGMessage) error {
+// hasValidDKGInstanceID returns an error if msg.DKGInstanceID does not match Broker.DKGInstanceID
+func (b *Broker) hasValidDKGInstanceID(msg messages.DKGMessage) error {
 	// check that the message corresponds to the current epoch
 	if b.dkgInstanceID != msg.DKGInstanceID {
 		return fmt.Errorf("wrong DKG instance. Got %s, want %s", msg.DKGInstanceID, b.dkgInstanceID)
 	}
-	// check that the message's origin is not out of range
-	if msg.Orig >= uint64(len(b.committee)) {
-		return fmt.Errorf("origin id out of range: %d", msg.Orig)
-	}
+
 	return nil
 }
 
@@ -448,7 +443,6 @@ func (b *Broker) checkMessageInstanceAndOrigin(msg messages.DKGMessage) error {
 // node's staking key.
 func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMessage, error) {
 	dkgMessage := messages.NewDKGMessage(
-		b.myIndex,
 		data,
 		b.dkgInstanceID,
 	)
@@ -464,7 +458,7 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 	return bcastMsg, nil
 }
 
-// verifyBroadcastMessage checks the DKG instance and Origin of a broadcast
+// verifyBroadcastMessage checks the DKG instance of a broadcast
 // message, as well as the signature against the staking key of the sender.
 // Returns:
 // * true, nil if the message contents are valid and have a valid signature
@@ -473,11 +467,11 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 //   or the signature could not be checked
 // TODO differentiate errors
 func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (bool, error) {
-	err := b.checkMessageInstanceAndOrigin(bcastMsg.DKGMessage)
+	err := b.hasValidDKGInstanceID(bcastMsg.DKGMessage)
 	if err != nil {
 		return false, err
 	}
-	origin := b.committee[bcastMsg.Orig]
+	origin := b.committee[bcastMsg.CommitteeMemberIndex]
 	signData := fingerprint.Fingerprint(bcastMsg.DKGMessage)
 	return origin.StakingPubKey.Verify(
 		bcastMsg.Signature,

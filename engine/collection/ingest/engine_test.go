@@ -238,7 +238,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("invalid signature", func() {
 		// TODO cannot check signatures in MVP
-		unittest.SkipUnless(suite.T(), unittest.TEST_WIP, "skipping unimplemented test")
+		unittest.SkipUnless(suite.T(), unittest.TEST_TODO, "skipping unimplemented test")
 	})
 
 	suite.Run("invalid address", func() {
@@ -293,7 +293,7 @@ func (suite *Suite) TestComponentShutdown() {
 	suite.engine.Start(ctx)
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), 10*time.Millisecond)
 	cancel()
-	unittest.AssertClosesBefore(suite.T(), suite.engine.Done(), 10*time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), suite.engine.ShutdownSignal(), 10*time.Millisecond)
 
 	err := suite.engine.ProcessTransaction(&tx)
 	suite.Assert().ErrorIs(err, component.ErrComponentShutdown)

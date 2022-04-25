@@ -56,8 +56,8 @@ require (
 	github.com/onflow/atree v0.3.0
 	github.com/onflow/cadence v0.21.3-0.20220419065337-d5202c162010
 	github.com/onflow/flow v0.2.5
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220421202640-c5cc115fdcbc
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220421202640-c5cc115fdcbc
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.2-0.20220422202806-92ad02a996cc
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.2-0.20220422202806-92ad02a996cc
 	github.com/onflow/flow-emulator v0.31.2-0.20220421202209-eb83f9bfda53
 	github.com/onflow/flow-go-sdk v0.24.1-0.20220421152843-9ce4d554036e
 	github.com/onflow/flow-go/crypto v0.24.3
@@ -69,7 +69,7 @@ require (
 	github.com/rs/cors v1.8.0
 	github.com/rs/zerolog v1.26.1
 	github.com/schollz/progressbar/v3 v3.8.3
-	github.com/sethvargo/go-retry v0.1.0
+	github.com/sethvargo/go-retry v0.2.3
 	github.com/shirou/gopsutil/v3 v3.22.2
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/pflag v1.0.5
@@ -83,6 +83,7 @@ require (
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/text v0.3.7
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/api v0.70.0
 	google.golang.org/genproto v0.0.0-20220222213610-43724f9ea8cf
