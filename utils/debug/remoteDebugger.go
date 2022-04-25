@@ -28,9 +28,9 @@ func NewRemoteDebugger(grpcAddress string,
 		logger,
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionAccountFrozenChecker(),
-			fvm.NewTransactionSequenceNumberChecker(),
-			fvm.NewTransactionAccountFrozenEnabler(),
+			// fvm.NewTransactionAccountFrozenChecker(),
+			// fvm.NewTransactionSequenceNumberChecker(),
+			// fvm.NewTransactionAccountFrozenEnabler(),
 			fvm.NewTransactionInvoker(logger),
 		),
 	)
