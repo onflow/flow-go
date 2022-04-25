@@ -54,7 +54,7 @@ func (o *Orchestrator) WithAttackNetwork(network insecure.AttackNetwork) {
 // HandleEventFromCorruptedNode implements logic of processing the events received from a corrupted node.
 //
 // In Corruptible Conduit Framework for BFT testing, corrupted nodes relay their outgoing events to
-// the attack Orchestrator instead of dispatching them directly to the network. The Orchestrator completely determines what the corrupted conduit should send to the network. 
+// the attack Orchestrator instead of dispatching them directly to the network. The Orchestrator completely determines what the corrupted conduit should send to the network.
 func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
 	o.Lock()
 	defer o.Unlock()
@@ -62,17 +62,17 @@ func (o *Orchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error
 	switch protocolEvent := event.FlowProtocolEvent.(type) {
 
 	case *flow.ExecutionReceipt:
-		// orchestrator received execution receipt from EN after EN executed a block.
+		// orchestrator received execution receipt from corrupted EN after EN executed a block.
 		if err := o.handleExecutionReceiptEvent(event); err != nil {
 			return fmt.Errorf("could not handle execution receipt event: %w", err)
 		}
 	case *messages.ChunkDataRequest:
-		// orchestrator received chunk data request from VN after VN assigned a chunk, and VN now requesting that chunk to verify it.
+		// orchestrator received chunk data request from corrupted VN after VN assigned a chunk, and VN about to request that chunk to verify it.
 		if err := o.handleChunkDataPackRequestEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack request event: %w", err)
 		}
 	case *messages.ChunkDataResponse:
-		// orchestrator received chunk data response from EN when EN wants to respond to a chunk data request from VN.
+		// orchestrator received chunk data response from corrupted EN when EN wants to respond to a chunk data request from VN.
 		if err := o.handleChunkDataPackResponseEvent(event); err != nil {
 			return fmt.Errorf("could not handle chunk data pack response event: %w", err)
 		}
@@ -213,7 +213,7 @@ func (o *Orchestrator) handleChunkDataPackRequestEvent(chunkDataPackRequestEvent
 		}
 	}
 
-	// no result corruption yet conducted, hence bouncing back the chunk data request.
+	// no result corruption yet conducted, hence passing through the chunk data request.
 	err := o.network.Send(chunkDataPackRequestEvent)
 	if err != nil {
 		return fmt.Errorf("could not send chunk data request: %w", err)
@@ -247,6 +247,8 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 			if !ok {
 				// this is a chunk data pack response for a CORRUPTED chunk to an HONEST verification node
 				// we WINTERMUTE it!
+				// The orchestrator doesn't send anything back to the EN to send to the VN,
+				// thereby indirectly causing the EN to wintermute the honest VN.
 				lg.Info().Msg("wintermuted corrupted chunk data response to an honest verification node")
 				return nil
 			} else {
@@ -259,7 +261,7 @@ func (o *Orchestrator) handleChunkDataPackResponseEvent(chunkDataPackReplyEvent 
 		}
 	}
 
-	// no result corruption yet conducted, hence bouncing back the chunk data request.
+	// no result corruption yet conducted, hence passing through the chunk data request.
 	err := o.network.Send(chunkDataPackReplyEvent)
 	if err != nil {
 		return fmt.Errorf("could not passed through chunk data reply: %w", err)
