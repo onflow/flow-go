@@ -394,9 +394,9 @@ func (l *Ledger) ExportCheckpointAt(
 
 	// run reporters
 	for _, reporter := range reporters {
-		stateCommittment, err := runReport(reporter, payloads, l.logger)
+		err := runReport(reporter, payloads, l.logger)
 		if err != nil {
-			return stateCommittment, err
+			return ledger.State(hash.DummyHash), err
 		}
 	}
 
@@ -442,7 +442,7 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 	return nil
 }
 
-func runReport(r ledger.Reporter, p []ledger.Payload, l zerolog.Logger) (ledger.State, error) {
+func runReport(r ledger.Reporter, p []ledger.Payload, l zerolog.Logger) error {
 	l.Info().
 		Str("name", r.Name()).
 		Msg("starting reporter")
@@ -456,10 +456,9 @@ func runReport(r ledger.Reporter, p []ledger.Payload, l zerolog.Logger) (ledger.
 		Str("name", r.Name()).
 		Msg("reporter done")
 	if err != nil {
-		return ledger.State(hash.DummyHash),
-			fmt.Errorf("error running reporter (%s): %w", r.Name(), err)
+		return fmt.Errorf("error running reporter (%s): %w", r.Name(), err)
 	}
-	return ledger.State(hash.DummyHash), nil
+	return nil
 }
 
 func writeStatusFile(fileName string, e error) error {
