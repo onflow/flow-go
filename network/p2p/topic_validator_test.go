@@ -308,7 +308,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
-// TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages from nodes that are ejected
+// TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator rejects messages from nodes that are ejected
 func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
