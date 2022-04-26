@@ -71,7 +71,7 @@ func (p *NitroPaceMaker) TimeoutChannel() <-chan time.Time {
 	return p.timeoutControl.Channel()
 }
 
-// UpdateCurViewWithQC notifies the pacemaker with a new QC, which might allow pacemaker to
+// ProcessQC notifies the pacemaker with a new QC, which might allow pacemaker to
 // fast forward its view.
 func (p *NitroPaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
 	if qc.View < p.currentView {
@@ -96,32 +96,15 @@ func (p *NitroPaceMaker) OnPartialTC(curView uint64) {
 	panic("not yet implemented")
 }
 
-// UpdateCurViewWithBlock indicates the pacermaker that the block for the current view has received.
-// and isLeaderForNextView indicates whether or not this replica is the primary for the NEXT view.
-func (p *NitroPaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
-	// use block's QC to fast-forward if possible
-	newViewOnQc, newViewOccurredOnQc := p.ProcessQC(block.QC)
-	if block.View != p.currentView {
-		return newViewOnQc, newViewOccurredOnQc
-	}
-	// block is for current view
+// HighestQC returns QC with the highest view discovered by PaceMaker.
+func (p *NitroPaceMaker) HighestQC() *flow.QuorumCertificate {
+	panic("not yet implemented")
+}
 
-	if p.timeoutControl.TimerInfo().Mode != model.ReplicaTimeout {
-		// i.e. we are already on timeout.VoteCollectionTimeout.
-		// This edge case can occur as follows:
-		// * we previously already have processed a block for the current view
-		//   and started the vote collection phase
-		// In this case, we do NOT want to RE-start the vote collection timer
-		// if we get a second block for the current View.
-		return nil, false
-	}
-	newViewOnBlock, newViewOccurredOnBlock := p.actOnBlockForCurView(block, isLeaderForNextView)
-	if !newViewOccurredOnBlock { // if processing current block didn't lead to NewView event,
-		// the initial processing of the block's QC still might have changes the view:
-		return newViewOnQc, newViewOccurredOnQc
-	}
-	// processing current block created NewView event, which is always newer than any potential newView event from processing the block's QC
-	return newViewOnBlock, newViewOccurredOnBlock
+// LastViewTC returns TC for last view, this could be nil if previous round
+// has entered with a QC.
+func (p *NitroPaceMaker) LastViewTC() *flow.TimeoutCertificate {
+	panic("not yet implemented")
 }
 
 func (p *NitroPaceMaker) actOnBlockForCurView(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
@@ -136,15 +119,6 @@ func (p *NitroPaceMaker) actOnBlockForCurView(block *model.Block, isLeaderForNex
 		p.timeoutControl.OnProgressBeforeTimeout()
 	}
 	return p.gotoView(p.currentView + 1), true
-}
-
-// OnTimeout notifies the pacemaker that the timeout event has looped through the event loop.
-// It always trigger a view change, and the new view will be returned as NewViewEvent
-func (p *NitroPaceMaker) OnTimeout() *model.TimeoutObject {
-	p.emitTimeoutNotifications(p.timeoutControl.TimerInfo())
-	p.timeoutControl.OnTimeout()
-	p.gotoView(p.currentView + 1)
-	return nil
 }
 
 func (p *NitroPaceMaker) emitTimeoutNotifications(timeout *model.TimerInfo) {

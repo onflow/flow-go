@@ -40,6 +40,13 @@ type PaceMaker interface {
 	// CurView returns the current view.
 	CurView() uint64
 
+	// HighestQC returns QC with the highest view discovered by PaceMaker.
+	HighestQC() *flow.QuorumCertificate
+
+	// LastViewTC returns TC for last view, this could be nil if previous round
+	// has entered with a QC.
+	LastViewTC() *flow.TimeoutCertificate
+
 	// ProcessQC will check if the given QC will allow PaceMaker to fast-forward to QC.view+1.
 	// If PaceMaker incremented the current View, a NewViewEvent will be returned.
 	ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool)
@@ -51,13 +58,6 @@ type PaceMaker interface {
 	// TimeoutChannel returns the timeout channel for the CURRENTLY ACTIVE timeout.
 	// Each time the pacemaker starts a new timeout, this channel is replaced.
 	TimeoutChannel() <-chan time.Time
-
-	// OnTimeout is called when a timeout, which was previously created by the PaceMaker, has
-	// looped through the event loop.
-	// Triggering a timeout will result with high probability in creating a TimeoutObject.
-	// It is the responsibility of the calling code to ensure that NO STALE timeouts are
-	// delivered to the PaceMaker.
-	OnTimeout() *model.TimeoutObject
 
 	// OnPartialTC is called when TimeoutAggregator has collected f+1 timeouts. This implements Bracha style timeouts,
 	// which times out current view after receiving partial TC.

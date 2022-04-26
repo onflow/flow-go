@@ -192,7 +192,6 @@ func (e *EventHandler) TimeoutChannel() <-chan time.Time {
 func (e *EventHandler) OnLocalTimeout() error {
 
 	curView := e.paceMaker.CurView()
-	e.paceMaker.OnTimeout()
 	defer e.notifier.OnEventProcessed()
 
 	log := e.log.With().
@@ -206,11 +205,11 @@ func (e *EventHandler) OnLocalTimeout() error {
 	//	return fmt.Errorf("OnLocalTimeout should guarantee that the pacemaker should go to next view, but didn't: (curView: %v, newView: %v)", curView, newView.View)
 	//}
 
-	// current view has changed, go to new view
-	err := e.startNewView()
-	if err != nil {
-		return fmt.Errorf("could not start new view: %w", err)
-	}
+	// Local timeout can never lead to a view change. View changes can only be triggered by QCs or TCs.
+	//err := e.startNewView()
+	//if err != nil {
+	//	return fmt.Errorf("could not start new view: %w", err)
+	//}
 
 	log.Debug().Msg("local timeout processed")
 
