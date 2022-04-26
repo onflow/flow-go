@@ -324,7 +324,7 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlock
 	return nil
 }
 
-func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) error {
+func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.ClusterTimeoutObject) error {
 	t := &model.TimeoutObject{
 		View:       timeout.View,
 		HighestQC:  timeout.HighestQC,
