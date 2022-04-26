@@ -44,6 +44,7 @@ func init() {
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
 	bootstrap.NodeInfo
+	// Corrupted indicates a container is running a binary implementing a malicious node
 	Corrupted             bool
 	ContainerName         string
 	LogLevel              zerolog.Level
