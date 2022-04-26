@@ -185,11 +185,17 @@ func New(
 	// to get a sequential list of sealed blocks.
 	sealedBlockReader := jobs.NewSealedBlockReader(state, headers)
 
-	// jobqueue Consumer that listens for block finalization events, then checks if there are new
-	// sealed blocks. If there are, it starts at most `fetchWorkers` number of workers to process them.
-	// when a sealed block's execution data has been downloaded, it persists the highest consecutive
-	// downloaded height. That way, if the node crashes, it has a record of the lowest missing height,
-	// and can resume from there.
+	// blockConsumer ensures every sealed block's execution data is downloaded.
+	// It listens to block finalization events from `finalizationNotifier`, then checks 
+	// if there are new sealed blocks with `sealedBlockReader`. 
+	// If there are, it starts workers to process them with `processingBlockJob`, which fetches 
+	// execution data. At most `fetchWorkers` number of workers will be created for concurrent processing.
+	// when a sealed block's execution data has been downloaded, it updates and persists
+	// the highest consecutive downloaded height with `processedHeight`. 
+	// That way, if the node crashes, it reads the `processedHeight` and resume 
+	// from `processedHeight + 1`. If the database is empty, rootHeight will be used 
+	// to init the last processed height.
+	// once the execution data is fetched and stored, it notifies `executionDataNotifier`.
 	e.blockConsumer, err = jobqueue.NewReadyDoneAwareConsumer(
 		log.With().Str("module", "block_consumer").Logger(),
 		processedHeight,                  // read and persist the downloaded height
@@ -207,7 +213,7 @@ func New(
 	}
 
 	// jobqueue Jobs object tracks downloaded execution data by height. This is used by the
-	// notificationConsumer to get downloaded execution data. It also  maintains a cache of the
+	// notificationConsumer to get downloaded execution data from storage. It also  maintains a cache of the
 	// downloaded execution data to reduce disk reads.
 	e.executionDataCache = jobs.NewExecutionDataReader(
 		e.config.MaxCachedEntries,          // max number of ExecutionData objects to cache
@@ -215,11 +221,17 @@ func New(
 		e.getExecutionData,                 // method to get execution data from the db
 	)
 
-	// jobqueue Consumer that listens for notifications from the block consumer, and sends
-	// OnExecutionDataFetched notifications for downloaded execution data. It sends notifications
-	// in consecutively order. When a notification is sent, it persists the highest consecutive
-	// notified height. That way, if the node crashes, it can resume sending notifications without
-	// gaps and with minimal state
+	// notificationConsumer consumes `OnExecutionDataFetched` events, and ensures its consumer
+	// receives this event in consecutive block height order. 
+	// It listens to events from `executionDataNotifier`, which is delivered when
+	// a block's execution data is downloaded and stored, and checks the `executionDataCache` to
+	// find if the next un-processed consecutive height is available. 
+	// To know what's the height of the next un-processed consecutive height, it reads the latest 
+	// consecutive height in `processedNotifications`. And it's persisted in storage to be crash-resistant.
+	// When a new consecutive height is available, it calls `processNotificationJob` to notify all the 
+	// `e.consumers`.
+	// Note: the `e.consumers` will be guaranteed to receive at least one `OnExecutionDataFetched` event
+	// for each sealed block in consecutive block height order.
 	e.notificationConsumer, err = jobqueue.NewReadyDoneAwareConsumer(
 		e.log.With().Str("module", "notification_consumer").Logger(),
 		processedNotifications,          // read and persist the notified height
@@ -227,7 +239,7 @@ func New(
 		e.processNotificationJob,        // process the job to send notifications for an execution data
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
 		rootHeight,                      // initial "last processed" height for empty db
-		1,                               // always use a single worker
+		1,                               // use a single worker to ensure notification is delivered in consecutive order
 		0,                               // search ahead limit controlled by worker count
 		// kick notifier to make sure we scan until the last available notification
 		func(module.JobID) { executionDataNotifier.Notify() },
