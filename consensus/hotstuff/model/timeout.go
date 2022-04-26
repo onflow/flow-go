@@ -48,3 +48,8 @@ type TimeoutObject struct {
 	// This signature is further aggregated in TimeoutCertificate.
 	SigData crypto.Signature
 }
+
+// ID returns the identifier for the vote.
+func (t *TimeoutObject) ID() flow.Identifier {
+	return flow.MakeID(t)
+}
