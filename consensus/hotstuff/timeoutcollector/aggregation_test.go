@@ -15,7 +15,7 @@ import (
 
 // createAggregationData is a helper which creates fixture data for testing
 func createAggregationData(t *testing.T, signersNumber int) (
-	*WeightedMultiMessageSignatureAggregator,
+	*TimeoutSignatureAggregator,
 	flow.IdentityList,
 	[]crypto.PublicKey,
 	[]crypto.Signature,

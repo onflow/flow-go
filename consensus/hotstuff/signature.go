@@ -107,40 +107,34 @@ type WeightedSignatureAggregator interface {
 	Aggregate() ([]flow.Identifier, []byte, error)
 }
 
-// WeightedMultiMessageSignatureAggregator aggregates signatures of the same signature scheme but
+// TimeoutSignatureAggregator aggregates signatures of the same signature scheme but
 // possibly distinct message from different signers. Only public keys are agreed upon upfront.
 // It's similar to WeightedSignatureAggregator but supports distinct messages and  messages are not known upfront.
 // It is also recommended to only aggregate signatures generated with keys representing
 // equivalent security-bit level.
 // Furthermore, a weight [unsigned int64] is assigned to each signer ID. The
-// WeightedMultiMessageSignatureAggregator internally tracks the total weight of all collected signatures.
+// TimeoutSignatureAggregator internally tracks the total weight of all collected signatures.
 // Implementations must be concurrency safe.
-type WeightedMultiMessageSignatureAggregator interface {
-	// Verify verifies the signature under the stored public keys.
-	// Expected errors during normal operations:
-	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
-	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
-	Verify(signerID flow.Identifier, sig crypto.Signature, msg []byte) error
-
-	// TrustedAdd adds signature and message to the internal set of signatures and adds the signer's
-	// weight to the total collected weight, iff the signature is _not_ a duplicate.
+type TimeoutSignatureAggregator interface {
+	// VerifyAndAdd verifies the signature under the stored public keys and adds signature with corresponding
+	// highest QC view to the internal set. Internal set and collected weight is modified iff signature _is_ valid.
 	// The total weight of all collected signatures (excluding duplicates) is returned regardless
 	// of any returned error.
-	// The function errors with:
+	// Expected errors during normal operations:
 	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 	//  - model.DuplicatedSignerError if the signer has been already added
-	TrustedAdd(signerID flow.Identifier, sig crypto.Signature, msg []byte) (totalWeight uint64, exception error)
+	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
+	VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) (totalWeight uint64, exception error)
 
 	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
 
-	// UnsafeAggregate aggregates the signatures and returns the aggregated signature.
-	// The function DOES NOT perform a final verification of aggregated
-	// signature. This aggregated signature needs to be verified against messages that were submitted
-	// in `TrustedAdd`.
+	// Aggregate aggregates the signatures and returns the aggregated signature.
+	// The function performs a final verification of aggregated
+	// signature. Caller can be sure that resulting signature is valid.
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
-	UnsafeAggregate() ([]flow.Identifier, []byte, error)
+	Aggregate() (signers []flow.Identifier, highQCViews []uint64, aggregatedSignature crypto.Signature, exception error)
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the
