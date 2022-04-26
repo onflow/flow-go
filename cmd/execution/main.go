@@ -497,7 +497,6 @@ func main() {
 				node.Storage.Collections,
 				chunkDataPacks,
 				results,
-				node.Storage.Receipts,
 				myReceipts,
 				events,
 				serviceEvents,
