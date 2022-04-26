@@ -639,7 +639,7 @@ func TestCheck_WithInvalidBlobs(t *testing.T) {
 
 	t.Run("corrupted multiple CID blob", func(t *testing.T) {
 		expected, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-		fid, tree, err := addExecutionDataWithTree(eds, expected, 20*time.Millisecond)
+		fid, tree, err := addExecutionDataWithTree(eds, expected, 60*time.Millisecond)
 		require.NoError(t, err)
 
 		corruptedCids := []cid.Cid{tree[0][1], tree[0][5]}
@@ -648,7 +648,7 @@ func TestCheck_WithInvalidBlobs(t *testing.T) {
 			corruptBlob(ctx, t, wrappedDS, cid)
 		}
 
-		invalidCIDs, ok := checkExecutionData(eds, fid, 20*time.Millisecond)
+		invalidCIDs, ok := checkExecutionData(eds, fid, 60*time.Millisecond)
 		assert.False(t, ok)
 		require.Len(t, invalidCIDs, len(corruptedCids))
 

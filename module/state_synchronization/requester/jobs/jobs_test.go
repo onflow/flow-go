@@ -21,29 +21,58 @@ func TestBlockJob(t *testing.T) {
 	block := unittest.BlockHeaderFixture()
 
 	job := jobs.BlockToJob(&block)
-	assert.IsType(t, &jobs.BlockJob{}, job, "job is not a block job")
+	t.Run("job is correct type", func(t *testing.T) {
+		assert.IsType(t, &jobs.BlockJob{}, job, "job is not a block job")
+	})
 
-	jobID := jobs.JobID(block.ID())
-	assert.Equal(t, job.ID(), jobID, "job ID is not the block ID")
+	t.Run("job ID matches block ID", func(t *testing.T) {
+		jobID := jobs.JobID(block.ID())
+		assert.Equal(t, job.ID(), jobID, "job ID is not the block ID")
+	})
 
-	b, err := jobs.JobToBlock(job)
-	assert.NoError(t, err, "unexpected error converting block job to block")
-	assert.Equal(t, block, *b, "converted block is not the same as the original block")
+	t.Run("job converts to block", func(t *testing.T) {
+		b, err := jobs.JobToBlock(job)
+		assert.NoError(t, err, "unexpected error converting notify job to block")
+		assert.Equal(t, block, *b, "converted block is not the same as the original block")
+	})
+
+	t.Run("incorrect job type fails to convert to block", func(t *testing.T) {
+		blockEntryJob := jobs.BlockEntryToJob(&jobs.BlockEntry{})
+
+		e, err := jobs.JobToBlock(blockEntryJob)
+		assert.Error(t, err, "expected error converting block job to block")
+		assert.Nil(t, e, "expected nil block")
+	})
 }
 
-func TestNotifyJob(t *testing.T) {
+func TestBlockEntryJob(t *testing.T) {
 	blockEntry := &jobs.BlockEntry{
 		Height:  42,
 		BlockID: unittest.IdentifierFixture(),
 	}
 
 	job := jobs.BlockEntryToJob(blockEntry)
-	assert.IsType(t, &jobs.NotifyJob{}, job, "job is not a block entry job")
+	t.Run("job is correct type", func(t *testing.T) {
+		assert.IsType(t, &jobs.BlockEntryJob{}, job, "job is not a block entry job")
+	})
 
-	jobID := jobs.JobID(blockEntry.BlockID)
-	assert.Equal(t, job.ID(), jobID, "job ID is not the block ID")
+	t.Run("job ID matches block ID", func(t *testing.T) {
+		jobID := jobs.JobID(blockEntry.BlockID)
+		assert.Equal(t, job.ID(), jobID, "job ID is not the block ID")
+	})
 
-	e, err := jobs.JobToBlockEntry(job)
-	assert.NoError(t, err, "unexpected error converting notify job to block entry")
-	assert.Equal(t, blockEntry, e, "converted block entry is not the same as the original block entry")
+	t.Run("job converts to block entry", func(t *testing.T) {
+		e, err := jobs.JobToBlockEntry(job)
+		assert.NoError(t, err, "unexpected error converting notify job to block entry")
+		assert.Equal(t, blockEntry, e, "converted block entry is not the same as the original block entry")
+	})
+
+	t.Run("incorrect job type fails to convert to block entry", func(t *testing.T) {
+		block := unittest.BlockHeaderFixture()
+		blockJob := jobs.BlockToJob(&block)
+
+		e, err := jobs.JobToBlockEntry(blockJob)
+		assert.Error(t, err, "expected error converting block job to block entry")
+		assert.Nil(t, e, "expected nil block entry")
+	})
 }

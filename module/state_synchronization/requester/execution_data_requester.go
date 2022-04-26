@@ -7,28 +7,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-datastore"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -286,9 +279,19 @@ func (e *executionDataRequester) runBootstrap(ctx irrecoverable.SignalerContext,
 
 	// only run datastore check if enabled
 	if e.config.CheckEnabled {
-		err = e.checkDatastore(ctx, e.notificationConsumer.LastProcessedIndex())
+		checker := NewDatastoreChecker(
+			e.log,
+			e.bs,
+			LocalExecutionDataService(ctx, e.ds, e.log),
+			e.headers,
+			e.results,
+			e.config.StartBlockHeight,
+			e.processSealedHeight,
+		)
 
-		// Any error should crash the component
+		err = checker.Run(ctx, e.notificationConsumer.LastProcessedIndex())
+
+		// Any error is unexpected and should crash the component
 		if err != nil {
 			ctx.Throw(err)
 		}
@@ -347,12 +350,7 @@ func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerConte
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	request := &jobs.BlockEntry{
-		BlockID: header.ID(),
-		Height:  header.Height,
-	}
-
-	err = e.processSealedHeight(ctx, request)
+	err = e.processSealedHeight(ctx, header.ID(), header.Height)
 	if err == nil {
 		complete()
 	}
@@ -364,7 +362,7 @@ func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerConte
 
 // processSealedHeight downloads ExecutionData for the given block height.
 // If the download fails, it will retry forever, using exponential backoff.
-func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerContext, request *jobs.BlockEntry) error {
+func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64) error {
 	backoff := retry.NewExponential(e.config.RetryDelay)
 	backoff = retry.WithCappedDuration(e.config.MaxRetryDelay, backoff)
 	backoff = retry.WithJitterPercent(15, backoff)
@@ -377,7 +375,7 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 		attempt++
 
 		// download execution data for the block
-		err := e.processFetchRequest(ctx, request)
+		err := e.processFetchRequest(ctx, blockID, height)
 
 		// don't retry if the blob was invalid
 		if isInvalidBlobError(err) {
@@ -388,21 +386,27 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 	})
 }
 
-func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, request *jobs.BlockEntry) error {
+func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerContext, blockID flow.Identifier, height uint64) error {
 	logger := e.log.With().
-		Str("block_id", request.BlockID.String()).
-		Uint64("height", request.Height).
+		Str("block_id", blockID.String()).
+		Uint64("height", height).
 		Logger()
+
 	logger.Debug().Msg("processing fetch request")
 
-	result, err := e.results.ByBlockID(request.BlockID)
+	result, err := e.results.ByBlockID(blockID)
 
 	// By the time the block is sealed, the ExecutionResult must be in the db
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to lookup execution result for block: %w", err))
 	}
 
-	executionData, err := e.fetchExecutionData(ctx, result.ExecutionDataID, request.Height)
+	start := time.Now()
+	e.metrics.ExecutionDataFetchStarted()
+
+	executionData, err := e.fetchExecutionData(ctx, result.ExecutionDataID)
+
+	e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 
 	if isInvalidBlobError(err) {
 		// This means an execution result was sealed with an invalid execution data id (invalid data).
@@ -433,27 +437,20 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	logger.Debug().Msg("Fetched execution data")
 
-	e.executionDataCache.Add(request.Height, executionData)
+	e.executionDataCache.Add(height, executionData)
 
 	return nil
 }
 
 // fetchExecutionData fetches the ExecutionData by its ID, and times out if fetchTimeout is exceeded
-func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier, height uint64) (executionData *state_synchronization.ExecutionData, err error) {
+func (e *executionDataRequester) fetchExecutionData(signalerCtx irrecoverable.SignalerContext, executionDataID flow.Identifier) (*state_synchronization.ExecutionData, error) {
 	ctx, cancel := context.WithTimeout(signalerCtx, e.config.FetchTimeout)
 	defer cancel()
-
-	start := time.Now()
-	e.metrics.ExecutionDataFetchStarted()
-	defer func() {
-		// needs to be run inside a closure so the variables are resolved when the defer is executed
-		e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
-	}()
 
 	// Get the data from the network
 	// this is a blocking call, won't be unblocked until either hitting error (including timeout) or
 	// the data is received
-	executionData, err = e.eds.Get(ctx, executionDataID)
+	executionData, err := e.eds.Get(ctx, executionDataID)
 
 	if err != nil {
 		return nil, err
@@ -478,18 +475,18 @@ func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.Signal
 		ctx.Throw(fmt.Errorf("failed to convert job to entry: %w", err))
 	}
 
-	e.processNotification(ctx, entry)
+	e.processNotification(ctx, entry.Height, entry.ExecutionData)
 	complete()
 }
 
-func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, entry *jobs.BlockEntry) {
-	e.log.Debug().Msgf("notifying for block %d", entry.Height)
+func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerContext, height uint64, executionData *state_synchronization.ExecutionData) {
+	e.log.Debug().Msgf("notifying for block %d", height)
 
 	// send notifications
-	e.notifyConsumers(entry.ExecutionData)
+	e.notifyConsumers(executionData)
 
-	e.metrics.NotificationSent(entry.Height)
-	e.executionDataCache.Remove(entry.Height)
+	e.metrics.NotificationSent(height)
+	e.executionDataCache.Remove(height)
 }
 
 func (e *executionDataRequester) notifyConsumers(executionData *state_synchronization.ExecutionData) {
@@ -524,154 +521,6 @@ func (e *executionDataRequester) getExecutionData(signalCtx irrecoverable.Signal
 	}
 
 	return executionData, nil
-}
-
-// Bootstrap Methods
-
-func (e *executionDataRequester) checkDatastore(ctx irrecoverable.SignalerContext, lastHeight uint64) error {
-	if e.config.StartBlockHeight >= lastHeight {
-		e.log.Info().Msg("skipping datastore check. no blocks in datastore")
-		return nil
-	}
-
-	logger := e.log.With().Str("module", "check_datastore").Logger()
-
-	logger.Info().
-		Uint64("start_height", e.config.StartBlockHeight).
-		Uint64("end_height", lastHeight).
-		Msg("starting check")
-
-	// we're only interested in inspecting blobs that exist in our local db, so create an
-	// ExecutionDataService that only uses the local datastore
-	localEDS, err := initLocalExecutionDataService(ctx, e.ds, e.log)
-
-	if errors.Is(err, context.Canceled) {
-		return nil
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to create local ExecutionDataService: %w", err)
-	}
-
-	// Search from the start height to the lastHeight, and confirm data is still available for all
-	// heights. All data should be present, otherwise data was deleted or corrupted on disk.
-	for height := e.config.StartBlockHeight; height <= lastHeight; height++ {
-		if ctx.Err() != nil {
-			return nil
-		}
-
-		block, err := e.headers.ByHeight(height)
-		if err != nil {
-			return fmt.Errorf("failed to get block for height %d: %w", height, err)
-		}
-
-		result, err := e.results.ByBlockID(block.ID())
-		if err != nil {
-			return fmt.Errorf("failed to lookup execution result for block %d: %w", block.ID(), err)
-		}
-
-		checkLogger := logger.With().
-			Uint64("height", height).
-			Str("execution_data_id", result.ExecutionDataID.String()).
-			Logger()
-
-		exists, err := e.checkExecutionData(ctx, checkLogger, localEDS, result.ExecutionDataID)
-
-		if err != nil {
-			return err
-		}
-
-		if !exists {
-			// blocking download of any missing block that should exist in the datastore
-			// TODO: ideally, this should push a job into the blockConsumer's queue for the worker
-			// pool to consume. However, the jobqueue doesn't currently have a convenient way to
-			// push work into the queue.
-			err = e.processSealedHeight(ctx, &jobs.BlockEntry{
-				BlockID: block.ID(),
-				Height:  height,
-			})
-			if err != nil && err != ctx.Err() {
-				return fmt.Errorf("failed to redownload execution data for height %d: %w", height, err)
-			}
-		}
-	}
-
-	logger.Info().
-		Uint64("start_height", e.config.StartBlockHeight).
-		Uint64("end_height", lastHeight).
-		Uint64("total_checked", lastHeight-e.config.StartBlockHeight+1).
-		Msg("datastore check successful")
-
-	return nil
-}
-
-func (e *executionDataRequester) checkExecutionData(ctx irrecoverable.SignalerContext, logger zerolog.Logger, localEDS state_synchronization.ExecutionDataService, rootID flow.Identifier) (bool, error) {
-	invalidCIDs, ok := localEDS.Check(ctx, rootID)
-
-	// Check returns a list of CIDs with the corresponding errors encountered while retrieving their
-	// data from the local datastore.
-
-	if ok {
-		logger.Debug().Msg("check ok")
-		return true, nil
-	}
-
-	// Track if this blob should be refetched
-	missing := false
-
-	var errs *multierror.Error
-	for _, invalidCID := range invalidCIDs {
-		cid := invalidCID.Cid
-		err := invalidCID.Err
-
-		// Not Found, just report and continue
-		if errors.Is(err, blockservice.ErrNotFound) {
-			logger.Info().Str("cid", cid.String()).Msg("blob not found")
-			missing = true
-			continue
-		}
-
-		// The blob's hash didn't match. This is a special case where the data was corrupted on
-		// disk. Delete and refetch
-		if errors.Is(err, blockstore.ErrHashMismatch) {
-			logger.Info().Str("cid", cid.String()).Msg("blob corrupt. deleting")
-			if err := e.bs.DeleteBlob(ctx, cid); err != nil {
-				return false, fmt.Errorf("failed to delete corrupted CID %s from rootCID %s: %w", cid, rootID, err)
-			}
-
-			missing = true
-			continue
-		}
-
-		// Record any other errors to return
-		errs = multierror.Append(errs, err)
-	}
-
-	return missing, errs.ErrorOrNil()
-}
-
-// initLocalExecutionDataService returns an ExecutionDataService that's configured to use only the local
-// datastore, and to rehash blobs on read. This is used to check the validity of blobs that exist in
-// the local db.
-func initLocalExecutionDataService(ctx irrecoverable.SignalerContext, ds datastore.Batching, log zerolog.Logger) (state_synchronization.ExecutionDataService, error) {
-	blobService := p2p.NewBlobService(ds, p2p.WithHashOnRead(true))
-	blobService.Start(ctx)
-
-	eds := state_synchronization.NewExecutionDataService(
-		new(cbor.Codec),
-		compressor.NewLz4Compressor(),
-		blobService,
-		metrics.NewNoopCollector(),
-		log,
-	)
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-eds.Ready():
-	}
-
-	return eds, nil
 }
 
 func isInvalidBlobError(err error) bool {

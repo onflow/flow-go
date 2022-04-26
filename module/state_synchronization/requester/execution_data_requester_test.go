@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -44,6 +45,7 @@ type ExecutionDataRequesterSuite struct {
 	blobservice *mocknetwork.BlobService
 	datastore   datastore.Batching
 	db          *badger.DB
+	headers     *storagemock.Headers
 
 	eds *syncmock.ExecutionDataService
 
@@ -115,22 +117,27 @@ func mockExecutionDataService(edStore map[flow.Identifier]*testExecutionDataServ
 		return ed.ExecutionData, nil
 	}
 
-	eds.On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).Return(
-		func(ctx context.Context, id flow.Identifier) *state_synchronization.ExecutionData {
-			ed, _ := get(id)
-			return ed
-		},
-		func(ctx context.Context, id flow.Identifier) error {
-			_, err := get(id)
-			return err
-		},
-	).Maybe() // Maybe() needed to get call count
+	eds.On("Get", mock.Anything, mock.AnythingOfType("flow.Identifier")).
+		Return(
+			func(ctx context.Context, id flow.Identifier) *state_synchronization.ExecutionData {
+				ed, _ := get(id)
+				return ed
+			},
+			func(ctx context.Context, id flow.Identifier) error {
+				_, err := get(id)
+				return err
+			},
+		).
+		Maybe() // Maybe() needed to get call count
 
 	eds.On("Add", mock.Anything, mock.AnythingOfType("*state_synchronization.ExecutionData")).
-		Return(flow.ZeroID, nil, nil)
+		Return(flow.ZeroID, nil, nil).
+		Maybe() // Maybe() needed to get call count
 
 	noop := module.NoopReadyDoneAware{}
-	eds.On("Ready").Return(func() <-chan struct{} { return noop.Ready() })
+	eds.On("Ready").
+		Return(func() <-chan struct{} { return noop.Ready() }).
+		Maybe() // Maybe() needed to get call count
 
 	return eds
 }
@@ -143,46 +150,6 @@ func (suite *ExecutionDataRequesterSuite) mockProtocolState(blocksByHeight map[u
 
 	state.On("Sealed").Return(suite.mockSnapshot).Maybe()
 	return state
-}
-
-// Test cases:
-// - errors looking up data in storage should throw irrecoverable
-// - errors adding ED to blobstore
-// - errors fetching blob
-// - timeout fetching blob
-// - restarts from existing state, and notifications are behind downloads
-
-func (suite *ExecutionDataRequesterSuite) TestCheckDatastore() {
-	// error initializing EDS (context cancelled)
-	// context cancelled while checking
-	// error getting header from storage
-	// error getting result from storage
-
-	// all data is valid
-	// some data is missing
-	// some data is corrupt
-	// error deleting corrupt data
-	// unrecognized error from check
-
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		suite.db = db
-
-		suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
-		suite.blobservice = synctest.MockBlobService(blockstore.NewBlockstore(suite.datastore))
-
-		testData := suite.generateTestData(suite.run.blockCount, suite.run.specialBlocks(suite.run.blockCount))
-		testData.checkEnabled = true
-
-		lastHeight := testData.startHeight + uint64(testData.sealedCount) - 1
-		processedNotification := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
-		require.NoError(suite.T(), processedNotification.InitProcessedIndex(lastHeight))
-
-		edr, _ := suite.prepareRequesterTest(testData)
-
-		suite.runCheckDatastoreTest(edr, testData)
-
-		suite.T().Log("Shutting down test")
-	})
 }
 
 // TestRequesterProcessesBlocks tests that the requester processes all blocks and sends notifications
@@ -428,7 +395,7 @@ func generatePauseResume(pauseHeight uint64) (specialBlockGenerator, func()) {
 }
 
 func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun) (state_synchronization.ExecutionDataRequester, *pubsub.FinalizationDistributor) {
-	headers := synctest.MockBlockHeaderStorage(synctest.WithByID(cfg.blocksByID), synctest.WithByHeight(cfg.blocksByHeight))
+	suite.headers = synctest.MockBlockHeaderStorage(synctest.WithByID(cfg.blocksByID), synctest.WithByHeight(cfg.blocksByHeight))
 	results := synctest.MockResultsStorage(synctest.WithByBlockID(cfg.resultsByID))
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 
@@ -447,7 +414,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		processedHeight,
 		processedNotification,
 		state,
-		headers,
+		suite.headers,
 		results,
 		requester.ExecutionDataConfig{
 			StartBlockHeight: cfg.startHeight,
@@ -464,26 +431,6 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	finalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 
 	return edr, finalizationDistributor
-}
-
-func (suite *ExecutionDataRequesterSuite) runCheckDatastoreTest(edr state_synchronization.ExecutionDataRequester, cfg *fetchTestRun) receivedExecutionData {
-	// make sure test helper goroutines are cleaned up
-	ctx, cancel := context.WithCancel(context.Background())
-
-	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	if cfg.expectedIrrecoverable != nil {
-		go irrecoverableExpected(suite.T(), ctx, errChan, cfg.expectedIrrecoverable.Error())
-	} else {
-		go irrecoverableNotExpected(suite.T(), ctx, errChan)
-	}
-
-	edr.Start(signalerCtx)
-	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")
-
-	cancel()
-	unittest.RequireCloseBefore(suite.T(), edr.Done(), cfg.waitTimeout, "timed out waiting for requester to shutdown")
-
-	return nil
 }
 
 func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchronization.ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun) receivedExecutionData {
@@ -514,29 +461,6 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchr
 	unittest.RequireCloseBefore(suite.T(), edr.Done(), cfg.waitTimeout, "timed out waiting for requester to shutdown")
 
 	return fetchedExecutionData
-}
-
-func (suite *ExecutionDataRequesterSuite) runRequesterTestStartsHalted(edr state_synchronization.ExecutionDataRequester, cfg *fetchTestRun) receivedExecutionData {
-	// make sure test helper goroutines are cleaned up
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go irrecoverableNotExpected(suite.T(), ctx, errChan)
-
-	edr.AddOnExecutionDataFetchedConsumer(func(ed *state_synchronization.ExecutionData) {
-		assert.Fail(suite.T(), "should not have received any execution data")
-	})
-
-	edr.Start(signalerCtx)
-
-	// requester should never become ready
-	unittest.RequireNeverClosedWithin(suite.T(), edr.Ready(), 100*time.Millisecond, "requester started unexpectedly")
-
-	cancel()
-	unittest.RequireCloseBefore(suite.T(), edr.Done(), cfg.waitTimeout, "timed out waiting for requester to shutdown")
-
-	return nil
 }
 
 func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_synchronization.ExecutionDataRequester, finalizationDistributor *pubsub.FinalizationDistributor, cfg *fetchTestRun, expectedDownloads int, resume func()) receivedExecutionData {
@@ -648,15 +572,16 @@ func (suite *ExecutionDataRequesterSuite) finalizeBlocks(cfg *fetchTestRun, fina
 
 type receivedExecutionData map[flow.Identifier]*state_synchronization.ExecutionData
 type fetchTestRun struct {
-	sealedCount           int
-	startHeight           uint64
-	endHeight             uint64
-	blocksByHeight        map[uint64]*flow.Block
-	blocksByID            map[flow.Identifier]*flow.Block
-	resultsByID           map[flow.Identifier]*flow.ExecutionResult
-	executionDataByID     map[flow.Identifier]*state_synchronization.ExecutionData
-	executionDataEntries  map[flow.Identifier]*testExecutionDataServiceEntry
-	expectedIrrecoverable error
+	sealedCount              int
+	startHeight              uint64
+	endHeight                uint64
+	blocksByHeight           map[uint64]*flow.Block
+	blocksByID               map[flow.Identifier]*flow.Block
+	resultsByID              map[flow.Identifier]*flow.ExecutionResult
+	executionDataByID        map[flow.Identifier]*state_synchronization.ExecutionData
+	executionDataEntries     map[flow.Identifier]*testExecutionDataServiceEntry
+	executionDataIDByBlockID map[flow.Identifier]flow.Identifier
+	expectedIrrecoverable    error
 
 	stopHeight           uint64
 	resumeHeight         uint64
@@ -705,6 +630,7 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 	blocksByID := map[flow.Identifier]*flow.Block{}
 	resultsByID := map[flow.Identifier]*flow.ExecutionResult{}
 	executionDataByID := map[flow.Identifier]*state_synchronization.ExecutionData{}
+	executionDataIDByBlockID := map[flow.Identifier]flow.Identifier{}
 
 	sealedCount := blockCount - 4 // seals for blocks 1-96
 	firstSeal := blockCount - sealedCount
@@ -755,6 +681,8 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 			if fn, has := specialHeightFuncs[height]; has {
 				edsEntries[cid].fn = fn
 			}
+
+			executionDataIDByBlockID[block.ID()] = cid
 		}
 
 		previousBlock = block
@@ -762,15 +690,16 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 	}
 
 	return &fetchTestRun{
-		sealedCount:          sealedCount,
-		startHeight:          startHeight,
-		endHeight:            endHeight,
-		blocksByHeight:       blocksByHeight,
-		blocksByID:           blocksByID,
-		resultsByID:          resultsByID,
-		executionDataByID:    executionDataByID,
-		executionDataEntries: edsEntries,
-		waitTimeout:          time.Second * 5,
+		sealedCount:              sealedCount,
+		startHeight:              startHeight,
+		endHeight:                endHeight,
+		blocksByHeight:           blocksByHeight,
+		blocksByID:               blocksByID,
+		resultsByID:              resultsByID,
+		executionDataByID:        executionDataByID,
+		executionDataEntries:     edsEntries,
+		executionDataIDByBlockID: executionDataIDByBlockID,
+		waitTimeout:              time.Second * 5,
 
 		maxCachedEntries: requester.DefaultMaxCachedEntries,
 		maxSearchAhead:   requester.DefaultMaxSearchAhead,
@@ -811,7 +740,7 @@ func irrecoverableExpected(t *testing.T, ctx context.Context, errChan <-chan err
 	case <-ctx.Done():
 		t.Errorf("expected irrecoverable error, but got none")
 	case err := <-errChan:
-		assert.Equal(t, expectedErrMsg, err.Error())
+		assert.Contains(t, err.Error(), expectedErrMsg)
 	}
 }
 

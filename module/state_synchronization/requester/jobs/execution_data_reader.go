@@ -1,7 +1,6 @@
 package jobs
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -26,6 +25,8 @@ type ExecutionDataReader struct {
 	cm *component.ComponentManager
 
 	head func() uint64
+
+	// TODO: doc, read must be concurrency safe
 	read ReadExecutionData
 
 	maxCachedEntries uint64
@@ -67,12 +68,10 @@ func NewExecutionDataReader(maxCachedEntries uint64, fetchHead func() uint64, fe
 func (r *ExecutionDataReader) AtIndex(index uint64) (module.Job, error) {
 	if !util.CheckClosed(r.Ready()) || util.CheckClosed(r.cm.ShutdownSignal()) {
 		// no jobs are available if reader is not ready or is shutting down
-		fmt.Printf("ExecutionDataReader is not ready or shutting down\n")
 		return nil, storage.ErrNotFound
 	}
 
 	if index > r.head() {
-		fmt.Printf("index %d > head %d\n", index, r.head())
 		return nil, storage.ErrNotFound
 	}
 

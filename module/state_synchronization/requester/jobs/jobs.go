@@ -29,7 +29,7 @@ func (j BlockJob) ID() module.JobID {
 func JobToBlock(job module.Job) (*flow.Header, error) {
 	blockJob, ok := job.(*BlockJob)
 	if !ok {
-		return nil, fmt.Errorf("could not assert job to block, job id: %x", job.ID())
+		return nil, fmt.Errorf("could not convert job to block, job id: %x", job.ID())
 	}
 	return blockJob.Block, nil
 }
@@ -39,29 +39,29 @@ func BlockToJob(block *flow.Header) *BlockJob {
 	return &BlockJob{Block: block}
 }
 
-// NotifyJob implements the Job interface. It converts a BlockEntry into a Job to be used by job queue.
+// BlockEntryJob implements the Job interface. It converts a BlockEntry into a Job to be used by job queue.
 //
 // In current architecture, BlockEntryJob represents a ExecutionData notification enqueued to be
 // processed by the NotificationConsumer that implements the JobQueue interface.
-type NotifyJob struct {
+type BlockEntryJob struct {
 	Entry *BlockEntry
 }
 
 // ID converts block id into job id, which guarantees uniqueness.
-func (j NotifyJob) ID() module.JobID {
+func (j BlockEntryJob) ID() module.JobID {
 	return JobID(j.Entry.BlockID)
 }
 
 // JobToBlockEntry converts a block entry job into its corresponding BlockEntry.
 func JobToBlockEntry(job module.Job) (*BlockEntry, error) {
-	blockJob, ok := job.(*NotifyJob)
+	blockJob, ok := job.(*BlockEntryJob)
 	if !ok {
-		return nil, fmt.Errorf("could not assert job to block, job id: %x", job.ID())
+		return nil, fmt.Errorf("could not convert job to block entry, job id: %x", job.ID())
 	}
 	return blockJob.Entry, nil
 }
 
-// BlockEntryToJob converts the BlockEntry to a NotifyJob.
-func BlockEntryToJob(entry *BlockEntry) *NotifyJob {
-	return &NotifyJob{Entry: entry}
+// BlockEntryToJob converts the BlockEntry to a BlockEntryJob.
+func BlockEntryToJob(entry *BlockEntry) *BlockEntryJob {
+	return &BlockEntryJob{Entry: entry}
 }

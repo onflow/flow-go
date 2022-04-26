@@ -17,7 +17,7 @@ import (
 // TestSealedBlockReader evaluates that block reader correctly reads stored finalized blocks from the blocks storage and
 // protocol state.
 func TestSealedBlockReader(t *testing.T) {
-	withReader(t, 10, func(reader *jobs.SealedBlockReader, blocks []*flow.Block) {
+	RunWithReader(t, 10, func(reader *jobs.SealedBlockReader, blocks []*flow.Block) {
 		// the last block seals its parent
 		lastSealedBlock := blocks[len(blocks)-2]
 
@@ -46,10 +46,10 @@ func TestSealedBlockReader(t *testing.T) {
 	})
 }
 
-// withReader is a test helper that sets up a block reader.
+// RunWithReader is a test helper that sets up a block reader.
 // It also provides a chain of specified number of finalized blocks ready to read by block reader, i.e., the protocol state is extended with the
 // chain of blocks and the blocks are stored in blocks storage.
-func withReader(
+func RunWithReader(
 	t *testing.T,
 	blockCount int,
 	withBlockReader func(*jobs.SealedBlockReader, []*flow.Block),

@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/mock"
@@ -85,12 +86,13 @@ func MockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 			}()
 
 			return ch
-		})
+		}).Maybe()
 
-	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(bs.PutMany)
+	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(bs.PutMany).Maybe()
+	bex.On("DeleteBlob", mock.Anything, mock.AnythingOfType("cid.Cid")).Return(bs.DeleteBlock).Maybe()
 
 	noop := module.NoopReadyDoneAware{}
-	bex.On("Ready").Return(func() <-chan struct{} { return noop.Ready() })
+	bex.On("Ready").Return(func() <-chan struct{} { return noop.Ready() }).Maybe()
 
 	return bex
 }
@@ -148,11 +150,14 @@ func WithByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions 
 	return func(blocks *storagemock.Headers) {
 		blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 			func(height uint64) *flow.Header {
+				if _, has := blocksByHeight[height]; !has {
+					return nil
+				}
 				return blocksByHeight[height].Header
 			},
 			func(height uint64) error {
 				if _, has := blocksByHeight[height]; !has {
-					return fmt.Errorf("block %d not found", height)
+					return fmt.Errorf("block %d not found: %w", height, storage.ErrNotFound)
 				}
 				return nil
 			},
@@ -164,11 +169,14 @@ func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlockHeaderMockOptions
 	return func(blocks *storagemock.Headers) {
 		blocks.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 			func(blockID flow.Identifier) *flow.Header {
+				if _, has := blocksByID[blockID]; !has {
+					return nil
+				}
 				return blocksByID[blockID].Header
 			},
 			func(blockID flow.Identifier) error {
 				if _, has := blocksByID[blockID]; !has {
-					return fmt.Errorf("block %s not found", blockID)
+					return fmt.Errorf("block %s not found: %w", blockID, storage.ErrNotFound)
 				}
 				return nil
 			},
@@ -192,11 +200,14 @@ func WithByBlockID(resultsByID map[flow.Identifier]*flow.ExecutionResult) Result
 	return func(results *storagemock.ExecutionResults) {
 		results.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 			func(blockID flow.Identifier) *flow.ExecutionResult {
+				if _, has := resultsByID[blockID]; !has {
+					return nil
+				}
 				return resultsByID[blockID]
 			},
 			func(blockID flow.Identifier) error {
 				if _, has := resultsByID[blockID]; !has {
-					return fmt.Errorf("result %s not found", blockID)
+					return fmt.Errorf("result %s not found: %w", blockID, storage.ErrNotFound)
 				}
 				return nil
 			},
@@ -212,4 +223,13 @@ func MockResultsStorage(opts ...ResultsMockOptions) *storagemock.ExecutionResult
 	}
 
 	return results
+}
+
+func RemoveExpectedCall(method string, expectedCalls []*mock.Call) []*mock.Call {
+	for i, call := range expectedCalls {
+		if call.Method == method {
+			expectedCalls = append(expectedCalls[:i], expectedCalls[i+1:]...)
+		}
+	}
+	return expectedCalls
 }
