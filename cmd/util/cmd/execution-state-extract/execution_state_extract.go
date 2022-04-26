@@ -58,8 +58,7 @@ func extractExecutionState(
 	}
 
 	var migrations []ledger.Migration
-	var rs map[string]ledger.Reporter
-	extractionReportName := "extractionReport"
+	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter
 	newState := ledger.State(targetHash)
 
 	if migrate {
@@ -86,28 +85,29 @@ func extractExecutionState(
 		log.Info().Msgf("preparing reporter files")
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
-		rs = map[string]ledger.Reporter{
-			// The ExportReporter needs to be run first so that it can be used
-			// immediately after execution
-			extractionReportName: reporters.NewExportReporter(log,
+		preCheckpointReporters = []ledger.Reporter{
+			reporters.NewExportReporter(log,
 				chain,
 				func() flow.StateCommitment { return targetHash },
 				func() flow.StateCommitment { return flow.StateCommitment(newState) },
 			),
-			"account": &reporters.AccountReporter{
+		}
+
+		postCheckpointReporters = []ledger.Reporter{
+			&reporters.AccountReporter{
 				Log:   log,
 				Chain: chain,
 				RWF:   reportFileWriterFactory,
 			},
-			"newFungibleTokenTracker": reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
+			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
 		}
 	}
 
 	newState, err = led.ExportCheckpointAt(
 		newState,
 		migrations,
-		rs,
-		extractionReportName,
+		preCheckpointReporters,
+		postCheckpointReporters,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
