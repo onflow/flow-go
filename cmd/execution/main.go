@@ -236,6 +236,15 @@ func main() {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
 		}).
+		Module("Linux page cache adviser", func(node *cmd.NodeConfig) error {
+			logger := node.Logger.With().Str("subcomponent", "checkpointer").Logger()
+			_, err := wal.EvictAllCheckpointsFromLinuxPageCache(triedir, &logger)
+			if err != nil {
+				logger.Warn().Msgf("failed to evict checkpoint files from Linux page cache: %s", err)
+			}
+			// Don't return error because we only advise Linux to evict files.
+			return nil
+		}).
 		Component("GCP block data uploader", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			if enableBlockDataUpload && gcpBucketName != "" {
 				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
