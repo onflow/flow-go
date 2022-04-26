@@ -16,11 +16,12 @@ const (
 // An event is the protocol-level representation of an outgoing message of a corruptible conduit.
 // The corruptible conduit relays the message to the attacker instead of dispatching it through the Flow network.
 // The attacker decodes the message into an event and relays it to the orchestrator.
+// Each corrupted conduit is uniquely identified by 1) corrupted node ID and 2) channel
 type Event struct {
-	CorruptedId flow.Identifier // identifier of corrupted conduit
-	Channel     network.Channel // channel of the event on the corrupted conduit
-	Protocol    Protocol        // networking-layer protocol that this event was meant to send on.
-	TargetNum   uint32          // number of randomly chosen targets (used in multicast protocol).
+	CorruptedNodeId flow.Identifier // identifier of corrupted flow node that this corruptible conduit belongs to
+	Channel         network.Channel // channel of the event on the corrupted conduit
+	Protocol        Protocol        // networking-layer protocol that this event was meant to send on.
+	TargetNum       uint32          // number of randomly chosen targets (used in multicast protocol).
 
 	// set of target identifiers (can be any subset of nodes, either honest or corrupted).
 	TargetIds flow.IdentifierList

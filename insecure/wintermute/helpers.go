@@ -56,7 +56,7 @@ func chunkDataPackRequestForReceipts(
 			// creates a request event per verification node
 			for _, verId := range corVnIds {
 				event := &insecure.Event{
-					CorruptedId:       verId,
+					CorruptedNodeId:   verId,
 					Channel:           engine.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
@@ -118,7 +118,7 @@ func receiptsWithSameResultFixture(
 // executionReceiptEvent creates the attack network event of the corresponding execution receipt.
 func executionReceiptEvent(receipt *flow.ExecutionReceipt, targetIds flow.IdentifierList) *insecure.Event {
 	return &insecure.Event{
-		CorruptedId:       receipt.ExecutorID,
+		CorruptedNodeId:   receipt.ExecutorID,
 		Channel:           engine.PushReceipts,
 		Protocol:          insecure.Protocol_UNICAST,
 		TargetIds:         targetIds,
@@ -149,7 +149,7 @@ func chunkDataPackResponseForReceipts(receipts []*flow.ExecutionReceipt, verIds 
 			// creates a request event per verification node
 			for _, verId := range verIds {
 				event := &insecure.Event{
-					CorruptedId:       receipt.ExecutorID,
+					CorruptedNodeId:   receipt.ExecutorID,
 					Channel:           engine.RequestChunks,
 					Protocol:          insecure.Protocol_PUBLISH,
 					TargetNum:         0,
@@ -208,7 +208,7 @@ func orchestratorOutputSanityCheck(
 		switch event := outputEvent.FlowProtocolEvent.(type) {
 		case *flow.ExecutionReceipt:
 			// makes sure sender is a corrupted execution node.
-			ok := corrEnIds.Contains(outputEvent.CorruptedId)
+			ok := corrEnIds.Contains(outputEvent.CorruptedNodeId)
 			require.True(t, ok)
 			// uses union to avoid adding duplicate.
 			bouncedReceipts = bouncedReceipts.Union(flow.IdentifierList{event.ID()})
@@ -218,7 +218,7 @@ func orchestratorOutputSanityCheck(
 				dictatedResults[resultId] = flow.IdentifierList{}
 			}
 			// uses union to avoid adding duplicate.
-			dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedId})
+			dictatedResults[resultId] = dictatedResults[resultId].Union(flow.IdentifierList{outputEvent.CorruptedNodeId})
 		}
 	}
 

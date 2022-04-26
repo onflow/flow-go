@@ -238,13 +238,13 @@ func mockAttackNetworkForCorruptedExecutionResult(
 			require.True(t, ok)
 
 			// make sure sender is a corrupted execution node.
-			ok = corruptedExecutionIds.Contains(event.CorruptedId)
+			ok = corruptedExecutionIds.Contains(event.CorruptedNodeId)
 			require.True(t, ok)
 
 			// makes sure sender is unique
-			_, ok = seen[event.CorruptedId]
+			_, ok = seen[event.CorruptedNodeId]
 			require.False(t, ok)
-			seen[event.CorruptedId] = struct{}{}
+			seen[event.CorruptedNodeId] = struct{}{}
 
 			// make sure message being sent on correct channel
 			require.Equal(t, engine.PushReceipts, event.Channel)
