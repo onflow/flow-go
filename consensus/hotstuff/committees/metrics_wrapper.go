@@ -19,6 +19,7 @@ type CommitteeMetricsWrapper struct {
 	metrics   module.HotstuffMetrics
 }
 
+var _ hotstuff.VoterCommittee = (*CommitteeMetricsWrapper)(nil)
 var _ hotstuff.Committee = (*CommitteeMetricsWrapper)(nil)
 
 func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetrics) *CommitteeMetricsWrapper {
@@ -28,16 +29,30 @@ func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetr
 	}
 }
 
-func (w CommitteeMetricsWrapper) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (w CommitteeMetricsWrapper) IdentitiesByBlock(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	processStart := time.Now()
-	identities, err := w.committee.Identities(blockID, selector)
+	identities, err := w.committee.IdentitiesByBlock(blockID, selector)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return identities, err
 }
 
-func (w CommitteeMetricsWrapper) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+func (w CommitteeMetricsWrapper) IdentityByBlock(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
 	processStart := time.Now()
-	identity, err := w.committee.Identity(blockID, participantID)
+	identity, err := w.committee.IdentityByBlock(blockID, participantID)
+	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
+	return identity, err
+}
+
+func (w CommitteeMetricsWrapper) IdentitiesByEpoch(view uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
+	processStart := time.Now()
+	identities, err := w.committee.IdentitiesByEpoch(view, selector)
+	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
+	return identities, err
+}
+
+func (w CommitteeMetricsWrapper) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.Identity, error) {
+	processStart := time.Now()
+	identity, err := w.committee.IdentityByEpoch(view, participantID)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return identity, err
 }
@@ -56,9 +71,9 @@ func (w CommitteeMetricsWrapper) Self() flow.Identifier {
 	return id
 }
 
-func (w CommitteeMetricsWrapper) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
+func (w CommitteeMetricsWrapper) DKG(view uint64) (hotstuff.DKG, error) {
 	processStart := time.Now()
-	dkg, err := w.committee.DKG(blockID)
+	dkg, err := w.committee.DKG(view)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return dkg, err
 }

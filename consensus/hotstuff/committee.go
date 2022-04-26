@@ -21,13 +21,14 @@ import (
 // VoterCommittee defines the consensus committee for the purposes of validating votes, timeouts,
 // quorum certificates, and timeout certificates. Any consensus committee member who was legitimate
 // AT THE BEGINNING of the epoch may produce valid votes and timeouts for the entire epoch, even
-// if they are later ejected.
+// if they are later ejected. So for validating votes/timeouts we use *ByEpoch methods.
 //
 // Since the voter committee is considered static over an epoch:
 // * we can query identities by view
 // * we don't need the full block ancestry prior to validating messages
 //
 type VoterCommittee interface {
+
 	// LeaderForView returns the identity of the leader for a given view.
 	// CAUTION: per liveness requirement of HotStuff, the leader must be fork-independent.
 	//          Therefore, a node retains its proposer view slots even if it is slashed.
@@ -72,6 +73,7 @@ type VoterCommittee interface {
 // Committee extends VoterCommittee to provide the consensus committee for the purposes
 // of validating proposals. The proposer committee reflects block-to-block changes in the
 // identity table to support immediately rejecting proposals from nodes after they are ejected.
+// For validating proposals, we use *ByBlock methods.
 //
 // Since the proposer committee can change at any block:
 // * we query by block ID
@@ -98,7 +100,6 @@ type Committee interface {
 	IdentityByBlock(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error)
 }
 
-// TODO remove
 type DKG interface {
 	protocol.DKG
 }
