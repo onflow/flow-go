@@ -218,14 +218,14 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 		// goroutine and the parent's are scheduled. If the parent is scheduled first, any errors
 		// thrown within workers would not have propagated, and it would only receive the done signal
 		defer func() {
+			cancel() // shutdown all workers
+			<-c.shutdownSignal
 			<-c.workersDone
 			close(c.done)
 		}()
 
 		// wait until the workersDone channel is closed or an irrecoverable error is encountered
 		if err := util.WaitError(errChan, c.workersDone); err != nil {
-			cancel() // shutdown all workers
-
 			// propagate the error directly to the parent because a failure in a worker routine
 			// is considered irrecoverable
 			parent.Throw(err)
