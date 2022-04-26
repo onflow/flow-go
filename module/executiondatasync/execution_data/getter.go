@@ -1,4 +1,4 @@
-package state_synchronization
+package execution_data
 
 import (
 	"bytes"
@@ -19,21 +19,22 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-const defaultMaxBlobTreeDepth = 1 // prevents malicious CID from causing download of unbounded amounts of data
-
-var ErrBlobTreeDepthExceeded = errors.New("blob tree depth exceeded")
+// ExecutionDataGetter handles getting execution data from a blobservice
+type ExecutionDataGetter interface {
+	// GetExecutionData gets the ExecutionData for the given root ID from the blobservice.
+	// The given callbacks are called right before each level of the blob tree is retrieved.
+	// The returned error will be:
+	// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+	// - BlobSizeLimitExceededError if any blob in the blob tree exceeds the maximum blob size
+	// - BlobNotFoundError if some CID in the blob tree could not be found from the blobservice
+	GetExecutionData(ctx context.Context, rootID flow.Identifier, callbacks ...func(...cid.Cid) error) (*ExecutionData, error)
+}
 
 type ExecutionDataGetterOption func(*executionDataGetterImpl)
 
 func WithMaxBlobSize(size int) ExecutionDataGetterOption {
 	return func(s *executionDataGetterImpl) {
 		s.maxBlobSize = size
-	}
-}
-
-func WithMaxBlobTreeDepth(depth int) ExecutionDataGetterOption {
-	return func(s *executionDataGetterImpl) {
-		s.maxBlobTreeDepth = depth
 	}
 }
 
@@ -46,10 +47,9 @@ func NewExecutionDataGetter(
 	opts ...ExecutionDataGetterOption,
 ) *executionDataGetterImpl {
 	eds := &executionDataGetterImpl{
-		&serializer{codec, compressor},
+		NewSerializer(codec, compressor),
 		blobService,
 		DefaultMaxBlobSize,
-		defaultMaxBlobTreeDepth,
 		metrics,
 		logger.With().Str("component", "execution_data_service").Logger(),
 	}
@@ -64,12 +64,11 @@ func NewExecutionDataGetter(
 var _ ExecutionDataGetter = (*executionDataGetterImpl)(nil)
 
 type executionDataGetterImpl struct {
-	serializer       *serializer
-	blobService      network.BlobService
-	maxBlobSize      int
-	maxBlobTreeDepth int
-	metrics          module.ExecutionDataGetterMetrics
-	logger           zerolog.Logger
+	serializer  *Serializer
+	blobService network.BlobService
+	maxBlobSize int
+	metrics     module.ExecutionDataGetterMetrics
+	logger      zerolog.Logger
 }
 
 // retrieveBlobs retrieves the blobs for the given CIDs from the blobservice, and sends them to the given BlobSender
@@ -198,37 +197,37 @@ func (s *executionDataGetterImpl) getBlobs(ctx context.Context, cids []cid.Cid, 
 
 func (s *executionDataGetterImpl) getExecutionDataRoot(
 	ctx context.Context,
-	blockID flow.Identifier,
 	rootID flow.Identifier,
 	blobGetter network.BlobGetter,
-) (*ExecutionDataRoot, error) {
-	blob, err := blobGetter.GetBlob(ctx, flow.IdToCid(rootID))
+	callbacks []func(...cid.Cid) error,
+) (*ExecutionDataRoot, uint64, error) {
+	rootCid := flow.IdToCid(rootID)
+
+	for _, cb := range callbacks {
+		if err := cb(rootCid); err != nil {
+			return nil, 0, fmt.Errorf("callback returned error: %w", err)
+		}
+	}
+
+	blob, err := blobGetter.GetBlob(ctx, rootCid)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get execution data root blob: %w", err)
+		return nil, 0, fmt.Errorf("failed to get execution data root blob: %w", err)
 	}
 
 	v, err := s.serializer.Deserialize(bytes.NewBuffer(blob.RawData()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize execution data root blob: %w", err)
+		return nil, 0, fmt.Errorf("failed to deserialize execution data root blob: %w", err)
 	}
 
 	edRoot, ok := v.(*ExecutionDataRoot)
 	if !ok {
-		return nil, fmt.Errorf("execution data root blob is not an ExecutionDataRoot")
+		return nil, 0, fmt.Errorf("execution data root blob is not an ExecutionDataRoot")
 	}
 
-	if edRoot.BlockID != blockID {
-		return nil, &MismatchedBlockIDError{blockID, edRoot.BlockID}
-	}
-
-	return edRoot, nil
+	return edRoot, uint64(len(blob.RawData())), nil
 }
 
-func (s *executionDataGetterImpl) GetChunkExecutionDatas(
-	ctx context.Context,
-	blockID flow.Identifier,
-	rootID flow.Identifier,
-) ([]*ChunkExecutionData, error) {
+func (s *executionDataGetterImpl) GetExecutionData(ctx context.Context, rootID flow.Identifier, callbacks ...func(...cid.Cid) error) (*ExecutionData, error) {
 	logger := s.logger.With().Str("root_id", rootID.String()).Logger()
 	logger.Debug().Msg("getting execution data")
 
@@ -243,23 +242,29 @@ func (s *executionDataGetterImpl) GetChunkExecutionDatas(
 		s.metrics.ExecutionDataGetFinished(time.Since(start), success, int(totalSize.Load()))
 	}()
 
-	edRoot, err := s.getExecutionDataRoot(ctx, blockID, rootID, blobGetter)
+	edRoot, size, err := s.getExecutionDataRoot(ctx, rootID, blobGetter, callbacks)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get execution data root: %w", err)
 	}
+	totalSize.Add(size)
 
 	g, gCtx := errgroup.WithContext(ctx)
 
 	chunkExecutionDatas := make([]*ChunkExecutionData, len(edRoot.ChunkExecutionDataIDs))
-	for i, chunkID := range edRoot.ChunkExecutionDataIDs {
+	for i, chunkDataID := range edRoot.ChunkExecutionDataIDs {
 		i := i
-		chunkID := chunkID
+		chunkDataID := chunkDataID
 
 		g.Go(func() error {
-			ced, size, err := s.getChunkExecutionData(gCtx, chunkID, blobGetter, logger.With().
-				Str("chunk_id", chunkID.String()).
-				Int("chunk_index", i).
-				Logger(),
+			ced, size, err := s.getChunkExecutionData(
+				gCtx,
+				chunkDataID,
+				blobGetter,
+				logger.With().
+					Str("chunk_data_id", chunkDataID.String()).
+					Int("chunk_index", i).
+					Logger(),
+				callbacks,
 			)
 
 			if err != nil {
@@ -278,7 +283,11 @@ func (s *executionDataGetterImpl) GetChunkExecutionDatas(
 	}
 
 	success = true
-	return chunkExecutionDatas, nil
+
+	return &ExecutionData{
+		BlockID:             edRoot.BlockID,
+		ChunkExecutionDatas: chunkExecutionDatas,
+	}, nil
 }
 
 func (s *executionDataGetterImpl) getChunkExecutionData(
@@ -286,12 +295,19 @@ func (s *executionDataGetterImpl) getChunkExecutionData(
 	chunkExecutionDataID cid.Cid,
 	blobGetter network.BlobGetter,
 	logger zerolog.Logger,
+	callbacks []func(...cid.Cid) error,
 ) (*ChunkExecutionData, uint64, error) {
 	var blobTreeSize uint64
 
 	cids := []cid.Cid{chunkExecutionDataID}
 
-	for i := 0; i <= s.maxBlobTreeDepth; i++ {
+	for i := 0; ; i++ {
+		for _, cb := range callbacks {
+			if err := cb(cids...); err != nil {
+				return nil, 0, fmt.Errorf("callback returned error: %w", err)
+			}
+		}
+
 		v, totalBytes, err := s.getBlobs(ctx, cids, logger)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
@@ -308,6 +324,35 @@ func (s *executionDataGetterImpl) getChunkExecutionData(
 			cids = *v
 		}
 	}
+}
 
-	return nil, 0, ErrBlobTreeDepthExceeded
+// MalformedDataError is returned when malformed data is found at some level of the requested
+// blob tree. It likely indicates that the tree was generated incorrectly, and hence the request
+// should not be retried.
+type MalformedDataError struct {
+	err error
+}
+
+func (e *MalformedDataError) Error() string {
+	return fmt.Sprintf("malformed data: %v", e.err)
+}
+
+func (e *MalformedDataError) Unwrap() error { return e.err }
+
+// BlobSizeLimitExceededError is returned when a blob exceeds the maximum size allowed.
+type BlobSizeLimitExceededError struct {
+	cid cid.Cid
+}
+
+func (e *BlobSizeLimitExceededError) Error() string {
+	return fmt.Sprintf("blob %v exceeds maximum blob size", e.cid.String())
+}
+
+// BlobNotFoundError is returned when the blobservice failed to find a blob.
+type BlobNotFoundError struct {
+	cid cid.Cid
+}
+
+func (e *BlobNotFoundError) Error() string {
+	return fmt.Sprintf("blob %v not found", e.cid.String())
 }

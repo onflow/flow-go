@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const DefaultMaxBlobSize = 1 << 20 // 1MiB
+
 // ChunkExecutionData represents the execution data of a chunk
 type ChunkExecutionData struct {
 	Collection *flow.Collection

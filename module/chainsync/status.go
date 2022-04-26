@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package synchronization
+package chainsync
 
 import (
 	"time"

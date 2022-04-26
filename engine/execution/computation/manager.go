@@ -256,6 +256,7 @@ func (e *Manager) ComputeBlock(
 	var rootID flow.Identifier
 	var blobTree [][]cid.Cid
 
+	// TODO
 	group.Go(func() error {
 		var collections []*flow.Collection
 		for _, collection := range result.ExecutableBlock.Collections() {

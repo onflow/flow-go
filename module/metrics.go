@@ -321,18 +321,6 @@ type WALMetrics interface {
 	DiskSize(uint64)
 }
 
-type ExecutionDataGetterMetrics interface {
-	ExecutionDataGetStarted()
-	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeSize int)
-}
-
-type ExecutionDataAdderMetrics interface {
-	ChunkExecutionDataAddStarted()
-	ChunkExecutionDataAddFinished(duration time.Duration, success bool, blobTreeSize int)
-	ExecutionDataRootAddStarted()
-	ExecutionDataRootAddFinished(duration time.Duration, success bool, size int)
-}
-
 type RuntimeMetrics interface {
 	// TransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)
