@@ -98,34 +98,37 @@ func main() {
 	// output collected data to file
 	outputDataToFile(filenameFlag+"_c.csv",
 		rootDataCollector.ComputationColumns,
+		rootDataCollector.ComputationUsed,
 		rootDataCollector.TimeSpent,
 		rootDataCollector.TransactionNames,
 		rootDataCollector.ComputationIntensities)
 
 	outputDataToFile(filenameFlag+"_m.csv",
 		rootDataCollector.MemoryColumns,
+		rootDataCollector.MemoryUsed,
 		rootDataCollector.MemAlloc,
 		rootDataCollector.TransactionNames,
 		rootDataCollector.MemoryIntensities)
 }
 
-func outputDataToFile(filename string, columns map[string]struct{}, independent map[string]uint64, transactionNames map[string]string, intensities map[string]map[string]uint64) {
+func outputDataToFile(filename string, columns map[string]struct{}, estimated map[string]uint, actual map[string]uint64, transactionNames map[string]string, intensities map[string]map[string]uint64) {
 	// output collected data to file
 	var data [][]string
 	allColumns := []string{"tx"}
 	for s := range columns {
 		allColumns = append(allColumns, s)
 	}
-	allColumns = append(allColumns, "x")
+	allColumns = append(allColumns, "estimated", "actual")
 
 	data = append(data, allColumns)
 
-	for s, u := range independent {
+	for s, u := range actual {
 		cdata := make([]string, len(allColumns))
 		cdata[0] = transactionNames[s]
-		for i := 1; i < len(allColumns)-1; i++ {
+		for i := 1; i < len(allColumns)-2; i++ {
 			cdata[i] = strconv.FormatUint(intensities[s][allColumns[i]], 10)
 		}
+		cdata[len(allColumns)-2] = strconv.FormatUint(uint64(estimated[s]), 10)
 		cdata[len(allColumns)-1] = strconv.FormatUint(uint64(u), 10)
 		data = append(data, cdata)
 	}
@@ -659,6 +662,7 @@ func (l *transactionDataCollector) Write(p []byte) (n int, err error) {
 		l.ComputationIntensities[w.TXHash] = w.ComputationIntensities
 		l.MemoryIntensities[w.TXHash] = w.MemoryIntensities
 		l.ComputationUsed[w.TXHash] = w.ComputationUsed
+		l.MemoryUsed[w.TXHash] = w.MemoryUsed
 
 		for s := range w.MemoryIntensities {
 			l.MemoryColumns[s] = struct{}{}
