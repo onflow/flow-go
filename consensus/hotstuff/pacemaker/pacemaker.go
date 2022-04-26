@@ -107,24 +107,6 @@ func (p *NitroPaceMaker) LastViewTC() *flow.TimeoutCertificate {
 	panic("not yet implemented")
 }
 
-func (p *NitroPaceMaker) actOnBlockForCurView(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
-	if isLeaderForNextView {
-		timerInfo := p.timeoutControl.StartTimeout(model.VoteCollectionTimeout, p.currentView)
-		p.notifier.OnStartingTimeout(timerInfo)
-		return nil, false
-	}
-	if block.QC.View+1 == p.currentView {
-		// only decrease timeout if block has been build on a quorum from the previous view;
-		// otherwise, the committee is still not synchronized (as the qc is from a view _prior_ to the previous one)
-		p.timeoutControl.OnProgressBeforeTimeout()
-	}
-	return p.gotoView(p.currentView + 1), true
-}
-
-func (p *NitroPaceMaker) emitTimeoutNotifications(timeout *model.TimerInfo) {
-	p.notifier.OnReachedTimeout(timeout)
-}
-
 // Start starts the pacemaker
 func (p *NitroPaceMaker) Start() {
 	if p.started.Swap(true) {
