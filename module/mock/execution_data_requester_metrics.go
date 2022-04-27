@@ -28,11 +28,6 @@ func (_m *ExecutionDataRequesterMetrics) FetchRetried() {
 	_m.Called()
 }
 
-// Halted provides a mock function with given fields:
-func (_m *ExecutionDataRequesterMetrics) Halted() {
-	_m.Called()
-}
-
 // NotificationSent provides a mock function with given fields: height
 func (_m *ExecutionDataRequesterMetrics) NotificationSent(height uint64) {
 	_m.Called(height)

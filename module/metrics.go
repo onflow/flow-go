@@ -343,9 +343,6 @@ type ExecutionDataRequesterMetrics interface {
 
 	// FetchRetried reports that a download retry was processed
 	FetchRetried()
-
-	// Halted reports the requester is halted
-	Halted()
 }
 
 type RuntimeMetrics interface {

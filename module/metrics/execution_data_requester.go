@@ -17,7 +17,6 @@ type ExecutionDataRequesterCollector struct {
 
 	highestNotificationHeight prometheus.Gauge
 	highestDownloadHeight     prometheus.Gauge
-	halted                    prometheus.Gauge
 
 	downloadRetries prometheus.Counter
 	failedDownloads prometheus.Counter
@@ -61,13 +60,6 @@ func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
 		Help:      "highest block height for which execution data notifications have been sent",
 	})
 
-	halted := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceStateSync,
-		Subsystem: subsystemExecutionDataRequester,
-		Name:      "execution_requester_halted",
-		Help:      "whether the execution data requester is halted",
-	})
-
 	downloadRetries := promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataRequester,
@@ -90,7 +82,6 @@ func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
 		highestNotificationHeight: highestNotificationHeight,
 		downloadRetries:           downloadRetries,
 		failedDownloads:           failedDownloads,
-		halted:                    halted,
 	}
 }
 
@@ -116,8 +107,4 @@ func (ec *ExecutionDataRequesterCollector) NotificationSent(height uint64) {
 
 func (ec *ExecutionDataRequesterCollector) FetchRetried() {
 	ec.downloadRetries.Inc()
-}
-
-func (ec *ExecutionDataRequesterCollector) Halted() {
-	ec.halted.Set(1)
 }

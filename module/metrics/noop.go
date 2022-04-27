@@ -167,4 +167,3 @@ func (nc *NoopCollector) ExecutionDataFetchStarted()                            
 func (nc *NoopCollector) ExecutionDataFetchFinished(_ time.Duration, _ bool, _ uint64)          {}
 func (nc *NoopCollector) NotificationSent(height uint64)                                        {}
 func (nc *NoopCollector) FetchRetried()                                                         {}
-func (nc *NoopCollector) Halted()                                                               {}

@@ -427,7 +427,6 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 			Str("execution_data_id", result.ExecutionDataID.String()).
 			Msg("HALTING REQUESTER: invalid execution data found")
 
-		e.metrics.Halted()
 		return err
 	}
 
