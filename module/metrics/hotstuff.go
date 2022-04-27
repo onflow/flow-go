@@ -15,6 +15,7 @@ const (
 	HotstuffEventTypeOnProposal = "onproposal"
 	HotstuffEventTypeOnVote     = "onvote"
 	HotstuffEventTypeOnQC       = "onqc"
+	HotstuffEventTypeOnTC       = "ontc"
 )
 
 // HotstuffCollector implements only the metrics emitted by the HotStuff core logic.
