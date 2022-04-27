@@ -16,12 +16,12 @@ type ChunkExecutionData struct {
 	TrieUpdate *ledger.TrieUpdate
 }
 
-type ExecutionDataRoot struct {
+type BlockExecutionDataRoot struct {
 	BlockID               flow.Identifier
 	ChunkExecutionDataIDs []cid.Cid
 }
 
-type ExecutionData struct {
+type BlockExecutionData struct {
 	BlockID             flow.Identifier
 	ChunkExecutionDatas []*ChunkExecutionData
 }

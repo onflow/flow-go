@@ -12,26 +12,25 @@ type Deleter struct {
 }
 
 func (p *Deleter) delete(ctx irrecoverable.SignalerContext, height uint64) {
-	p.storage.ProtectDelete()
-	defer p.storage.UnprotectDelete()
+	p.storage.RunSerially(func() {
+		cids, delete, err := p.storage.PrepareForDeletion(height)
+		if err != nil {
+			// TODO: log error
+			// Do we try again?
+			// Or do we throw?
+		}
 
-	cids, delete, err := p.storage.PrepareForDeletion(height)
-	if err != nil {
-		// TODO: log error
-		// Do we try again?
-		// Or do we throw?
-	}
+		for _, cid := range cids {
+			if err := p.blobService.DeleteBlob(ctx, cid); err != nil {
+				// TODO: log error
+				// Do we throw?
+				// TODO: confirm that deleting a non-existing blob is not an error
+			}
+		}
 
-	for _, cid := range cids {
-		if err := p.blobService.DeleteBlob(ctx, cid); err != nil {
+		if err := delete(); err != nil {
 			// TODO: log error
 			// Do we throw?
-			// TODO: confirm that deleting a non-existing blob is not an error
 		}
-	}
-
-	if err := delete(); err != nil {
-		// TODO: log error
-		// Do we throw?
-	}
+	})
 }

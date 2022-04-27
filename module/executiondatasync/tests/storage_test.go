@@ -149,3 +149,9 @@ func TestStorageConcurrency(t *testing.T) {
 // This is where we resume from when we restart.
 
 // Adder and Getter can take in an instance of Synchronizer, and we can use that to synchronize
+
+// TODO: for the hander, we should test all kinds of various edge cases
+// E.g duplicate CID's in the same level, cid not found in the blobservice, etc
+
+// TODO: requester components should wait for each other to be ready
+// Note: The subscription just needs to be setup before HotStuff is constructed

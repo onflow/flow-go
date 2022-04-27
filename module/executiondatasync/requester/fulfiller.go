@@ -6,31 +6,72 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 )
 
-type completedJob struct {
-	executionData *execution_data.ExecutionData
+type jobResult struct {
+	executionData *execution_data.BlockExecutionData
 	resultID      flow.Identifier
 	blockHeight   uint64
+	err           error
 }
 
 type fulfiller struct {
-	completedJobs map[uint64]map[flow.Identifier]*completedJob
+	jobResults    map[uint64]map[flow.Identifier]*jobResult
 	sealedResults map[uint64]flow.Identifier
-	fulfilled     map[uint64]*completedJob
+	fulfilled     map[uint64]*jobResult
 
 	fulfilledHeight uint64
 	sealedHeight    uint64
 
-	jobChan    chan *completedJob   // TODO: unbounded
-	resultChan chan flow.Identifier // TODO: unbounded
+	jobsIn     chan<- interface{}
+	jobsOut    <-chan interface{}
+	resultsIn  chan<- interface{}
+	resultsOut <-chan interface{}
 
 	notifier *notifier
 	storage  *tracker.Storage
+
+	component.Component
 }
 
-func (f *fulfiller) submit(j *completedJob) {
+func newFulfiller(
+	fulfilledHeight uint64,
+	notifier *notifier,
+	storage *tracker.Storage,
+) *fulfiller {
+	jobsIn, jobsOut := util.UnboundedChannel()
+	resultsIn, resultsOut := util.UnboundedChannel()
 
+	f := &fulfiller{
+		jobResults:      make(map[uint64]map[flow.Identifier]*jobResult),
+		sealedResults:   make(map[uint64]flow.Identifier),
+		fulfilled:       make(map[uint64]*jobResult),
+		jobsIn:          jobsIn,
+		jobsOut:         jobsOut,
+		resultsIn:       resultsIn,
+		resultsOut:      resultsOut,
+		fulfilledHeight: fulfilledHeight,
+		sealedHeight:    fulfilledHeight,
+		notifier:        notifier,
+		storage:         storage,
+	}
+
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(f.loop).
+		Build()
+
+	f.Component = cm
+
+	return f
+}
+
+func (f *fulfiller) submitJobResult(j *jobResult) {
+	f.jobsIn <- j
+}
+
+func (f *fulfiller) submitSealedResult(resultID flow.Identifier) {
+	f.resultsIn <- resultID
 }
 
 func (f *fulfiller) fulfill() {
@@ -39,7 +80,7 @@ loop:
 		f.fulfilledHeight++
 		delete(f.fulfilled, f.fulfilledHeight)
 		delete(f.sealedResults, f.fulfilledHeight)
-		f.notifier.notify(j)
+		f.notifier.notify(j.blockHeight, j.executionData)
 
 		goto loop
 	}
@@ -47,7 +88,7 @@ loop:
 	f.storage.SetFulfilledHeight(f.fulfilledHeight)
 }
 
-func (f *fulfiller) handleCompletedJob(j *completedJob) {
+func (f *fulfiller) handleJobResult(j *jobResult) {
 	if j.blockHeight <= f.fulfilledHeight {
 		return
 	}
@@ -57,16 +98,21 @@ func (f *fulfiller) handleCompletedJob(j *completedJob) {
 			return
 		}
 
+		if j.err != nil {
+			// TODO: error getting sealed execution data
+			// we should throw an irrecoverable error
+		}
+
 		f.fulfilled[j.blockHeight] = j
 
 		if j.blockHeight == f.fulfilledHeight+1 {
 			f.fulfill()
 		}
 	} else {
-		jmap, ok := f.completedJobs[j.blockHeight]
+		jmap, ok := f.jobResults[j.blockHeight]
 		if !ok {
-			jmap = make(map[flow.Identifier]*completedJob)
-			f.completedJobs[j.blockHeight] = jmap
+			jmap = make(map[flow.Identifier]*jobResult)
+			f.jobResults[j.blockHeight] = jmap
 		}
 
 		jmap[j.resultID] = j
@@ -77,10 +123,15 @@ func (f *fulfiller) handleSealedResult(sealedResultID flow.Identifier) {
 	f.sealedHeight++
 	f.sealedResults[f.sealedHeight] = sealedResultID
 
-	if completedJobs, ok := f.completedJobs[f.sealedHeight]; ok {
-		delete(f.completedJobs, f.sealedHeight)
+	if completedJobs, ok := f.jobResults[f.sealedHeight]; ok {
+		delete(f.jobResults, f.sealedHeight)
 
 		if j, ok := completedJobs[sealedResultID]; ok {
+			if j.err != nil {
+				// TODO: error getting sealed execution data
+				// we should throw an irrecoverable error
+			}
+
 			f.fulfilled[f.sealedHeight] = j
 
 			if f.sealedHeight == f.fulfilledHeight+1 {
@@ -91,16 +142,17 @@ func (f *fulfiller) handleSealedResult(sealedResultID flow.Identifier) {
 }
 
 func (f *fulfiller) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	<-f.notifier.Ready()
 	ready()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case j := <-f.jobChan:
-			f.handleCompletedJob(j)
-		case sealedResultID := <-f.resultChan:
-			f.handleSealedResult(sealedResultID)
+		case j := <-f.jobsOut:
+			f.handleJobResult(j.(*jobResult))
+		case sealedResultID := <-f.resultsOut:
+			f.handleSealedResult(sealedResultID.(flow.Identifier))
 		}
 	}
 }

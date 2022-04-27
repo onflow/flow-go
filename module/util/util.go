@@ -145,3 +145,42 @@ func WaitError(errChan <-chan error, done <-chan struct{}) error {
 		return nil
 	}
 }
+
+// UnboundedChannel returns a pair of channels that represent the two ends of
+// an unbounded channel.
+// The in channel is used to write to the unbounded channel, and never blocks.
+// The out channel is used to read from the unbounded channel.
+func UnboundedChannel() (chan<- interface{}, <-chan interface{}) {
+	in := make(chan interface{})
+	out := make(chan interface{})
+	go func() {
+		var inQueue []interface{}
+		outCh := func() chan interface{} {
+			if len(inQueue) == 0 {
+				return nil
+			}
+			return out
+		}
+		curVal := func() interface{} {
+			if len(inQueue) == 0 {
+				return nil
+			}
+			return inQueue[0]
+		}
+		for len(inQueue) > 0 || in != nil {
+			select {
+			case val, ok := <-in:
+				if !ok {
+					in = nil
+				} else {
+					inQueue = append(inQueue, val)
+				}
+			case outCh() <- curVal():
+				inQueue[0] = nil
+				inQueue = inQueue[1:]
+			}
+		}
+		close(out)
+	}()
+	return in, out
+}

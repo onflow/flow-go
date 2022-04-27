@@ -67,10 +67,6 @@ func makeLatestHeightKey(c cid.Cid) []byte {
 	return latestHeightKey
 }
 
-func parseLatestHeightKey(key []byte) (cid.Cid, error) {
-	return cid.Cast(key[1:])
-}
-
 // getBatchItemCountLimit returns the maximum number of items that can be included in a single batch
 // transaction based on the number / total size of updates per item.
 func getBatchItemCountLimit(db *badger.DB, writeCountPerItem int64, writeSizePerItem int64) int {
@@ -90,20 +86,16 @@ type Storage struct {
 	db *badger.DB
 }
 
-func (s *Storage) ProtectDelete() {
-	s.mu.Lock()
-}
-
-func (s *Storage) UnprotectDelete() {
-	s.mu.Unlock()
-}
-
-func (s *Storage) ProtectTrackBlobs() {
+func (s *Storage) RunConcurrently(f func()) {
 	s.mu.RLock()
+	defer s.mu.RUnlock()
+	f()
 }
 
-func (s *Storage) UnprotectTrackBlobs() {
-	s.mu.RUnlock()
+func (s *Storage) RunSerially(f func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f()
 }
 
 func (s *Storage) SetFulfilledHeight(height uint64) error {
@@ -179,7 +171,7 @@ func (s *Storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) erro
 	return nil
 }
 
-func (s *Storage) TrackBlobs(blockHeight uint64, cids []cid.Cid) error {
+func (s *Storage) TrackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 	cidsPerBatch := 16
 	maxCidsPerBatch := getBatchItemCountLimit(s.db, 2, blobRecordKeyLength+latestHeightKeyLength+8)
 	if maxCidsPerBatch < cidsPerBatch {

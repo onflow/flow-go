@@ -51,25 +51,28 @@ func (p *Provider) storeBlobs(ctx context.Context, blockHeight uint64, blobCh <-
 			cids = append(cids, blob.Cid())
 		}
 
-		p.storage.ProtectTrackBlobs()
-		defer p.storage.UnprotectTrackBlobs()
+		p.storage.RunConcurrently(func() {
+			// TODO: should we create a child context for the AddBlobs which gets cancelled
+			// before return?
 
-		if err := p.storage.TrackBlobs(blockHeight, cids); err != nil {
-			ch <- fmt.Errorf("failed to track blobs: %w", err)
-			return
-		}
+			if err := p.storage.TrackBlobs(blockHeight, cids...); err != nil {
+				ch <- fmt.Errorf("failed to track blobs: %w", err)
+				return
+			}
 
-		if err := p.blobService.AddBlobs(ctx, blobs); err != nil {
-			ch <- fmt.Errorf("failed to add blobs: %w", err)
-			return
-		}
+			if err := p.blobService.AddBlobs(ctx, blobs); err != nil {
+				ch <- fmt.Errorf("failed to add blobs: %w", err)
+				return
+			}
+		})
 	}()
 
 	return ch
 }
 
-func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.ExecutionData) (*ProvideJob, error) {
-	blobCh := make(chan blobs.Blob) // TODO: make unbounded
+func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (*ProvideJob, error) {
+	blobCh := make(chan blobs.Blob) // TODO: make unbounded, otherwise we could have deadlock
+	// TODO: actually, could we just make sure the channel has enough buffer space?
 	defer close(blobCh)
 
 	errCh := p.storeBlobs(ctx, blockHeight, blobCh)
@@ -95,7 +98,7 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 		return nil, err
 	}
 
-	edRoot := &execution_data.ExecutionDataRoot{
+	edRoot := &execution_data.BlockExecutionDataRoot{
 		BlockID:               executionData.BlockID,
 		ChunkExecutionDataIDs: chunkDataIDs,
 	}
@@ -109,7 +112,7 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 
 func (p *Provider) addExecutionDataRoot(
 	ctx context.Context,
-	edRoot *execution_data.ExecutionDataRoot,
+	edRoot *execution_data.BlockExecutionDataRoot,
 	blobCh chan<- blobs.Blob,
 ) (flow.Identifier, error) {
 	buf := new(bytes.Buffer)

@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -22,47 +20,89 @@ type resultInfo struct {
 	sealed          bool
 }
 
-type Dispatcher struct {
+type dispatcher struct {
 	sealedHeight uint64
 	jobs         map[uint64]map[flow.Identifier]context.CancelFunc
 
-	receipts        chan *flow.ExecutionReceipt // TODO: use unbounded channel
-	finalizedBlocks chan flow.Identifier        // TODO: unbounded channel
-	resultInfos     chan *resultInfo            // TODO: unbounded channel
+	receiptsIn         chan<- interface{}
+	receiptsOut        <-chan interface{}
+	finalizedBlocksIn  chan<- interface{}
+	finalizedBlocksOut <-chan interface{}
+	resultInfosIn      chan<- interface{}
+	resultInfosOut     <-chan interface{}
 
 	blocks  storage.Blocks
 	results storage.ExecutionResults
 
-	handler *handler
+	handler   *handler
+	fulfiller *fulfiller
 
-	logger zerolog.Logger
+	component.Component
 }
 
-func (d *Dispatcher) HandleReceipt(receipt *flow.ExecutionReceipt) {
+func newDispatcher(
+	sealedHeight uint64,
+	blocks storage.Blocks,
+	results storage.ExecutionResults,
+	handler *handler,
+	fulfiller *fulfiller,
+) *dispatcher {
+	receiptsIn, receiptsOut := util.UnboundedChannel()
+	finalizedBlocksIn, finalizedBlocksOut := util.UnboundedChannel()
+	resultInfosIn, resultInfosOut := util.UnboundedChannel()
+
+	d := &dispatcher{
+		sealedHeight:       sealedHeight,
+		jobs:               make(map[uint64]map[flow.Identifier]context.CancelFunc),
+		receiptsIn:         receiptsIn,
+		receiptsOut:        receiptsOut,
+		finalizedBlocksIn:  finalizedBlocksIn,
+		finalizedBlocksOut: finalizedBlocksOut,
+		resultInfosIn:      resultInfosIn,
+		resultInfosOut:     resultInfosOut,
+		blocks:             blocks,
+		results:            results,
+		handler:            handler,
+		fulfiller:          fulfiller,
+	}
+
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(d.processReceipts).
+		AddWorker(d.processFinalizedBlocks).
+		AddWorker(d.processResults).
+		Build()
+
+	d.Component = cm
+
+	return d
+}
+
+func (d *dispatcher) submitReceipt(receipt *flow.ExecutionReceipt) {
 	// TODO: do we also want an upper bound on height?
 	// For example, we could say that we ignore anything past the latest incorporated height?
-	d.receipts <- receipt
+	d.receiptsIn <- receipt
 }
 
-func (d *Dispatcher) HandleFinalizedBlock(block *model.Block) {
-	d.finalizedBlocks <- block.BlockID
+func (d *dispatcher) submitFinalizedBlock(block *flow.Block) {
+	d.finalizedBlocksIn <- block
 }
 
-func (d *Dispatcher) processReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (d *dispatcher) processReceipts(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case receipt := <-d.receipts:
+		case r := <-d.receiptsOut:
+			receipt := r.(*flow.ExecutionReceipt)
 			block, err := d.blocks.ByID(receipt.ExecutionResult.BlockID)
 			if err != nil {
 				// TODO: log
 				continue
 			}
 
-			d.resultInfos <- &resultInfo{
+			d.resultInfosIn <- &resultInfo{
 				resultID:        receipt.ExecutionResult.ID(),
 				blockID:         receipt.ExecutionResult.BlockID,
 				blockHeight:     block.Header.Height,
@@ -72,19 +112,16 @@ func (d *Dispatcher) processReceipts(ctx irrecoverable.SignalerContext, ready co
 	}
 }
 
-func (d *Dispatcher) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (d *dispatcher) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	<-d.fulfiller.Ready()
 	ready()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case blockID := <-d.finalizedBlocks:
-			finalizedBlock, err := d.blocks.ByID(blockID)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("could not retrieve finalized block: %w", err))
-			}
-
+		case fb := <-d.finalizedBlocksOut:
+			finalizedBlock := fb.(*flow.Block)
 			rinfos := make([]*resultInfo, 0, len(finalizedBlock.Payload.Seals))
 			for _, seal := range finalizedBlock.Payload.Seals {
 				result, err := d.results.ByID(seal.ResultID)
@@ -109,33 +146,36 @@ func (d *Dispatcher) processFinalizedBlocks(ctx irrecoverable.SignalerContext, r
 			sort.Slice(rinfos, func(i, j int) bool { return rinfos[i].blockHeight < rinfos[j].blockHeight })
 
 			for _, rinfo := range rinfos {
-				d.resultInfos <- rinfo
+				d.fulfiller.submitSealedResult(rinfo.resultID)
+				d.resultInfosIn <- rinfo
 			}
 		}
 	}
 }
 
-func (d *Dispatcher) processResults(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (d *dispatcher) processResults(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	<-d.handler.Ready()
 	ready()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case rinfo := <-d.resultInfos:
-			if rinfo.sealed {
-				d.handleSealedResult(ctx, rinfo)
+		case ri := <-d.resultInfosOut:
+			rInfo := ri.(*resultInfo)
+			if rInfo.sealed {
+				d.handleSealedResult(ctx, rInfo)
 			} else {
-				d.handleResult(ctx, rinfo)
+				d.handleResult(ctx, rInfo)
 			}
 		}
 	}
 }
 
-func (d *Dispatcher) dispatchJob(ctx irrecoverable.SignalerContext, resultID, executionDataID, blockID flow.Identifier, blockHeight uint64) context.CancelFunc {
+func (d *dispatcher) dispatchJob(ctx irrecoverable.SignalerContext, resultID, executionDataID, blockID flow.Identifier, blockHeight uint64) context.CancelFunc {
 	jobCtx, cancel := context.WithCancel(ctx)
 
-	d.handler.submit(&job{
+	d.handler.submitJob(&job{
 		ctx:             jobCtx,
 		executionDataID: executionDataID,
 		blockID:         blockID,
@@ -146,7 +186,7 @@ func (d *Dispatcher) dispatchJob(ctx irrecoverable.SignalerContext, resultID, ex
 	return cancel
 }
 
-func (d *Dispatcher) handleSealedResult(ctx irrecoverable.SignalerContext, rinfo *resultInfo) {
+func (d *dispatcher) handleSealedResult(ctx irrecoverable.SignalerContext, rinfo *resultInfo) {
 	d.sealedHeight = rinfo.blockHeight
 
 	hmap, ok := d.jobs[rinfo.blockHeight]
@@ -175,7 +215,7 @@ func (d *Dispatcher) handleSealedResult(ctx irrecoverable.SignalerContext, rinfo
 	d.dispatchJob(ctx, rinfo.resultID, rinfo.executionDataID, rinfo.blockID, rinfo.blockHeight)
 }
 
-func (d *Dispatcher) handleResult(ctx irrecoverable.SignalerContext, rinfo *resultInfo) {
+func (d *dispatcher) handleResult(ctx irrecoverable.SignalerContext, rinfo *resultInfo) {
 	if d.sealedHeight >= rinfo.blockHeight {
 		// TODO: log something
 		return

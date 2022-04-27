@@ -19,7 +19,7 @@ const (
 
 func getCode(v interface{}) (byte, error) {
 	switch v.(type) {
-	case *ExecutionDataRoot:
+	case *BlockExecutionDataRoot:
 		return codeExecutionDataRoot, nil
 	case *ChunkExecutionData:
 		return codeChunkExecutionData, nil
@@ -33,7 +33,7 @@ func getCode(v interface{}) (byte, error) {
 func getPrototype(code byte) (interface{}, error) {
 	switch code {
 	case codeExecutionDataRoot:
-		return &ExecutionDataRoot{}, nil
+		return &BlockExecutionDataRoot{}, nil
 	case codeChunkExecutionData:
 		return &ChunkExecutionData{}, nil
 	case codeRecursiveCIDs:
