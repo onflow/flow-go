@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/module/compliance"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -309,6 +310,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			builder.FollowerCore,
 			builder.SyncCore,
 			node.Tracer,
+			compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
