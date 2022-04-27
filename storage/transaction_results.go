@@ -12,4 +12,7 @@ type TransactionResults interface {
 	ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.TransactionResult, error)
 
 	ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error)
+
+	// ByBlockID gets all transaction results for a block, ordered by transaction index
+	ByBlockID(id flow.Identifier) ([]flow.TransactionResult, error)
 }

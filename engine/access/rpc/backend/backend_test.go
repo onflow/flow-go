@@ -328,6 +328,62 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.assertAllExpectations()
 }
 
+func (suite *Suite) TestGetTransactionResultsByBlockID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockId := block.ID()
+
+	// block storage returns the corresponding block
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	exeEventReq := execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+
+	exeEventResp := execproto.GetTransactionResultsResponse{}
+
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		connFactory, // the connection factory should be used to get the execution node client
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
+		suite.log,
+	)
+	suite.execClient.
+		On("GetTransactionResultsByBlockID", ctx, &exeEventReq).
+		Return(&exeEventResp, nil).
+		Once()
+
+	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId)
+	suite.checkResponse(result, err)
+
+	suite.assertAllExpectations()
+}
+
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
 // when the protocol state is updated
 func (suite *Suite) TestTransactionStatusTransition() {
@@ -1622,6 +1678,18 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			require.ElementsMatch(suite.T(), actualList, expectedENs)
 		}
 	}
+	// if we don't find sufficient receipts, executionNodesForBlockID should return a list of random ENs
+	suite.Run("insufficient receipts return random ENs in state", func() {
+		// return no receipts at all attempts
+		attempt1Receipts = flow.ExecutionReceiptList{}
+		attempt2Receipts = flow.ExecutionReceiptList{}
+		attempt3Receipts = flow.ExecutionReceiptList{}
+		suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
+		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
+		require.NoError(suite.T(), err)
+		require.Equal(suite.T(), len(actualList), maxExecutionNodesCnt)
+	})
+
 	// if no preferred or fixed ENs are specified, the ExecutionNodesForBlockID function should
 	// return the exe node list without a filter
 	suite.Run("no preferred or fixed ENs", func() {

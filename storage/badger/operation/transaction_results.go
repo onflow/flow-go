@@ -4,7 +4,6 @@ package operation
 
 import (
 	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -72,4 +71,27 @@ func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(*badger.Txn
 
 func RemoveTransactionResult(blockID flow.Identifier, transactionResultID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeTransactionResult, blockID, transactionResultID))
+}
+
+// LookupTransactionResultsByBlockIDUsingIndex retrieves all tx results for a block, but using
+// tx_index index. This correctly handles cases of duplicate transactions within block, and should
+// eventually replace uses of LookupTransactionResultsByBlockID
+func LookupTransactionResultsByBlockIDUsingIndex(blockID flow.Identifier, txResults *[]flow.TransactionResult) func(*badger.Txn) error {
+
+	txErrIterFunc := func() (checkFunc, createFunc, handleFunc) {
+		check := func(_ []byte) bool {
+			return true
+		}
+		var val flow.TransactionResult
+		create := func() interface{} {
+			return &val
+		}
+		handle := func() error {
+			*txResults = append(*txResults, val)
+			return nil
+		}
+		return check, create, handle
+	}
+
+	return traverse(makePrefix(codeTransactionResultIndex, blockID), txErrIterFunc)
 }
