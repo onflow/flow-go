@@ -107,9 +107,10 @@ type WeightedSignatureAggregator interface {
 	Aggregate() ([]flow.Identifier, []byte, error)
 }
 
-// TimeoutSignatureAggregator aggregates signatures of the same signature scheme but
-// possibly distinct message from different signers. Only public keys are agreed upon upfront.
-// It's similar to WeightedSignatureAggregator but supports distinct messages and  messages are not known upfront.
+// TimeoutSignatureAggregator aggregates timeout signatures of the same signature scheme but
+// possibly distinct message from different signers. Each signer signs a message which is composed of
+// view in which timeout has been created and highest QC view known to that replica.
+// View and public keys are agreed upon upfront.
 // It is also recommended to only aggregate signatures generated with keys representing
 // equivalent security-bit level.
 // Furthermore, a weight [unsigned int64] is assigned to each signer ID. The

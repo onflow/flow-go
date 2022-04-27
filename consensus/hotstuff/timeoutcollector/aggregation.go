@@ -25,8 +25,11 @@ type sigInfo struct {
 }
 
 // TimeoutSignatureAggregator implements consensus/hotstuff.TimeoutSignatureAggregator.
-// It aggregates BLS signatures for many messages from different signers.
-// Only public keys needs to be agreed upon upfront.
+// It performs timeout specific BLS aggregation over multiple distinct messages.
+// We perform timeout signature aggregation for some concrete view, because of that our messages
+// are build in next way: hash(view, highestQCView), where `highestQCView` is a value contributed
+// by different replicas.
+// View and public keys needs to be agreed upon upfront.
 // Each signer is allowed to sign at most once.
 // Aggregation uses BLS scheme. Mitigation against rogue attacks is done using Proof Of Possession (PoP)
 // This module does not verify PoPs of input public keys, it assumes verification was done outside this module.
@@ -42,12 +45,12 @@ type TimeoutSignatureAggregator struct {
 
 var _ hotstuff.TimeoutSignatureAggregator = (*TimeoutSignatureAggregator)(nil)
 
-// NewTimeoutSignatureAggregator returns a multi message signature aggregator initialized with a list of flow
-// identities, their respective public keys and a domain separation tag. The identities
+// NewTimeoutSignatureAggregator returns a multi message signature aggregator initialized with a predefined view
+// for which we aggregate signatures, list of flow identities,
+// their respective public keys and a domain separation tag. The identities
 // represent the list of all possible signers.
 // The constructor errors if:
 // - the list of identities is empty
-// - if the length of keys does not match the length of identities
 // - if one of the keys is not a valid public key.
 //
 // A multi message sig aggregator is used for one aggregation only. A new instance should be used for each
