@@ -370,6 +370,75 @@ var Pool = TransactionTypePool{
 			body:     `TestContract.mintNFT()`,
 			name:     "mint NFT",
 		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let x = [1].append(3)`,
+			name:     "array append",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let b = true || false`,
+			name:     "bool",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let v: Character = "x"[0]`,
+			name:     "character",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let b = "x".toLower()`,
+			name:     "string toLower",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body: `let j: Int64 = 0
+					let v = &j as &Int64`,
+			name: "ephemeral ref",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let v = 3.2 + 1.1`,
+			name:     "float",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let t: StoragePath = /storage/foo`,
+			name:     "path",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let t: Address = 0x1`,
+			name:     "address",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let v: {String: String} = {}`,
+			name:     "dict",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let f = fun() {}`,
+			name:     "function",
+		},
+		&SimpleTxType{
+			paramMax: 10000,
+			body:     `let x = 10 as Word64 << 2 as Word64`,
+			name:     "bitwise",
+		},
+		&SimpleTxType{
+			paramMax: 1000,
+			body: `var i = 0
+			var a: [String] = []
+			while i < 1000 {
+				a.append("a")
+				i = i + 1
+			}
+			for s in a {
+				let x = s
+			}`,
+			name: "iteration",
+		},
 	},
 }
 
