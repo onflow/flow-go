@@ -19,3 +19,17 @@ func MakeVoteMessage(view uint64, blockID flow.Identifier) []byte {
 	})
 	return msg[:]
 }
+
+// MakeTimeoutMessage generates the message we have to sign in order to be able
+// to contribute to Active Pacemaker protocol. Each replica signs with the highest QC view
+// known to that replica.
+func MakeTimeoutMessage(view uint64, highQCView uint64) []byte {
+	msg := flow.MakeID(struct {
+		View    uint64
+		HighQCView    uint64
+	}{
+		View:    view,
+		HighQCView: highQCView,
+	})
+	return msg[:]
+}

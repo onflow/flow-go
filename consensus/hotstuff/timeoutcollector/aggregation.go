@@ -2,6 +2,7 @@ package timeoutcollector
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -17,6 +18,12 @@ type signerInfo struct {
 	weight uint64
 }
 
+// sigInfo holds signature and high QC view submitted by some signer
+type sigInfo struct {
+	sig        crypto.Signature
+	highQCView uint64
+}
+
 // TimeoutSignatureAggregator implements consensus/hotstuff.TimeoutSignatureAggregator.
 // It aggregates BLS signatures for many messages from different signers.
 // Only public keys needs to be agreed upon upfront.
@@ -27,14 +34,15 @@ type signerInfo struct {
 type TimeoutSignatureAggregator struct {
 	lock          sync.RWMutex
 	hasher        hash.Hasher
-	idToInfo      map[flow.Identifier]signerInfo       // auxiliary map to lookup signer weight and public key (only gets updated by constructor)
-	idToSignature map[flow.Identifier]crypto.Signature // signatures indexed by the signer ID
-	totalWeight   uint64                               // total accumulated weight
+	idToInfo      map[flow.Identifier]signerInfo // auxiliary map to lookup signer weight and public key (only gets updated by constructor)
+	idToSignature map[flow.Identifier]sigInfo    // signatures indexed by the signer ID
+	totalWeight   uint64                         // total accumulated weight
+	view          uint64                         // view for which we are aggregating signatures
 }
 
 var _ hotstuff.TimeoutSignatureAggregator = (*TimeoutSignatureAggregator)(nil)
 
-// NewWeightedMultiMessageSigAggregator returns a multi message signature aggregator initialized with a list of flow
+// NewTimeoutSignatureAggregator returns a multi message signature aggregator initialized with a list of flow
 // identities, their respective public keys and a domain separation tag. The identities
 // represent the list of all possible signers.
 // The constructor errors if:
@@ -44,7 +52,9 @@ var _ hotstuff.TimeoutSignatureAggregator = (*TimeoutSignatureAggregator)(nil)
 //
 // A multi message sig aggregator is used for one aggregation only. A new instance should be used for each
 // signature aggregation task in the protocol.
-func NewWeightedMultiMessageSigAggregator(ids flow.IdentityList, // list of all authorized signers
+func NewTimeoutSignatureAggregator(
+	view uint64, // view for which we are aggregating signatures
+	ids flow.IdentityList, // list of all authorized signers
 	dsTag string, // domain separation tag used by the signature
 ) (*TimeoutSignatureAggregator, error) {
 	if len(ids) == 0 {
@@ -69,43 +79,33 @@ func NewWeightedMultiMessageSigAggregator(ids flow.IdentityList, // list of all 
 	return &TimeoutSignatureAggregator{
 		hasher:        crypto.NewBLSKMAC(dsTag),
 		idToInfo:      idToInfo,
-		idToSignature: make(map[flow.Identifier]crypto.Signature),
+		idToSignature: make(map[flow.Identifier]sigInfo),
+		view:          view,
 	}, nil
 }
 
-// Verify verifies the signature under the stored public keys.
-// Expected errors during normal operations:
-//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
-//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
-// The function is thread-safe.
-func (a *TimeoutSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature, msg []byte) error {
-	info, ok := a.idToInfo[signerID]
-	if !ok {
-		return model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
-	}
-	valid, err := info.pk.Verify(sig, msg, a.hasher)
-	if err != nil {
-		return fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
-	}
-	if !valid {
-		return fmt.Errorf("invalid signature from %s: %w", signerID, model.ErrInvalidSignature)
-	}
-	return nil
-}
-
-// TrustedAdd adds signature and message to the internal set of signatures and adds the signer's
-// weight to the total collected weight, iff the signature is _not_ a duplicate.
-//
+// VerifyAndAdd verifies the signature under the stored public keys and adds signature with corresponding
+// highest QC view to the internal set. Internal set and collected weight is modified iff signature _is_ valid.
 // The total weight of all collected signatures (excluding duplicates) is returned regardless
 // of any returned error.
-// The function errors with:
+// Expected errors during normal operations:
 //  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 //  - model.DuplicatedSignerError if the signer has been already added
+//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 // The function is thread-safe.
-func (a *TimeoutSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature, msg []byte) (uint64, error) {
-	info, found := a.idToInfo[signerID]
-	if !found {
+func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) (totalWeight uint64, exception error) {
+	info, ok := a.idToInfo[signerID]
+	if !ok {
 		return a.TotalWeight(), model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
+	}
+
+	msg := verification.MakeTimeoutMessage(a.view, highestQCView)
+	valid, err := info.pk.Verify(sig, msg, a.hasher)
+	if err != nil {
+		return a.TotalWeight(), fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
+	}
+	if !valid {
+		return a.TotalWeight(), fmt.Errorf("invalid signature from %s: %w", signerID, model.ErrInvalidSignature)
 	}
 
 	a.lock.Lock()
@@ -115,7 +115,10 @@ func (a *TimeoutSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig cr
 		return a.totalWeight, model.NewDuplicatedSignerErrorf("signature from %v was already added", signerID)
 	}
 
-	a.idToSignature[signerID] = sig
+	a.idToSignature[signerID] = sigInfo{
+		sig:        sig,
+		highQCView: highestQCView,
+	}
 	a.totalWeight += info.weight
 
 	return a.totalWeight, nil
@@ -129,27 +132,35 @@ func (a *TimeoutSignatureAggregator) TotalWeight() uint64 {
 	return a.totalWeight
 }
 
-// UnsafeAggregate aggregates the signatures and returns the aggregated signature.
-// The function DOES NOT perform a final verification of aggregated
-// signature. This aggregated signature needs to be verified against messages that were submitted
-// in `TrustedAdd`.
+// Aggregate aggregates the signatures and returns the aggregated signature.
+// The function performs a final verification of aggregated
+// signature. Caller can be sure that resulting signature is valid.
 // Expected errors during normal operations:
 //  - model.InsufficientSignaturesError if no signatures have been added yet
 // This function is thread-safe
 //
-func (a *TimeoutSignatureAggregator) UnsafeAggregate() ([]flow.Identifier, []byte, error) {
+func (a *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, crypto.Signature, error) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
 	sharesNum := len(a.idToSignature)
 	if sharesNum == 0 {
-		return nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures")
+		return nil, nil, nil, model.NewInsufficientSignaturesErrorf("cannot aggregate an empty list of signatures")
 	}
+	pks := make([]crypto.PublicKey, 0, sharesNum)
 	signatures := make([]crypto.Signature, 0, sharesNum)
-	signerIDs := make([]flow.Identifier, 0, sharesNum)
-	for id, sig := range a.idToSignature {
-		signatures = append(signatures, sig)
-		signerIDs = append(signerIDs, id)
+	hashers := make([]hash.Hasher, 0, sharesNum)
+	signers := make([]flow.Identifier, 0, sharesNum)
+	messages := make([][]byte, 0, sharesNum)
+	highQCViews := make([]uint64, 0, sharesNum)
+	for id, info := range a.idToSignature {
+		msg := verification.MakeTimeoutMessage(a.view, info.highQCView)
+		signatures = append(signatures, info.sig)
+		signers = append(signers, id)
+		messages = append(messages, msg)
+		pks = append(pks, a.idToInfo[id].pk)
+		hashers = append(hashers, a.hasher)
+		highQCViews = append(highQCViews, info.highQCView)
 	}
 
 	aggSignature, err := crypto.AggregateBLSSignatures(signatures)
@@ -158,10 +169,19 @@ func (a *TimeoutSignatureAggregator) UnsafeAggregate() ([]flow.Identifier, []byt
 		//  * empty `signatures` slice, i.e. sharesNum == 0, which we exclude by earlier check
 		//  * if some signature(s), included via TrustedAdd, could not be decoded
 		if crypto.IsInvalidInputsError(err) {
-			return nil, nil, model.NewInvalidSignatureIncludedErrorf("signatures with invalid structure were included via TrustedAdd: %w", err)
+			return nil, nil, nil, model.NewInvalidSignatureIncludedErrorf("signatures with invalid structure were included via TrustedAdd: %w", err)
 		}
-		return nil, nil, fmt.Errorf("BLS signature aggregation failed: %w", err)
+		return nil, nil, nil, fmt.Errorf("BLS signature aggregation failed: %w", err)
 	}
 
-	return signerIDs, aggSignature, nil
+	valid, err := crypto.VerifyBLSSignatureManyMessages(pks, aggSignature, messages, hashers)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("signature verification failed: %w", err)
+	}
+	// since we add only verified signatures, then we MUST have a valid signature at this point
+	if !valid {
+		return nil, nil, nil, fmt.Errorf("constructed invalid BLS signature")
+	}
+
+	return signers, highQCViews, aggSignature, nil
 }
