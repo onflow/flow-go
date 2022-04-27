@@ -376,6 +376,83 @@ func TestRemove(t *testing.T) {
 	})
 }
 
+func TestRemoveByPrefix(t *testing.T) {
+	t.Run("should no-op when removing non-existant value", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			e := Entity{ID: 1337}
+			key := []byte{0x01, 0x02, 0x03}
+			val, _ := msgpack.Marshal(e)
+
+			_ = db.Update(func(tx *badger.Txn) error {
+				err := tx.Set(key, val)
+				assert.NoError(t, err)
+				return nil
+			})
+
+			nonexistantKey := append(key, 0x01)
+			err := db.Update(removeByPrefix(nonexistantKey))
+			assert.NoError(t, err)
+
+			var act Entity
+			err = db.View(retrieve(key, &act))
+			require.NoError(t, err)
+
+			assert.Equal(t, e, act)
+		})
+	})
+
+	t.Run("should be able to remove", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			e := Entity{ID: 1337}
+			key := []byte{0x01, 0x02, 0x03}
+			val, _ := msgpack.Marshal(e)
+
+			_ = db.Update(func(tx *badger.Txn) error {
+				err := tx.Set(key, val)
+				assert.NoError(t, err)
+				return nil
+			})
+
+			_ = db.Update(func(txn *badger.Txn) error {
+				prefix := []byte{0x01, 0x02}
+				err := removeByPrefix(prefix)(txn)
+				assert.NoError(t, err)
+
+				_, err = txn.Get(key)
+				assert.Error(t, err)
+				assert.IsType(t, badger.ErrKeyNotFound, err)
+
+				return nil
+			})
+		})
+	})
+
+	t.Run("should be able to remove by key", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			e := Entity{ID: 1337}
+			key := []byte{0x01, 0x02, 0x03}
+			val, _ := msgpack.Marshal(e)
+
+			_ = db.Update(func(tx *badger.Txn) error {
+				err := tx.Set(key, val)
+				assert.NoError(t, err)
+				return nil
+			})
+
+			_ = db.Update(func(txn *badger.Txn) error {
+				err := removeByPrefix(key)(txn)
+				assert.NoError(t, err)
+
+				_, err = txn.Get(key)
+				assert.Error(t, err)
+				assert.IsType(t, badger.ErrKeyNotFound, err)
+
+				return nil
+			})
+		})
+	})
+}
+
 func TestIterateBoundaries(t *testing.T) {
 
 	// create range of keys covering all boundaries around our start/end values

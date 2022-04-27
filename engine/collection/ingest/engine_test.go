@@ -293,7 +293,7 @@ func (suite *Suite) TestComponentShutdown() {
 	suite.engine.Start(ctx)
 	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), 10*time.Millisecond)
 	cancel()
-	unittest.AssertClosesBefore(suite.T(), suite.engine.Done(), 10*time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), suite.engine.ShutdownSignal(), 10*time.Millisecond)
 
 	err := suite.engine.ProcessTransaction(&tx)
 	suite.Assert().ErrorIs(err, component.ErrComponentShutdown)

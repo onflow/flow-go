@@ -8,9 +8,12 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
@@ -244,15 +247,11 @@ func NumberToFilename(n int) string {
 }
 
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
-	return CreateCheckpointWriter(c.dir, to)
-}
-
-func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
-	return CreateCheckpointWriterForFile(dir, NumberToFilename(fileNo))
+	return CreateCheckpointWriterForFile(c.dir, NumberToFilename(to), &c.wal.log)
 }
 
 // CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
-func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error) {
+func CreateCheckpointWriterForFile(dir, filename string, logger *zerolog.Logger) (io.WriteCloser, error) {
 
 	fullname := path.Join(dir, filename)
 
@@ -267,6 +266,7 @@ func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error)
 
 	writer := bufio.NewWriterSize(tmpFile, defaultBufioWriteSize)
 	return &SyncOnCloseRenameFile{
+		logger:     logger,
 		file:       tmpFile,
 		targetName: fullname,
 		Writer:     writer,
@@ -403,12 +403,12 @@ func StoreCheckpoint(writer io.Writer, tries ...*trie.MTrie) error {
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*trie.MTrie, error) {
 	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
-	return LoadCheckpoint(filepath)
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() ([]*trie.MTrie, error) {
 	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
-	return LoadCheckpoint(filepath)
+	return LoadCheckpoint(filepath, &c.wal.log)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
@@ -425,12 +425,18 @@ func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
 	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
-func LoadCheckpoint(filepath string) ([]*trie.MTrie, error) {
+func LoadCheckpoint(filepath string, logger *zerolog.Logger) ([]*trie.MTrie, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
 	}
 	defer func() {
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
+
 		_ = file.Close()
 	}()
 
@@ -778,4 +784,73 @@ func readCheckpointV5(f *os.File) ([]*trie.MTrie, error) {
 	}
 
 	return tries, nil
+}
+
+// EvictAllCheckpointsFromLinuxPageCache advises Linux to evict all checkpoint files
+// in dir from Linux page cache.  It returns list of files that Linux was
+// successfully advised to evict and first error encountered (if any).
+// Even after error advising eviction, it continues to advise eviction of remaining files.
+func EvictAllCheckpointsFromLinuxPageCache(dir string, logger *zerolog.Logger) ([]string, error) {
+	var err error
+	matches, err := filepath.Glob(filepath.Join(dir, checkpointFilenamePrefix+"*"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to enumerate checkpoints: %w", err)
+	}
+	evictedFileNames := make([]string, 0, len(matches))
+	for _, fn := range matches {
+		base := filepath.Base(fn)
+		if !strings.HasPrefix(base, checkpointFilenamePrefix) {
+			continue
+		}
+		justNumber := base[len(checkpointFilenamePrefix):]
+		_, err := strconv.Atoi(justNumber)
+		if err != nil {
+			continue
+		}
+		evictErr := evictFileFromLinuxPageCacheByName(fn, false, logger)
+		if evictErr != nil {
+			if err == nil {
+				err = evictErr // Save first evict error encountered
+			}
+			logger.Warn().Msgf("failed to evict file %s from Linux page cache: %s", fn, err)
+			continue
+		}
+		evictedFileNames = append(evictedFileNames, fn)
+	}
+	// return the first error encountered
+	return evictedFileNames, err
+}
+
+// evictFileFromLinuxPageCacheByName advises Linux to evict the file from Linux page cache.
+func evictFileFromLinuxPageCacheByName(fileName string, fsync bool, logger *zerolog.Logger) error {
+	f, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return evictFileFromLinuxPageCache(f, fsync, logger)
+}
+
+// evictFileFromLinuxPageCache advises Linux to evict a file from Linux page cache.
+// A use case is when a new checkpoint is loaded or created, Linux may cache big
+// checkpoint files in memory until evictFileFromLinuxPageCache causes them to be
+// evicted from the Linux page cache.  Not calling eviceFileFromLinuxPageCache()
+// causes two checkpoint files to be cached for each checkpointing, eventually
+// caching hundreds of GB.
+// CAUTION: no-op when GOOS != linux.
+func evictFileFromLinuxPageCache(f *os.File, fsync bool, logger *zerolog.Logger) error {
+	err := fadviseNoLinuxPageCache(f.Fd(), fsync)
+	if err != nil {
+		return err
+	}
+
+	fstat, err := f.Stat()
+	if err == nil {
+		fsize := fstat.Size()
+		logger.Info().Msgf("advised Linux to evict file %s (%d MiB) from page cache", f.Name(), fsize/1024/1024)
+	} else {
+		logger.Info().Msgf("advised Linux to evict file %s from page cache", f.Name())
+	}
+	return nil
 }
