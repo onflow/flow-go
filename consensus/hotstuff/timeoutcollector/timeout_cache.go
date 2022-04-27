@@ -63,8 +63,8 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 	//    we return a model.DoubleTimeoutError.
 	firstTimeout, exists := vc.timeouts[timeout.SignerID]
 	if exists {
-		// TODO: once we have signer indices, implement Equals methods for QC, TC 
-		// and TimeoutObjects, to avoid the comparatively very expensive ID computation. 
+		// TODO: once we have signer indices, implement Equals methods for QC, TC
+		// and TimeoutObjects, to avoid the comparatively very expensive ID computation.
 		if firstTimeout.ID() != timeout.ID() {
 			return model.NewDoubleTimeoutErrorf(firstTimeout, timeout, "detected timeout equivocation by replica %x at view: %d", timeout.SignerID, vc.view)
 		}
