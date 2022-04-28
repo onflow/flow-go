@@ -7,17 +7,16 @@ import (
 
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -95,17 +94,6 @@ func MockBlobService(bs blockstore.Blockstore) *mocknetwork.BlobService {
 	bex.On("Ready").Return(func() <-chan struct{} { return noop.Ready() }).Maybe()
 
 	return bex
-}
-
-func BlockEntryFixture(height uint64) *jobs.BlockEntry {
-	blockID := unittest.IdentifierFixture()
-	return &jobs.BlockEntry{
-		BlockID: blockID,
-		Height:  height,
-		ExecutionData: &state_synchronization.ExecutionData{
-			BlockID: blockID,
-		},
-	}
 }
 
 type SnapshotMockOptions func(*statemock.Snapshot)

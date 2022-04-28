@@ -1,4 +1,4 @@
-package jobs
+package jobqueue
 
 import (
 	"fmt"
@@ -9,24 +9,24 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// SealedBlockReader provides an abstraction for consumers to read blocks as job.
-type SealedBlockReader struct {
+// SealedBlockHeaderReader provides an abstraction for consumers to read blocks as job.
+type SealedBlockHeaderReader struct {
 	state   protocol.State
 	headers storage.Headers
 }
 
-// NewSealedBlockReader creates and returns a SealedBlockReader.
-func NewSealedBlockReader(state protocol.State, headers storage.Headers) *SealedBlockReader {
-	return &SealedBlockReader{
+// NewSealedBlockHeaderReader creates and returns a SealedBlockHeaderReader.
+func NewSealedBlockHeaderReader(state protocol.State, headers storage.Headers) *SealedBlockHeaderReader {
+	return &SealedBlockHeaderReader{
 		state:   state,
 		headers: headers,
 	}
 }
 
-// AtIndex returns the block job at the given index.
-// The block job at an index is just the finalized block at that index (i.e., height).
-func (r SealedBlockReader) AtIndex(index uint64) (module.Job, error) {
-	block, err := r.blockByHeight(index)
+// AtIndex returns the block header job at the given index.
+// The block header job at an index is just the finalized block header at that index (i.e., height).
+func (r SealedBlockHeaderReader) AtIndex(index uint64) (module.Job, error) {
+	header, err := r.blockByHeight(index)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block by index %v: %w", index, err)
 	}
@@ -42,11 +42,11 @@ func (r SealedBlockReader) AtIndex(index uint64) (module.Job, error) {
 	}
 
 	// the block at height index is sealed
-	return BlockToJob(block), nil
+	return BlockHeaderToJob(header), nil
 }
 
 // blockByHeight returns the block at the given height.
-func (r SealedBlockReader) blockByHeight(height uint64) (*flow.Header, error) {
+func (r SealedBlockHeaderReader) blockByHeight(height uint64) (*flow.Header, error) {
 	block, err := r.headers.ByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
@@ -56,7 +56,7 @@ func (r SealedBlockReader) blockByHeight(height uint64) (*flow.Header, error) {
 }
 
 // Head returns the last sealed height as job index.
-func (r SealedBlockReader) Head() (uint64, error) {
+func (r SealedBlockHeaderReader) Head() (uint64, error) {
 	header, err := r.state.Sealed().Head()
 	if err != nil {
 		return 0, fmt.Errorf("could not get header of last sealed block: %w", err)

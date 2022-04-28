@@ -1,4 +1,4 @@
-package jobs_test
+package jobqueue_test
 
 import (
 	"testing"
@@ -8,16 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
+	"github.com/onflow/flow-go/module/jobqueue"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestSealedBlockReader evaluates that block reader correctly reads stored finalized blocks from the blocks storage and
+// TestSealedBlockHeaderReader evaluates that block reader correctly reads stored finalized blocks from the blocks storage and
 // protocol state.
-func TestSealedBlockReader(t *testing.T) {
-	RunWithReader(t, 10, func(reader *jobs.SealedBlockReader, blocks []*flow.Block) {
+func TestSealedBlockHeaderReader(t *testing.T) {
+	RunWithReader(t, 10, func(reader *jobqueue.SealedBlockHeaderReader, blocks []*flow.Block) {
 		// the last block seals its parent
 		lastSealedBlock := blocks[len(blocks)-2]
 
@@ -34,7 +34,7 @@ func TestSealedBlockReader(t *testing.T) {
 			job, err := reader.AtIndex(index)
 			assert.NoError(t, err)
 
-			retrieved, err := jobs.JobToBlock(job)
+			retrieved, err := jobqueue.JobToBlock(job)
 			assert.NoError(t, err)
 			assert.Equal(t, actual.ID(), retrieved.ID())
 		}
@@ -52,7 +52,7 @@ func TestSealedBlockReader(t *testing.T) {
 func RunWithReader(
 	t *testing.T,
 	blockCount int,
-	withBlockReader func(*jobs.SealedBlockReader, []*flow.Block),
+	withBlockReader func(*jobqueue.SealedBlockHeaderReader, []*flow.Block),
 ) {
 	require.Equal(t, blockCount%2, 0, "block count for this test should be even")
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -76,7 +76,7 @@ func RunWithReader(
 		state := synctest.MockProtocolState(synctest.WithSnapshot(snapshot))
 		headerStorage := synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 
-		reader := jobs.NewSealedBlockReader(state, headerStorage)
+		reader := jobqueue.NewSealedBlockHeaderReader(state, headerStorage)
 
 		withBlockReader(reader, blocks)
 	})

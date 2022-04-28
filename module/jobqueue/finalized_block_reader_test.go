@@ -1,4 +1,4 @@
-package blockconsumer_test
+package jobqueue_test
 
 import (
 	"testing"
@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
-	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -18,7 +18,7 @@ import (
 // TestBlockReader evaluates that block reader correctly reads stored finalized blocks from the blocks storage and
 // protocol state.
 func TestBlockReader(t *testing.T) {
-	withReader(t, 10, func(reader *blockconsumer.FinalizedBlockReader, blocks []*flow.Block) {
+	withReader(t, 10, func(reader *jobqueue.FinalizedBlockReader, blocks []*flow.Block) {
 		// head of block reader should be the same height as the last block on the chain.
 		head, err := reader.Head()
 		require.NoError(t, err)
@@ -30,7 +30,7 @@ func TestBlockReader(t *testing.T) {
 			job, err := reader.AtIndex(index)
 			require.NoError(t, err)
 
-			retrieved, err := blockconsumer.JobToBlock(job)
+			retrieved, err := jobqueue.JobToBlock(job)
 			require.NoError(t, err)
 			require.Equal(t, actual.ID(), retrieved.ID())
 		}
@@ -43,7 +43,7 @@ func TestBlockReader(t *testing.T) {
 func withReader(
 	t *testing.T,
 	blockCount int,
-	withBlockReader func(*blockconsumer.FinalizedBlockReader, []*flow.Block),
+	withBlockReader func(*jobqueue.FinalizedBlockReader, []*flow.Block),
 ) {
 	require.Equal(t, blockCount%2, 0, "block count for this test should be even")
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -54,7 +54,7 @@ func withReader(
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
 
-		reader := blockconsumer.NewFinalizedBlockReader(s.State, s.Storage.Blocks)
+		reader := jobqueue.NewFinalizedBlockReader(s.State, s.Storage.Blocks)
 
 		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,

@@ -183,7 +183,7 @@ func New(
 
 	// jobqueue Jobs object that tracks sealed blocks by height. This is used by the blockConsumer
 	// to get a sequential list of sealed blocks.
-	sealedBlockReader := jobs.NewSealedBlockReader(state, headers)
+	sealedBlockReader := jobqueue.NewSealedBlockHeaderReader(state, headers)
 
 	// blockConsumer ensures every sealed block's execution data is downloaded.
 	// It listens to block finalization events from `finalizationNotifier`, then checks
