@@ -1017,9 +1017,11 @@ func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
 		flow.RoleExecution:    {},
 		flow.RoleVerification: {},
 	}
+	// don't add identities for roles that already exist
 	for _, identity := range identities {
 		delete(required, identity.Role)
 	}
+	// add identities for missing roles
 	for role := range required {
 		identities = append(identities, IdentityFixture(WithRole(role)))
 	}
@@ -1958,4 +1960,16 @@ func MachineAccountFixture(t *testing.T) (bootstrap.NodeMachineAccountInfo, *sdk
 		},
 	}
 	return info, acct
+}
+
+func TransactionResultsFixture(n int) []flow.TransactionResult {
+	results := make([]flow.TransactionResult, 0, n)
+	for i := 0; i < n; i++ {
+		results = append(results, flow.TransactionResult{
+			TransactionID:   IdentifierFixture(),
+			ErrorMessage:    "whatever",
+			ComputationUsed: uint64(rand.Uint32()),
+		})
+	}
+	return results
 }

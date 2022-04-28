@@ -84,7 +84,6 @@ type state struct {
 	collections        storage.Collections
 	chunkDataPacks     storage.ChunkDataPacks
 	results            storage.ExecutionResults
-	receipts           storage.ExecutionReceipts
 	myReceipts         storage.MyExecutionReceipts
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
@@ -334,6 +333,12 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
 	results []flow.TransactionResult) error {
+	return s.saveExecutionResults(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
+}
+
+func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
+	results []flow.TransactionResult) error {
 
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
@@ -388,7 +393,6 @@ func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, e
 		return fmt.Errorf("cannot store execution result: %w", err)
 	}
 
-	// it overwrites the index if exists already
 	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot index execution result: %w", err)
@@ -534,11 +538,11 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	err := s.db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveExecutedBlock(&blockID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not lookup executed block: %w", err)
+			return fmt.Errorf("could not lookup executed block %v: %w", blockID, err)
 		}
 		err = operation.RetrieveHeader(blockID, &highest)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve executed header: %w", err)
+			return fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
 		}
 		return nil
 	})
