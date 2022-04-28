@@ -256,7 +256,7 @@ func IsInvalidSignerError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// DoubleTimeoutError indicates that a consensus replica has created for two different
+// DoubleTimeoutError indicates that a consensus replica has created two different
 // timeout objects for same view.
 type DoubleTimeoutError struct {
 	FirstTimeout       *TimeoutObject

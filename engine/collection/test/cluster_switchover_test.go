@@ -153,6 +153,7 @@ func TestClusterSwitchover_Simple(t *testing.T) {
 // TestClusterSwitchover_MultiCollectorCluster tests switchover with a cluster
 // containing more than one collector.
 func TestClusterSwitchover_MultiCollectorCluster(t *testing.T) {
+	t.Skip("active-pacemaker, to be fixed")
 	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
 		clusters:   1,
 		collectors: 2,
@@ -161,6 +162,7 @@ func TestClusterSwitchover_MultiCollectorCluster(t *testing.T) {
 
 // TestClusterSwitchover_MultiCluster tests cluster switchover with two clusters.
 func TestClusterSwitchover_MultiCluster(t *testing.T) {
+	t.Skip("active-pacemaker, to be fixed")
 	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
 		clusters:   2,
 		collectors: 2,

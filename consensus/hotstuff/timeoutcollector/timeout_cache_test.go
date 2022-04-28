@@ -45,7 +45,8 @@ func TestTimeoutObjectsCache_AddTimeoutObjectIncompatibleView(t *testing.T) {
 	require.ErrorIs(t, err, ErrTimeoutForIncompatibleView)
 }
 
-// TestTimeoutObjectsCache_GetTimeout tests that GetTimeout method
+// TestTimeoutObjectsCache_GetTimeout tests that GetTimeout method returns the first added timeout
+// for a given signer, if any timeout has been added.
 func TestTimeoutObjectsCache_GetTimeout(t *testing.T) {
 	view := uint64(100)
 	knownTimeout := helper.TimeoutObjectFixture(helper.WithTimeoutObjectView(view))

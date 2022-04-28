@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	// ErrRepeatedTimeout is emitted, when we receive a timeout object for the same block
+	// ErrRepeatedTimeout is emitted, when we receive an identical timeout object for the same block
 	// from the same voter multiple times. This error does _not_ indicate
 	// equivocation.
 	ErrRepeatedTimeout            = errors.New("duplicated timeout")
@@ -42,9 +42,9 @@ func (vc *TimeoutObjectsCache) View() uint64 { return vc.view }
 
 // AddTimeoutObject stores a timeout in the cache. The following errors are expected during
 // normal operations:
-//  * nil: if the vote was successfully added
-//  * model.DoubleTimeoutError is returned if the voter is equivocating
-//  * RepeatedTimeoutErr is returned when adding a timeout for the same view from
+//  * nil: if the timeout was successfully added
+//  * model.DoubleTimeoutError is returned if the replica is equivocating
+//  * RepeatedTimeoutErr is returned when adding an _identical_ timeout for the same view from
 //    the same voter multiple times.
 //  * TimeoutForIncompatibleViewError is returned if the timeout is for a different view.
 // When AddTimeoutObject returns an error, the timeout is _not_ stored.
@@ -63,8 +63,10 @@ func (vc *TimeoutObjectsCache) AddTimeoutObject(timeout *model.TimeoutObject) er
 	//    we return a model.DoubleTimeoutError.
 	firstTimeout, exists := vc.timeouts[timeout.SignerID]
 	if exists {
+		// TODO: once we have signer indices, implement Equals methods for QC, TC
+		// and TimeoutObjects, to avoid the comparatively very expensive ID computation.
 		if firstTimeout.ID() != timeout.ID() {
-			return model.NewDoubleTimeoutErrorf(firstTimeout, timeout, "detected timeout equivocation by voter %x at view: %d", timeout.SignerID, vc.view)
+			return model.NewDoubleTimeoutErrorf(firstTimeout, timeout, "detected timeout equivocation by replica %x at view: %d", timeout.SignerID, vc.view)
 		}
 		return ErrRepeatedTimeout
 	}

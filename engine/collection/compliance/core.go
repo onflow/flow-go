@@ -324,7 +324,7 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlock
 	return nil
 }
 
-func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.TimeoutObject) error {
+func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.ClusterTimeoutObject) error {
 	t := &model.TimeoutObject{
 		View:       timeout.View,
 		HighestQC:  timeout.HighestQC,
@@ -334,8 +334,8 @@ func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.Timeo
 	}
 
 	c.log.Debug().
+		Hex("origin_id", originID[:]).
 		Uint64("view", t.View).
-		Hex("voter", t.SignerID[:]).
 		Str("timeout_id", t.ID().String()).
 		Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
 

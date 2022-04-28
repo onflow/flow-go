@@ -388,8 +388,8 @@ func (c *Core) OnTimeoutObject(originID flow.Identifier, timeout *messages.Timeo
 	}
 
 	c.log.Info().
+		Hex("origin_id", originID[:]).
 		Uint64("view", t.View).
-		Hex("voter", t.SignerID[:]).
 		Str("timeout_id", t.ID().String()).
 		Msg("timeout received, forwarding timeout to hotstuff timeout aggregator")
 
