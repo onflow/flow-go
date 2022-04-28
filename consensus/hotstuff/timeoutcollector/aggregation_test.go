@@ -1,6 +1,7 @@
 package timeoutcollector
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"math/rand"
 	"sync"
@@ -21,7 +22,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	flow.IdentityList,
 	[]crypto.PublicKey,
 	[]crypto.Signature,
-	[]uint64,
+	[]*flow.QuorumCertificate,
 	[][]byte,
 	[]hash.Hasher) {
 
@@ -29,35 +30,35 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	tag := "random_tag"
 	hasher := crypto.NewBLSKMAC(tag)
 	sigs := make([]crypto.Signature, 0, signersNumber)
-	highQCViews := make([]uint64, 0, signersNumber)
+	highQCs := make([]*flow.QuorumCertificate, 0, signersNumber)
 	msgs := make([][]byte, 0, signersNumber)
 	hashers := make([]hash.Hasher, 0, signersNumber)
 
 	// create keys, identities and signatures
 	ids := make([]*flow.Identity, 0, signersNumber)
 	pks := make([]crypto.PublicKey, 0, signersNumber)
-	view := uint64(rand.Uint32())
+	view := 10 + uint64(rand.Uint32())
 	for i := 0; i < signersNumber; i++ {
 		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
 		identity := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
 		// id
 		ids = append(ids, identity)
 		// keys
-		highQCView := view + uint64(rand.Intn(signersNumber))
-		msg := verification.MakeTimeoutMessage(view, highQCView)
+		qc := helper.MakeQC(helper.WithQCView(uint64(rand.Intn(int(view)))))
+		msg := verification.MakeTimeoutMessage(view, qc.View)
 		// signatures
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
 		sigs = append(sigs, sig)
 
 		pks = append(pks, identity.StakingPubKey)
-		highQCViews = append(highQCViews, highQCView)
+		highQCs = append(highQCs, qc)
 		hashers = append(hashers, hasher)
 		msgs = append(msgs, msg)
 	}
 	aggregator, err := NewTimeoutSignatureAggregator(view, ids, tag)
 	require.NoError(t, err)
-	return aggregator, ids, pks, sigs, highQCViews, msgs, hashers
+	return aggregator, ids, pks, sigs, highQCs, msgs, hashers
 }
 
 // TestNewMultiMessageSigAggregator tests different happy and unhappy path scenarios when constructing
@@ -79,7 +80,12 @@ func TestNewMultiMessageSigAggregator(t *testing.T) {
 // Tests verification, adding and aggregation. Test is performed in concurrent environment
 func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 	signersNum := 20
-	aggregator, ids, pks, sigs, highQCViews, msgs, hashers := createAggregationData(t, signersNum)
+	aggregator, ids, pks, sigs, highQCs, msgs, hashers := createAggregationData(t, signersNum)
+
+	highQCViews := make([]uint64, 0, len(highQCs))
+	for _, qc := range highQCs {
+		highQCViews = append(highQCViews, qc.View)
+	}
 
 	// only add a subset of the signatures
 	subSet := signersNum / 2
@@ -92,7 +98,7 @@ func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 			defer wg.Done()
 			index := i + subSet
 			// test TrustedAdd
-			_, err := aggregator.VerifyAndAdd(ids[index].NodeID, sig, highQCViews[index])
+			_, err := aggregator.VerifyAndAdd(ids[index].NodeID, sig, highQCs[index])
 			// ignore weight as comparing against expected weight is not thread safe
 			require.NoError(t, err)
 		}(i, sig)
@@ -100,11 +106,11 @@ func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 	}
 
 	wg.Wait()
-	signers, highQCViewsActual, agg, err := aggregator.Aggregate()
+	tc, err := aggregator.Aggregate()
 	require.NoError(t, err)
-	require.ElementsMatch(t, highQCViews[subSet:], highQCViewsActual)
+	require.ElementsMatch(t, highQCViews[subSet:], tc.TOHighQCViews)
 
-	ok, err := crypto.VerifyBLSSignatureManyMessages(pks[subSet:], agg, msgs[subSet:], hashers[subSet:])
+	ok, err := crypto.VerifyBLSSignatureManyMessages(pks[subSet:], tc.SigData, msgs[subSet:], hashers[subSet:])
 	require.NoError(t, err)
 	require.True(t, ok)
 	// check signers
@@ -112,22 +118,22 @@ func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 	for i := subSet; i < signersNum; i++ {
 		identifiers = append(identifiers, ids[i].NodeID)
 	}
-	require.ElementsMatch(t, signers, identifiers)
+	require.ElementsMatch(t, tc.SignerIDs, identifiers)
 
 	// add remaining signatures in one thread in order to test the returned weight
 	for i, sig := range sigs[:subSet] {
-		weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, highQCViews[i])
+		weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, highQCs[i])
 		require.NoError(t, err)
 		expectedWeight += ids[i].Weight
 		require.Equal(t, expectedWeight, weight)
 		// test TotalWeight
 		require.Equal(t, expectedWeight, aggregator.TotalWeight())
 	}
-	signers, highQCViewsActual, agg, err = aggregator.Aggregate()
+	tc, err = aggregator.Aggregate()
 	require.NoError(t, err)
-	require.ElementsMatch(t, highQCViews, highQCViewsActual)
+	require.ElementsMatch(t, highQCViews, tc.TOHighQCViews)
 
-	ok, err = crypto.VerifyBLSSignatureManyMessages(pks, agg, msgs, hashers)
+	ok, err = crypto.VerifyBLSSignatureManyMessages(pks, tc.SigData, msgs, hashers)
 	require.NoError(t, err)
 	require.True(t, ok)
 	// check signers
@@ -135,7 +141,7 @@ func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 	for i := 0; i < signersNum; i++ {
 		identifiers = append(identifiers, ids[i].NodeID)
 	}
-	require.ElementsMatch(t, signers, identifiers)
+	require.ElementsMatch(t, tc.SignerIDs, identifiers)
 }
 
 // TestMultiMessageSignatureAggregator_VerifyAndAdd tests behavior of VerifyAndAdd under invalid input data.
@@ -144,22 +150,22 @@ func TestMultiMessageSignatureAggregator_VerifyAndAdd(t *testing.T) {
 
 	// Unhappy paths
 	t.Run("invalid signer ID", func(t *testing.T) {
-		aggregator, _, _, sigs, highQCViews, _, _ := createAggregationData(t, signersNum)
+		aggregator, _, _, sigs, highQCs, _, _ := createAggregationData(t, signersNum)
 		// generate an ID that is not in the node ID list
 		invalidId := unittest.IdentifierFixture()
 
-		weight, err := aggregator.VerifyAndAdd(invalidId, sigs[0], highQCViews[0])
+		weight, err := aggregator.VerifyAndAdd(invalidId, sigs[0], highQCs[0])
 		require.Equal(t, uint64(0), weight)
 		require.Equal(t, uint64(0), aggregator.TotalWeight())
 		require.True(t, model.IsInvalidSignerError(err))
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
-		aggregator, ids, _, sigs, highQCViews, _, _ := createAggregationData(t, signersNum)
+		aggregator, ids, _, sigs, highQCs, _, _ := createAggregationData(t, signersNum)
 		expectedWeight := uint64(0)
 		// add signatures
 		for i, sig := range sigs {
-			weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, highQCViews[i])
+			weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, highQCs[i])
 			expectedWeight += ids[i].Weight
 			require.Equal(t, expectedWeight, weight)
 			require.NoError(t, err)
@@ -171,15 +177,15 @@ func TestMultiMessageSignatureAggregator_VerifyAndAdd(t *testing.T) {
 			// test thread safety
 			go func(i int, sig crypto.Signature) {
 				defer wg.Done()
-				weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sigs[i], highQCViews[i]) // same signature for same index
+				weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sigs[i], highQCs[i]) // same signature for same index
 				// weight should not change
 				require.Equal(t, expectedWeight, weight)
 				require.True(t, model.IsDuplicatedSignerError(err))
-				weight, err = aggregator.VerifyAndAdd(ids[i].NodeID, sigs[(i+1)%signersNum], highQCViews[(i+1)%signersNum]) // different signature for same index
+				weight, err = aggregator.VerifyAndAdd(ids[i].NodeID, sigs[(i+1)%signersNum], highQCs[(i+1)%signersNum]) // different signature for same index
 				// weight should not change
 				require.Equal(t, expectedWeight, weight)
 				require.True(t, model.IsDuplicatedSignerError(err))
-				weight, err = aggregator.VerifyAndAdd(ids[(i+1)%signersNum].NodeID, sigs[(i+1)%signersNum], highQCViews[(i+1)%signersNum]) // different signature for same index
+				weight, err = aggregator.VerifyAndAdd(ids[(i+1)%signersNum].NodeID, sigs[(i+1)%signersNum], highQCs[(i+1)%signersNum]) // different signature for same index
 				// weight should not change
 				require.Equal(t, expectedWeight, weight)
 				require.ErrorAs(t, err, &model.ErrInvalidSignature)
@@ -196,31 +202,31 @@ func TestMultiMessageSignatureAggregator_Aggregate(t *testing.T) {
 
 	t.Run("invalid signature", func(t *testing.T) {
 		var err error
-		aggregator, ids, pks, sigs, highQCViews, msgs, hashers := createAggregationData(t, signersNum)
+		aggregator, ids, pks, sigs, highQCs, msgs, hashers := createAggregationData(t, signersNum)
 		// replace sig with random one
 		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenECDSAP256)
 		sigs[0], err = sk.Sign([]byte("dummy"), hashers[0])
 		require.NoError(t, err)
 
 		// test VerifyAndAdd
-		_, err = aggregator.VerifyAndAdd(ids[0].NodeID, sigs[0], highQCViews[0])
+		_, err = aggregator.VerifyAndAdd(ids[0].NodeID, sigs[0], highQCs[0])
 		require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 		// add signatures for aggregation including corrupt sigs[0]
 		expectedWeight := uint64(0)
 		for i, sig := range sigs {
-			weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, highQCViews[i])
+			weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, highQCs[i])
 			if err == nil {
 				expectedWeight += ids[i].Weight
 			}
 			require.Equal(t, expectedWeight, weight)
 		}
-		signers, _, agg, err := aggregator.Aggregate()
+		tc, err := aggregator.Aggregate()
 		require.NoError(t, err)
 		// we should have signers for all signatures except first one since it's invalid
-		require.Equal(t, len(signers), len(ids)-1)
+		require.Equal(t, len(tc.SignerIDs), len(ids)-1)
 
-		ok, err := crypto.VerifyBLSSignatureManyMessages(pks[1:], agg, msgs[1:], hashers[1:])
+		ok, err := crypto.VerifyBLSSignatureManyMessages(pks[1:], tc.SigData, msgs[1:], hashers[1:])
 		require.NoError(t, err)
 		require.True(t, ok)
 	})
@@ -229,22 +235,18 @@ func TestMultiMessageSignatureAggregator_Aggregate(t *testing.T) {
 		aggregator, _, _, _, _, _, _ := createAggregationData(t, signersNum)
 
 		// no signatures were added => aggregate should error with
-		signers, highQCViews, agg, err := aggregator.Aggregate()
+		tc, err := aggregator.Aggregate()
 		require.True(t, model.IsInsufficientSignaturesError(err))
-		require.Nil(t, agg)
-		require.Nil(t, signers)
-		require.Nil(t, highQCViews)
+		require.Nil(t, tc)
 
 		// Also, _after_ attempting to add a signature from unknown `signerID`:
 		// calling `Aggregate()` should error with `model.InsufficientSignaturesError`,
 		// as still zero signatures are stored.
-		_, err = aggregator.VerifyAndAdd(unittest.IdentifierFixture(), unittest.SignatureFixture(), 0)
+		_, err = aggregator.VerifyAndAdd(unittest.IdentifierFixture(), unittest.SignatureFixture(), helper.MakeQC())
 		require.True(t, model.IsInvalidSignerError(err))
 
-		signers, highQCViews, agg, err = aggregator.Aggregate()
+		tc, err = aggregator.Aggregate()
 		require.True(t, model.IsInsufficientSignaturesError(err))
-		require.Nil(t, agg)
-		require.Nil(t, signers)
-		require.Nil(t, highQCViews)
+		require.Nil(t, tc)
 	})
 }

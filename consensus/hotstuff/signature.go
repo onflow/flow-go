@@ -118,24 +118,25 @@ type WeightedSignatureAggregator interface {
 // Implementations must be concurrency safe.
 type TimeoutSignatureAggregator interface {
 	// VerifyAndAdd verifies the signature under the stored public keys and adds signature with corresponding
-	// highest QC view to the internal set. Internal set and collected weight is modified iff signature _is_ valid.
+	// highest QC to the internal set. Internal set and collected weight is modified iff signature _is_ valid.
 	// The total weight of all collected signatures (excluding duplicates) is returned regardless
 	// of any returned error.
 	// Expected errors during normal operations:
 	//  - model.InvalidSignerError if signerID is invalid (not a consensus participant)
 	//  - model.DuplicatedSignerError if the signer has been already added
 	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
-	VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, highestQCView uint64) (totalWeight uint64, exception error)
+	VerifyAndAdd(signerID flow.Identifier, sig crypto.Signature, highestQC *flow.QuorumCertificate) (totalWeight uint64, exception error)
 
 	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
 
-	// Aggregate aggregates the signatures and returns the aggregated signature.
+	// Aggregate aggregates the signatures and builds a flow.TimeoutCertificate with data supplied in VerifyAndAdd.
+	// Aggregated signature will be returned as SigData of timeout certificate.
 	// The function performs a final verification of aggregated
 	// signature. Caller can be sure that resulting signature is valid.
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
-	Aggregate() (signers []flow.Identifier, highQCViews []uint64, aggregatedSignature crypto.Signature, exception error)
+	Aggregate() (*flow.TimeoutCertificate, error)
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the
