@@ -86,6 +86,7 @@ require (
 	github.com/stretchr/testify v1.7.1-0.20210824115523-ab6dc3262822
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
+	github.com/valyala/gozstd v1.16.0 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.9.0
