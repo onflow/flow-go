@@ -21,6 +21,7 @@ type DefaultConduitFactory struct {
 
 func NewDefaultConduitFactory() *DefaultConduitFactory {
 	d := &DefaultConduitFactory{}
+	// worker added so conduit factory doesn't immediately shut down when it's started
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
