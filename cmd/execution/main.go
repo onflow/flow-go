@@ -61,6 +61,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
@@ -233,6 +234,15 @@ func main() {
 		}).
 		Module("pending block cache", func(node *cmd.NodeConfig) error {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
+			return nil
+		}).
+		Module("Linux page cache adviser", func(node *cmd.NodeConfig) error {
+			logger := node.Logger.With().Str("subcomponent", "checkpointer").Logger()
+			_, err := wal.EvictAllCheckpointsFromLinuxPageCache(triedir, &logger)
+			if err != nil {
+				logger.Warn().Msgf("failed to evict checkpoint files from Linux page cache: %s", err)
+			}
+			// Don't return error because we only advise Linux to evict files.
 			return nil
 		}).
 		Component("GCP block data uploader", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -487,7 +497,6 @@ func main() {
 				node.Storage.Collections,
 				chunkDataPacks,
 				results,
-				node.Storage.Receipts,
 				myReceipts,
 				events,
 				serviceEvents,
@@ -674,6 +683,7 @@ func main() {
 				followerCore,
 				syncCore,
 				node.Tracer,
+				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
