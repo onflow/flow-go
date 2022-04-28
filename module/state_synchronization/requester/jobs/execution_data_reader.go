@@ -66,13 +66,11 @@ func (r *ExecutionDataReader) AtIndex(height uint64) (module.Job, error) {
 
 	// height has not been downloaded, so height is not available yet
 	if height > r.highestAvailableHeight() {
-		fmt.Printf("execution data reader: height %d > r.highestAvailableHeight() %d\n", height, r.highestAvailableHeight())
 		return nil, storage.ErrNotFound
 	}
 
 	executionData, err := r.getExecutionData(r.ctx, height)
 	if err != nil {
-		fmt.Printf("err getting execution data: %v\n", err)
 		return nil, err
 	}
 

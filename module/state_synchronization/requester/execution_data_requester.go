@@ -26,21 +26,26 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// The ExecutionDataRequester downloads ExecutionData for sealed blocks from other participants.
-// The ExecutionData for a sealed block is always downloadable, because a sealed block must have been executed.
-// Once the ExecutionData for a block is downloaded, it becomes the "Seed" to respond to others participants'
-// execution data requests.
-// The downloading and seeding work is handled by the ExecutionDataService.
-// The ExecutionDataRequester internally uses a job queue to request and download for each sealed block with multiple workers. It downloads ExecutionData block by block towards the latest sealed block.
-// In order to ensure it won't miss any sealed block to download, it persists the last downloaded height, and only
-// increment it when the next height has been downloaded.
-// In the event of a crash failure, it will read the last downloaded height, and process from the next un-downloaded height.
-// The requester listens to block finalization event, and checks if sealed height has been changed, if changed, it
-// create job for each un-downloaded and sealed height.
+// The ExecutionDataRequester downloads ExecutionData for sealed blocks from other participants in
+// the flow network. The ExecutionData for a sealed block should always downloadable, since a
+// sealed block must have been executed.
+//
+// Once the ExecutionData for a block is downloaded, the node becomes a seeder for other participants
+// on the network using the bitswap protocol. The downloading and seeding work is handled by the
+// ExecutionDataService.
+//
+// The ExecutionDataRequester internally uses a job queue to request and download each sealed block
+// with multiple workers. It downloads ExecutionData block by block towards the latest sealed block.
+// In order to ensure it does not miss any sealed block to download, it persists the last downloaded
+// height, and only increments it when the next height has been downloaded. In the event of a crash
+// failure, it will read the last downloaded height, and process from the next un-downloaded height.
+// The requester listens to block finalization event, and checks if sealed height has been changed,
+// if changed, it create job for each un-downloaded and sealed height.
+//
 // The requester is made up of 4 subcomponents:
 //
 // * OnBlockFinalized:     receives block finalized events from the finalization distributor and
-//                         forwards them to the sealed blockConsumer.
+//                         forwards them to the blockConsumer.
 //
 // * blockConsumer:        is a jobqueue that receives block finalization events. On each event,
 //                         it checks for the latest sealed block, then uses a pool of workers to
@@ -54,20 +59,12 @@ import (
 //                         consumers.
 //
 //    +------------------+      +---------------+       +----------------------+
-// -->| OnBlockFinalized |----->| blockConsumer |   +-->| notificationConsumer |<-+
-//    +------------------+      +-------+-------+   |   +-----------+----------+  | scan for addition
-//                                      |           |               |             | notifications to
-//                               +------+------+    |        +------+------+      | send
-//                            xN | Worker Pool |----+     x1 | Worker Pool |------+
+// -->| OnBlockFinalized |----->| blockConsumer |   +-->| notificationConsumer |
+//    +------------------+      +-------+-------+   |   +-----------+----------+
+//                                      |           |               |
+//                               +------+------+    |        +------+------+
+//                            xN | Worker Pool |----+     x1 | Worker Pool |----> Registered consumers
 //                               +-------------+             +-------------+
-//
-// The requester has 2 main priorities:
-//   1. ensure execution state is as widely distributed as possible among the network participants
-//   2. make the execution state available to local subscribers
-// #1 is the top priority, and this component is optimized to download and seed ExecutionData for
-// as many blocks as possible, making them available to other nodes in the network. This ensures
-// execution state is available for all participants, and reduces network load on the execution
-// nodes that source the data.
 
 const (
 	// DefaultFetchTimeout is the default timeout for fetching ExecutionData from the db/network
