@@ -16,57 +16,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
-func init() {
-	// initialize the authorized roles map the first time this package is imported.
-	initializeChannelToMsgCodesMap()
-}
-
-// channelToMsgCodes is a mapping of network channels to codes of the messages communicated on them. This will be used to check the list of authorized roles associated with the channel
-var channelToMsgCodes map[network.Channel][]uint8
-
-// initializeChannelToMsgCodesMap initializes channelToMsgCodes.
-func initializeChannelToMsgCodesMap() {
-	channelToMsgCodes = make(map[network.Channel][]uint8)
-
-	// consensus
-	channelToMsgCodes[channels.ConsensusCommittee] = []uint8{cborcodec.CodeBlockProposal, cborcodec.CodeBlockVote}
-
-	// protocol state sync
-	channelToMsgCodes[channels.SyncCommittee] = []uint8{cborcodec.CodeSyncRequest, cborcodec.CodeSyncResponse, cborcodec.CodeRangeRequest, cborcodec.CodeBatchRequest, cborcodec.CodeBlockResponse}
-
-	// collections, guarantees & transactions
-	channelToMsgCodes[channels.PushGuarantees] = []uint8{cborcodec.CodeCollectionGuarantee}
-	channelToMsgCodes[channels.ReceiveGuarantees] = channelToMsgCodes[channels.PushGuarantees]
-
-	channelToMsgCodes[channels.PushTransactions] = []uint8{cborcodec.CodeTransactionBody, cborcodec.CodeTransaction}
-	channelToMsgCodes[channels.ReceiveTransactions] = channelToMsgCodes[channels.PushTransactions]
-
-	// core messages for execution & verification
-	channelToMsgCodes[channels.PushReceipts] = []uint8{cborcodec.CodeExecutionReceipt}
-	channelToMsgCodes[channels.ReceiveReceipts] = channelToMsgCodes[channels.PushReceipts]
-
-	channelToMsgCodes[channels.PushApprovals] = []uint8{cborcodec.CodeResultApproval}
-	channelToMsgCodes[channels.ReceiveApprovals] = channelToMsgCodes[channels.PushApprovals]
-
-	channelToMsgCodes[channels.PushBlocks] = []uint8{cborcodec.CodeBlockProposal}
-	channelToMsgCodes[channels.ReceiveBlocks] = channelToMsgCodes[channels.PushBlocks]
-
-	// data exchange for execution of blocks
-	channelToMsgCodes[channels.ProvideChunks] = []uint8{cborcodec.CodeChunkDataRequest, cborcodec.CodeChunkDataResponse}
-
-	// result approvals
-	channelToMsgCodes[channels.ProvideApprovalsByChunk] = []uint8{cborcodec.CodeApprovalRequest, cborcodec.CodeApprovalResponse}
-
-	// generic entity exchange engines all use EntityRequest and EntityResponse
-	channelToMsgCodes[channels.RequestChunks] = []uint8{cborcodec.CodeEntityRequest, cborcodec.CodeEntityResponse, cborcodec.CodeChunkDataRequest, cborcodec.CodeChunkDataResponse}
-	channelToMsgCodes[channels.RequestCollections] = channelToMsgCodes[channels.RequestChunks]
-	channelToMsgCodes[channels.RequestApprovalsByChunk] = channelToMsgCodes[channels.RequestChunks]
-	channelToMsgCodes[channels.RequestReceiptsByBlockID] = channelToMsgCodes[channels.RequestChunks]
-
-	// dkg
-	channelToMsgCodes[channels.DKGCommittee] = []uint8{cborcodec.CodeDKGMessage}
-}
-
 // AuthorizedSenderValidator using the getIdentity func will check if the role of the sender
 // is part of the authorized roles list for the channel being communicated on. A node is considered
 // to be authorized to send a message if all of the following are true.
@@ -150,7 +99,7 @@ func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error)
 	}
 
 	// get message type codes for all messages communicated on the channel
-	codes, ok := channelToMsgCodes[channel]
+	codes, ok := cborcodec.ChannelToMsgCodes[channel]
 	if !ok {
 		return nil, fmt.Errorf("could not get message codes for unknown channel")
 	}
