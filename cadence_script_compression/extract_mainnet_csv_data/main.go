@@ -7,9 +7,9 @@ import (
 	"os"
 )
 
-func main()  {
+func main() {
 	// Open the file
-	csvfile, err := os.Open("./contracts/mainnet/mainnet-contract-data.csv")
+	csvfile, err := os.Open("./mainnet-contract-data.csv")
 	if err != nil {
 		panic(err)
 	}
