@@ -6,9 +6,10 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/programs"
 
 	"github.com/onflow/flow-go/fvm/handler"
 	stateMock "github.com/onflow/flow-go/fvm/mock/state"
