@@ -14,30 +14,29 @@ import (
 type ReadyDoneAwareConsumer struct {
 	component.Component
 
-	cm         *component.ComponentManager
-	consumer   module.JobConsumer
-	jobs       module.Jobs
-	workSignal <-chan struct{}
-	notifier   NotifyDone
-	log        zerolog.Logger
+	cm           *component.ComponentManager
+	consumer     module.JobConsumer
+	jobs         module.Jobs
+	workSignal   <-chan struct{}
+	preNotifier  NotifyDone
+	postNotifier NotifyDone
+	log          zerolog.Logger
 }
 
 // NewReadyDoneAwareConsumer creates a new ReadyDoneAwareConsumer consumer
 func NewReadyDoneAwareConsumer(
 	log zerolog.Logger,
+	workSignal <-chan struct{},
 	progress storage.ConsumerProgress,
 	jobs module.Jobs,
-	processor JobProcessor, // method used to process jobs
-	workSignal <-chan struct{},
 	defaultIndex uint64,
+	processor JobProcessor, // method used to process jobs
 	maxProcessing uint64,
 	maxSearchAhead uint64,
-	notifier NotifyDone,
-) (*ReadyDoneAwareConsumer, error) {
+) *ReadyDoneAwareConsumer {
 
 	c := &ReadyDoneAwareConsumer{
 		workSignal: workSignal,
-		notifier:   notifier,
 		jobs:       jobs,
 		log:        log,
 	}
@@ -81,18 +80,39 @@ func NewReadyDoneAwareConsumer(
 	c.cm = cm
 	c.Component = cm
 
-	return c, nil
+	return c
+}
+
+// SetPreNotifier sets a notification function that is invoked before marking a job as done in the
+// consumer.
+//
+// Note: This guarantees that the function is called at least once for each job, but may be executed
+// before consumer updates the last processed index.
+func (c *ReadyDoneAwareConsumer) SetPreNotifier(fn NotifyDone) {
+	c.preNotifier = fn
+}
+
+// SetPostNotifier sets a notification function that is invoked after marking a job as done in the
+// consumer.
+//
+// Note: This guarantees that the function is executed after consumer updates the last processed index,
+// but notifications may be missed in the event of a crash.
+func (c *ReadyDoneAwareConsumer) SetPostNotifier(fn NotifyDone) {
+	c.postNotifier = fn
 }
 
 // NotifyJobIsDone is invoked by the worker to let the consumer know that it is done
 // processing a (block) job.
 func (c *ReadyDoneAwareConsumer) NotifyJobIsDone(jobID module.JobID) uint64 {
+	if c.preNotifier != nil {
+		c.preNotifier(jobID)
+	}
+
 	// notify wrapped consumer that job is complete
 	processedIndex := c.consumer.NotifyJobIsDone(jobID)
 
-	// notify instantiator that job is complete
-	if c.notifier != nil {
-		c.notifier(jobID)
+	if c.postNotifier != nil {
+		c.postNotifier(jobID)
 	}
 
 	return processedIndex

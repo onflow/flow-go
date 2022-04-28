@@ -91,7 +91,8 @@ func generateTestData(jobCount uint64) map[uint64]TestJob {
 
 func (suite *ReadyDoneAwareConsumerSuite) prepareTest(
 	processor JobProcessor,
-	notifier NotifyDone,
+	preNotifier NotifyDone,
+	postNotifier NotifyDone,
 	jobData map[uint64]TestJob,
 ) (*ReadyDoneAwareConsumer, chan struct{}) {
 
@@ -99,18 +100,18 @@ func (suite *ReadyDoneAwareConsumerSuite) prepareTest(
 	workSignal := make(chan struct{})
 	progress := mockProgress()
 
-	consumer, err := NewReadyDoneAwareConsumer(
+	consumer := NewReadyDoneAwareConsumer(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
+		workSignal,
 		progress,
 		jobs,
-		processor,
-		workSignal,
 		suite.defaultIndex,
+		processor,
 		suite.maxProcessing,
 		suite.maxSearchAhead,
-		notifier,
 	)
-	assert.NoError(suite.T(), err)
+	consumer.SetPreNotifier(preNotifier)
+	consumer.SetPostNotifier(postNotifier)
 
 	return consumer, workSignal
 }
@@ -127,7 +128,6 @@ func (suite *ReadyDoneAwareConsumerSuite) TestHappyPath() {
 	finishedJobs := make(map[uint64]bool, testJobsCount)
 
 	wg := sync.WaitGroup{}
-	wg.Add(int(testJobsCount))
 
 	processor := func(_ irrecoverable.SignalerContext, _ module.Job, complete func()) { complete() }
 	notifier := func(jobID module.JobID) {
@@ -141,18 +141,37 @@ func (suite *ReadyDoneAwareConsumerSuite) TestHappyPath() {
 		suite.T().Logf("job %d finished", index)
 	}
 
-	consumer, workSignal := suite.prepareTest(processor, notifier, jobData)
+	suite.Run("runs and notifies using pre-notifier", func() {
+		wg.Add(int(testJobsCount))
+		consumer, workSignal := suite.prepareTest(processor, nil, notifier, jobData)
 
-	suite.runTest(testCtx, consumer, workSignal, func() {
-		workSignal <- struct{}{}
-		wg.Wait()
+		suite.runTest(testCtx, consumer, workSignal, func() {
+			workSignal <- struct{}{}
+			wg.Wait()
+		})
+
+		// verify all jobs were run
+		assert.Len(suite.T(), finishedJobs, len(jobData))
+		for index := range jobData {
+			assert.True(suite.T(), finishedJobs[index], "job %d did not finished", index)
+		}
 	})
 
-	// verify all jobs were run
-	assert.Len(suite.T(), finishedJobs, len(jobData))
-	for index := range jobData {
-		assert.True(suite.T(), finishedJobs[index], "job %d did not finished", index)
-	}
+	suite.Run("runs and notifies using post-notifier", func() {
+		wg.Add(int(testJobsCount))
+		consumer, workSignal := suite.prepareTest(processor, notifier, nil, jobData)
+
+		suite.runTest(testCtx, consumer, workSignal, func() {
+			workSignal <- struct{}{}
+			wg.Wait()
+		})
+
+		// verify all jobs were run
+		assert.Len(suite.T(), finishedJobs, len(jobData))
+		for index := range jobData {
+			assert.True(suite.T(), finishedJobs[index], "job %d did not finished", index)
+		}
+	})
 }
 
 // TestProgressesOnComplete:
@@ -189,7 +208,7 @@ func (suite *ReadyDoneAwareConsumerSuite) TestProgressesOnComplete() {
 	}
 
 	suite.maxProcessing = 1
-	consumer, workSignal := suite.prepareTest(processor, notifier, jobData)
+	consumer, workSignal := suite.prepareTest(processor, nil, notifier, jobData)
 
 	suite.runTest(testCtx, consumer, workSignal, func() {
 		workSignal <- struct{}{}
@@ -227,7 +246,7 @@ func (suite *ReadyDoneAwareConsumerSuite) TestPassesIrrecoverableErrors() {
 		close(done)
 	}
 
-	consumer, _ := suite.prepareTest(processor, notifier, jobData)
+	consumer, _ := suite.prepareTest(processor, nil, notifier, jobData)
 
 	ctx, cancel := context.WithCancel(testCtx)
 	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
