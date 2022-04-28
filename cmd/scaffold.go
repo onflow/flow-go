@@ -276,7 +276,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(node *NodeConfig, 
 		mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 	}
 
-	// run peer manager with the specified interval and let is also prune connections
+	// run peer manager with the specified interval and let it also prune connections
 	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
 	mwOpts = append(mwOpts,
 		p2p.WithPeerManager(peerManagerFactory),
