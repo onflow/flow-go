@@ -146,8 +146,8 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
-	eventMap := make(map[flow.Identifier]*insecure.Event)
-	receipts := make([]*flow.ExecutionReceipt, 0)
+	var eventMap map[flow.Identifier]*insecure.Event
+	var receipts []*flow.ExecutionReceipt
 
 	if sameResult {
 		eventMap, receipts = receiptsWithSameResultFixture(t, count, corruptedExecutionIds, receiptTargetIds.NodeIDs())
