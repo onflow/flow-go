@@ -102,6 +102,11 @@ func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig 
 		return a.TotalWeight(), model.NewInvalidSignerErrorf("%v is not an authorized signer", signerID)
 	}
 
+	// to avoid expensive signature verification we will proceed with double lock style check
+	if a.hasSignature(signerID) {
+		return a.TotalWeight(), model.NewDuplicatedSignerErrorf("signature from %v was already added", signerID)
+	}
+
 	msg := verification.MakeTimeoutMessage(a.view, highestQCView)
 	valid, err := info.pk.Verify(sig, msg, a.hasher)
 	if err != nil {
@@ -125,6 +130,13 @@ func (a *TimeoutSignatureAggregator) VerifyAndAdd(signerID flow.Identifier, sig 
 	a.totalWeight += info.weight
 
 	return a.totalWeight, nil
+}
+
+func (a *TimeoutSignatureAggregator) hasSignature(singerID flow.Identifier) bool {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	_, found := a.idToSignature[singerID]
+	return found
 }
 
 // TotalWeight returns the total weight presented by the collected signatures.

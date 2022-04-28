@@ -175,6 +175,10 @@ func TestMultiMessageSignatureAggregator_VerifyAndAdd(t *testing.T) {
 				// weight should not change
 				require.Equal(t, expectedWeight, weight)
 				require.True(t, model.IsDuplicatedSignerError(err))
+				weight, err = aggregator.VerifyAndAdd(ids[i].NodeID, sigs[(i+1)%signersNum], highQCViews[(i+1)%signersNum]) // different signature for same index
+				// weight should not change
+				require.Equal(t, expectedWeight, weight)
+				require.True(t, model.IsDuplicatedSignerError(err))
 				weight, err = aggregator.VerifyAndAdd(ids[(i+1)%signersNum].NodeID, sigs[(i+1)%signersNum], highQCViews[(i+1)%signersNum]) // different signature for same index
 				// weight should not change
 				require.Equal(t, expectedWeight, weight)
