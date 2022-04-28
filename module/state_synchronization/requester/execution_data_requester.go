@@ -128,8 +128,8 @@ type executionDataRequester struct {
 	finalizationNotifier engine.Notifier
 
 	// Job queues
-	blockConsumer        *jobqueue.ReadyDoneAwareConsumer
-	notificationConsumer *jobqueue.ReadyDoneAwareConsumer
+	blockConsumer        *jobqueue.ComponentConsumer
+	notificationConsumer *jobqueue.ComponentConsumer
 
 	// List of callbacks to call when ExecutionData is successfully fetched for a block
 	consumers []state_synchronization.ExecutionDataReceivedCallback
@@ -182,7 +182,7 @@ func New(
 	// from `processedHeight + 1`. If the database is empty, rootHeight will be used
 	// to init the last processed height.
 	// once the execution data is fetched and stored, it notifies `executionDataNotifier`.
-	e.blockConsumer = jobqueue.NewReadyDoneAwareConsumer(
+	e.blockConsumer = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "block_consumer").Logger(),
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
 		processedHeight,                  // read and persist the downloaded height
@@ -216,7 +216,7 @@ func New(
 	// `e.consumers`.
 	// Note: the `e.consumers` will be guaranteed to receive at least one `OnExecutionDataFetched` event
 	// for each sealed block in consecutive block height order.
-	e.notificationConsumer = jobqueue.NewReadyDoneAwareConsumer(
+	e.notificationConsumer = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "notification_consumer").Logger(),
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
 		processedNotifications,          // read and persist the notified height

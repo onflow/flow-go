@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type ReadyDoneAwareConsumerSuite struct {
+type ComponentConsumerSuite struct {
 	suite.Suite
 
 	db *badger.DB
@@ -35,12 +35,12 @@ type ReadyDoneAwareConsumerSuite struct {
 	progress *storagemock.ConsumerProgress
 }
 
-func TestReadyDoneAwareConsumerSuite(t *testing.T) {
+func TestComponentConsumerSuite(t *testing.T) {
 	t.Parallel()
-	suite.Run(t, new(ReadyDoneAwareConsumerSuite))
+	suite.Run(t, new(ComponentConsumerSuite))
 }
 
-func (suite *ReadyDoneAwareConsumerSuite) SetupTest() {
+func (suite *ComponentConsumerSuite) SetupTest() {
 	suite.defaultIndex = uint64(0)
 	suite.maxProcessing = uint64(2)
 	suite.maxSearchAhead = uint64(5)
@@ -89,18 +89,18 @@ func generateTestData(jobCount uint64) map[uint64]TestJob {
 	return jobData
 }
 
-func (suite *ReadyDoneAwareConsumerSuite) prepareTest(
+func (suite *ComponentConsumerSuite) prepareTest(
 	processor JobProcessor,
 	preNotifier NotifyDone,
 	postNotifier NotifyDone,
 	jobData map[uint64]TestJob,
-) (*ReadyDoneAwareConsumer, chan struct{}) {
+) (*ComponentConsumer, chan struct{}) {
 
 	jobs := mockJobs(jobData)
 	workSignal := make(chan struct{})
 	progress := mockProgress()
 
-	consumer := NewReadyDoneAwareConsumer(
+	consumer := NewComponentConsumer(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
 		workSignal,
 		progress,
@@ -119,7 +119,7 @@ func (suite *ReadyDoneAwareConsumerSuite) prepareTest(
 // TestHappyPath:
 // - processes jobs until cancelled
 // - notify called for all jobs
-func (suite *ReadyDoneAwareConsumerSuite) TestHappyPath() {
+func (suite *ComponentConsumerSuite) TestHappyPath() {
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()
 
@@ -176,7 +176,7 @@ func (suite *ReadyDoneAwareConsumerSuite) TestHappyPath() {
 
 // TestProgressesOnComplete:
 // - only processes next job after complete is called
-func (suite *ReadyDoneAwareConsumerSuite) TestProgressesOnComplete() {
+func (suite *ComponentConsumerSuite) TestProgressesOnComplete() {
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()
 
@@ -225,7 +225,7 @@ func (suite *ReadyDoneAwareConsumerSuite) TestProgressesOnComplete() {
 // TestPassesIrrecoverableErrors:
 // - throws an irrecoverable error
 // - verifies no jobs were processed
-func (suite *ReadyDoneAwareConsumerSuite) TestPassesIrrecoverableErrors() {
+func (suite *ComponentConsumerSuite) TestPassesIrrecoverableErrors() {
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()
 
@@ -271,9 +271,9 @@ func (suite *ReadyDoneAwareConsumerSuite) TestPassesIrrecoverableErrors() {
 	unittest.RequireNotClosed(suite.T(), done, "job wasn't supposed to finish")
 }
 
-func (suite *ReadyDoneAwareConsumerSuite) runTest(
+func (suite *ComponentConsumerSuite) runTest(
 	testCtx context.Context,
-	consumer *ReadyDoneAwareConsumer,
+	consumer *ComponentConsumer,
 	workSignal chan<- struct{},
 	sendJobs func(),
 ) {

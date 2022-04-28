@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type ReadyDoneAwareConsumer struct {
+type ComponentConsumer struct {
 	component.Component
 
 	cm           *component.ComponentManager
@@ -23,8 +23,8 @@ type ReadyDoneAwareConsumer struct {
 	log          zerolog.Logger
 }
 
-// NewReadyDoneAwareConsumer creates a new ReadyDoneAwareConsumer consumer
-func NewReadyDoneAwareConsumer(
+// NewComponentConsumer creates a new ComponentConsumer consumer
+func NewComponentConsumer(
 	log zerolog.Logger,
 	workSignal <-chan struct{},
 	progress storage.ConsumerProgress,
@@ -33,9 +33,9 @@ func NewReadyDoneAwareConsumer(
 	processor JobProcessor, // method used to process jobs
 	maxProcessing uint64,
 	maxSearchAhead uint64,
-) *ReadyDoneAwareConsumer {
+) *ComponentConsumer {
 
-	c := &ReadyDoneAwareConsumer{
+	c := &ComponentConsumer{
 		workSignal: workSignal,
 		jobs:       jobs,
 		log:        log,
@@ -88,7 +88,7 @@ func NewReadyDoneAwareConsumer(
 //
 // Note: This guarantees that the function is called at least once for each job, but may be executed
 // before consumer updates the last processed index.
-func (c *ReadyDoneAwareConsumer) SetPreNotifier(fn NotifyDone) {
+func (c *ComponentConsumer) SetPreNotifier(fn NotifyDone) {
 	c.preNotifier = fn
 }
 
@@ -97,13 +97,13 @@ func (c *ReadyDoneAwareConsumer) SetPreNotifier(fn NotifyDone) {
 //
 // Note: This guarantees that the function is executed after consumer updates the last processed index,
 // but notifications may be missed in the event of a crash.
-func (c *ReadyDoneAwareConsumer) SetPostNotifier(fn NotifyDone) {
+func (c *ComponentConsumer) SetPostNotifier(fn NotifyDone) {
 	c.postNotifier = fn
 }
 
 // NotifyJobIsDone is invoked by the worker to let the consumer know that it is done
 // processing a (block) job.
-func (c *ReadyDoneAwareConsumer) NotifyJobIsDone(jobID module.JobID) uint64 {
+func (c *ComponentConsumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 	if c.preNotifier != nil {
 		c.preNotifier(jobID)
 	}
@@ -119,21 +119,21 @@ func (c *ReadyDoneAwareConsumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 }
 
 // Size returns number of in-memory block jobs that block consumer is processing.
-func (c *ReadyDoneAwareConsumer) Size() uint {
+func (c *ComponentConsumer) Size() uint {
 	return c.consumer.Size()
 }
 
 // Head returns the highest job index available
-func (c *ReadyDoneAwareConsumer) Head() (uint64, error) {
+func (c *ComponentConsumer) Head() (uint64, error) {
 	return c.jobs.Head()
 }
 
 // LastProcessedIndex returns the last processed job index
-func (c *ReadyDoneAwareConsumer) LastProcessedIndex() uint64 {
+func (c *ComponentConsumer) LastProcessedIndex() uint64 {
 	return c.consumer.LastProcessedIndex()
 }
 
-func (c *ReadyDoneAwareConsumer) processingLoop(ctx irrecoverable.SignalerContext) {
+func (c *ComponentConsumer) processingLoop(ctx irrecoverable.SignalerContext) {
 	c.log.Debug().Msg("listening for new jobs")
 	for {
 		select {
