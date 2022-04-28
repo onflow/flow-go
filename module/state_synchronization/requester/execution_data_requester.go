@@ -81,10 +81,6 @@ const (
 	// ExecutionData download retries
 	DefaultMaxRetryDelay = 5 * time.Minute
 
-	// DefaultMaxCachedEntries is the default the number of ExecutionData objects to keep when
-	// waiting to send notifications.
-	DefaultMaxCachedEntries = 50
-
 	// DefaultMaxSearchAhead is the default max number of unsent notifications to allow before
 	// pausing new fetches.
 	DefaultMaxSearchAhead = 5000
@@ -98,10 +94,6 @@ type ExecutionDataConfig struct {
 	// The initial value to use as the last processed block height. This should be the
 	// first block height to sync - 1
 	InitialBlockHeight uint64
-
-	// Max number of ExecutionData objects to keep when waiting to send notifications.
-	// Dropped data is refetched from disk.
-	MaxCachedEntries uint64
 
 	// Max number of unsent notifications to allow before pausing new fetches. After exceeding this
 	// limit, the requester will stop processing new finalized block notifications. This prevents
@@ -133,8 +125,7 @@ type executionDataRequester struct {
 	headers storage.Headers
 	results storage.ExecutionResults
 
-	// ExecutionData Jobs reader and cache for notificationConsumer
-	executionDataCache *jobs.ExecutionDataReader
+	executionDataReader *jobs.ExecutionDataReader
 
 	// Notifiers for queue consumers
 	finalizationNotifier engine.Notifier
@@ -208,12 +199,13 @@ func New(
 	e.blockConsumer.SetPostNotifier(func(module.JobID) { executionDataNotifier.Notify() })
 
 	// jobqueue Jobs object tracks downloaded execution data by height. This is used by the
-	// notificationConsumer to get downloaded execution data from storage. It also  maintains a cache of the
-	// downloaded execution data to reduce disk reads.
-	e.executionDataCache = jobs.NewExecutionDataReader(
-		e.config.MaxCachedEntries,          // max number of ExecutionData objects to cache
+	// notificationConsumer to get downloaded execution data from storage.
+	e.executionDataReader = jobs.NewExecutionDataReader(
+		e.eds,
+		e.headers,
+		e.results,
+		e.config.FetchTimeout,
 		e.blockConsumer.LastProcessedIndex, // method to get the highest consecutive height to notify
-		e.getExecutionData,                 // method to get execution data from the db
 	)
 
 	// notificationConsumer consumes `OnExecutionDataFetched` events, and ensures its consumer
@@ -231,7 +223,7 @@ func New(
 		e.log.With().Str("module", "notification_consumer").Logger(),
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
 		processedNotifications,          // read and persist the notified height
-		e.executionDataCache,            // read execution data by height
+		e.executionDataReader,           // read execution data by height
 		e.config.InitialBlockHeight,     // initial "last processed" height for empty db
 		e.processNotificationJob,        // process the job to send notifications for an execution data
 		1,                               // use a single worker to ensure notification is delivered in consecutive order
@@ -322,23 +314,15 @@ func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerCont
 
 // runNotificationConsumer runs the notificationConsumer component
 func (e *executionDataRequester) runNotificationConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	e.executionDataCache.Start(ctx)
-
-	err := util.WaitClosed(ctx, e.executionDataCache.Ready())
-	if err != nil {
-		<-e.executionDataCache.Done()
-		return // context cancelled
-	}
-
+	e.executionDataReader.AddContext(ctx)
 	e.notificationConsumer.Start(ctx)
 
-	err = util.WaitClosed(ctx, e.notificationConsumer.Ready())
+	err := util.WaitClosed(ctx, e.notificationConsumer.Ready())
 	if err == nil {
 		ready()
 	}
 
 	<-e.notificationConsumer.Done()
-	<-e.executionDataCache.Done()
 }
 
 // Fetch Worker Methods
@@ -407,7 +391,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 	start := time.Now()
 	e.metrics.ExecutionDataFetchStarted()
 
-	executionData, err := e.fetchExecutionData(ctx, result.ExecutionDataID)
+	_, err = e.fetchExecutionData(ctx, result.ExecutionDataID)
 
 	e.metrics.ExecutionDataFetchFinished(time.Since(start), err == nil, height)
 
@@ -438,8 +422,6 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 	}
 
 	logger.Debug().Msg("Fetched execution data")
-
-	e.executionDataCache.Add(height, executionData)
 
 	return nil
 }
@@ -481,7 +463,6 @@ func (e *executionDataRequester) processNotification(ctx irrecoverable.SignalerC
 	e.notifyConsumers(executionData)
 
 	e.metrics.NotificationSent(height)
-	e.executionDataCache.Remove(height)
 }
 
 func (e *executionDataRequester) notifyConsumers(executionData *state_synchronization.ExecutionData) {
@@ -491,31 +472,6 @@ func (e *executionDataRequester) notifyConsumers(executionData *state_synchroniz
 	for _, fn := range e.consumers {
 		fn(executionData)
 	}
-}
-
-// getExecutionData returns the ExecutionData for the given block height.
-// This is used by the execution data reader to get the ExecutionData for a block.
-func (e *executionDataRequester) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*state_synchronization.ExecutionData, error) {
-	header, err := e.headers.ByHeight(height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup header for height %d: %w", height, err)
-	}
-
-	result, err := e.results.ByBlockID(header.ID())
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup execution result for block %s: %w", header.ID(), err)
-	}
-
-	ctx, cancel := context.WithTimeout(signalCtx, e.config.FetchTimeout)
-	defer cancel()
-
-	executionData, err := e.eds.Get(ctx, result.ExecutionDataID)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)
-	}
-
-	return executionData, nil
 }
 
 func isInvalidBlobError(err error) bool {

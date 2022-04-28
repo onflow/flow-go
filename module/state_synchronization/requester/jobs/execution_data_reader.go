@@ -1,14 +1,14 @@
 package jobs
 
 import (
-	"sync"
+	"context"
+	"fmt"
+	"time"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -21,109 +21,94 @@ type BlockEntry struct {
 
 // ExecutionDataReader provides an abstraction for consumers to read blocks as job.
 type ExecutionDataReader struct {
-	component.Component
-	cm *component.ComponentManager
+	eds     state_synchronization.ExecutionDataService
+	headers storage.Headers
+	results storage.ExecutionResults
 
-	head func() uint64
-
-	// TODO: doc, read must be concurrency safe
-	read ReadExecutionData
-
-	maxCachedEntries uint64
-	cache            map[uint64]*state_synchronization.ExecutionData
+	fetchTimeout           time.Duration
+	highestAvailableHeight func() uint64
 
 	// TODO: refactor this to accept a context in AtIndex instead of storing it on the struct.
 	// This requires also refactoring jobqueue.Consumer
 	ctx irrecoverable.SignalerContext
-
-	mu sync.RWMutex
 }
-
-type ReadExecutionData func(irrecoverable.SignalerContext, uint64) (*state_synchronization.ExecutionData, error)
 
 // NewExecutionDataReader creates and returns a ExecutionDataReader.
-func NewExecutionDataReader(maxCachedEntries uint64, fetchHead func() uint64, fetchData ReadExecutionData) *ExecutionDataReader {
-	r := &ExecutionDataReader{
-		head:  fetchHead,
-		read:  fetchData,
-		cache: make(map[uint64]*state_synchronization.ExecutionData),
-
-		maxCachedEntries: maxCachedEntries,
+func NewExecutionDataReader(
+	eds state_synchronization.ExecutionDataService,
+	headers storage.Headers,
+	results storage.ExecutionResults,
+	fetchTimeout time.Duration,
+	highestAvailableHeight func() uint64,
+) *ExecutionDataReader {
+	return &ExecutionDataReader{
+		eds:                    eds,
+		headers:                headers,
+		results:                results,
+		fetchTimeout:           fetchTimeout,
+		highestAvailableHeight: highestAvailableHeight,
 	}
-
-	r.cm = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			r.ctx = ctx
-			ready()
-			<-ctx.Done()
-		}).
-		Build()
-	r.Component = r.cm
-
-	return r
 }
 
-// AtIndex returns the block entry job at the given index, or storage.ErrNotFound.
+// AddContext adds a context to the execution data reader
+// TODO: this is an anti-pattern, refactor this to accept a context in AtIndex instead of storing
+// it on the struct.
+func (r *ExecutionDataReader) AddContext(ctx irrecoverable.SignalerContext) {
+	r.ctx = ctx
+}
+
+// AtIndex returns the block entry job at the given height, or storage.ErrNotFound.
 // Any other error is unexpected
-func (r *ExecutionDataReader) AtIndex(index uint64) (module.Job, error) {
-	if !util.CheckClosed(r.Ready()) || util.CheckClosed(r.cm.ShutdownSignal()) {
-		// no jobs are available if reader is not ready or is shutting down
+func (r *ExecutionDataReader) AtIndex(height uint64) (module.Job, error) {
+	if r.ctx == nil {
+		return nil, fmt.Errorf("execution data reader is not initialized")
+	}
+
+	// height has not been downloaded, so height is not available yet
+	if height > r.highestAvailableHeight() {
+		fmt.Printf("execution data reader: height %d > r.highestAvailableHeight() %d\n", height, r.highestAvailableHeight())
 		return nil, storage.ErrNotFound
 	}
 
-	if index > r.head() {
-		return nil, storage.ErrNotFound
-	}
-
-	r.mu.RLock()
-	executionData, cached := r.cache[index]
-	r.mu.RUnlock()
-
-	if !cached {
-		// Data is not in the cache, look it up
-		var err error
-		executionData, err = r.read(r.ctx, index)
-		if err != nil {
-			return nil, err
-		}
+	executionData, err := r.getExecutionData(r.ctx, height)
+	if err != nil {
+		fmt.Printf("err getting execution data: %v\n", err)
+		return nil, err
 	}
 
 	return BlockEntryToJob(&BlockEntry{
 		BlockID:       executionData.BlockID,
-		Height:        index,
+		Height:        height,
 		ExecutionData: executionData,
 	}), nil
 }
 
 // Head returns the highest consecutive block height with downloaded execution data
 func (r *ExecutionDataReader) Head() (uint64, error) {
-	return r.head(), nil
+	return r.highestAvailableHeight(), nil
 }
 
-// Add adds an execution data to the cache
-func (r *ExecutionDataReader) Add(index uint64, executionData *state_synchronization.ExecutionData) {
-	head := r.head()
-
-	// Don't cache if execution data for the height is already available
-	if index <= head {
-		return
+// getExecutionData returns the ExecutionData for the given block height.
+// This is used by the execution data reader to get the ExecutionData for a block.
+func (r *ExecutionDataReader) getExecutionData(signalCtx irrecoverable.SignalerContext, height uint64) (*state_synchronization.ExecutionData, error) {
+	header, err := r.headers.ByHeight(height)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup header for height %d: %w", height, err)
 	}
 
-	// Enforce a maximum cache size
-	if index-head > r.maxCachedEntries {
-		return
+	result, err := r.results.ByBlockID(header.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup execution result for block %s: %w", header.ID(), err)
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	ctx, cancel := context.WithTimeout(signalCtx, r.fetchTimeout)
+	defer cancel()
 
-	r.cache[index] = executionData
-}
+	executionData, err := r.eds.Get(ctx, result.ExecutionDataID)
 
-// Remove removes an execution data from the cache
-func (r *ExecutionDataReader) Remove(index uint64) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get execution data for block %s: %w", header.ID(), err)
+	}
 
-	delete(r.cache, index)
+	return executionData, nil
 }

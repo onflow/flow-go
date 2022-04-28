@@ -285,7 +285,7 @@ func (suite *ExecutionDataRequesterSuite) TestRequesterPausesAndResumes() {
 		testData.waitTimeout = time.Second * 10
 
 		// calculate the expected number of blocks that should be downloaded before resuming
-		expectedDownloads := maxSearchAhead + pauseHeight - 1
+		expectedDownloads := maxSearchAhead + (pauseHeight-1)*2
 
 		edr, fd := suite.prepareRequesterTest(testData)
 		fetchedExecutionData := suite.runRequesterTestPauseResume(edr, fd, testData, int(expectedDownloads), resume)
@@ -418,7 +418,6 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		results,
 		requester.ExecutionDataConfig{
 			InitialBlockHeight: cfg.startHeight - 1,
-			MaxCachedEntries:   cfg.maxCachedEntries,
 			MaxSearchAhead:     cfg.maxSearchAhead,
 			FetchTimeout:       cfg.fetchTimeout,
 			RetryDelay:         cfg.retryDelay,
@@ -588,12 +587,11 @@ type fetchTestRun struct {
 	fetchedExecutionData map[flow.Identifier]*state_synchronization.ExecutionData
 	waitTimeout          time.Duration
 
-	maxCachedEntries uint64
-	maxSearchAhead   uint64
-	fetchTimeout     time.Duration
-	retryDelay       time.Duration
-	maxRetryDelay    time.Duration
-	checkEnabled     bool
+	maxSearchAhead uint64
+	fetchTimeout   time.Duration
+	retryDelay     time.Duration
+	maxRetryDelay  time.Duration
+	checkEnabled   bool
 }
 
 func (r *fetchTestRun) StartHeight() uint64 {
@@ -701,12 +699,11 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		executionDataIDByBlockID: executionDataIDByBlockID,
 		waitTimeout:              time.Second * 5,
 
-		maxCachedEntries: requester.DefaultMaxCachedEntries,
-		maxSearchAhead:   requester.DefaultMaxSearchAhead,
-		fetchTimeout:     requester.DefaultFetchTimeout,
-		retryDelay:       1 * time.Millisecond,
-		maxRetryDelay:    15 * time.Millisecond,
-		checkEnabled:     false,
+		maxSearchAhead: requester.DefaultMaxSearchAhead,
+		fetchTimeout:   requester.DefaultFetchTimeout,
+		retryDelay:     1 * time.Millisecond,
+		maxRetryDelay:  15 * time.Millisecond,
+		checkEnabled:   false,
 	}
 }
 
