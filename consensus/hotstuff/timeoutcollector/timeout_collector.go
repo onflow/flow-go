@@ -95,6 +95,7 @@ func (c *TimeoutCollector) processTimeout(timeout *model.TimeoutObject) error {
 	return nil
 }
 
+// View returns view which is associated with this timeout collector
 func (c *TimeoutCollector) View() uint64 {
 	return c.timeoutsCache.View()
 }
