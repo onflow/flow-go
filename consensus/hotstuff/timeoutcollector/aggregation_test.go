@@ -61,9 +61,9 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	return aggregator, ids, pks, sigs, highQCs, msgs, hashers
 }
 
-// TestNewMultiMessageSigAggregator tests different happy and unhappy path scenarios when constructing
+// TestNewTimeoutSignatureAggregator tests different happy and unhappy path scenarios when constructing
 // multi message signature aggregator.
-func TestNewMultiMessageSigAggregator(t *testing.T) {
+func TestNewTimeoutSignatureAggregator(t *testing.T) {
 	tag := "random_tag"
 
 	sk := unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
@@ -76,9 +76,9 @@ func TestNewMultiMessageSigAggregator(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestMultiMessageSignatureAggregator_HappyPath tests happy path when aggregating signatures
+// TestTimeoutSignatureAggregator_HappyPath tests happy path when aggregating signatures
 // Tests verification, adding and aggregation. Test is performed in concurrent environment
-func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
+func TestTimeoutSignatureAggregator_HappyPath(t *testing.T) {
 	signersNum := 20
 	aggregator, ids, pks, sigs, highQCs, msgs, hashers := createAggregationData(t, signersNum)
 
@@ -144,8 +144,8 @@ func TestMultiMessageSignatureAggregator_HappyPath(t *testing.T) {
 	require.ElementsMatch(t, tc.SignerIDs, identifiers)
 }
 
-// TestMultiMessageSignatureAggregator_VerifyAndAdd tests behavior of VerifyAndAdd under invalid input data.
-func TestMultiMessageSignatureAggregator_VerifyAndAdd(t *testing.T) {
+// TestTimeoutSignatureAggregator_VerifyAndAdd tests behavior of VerifyAndAdd under invalid input data.
+func TestTimeoutSignatureAggregator_VerifyAndAdd(t *testing.T) {
 	signersNum := 20
 
 	// Unhappy paths
@@ -195,9 +195,9 @@ func TestMultiMessageSignatureAggregator_VerifyAndAdd(t *testing.T) {
 	})
 }
 
-// TestMultiMessageSignatureAggregator_Aggregate tests that Aggregate performs internal checks and
+// TestTimeoutSignatureAggregator_Aggregate tests that Aggregate performs internal checks and
 // doesn't produce aggregated signature even when feed with invalid signatures.
-func TestMultiMessageSignatureAggregator_Aggregate(t *testing.T) {
+func TestTimeoutSignatureAggregator_Aggregate(t *testing.T) {
 	signersNum := 20
 
 	t.Run("invalid signature", func(t *testing.T) {
