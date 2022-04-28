@@ -14,7 +14,7 @@ func InsertChunkDataPack(c *badgermodel.StoredChunkDataPack) func(*badger.Txn) e
 
 // BatchInsertChunkDataPack inserts a chunk data pack keyed by chunk ID into a batch
 func BatchInsertChunkDataPack(c *badgermodel.StoredChunkDataPack) func(batch *badger.WriteBatch) error {
-	return batchInsert(makePrefix(codeChunkDataPack, c.ChunkID), c)
+	return batchWrite(makePrefix(codeChunkDataPack, c.ChunkID), c)
 }
 
 // RetrieveChunkDataPack retrieves a chunk data pack by chunk ID.
