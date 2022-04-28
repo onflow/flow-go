@@ -270,17 +270,7 @@ func (e *executionDataRequester) runBootstrap(ctx irrecoverable.SignalerContext,
 
 	// only run datastore check if enabled
 	if e.config.CheckEnabled {
-		checker := NewDatastoreChecker(
-			e.log,
-			e.bs,
-			LocalExecutionDataService(ctx, e.ds, e.log),
-			e.headers,
-			e.results,
-			e.config.InitialBlockHeight,
-			e.processSealedHeight,
-		)
-
-		err = checker.Run(ctx, e.notificationConsumer.LastProcessedIndex())
+		err := e.checkDatastore(ctx)
 
 		// Any error is unexpected and should crash the component
 		if err != nil {
@@ -469,6 +459,46 @@ func (e *executionDataRequester) notifyConsumers(executionData *state_synchroniz
 	for _, fn := range e.consumers {
 		fn(executionData)
 	}
+}
+
+// checkDatastore checks that valid ExecutionData exists in the datastore for all expected blocks
+func (e *executionDataRequester) checkDatastore(parentCtx irrecoverable.SignalerContext) error {
+	// branch a separate context so we can shutdown the local Execution Data Service when done
+	ctx, cancel := context.WithCancel(parentCtx)
+	defer cancel()
+
+	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+
+	go func() {
+		// rethrow any irrecoverable errors to requester's context
+		if err := util.WaitError(errChan, ctx.Done()); err != nil {
+			parentCtx.Throw(err)
+		}
+	}()
+
+	eds := LocalExecutionDataService(signalCtx, e.ds, e.log)
+
+	if err := util.WaitClosed(ctx, eds.Ready()); err != nil {
+		return nil
+	}
+
+	checker := NewDatastoreChecker(
+		e.log,
+		e.bs,
+		eds,
+		e.headers,
+		e.results,
+		e.config.InitialBlockHeight,
+		e.processSealedHeight,
+	)
+
+	err := checker.Run(signalCtx, e.notificationConsumer.LastProcessedIndex())
+
+	// done with check, shutdown the local Execution Data Service
+	cancel()
+	<-eds.Done()
+
+	return err
 }
 
 func isInvalidBlobError(err error) bool {

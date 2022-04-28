@@ -160,15 +160,19 @@ func (suite *ExecutionDatastoreCheckerSuite) TestCheckDatastoreWithLocalEDS() {
 	}
 
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	eds := requester.LocalExecutionDataService(signalerCtx, suite.datastore, logger)
+
 	checker := requester.NewDatastoreChecker(
 		logger,
 		suite.blobservice,
-		requester.LocalExecutionDataService(signalerCtx, suite.datastore, logger),
+		eds,
 		suite.headers,
 		suite.results,
 		suite.cfg.startHeight,
 		download,
 	)
+
+	<-eds.Ready()
 
 	run := func() {
 		err := checker.Run(signalerCtx, suite.lastHeight)
@@ -177,6 +181,9 @@ func (suite *ExecutionDatastoreCheckerSuite) TestCheckDatastoreWithLocalEDS() {
 
 	unittest.RequireReturnsBefore(suite.T(), run, suite.cfg.waitTimeout, "timed out waiting for requester to shutdown")
 	assert.Equal(suite.T(), 0, downloadCalls)
+
+	cancel()
+	<-eds.Done()
 }
 
 // TestCheckDatastore tests the checker scenarios where the blocks are checked
