@@ -88,7 +88,7 @@ func NewTimeoutSignatureAggregator(
 }
 
 // VerifyAndAdd verifies the signature under the stored public keys and adds signature with corresponding
-// highest QC view to the internal set. Internal set and collected weight is modified iff signature _is_ valid.
+// highest QC view to the internal set. Internal set and collected weight is modified iff the signer ID is not a duplicate and signature _is_ valid.
 // The total weight of all collected signatures (excluding duplicates) is returned regardless
 // of any returned error.
 // Expected errors during normal operations:
