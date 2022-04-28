@@ -256,36 +256,6 @@ func (_m *ExecutionAPIClient) GetTransactionResultByIndex(ctx context.Context, i
 	return r0, r1
 }
 
-// GetTransactionResultsByBlockID provides a mock function with given fields: ctx, in, opts
-func (_m *ExecutionAPIClient) GetTransactionResultsByBlockID(ctx context.Context, in *execution.GetTransactionsByBlockIDRequest, opts ...grpc.CallOption) (*execution.GetTransactionResultsResponse, error) {
-	_va := make([]interface{}, len(opts))
-	for _i := range opts {
-		_va[_i] = opts[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, in)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	var r0 *execution.GetTransactionResultsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionsByBlockIDRequest, ...grpc.CallOption) *execution.GetTransactionResultsResponse); ok {
-		r0 = rf(ctx, in, opts...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.GetTransactionResultsResponse)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetTransactionsByBlockIDRequest, ...grpc.CallOption) error); ok {
-		r1 = rf(ctx, in, opts...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Ping provides a mock function with given fields: ctx, in, opts
 func (_m *ExecutionAPIClient) Ping(ctx context.Context, in *execution.PingRequest, opts ...grpc.CallOption) (*execution.PingResponse, error) {
 	_va := make([]interface{}, len(opts))

@@ -46,13 +46,13 @@ func (_m *Packer) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData
 	return r0, r1, r2
 }
 
-// Unpack provides a mock function with given fields: signerIDs, sigData
-func (_m *Packer) Unpack(signerIDs flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
-	ret := _m.Called(signerIDs, sigData)
+// Unpack provides a mock function with given fields: signerIdentities, sigData
+func (_m *Packer) Unpack(signerIdentities flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+	ret := _m.Called(signerIdentities, sigData)
 
 	var r0 *hotstuff.BlockSignatureData
 	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte) *hotstuff.BlockSignatureData); ok {
-		r0 = rf(signerIDs, sigData)
+		r0 = rf(signerIdentities, sigData)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*hotstuff.BlockSignatureData)
@@ -61,7 +61,7 @@ func (_m *Packer) Unpack(signerIDs flow.IdentityList, sigData []byte) (*hotstuff
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.IdentityList, []byte) error); ok {
-		r1 = rf(signerIDs, sigData)
+		r1 = rf(signerIdentities, sigData)
 	} else {
 		r1 = ret.Error(1)
 	}

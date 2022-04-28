@@ -198,29 +198,6 @@ func (_m *ExecutionAPIServer) GetTransactionResultByIndex(_a0 context.Context, _
 	return r0, r1
 }
 
-// GetTransactionResultsByBlockID provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionAPIServer) GetTransactionResultsByBlockID(_a0 context.Context, _a1 *execution.GetTransactionsByBlockIDRequest) (*execution.GetTransactionResultsResponse, error) {
-	ret := _m.Called(_a0, _a1)
-
-	var r0 *execution.GetTransactionResultsResponse
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionsByBlockIDRequest) *execution.GetTransactionResultsResponse); ok {
-		r0 = rf(_a0, _a1)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.GetTransactionResultsResponse)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetTransactionsByBlockIDRequest) error); ok {
-		r1 = rf(_a0, _a1)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Ping provides a mock function with given fields: _a0, _a1
 func (_m *ExecutionAPIServer) Ping(_a0 context.Context, _a1 *execution.PingRequest) (*execution.PingResponse, error) {
 	ret := _m.Called(_a0, _a1)
