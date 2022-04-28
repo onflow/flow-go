@@ -327,57 +327,87 @@ docker-build-benchnet: docker-build-flow docker-build-loader
 
 .PHONY: docker-push-collection
 docker-push-collection:
-	docker push "$(CONTAINER_REGISTRY)/collection:latest"
 	docker push "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)"
 
+.PHONY: docker-push-collection-latest
+docker-push-collection-latest: docker-push-collection
+	docker push "$(CONTAINER_REGISTRY)/collection:latest"
+
 .PHONY: docker-push-consensus
 docker-push-consensus:
-	docker push "$(CONTAINER_REGISTRY)/consensus:latest"
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)"
 
+.PHONY: docker-push-consensus-latest
+docker-push-consensus-latest: docker-push-consensus
+	docker push "$(CONTAINER_REGISTRY)/consensus:latest"
+
 .PHONY: docker-push-execution
 docker-push-execution:
-	docker push "$(CONTAINER_REGISTRY)/execution:latest"
 	docker push "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)"
 
+.PHONY: docker-push-execution-latest
+docker-push-execution-latest: docker-push-execution
+	docker push "$(CONTAINER_REGISTRY)/execution:latest"
+
 .PHONY: docker-push-verification
 docker-push-verification:
-	docker push "$(CONTAINER_REGISTRY)/verification:latest"
 	docker push "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)"
 
+.PHONY: docker-push-verification-latest
+docker-push-verification-latest: docker-push-verification
+	docker push "$(CONTAINER_REGISTRY)/verification:latest"
+
 .PHONY: docker-push-access
 docker-push-access:
-	docker push "$(CONTAINER_REGISTRY)/access:latest"
 	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
 
+.PHONY: docker-push-access-latest
+docker-push-access-latest: docker-push-access
+	docker push "$(CONTAINER_REGISTRY)/access:latest"
+
 .PHONY: docker-push-observer
 docker-push-observer:
-	docker push "$(CONTAINER_REGISTRY)/observer:latest"
 	docker push "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)"
 
+.PHONY: docker-push-observer-latest
+docker-push-observer-latest: docker-push-observer
+	docker push "$(CONTAINER_REGISTRY)/observer:latest"
+
 .PHONY: docker-push-ghost
 docker-push-ghost:
-	docker push "$(CONTAINER_REGISTRY)/ghost:latest"
 	docker push "$(CONTAINER_REGISTRY)/ghost:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)"
 
+.PHONY: docker-push-ghost-latest
+docker-push-ghost-latest: docker-push-ghost
+	docker push "$(CONTAINER_REGISTRY)/ghost:latest"
+
 .PHONY: docker-push-loader
 docker-push-loader:
-	docker push "$(CONTAINER_REGISTRY)/loader:latest"
 	docker push "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)"
+
+.PHONY: docker-push-loader-latest
+docker-push-loader-latest: docker-push-loader
+	docker push "$(CONTAINER_REGISTRY)/loader:latest"
 
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access docker-push-observer
 
+.PHONY: docker-push-flow-latest
+docker-push-flow-latest: docker-push-collection-latest docker-push-consensus-latest docker-push-execution-latest docker-push-verification-latest docker-push-access-latest docker-push-observer-latest
+
 .PHONY: docker-push-benchnet
 docker-push-benchnet: docker-push-flow docker-push-loader
+
+.PHONY: docker-push-benchnet-latest
+docker-push-benchnet-latest: docker-push-flow-latest docker-push-loader-latest
 
 .PHONY: docker-run-collection
 docker-run-collection:
