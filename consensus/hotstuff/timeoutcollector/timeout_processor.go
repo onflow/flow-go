@@ -28,18 +28,19 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 }
 
 type TimeoutProcessor struct {
-	view               uint64
-	validator          hotstuff.Validator
-	partialTCTracker   accumulatedWeightTracker
-	tcTracker          accumulatedWeightTracker
-	tcBuilder          *TimeoutCertificateBuilder
+	view             uint64
+	validator        hotstuff.Validator
+	partialTCTracker accumulatedWeightTracker
+	tcTracker        accumulatedWeightTracker
+	//sigAggregator         *TimeoutSignatureAggregator
 	onPartialTCCreated hotstuff.OnPartialTCCreated
 	onTCCreated        hotstuff.OnTCCreated
 }
 
 var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 
-func NewTimeoutProcessor(view uint64, totalWeight uint64,
+func NewTimeoutProcessor(view uint64,
+	totalWeight uint64,
 	onPartialTCCreated hotstuff.OnPartialTCCreated,
 	onTCCreated hotstuff.OnTCCreated,
 ) *TimeoutProcessor {
@@ -80,18 +81,14 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 		// handle error
 	}
 
-	//msg := hotstuff.MakeTimeoutMessage(timeout.View, timeout.HighestQC.View)
-
 	totalWeight := uint64(0)
 	//totalWeight, err := p.sigAggregator.TrustedAdd(timeout.SignerID, timeout.SigData, msg)
 	//if err != nil {
 	//	// handle error
 	//}
 
-	p.tcBuilder.Add(timeout)
-
 	if p.partialTCTracker.Track(totalWeight) {
-		p.onPartialTCCreated(p.tcBuilder.View())
+		//p.onPartialTCCreated(p.tcBuilder.View())
 	}
 
 	// checking of conditions for building TC are satisfied
