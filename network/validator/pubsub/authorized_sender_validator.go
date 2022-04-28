@@ -70,12 +70,14 @@ func initializeChannelToMsgCodesMap() {
 // AuthorizedSenderValidator using the getIdentity func will check if the role of the sender
 // is part of the authorized roles list for the channel being communicated on. A node is considered
 // to be authorized to send a message if all of the following are true.
-// 1. The message type is a known message type (can be decoded with cbor codec).
-// 2. The authorized roles list for the channel contains the senders role.
-// 3. The node is not ejected
+// 1. The node is staked
+// 2. The message type is a known message type (can be decoded with cbor codec).
+// 3. The authorized roles list for the channel contains the senders role.
+// 4. The node is not ejected
 func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getIdentity func(peer.ID) (*flow.Identity, bool)) MessageValidator {
 	log = log.With().
 		Str("component", "authorized_sender_validator").
+		Str("network_channel", channel.String()).
 		Logger()
 
 	// use cbor codec to add explicit dependency on cbor encoded messages adding the message type
