@@ -25,10 +25,10 @@ func MakeVoteMessage(view uint64, blockID flow.Identifier) []byte {
 // known to that replica.
 func MakeTimeoutMessage(view uint64, highQCView uint64) []byte {
 	msg := flow.MakeID(struct {
-		View    uint64
-		HighQCView    uint64
+		View       uint64
+		HighQCView uint64
 	}{
-		View:    view,
+		View:       view,
 		HighQCView: highQCView,
 	})
 	return msg[:]
