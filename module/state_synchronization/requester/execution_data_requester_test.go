@@ -417,13 +417,13 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		suite.headers,
 		results,
 		requester.ExecutionDataConfig{
-			StartBlockHeight: cfg.startHeight,
-			MaxCachedEntries: cfg.maxCachedEntries,
-			MaxSearchAhead:   cfg.maxSearchAhead,
-			FetchTimeout:     cfg.fetchTimeout,
-			RetryDelay:       cfg.retryDelay,
-			MaxRetryDelay:    cfg.maxRetryDelay,
-			CheckEnabled:     cfg.checkEnabled,
+			InitialBlockHeight: cfg.startHeight - 1,
+			MaxCachedEntries:   cfg.maxCachedEntries,
+			MaxSearchAhead:     cfg.maxSearchAhead,
+			FetchTimeout:       cfg.fetchTimeout,
+			RetryDelay:         cfg.retryDelay,
+			MaxRetryDelay:      cfg.maxRetryDelay,
+			CheckEnabled:       cfg.checkEnabled,
 		},
 	)
 	assert.NoError(suite.T(), err)

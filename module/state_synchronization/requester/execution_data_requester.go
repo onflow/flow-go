@@ -95,8 +95,9 @@ const (
 
 // ExecutionDataConfig contains configuration options for the ExecutionDataRequester
 type ExecutionDataConfig struct {
-	// The first block height for which to request ExecutionData
-	StartBlockHeight uint64
+	// The initial value to use as the last processed block height. This should be the
+	// first block height to sync - 1
+	InitialBlockHeight uint64
 
 	// Max number of ExecutionData objects to keep when waiting to send notifications.
 	// Dropped data is refetched from disk.
@@ -177,7 +178,6 @@ func New(
 	}
 
 	executionDataNotifier := engine.NewNotifier()
-	rootHeight := e.config.StartBlockHeight - 1
 
 	var err error
 
@@ -186,14 +186,14 @@ func New(
 	sealedBlockReader := jobs.NewSealedBlockReader(state, headers)
 
 	// blockConsumer ensures every sealed block's execution data is downloaded.
-	// It listens to block finalization events from `finalizationNotifier`, then checks 
-	// if there are new sealed blocks with `sealedBlockReader`. 
-	// If there are, it starts workers to process them with `processingBlockJob`, which fetches 
+	// It listens to block finalization events from `finalizationNotifier`, then checks
+	// if there are new sealed blocks with `sealedBlockReader`.
+	// If there are, it starts workers to process them with `processingBlockJob`, which fetches
 	// execution data. At most `fetchWorkers` number of workers will be created for concurrent processing.
 	// when a sealed block's execution data has been downloaded, it updates and persists
-	// the highest consecutive downloaded height with `processedHeight`. 
-	// That way, if the node crashes, it reads the `processedHeight` and resume 
-	// from `processedHeight + 1`. If the database is empty, rootHeight will be used 
+	// the highest consecutive downloaded height with `processedHeight`.
+	// That way, if the node crashes, it reads the `processedHeight` and resume
+	// from `processedHeight + 1`. If the database is empty, rootHeight will be used
 	// to init the last processed height.
 	// once the execution data is fetched and stored, it notifies `executionDataNotifier`.
 	e.blockConsumer, err = jobqueue.NewReadyDoneAwareConsumer(
@@ -202,7 +202,7 @@ func New(
 		sealedBlockReader,                // read sealed blocks by height
 		e.processBlockJob,                // process the sealed block job to download its execution data
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
-		rootHeight,                       // initial "last processed" height for empty db
+		e.config.InitialBlockHeight,      // initial "last processed" height for empty db
 		fetchWorkers,                     // the number of concurrent workers
 		e.config.MaxSearchAhead,          // max number of unsent notifications to allow before pausing new fetches
 		// notifies notificationConsumer when new ExecutionData blobs are available
@@ -222,13 +222,13 @@ func New(
 	)
 
 	// notificationConsumer consumes `OnExecutionDataFetched` events, and ensures its consumer
-	// receives this event in consecutive block height order. 
+	// receives this event in consecutive block height order.
 	// It listens to events from `executionDataNotifier`, which is delivered when
 	// a block's execution data is downloaded and stored, and checks the `executionDataCache` to
-	// find if the next un-processed consecutive height is available. 
-	// To know what's the height of the next un-processed consecutive height, it reads the latest 
+	// find if the next un-processed consecutive height is available.
+	// To know what's the height of the next un-processed consecutive height, it reads the latest
 	// consecutive height in `processedNotifications`. And it's persisted in storage to be crash-resistant.
-	// When a new consecutive height is available, it calls `processNotificationJob` to notify all the 
+	// When a new consecutive height is available, it calls `processNotificationJob` to notify all the
 	// `e.consumers`.
 	// Note: the `e.consumers` will be guaranteed to receive at least one `OnExecutionDataFetched` event
 	// for each sealed block in consecutive block height order.
@@ -238,7 +238,7 @@ func New(
 		e.executionDataCache,            // read execution data by height
 		e.processNotificationJob,        // process the job to send notifications for an execution data
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
-		rootHeight,                      // initial "last processed" height for empty db
+		e.config.InitialBlockHeight,     // initial "last processed" height for empty db
 		1,                               // use a single worker to ensure notification is delivered in consecutive order
 		0,                               // search ahead limit controlled by worker count
 		// kick notifier to make sure we scan until the last available notification
@@ -297,7 +297,7 @@ func (e *executionDataRequester) runBootstrap(ctx irrecoverable.SignalerContext,
 			LocalExecutionDataService(ctx, e.ds, e.log),
 			e.headers,
 			e.results,
-			e.config.StartBlockHeight,
+			e.config.InitialBlockHeight,
 			e.processSealedHeight,
 		)
 

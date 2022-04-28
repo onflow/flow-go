@@ -107,6 +107,7 @@ type AccessNodeConfig struct {
 	rpcMetricsEnabled            bool
 	executionDataSyncEnabled     bool
 	executionDataDir             string
+	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
 	baseOptions                  []cmd.Option
 
@@ -160,14 +161,14 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		observerNetworkingKeyPath: cmd.NotSet,
 		executionDataSyncEnabled:  false,
 		executionDataDir:          filepath.Join(homedir, ".flow", "execution_data"),
+		executionDataStartHeight:  0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
-			StartBlockHeight: 0,
-			MaxCachedEntries: edrequester.DefaultMaxCachedEntries,
-			MaxSearchAhead:   edrequester.DefaultMaxSearchAhead,
-			FetchTimeout:     edrequester.DefaultFetchTimeout,
-			RetryDelay:       edrequester.DefaultRetryDelay,
-			MaxRetryDelay:    edrequester.DefaultMaxRetryDelay,
-			CheckEnabled:     false,
+			InitialBlockHeight: 0,
+			MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
+			FetchTimeout:       edrequester.DefaultFetchTimeout,
+			RetryDelay:         edrequester.DefaultRetryDelay,
+			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
+			CheckEnabled:       false,
 		},
 	}
 }
@@ -465,11 +466,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		}).
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
-			if builder.executionDataConfig.StartBlockHeight > 0 {
-				if builder.executionDataConfig.StartBlockHeight <= builder.RootBlock.Header.Height {
+			if builder.executionDataStartHeight > 0 {
+				if builder.executionDataStartHeight <= builder.RootBlock.Header.Height {
 					return nil, fmt.Errorf(
 						"execution data start block height (%d) must be greater than the root block height (%d)",
-						builder.executionDataConfig.StartBlockHeight, builder.RootBlock.Header.Height)
+						builder.executionDataStartHeight, builder.RootBlock.Header.Height)
 				}
 
 				latestSeal, err := builder.State.Sealed().Head()
@@ -480,15 +481,18 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				// Note: since the root block of a spork is also sealed in the root protocol state, the
 				// latest sealed height is always equal to the root block height. That means that at the
 				// very beginning of a spork, this check will always fail. Operators should not specify
-				// a StartBlockHeight when starting from the beginning of a spork.
-				if builder.executionDataConfig.StartBlockHeight > latestSeal.Height {
+				// a InitialBlockHeight when starting from the beginning of a spork.
+				if builder.executionDataStartHeight > latestSeal.Height {
 					return nil, fmt.Errorf(
 						"execution data start block height (%d) must be less than or equal to the latest sealed block height (%d)",
-						builder.executionDataConfig.StartBlockHeight, latestSeal.Height)
+						builder.executionDataStartHeight, latestSeal.Height)
 				}
+
+				// executionDataStartHeight is provided as the first block to sync, but the
+				// requester expects the initial last processed height, which is the first height - 1
+				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
 			} else {
-				// The default StartBlockHeight is the first block executed for the spork
-				builder.executionDataConfig.StartBlockHeight = builder.RootBlock.Header.Height + 1
+				builder.executionDataConfig.InitialBlockHeight = builder.RootBlock.Header.Height
 			}
 
 			edr, err := edrequester.New(
@@ -608,8 +612,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
 		flags.BoolVar(&builder.executionDataConfig.CheckEnabled, "execution-data-startup-check", defaultConfig.executionDataConfig.CheckEnabled, "whether to check execution data exists for all heights during startup")
-		flags.Uint64Var(&builder.executionDataConfig.StartBlockHeight, "execution-data-start-height", defaultConfig.executionDataConfig.StartBlockHeight, "height of first block to sync execution data from")
 		flags.Uint64Var(&builder.executionDataConfig.MaxCachedEntries, "execution-data-max-cache-entries", defaultConfig.executionDataConfig.MaxCachedEntries, "max number of execution data entries to cache for notifications")
+		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from")
 		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead, "execution-data-max-search-ahead", defaultConfig.executionDataConfig.MaxSearchAhead, "max number of heights to search ahead of the lowest outstanding execution data height")
 		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "timeout to use when fetching execution data from the network e.g. 300s")
 		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
