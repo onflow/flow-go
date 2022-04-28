@@ -516,7 +516,6 @@ func (e *ExecutionNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Collections,
 				chunkDataPacks,
 				results,
-				node.Storage.Receipts,
 				myReceipts,
 				events,
 				serviceEvents,
