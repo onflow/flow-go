@@ -84,6 +84,14 @@ func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.Trans
 	return *t, nil
 }
 
+func TransactionsToMessages(transactions []*flow.TransactionBody) []*entities.Transaction {
+	transactionMessages := make([]*entities.Transaction, len(transactions))
+	for i, t := range transactions {
+		transactionMessages[i] = TransactionToMessage(*t)
+	}
+	return transactionMessages
+}
+
 func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	proposalKeyMessage := &entities.Transaction_ProposalKey{
 		Address:        tb.ProposalKey.Address.Bytes(),

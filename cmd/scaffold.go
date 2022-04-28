@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
@@ -154,6 +155,15 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.BoolVar(&fnb.BaseConfig.InsecureSecretsDB, "insecure-secrets-db", false, "allow the node to start up without an secrets DB encryption key")
 	fnb.flags.BoolVar(&fnb.BaseConfig.HeroCacheMetricsEnable, "herocache-metrics-collector", false, "enables herocache metrics collection")
+
+	// sync core flags
+	fnb.flags.DurationVar(&fnb.BaseConfig.SyncCoreConfig.RetryInterval, "sync-retry-interval", defaultConfig.SyncCoreConfig.RetryInterval, "the initial interval before we retry a sync request, uses exponential backoff")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.Tolerance, "sync-tolerance", defaultConfig.SyncCoreConfig.Tolerance, "determines how big of a difference in block heights we tolerate before actively syncing with range requests")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxAttempts, "sync-max-attempts", defaultConfig.SyncCoreConfig.MaxAttempts, "the maximum number of attempts we make for each requested block/height before discarding")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize, "sync-max-size", defaultConfig.SyncCoreConfig.MaxSize, "the maximum number of blocks we request in the same block request message")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
+
+	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -1034,6 +1044,12 @@ func WithSecretsDBEnabled(enabled bool) Option {
 func WithMetricsEnabled(enabled bool) Option {
 	return func(config *BaseConfig) {
 		config.MetricsEnabled = enabled
+	}
+}
+
+func WithSyncCoreConfig(syncConfig synchronization.Config) Option {
+	return func(config *BaseConfig) {
+		config.SyncCoreConfig = syncConfig
 	}
 }
 

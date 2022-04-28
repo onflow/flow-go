@@ -310,7 +310,7 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 	// We don't require the receipts to be sorted by height anymore
 	// We could require an "parent first" ordering, which is less strict than
 	// a full ordering by height
-	unittest.SkipUnless(t, unittest.TEST_WIP, "needs update")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "needs update")
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
@@ -1147,7 +1147,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 	// skipping because this case will now result in emergency epoch continuation kicking in
-	t.SkipNow()
+	unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EECC), rather than returning an error")
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {

@@ -1042,7 +1042,7 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 			Str("args", strings.Join(args[:], ",")).
 			Msg("extensive log: executed script content")
 	}
-	return e.computationManager.ExecuteScript(script, arguments, block, blockView)
+	return e.computationManager.ExecuteScript(ctx, script, arguments, block, blockView)
 }
 
 func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, key []byte, blockID flow.Identifier) ([]byte, error) {

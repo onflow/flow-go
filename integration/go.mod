@@ -15,9 +15,10 @@ require (
 	github.com/ethereum/go-ethereum v1.10.1 // indirect
 	github.com/go-openapi/strfmt v0.20.1 // indirect
 	github.com/go-test/deep v1.0.7 // indirect
+	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.23.2
+	github.com/onflow/cadence v0.23.3
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.0
 	github.com/onflow/flow-emulator v0.20.3
@@ -33,7 +34,6 @@ require (
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
 	google.golang.org/grpc v1.44.0
-	gopkg.in/yaml.v2 v2.4.0
 )
 
 // temp fix for MacOS build. See comment https://github.com/ory/dockertest/issues/208#issuecomment-686820414

@@ -14,12 +14,14 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/module/compliance"
 
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
@@ -149,6 +151,10 @@ type BaseConfig struct {
 	topologyProtocolName            string
 	topologyEdgeProbability         float64
 	HeroCacheMetricsEnable          bool
+	SyncCoreConfig                  synchronization.Config
+	// ComplianceConfig configures either the compliance engine (consensus nodes)
+	// or the follower engine (all other node roles)
+	ComplianceConfig compliance.Config
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -229,5 +235,7 @@ func DefaultBaseConfig() *BaseConfig {
 		topologyProtocolName:            string(topology.TopicBased),
 		topologyEdgeProbability:         topology.MaximumEdgeProbability,
 		HeroCacheMetricsEnable:          false,
+		SyncCoreConfig:                  synchronization.DefaultConfig(),
+		ComplianceConfig:                compliance.DefaultConfig(),
 	}
 }

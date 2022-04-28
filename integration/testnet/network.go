@@ -204,6 +204,7 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 		t.Logf("%v (%v) before starting flow network, found docker container %v with ports %v", time.Now().UTC(), t.Name(), container.Names, container.Ports)
 	}
 
+	t.Log("starting flow network")
 	net.suite.Start(ctx)
 
 	containers, err = cli.ContainerList(ctx, types.ContainerListOptions{})

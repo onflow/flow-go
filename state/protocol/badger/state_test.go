@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 	storutil "github.com/onflow/flow-go/storage/util"
@@ -461,6 +462,30 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 			snap := state.AtBlockID(block.ID())
 			_, err := snap.SealingSegment()
 			assert.ErrorIs(t, err, protocol.ErrSealingSegmentBelowRootBlock)
+		}
+	})
+}
+
+// BenchmarkFinal benchmarks retrieving the latest finalized block from storage.
+func BenchmarkFinal(b *testing.B) {
+	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			header, err := state.Final().Head()
+			assert.NoError(b, err)
+			assert.NotNil(b, header)
+		}
+	})
+}
+
+// BenchmarkFinal benchmarks retrieving the block by height from storage.
+func BenchmarkByHeight(b *testing.B) {
+	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			header, err := state.AtHeight(0).Head()
+			assert.NoError(b, err)
+			assert.NotNil(b, header)
 		}
 	})
 }

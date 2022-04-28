@@ -23,7 +23,7 @@ import (
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -146,6 +146,7 @@ func (s *DKGSuite) deployDKGContract() {
 	s.adminDKGContractClient = dkg.NewClient(
 		zerolog.Nop(),
 		s.adminEmulatorClient,
+		flow.ZeroID,
 		s.dkgSigner,
 		s.dkgAddress.String(),
 		s.dkgAddress.String(), 0)
@@ -170,13 +171,13 @@ func (s *DKGSuite) setupDKGAdmin() {
 
 // createAndFundAccount creates a nodeAccount and funds it in the emulator
 func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
-	accountPrivateKey := common.RandomPrivateKey()
+	accountPrivateKey := lib.RandomPrivateKey()
 	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(accountPrivateKey).
 		SetSigAlgo(sdkcrypto.ECDSA_P256).
 		SetHashAlgo(sdkcrypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
-	accountID := accountKey.PublicKey.String()
+	accountID := netID.NodeID.String()
 	accountSigner := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -267,6 +268,7 @@ func (s *DKGSuite) createNode(account *nodeAccount) *node {
 	contractClient := dkg.NewClient(
 		zerolog.Nop(),
 		emulatorClient,
+		flow.ZeroID,
 		account.accountSigner,
 		s.dkgAddress.String(),
 		account.accountAddress.String(),
@@ -328,9 +330,9 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 
 	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
 	require.NoError(s.T(), err)
-	valueAccountPubKey, err := cadence.NewString(node.account.accountKey.PublicKey.String())
+	nodeID, err := cadence.NewString(node.account.accountID)
 	require.NoError(s.T(), err)
-	err = createParticipantTx.AddArgument(valueAccountPubKey)
+	err = createParticipantTx.AddArgument(nodeID)
 	require.NoError(s.T(), err)
 
 	_, err = s.prepareAndSubmit(createParticipantTx,

@@ -9,16 +9,18 @@ import (
 	"strings"
 	"testing"
 
+	mocks "github.com/stretchr/testify/mock"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	mocks "github.com/stretchr/testify/mock"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func getTransactionReq(id string, expandResult bool) *http.Request {
@@ -304,7 +306,7 @@ func TestGetTransactionResult(t *testing.T) {
 				"_links": {
 					"_self": "/v1/transaction_results/%s"
 				}
-			}`, bid.String(), err, strings.Title(strings.ToLower(txr.Status.String())), txr.ErrorMessage, id.String())
+			}`, bid.String(), err, cases.Title(language.English).String(strings.ToLower(txr.Status.String())), txr.ErrorMessage, id.String())
 			assertOKResponse(t, req, expected, backend)
 		}
 	})
