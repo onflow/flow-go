@@ -90,12 +90,12 @@ func init() {
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
 	// Prepare localnet host folders, mapped to Docker container volumes upon `docker compose up`
 	prepareCommonHostFolders()
-	_, _, _, flowNodeContainerConfigs, _, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir)
+	bootstrapData, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("Flow test network bootstrapping data generated...")
-	return flowNodeContainerConfigs
+	return bootstrapData.StakedConfs
 }
 
 // localnet/bootstrap.go generates a docker compose file with images configured for a
@@ -211,41 +211,6 @@ func prepareCommonHostFolders() {
 	if err != nil && !os.IsExist(err) {
 		panic(err)
 	}
-
-	bootstrapData, err := testnet.BootstrapNetwork(conf, BootstrapDir)
-	containers := bootstrapData.StakedConfs
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Node bootstrapping data generated...")
-
-	services := prepareServices(containers)
-
-	err = writeDockerComposeConfig(services)
-	if err != nil {
-		panic(err)
-	}
-
-	serviceDisc := prepareServiceDiscovery(containers)
-
-	err = writePrometheusConfig(serviceDisc)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Print("Bootstrapping success!\n\n")
-
-	for i := 0; i < accessCount; i++ {
-		fmt.Printf("Access API %d will be accessible at localhost:%d\n", i+1, AccessAPIPort+i)
-	}
-	for i := 0; i < executionCount; i++ {
-		fmt.Printf("Execution API %d will be accessible at localhost:%d\n", i+1, ExecutionAPIPort+i)
-	}
-
-	fmt.Println()
-
-	fmt.Print("Run \"make start\" to launch the network.\n")
 }
 
 func prepareFlowNodes() []testnet.NodeConfig {
