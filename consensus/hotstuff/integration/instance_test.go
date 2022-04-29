@@ -321,10 +321,14 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root, 0)
+
+	signerIndices, err := msig.EncodeSignersToIndices(in.participants.NodeIDs(), in.participants.NodeIDs())
+	require.NoError(t, err, "could not encode signer indices")
+
 	rootQC := &flow.QuorumCertificate{
 		View:          rootBlock.View,
 		BlockID:       rootBlock.BlockID,
-		SignerIndices: []byte{},
+		SignerIndices: signerIndices,
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)
