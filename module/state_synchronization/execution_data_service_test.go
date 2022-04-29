@@ -588,7 +588,7 @@ func TestCheck_WithValidBlobs(t *testing.T) {
 		fid, err := addExecutionData(eds, expected, time.Second)
 		require.NoError(t, err)
 
-		invalidCIDs, ok := checkExecutionData(eds, fid, 20*time.Millisecond)
+		invalidCIDs, ok := checkExecutionData(eds, fid, time.Second)
 		assert.True(t, ok)
 		assert.Empty(t, invalidCIDs)
 	})
@@ -598,7 +598,7 @@ func TestCheck_WithValidBlobs(t *testing.T) {
 		fid, err := addExecutionData(eds, expected, time.Second)
 		require.NoError(t, err)
 
-		invalidCIDs, ok := checkExecutionData(eds, fid, 20*time.Millisecond)
+		invalidCIDs, ok := checkExecutionData(eds, fid, time.Second)
 		assert.True(t, ok)
 		assert.Empty(t, invalidCIDs)
 	})
@@ -623,13 +623,13 @@ func TestCheck_WithInvalidBlobs(t *testing.T) {
 
 	t.Run("corrupted single CID blob", func(t *testing.T) {
 		expected, _ := executionData(t, eds.serializer, defaultMaxBlobSize/10)
-		fid, err := addExecutionData(eds, expected, 20*time.Millisecond)
+		fid, err := addExecutionData(eds, expected, time.Second)
 		require.NoError(t, err)
 
 		cid := flow.IdToCid(fid)
 		corruptBlob(ctx, t, wrappedDS, cid)
 
-		invalidCIDs, ok := checkExecutionData(eds, fid, 20*time.Millisecond)
+		invalidCIDs, ok := checkExecutionData(eds, fid, time.Second)
 		assert.False(t, ok)
 		require.Len(t, invalidCIDs, 1)
 
@@ -639,7 +639,7 @@ func TestCheck_WithInvalidBlobs(t *testing.T) {
 
 	t.Run("corrupted multiple CID blob", func(t *testing.T) {
 		expected, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-		fid, tree, err := addExecutionDataWithTree(eds, expected, 60*time.Millisecond)
+		fid, tree, err := addExecutionDataWithTree(eds, expected, time.Second)
 		require.NoError(t, err)
 
 		corruptedCids := []cid.Cid{tree[0][1], tree[0][5]}
@@ -648,7 +648,7 @@ func TestCheck_WithInvalidBlobs(t *testing.T) {
 			corruptBlob(ctx, t, wrappedDS, cid)
 		}
 
-		invalidCIDs, ok := checkExecutionData(eds, fid, 60*time.Millisecond)
+		invalidCIDs, ok := checkExecutionData(eds, fid, time.Second)
 		assert.False(t, ok)
 		require.Len(t, invalidCIDs, len(corruptedCids))
 
