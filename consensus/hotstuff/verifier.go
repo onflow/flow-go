@@ -48,4 +48,6 @@ type Verifier interface {
 	//  * unexpected errors should be treated as symptoms of bugs or uncovered
 	//	  edge cases in the logic (i.e. as fatal)
 	VerifyQC(voters flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error
+
+	VerifyTC(voters flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error
 }

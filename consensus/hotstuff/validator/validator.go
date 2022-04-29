@@ -36,16 +36,16 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	highestQC := tc.TOHighestQC
 
 	if len(tc.TOHighQCViews) == 0 {
-		return model.InvalidTimeoutErr("")
+		return newInvalidTCError(tc, fmt.Errorf(""))
 	}
 
 	// consistency checks
 	if len(tc.TOHighQCViews) != len(tc.SignerIDs) {
-		return model.InvalidTimeoutErr("invalid TC structure expected %x messages, got %x", len(tc.SignerIDs), len(tc.TOHighQCViews))
+		return newInvalidTCError(tc, fmt.Errorf("invalid TC structure expected %x messages, got %x", len(tc.SignerIDs), len(tc.TOHighQCViews)))
 	}
 
 	if tc.View < highestQC.View {
-		return model.InvalidTimeoutErr("TC's QC cannot be newer than the TC's view")
+		return newInvalidTCError(tc, fmt.Errorf("TC's QC cannot be newer than the TC's view"))
 	}
 
 	highestQCView := tc.TOHighQCViews[0]
@@ -56,12 +56,10 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	}
 
 	if highestQCView < tc.TOHighestQC.View {
-		return model.InvalidTimoutErr("")
+		return newInvalidTCError(tc, fmt.Errorf(""))
 	}
 
-	// 2. check if max(tc.TOHightQCViews) == highestQC.View
-
-	// 1. Check if there is supermajority of votes
+	// 1. Check if there is super-majority of votes
 	allParticipants, err := v.committee.IdentitiesByEpoch(tc.View, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants at view %d: %w", tc.View, err)
@@ -69,19 +67,27 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 
 	signers := allParticipants.Filter(filter.HasNodeID(tc.SignerIDs...)) // resulting IdentityList contains no duplicates
 	if len(signers) != len(tc.SignerIDs) {
-		return newInvalidQCError(qc, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at view %x", qc.View))
+		return newInvalidTCError(tc, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at view %x", qc.View))
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
 	threshold := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight()) // compute required weight threshold
 	if signers.TotalWeight() < threshold {
-		return newInvalidQCError(qc, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
+		return newInvalidTCError(tc, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
 
 	// Validate QC
-	err := v.ValidateQC(highestQC)
+	err = v.ValidateQC(highestQC)
+	if err != nil {
+		return newInvalidTCError(tc, fmt.Errorf("invalid QC included in TC: %w", err))
+	}
 
-	// Verify mutli-message BLS sig of TC, by far the most expensive check
+	// Verify mulii-message BLS sig of TC, by far the most expensive check
+	err = v.verifier.VerifyTC(signers, tc.SigData, tc.View, tc.TOHighQCViews)
+	if err != nil {
+		return newInvalidTCError(tc, fmt.Errorf("invalid TC signature: %w", err))
+	}
+	return nil
 }
 
 // ValidateQC validates the QC
@@ -191,10 +197,17 @@ func newInvalidBlockError(block *model.Block, err error) error {
 }
 
 func newInvalidQCError(qc *flow.QuorumCertificate, err error) error {
-	return model.InvalidBlockError{
+	return model.InvalidQCError{
 		BlockID: qc.BlockID,
 		View:    qc.View,
 		Err:     err,
+	}
+}
+
+func newInvalidTCError(tc *flow.TimeoutCertificate, err error) error {
+	return model.InvalidTCError{
+		View: tc.View,
+		Err:  err,
 	}
 }
 

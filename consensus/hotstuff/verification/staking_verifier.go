@@ -96,3 +96,25 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, vi
 	}
 	return nil
 }
+
+func (v *StakingVerifier) VerifyTC(voters flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
+	pks := make([]crypto.PublicKey, 0, len(voters))
+	messages := make([][]byte, 0, len(voters))
+	hashers := make([]hash.Hasher, 0, len(voters))
+	for _, identity := range voters {
+		pks = append(pks, identity.StakingPubKey)
+		// TODO(active-pacemaker): construct valid message
+		var msg []byte
+		messages = append(messages, msg)
+		hashers = append(hashers, v.stakingHasher)
+	}
+
+	valid, err := crypto.VerifyBLSSignatureManyMessages(pks, sigData, messages, hashers)
+	if err != nil {
+		return fmt.Errorf("signature verification failed: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("invalid aggregated TC signature for view %d: %w", view, err)
+	}
+	return nil
+}

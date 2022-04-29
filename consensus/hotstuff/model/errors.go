@@ -65,7 +65,7 @@ func IsMissingBlockError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// InvalidQCError indicates that the QC for block identified `BlockID` and `View` is invalid
+// InvalidQCError indicates that the QC for block identified by `BlockID` and `View` is invalid
 type InvalidQCError struct {
 	BlockID flow.Identifier
 	View    uint64
@@ -83,6 +83,26 @@ func IsInvalidQCError(err error) bool {
 }
 
 func (e InvalidQCError) Unwrap() error {
+	return e.Err
+}
+
+// InvalidTCError indicates that the TC for view identified by `View` is invalid
+type InvalidTCError struct {
+	View uint64
+	Err  error
+}
+
+func (e InvalidTCError) Error() string {
+	return fmt.Sprintf("invalid TC at view %d: %s", e.View, e.Err.Error())
+}
+
+// IsInvalidTCError returns whether an error is InvalidQCError
+func IsInvalidTCError(err error) bool {
+	var e InvalidTCError
+	return errors.As(err, &e)
+}
+
+func (e InvalidTCError) Unwrap() error {
 	return e.Err
 }
 
