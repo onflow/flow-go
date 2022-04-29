@@ -14,8 +14,7 @@ import (
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
-	component.Component
-	cm      *component.ComponentManager
+	*component.ComponentManager
 	adapter network.Adapter
 }
 
@@ -29,8 +28,7 @@ func NewDefaultConduitFactory() *DefaultConduitFactory {
 			<-ctx.Done()
 		}).Build()
 
-	d.Component = cm
-	d.cm = cm
+	d.ComponentManager = cm
 
 	return d
 }
