@@ -59,6 +59,20 @@ func (_m *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	return r0
 }
 
+// OnTCConstructed provides a mock function with given fields: tc
+func (_m *EventHandler) OnTCConstructed(tc *flow.TimeoutCertificate) error {
+	ret := _m.Called(tc)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.TimeoutCertificate) error); ok {
+		r0 = rf(tc)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Start provides a mock function with given fields:
 func (_m *EventHandler) Start() error {
 	ret := _m.Called()

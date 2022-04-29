@@ -45,20 +45,71 @@ func (_m *PaceMaker) CurView() uint64 {
 	return r0
 }
 
+// OnPartialTC provides a mock function with given fields: curView
+func (_m *PaceMaker) OnPartialTC(curView uint64) {
+	_m.Called(curView)
+}
+
 // OnTimeout provides a mock function with given fields:
-func (_m *PaceMaker) OnTimeout() *model.NewViewEvent {
+func (_m *PaceMaker) OnTimeout() *model.TimeoutObject {
 	ret := _m.Called()
 
-	var r0 *model.NewViewEvent
-	if rf, ok := ret.Get(0).(func() *model.NewViewEvent); ok {
+	var r0 *model.TimeoutObject
+	if rf, ok := ret.Get(0).(func() *model.TimeoutObject); ok {
 		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.TimeoutObject)
+		}
+	}
+
+	return r0
+}
+
+// ProcessQC provides a mock function with given fields: qc
+func (_m *PaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
+	ret := _m.Called(qc)
+
+	var r0 *model.NewViewEvent
+	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) *model.NewViewEvent); ok {
+		r0 = rf(qc)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*model.NewViewEvent)
 		}
 	}
 
-	return r0
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(*flow.QuorumCertificate) bool); ok {
+		r1 = rf(qc)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
+// ProcessTC provides a mock function with given fields: tc
+func (_m *PaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, bool) {
+	ret := _m.Called(tc)
+
+	var r0 *model.NewViewEvent
+	if rf, ok := ret.Get(0).(func(*flow.TimeoutCertificate) *model.NewViewEvent); ok {
+		r0 = rf(tc)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.NewViewEvent)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(*flow.TimeoutCertificate) bool); ok {
+		r1 = rf(tc)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
 }
 
 // Start provides a mock function with given fields:
@@ -80,50 +131,4 @@ func (_m *PaceMaker) TimeoutChannel() <-chan time.Time {
 	}
 
 	return r0
-}
-
-// UpdateCurViewWithBlock provides a mock function with given fields: block, isLeaderForNextView
-func (_m *PaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
-	ret := _m.Called(block, isLeaderForNextView)
-
-	var r0 *model.NewViewEvent
-	if rf, ok := ret.Get(0).(func(*model.Block, bool) *model.NewViewEvent); ok {
-		r0 = rf(block, isLeaderForNextView)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.NewViewEvent)
-		}
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(*model.Block, bool) bool); ok {
-		r1 = rf(block, isLeaderForNextView)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
-}
-
-// UpdateCurViewWithQC provides a mock function with given fields: qc
-func (_m *PaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
-	ret := _m.Called(qc)
-
-	var r0 *model.NewViewEvent
-	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) *model.NewViewEvent); ok {
-		r0 = rf(qc)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*model.NewViewEvent)
-		}
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(*flow.QuorumCertificate) bool); ok {
-		r1 = rf(qc)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
 }
