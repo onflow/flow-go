@@ -45,6 +45,11 @@ func (b *backendEvents) GetEventsForHeightRange(
 		return nil, status.Errorf(codes.Internal, " failed to get events: %v", err)
 	}
 
+	// start height requested is higher than the latest sealed block, return empty list of events
+	if head.Height < startHeight {
+		return []flow.BlockEvents{}, nil
+	}
+
 	// limit max height to last sealed block in the chain
 	if head.Height < endHeight {
 		endHeight = head.Height
@@ -71,6 +76,11 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	eventType string,
 	blockIDs []flow.Identifier,
 ) ([]flow.BlockEvents, error) {
+
+
+	if len(blockIDs) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "empty block ID list provided")
+	}
 
 	// find the block headers for all the block IDs
 	blockHeaders := make([]*flow.Header, 0)
