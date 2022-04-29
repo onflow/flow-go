@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"go.uber.org/atomic"
+	"sync"
 )
 
 type accumulatedWeightTracker struct {
@@ -27,11 +28,37 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 	return false
 }
 
+type highestQCTracker struct {
+	lock      sync.RWMutex
+	highestQC *flow.QuorumCertificate
+}
+
+func (t *highestQCTracker) Track(qc *flow.QuorumCertificate) {
+	highestQC := t.HighestQC()
+	if highestQC != nil || highestQC.View >= qc.View {
+		return
+	}
+
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	if t.highestQC == nil || t.highestQC.View < qc.View {
+		t.highestQC = qc
+	}
+}
+
+func (t *highestQCTracker) HighestQC() *flow.QuorumCertificate {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.highestQC
+}
+
 type TimeoutProcessor struct {
 	view             uint64
 	validator        hotstuff.Validator
+	committee        hotstuff.Committee
 	partialTCTracker accumulatedWeightTracker
 	tcTracker        accumulatedWeightTracker
+	highestQCTracker highestQCTracker
 	//sigAggregator         *TimeoutSignatureAggregator
 	onPartialTCCreated hotstuff.OnPartialTCCreated
 	onTCCreated        hotstuff.OnTCCreated
@@ -45,6 +72,7 @@ func NewTimeoutProcessor(view uint64,
 	onTCCreated hotstuff.OnTCCreated,
 ) *TimeoutProcessor {
 	return &TimeoutProcessor{
+		view: view,
 		partialTCTracker: accumulatedWeightTracker{
 			minRequiredWeight: hotstuff.ComputeWeightThresholdForHonestMajority(totalWeight),
 			done:              *atomic.NewBool(false),
@@ -82,10 +110,12 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	}
 
 	totalWeight := uint64(0)
-	//totalWeight, err := p.sigAggregator.TrustedAdd(timeout.SignerID, timeout.SigData, msg)
+	//totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.HighestQC.View)
 	//if err != nil {
 	//	// handle error
 	//}
+
+	p.highestQCTracker.Track(timeout.HighestQC)
 
 	if p.partialTCTracker.Track(totalWeight) {
 		//p.onPartialTCCreated(p.tcBuilder.View())
@@ -107,8 +137,59 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 	return nil
 }
 
+// validateTimeout performs validation of timeout object, verifies if timeout is correctly structured
+// and included QC and TC is correctly structured and signed.
+// ATTENTION: this function doesn't check if timeout signature is valid, this check happens in signature aggregator
 func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
-	panic("implement me")
+	// 1. check if it's correctly structured
+	// (a) Every TO must contain a QC
+	if timeout.HighestQC == nil {
+		return model.NewInvalidTimeoutErrorf(timeout, "TimeoutObject without QC is invalid")
+	}
+
+	if timeout.View < timeout.HighestQC.View {
+		return model.NewInvalidTimeoutErrorf(timeout, "TO's QC cannot be newer than the TO's view")
+	}
+
+	// (b) If a TC is included, the TC must be for the past round, no matter whether a QC
+	//     for the last round is also included. In some edge cases, a node might observe
+	//     _both_ QC and TC for the previous round, in which case it can include both.
+	if timeout.LastViewTC != nil {
+		if timeout.View != timeout.LastViewTC.View+1 {
+			return model.NewInvalidTimeoutErrorf(timeout, "invalid TC for previous round")
+		}
+		if timeout.HighestQC.View < timeout.LastViewTC.TOHighestQC.View {
+			return model.NewInvalidTimeoutErrorf(timeout, "timeout.HighestQC has older view that the QC in timeout.LastViewTC")
+		}
+	}
+	// (c) The TO must contain a proof that sender legitimately entered timeout.View. Transitioning
+	//     to round timeout.View is possible either by observing a QC or a TC for the previous round.
+	//     If no QC is included, we require a TC to be present, which by check (1b) must be for
+	//     the previous round.
+	lastViewSuccessful := timeout.View == timeout.HighestQC.View+1
+	if !lastViewSuccessful {
+		// The TO's sender did _not_ observe a QC for round timeout.View-1. Hence, it should
+		// include a TC for the previous round. Otherwise, the TO is invalid.
+		if timeout.LastViewTC == nil {
+			return model.NewInvalidTimeoutErrorf(timeout, "timeout must include TC")
+		}
+	}
+
+	// 2. Check if QC is valid
+	err := p.validator.ValidateQC(timeout.HighestQC)
+	if err != nil {
+		return model.NewInvalidTimeoutErrorf(timeout, "included QC is invalid: %w", err)
+	}
+
+	// 3. If TC is included, it must be valid
+	if timeout.LastViewTC != nil {
+		err = p.ValidateTC(timeout.LastViewTC)
+		if err != nil {
+			return model.NewInvalidTimeoutErrorf(timeout, "included TC is invalid: %w", err)
+		}
+	}
+	return nil
+
 }
 
 func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
