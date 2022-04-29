@@ -174,7 +174,7 @@ func (a *TimeoutSignatureAggregator) Aggregate() ([]flow.Identifier, []uint64, c
 
 	aggSignature, err := crypto.AggregateBLSSignatures(signatures)
 	if err != nil {
-		// invalidInputsError for:
+		// unexpected error for:
 		//  * empty `signatures` slice, i.e. sharesNum == 0, which we exclude by earlier check
 		//  * if some signature(s) could not be decoded, which should be impossible since we check all signatures before adding them
 		// Hence, any error here is a symptom of an internal bug

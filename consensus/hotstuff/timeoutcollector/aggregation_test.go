@@ -91,7 +91,7 @@ func TestTimeoutSignatureAggregator_HappyPath(t *testing.T) {
 		go func(i int, sig crypto.Signature) {
 			defer wg.Done()
 			index := i + subSet
-			// test TrustedAdd
+			// test VerifyAndAdd
 			_, err := aggregator.VerifyAndAdd(ids[index].NodeID, sig, highQCViews[index])
 			// ignore weight as comparing against expected weight is not thread safe
 			require.NoError(t, err)
