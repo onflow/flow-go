@@ -1,9 +1,9 @@
 package verification
 
 import (
-	"encoding/binary"
-	
 	"github.com/onflow/flow-go/model/flow"
+
+	"encoding/binary"
 )
 
 // MakeVoteMessage generates the message we have to sign in order to be able
