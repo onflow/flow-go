@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"encoding/binary"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -10,26 +11,18 @@ import (
 // block ID; this allows us to create the signed message and verify the signed
 // message without having the full block contents.
 func MakeVoteMessage(view uint64, blockID flow.Identifier) []byte {
-	msg := flow.MakeID(struct {
-		BlockID flow.Identifier
-		View    uint64
-	}{
-		BlockID: blockID,
-		View:    view,
-	})
-	return msg[:]
+	msg := make([]byte, 8, 8+flow.IdentifierLen)
+	binary.BigEndian.PutUint64(msg, view)
+	msg = append(msg, blockID[:]...)
+	return msg
 }
 
 // MakeTimeoutMessage generates the message we have to sign in order to be able
 // to contribute to Active Pacemaker protocol. Each replica signs with the highest QC view
 // known to that replica.
 func MakeTimeoutMessage(view uint64, highQCView uint64) []byte {
-	msg := flow.MakeID(struct {
-		View       uint64
-		HighQCView uint64
-	}{
-		View:       view,
-		HighQCView: highQCView,
-	})
-	return msg[:]
+	msg := make([]byte, 16)
+	binary.BigEndian.PutUint64(msg[:8], view)
+	binary.BigEndian.PutUint64(msg[8:], highQCView)
+	return msg
 }
