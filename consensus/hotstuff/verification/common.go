@@ -2,6 +2,7 @@ package verification
 
 import (
 	"encoding/binary"
+	
 	"github.com/onflow/flow-go/model/flow"
 )
 
