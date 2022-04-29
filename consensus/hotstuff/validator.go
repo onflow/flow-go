@@ -13,6 +13,11 @@ type Validator interface {
 	//  * model.InvalidQCError if the QC is invalid
 	ValidateQC(qc *flow.QuorumCertificate) error
 
+	// ValidateTC checks the validity of a TC for a given view.
+	// During normal operations, the following error returns are expected:
+	//  * model.InvalidTCError if the TC is invalid
+	ValidateTC(tc *flow.TimeoutCertificate) error
+
 	// ValidateProposal checks the validity of a proposal.
 	// During normal operations, the following error returns are expected:
 	//  * model.InvalidBlockError if the block is invalid
