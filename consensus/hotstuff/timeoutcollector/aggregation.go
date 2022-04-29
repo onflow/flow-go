@@ -26,10 +26,11 @@ type sigInfo struct {
 
 // TimeoutSignatureAggregator implements consensus/hotstuff.TimeoutSignatureAggregator.
 // It performs timeout specific BLS aggregation over multiple distinct messages.
-// We perform timeout signature aggregation for some concrete view, because of that our messages
-// are build in next way: hash(view, highestQC.View), where `highestQC` is a value contributed
-// by different replicas.
-// View and public keys needs to be agreed upon upfront.
+// We perform timeout signature aggregation for some concrete view, utilizing the protocol specification
+// that timeouts sign the message: hash(view, highestQC.View), where `highestQC` can have different values
+// for different replicas.
+// View and the identities of all authorized replicas are 
+// specified when the TimeoutSignatureAggregator is instantiated.
 // Each signer is allowed to sign at most once.
 // Aggregation uses BLS scheme. Mitigation against rogue attacks is done using Proof Of Possession (PoP)
 // This module does not verify PoPs of input public keys, it assumes verification was done outside this module.
@@ -49,12 +50,12 @@ var _ hotstuff.TimeoutSignatureAggregator = (*TimeoutSignatureAggregator)(nil)
 // NewTimeoutSignatureAggregator returns a multi message signature aggregator initialized with a predefined view
 // for which we aggregate signatures, list of flow identities,
 // their respective public keys and a domain separation tag. The identities
-// represent the list of all possible signers.
+// represent the list of all authorized signers.
 // The constructor errors if:
 // - the list of identities is empty
 // - if one of the keys is not a valid public key.
 //
-// A multi message sig aggregator is used for one aggregation only. A new instance should be used for each
+// A multi message sig aggregator is used for aggregating timeouts for a single view only. A new instance should be used for each
 // signature aggregation task in the protocol.
 func NewTimeoutSignatureAggregator(
 	view uint64, // view for which we are aggregating signatures
@@ -81,7 +82,7 @@ func NewTimeoutSignatureAggregator(
 	}
 
 	return &TimeoutSignatureAggregator{
-		hasher:        crypto.NewBLSKMAC(dsTag),
+		hasher:        crypto.NewBLSKMAC(dsTag), // concurrency safe
 		idToInfo:      idToInfo,
 		idToSignature: make(map[flow.Identifier]sigInfo),
 		view:          view,
@@ -187,21 +188,11 @@ func (a *TimeoutSignatureAggregator) Aggregate() (*flow.TimeoutCertificate, erro
 	if err != nil {
 		// invalidInputsError for:
 		//  * empty `signatures` slice, i.e. sharesNum == 0, which we exclude by earlier check
-		//  * if some signature(s), included via TrustedAdd, could not be decoded
-		if crypto.IsInvalidInputsError(err) {
-			return nil, model.NewInvalidSignatureIncludedErrorf("signatures with invalid structure were included via TrustedAdd: %w", err)
-		}
-		return nil, fmt.Errorf("BLS signature aggregation failed: %w", err)
+		//  * if some signature(s) could not be decoded, which should be impossible since we check all signatures before adding them
+		// Hence, any error here is a symptom of an internal bug
+		return nil, fmt.Errorf("unexpected internal error during BLS signature aggregation: %w", err)
 	}
 
-	valid, err := crypto.VerifyBLSSignatureManyMessages(pks, aggSignature, messages, hashers)
-	if err != nil {
-		return nil, fmt.Errorf("signature verification failed: %w", err)
-	}
-	// since we add only verified signatures, then we MUST have a valid signature at this point
-	if !valid {
-		return nil, fmt.Errorf("constructed invalid BLS signature")
-	}
 
 	return &flow.TimeoutCertificate{
 		View:          a.view,

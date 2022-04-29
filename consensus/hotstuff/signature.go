@@ -107,17 +107,24 @@ type WeightedSignatureAggregator interface {
 	Aggregate() ([]flow.Identifier, []byte, error)
 }
 
-// TimeoutSignatureAggregator aggregates timeout signatures of the same signature scheme but
-// possibly distinct message from different signers. Each signer signs a message which is composed of
-// view in which timeout has been created and highest QC view known to that replica.
-// View and public keys are agreed upon upfront.
-// It is also recommended to only aggregate signatures generated with keys representing
-// equivalent security-bit level.
-// Furthermore, a weight [unsigned int64] is assigned to each signer ID. The
+// TimeoutSignatureAggregator aggregates timeout signatures for one particular view. 
+// When instantiating a TimeoutSignatureAggregator, the following information is supplied:
+//  * The view for which the aggregator collects timeouts.
+//  * For each replicas that is authorized to send a timeout at this particular view:
+//    the node ID, public staking keys, and weight
+// Timeouts for other views or from non-authorized replicas are rejected.
+// In their TimeoutObjects, replicas include a signature over the pair (view, highestQCView),
+// where `view` is the view number the timeout is for and `highestQCView` is the view of
+// the newest QC known to the replica. TimeoutSignatureAggregator collects these signatures,  
+// internally tracks the total weight of all collected signatures. Note that in general the 
+// signed messages are different, which makes the aggregation a comparatively expensive operation. 
+// Upon calling `Aggregate`, the TimeoutSignatureAggregator aggregates all valid signatures collected
+// up to this point. The aggregate signature is guaranteed to be correct, as only valid signatues 
+// are excepted as inputs. 
 // TimeoutSignatureAggregator internally tracks the total weight of all collected signatures.
 // Implementations must be concurrency safe.
 type TimeoutSignatureAggregator interface {
-	// VerifyAndAdd verifies the signature under the stored public keys and adds signature with corresponding
+	// VerifyAndAdd verifies the signature under the stored public keys and adds the signature and the corresponding
 	// highest QC to the internal set. Internal set and collected weight is modified iff signature _is_ valid.
 	// The total weight of all collected signatures (excluding duplicates) is returned regardless
 	// of any returned error.
@@ -132,8 +139,7 @@ type TimeoutSignatureAggregator interface {
 
 	// Aggregate aggregates the signatures and builds a flow.TimeoutCertificate with data supplied in VerifyAndAdd.
 	// Aggregated signature will be returned as SigData of timeout certificate.
-	// The function performs a final verification of aggregated
-	// signature. Caller can be sure that resulting signature is valid.
+	// Caller can be sure that resulting signature is valid.
 	// Expected errors during normal operations:
 	//  - model.InsufficientSignaturesError if no signatures have been added yet
 	Aggregate() (*flow.TimeoutCertificate, error)
