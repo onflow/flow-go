@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -25,8 +24,6 @@ import (
 
 type ComponentConsumerSuite struct {
 	suite.Suite
-
-	db *badger.DB
 
 	defaultIndex   uint64
 	maxProcessing  uint64

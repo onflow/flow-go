@@ -3,11 +3,12 @@ package jobs_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestBlockEntryJob(t *testing.T) {

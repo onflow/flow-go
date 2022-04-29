@@ -294,7 +294,7 @@ func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerCont
 	e.blockConsumer.Start(ctx)
 
 	// ignore context error since we always want to wait for Done()
-	util.WaitClosed(ctx, e.blockConsumer.Ready())
+	_ = util.WaitClosed(ctx, e.blockConsumer.Ready())
 
 	<-e.blockConsumer.Done()
 }

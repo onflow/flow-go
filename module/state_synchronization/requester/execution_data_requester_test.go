@@ -732,15 +732,6 @@ func buildResult(block *flow.Block, cid flow.Identifier, previousResult *flow.Ex
 	return unittest.ExecutionResultFixture(opts...)
 }
 
-func irrecoverableExpected(t *testing.T, ctx context.Context, errChan <-chan error, expectedErrMsg string) {
-	select {
-	case <-ctx.Done():
-		t.Errorf("expected irrecoverable error, but got none")
-	case err := <-errChan:
-		assert.Contains(t, err.Error(), expectedErrMsg)
-	}
-}
-
 func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan error) {
 	select {
 	case <-ctx.Done():

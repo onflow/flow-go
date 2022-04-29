@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
@@ -26,7 +25,6 @@ import (
 type ExecutionDataReaderSuite struct {
 	suite.Suite
 
-	jobs         []module.Job
 	reader       *ExecutionDataReader
 	eds          *syncmock.ExecutionDataService
 	headers      *storagemock.Headers

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,7 +18,6 @@ import (
 	statemock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	"github.com/stretchr/testify/mock"
 )
 
 func WithCollections(collections []*flow.Collection) func(*state_synchronization.ExecutionData) {

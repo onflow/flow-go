@@ -8,6 +8,8 @@ import (
 	"github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-datastore"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -17,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 type DatastoreChecker interface {
