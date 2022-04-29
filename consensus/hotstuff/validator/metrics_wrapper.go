@@ -26,9 +26,9 @@ func NewMetricsWrapper(validator hotstuff.Validator, metrics module.HotstuffMetr
 	}
 }
 
-func (w ValidatorMetricsWrapper) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
+func (w ValidatorMetricsWrapper) ValidateQC(qc *flow.QuorumCertificate) error {
 	processStart := time.Now()
-	err := w.validator.ValidateQC(qc, block)
+	err := w.validator.ValidateQC(qc)
 	w.metrics.ValidatorProcessingDuration(time.Since(processStart))
 	return err
 }
@@ -40,9 +40,9 @@ func (w ValidatorMetricsWrapper) ValidateProposal(proposal *model.Proposal) erro
 	return err
 }
 
-func (w ValidatorMetricsWrapper) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Identity, error) {
+func (w ValidatorMetricsWrapper) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
 	processStart := time.Now()
-	identity, err := w.validator.ValidateVote(vote, block)
+	identity, err := w.validator.ValidateVote(vote)
 	w.metrics.ValidatorProcessingDuration(time.Since(processStart))
 	return identity, err
 }

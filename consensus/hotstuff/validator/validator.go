@@ -12,7 +12,7 @@ import (
 
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
-	committee hotstuff.Committee
+	committee hotstuff.VoterCommittee
 	forks     hotstuff.ForksReader
 	verifier  hotstuff.Verifier
 }
@@ -34,35 +34,26 @@ func New(
 
 // ValidateQC validates the QC
 // qc - the qc to be validated
-// block - the block that the qc is pointing to
-func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) error {
-	if qc.BlockID != block.BlockID {
-		// Sanity check! Failing indicates a bug in the higher-level logic
-		return fmt.Errorf("qc.BlockID %s doesn't match block's ID %s", qc.BlockID, block.BlockID)
-	}
-	if qc.View != block.View { // check view
-		return newInvalidBlockError(block, fmt.Errorf("qc's View %d doesn't match referenced block's View %d", qc.View, block.View))
-	}
-
+func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
-	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive weight)
-	allParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
+	// IdentityList returned by hotstuff.VoterCommittee contains only legitimate consensus participants for the specified view (must have positive weight)
+	allParticipants, err := v.committee.IdentitiesByEpoch(qc.View, filter.Any)
 	if err != nil {
-		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
+		return fmt.Errorf("could not get consensus participants at view %d: %w", qc.View, err)
 	}
 	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
 	if len(signers) != len(qc.SignerIDs) {
-		return newInvalidBlockError(block, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at block %x", block.BlockID))
+		return newInvalidQCError(qc, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at view %x", qc.View))
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
 	threshold := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight()) // compute required weight threshold
 	if signers.TotalWeight() < threshold {
-		return newInvalidBlockError(block, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
+		return newInvalidQCError(qc, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
-	err = v.verifier.VerifyQC(signers, qc.SigData, block)
+	err = v.verifier.VerifyQC(signers, qc.SigData, qc.View, qc.BlockID)
 	if err != nil {
 		// Theoretically, `VerifyQC` could also return a `model.InvalidSignerError`. However,
 		// for the time being, we assume that _every_ HotStuff participant is also a member of
@@ -71,9 +62,9 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		//       we expect `model.InvalidSignerError` here during normal operations.
 		switch {
 		case errors.Is(err, model.ErrInvalidFormat):
-			return newInvalidBlockError(block, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
+			return newInvalidQCError(qc, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
-			return newInvalidBlockError(block, fmt.Errorf("QC contains invalid signature(s): %w", err))
+			return newInvalidQCError(qc, fmt.Errorf("QC contains invalid signature(s): %w", err))
 		default:
 			return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)
 		}
@@ -90,7 +81,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	block := proposal.Block
 
 	// validate the proposer's vote and get his identity
-	_, err := v.ValidateVote(proposal.ProposerVote(), block)
+	_, err := v.ValidateVote(proposal.ProposerVote())
 	if model.IsInvalidVoteError(err) {
 		return newInvalidBlockError(block, fmt.Errorf("invalid proposer signature: %w", err))
 	}
@@ -107,51 +98,23 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not leader (%s) for view %d", block.ProposerID, leader, block.View))
 	}
 
-	// check that we have the parent for the proposal
-	parent, found := v.forks.GetBlock(qc.BlockID)
-	if !found {
-		// Forks is _allowed_ to (but obliged to) prune blocks whose view is below the newest finalized block.
-		if qc.View >= v.forks.FinalizedView() {
-			// If the parent block is equal or above the finalized view, then Forks should have it. Otherwise, we are missing a block!
-			return model.MissingBlockError{View: qc.View, BlockID: qc.BlockID}
-		}
-
-		// Forks has already pruned the parent block. I.e., we can't validate that the qc matches
-		// a known (and valid) parent. Nevertheless, we just store this block, because there might already
-		// exists children of this block, which we could receive later. However, we know for sure that the
-		// block's fork cannot keep growing anymore because it conflicts with a finalized block.
-		// TODO: note other components will expect Validator has validated, and might re-validate it,
-		return model.ErrUnverifiableBlock
-	}
-
 	// validate QC - keep the most expensive the last to check
-	return v.ValidateQC(qc, parent)
+	return v.ValidateQC(qc)
 }
 
 // ValidateVote validates the vote and returns the identity of the voter who signed
 // vote - the vote to be validated
-// block - the voting block. Assuming the block has been validated.
-func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Identity, error) {
-	// block hash must match
-	if vote.BlockID != block.BlockID {
-		// Sanity check! Failing indicates a bug in the higher-level logic
-		return nil, fmt.Errorf("wrong block ID. expected (%s), got (%d)", block.BlockID, vote.BlockID)
-	}
-	// view must match with the block's view
-	if vote.View != block.View {
-		return nil, newInvalidVoteError(vote, fmt.Errorf("vote's view %d is inconsistent with referenced block (view %d)", vote.View, block.View))
-	}
-
-	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
+func (v *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
+	voter, err := v.committee.IdentityByEpoch(vote.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving voter Identity at block %x: %w", block.BlockID, err)
+		return nil, fmt.Errorf("error retrieving voter Identity at view %x: %w", vote.View, err)
 	}
 
 	// check whether the signature data is valid for the vote in the hotstuff context
-	err = v.verifier.VerifyVote(voter, vote.SigData, block)
+	err = v.verifier.VerifyVote(voter, vote.SigData, vote.View, vote.BlockID)
 	if err != nil {
 		// Theoretically, `VerifyVote` could also return a `model.InvalidSignerError`. However,
 		// for the time being, we assume that _every_ HotStuff participant is also a member of
@@ -171,6 +134,14 @@ func newInvalidBlockError(block *model.Block, err error) error {
 	return model.InvalidBlockError{
 		BlockID: block.BlockID,
 		View:    block.View,
+		Err:     err,
+	}
+}
+
+func newInvalidQCError(qc *flow.QuorumCertificate, err error) error {
+	return model.InvalidBlockError{
+		BlockID: qc.BlockID,
+		View:    qc.View,
 		Err:     err,
 	}
 }
