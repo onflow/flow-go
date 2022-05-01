@@ -42,7 +42,7 @@ import (
 // The requester listens to block finalization event, and checks if sealed height has been changed,
 // if changed, it create job for each un-downloaded and sealed height.
 //
-// The requester is made up of 4 subcomponents:
+// The requester is made up of 3 subcomponents:
 //
 // * OnBlockFinalized:     receives block finalized events from the finalization distributor and
 //                         forwards them to the blockConsumer.
@@ -57,6 +57,8 @@ import (
 //                         it checks if ExecutionData for the next consecutive block height is
 //                         available, then uses a single worker to send notifications to registered
 //                         consumers.
+//                         the registered consumers are guaranteed to receive each sealed block in
+//                         consecutive height at least once.
 //
 //    +------------------+      +---------------+       +----------------------+
 // -->| OnBlockFinalized |----->| blockConsumer |   +-->| notificationConsumer |
@@ -202,7 +204,11 @@ func New(
 		e.headers,
 		e.results,
 		e.config.FetchTimeout,
-		e.blockConsumer.LastProcessedIndex, // method to get the highest consecutive height to notify
+		// method to get highest consecutive height that has downloaded execution data. it is used
+		// here by the notification job consumer to discover new jobs.
+		// Note: we don't want to notify notificationConsumer for a block if it has not downloaded
+		// execution data yet.
+		e.blockConsumer.LastProcessedIndex,
 	)
 
 	// notificationConsumer consumes `OnExecutionDataFetched` events, and ensures its consumer
