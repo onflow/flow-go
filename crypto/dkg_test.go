@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -285,7 +286,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	}
 
 	phase := 0
-	if dkg == feldmanVSS {
+	if dkg == feldmanVSS { // jump to the last phase since there is only one phase for feldmanVSS
 		phase = 2
 	}
 
@@ -395,14 +396,17 @@ func dkgRunChan(proc *testDKGProcessor,
 			switch phase {
 			case 0:
 				log.Infof("%d shares phase ended\n", proc.current)
+				proc.startSync.Wait() // avoids racing when starting isn't over yet
 				err := proc.dkg.NextTimeout()
 				require.Nil(t, err)
 			case 1:
 				log.Infof("%d complaints phase ended \n", proc.current)
+				proc.startSync.Wait() // avoids racing when starting isn't over yet
 				err := proc.dkg.NextTimeout()
 				require.Nil(t, err)
 			case 2:
 				log.Infof("%d dkg ended \n", proc.current)
+				proc.startSync.Wait() // avoids racing when starting isn't over yet
 				_, pk, _, err := proc.dkg.End()
 				proc.finalError = err
 				proc.pk = pk
