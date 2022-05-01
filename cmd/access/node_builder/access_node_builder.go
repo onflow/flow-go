@@ -168,7 +168,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			FetchTimeout:       edrequester.DefaultFetchTimeout,
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
-			CheckEnabled:       false,
 		},
 	}
 }
@@ -611,7 +610,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
-		flags.BoolVar(&builder.executionDataConfig.CheckEnabled, "execution-data-startup-check", defaultConfig.executionDataConfig.CheckEnabled, "whether to check execution data exists for all heights during startup")
 		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from")
 		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead, "execution-data-max-search-ahead", defaultConfig.executionDataConfig.MaxSearchAhead, "max number of heights to search ahead of the lowest outstanding execution data height")
 		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "timeout to use when fetching execution data from the network e.g. 300s")

@@ -105,9 +105,6 @@ type ExecutionDataConfig struct {
 	// Exponential backoff settings for download retries
 	RetryDelay    time.Duration
 	MaxRetryDelay time.Duration
-
-	// Whether or not to run datastore check on startup
-	CheckEnabled bool
 }
 
 type executionDataRequester struct {
@@ -174,16 +171,15 @@ func New(
 	sealedBlockReader := jobqueue.NewSealedBlockHeaderReader(state, headers)
 
 	// blockConsumer ensures every sealed block's execution data is downloaded.
-	// It listens to block finalization events from `finalizationNotifier`, then checks
-	// if there are new sealed blocks with `sealedBlockReader`.
-	// If there are, it starts workers to process them with `processingBlockJob`, which fetches
-	// execution data. At most `fetchWorkers` number of workers will be created for concurrent processing.
-	// when a sealed block's execution data has been downloaded, it updates and persists
-	// the highest consecutive downloaded height with `processedHeight`.
-	// That way, if the node crashes, it reads the `processedHeight` and resume
-	// from `processedHeight + 1`. If the database is empty, rootHeight will be used
-	// to init the last processed height.
-	// once the execution data is fetched and stored, it notifies `executionDataNotifier`.
+	// It listens to block finalization events from `finalizationNotifier`, then checks if there
+	// are new sealed blocks with `sealedBlockReader`. If there are, it starts workers to process
+	// them with `processingBlockJob`, which fetches execution data. At most `fetchWorkers` workers
+	// will be created for concurrent processing. When a sealed block's execution data has been
+	// downloaded, it updates and persists the highest consecutive downloaded height with
+	// `processedHeight`. That way, if the node crashes, it reads the `processedHeight` and resume
+	// from `processedHeight + 1`. If the database is empty, rootHeight will be used to init the
+	// last processed height. Once the execution data is fetched and stored, it notifies
+	// `executionDataNotifier`.
 	e.blockConsumer = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "block_consumer").Logger(),
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
@@ -234,7 +230,6 @@ func New(
 	)
 
 	builder := component.NewComponentManagerBuilder().
-		AddWorker(e.runBootstrap).
 		AddWorker(e.runBlockConsumer).
 		AddWorker(e.runNotificationConsumer)
 
@@ -261,9 +256,8 @@ func (e *executionDataRequester) AddOnExecutionDataFetchedConsumer(fn state_sync
 	e.consumers = append(e.consumers, fn)
 }
 
-// runBootstrap runs the main process that processes finalized block notifications and requests
-// ExecutionData for each block seal
-func (e *executionDataRequester) runBootstrap(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// runBlockConsumer runs the blockConsumer component
+func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	err := util.WaitClosed(ctx, e.eds.Ready())
 	if err != nil {
 		return // context cancelled
@@ -274,33 +268,12 @@ func (e *executionDataRequester) runBootstrap(ctx irrecoverable.SignalerContext,
 		return // context cancelled
 	}
 
-	// only run datastore check if enabled
-	if e.config.CheckEnabled {
-		err := e.checkDatastore(ctx)
-
-		// Any error is unexpected and should crash the component
-		if err != nil {
-			ctx.Throw(err)
-		}
-	}
-
-	ready()
-}
-
-// runBlockConsumer runs the blockConsumer component
-func (e *executionDataRequester) runBlockConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	// start the blockConsumer after bootstrapping the requester is complete
-	err := util.WaitClosed(ctx, e.Ready())
-	if err != nil {
-		return // context cancelled
-	}
-
 	e.blockConsumer.Start(ctx)
 
-	// ignore context error since we always want to wait for Done()
-	_ = util.WaitClosed(ctx, e.blockConsumer.Ready())
+	err = util.WaitClosed(ctx, e.blockConsumer.Ready())
+	if err == nil {
+		ready()
+	}
 
 	<-e.blockConsumer.Done()
 }
@@ -465,46 +438,6 @@ func (e *executionDataRequester) notifyConsumers(executionData *state_synchroniz
 	for _, fn := range e.consumers {
 		fn(executionData)
 	}
-}
-
-// checkDatastore checks that valid ExecutionData exists in the datastore for all expected blocks
-func (e *executionDataRequester) checkDatastore(parentCtx irrecoverable.SignalerContext) error {
-	// branch a separate context so we can shutdown the local Execution Data Service when done
-	ctx, cancel := context.WithCancel(parentCtx)
-	defer cancel()
-
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
-
-	go func() {
-		// rethrow any irrecoverable errors to requester's context
-		if err := util.WaitError(errChan, ctx.Done()); err != nil {
-			parentCtx.Throw(err)
-		}
-	}()
-
-	eds := LocalExecutionDataService(signalCtx, e.ds, e.log)
-
-	if err := util.WaitClosed(ctx, eds.Ready()); err != nil {
-		return nil
-	}
-
-	checker := NewDatastoreChecker(
-		e.log,
-		e.bs,
-		eds,
-		e.headers,
-		e.results,
-		e.config.InitialBlockHeight,
-		e.processSealedHeight,
-	)
-
-	err := checker.Run(signalCtx, e.notificationConsumer.LastProcessedIndex())
-
-	// done with check, shutdown the local Execution Data Service
-	cancel()
-	<-eds.Done()
-
-	return err
 }
 
 func isInvalidBlobError(err error) bool {

@@ -422,7 +422,6 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 			FetchTimeout:       cfg.fetchTimeout,
 			RetryDelay:         cfg.retryDelay,
 			MaxRetryDelay:      cfg.maxRetryDelay,
-			CheckEnabled:       cfg.checkEnabled,
 		},
 	)
 	assert.NoError(suite.T(), err)
@@ -591,7 +590,6 @@ type fetchTestRun struct {
 	fetchTimeout   time.Duration
 	retryDelay     time.Duration
 	maxRetryDelay  time.Duration
-	checkEnabled   bool
 }
 
 func (r *fetchTestRun) StartHeight() uint64 {
@@ -703,7 +701,6 @@ func (suite *ExecutionDataRequesterSuite) generateTestData(blockCount int, speci
 		fetchTimeout:   requester.DefaultFetchTimeout,
 		retryDelay:     1 * time.Millisecond,
 		maxRetryDelay:  15 * time.Millisecond,
-		checkEnabled:   false,
 	}
 }
 
