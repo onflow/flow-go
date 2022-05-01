@@ -393,20 +393,18 @@ func dkgRunChan(proc *testDKGProcessor,
 			}
 		// if no message is received by the channel, call the DKG timeout
 		case <-time.After(phaseSwitchTimeout):
+			proc.startSync.Wait() // avoids racing when starting isn't over yet
 			switch phase {
 			case 0:
 				log.Infof("%d shares phase ended\n", proc.current)
-				proc.startSync.Wait() // avoids racing when starting isn't over yet
 				err := proc.dkg.NextTimeout()
 				require.Nil(t, err)
 			case 1:
 				log.Infof("%d complaints phase ended \n", proc.current)
-				proc.startSync.Wait() // avoids racing when starting isn't over yet
 				err := proc.dkg.NextTimeout()
 				require.Nil(t, err)
 			case 2:
 				log.Infof("%d dkg ended \n", proc.current)
-				proc.startSync.Wait() // avoids racing when starting isn't over yet
 				_, pk, _, err := proc.dkg.End()
 				proc.finalError = err
 				proc.pk = pk
