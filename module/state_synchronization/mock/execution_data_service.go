@@ -48,29 +48,6 @@ func (_m *ExecutionDataService) Add(ctx context.Context, sd *state_synchronizati
 	return r0, r1, r2
 }
 
-// Check provides a mock function with given fields: ctx, rootID
-func (_m *ExecutionDataService) Check(ctx context.Context, rootID flow.Identifier) ([]state_synchronization.InvalidCid, bool) {
-	ret := _m.Called(ctx, rootID)
-
-	var r0 []state_synchronization.InvalidCid
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) []state_synchronization.InvalidCid); ok {
-		r0 = rf(ctx, rootID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]state_synchronization.InvalidCid)
-		}
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) bool); ok {
-		r1 = rf(ctx, rootID)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
-}
-
 // Done provides a mock function with given fields:
 func (_m *ExecutionDataService) Done() <-chan struct{} {
 	ret := _m.Called()
