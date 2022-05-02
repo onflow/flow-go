@@ -405,11 +405,9 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	processedHeight := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 	processedNotification := storage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
 
-	edr, err := requester.New(
+	edr := requester.New(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
 		metrics.NewNoopCollector(),
-		suite.datastore,
-		suite.blobservice,
 		suite.eds,
 		processedHeight,
 		processedNotification,
@@ -424,7 +422,6 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 			MaxRetryDelay:      cfg.maxRetryDelay,
 		},
 	)
-	assert.NoError(suite.T(), err)
 
 	finalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 

@@ -452,7 +452,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			return nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
 			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
 				new(cbor.Codec),
 				compressor.NewLz4Compressor(),
@@ -480,7 +479,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				// Note: since the root block of a spork is also sealed in the root protocol state, the
 				// latest sealed height is always equal to the root block height. That means that at the
 				// very beginning of a spork, this check will always fail. Operators should not specify
-				// a InitialBlockHeight when starting from the beginning of a spork.
+				// an InitialBlockHeight when starting from the beginning of a spork.
 				if builder.executionDataStartHeight > latestSeal.Height {
 					return nil, fmt.Errorf(
 						"execution data start block height (%d) must be less than or equal to the latest sealed block height (%d)",
@@ -494,11 +493,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				builder.executionDataConfig.InitialBlockHeight = builder.RootBlock.Header.Height
 			}
 
-			edr, err := edrequester.New(
+			builder.ExecutionDataRequester = edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
-				ds,
-				bs,
 				builder.ExecutionDataService,
 				processedBlockHeight,
 				processedNotifications,
@@ -508,13 +505,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				builder.executionDataConfig,
 			)
 
-			if err != nil {
-				return nil, fmt.Errorf("could not create execution data requester: %w", err)
-			}
-
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
-
-			builder.ExecutionDataRequester = edr
+			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
 			return builder.ExecutionDataRequester, nil
 		})

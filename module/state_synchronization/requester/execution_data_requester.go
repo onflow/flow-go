@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs/go-datastore"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
@@ -21,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -110,8 +108,6 @@ type ExecutionDataConfig struct {
 type executionDataRequester struct {
 	component.Component
 	cm      *component.ComponentManager
-	ds      datastore.Batching
-	bs      network.BlobService
 	eds     state_synchronization.ExecutionDataService
 	metrics module.ExecutionDataRequesterMetrics
 	config  ExecutionDataConfig
@@ -142,8 +138,6 @@ var _ state_synchronization.ExecutionDataRequester = (*executionDataRequester)(n
 func New(
 	log zerolog.Logger,
 	edrMetrics module.ExecutionDataRequesterMetrics,
-	datastore datastore.Batching,
-	blobservice network.BlobService,
 	eds state_synchronization.ExecutionDataService,
 	processedHeight storage.ConsumerProgress,
 	processedNotifications storage.ConsumerProgress,
@@ -151,11 +145,9 @@ func New(
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	cfg ExecutionDataConfig,
-) (state_synchronization.ExecutionDataRequester, error) {
+) state_synchronization.ExecutionDataRequester {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
-		ds:                   datastore,
-		bs:                   blobservice,
 		eds:                  eds,
 		metrics:              edrMetrics,
 		headers:              headers,
@@ -236,7 +228,7 @@ func New(
 	e.cm = builder.Build()
 	e.Component = e.cm
 
-	return e, nil
+	return e
 }
 
 // OnBlockFinalized accepts block finalization notifications from the FinalizationDistributor
