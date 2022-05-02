@@ -166,3 +166,15 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, v
 
 	return nil
 }
+
+// VerifyTC checks cryptographic validity of the TC's `sigData` for the given view.
+// It is the responsibility of the calling code to ensure
+// that all `voters` are authorized, without duplicates. Return values:
+//  - nil if `sigData` is cryptographically valid
+//  - model.ErrInvalidFormat if `sigData` has an incompatible format
+//  - model.ErrInvalidSignature if a signature is invalid
+//  - unexpected errors should be treated as symptoms of bugs or uncovered
+//	  edge cases in the logic (i.e. as fatal)
+func (c *CombinedVerifier) VerifyTC(voters flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
+	return verifyTC(voters, sigData, view, highQCViews, c.stakingHasher)
+}
