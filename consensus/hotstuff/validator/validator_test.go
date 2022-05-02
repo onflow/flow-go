@@ -360,8 +360,8 @@ func (qs *QCSuite) SetupTest() {
 
 	// return the correct participants and identities from view state
 	qs.committee = &mocks.Committee{}
-	qs.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
+	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
+		func(view uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return qs.participants.Filter(selector)
 		},
 		nil,
@@ -369,7 +369,7 @@ func (qs *QCSuite) SetupTest() {
 
 	// set up the mocked verifier to verify the QC correctly
 	qs.verifier = &mocks.Verifier{}
-	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData).Return(nil)
+	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.qc.View, qs.qc.BlockID).Return(nil)
 
 	// set up the validator with the mocked dependencies
 	qs.validator = New(qs.committee, nil, qs.verifier)
@@ -387,7 +387,7 @@ func (qs *QCSuite) TestQCOK() {
 func (qs *QCSuite) TestQCInvalidSignersError() {
 	qs.participants = qs.participants[1:] // remove participant[0] from the list of valid consensus participant
 	err := qs.validator.ValidateQC(qs.qc) // the QC should not be validated anymore
-	assert.True(qs.T(), model.IsInvalidBlockError(err), "if some signers are invalid consensus participants, an ErrorInvalidBlock error should be raised")
+	assert.True(qs.T(), model.IsInvalidQCError(err), "if some signers are invalid consensus participants, an ErrorInvalidBlock error should be raised")
 }
 
 // TestQCRetrievingParticipantsError tests that validation errors if:
@@ -395,12 +395,12 @@ func (qs *QCSuite) TestQCInvalidSignersError() {
 func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 	// change the hotstuff.Committee to fail on retrieving participants
 	*qs.committee = mocks.Committee{}
-	qs.committee.On("Identities", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
+	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
 
 	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidBlock
 	err := qs.validator.ValidateQC(qs.qc)
 	assert.Error(qs.T(), err, "unspecific error when retrieving consensus participants should be escalated to surrounding logic")
-	assert.False(qs.T(), model.IsInvalidBlockError(err), "unspecific internal errors should not result in ErrorInvalidBlock error")
+	assert.False(qs.T(), model.IsInvalidQCError(err), "unspecific internal errors should not result in ErrorInvalidBlock error")
 }
 
 // TestQCSignersError tests that a qc fails validation if:
@@ -415,7 +415,7 @@ func (qs *QCSuite) TestQCInsufficientWeight() {
 	assert.Error(qs.T(), err, "a QC should be rejected if it has insufficient voted weight")
 
 	// we should get a threshold error to bubble up for extra info
-	assert.True(qs.T(), model.IsInvalidBlockError(err), "if there is insufficient voted weight, an invalid block error should be raised")
+	assert.True(qs.T(), model.IsInvalidQCError(err), "if there is insufficient voted weight, an invalid block error should be raised")
 }
 
 // TestQCSignatureError tests that validation errors if:
@@ -424,32 +424,32 @@ func (qs *QCSuite) TestQCSignatureError() {
 
 	// set up the verifier to fail QC verification
 	*qs.verifier = mocks.Verifier{}
-	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData).Return(errors.New("dummy error"))
+	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.qc.View, qs.qc.BlockID).Return(errors.New("dummy error"))
 
 	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidBlock
 	err := qs.validator.ValidateQC(qs.qc)
 	assert.Error(qs.T(), err, "unspecific sig verification error should be escalated to surrounding logic")
-	assert.False(qs.T(), model.IsInvalidBlockError(err), "unspecific internal errors should not result in ErrorInvalidBlock error")
+	assert.False(qs.T(), model.IsInvalidQCError(err), "unspecific internal errors should not result in ErrorInvalidBlock error")
 }
 
 func (qs *QCSuite) TestQCSignatureInvalid() {
 
 	// change the verifier to fail the QC signature
 	*qs.verifier = mocks.Verifier{}
-	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData).Return(fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
+	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.qc.View, qs.qc.BlockID).Return(fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
 
 	// the QC should no longer be validation
 	err := qs.validator.ValidateQC(qs.qc)
-	assert.True(qs.T(), model.IsInvalidBlockError(err), "if the signature is invalid an ErrorInvalidBlock error should be raised")
+	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature is invalid an ErrorInvalidBlock error should be raised")
 }
 
 func (qs *QCSuite) TestQCSignatureInvalidFormat() {
 
 	// change the verifier to fail the QC signature
 	*qs.verifier = mocks.Verifier{}
-	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData).Return(fmt.Errorf("%w", model.ErrInvalidFormat))
+	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.qc.View, qs.qc.BlockID).Return(fmt.Errorf("%w", model.ErrInvalidFormat))
 
 	// the QC should no longer be validation
 	err := qs.validator.ValidateQC(qs.qc)
-	assert.True(qs.T(), model.IsInvalidBlockError(err), "if the signature has an invalid format, an ErrorInvalidBlock error should be raised")
+	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature has an invalid format, an ErrorInvalidBlock error should be raised")
 }
