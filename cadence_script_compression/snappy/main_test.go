@@ -4,11 +4,13 @@ import (
 	"testing"
 	"time"
 
-	ztsd "github.com/DataDog/zstd"
+	"github.com/klauspost/compress/snappy"
 	csc "github.com/onflow/flow-go/cadence_script_compression"
 )
 
-const contracsDir = "../../contracts/mainnet"
+const (
+	contracsDir = "../contracts/mainnet"
+)
 
 func TestCompressLargeSize(t *testing.T) {
 	// get a sample of contracts with large size compared to rest of the contracts
@@ -26,13 +28,10 @@ func TestCompressLargeSize(t *testing.T) {
 	sumRatio := 0.00
 	for _, name := range contractNames {
 		c := contracts[name]
-		start := time.Now()
-
 		dst := make([]byte, 0)
-		dst, err := ztsd.Compress(dst, c.Data)
-		if err != nil {
-			t.Fatal(err)
-		}
+
+		start := time.Now()
+		dst = snappy.Encode(dst, c.Data)
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
@@ -51,17 +50,14 @@ func TestCompressLargeSize(t *testing.T) {
 
 func TestCompressAllContracts(t *testing.T) {
 	contracts := csc.ReadContracts(contracsDir)
-
 	sumMbPerSec := 0.00
 	sumRatio := 0.00
 	for _, c := range contracts {
+		dst := make([]byte, 0)
+
 		start := time.Now()
 
-		dst := make([]byte, 0)
-		dst, err := ztsd.Compress(dst, c.Data)
-		if err != nil {
-			t.Fatal(err)
-		}
+		dst = snappy.Encode(dst, c.Data)
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec

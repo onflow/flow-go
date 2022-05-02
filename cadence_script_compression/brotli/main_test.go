@@ -1,14 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"testing"
 	"time"
 
-	ztsd "github.com/DataDog/zstd"
+	"github.com/andybalholm/brotli"
 	csc "github.com/onflow/flow-go/cadence_script_compression"
 )
 
-const contracsDir = "../../contracts/mainnet"
+const (
+	contracsDir = "../contracts/mainnet"
+)
 
 func TestCompressLargeSize(t *testing.T) {
 	// get a sample of contracts with large size compared to rest of the contracts
@@ -26,16 +30,20 @@ func TestCompressLargeSize(t *testing.T) {
 	sumRatio := 0.00
 	for _, name := range contractNames {
 		c := contracts[name]
-		start := time.Now()
-
 		dst := make([]byte, 0)
-		dst, err := ztsd.Compress(dst, c.Data)
-		if err != nil {
-			t.Fatal(err)
-		}
+
+		r := bytes.NewReader(c.Data)
+		w := bytes.NewBuffer(dst)
+		bw := brotli.NewWriter(w)
+
+		start := time.Now()
+		_, _ = io.Copy(bw, r)
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
+
+		_ = bw.Close() // Make sure the writer is closed
+		dst = w.Bytes()
 
 		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
 		sumRatio = sumRatio + ratio
@@ -51,20 +59,23 @@ func TestCompressLargeSize(t *testing.T) {
 
 func TestCompressAllContracts(t *testing.T) {
 	contracts := csc.ReadContracts(contracsDir)
-
 	sumMbPerSec := 0.00
 	sumRatio := 0.00
 	for _, c := range contracts {
-		start := time.Now()
-
 		dst := make([]byte, 0)
-		dst, err := ztsd.Compress(dst, c.Data)
-		if err != nil {
-			t.Fatal(err)
-		}
+
+		r := bytes.NewReader(c.Data)
+		w := bytes.NewBuffer(dst)
+		bw := brotli.NewWriter(w)
+
+		start := time.Now()
+		_, _ = io.Copy(bw, r)
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
+:
+		_ = bw.Close() // Make sure the writer is closed
+		dst = w.Bytes()
 
 		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
 		sumRatio = sumRatio + ratio

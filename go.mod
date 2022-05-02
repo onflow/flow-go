@@ -5,6 +5,7 @@ go 1.16
 require (
 	cloud.google.com/go/storage v1.16.0
 	github.com/DataDog/zstd v1.5.2 // indirect
+	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/antihax/optional v1.0.0
 	github.com/aws/aws-sdk-go-v2/config v1.8.0
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.1
@@ -22,6 +23,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-cmp v0.5.7
 	github.com/google/uuid v1.3.0
 	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
@@ -70,6 +72,7 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.2.5
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pierrec/lz4 v2.6.1+incompatible
+	github.com/pierrec/lz4/v4 v4.1.14 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/psiemens/sconfig v0.1.0 // indirect

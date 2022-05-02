@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	ztsd "github.com/DataDog/zstd"
 	csc "github.com/onflow/flow-go/cadence_script_compression"
+	ztsd "github.com/valyala/gozstd"
 )
 
 const contracsDir = "../../contracts/mainnet"
@@ -29,10 +29,7 @@ func TestCompressLargeSize(t *testing.T) {
 		start := time.Now()
 
 		dst := make([]byte, 0)
-		dst, err := ztsd.Compress(dst, c.Data)
-		if err != nil {
-			t.Fatal(err)
-		}
+		dst = ztsd.Compress(dst, c.Data)
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
@@ -58,10 +55,7 @@ func TestCompressAllContracts(t *testing.T) {
 		start := time.Now()
 
 		dst := make([]byte, 0)
-		dst, err := ztsd.Compress(dst, c.Data)
-		if err != nil {
-			t.Fatal(err)
-		}
+		dst = ztsd.Compress(dst, c.Data)
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
