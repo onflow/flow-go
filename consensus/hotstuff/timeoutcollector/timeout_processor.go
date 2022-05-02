@@ -9,6 +9,8 @@ import (
 	"sync"
 )
 
+// accumulatedWeightTracker tracks one-time event of reaching required weight
+// Uses atomic flag to guarantee concurrency safety.
 type accumulatedWeightTracker struct {
 	minRequiredWeight uint64
 	done              atomic.Bool
@@ -18,6 +20,8 @@ func (t *accumulatedWeightTracker) Done() bool {
 	return t.done.Load()
 }
 
+// Track checks if required threshold was reached as one-time event and
+// returns true whenever it's reached.
 func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 	if weight < t.minRequiredWeight {
 		return false
@@ -28,11 +32,14 @@ func (t *accumulatedWeightTracker) Track(weight uint64) bool {
 	return false
 }
 
+// highestQCTracker is a helper structure which keeps track of the highest QC(by view)
+// in concurrency safe way.
 type highestQCTracker struct {
 	lock      sync.RWMutex
 	highestQC *flow.QuorumCertificate
 }
 
+// Track updates local state of highestQC if the provided instance is higher(by view)
 func (t *highestQCTracker) Track(qc *flow.QuorumCertificate) {
 	highestQC := t.HighestQC()
 	if highestQC != nil || highestQC.View >= qc.View {
@@ -53,13 +60,13 @@ func (t *highestQCTracker) HighestQC() *flow.QuorumCertificate {
 }
 
 type TimeoutProcessor struct {
-	view             uint64
-	validator        hotstuff.Validator
-	committee        hotstuff.Committee
-	partialTCTracker accumulatedWeightTracker
-	tcTracker        accumulatedWeightTracker
-	highestQCTracker highestQCTracker
-	//sigAggregator         *TimeoutSignatureAggregator
+	view               uint64
+	validator          hotstuff.Validator
+	committee          hotstuff.Committee
+	partialTCTracker   accumulatedWeightTracker
+	tcTracker          accumulatedWeightTracker
+	highestQCTracker   highestQCTracker
+	sigAggregator      *TimeoutSignatureAggregator
 	onPartialTCCreated hotstuff.OnPartialTCCreated
 	onTCCreated        hotstuff.OnTCCreated
 }
@@ -109,16 +116,15 @@ func (p *TimeoutProcessor) Process(timeout *model.TimeoutObject) error {
 		// handle error
 	}
 
-	totalWeight := uint64(0)
-	//totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.HighestQC.View)
-	//if err != nil {
-	//	// handle error
-	//}
+	totalWeight, err := p.sigAggregator.VerifyAndAdd(timeout.SignerID, timeout.SigData, timeout.HighestQC.View)
+	if err != nil {
+		return fmt.Errorf("could not process invalid signature: %w", err)
+	}
 
 	p.highestQCTracker.Track(timeout.HighestQC)
 
 	if p.partialTCTracker.Track(totalWeight) {
-		//p.onPartialTCCreated(p.tcBuilder.View())
+		p.onPartialTCCreated(p.view)
 	}
 
 	// checking of conditions for building TC are satisfied
@@ -193,17 +199,16 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 }
 
 func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
-	panic("implement me")
-	//signers, aggregatedSig, err := p.sigAggregator.UnsafeAggregate()
-	//if err != nil {
-	//	return nil, fmt.Errorf("could not aggregate multi message signature: %w", err)
-	//}
-	//
-	//tc := p.tcBuilder.Build(signers, aggregatedSig)
-	//err = p.validator.ValidateTC(tc)
-	//if err != nil {
-	//	return nil, fmt.Errorf("constructed TC is invalid: %w", err)
-	//}
+	signers, highQCViews, aggregatedSig, err := p.sigAggregator.Aggregate()
+	if err != nil {
+		return nil, fmt.Errorf("could not aggregate multi message signature: %w", err)
+	}
 
-	//return tc, nil
+	return &flow.TimeoutCertificate{
+		View:          p.view,
+		TOHighQCViews: highQCViews,
+		TOHighestQC:   p.highestQCTracker.HighestQC(),
+		SignerIDs:     signers,
+		SigData:       aggregatedSig,
+	}, nil
 }
