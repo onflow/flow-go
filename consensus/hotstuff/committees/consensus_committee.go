@@ -268,7 +268,7 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 //     so long as we eventually cache a newly committed epoch, liveness is not compromised
 func (c *Consensus) tryPrepareNextEpoch() (*staticEpochInfo, bool, error) {
 	next := c.state.Final().Epochs().Next()
-	committed, err := protocol.EpochIsCommitted(next)
+	committed, err := protocol.IsEpochCommitted(next)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not check if epoch is committed: %w", err)
 	}
