@@ -163,53 +163,30 @@ func TestOverrideComponent(t *testing.T) {
 	nb := FlowNode("scaffold test")
 	nb.componentBuilder = component.NewComponentManagerBuilder()
 
-	logger := testLog{}
-
-	readyFn := func(name string) {
-		logger.Logf("%s ready", name)
-	}
-	doneFn := func(name string) {
-		logger.Logf("%s done", name)
-	}
+	logger := &testLog{}
 
 	name1 := "component 1"
 	nb.Component(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name1)
-		return &testReadyDone{
-			name:    name1,
-			readyFn: readyFn,
-			doneFn:  doneFn,
-		}, nil
+		return newTestReadyDone(logger, name1), nil
 	})
 
 	name2 := "component 2"
 	nb.Component(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name2)
-		return &testReadyDone{
-			name:    name2,
-			readyFn: readyFn,
-			doneFn:  doneFn,
-		}, nil
+		return newTestReadyDone(logger, name2), nil
 	})
 
 	name3 := "component 3"
 	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s initialized", name3)
-		return &testReadyDone{
-			name:    name3,
-			readyFn: readyFn,
-			doneFn:  doneFn,
-		}, nil
+		return newTestReadyDone(logger, name3), nil
 	})
 
 	// Overrides second component
 	nb.OverrideComponent(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		logger.Logf("%s overridden", name2)
-		return &testReadyDone{
-			name:    name2,
-			readyFn: readyFn,
-			doneFn:  doneFn,
-		}, nil
+		return newTestReadyDone(logger, name2), nil
 	})
 
 	err := nb.handleComponents()
