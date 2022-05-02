@@ -52,7 +52,7 @@ func TestEncodeIdentity(t *testing.T) {
 	indices, err := signature.EncodeSignersToIndices(only, only)
 	require.NoError(t, err)
 	// byte(1,0,0,0,0,0,0,0)
-	require.Equal(t, []byte{byte(1 << 7)}, indices)
+	require.Equal(t, []byte{byte(1 << 7)}, indices[signature.CheckSumLen:])
 }
 
 // TestEncodeFail verifies that an error is returned in case some signer is not part
@@ -82,7 +82,10 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 		stakingSigners, beaconSigners := sampleSigners(committee, numStakingSigners, numRandomBeaconSigners)
 
 		// encode
-		signerIndices, sigTypes, err := signature.EncodeSignerToIndicesAndSigType(committee, stakingSigners, beaconSigners)
+		prefixed, sigTypes, err := signature.EncodeSignerToIndicesAndSigType(committee, stakingSigners, beaconSigners)
+		require.NoError(t, err)
+
+		signerIndices, err := signature.CompareAndExtract(committeeIdentities.NodeIDs(), prefixed)
 		require.NoError(t, err)
 
 		// check verify signer indices
@@ -161,7 +164,10 @@ func Test_EncodeSignersToIndices(t *testing.T) {
 		signers := committee.Sample(uint(numSigners))
 
 		// encode
-		signerIndices, err := signature.EncodeSignersToIndices(committee, signers)
+		prefixed, err := signature.EncodeSignersToIndices(committee, signers)
+		require.NoError(t, err)
+
+		signerIndices, err := signature.CompareAndExtract(committee, prefixed)
 		require.NoError(t, err)
 
 		// check verify signer indices
@@ -171,7 +177,7 @@ func Test_EncodeSignersToIndices(t *testing.T) {
 
 // Test_DecodeSignerIndicesToIdentifiers uses fuzzy-testing framework Rapid to test the method DecodeSignerIndicesToIdentifiers:
 // * we generate a set of authorized signer: `identities`
-// * part of this set is sampled as singers: `signers`
+// * part of this set is sampled as signers: `signers`
 // * We encode the set using `EncodeSignersToIndices` (tested before) and then decode it.
 //   Thereby we should recover the original input. Caution, the order might be different,
 //   so we sort both sets.
@@ -655,7 +661,8 @@ func correctEncoding(t require.TestingT, indices []byte, canonicalIdentifiers fl
 	// verify that indices has correct length
 	numberBits := 8 * len(indices)
 	require.True(t, numberBits >= len(canonicalIdentifiers), "signerIndices has too few bits")
-	require.True(t, numberBits-len(canonicalIdentifiers) < 8, "signerIndices is padded with too many bits")
+	require.True(t, numberBits-len(canonicalIdentifiers) < 8, fmt.Sprintf("signerIndices %v is padded with too many %v bits",
+		numberBits, len(canonicalIdentifiers)))
 
 	// convert canonicalIdentifiers to map Identifier -> index
 	m := make(map[flow.Identifier]int)
