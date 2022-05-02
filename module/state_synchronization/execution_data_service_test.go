@@ -12,10 +12,8 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	dsns "github.com/ipfs/go-datastore/namespace"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	dshelp "github.com/ipfs/go-ipfs-ds-help"
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -79,18 +77,6 @@ func mockBlobService(bs blockstore.Blockstore) network.BlobService {
 			return ch
 		})
 
-	bex.On("GetBlob", mock.Anything, mock.AnythingOfType("cid.Cid")).
-		Return(
-			func(ctx context.Context, c cid.Cid) blobs.Blob {
-				blob, _ := bs.Get(ctx, c)
-				return blob
-			},
-			func(ctx context.Context, c cid.Cid) error {
-				_, err := bs.Get(ctx, c)
-				return err
-			},
-		)
-
 	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(bs.PutMany)
 
 	return bex
@@ -137,22 +123,12 @@ func getExecutionData(eds ExecutionDataService, rootID flow.Identifier, timeout 
 }
 
 func addExecutionData(eds ExecutionDataService, ed *ExecutionData, timeout time.Duration) (flow.Identifier, error) {
-	id, _, err := addExecutionDataWithTree(eds, ed, timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	id, _, err := eds.Add(ctx, ed)
+
 	return id, err
-}
-
-func addExecutionDataWithTree(eds ExecutionDataService, ed *ExecutionData, timeout time.Duration) (flow.Identifier, BlobTree, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return eds.Add(ctx, ed)
-}
-
-func checkExecutionData(eds ExecutionDataService, rootID flow.Identifier, timeout time.Duration) ([]InvalidCid, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	return eds.Check(ctx, rootID)
 }
 
 func putBlob(bs blockstore.Blockstore, data []byte, timeout time.Duration) (cid.Cid, error) {
@@ -578,98 +554,4 @@ func TestReprovider(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, true, reflect.DeepEqual(expected, actual))
-}
-
-func TestCheck_WithValidBlobs(t *testing.T) {
-	eds := executionDataService(mockBlobService(testBlobstore()))
-
-	t.Run("valid single CID blob", func(t *testing.T) {
-		expected, _ := executionData(t, eds.serializer, defaultMaxBlobSize/10)
-		fid, err := addExecutionData(eds, expected, time.Second)
-		require.NoError(t, err)
-
-		invalidCIDs, ok := checkExecutionData(eds, fid, time.Second)
-		assert.True(t, ok)
-		assert.Empty(t, invalidCIDs)
-	})
-
-	t.Run("valid multi-CID blob", func(t *testing.T) {
-		expected, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-		fid, err := addExecutionData(eds, expected, time.Second)
-		require.NoError(t, err)
-
-		invalidCIDs, ok := checkExecutionData(eds, fid, time.Second)
-		assert.True(t, ok)
-		assert.Empty(t, invalidCIDs)
-	})
-}
-
-func TestCheck_WithInvalidBlobs(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	ds := dssync.MutexWrap(datastore.NewMapDatastore())
-
-	// configure blockstore to hash the blob on read and compare the result to the CID
-	bstore := blockstore.NewBlockstore(ds)
-	bstore.HashOnRead(true)
-
-	bservice := mockBlobService(bstore)
-	eds := executionDataService(bservice)
-
-	// applies db key wrapping used by the blockstore implementation
-	// this is required to make direct calls to the datastore for corrupting the test data
-	wrappedDS := dsns.Wrap(ds, blockstore.BlockPrefix)
-
-	t.Run("corrupted single CID blob", func(t *testing.T) {
-		expected, _ := executionData(t, eds.serializer, defaultMaxBlobSize/10)
-		fid, err := addExecutionData(eds, expected, time.Second)
-		require.NoError(t, err)
-
-		cid := flow.IdToCid(fid)
-		corruptBlob(ctx, t, wrappedDS, cid)
-
-		invalidCIDs, ok := checkExecutionData(eds, fid, time.Second)
-		assert.False(t, ok)
-		require.Len(t, invalidCIDs, 1)
-
-		assert.ErrorIs(t, invalidCIDs[0].Err, blockstore.ErrHashMismatch)
-		assert.Equal(t, cid, invalidCIDs[0].Cid)
-	})
-
-	t.Run("corrupted multiple CID blob", func(t *testing.T) {
-		expected, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-		fid, tree, err := addExecutionDataWithTree(eds, expected, time.Second)
-		require.NoError(t, err)
-
-		corruptedCids := []cid.Cid{tree[0][1], tree[0][5]}
-
-		for _, cid := range corruptedCids {
-			corruptBlob(ctx, t, wrappedDS, cid)
-		}
-
-		invalidCIDs, ok := checkExecutionData(eds, fid, time.Second)
-		assert.False(t, ok)
-		require.Len(t, invalidCIDs, len(corruptedCids))
-
-		for i, cid := range corruptedCids {
-			assert.ErrorIs(t, invalidCIDs[i].Err, blockstore.ErrHashMismatch)
-			assert.Equal(t, cid, invalidCIDs[i].Cid)
-		}
-	})
-}
-
-func corruptBlob(ctx context.Context, t *testing.T, ds datastore.Datastore, cid cid.Cid) {
-	key := dshelp.NewKeyFromBinary(cid.Bytes())
-
-	// get the blob
-	data, err := ds.Get(ctx, key)
-	require.NoError(t, err)
-
-	// corrupt the data by flipping the 3rd bit
-	data[1] ^= 1 << 3
-
-	// overwrite the original data
-	err = ds.Put(ctx, key, data)
-	require.NoError(t, err)
 }
