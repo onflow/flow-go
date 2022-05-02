@@ -21,7 +21,7 @@ var _ hotstuff.Validator = (*Validator)(nil)
 
 // New creates a new Validator instance
 func New(
-	committee hotstuff.Committee,
+	committee hotstuff.VoterCommittee,
 	forks hotstuff.ForksReader,
 	verifier hotstuff.Verifier,
 ) *Validator {
@@ -157,7 +157,14 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	}
 
 	// validate QC - keep the most expensive the last to check
-	return v.ValidateQC(qc)
+	err = v.ValidateQC(qc)
+	if err != nil {
+		if model.IsInvalidQCError(err) {
+			return newInvalidBlockError(block, fmt.Errorf("invalid qc included: %w", err))
+		}
+		return fmt.Errorf("unexpected error verifying qc: %w", err)
+	}
+	return nil
 }
 
 // ValidateVote validates the vote and returns the identity of the voter who signed

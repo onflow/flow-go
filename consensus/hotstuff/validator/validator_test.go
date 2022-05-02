@@ -34,7 +34,7 @@ type ProposalSuite struct {
 	proposal     *model.Proposal
 	vote         *model.Vote
 	voter        *flow.Identity
-	committee    *mocks.Committee
+	committee    *mocks.VoterCommittee
 	forks        *mocks.Forks
 	verifier     *mocks.Verifier
 	validator    *Validator
@@ -63,16 +63,16 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.voter = ps.leader
 
 	// set up the mocked hotstuff Committee state
-	ps.committee = &mocks.Committee{}
+	ps.committee = &mocks.VoterCommittee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.leader.NodeID, nil)
-	ps.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
+	ps.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
+		func(view uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return ps.participants.Filter(selector)
 		},
 		nil,
 	)
 	for _, participant := range ps.participants {
-		ps.committee.On("Identity", mock.Anything, participant.NodeID).Return(participant, nil)
+		ps.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 
 	// the finalized view is the one of the parent of the
@@ -83,8 +83,8 @@ func (ps *ProposalSuite) SetupTest() {
 
 	// set up the mocked verifier
 	ps.verifier = &mocks.Verifier{}
-	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(nil)
-	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
+	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(nil)
+	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
 
 	// set up the validator with the mocked dependencies
 	ps.validator = New(ps.committee, ps.forks, ps.verifier)
@@ -100,8 +100,8 @@ func (ps *ProposalSuite) TestProposalSignatureError() {
 
 	// change the verifier to error on signature validation with unspecific error
 	*ps.verifier = mocks.Verifier{}
-	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(nil)
-	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(errors.New("dummy error"))
+	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(nil)
+	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(errors.New("dummy error"))
 
 	// check that validation now fails
 	err := ps.validator.ValidateProposal(ps.proposal)
@@ -115,8 +115,8 @@ func (ps *ProposalSuite) TestProposalSignatureInvalidFormat() {
 
 	// change the verifier to fail signature validation with ErrInvalidFormat error
 	*ps.verifier = mocks.Verifier{}
-	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(nil)
-	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(fmt.Errorf("%w", model.ErrInvalidFormat))
+	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(nil)
+	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(fmt.Errorf("%w", model.ErrInvalidFormat))
 
 	// check that validation now fails
 	err := ps.validator.ValidateProposal(ps.proposal)
@@ -130,8 +130,8 @@ func (ps *ProposalSuite) TestProposalSignatureInvalid() {
 
 	// change the verifier to fail signature validation
 	*ps.verifier = mocks.Verifier{}
-	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(nil)
-	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(model.ErrInvalidSignature)
+	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(nil)
+	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(model.ErrInvalidSignature)
 
 	// check that validation now fails
 	err := ps.validator.ValidateProposal(ps.proposal)
@@ -144,10 +144,10 @@ func (ps *ProposalSuite) TestProposalSignatureInvalid() {
 func (ps *ProposalSuite) TestProposalWrongLeader() {
 
 	// change the hotstuff.Committee to return a different leader
-	*ps.committee = mocks.Committee{}
+	*ps.committee = mocks.VoterCommittee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.participants[1].NodeID, nil)
 	for _, participant := range ps.participants {
-		ps.committee.On("Identity", mock.Anything, participant.NodeID).Return(participant, nil)
+		ps.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 
 	// check that validation fails now
@@ -158,51 +158,6 @@ func (ps *ProposalSuite) TestProposalWrongLeader() {
 	assert.True(ps.T(), model.IsInvalidBlockError(err), "if the proposal has wrong proposer, we should generate a invalid error")
 }
 
-func (ps *ProposalSuite) TestProposalMismatchingView() {
-
-	// change the QC's view to be different from the parent
-	ps.proposal.Block.QC.View++
-
-	// check that validation fails now
-	err := ps.validator.ValidateProposal(ps.proposal)
-	assert.Error(ps.T(), err, "a proposal with a mismatching QC view should be rejected")
-
-	// check that the error is an invalid proposal error to allow creating slashing challenge
-	assert.True(ps.T(), model.IsInvalidBlockError(err), "if the QC has a mismatching view, we should generate a invalid error")
-}
-
-func (ps *ProposalSuite) TestProposalMissingParentHigher() {
-
-	// change forks to not find the parent
-	ps.block.QC.View = ps.finalized
-	*ps.forks = mocks.Forks{}
-	ps.forks.On("FinalizedView").Return(ps.finalized)
-	ps.forks.On("GetBlock", ps.block.QC.BlockID).Return(nil, false)
-
-	// check that validation fails now
-	err := ps.validator.ValidateProposal(ps.proposal)
-	assert.Error(ps.T(), err, "a proposal with a missing parent should be rejected")
-
-	// check that the error is a missing block error because we should have the block but we don't
-	assert.True(ps.T(), model.IsMissingBlockError(err), "if we don't have the proposal parent for a QC above or equal finalized view, we should generate an missing block error")
-}
-
-func (ps *ProposalSuite) TestProposalMissingParentLower() {
-
-	// change forks to not find the parent
-	ps.block.QC.View = ps.finalized - 1
-	*ps.forks = mocks.Forks{}
-	ps.forks.On("FinalizedView").Return(ps.finalized)
-	ps.forks.On("GetBlock", ps.block.QC.BlockID).Return(nil, false)
-
-	// check that validation fails now
-	err := ps.validator.ValidateProposal(ps.proposal)
-	assert.Error(ps.T(), err, "a proposal with a missing parent should be rejected")
-
-	// check that the error is an unverifiable block because we can't verify the block
-	assert.True(ps.T(), errors.Is(err, model.ErrUnverifiableBlock), "if we don't have the proposal parent for a QC below finalized view, we should generate an unverifiable block error")
-}
-
 // TestProposalQCInvalid checks that Validator handles the verifier's error returns correctly.
 // In case of `model.ErrInvalidFormat` and model.ErrInvalidSignature`, we expect the Validator
 // to recognize those as an invalid QC, i.e. returns an `model.InvalidBlockError`.
@@ -211,9 +166,9 @@ func (ps *ProposalSuite) TestProposalMissingParentLower() {
 func (ps *ProposalSuite) TestProposalQCInvalid() {
 	ps.Run("invalid signature", func() {
 		*ps.verifier = mocks.Verifier{}
-		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(
+		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(
 			fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
-		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
+		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
 
 		// check that validation fails and the failure case is recognized as an invalid block
 		err := ps.validator.ValidateProposal(ps.proposal)
@@ -222,9 +177,9 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 
 	ps.Run("invalid format", func() {
 		*ps.verifier = mocks.Verifier{}
-		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(
+		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(
 			fmt.Errorf("invalid qc: %w", model.ErrInvalidFormat))
-		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
+		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
 
 		// check that validation fails and the failure case is recognized as an invalid block
 		err := ps.validator.ValidateProposal(ps.proposal)
@@ -238,9 +193,9 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 	//       we expect `model.InvalidSignerError` here during normal operations.
 	ps.Run("invalid signer", func() {
 		*ps.verifier = mocks.Verifier{}
-		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(
+		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(
 			fmt.Errorf("invalid qc: %w", model.NewInvalidSignerErrorf("")))
-		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
+		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
 
 		// check that validation fails and the failure case is recognized as an invalid block
 		err := ps.validator.ValidateProposal(ps.proposal)
@@ -251,8 +206,8 @@ func (ps *ProposalSuite) TestProposalQCInvalid() {
 	ps.Run("unknown exception", func() {
 		exception := errors.New("exception")
 		*ps.verifier = mocks.Verifier{}
-		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(exception)
-		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
+		ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(exception)
+		ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
 
 		// check that validation fails and the failure case is recognized as an invalid block
 		err := ps.validator.ValidateProposal(ps.proposal)
@@ -265,8 +220,8 @@ func (ps *ProposalSuite) TestProposalQCError() {
 
 	// change verifier to fail on QC validation
 	*ps.verifier = mocks.Verifier{}
-	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(fmt.Errorf("some exception"))
-	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(nil)
+	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent.View, ps.parent.BlockID).Return(fmt.Errorf("some exception"))
+	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block.View, ps.block.BlockID).Return(nil)
 
 	// check that validation fails now
 	err := ps.validator.ValidateProposal(ps.proposal)
@@ -325,7 +280,7 @@ func (vs *VoteSuite) SetupTest() {
 
 // TestVoteOK checks the happy case, which is the default for the suite
 func (vs *VoteSuite) TestVoteOK() {
-	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	_, err := vs.validator.ValidateVote(vs.vote)
 	assert.NoError(vs.T(), err, "a valid vote should be accepted")
 }
 
@@ -336,7 +291,7 @@ func (vs *VoteSuite) TestVoteMismatchingView() {
 	vs.vote.View++
 
 	// check that the vote is no longer validated
-	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	_, err := vs.validator.ValidateVote(vs.vote)
 	assert.Error(vs.T(), err, "a vote with a mismatching view should be rejected")
 
 	// TODO: this should raise an error that allows a slashing challenge
@@ -350,7 +305,7 @@ func (vs *VoteSuite) TestVoteSignatureError() {
 	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(fmt.Errorf("some exception"))
 
 	// check that the vote is no longer validated
-	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	_, err := vs.validator.ValidateVote(vs.vote)
 	assert.Error(vs.T(), err, "a vote with error on signature validation should be rejected")
 	assert.False(vs.T(), model.IsInvalidVoteError(err), "internal exception should not be interpreted as invalid vote")
 }
@@ -366,7 +321,7 @@ func (vs *VoteSuite) TestVoteInvalidSignerID() {
 
 	// A `model.InvalidSignerError` from the committee should be interpreted as
 	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
-	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	_, err := vs.validator.ValidateVote(vs.vote)
 	assert.Error(vs.T(), err, "a vote with unknown SignerID should be rejected")
 	assert.True(vs.T(), model.IsInvalidVoteError(err), "a vote with unknown SignerID should be rejected")
 }
@@ -382,7 +337,7 @@ func (vs *VoteSuite) TestVoteSignatureInvalid() {
 
 	// A `model.ErrInvalidSignature` from the `hotstuff.Verifier` should be interpreted as
 	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
-	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
+	_, err := vs.validator.ValidateVote(vs.vote)
 	assert.Error(vs.T(), err, "a vote with an invalid signature should be rejected")
 	assert.True(vs.T(), model.IsInvalidVoteError(err), "a vote with an invalid signature should be rejected")
 }
@@ -428,7 +383,7 @@ func (qs *QCSuite) SetupTest() {
 
 	// set up the mocked verifier to verify the QC correctly
 	qs.verifier = &mocks.Verifier{}
-	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.block).Return(nil)
+	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData).Return(nil)
 
 	// set up the validator with the mocked dependencies
 	qs.validator = New(qs.committee, nil, qs.verifier)
@@ -437,15 +392,15 @@ func (qs *QCSuite) SetupTest() {
 func (qs *QCSuite) TestQCOK() {
 
 	// check the default happy case passes
-	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	err := qs.validator.ValidateQC(qs.qc)
 	assert.NoError(qs.T(), err, "a valid QC should be accepted")
 }
 
 // TestQCInvalidSignersError tests that a qc fails validation if:
 // QC signer's Identities cannot all be retrieved (some are not valid consensus participants)
 func (qs *QCSuite) TestQCInvalidSignersError() {
-	qs.participants = qs.participants[1:]           // remove participant[0] from the list of valid consensus participant
-	err := qs.validator.ValidateQC(qs.qc, qs.block) // the QC should not be validated anymore
+	qs.participants = qs.participants[1:] // remove participant[0] from the list of valid consensus participant
+	err := qs.validator.ValidateQC(qs.qc) // the QC should not be validated anymore
 	assert.True(qs.T(), model.IsInvalidBlockError(err), "if some signers are invalid consensus participants, an ErrorInvalidBlock error should be raised")
 }
 
@@ -457,7 +412,7 @@ func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 	qs.committee.On("Identities", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
 
 	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidBlock
-	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	err := qs.validator.ValidateQC(qs.qc)
 	assert.Error(qs.T(), err, "unspecific error when retrieving consensus participants should be escalated to surrounding logic")
 	assert.False(qs.T(), model.IsInvalidBlockError(err), "unspecific internal errors should not result in ErrorInvalidBlock error")
 }
@@ -470,7 +425,7 @@ func (qs *QCSuite) TestQCInsufficientWeight() {
 	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
 
 	// the QC should not be validated anymore
-	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	err := qs.validator.ValidateQC(qs.qc)
 	assert.Error(qs.T(), err, "a QC should be rejected if it has insufficient voted weight")
 
 	// we should get a threshold error to bubble up for extra info
@@ -483,10 +438,10 @@ func (qs *QCSuite) TestQCSignatureError() {
 
 	// set up the verifier to fail QC verification
 	*qs.verifier = mocks.Verifier{}
-	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.block).Return(errors.New("dummy error"))
+	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData).Return(errors.New("dummy error"))
 
 	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidBlock
-	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	err := qs.validator.ValidateQC(qs.qc)
 	assert.Error(qs.T(), err, "unspecific sig verification error should be escalated to surrounding logic")
 	assert.False(qs.T(), model.IsInvalidBlockError(err), "unspecific internal errors should not result in ErrorInvalidBlock error")
 }
@@ -495,10 +450,10 @@ func (qs *QCSuite) TestQCSignatureInvalid() {
 
 	// change the verifier to fail the QC signature
 	*qs.verifier = mocks.Verifier{}
-	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.block).Return(fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
+	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData).Return(fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
 
 	// the QC should no longer be validation
-	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	err := qs.validator.ValidateQC(qs.qc)
 	assert.True(qs.T(), model.IsInvalidBlockError(err), "if the signature is invalid an ErrorInvalidBlock error should be raised")
 }
 
@@ -506,9 +461,9 @@ func (qs *QCSuite) TestQCSignatureInvalidFormat() {
 
 	// change the verifier to fail the QC signature
 	*qs.verifier = mocks.Verifier{}
-	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.block).Return(fmt.Errorf("%w", model.ErrInvalidFormat))
+	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData).Return(fmt.Errorf("%w", model.ErrInvalidFormat))
 
 	// the QC should no longer be validation
-	err := qs.validator.ValidateQC(qs.qc, qs.block)
+	err := qs.validator.ValidateQC(qs.qc)
 	assert.True(qs.T(), model.IsInvalidBlockError(err), "if the signature has an invalid format, an ErrorInvalidBlock error should be raised")
 }
