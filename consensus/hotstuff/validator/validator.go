@@ -67,7 +67,7 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 
 	signers := allParticipants.Filter(filter.HasNodeID(tc.SignerIDs...)) // resulting IdentityList contains no duplicates
 	if len(signers) != len(tc.SignerIDs) {
-		return newInvalidTCError(tc, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at view %x", qc.View))
+		return newInvalidTCError(tc, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at view %x", tc.View))
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
