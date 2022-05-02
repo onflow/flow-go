@@ -206,6 +206,79 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
 }
 
+// TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages from unstaked nodes
+func TestAuthorizedSenderValidator_Unstaked(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
+
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
+	sn2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
+
+	channel := engine.ConsensusCommittee
+	topic := engine.TopicFromChannel(channel, sporkId)
+
+	//NOTE: identity2 is not in the ids list simulating an un-staked node
+	ids := flow.IdentityList{identity1}
+	translator, err := NewFixedTableIdentityTranslator(ids)
+	require.NoError(t, err)
+
+	// setup hooked logger
+	var hookCalls uint64
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			atomic.AddUint64(&hookCalls, 1)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
+	authorizedSenderValidator := validator.AuthorizedSenderValidator(logger, channel, func(pid peer.ID) (*flow.Identity, bool) {
+		fid, err := translator.GetFlowID(pid)
+		if err != nil {
+			return &flow.Identity{}, false
+		}
+		return ids.ByNodeID(fid)
+	})
+
+	// node1 is connected to node2
+	// sn1 <-> sn2
+	require.NoError(t, sn1.AddPeer(context.TODO(), *host.InfoFromHost(sn2.host)))
+
+	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
+	sub1, err := sn1.Subscribe(topic, authorizedSenderValidator)
+	require.NoError(t, err)
+	_, err = sn2.Subscribe(topic)
+	require.NoError(t, err)
+
+	// assert that the nodes are connected as expected
+	require.Eventually(t, func() bool {
+		return len(sn1.pubSub.ListPeers(topic.String())) > 0 &&
+			len(sn2.pubSub.ListPeers(topic.String())) > 0
+	}, 3*time.Second, 100*time.Millisecond)
+
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel5s()
+	// create a dummy block proposal to publish from our SN node
+	header := unittest.BlockHeaderFixture()
+	data1 := getMsgFixtureBz(t, &messages.BlockProposal{Header: &header})
+
+	// sn2 publishes the block proposal on the sync committee channel
+	err = sn2.Publish(timedCtx, topic, data1)
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+
+	// sn1 should not receive message from sn2
+	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	checkReceive(timedCtx, t, nil, sub1, &wg, false)
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
+
+	// expecting 1 warn calls for each rejected message from ejected node
+	require.Equalf(t, uint64(1), hookCalls, "expected 1 warning to be logged")
+}
+
 // TestAuthorizedSenderValidator_Ejected tests that the authorized sender validator rejects messages from nodes that are ejected
 func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
