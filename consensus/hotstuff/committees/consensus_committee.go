@@ -247,7 +247,7 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 	}
 	// we successfully cached the next epoch, return the corresponding static info
 	// if it contains the given view
-	if nextEpochInfo.finalView <= view && view <= nextEpochInfo.finalView {
+	if nextEpochInfo.firstView <= view && view <= nextEpochInfo.finalView {
 		return nextEpochInfo, nil
 	}
 	return nil, ErrViewForUnknownEpoch
@@ -269,6 +269,7 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 func (c *Consensus) tryPrepareNextEpoch() (*staticEpochInfo, bool, error) {
 	next := c.state.Final().Epochs().Next()
 	committed, err := protocol.IsEpochCommitted(next)
+	fmt.Println("committed? ", committed, err)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not check if epoch is committed: %w", err)
 	}

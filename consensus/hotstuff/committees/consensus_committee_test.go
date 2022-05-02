@@ -106,6 +106,7 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 
 	state := new(protocolmock.State)
 	snapshot := new(protocolmock.Snapshot)
+	state.On("Final").Return(snapshot)
 
 	// create a mock epoch for leader selection setup in constructor
 	epoch1 := newMockEpoch(
@@ -178,6 +179,7 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 		t.Run("should be unable to retrieve epoch 1 identity in epoch 2", func(t *testing.T) {
 			_, err := com.IdentityByEpoch(randUint64(101, 200), realIdentity.NodeID)
 			require.Error(t, err)
+			fmt.Println(err)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
@@ -201,9 +203,9 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 	})
 }
 
-// test that LeaderForView returns a valid leader for the previous and current
-// epoch and that it returns the appropriate sentinel for the next epoch if it
-// is not yet ready
+// TestConsensus_LeaderForView tests that LeaderForView returns a valid leader
+// for the previous and current epoch and that it returns the appropriate
+// sentinel for the next epoch if it is not yet ready
 func TestConsensus_LeaderForView(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(10)
@@ -241,7 +243,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 	t.Run("next epoch not ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
 			// get leader for view in previous epoch
-			leaderID, err := committee.LeaderForView(50)
+			leaderID, err := committee.LeaderForView(randUint64(1, 100))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -249,37 +251,17 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("current epoch", func(t *testing.T) {
 			// get leader for view in current epoch
-			leaderID, err := committee.LeaderForView(150)
+			leaderID, err := committee.LeaderForView(randUint64(101, 200))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
 		})
 
-		t.Run("after current epoch", func(t *testing.T) {
-			unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EECC), rather than returning an error")
-			// REASON FOR SKIPPING TEST:
-			// We have a temporary fallback to continue with the current consensus committee, if the
-			// setup for the next epoch failed (aka emergency epoch chain continuation -- EECC).
-			// This test covers with behaviour _without_ EECC and is therefore skipped.
-			// The behaviour _with EECC_ is covered by the following test:
-			// "after current epoch - with emergency epoch chain continuation"
-			// TODO: for the mature implementation, remove EECC, enable this test, and remove the following test
-
+		t.Run("after current epoch - should return ErrViewForUnknownEpoch", func(t *testing.T) {
 			// get leader for view in next epoch when it is not set up yet
-			_, err := committee.LeaderForView(250)
+			_, err := committee.LeaderForView(randUint64(201, 300))
 			assert.Error(t, err)
-			assert.True(t, errors.Is(err, protocol.ErrNextEpochNotSetup))
-		})
-
-		t.Run("after current epoch - with emergency epoch chain continuation", func(t *testing.T) {
-			// This test covers the TEMPORARY emergency epoch chain continuation (EECC) fallback
-			// TODO: for the mature implementation, remove this test,
-			//       enable the previous test "after current epoch"
-
-			// get leader for view in next epoch when it is not set up yet
-			_, err := committee.LeaderForView(250)
-			// emergency epoch chain continuation should kick in and return a valid leader
-			assert.NoError(t, err)
+			assert.True(t, errors.Is(err, ErrViewForUnknownEpoch))
 		})
 	})
 
@@ -296,7 +278,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 	t.Run("next epoch ready", func(t *testing.T) {
 		t.Run("previous epoch", func(t *testing.T) {
 			// get leader for view in previous epoch
-			leaderID, err := committee.LeaderForView(50)
+			leaderID, err := committee.LeaderForView(randUint64(1, 100))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -304,7 +286,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("current epoch", func(t *testing.T) {
 			// get leader for view in current epoch
-			leaderID, err := committee.LeaderForView(150)
+			leaderID, err := committee.LeaderForView(randUint64(101, 200))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
@@ -312,14 +294,21 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("next epoch", func(t *testing.T) {
 			// get leader for view in next epoch after it has been set up
-			leaderID, err := committee.LeaderForView(250)
+			leaderID, err := committee.LeaderForView(randUint64(201, 300))
 			require.Nil(t, err)
 			_, exists := identities.ByNodeID(leaderID)
 			assert.True(t, exists)
 		})
+
+		t.Run("beyond known epochs", func(t *testing.T) {
+			_, err := committee.LeaderForView(randUint64(301, 1_000_000))
+			assert.Error(t, err)
+			assert.True(t, errors.Is(err, ErrViewForUnknownEpoch))
+		})
 	})
 }
 
+// TestRemoveOldEpochs tests that old epochs are pruned
 func TestRemoveOldEpochs(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(10)
@@ -345,7 +334,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 
 	// we should start with only current epoch (epoch 1) pre-computed
 	// since there is no previous epoch
-	assert.Equal(t, 1, len(committee.leaders))
+	assert.Equal(t, 1, len(committee.epochs))
 
 	// test for 10 epochs
 	for currentEpochCounter < 10 {
@@ -366,9 +355,9 @@ func TestRemoveOldEpochs(t *testing.T) {
 		t.Run(fmt.Sprintf("epoch %d", currentEpochCounter), func(t *testing.T) {
 			// check we have the right number of epochs stored
 			if currentEpochCounter <= 3 {
-				assert.Equal(t, int(currentEpochCounter), len(committee.leaders))
+				assert.Equal(t, int(currentEpochCounter), len(committee.epochs))
 			} else {
-				assert.Equal(t, 3, len(committee.leaders))
+				assert.Equal(t, 3, len(committee.epochs))
 			}
 
 			// check we have the correct epochs stored
@@ -377,7 +366,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 				if counter < firstEpochCounter {
 					break
 				}
-				_, exists := committee.leaders[counter]
+				_, exists := committee.epochs[counter]
 				assert.True(t, exists, "missing epoch with counter %d max counter is %d", counter, currentEpochCounter)
 			}
 		})
