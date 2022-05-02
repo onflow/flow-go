@@ -3,8 +3,7 @@ package cadence_script_compression
 import (
 	"os"
 	"path/filepath"
-
-	"github.com/onflow/flow-go/model/flow"
+	"time"
 )
 
 const (
@@ -22,10 +21,8 @@ type CompressionComparison struct {
 	UncompressedData []byte
 }
 
-func ReadContracts(chainID flow.ChainID) []*Contract {
-	contracts := make([]*Contract, 0)
-
-	dir := getDir(chainID)
+func ReadContracts(dir string) map[string]*Contract {
+	contracts := make(map[string]*Contract, 0)
 
 	files, err := os.ReadDir(dir)
 	if err != nil {
@@ -35,7 +32,7 @@ func ReadContracts(chainID flow.ChainID) []*Contract {
 	dirPath, _ := filepath.Abs(dir)
 	for _, file := range files {
 		filePath := filepath.Join(dirPath, file.Name())
-		contracts = append(contracts, ReadContract(filePath))
+		contracts[file.Name()] = ReadContract(filePath)
 	}
 
 	return contracts
@@ -64,14 +61,6 @@ func readContract(path string) *Contract {
 	}
 }
 
-func getDir(chainID flow.ChainID) string {
-	if chainID == flow.Mainnet {
-		return mainnetContractsDir
-	}
-
-	return ""
-}
-
 func (c *CompressionComparison) CompressedSize() int {
 	return len(c.CompressedData)
 }
@@ -81,6 +70,10 @@ func (c *CompressionComparison) UnCompressedSize() int {
 }
 
 // CompressionRatio is the uncompressed size / compressed size
-func (c *CompressionComparison) CompressionRatio() float64 {
-	return float64(len(c.UncompressedData)) / float64(len(c.CompressedData))
+func CompressionRatio(uncompressed, compressed float64) float64 {
+	return uncompressed / compressed
+}
+
+func CompressionSpeed(size float64, start time.Time) float64 {
+	return (size / (1 << 20)) / (float64(time.Since(start)) / (float64(time.Second)))
 }
