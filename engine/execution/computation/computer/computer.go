@@ -3,7 +3,13 @@ package computer
 import (
 	"context"
 	"fmt"
+	"math"
+	"os"
+	"os/exec"
+	"regexp"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -320,6 +326,61 @@ func (e *blockComputer) executeCollection(
 	return txIndex, nil
 }
 
+/* call top to get the memory of a process. Returns memory of the process in bytes */
+func GetProcessMem(pid int) uint64 {
+	out, err := exec.Command("top", "-stats", "mem", "-l 1", "-pid", strconv.FormatInt(int64(pid), 10)).Output()
+	if err != nil {
+		fmt.Printf("err: %s \n", err)
+	}
+
+	var s = string(out)
+	var lines = strings.Split(s, "\n")
+
+	//debug
+	/*
+			fmt.Printf("%s \n", out)
+			for i, j := range lines {
+				fmt.Println(i, j)
+			}
+
+		fmt.Printf("MEM: %s \n", lines[12])
+	*/
+
+	//separate units form the size
+	var mem = lines[12]
+	reg, _ := regexp.Compile("[^A-Z,]+")
+	processedStringUnit := reg.ReplaceAllString(mem, "")
+
+	//extract numerix value (without units) from the value returned by top
+	reg, _ = regexp.Compile("[^0-9,]+")
+	processedStringMem := reg.ReplaceAllString(mem, "")
+	memValUnit, err := strconv.Atoi(processedStringMem)
+	if err != nil {
+		fmt.Printf("err: %s \n", err)
+	}
+
+	//convert the value to bytes
+	var memValBytes uint64 = 0
+	var factor uint64 = 0
+	switch processedStringUnit[0] {
+	case 'K':
+		factor = uint64(math.Pow(2, 10))
+	case 'M':
+		factor = uint64(math.Pow(2, 20))
+	case 'G':
+		factor = uint64(math.Pow(2, 30))
+	default:
+		fmt.Printf("err: conversion of units: %s \n", processedStringUnit[0])
+
+	}
+	memValBytes = factor * uint64(memValUnit)
+
+	//debug
+	//fmt.Printf("TOP MEM: %d UNIT:%s memValBytes:%d\n", memValUnit, processedStringUnit, memValBytes)
+
+	return memValBytes
+}
+
 func (e *blockComputer) executeTransaction(
 	txBody *flow.TransactionBody,
 	colSpan opentracing.Span,
@@ -341,6 +402,9 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	txID := txBody.ID()
+
+	var osMemAllocBefore = int(GetProcessMem(os.Getpid()))
+	//fmt.Println("Tx ID:%d, mem:%d", txID, GetProcessMem(os.Getpid()))
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
 	txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
@@ -419,6 +483,9 @@ func (e *blockComputer) executeTransaction(
 		memAllocAfter := m.TotalAlloc
 		evt = evt.Uint64("memAlloc", memAllocAfter-memAllocBefore)
 	}
+
+	var osMemAllocAfter = int(GetProcessMem(os.Getpid()))
+	fmt.Println("Tx ID: %d MEM before: %d after: %d diff: %d", txID, osMemAllocBefore, osMemAllocAfter, osMemAllocAfter-osMemAllocBefore)
 
 	lg := evt.
 		Logger()
