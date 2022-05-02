@@ -268,11 +268,11 @@ func (vs *VoteSuite) SetupTest() {
 
 	// set up the mocked verifier
 	vs.verifier = &mocks.Verifier{}
-	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(nil)
+	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block.View, vs.block.BlockID).Return(nil)
 
 	// the leader for the block view is the correct one
 	vs.committee = &mocks.Committee{}
-	vs.committee.On("Identity", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
+	vs.committee.On("IdentityByEpoch", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
 
 	// set up the validator with the mocked dependencies
 	vs.validator = New(vs.committee, vs.forks, vs.verifier)
@@ -284,25 +284,11 @@ func (vs *VoteSuite) TestVoteOK() {
 	assert.NoError(vs.T(), err, "a valid vote should be accepted")
 }
 
-// TestVoteMismatchingView checks that the Validator handles the case where the
-// vote contains a mismatching `View` value. In this case, the vote is invalid.
-// Hence, we expect the Validator to return a `model.InvalidVoteError`.
-func (vs *VoteSuite) TestVoteMismatchingView() {
-	vs.vote.View++
-
-	// check that the vote is no longer validated
-	_, err := vs.validator.ValidateVote(vs.vote)
-	assert.Error(vs.T(), err, "a vote with a mismatching view should be rejected")
-
-	// TODO: this should raise an error that allows a slashing challenge
-	assert.True(vs.T(), model.IsInvalidVoteError(err), "a mismatching view should create a invalid vote error")
-}
-
 // TestVoteSignatureError checks that the Validator does not misinterpret
 // unexpected exceptions for invalid votes.
 func (vs *VoteSuite) TestVoteSignatureError() {
 	*vs.verifier = mocks.Verifier{}
-	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(fmt.Errorf("some exception"))
+	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block.View, vs.block.BlockID).Return(fmt.Errorf("some exception"))
 
 	// check that the vote is no longer validated
 	_, err := vs.validator.ValidateVote(vs.vote)
@@ -317,7 +303,7 @@ func (vs *VoteSuite) TestVoteSignatureError() {
 // Hence, we expect the validator to return a `model.InvalidVoteError`.
 func (vs *VoteSuite) TestVoteInvalidSignerID() {
 	*vs.committee = mocks.Committee{}
-	vs.committee.On("Identity", vs.block.BlockID, vs.vote.SignerID).Return(nil, model.NewInvalidSignerErrorf(""))
+	vs.committee.On("IdentityByEpoch", vs.block.View, vs.vote.SignerID).Return(nil, model.NewInvalidSignerErrorf(""))
 
 	// A `model.InvalidSignerError` from the committee should be interpreted as
 	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
@@ -333,7 +319,7 @@ func (vs *VoteSuite) TestVoteInvalidSignerID() {
 // Hence, we expect the validator to return a `model.InvalidVoteError`.
 func (vs *VoteSuite) TestVoteSignatureInvalid() {
 	*vs.verifier = mocks.Verifier{}
-	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(fmt.Errorf("staking sig is invalid: %w", model.ErrInvalidSignature))
+	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block.View, vs.block.BlockID).Return(fmt.Errorf("staking sig is invalid: %w", model.ErrInvalidSignature))
 
 	// A `model.ErrInvalidSignature` from the `hotstuff.Verifier` should be interpreted as
 	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
