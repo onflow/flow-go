@@ -359,6 +359,9 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 }
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
+// It blocks until all blobs are retrieved and the ExecutionData is reconstructed, or an error occurs.
+// If a bitswap enabled blobservice is used and the requested ExecutionData is not already in the
+// local blobstore, the ExecutionData will be retrieved from the network and stored in the blobstore.
 // The returned error will be:
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if any blob in the blob tree exceeds the maximum blob size
