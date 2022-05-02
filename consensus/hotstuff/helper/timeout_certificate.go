@@ -47,6 +47,12 @@ func WithTCView(view uint64) func(*flow.TimeoutCertificate) {
 	}
 }
 
+func WithTCHighQCViews(highQCViews []uint64) func(*flow.TimeoutCertificate) {
+	return func(tc *flow.TimeoutCertificate) {
+		tc.TOHighQCViews = highQCViews
+	}
+}
+
 func TimeoutObjectFixture(opts ...func(TimeoutObject *hotstuff.TimeoutObject)) *hotstuff.TimeoutObject {
 	timeout := &hotstuff.TimeoutObject{
 		View:       uint64(rand.Uint32()),

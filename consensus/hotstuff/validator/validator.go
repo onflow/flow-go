@@ -35,8 +35,8 @@ func New(
 func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 	highestQC := tc.TOHighestQC
 
-	if len(tc.TOHighQCViews) == 0 {
-		return newInvalidTCError(tc, fmt.Errorf(""))
+	if len(tc.SignerIDs) == 0 {
+		return newInvalidTCError(tc, fmt.Errorf("TC must have at least one signer"))
 	}
 
 	// consistency checks

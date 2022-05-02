@@ -387,7 +387,7 @@ func (qs *QCSuite) TestQCOK() {
 func (qs *QCSuite) TestQCInvalidSignersError() {
 	qs.participants = qs.participants[1:] // remove participant[0] from the list of valid consensus participant
 	err := qs.validator.ValidateQC(qs.qc) // the QC should not be validated anymore
-	assert.True(qs.T(), model.IsInvalidQCError(err), "if some signers are invalid consensus participants, an ErrorInvalidBlock error should be raised")
+	assert.True(qs.T(), model.IsInvalidQCError(err), "if some signers are invalid consensus participants, an ErrorInvalidQC error should be raised")
 }
 
 // TestQCRetrievingParticipantsError tests that validation errors if:
@@ -397,10 +397,10 @@ func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 	*qs.committee = mocks.Committee{}
 	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
 
-	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidBlock
+	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidQC
 	err := qs.validator.ValidateQC(qs.qc)
 	assert.Error(qs.T(), err, "unspecific error when retrieving consensus participants should be escalated to surrounding logic")
-	assert.False(qs.T(), model.IsInvalidQCError(err), "unspecific internal errors should not result in ErrorInvalidBlock error")
+	assert.False(qs.T(), model.IsInvalidQCError(err), "unspecific internal errors should not result in ErrorInvalidQC error")
 }
 
 // TestQCSignersError tests that a qc fails validation if:
@@ -426,10 +426,10 @@ func (qs *QCSuite) TestQCSignatureError() {
 	*qs.verifier = mocks.Verifier{}
 	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.qc.View, qs.qc.BlockID).Return(errors.New("dummy error"))
 
-	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidBlock
+	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidQC
 	err := qs.validator.ValidateQC(qs.qc)
 	assert.Error(qs.T(), err, "unspecific sig verification error should be escalated to surrounding logic")
-	assert.False(qs.T(), model.IsInvalidQCError(err), "unspecific internal errors should not result in ErrorInvalidBlock error")
+	assert.False(qs.T(), model.IsInvalidQCError(err), "unspecific internal errors should not result in ErrorInvalidQC error")
 }
 
 func (qs *QCSuite) TestQCSignatureInvalid() {
@@ -440,7 +440,7 @@ func (qs *QCSuite) TestQCSignatureInvalid() {
 
 	// the QC should no longer be validation
 	err := qs.validator.ValidateQC(qs.qc)
-	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature is invalid an ErrorInvalidBlock error should be raised")
+	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature is invalid an ErrorInvalidQC error should be raised")
 }
 
 func (qs *QCSuite) TestQCSignatureInvalidFormat() {
@@ -451,5 +451,79 @@ func (qs *QCSuite) TestQCSignatureInvalidFormat() {
 
 	// the QC should no longer be validation
 	err := qs.validator.ValidateQC(qs.qc)
-	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature has an invalid format, an ErrorInvalidBlock error should be raised")
+	assert.True(qs.T(), model.IsInvalidQCError(err), "if the signature has an invalid format, an ErrorInvalidQC error should be raised")
+}
+
+func TestValidateTC(t *testing.T) {
+	suite.Run(t, new(TCSuite))
+}
+
+type TCSuite struct {
+	suite.Suite
+	participants flow.IdentityList
+	signers      flow.IdentityList
+	block        *model.Block
+	tc           *flow.TimeoutCertificate
+	committee    *mocks.Committee
+	verifier     *mocks.Verifier
+	validator    *Validator
+}
+
+func (s *TCSuite) SetupTest() {
+
+	// create a list of 10 nodes with 1-weight each
+	s.participants = unittest.IdentityListFixture(10,
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithWeight(1),
+	)
+
+	// signers are a qualified majority at 7
+	s.signers = s.participants[:7]
+
+	rand.Seed(time.Now().UnixNano())
+	view := uint64(rand.Uint32()) + 1
+
+	highQCViews := make([]uint64, 0, len(s.signers))
+	for range s.signers {
+		highQCViews = append(highQCViews, view)
+	}
+
+	// create a block that has the signers in its QC
+	parent := helper.MakeBlock(helper.WithBlockView(view - 1))
+	s.block = helper.MakeBlock(helper.WithBlockView(view),
+		helper.WithParentBlock(parent),
+		helper.WithParentSigners(s.signers.NodeIDs()))
+	s.tc = helper.MakeTC(helper.WithTCHighestQC(s.block.QC),
+		helper.WithTCView(view+1),
+		helper.WithTCSigners(s.signers.NodeIDs()),
+		helper.WithTCHighQCViews(highQCViews))
+
+	// return the correct participants and identities from view state
+	s.committee = &mocks.Committee{}
+	s.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
+		func(view uint64, selector flow.IdentityFilter) flow.IdentityList {
+			return s.participants.Filter(selector)
+		},
+		nil,
+	)
+
+	s.verifier = &mocks.Verifier{}
+	s.verifier.On("VerifyQC", s.signers, s.block.QC.SigData, parent.View, parent.BlockID).Return(nil)
+
+	// set up the validator with the mocked dependencies
+	s.validator = New(s.committee, nil, s.verifier)
+}
+
+func (s *TCSuite) TestTCOk() {
+	s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(nil).Once()
+
+	// check the default happy case passes
+	err := s.validator.ValidateTC(s.tc)
+	assert.NoError(s.T(), err, "a valid TC should be accepted")
+}
+
+func (s *TCSuite) TestTCEmptySigners() {
+	s.participants = s.participants[1:] // remove participant[0] from the list of valid consensus participant
+	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	assert.True(s.T(), model.IsInvalidTCError(err), "if some signers are invalid consensus participants, an ErrorInvalidTC error should be raised")
 }
