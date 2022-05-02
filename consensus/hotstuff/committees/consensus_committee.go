@@ -25,6 +25,7 @@ type staticEpochInfo struct {
 	finalView        uint64
 	leaders          *leader.LeaderSelection
 	initialCommittee flow.IdentityList
+	dkg              hotstuff.DKG
 }
 
 // newStaticEpochInfo returns the static epoch information from the epoch.
@@ -47,12 +48,17 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 		return nil, fmt.Errorf("could not initial identities: %w", err)
 	}
 	initialCommittee := initialidentities.Filter(filter.IsVotingConsensusCommitteeMember)
+	dkg, err := epoch.DKG()
+	if err != nil {
+		return nil, fmt.Errorf("could not get dkg: %w", err)
+	}
 
 	epochInfo := &staticEpochInfo{
 		firstView:        firstView,
 		finalView:        finalView,
 		leaders:          leaders,
 		initialCommittee: initialCommittee,
+		dkg:              dkg,
 	}
 	return epochInfo, nil
 }
@@ -131,80 +137,120 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 	return identity, nil
 }
 
+// IdentitiesByEpoch returns the committee identities in the epoch which contains
+// the given view.
+//
+// Error returns:
+//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//     This is an expected error and must be handled.
+//   * unspecific error in case of unexpected problems and bugs
+//
 func (c *Consensus) IdentitiesByEpoch(view uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
-
+	epochInfo, err := c.staticEpochInfoByView(view)
+	if err != nil {
+		return nil, err
+	}
+	return epochInfo.initialCommittee.Filter(selector), nil
 }
 
+// IdentityByEpoch returns the identity for the given node ID, in the epoch which
+// contains the given view.
+//
+// Error returns:
+//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//     This is an expected error and must be handled.
+//   * unspecific error in case of unexpected problems and bugs
+//
 func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.Identity, error) {
-
+	epochInfo, err := c.staticEpochInfoByView(view)
+	if err != nil {
+		return nil, err
+	}
+	identity, ok := epochInfo.initialCommittee.ByNodeID(nodeID)
+	if !ok {
+		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id: %w", nodeID, err)
+	}
+	return identity, nil
 }
 
-// LeaderForView returns the node ID of the leader for the given view. Returns
-// the following errors:
-//  * epoch containing the requested view has not been set up (protocol.ErrNextEpochNotSetup)
-//  * epoch is too far in the past (leader.InvalidViewError)
-//  * any other error indicates an unexpected internal error
+// LeaderForView returns the node ID of the leader for the given view.
+//
+// Error returns:
+//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//     This is an expected error and must be handled.
+//   * unspecific error in case of unexpected problems and bugs
 //
 // TODO: Update protocol state to trigger EECC early using safety threshold
 //   * see https://github.com/dapperlabs/flow-go/issues/6227 for details
+//   * the current implementation assumes #6227 is implemented
 //   * we no longer need EECC logic here, because the protocol state will
 //     inject a "next" fallback epoch carrying over the last committee until
-//     the next spork, which we will query here
+//     the next spork, which we query here
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 
-	id, err := c.precomputedLeaderForView(view)
-	// happy path - we already pre-computed the leader for this view
-	if err == nil {
-		return id, nil
-	}
-	// unexpected error
-	if err != nil && !errors.Is(err, ErrViewForUnknownEpoch) {
-		return flow.ZeroID, fmt.Errorf("unexpected error retrieving precomputed leader for view: %w", err)
-	}
-
-	// at this point, we know that the epoch for the given view is not cached
-	// try to retrieve and cache epoch info for the next epoch
-	nextEpochInfo, ok, err := c.tryPrepareNextEpoch()
+	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
-		return flow.ZeroID, fmt.Errorf("unexpected error trying to cache next epoch: %w", err)
+		return flow.ZeroID, err
 	}
-	// we don't know about the epoch for this view yet, return the sentinel
-	if !ok {
-		return flow.ZeroID, ErrViewForUnknownEpoch
-	}
-	// attempt to retrieve the leader for the newly cached epoch
-	// if the view is still not found here, we will return ErrViewForUnknownEpoch
-	return nextEpochInfo.leaders.LeaderForView(view)
+	return epochInfo.leaders.LeaderForView(view)
 }
 
 func (c *Consensus) Self() flow.Identifier {
 	return c.me
 }
 
-func (c *Consensus) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
-	return c.state.AtBlockID(blockID).Epochs().Current().DKG()
+// DKG returns the DKG for epoch which includes the given view.
+//
+// Error returns:
+//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//     This is an expected error and must be handled.
+//   * unspecific error in case of unexpected problems and bugs
+func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
+	epochInfo, err := c.staticEpochInfoByView(view)
+	if err != nil {
+		return nil, err
+	}
+	return epochInfo.dkg, nil
 }
 
-// precomputedLeaderForView retrieves the leader from the precomputed
-// LeaderSelection in `c.leaders`
+// staticEpochInfoByView retrieves the previously cached static epoch info for
+// the epoch which includes the given view. If no epoch is known for the given
+// view, we will attempt to cache the next epoch.
+//
 // Error returns:
-//   * ErrViewForUnknownEpoch [sentinel error] if there is no Epoch for view stored in `c.leaders`
+//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known
 //   * unspecific error in case of unexpected problems and bugs
-func (c *Consensus) precomputedLeaderForView(view uint64) (flow.Identifier, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error) {
 
 	// look for an epoch matching this view for which we have already pre-computed
 	// leader selection. Epochs last ~500k views, so we find the epoch here 99.99%
 	// of the time. Since epochs are long-lived and we only cache the most recent 3,
 	// this linear map iteration is inexpensive.
+	c.mu.RLock()
 	for _, epoch := range c.epochs {
 		if epoch.firstView <= view && view <= epoch.finalView {
-			return epoch.leaders.LeaderForView(view)
+			c.mu.RUnlock()
+			return epoch, nil
 		}
 	}
+	c.mu.RUnlock()
 
-	return flow.ZeroID, ErrViewForUnknownEpoch
+	// at this point, we know that the epoch for the given view is not cached
+	// try to retrieve and cache epoch info for the next epoch
+	nextEpochInfo, ok, err := c.tryPrepareNextEpoch()
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error trying to cache next epoch: %w", err)
+	}
+	// we don't know about the epoch for this view yet, return the sentinel
+	if !ok {
+		return nil, ErrViewForUnknownEpoch
+	}
+	// we successfully cached the next epoch, return the corresponding static info
+	// if it contains the given view
+	if nextEpochInfo.finalView <= view && view <= nextEpochInfo.finalView {
+		return nextEpochInfo, nil
+	}
+	return nil, ErrViewForUnknownEpoch
 }
 
 // tryPrepareNextEpoch tries to cache the next epoch, returning the cached static
