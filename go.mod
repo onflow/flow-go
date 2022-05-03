@@ -51,7 +51,6 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.6.0
 	github.com/libp2p/go-libp2p-swarm v0.10.2
 	github.com/libp2p/go-libp2p-tls v0.4.1
-	github.com/libp2p/go-libp2p-transport-upgrader v0.7.1
 	github.com/libp2p/go-tcp-transport v0.5.1
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.5.0
