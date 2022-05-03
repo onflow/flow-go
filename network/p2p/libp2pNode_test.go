@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -38,10 +39,10 @@ func TestMultiAddress(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		ip, port, _, err := networkingInfo(*tc.identity)
+		ip, port, _, err := p2p.NetworkingInfo(*tc.identity)
 		require.NoError(t, err)
 
-		actualAddress := MultiAddressStr(ip, port)
+		actualAddress := p2p.MultiAddressStr(ip, port)
 		assert.Equal(t, tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 
@@ -73,12 +74,12 @@ func TestGetPeerInfo(t *testing.T) {
 		identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
 
 		// translates node-i address into info
-		info, err := PeerAddressInfo(*identity)
+		info, err := p2p.PeerAddressInfo(*identity)
 		require.NoError(t, err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
-			rinfo, err := PeerAddressInfo(*identity)
+			rinfo, err := p2p.PeerAddressInfo(*identity)
 			require.NoError(t, err)
 			assert.Equal(t, rinfo.String(), info.String(), "inconsistent id generated")
 		}
@@ -97,13 +98,13 @@ func TestAddPeers(t *testing.T) {
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
-		peerInfo, err := PeerAddressInfo(*identity)
+		peerInfo, err := p2p.PeerAddressInfo(*identity)
 		require.NoError(t, err)
 		require.NoError(t, nodes[0].AddPeer(ctx, peerInfo))
 	}
 
 	// Checks if both of the other nodes have been added as peers to the first node
-	assert.Len(t, nodes[0].host.Network().Peers(), count-1)
+	assert.Len(t, nodes[0].Host().Network().Peers(), count-1)
 }
 
 // TestRemovePeers checks if nodes can be removed as peers from a given node
@@ -114,7 +115,7 @@ func TestRemovePeers(t *testing.T) {
 
 	// create nodes
 	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
-	peerInfos, errs := peerInfosFromIDs(identities)
+	peerInfos, errs := p2p.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 	defer stopNodes(t, nodes)
 
@@ -124,12 +125,12 @@ func TestRemovePeers(t *testing.T) {
 	}
 
 	// check if all other nodes have been added as peers to the first node
-	assert.Len(t, nodes[0].host.Network().Peers(), count-1)
+	assert.Len(t, nodes[0].Host().Network().Peers(), count-1)
 
 	// disconnect from each peer and assert that the connection no longer exists
 	for _, pInfo := range peerInfos[1:] {
 		require.NoError(t, nodes[0].RemovePeer(pInfo.ID))
-		assert.Equal(t, network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
+		assert.Equal(t, network.NotConnected, nodes[0].Host().Network().Connectedness(pInfo.ID))
 	}
 }
 
@@ -145,7 +146,7 @@ func TestConnGater(t *testing.T) {
 		return ok
 	}))
 	defer stopNode(t, node1)
-	node1Info, err := PeerAddressInfo(identity1)
+	node1Info, err := p2p.PeerAddressInfo(identity1)
 	assert.NoError(t, err)
 
 	node2Peers := make(map[peer.ID]struct{})
@@ -154,11 +155,11 @@ func TestConnGater(t *testing.T) {
 		return ok
 	}))
 	defer stopNode(t, node2)
-	node2Info, err := PeerAddressInfo(identity2)
+	node2Info, err := p2p.PeerAddressInfo(identity2)
 	assert.NoError(t, err)
 
-	node1.host.Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)
-	node2.host.Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.PermanentAddrTTL)
+	node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)
+	node2.Host().Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.PermanentAddrTTL)
 
 	_, err = node1.CreateStream(ctx, node2Info.ID)
 	assert.Error(t, err, "connection should not be possible")

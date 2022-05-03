@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"context"
@@ -12,13 +12,16 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
-type nodeOpt func(NodeBuilder)
+const maxConnectAttempt = 3
+
+type nodeOpt func(p2p.NodeBuilder)
 
 func withSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
-	return func(builder NodeBuilder) {
+	return func(builder p2p.NodeBuilder) {
 		builder.SetSubscriptionFilter(filter)
 	}
 }
@@ -29,10 +32,10 @@ func createNode(
 	networkKey crypto.PrivateKey,
 	sporkID flow.Identifier,
 	opts ...nodeOpt,
-) *Node {
-	builder := NewNodeBuilder(zerolog.Nop(), "0.0.0.0:0", networkKey, sporkID).
+) *p2p.Node {
+	builder := p2p.NewNodeBuilder(zerolog.Nop(), "0.0.0.0:0", networkKey, sporkID).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID))
+			return p2p.NewDHT(c, h, unicast.FlowDHTProtocolID(sporkID))
 		}).
 		SetPubSub(pubsub.NewGossipSub)
 

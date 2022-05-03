@@ -98,8 +98,8 @@ func filterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, di
 	return filteredStreams
 }
 
-// networkingInfo returns ip, port, libp2p public key of the identity.
-func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, error) {
+// NetworkingInfo returns ip, port, libp2p public key of the identity.
+func NetworkingInfo(identity flow.Identity) (string, string, crypto.PubKey, error) {
 	// split the node address into ip and port
 	ip, port, err := net.SplitHostPort(identity.Address)
 	if err != nil {
@@ -168,7 +168,7 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 //    |-- Address          --->   |-- []multiaddr.Multiaddr
 //    |-- NetworkPublicKey --->   |-- ID
 func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
-	ip, port, key, err := networkingInfo(identity)
+	ip, port, key, err := NetworkingInfo(identity)
 	if err != nil {
 		return peer.AddrInfo{}, fmt.Errorf("could not translate identity to networking info %s: %w", identity.NodeID.String(), err)
 	}
@@ -187,10 +187,10 @@ func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	return pInfo, err
 }
 
-// peerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
+// PeerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
 // For each identity, if the conversion succeeds, the peer.AddrInfo is included in the result else it is
 // included in the error map with the corresponding error
-func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifier]error) {
+func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifier]error) {
 	validIDs := make([]peer.AddrInfo, 0, len(ids))
 	invalidIDs := make(map[flow.Identifier]error)
 	for _, id := range ids {

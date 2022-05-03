@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,21 +29,21 @@ func TestFindPeerWithDHT(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 2, withDHTOptions(AsServer()))
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 2, withDHTOptions(p2p.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-2, withDHTOptions(AsClient()))
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-2, withDHTOptions(p2p.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	defer stopNodes(t, nodes)
 
 	getDhtServerAddr := func(i uint) peer.AddrInfo {
-		return peer.AddrInfo{ID: dhtServerNodes[i].host.ID(), Addrs: dhtServerNodes[i].host.Addrs()}
+		return peer.AddrInfo{ID: dhtServerNodes[i].Host().ID(), Addrs: dhtServerNodes[i].Host().Addrs()}
 	}
 
 	// connect even numbered clients to the first DHT server, and odd number clients to the second
 	for i, clientNode := range dhtClientNodes {
-		err := clientNode.host.Connect(ctx, getDhtServerAddr(uint(i%2)))
+		err := clientNode.Host().Connect(ctx, getDhtServerAddr(uint(i%2)))
 		require.NoError(t, err)
 	}
 
@@ -57,7 +58,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	}, time.Second*5, ticksForAssertEventually, "nodes failed to connect")
 
 	// connect the two DHT servers to each other
-	err := dhtServerNodes[0].host.Connect(ctx, getDhtServerAddr(1))
+	err := dhtServerNodes[0].Host().Connect(ctx, getDhtServerAddr(1))
 	require.NoError(t, err)
 
 	// wait for the first server to connect to the second and update its routing table
@@ -70,12 +71,12 @@ func TestFindPeerWithDHT(t *testing.T) {
 		for j := 1; j < len(dhtClientNodes); j += 2 {
 			// client i should not yet know the address of client j, but we clear any addresses
 			// here just in case.
-			dhtClientNodes[i].host.Peerstore().ClearAddrs(dhtClientNodes[j].host.ID())
+			dhtClientNodes[i].Host().Peerstore().ClearAddrs(dhtClientNodes[j].Host().ID())
 
 			// Try to create a stream from client i to client j. This should resort to a DHT
 			// lookup since client i does not know client j's address.
 			unittest.RequireReturnsBefore(t, func() {
-				_, err = dhtClientNodes[i].CreateStream(ctx, dhtClientNodes[j].host.ID())
+				_, err = dhtClientNodes[i].CreateStream(ctx, dhtClientNodes[j].Host().ID())
 				require.NoError(t, err)
 			}, 1*time.Second, "could not create stream on time")
 		}
@@ -109,12 +110,12 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 1, withDHTOptions(AsServer()))
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 1, withDHTOptions(p2p.AsServer()))
 	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-1, withDHTOptions(AsClient()))
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-1, withDHTOptions(p2p.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	defer stopNodes(t, nodes)
@@ -123,9 +124,9 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	// This has to be done before subscribing to any topic, otherwise the node gives up on advertising
 	// its topics of interest and becomes undiscoverable by other nodes
 	// (see: https://github.com/libp2p/go-libp2p-pubsub/issues/442)
-	dhtServerAddr := peer.AddrInfo{ID: dhtServerNode.host.ID(), Addrs: dhtServerNode.host.Addrs()}
+	dhtServerAddr := peer.AddrInfo{ID: dhtServerNode.Host().ID(), Addrs: dhtServerNode.Host().Addrs()}
 	for _, clientNode := range dhtClientNodes {
-		err := clientNode.host.Connect(ctx, dhtServerAddr)
+		err := clientNode.Host().Connect(ctx, dhtServerAddr)
 		require.NoError(t, err)
 	}
 
@@ -148,7 +149,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, msg)
 			assert.Equal(t, data, msg.Data)
-			ch <- n.host.ID()
+			ch <- n.Host().ID()
 		}
 
 		// Subscribes to the test topic
@@ -164,7 +165,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	fullyConnectedGraph := func() bool {
 		for i := 0; i < len(nodes); i++ {
 			for j := i + 1; j < len(nodes); j++ {
-				if nodes[i].host.Network().Connectedness(nodes[j].host.ID()) == network.NotConnected {
+				if nodes[i].Host().Network().Connectedness(nodes[j].Host().ID()) == network.NotConnected {
 					return false
 				}
 			}
@@ -189,8 +190,8 @@ loop:
 		case <-time.After(3 * time.Second):
 			var missing peer.IDSlice
 			for _, n := range nodes {
-				if _, found := recv[n.host.ID()]; !found {
-					missing = append(missing, n.host.ID())
+				if _, found := recv[n.Host().ID()]; !found {
+					missing = append(missing, n.Host().ID())
 				}
 			}
 			assert.Fail(t, "messages not received by some nodes", "%v", missing)

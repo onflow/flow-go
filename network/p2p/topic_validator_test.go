@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,7 +31,7 @@ func TestTopicValidator(t *testing.T) {
 	badTopic := engine.TopicFromChannel(engine.SyncCommittee, sporkId)
 
 	ids := flow.IdentityList{identity1, identity2}
-	translator, err := NewFixedTableIdentityTranslator(ids)
+	translator, err := p2p.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	stakedValidator := validator.StakedValidator(func(pid peer.ID) (*flow.Identity, bool) {
@@ -49,8 +50,8 @@ func TestTopicValidator(t *testing.T) {
 
 	// node1 is connected to node2, and the unstaked node is connected to node1
 	// unstaked Node <-> node1 <-> node2
-	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.host)))
-	require.NoError(t, unstakedNode.AddPeer(context.TODO(), *host.InfoFromHost(node1.host)))
+	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
+	require.NoError(t, unstakedNode.AddPeer(context.TODO(), *host.InfoFromHost(node1.Host())))
 
 	// node1 and node2 subscribe to the topic with the topic validator
 	sub1, err := node1.Subscribe(badTopic, stakedValidator)
@@ -63,9 +64,9 @@ func TestTopicValidator(t *testing.T) {
 
 	// assert that the nodes are connected as expected
 	require.Eventually(t, func() bool {
-		return len(node1.pubSub.ListPeers(badTopic.String())) > 0 &&
-			len(node2.pubSub.ListPeers(badTopic.String())) > 0 &&
-			len(unstakedNode.pubSub.ListPeers(badTopic.String())) > 0
+		return len(node1.ListPeers(badTopic.String())) > 0 &&
+			len(node2.ListPeers(badTopic.String())) > 0 &&
+			len(unstakedNode.ListPeers(badTopic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
