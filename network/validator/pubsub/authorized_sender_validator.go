@@ -40,6 +40,15 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 			return pubsub.ValidationReject
 		}
 
+		if identity.Ejected {
+			log.Warn().
+				Err(fmt.Errorf("node %s is an ejected node", identity.NodeID)).
+				Str("peer_id", from.String()).
+				Str("role", identity.Role.String()).
+				Msg("rejecting message")
+			return pubsub.ValidationReject
+		}
+
 		// attempt to decode the flow message type from encoded payload
 		code, what, err := codec.DecodeMsgType(msg.Payload)
 		if err != nil {
@@ -77,10 +86,6 @@ func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code u
 
 	if !roles.Contains(identity.Role) {
 		return fmt.Errorf("sender is not authorized to send this message type")
-	}
-
-	if identity.Ejected {
-		return fmt.Errorf("node %s is an ejected node", identity.NodeID)
 	}
 
 	return nil
