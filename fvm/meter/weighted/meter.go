@@ -39,7 +39,7 @@ var (
 		common.MemoryKindArrayBase:               57 + 48,
 		common.MemoryKindDictionaryBase:          33 + 96,
 		common.MemoryKindCompositeBase:           233 + 96,
-		common.MemoryKindSimpleComposite:         73 + 96,
+		common.MemoryKindSimpleComposite:         73,
 		common.MemoryKindOptional:                41,
 		common.MemoryKindNil:                     1,
 		common.MemoryKindVoid:                    1,
