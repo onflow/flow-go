@@ -34,8 +34,7 @@ type VoterCommittee interface {
 	//          Therefore, a node retains its proposer view slots even if it is slashed.
 	//          Its proposal is simply considered invalid, as it is not from a legitimate participant.
 	// Returns the following expected errors for invalid inputs:
-	//  * epoch containing the requested view has not been set up (protocol.ErrNextEpochNotSetup)
-	//  * epoch is too far in the past (leader.InvalidViewError)
+	//   * committees.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	LeaderForView(view uint64) (flow.Identifier, error)
 
 	// Self returns our own node identifier.
@@ -57,7 +56,9 @@ type VoterCommittee interface {
 	// The list of all legitimate HotStuff participants for the given epoch can be obtained by using `filter.Any`
 	//
 	// CAUTION: DO NOT use this method for validating block proposals.
-	// TODO: error for unknown view
+	//
+	// Returns the following expected errors for invalid inputs:
+	//   * committees.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	IdentitiesByEpoch(view uint64, selector flow.IdentityFilter) (flow.IdentityList, error)
 
 	// IdentityByEpoch returns the full Identity for specified HotStuff participant.
@@ -65,8 +66,8 @@ type VoterCommittee interface {
 	// ERROR conditions:
 	//  * model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
 	//
-	// CAUTION: DO NOT use this method for validating block proposals.
-	// TODO: error for unknown view
+	// Returns the following expected errors for invalid inputs:
+	//   * committees.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.Identity, error)
 }
 

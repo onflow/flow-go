@@ -23,7 +23,7 @@ import (
 // a signature from a random beacon signer, which verifies both the signature share and
 // the reconstructed threshold signature.
 type CombinedVerifierV3 struct {
-	committee     hotstuff.Committee
+	committee     hotstuff.VoterCommittee
 	stakingHasher hash.Hasher
 	beaconHasher  hash.Hasher
 	packer        hotstuff.Packer
@@ -75,7 +75,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 		}
 
 	case hotstuff.SigTypeRandomBeacon:
-		dkg, err := c.committee.DKG(block.BlockID)
+		dkg, err := c.committee.DKG(block.View)
 		if err != nil {
 			return fmt.Errorf("could not get dkg: %w", err)
 		}
@@ -115,7 +115,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 // _strict subset_ of the full consensus committee.
 func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
 	signerIdentities := signers.Lookup()
-	dkg, err := c.committee.DKG(block.BlockID)
+	dkg, err := c.committee.DKG(block.View)
 	if err != nil {
 		return fmt.Errorf("could not get dkg data: %w", err)
 	}

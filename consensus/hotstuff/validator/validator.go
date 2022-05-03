@@ -46,7 +46,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 
 	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
 	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive weight)
-	allParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
+	allParticipants, err := v.committee.IdentitiesByEpoch(block.View, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
 	}
@@ -107,6 +107,16 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not leader (%s) for view %d", block.ProposerID, leader, block.View))
 	}
 
+	// check the proposer is a valid committee member at the most recent state on this fork
+	// TODO: Idea - replace *ByBlock with ValidAtBlock(blockID, signerID) (bool, error)
+	_, err = v.committee.IdentityByBlock(block.BlockID, block.ProposerID)
+	if model.IsInvalidSignerError(err) {
+		return newInvalidBlockError(block, fmt.Errorf("proposer %x is leader but is not a valid committee member", block.ProposerID))
+	}
+	if err != nil {
+		return fmt.Errorf("unexpected error checking proposer standing for block %x: %w", block.BlockID, err)
+	}
+
 	// check that we have the parent for the proposal
 	parent, found := v.forks.GetBlock(qc.BlockID)
 	if !found {
@@ -142,7 +152,8 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		return nil, newInvalidVoteError(vote, fmt.Errorf("vote's view %d is inconsistent with referenced block (view %d)", vote.View, block.View))
 	}
 
-	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
+	// TODO - need to deal with proposer vote differently
+	voter, err := v.committee.IdentityByEpoch(block.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)
 	}

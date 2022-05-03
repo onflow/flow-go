@@ -23,7 +23,7 @@ type EventHandler struct {
 	forks          hotstuff.Forks
 	persist        hotstuff.Persister
 	communicator   hotstuff.Communicator
-	committee      hotstuff.Committee
+	committee      hotstuff.VoterCommittee
 	voteAggregator hotstuff.VoteAggregator
 	voter          hotstuff.SafetyRules
 	validator      hotstuff.Validator
@@ -41,7 +41,7 @@ func NewEventHandler(
 	forks hotstuff.Forks,
 	persist hotstuff.Persister,
 	communicator hotstuff.Communicator,
-	committee hotstuff.Committee,
+	committee hotstuff.VoterCommittee,
 	voteAggregator hotstuff.VoteAggregator,
 	voter hotstuff.SafetyRules,
 	validator hotstuff.Validator,

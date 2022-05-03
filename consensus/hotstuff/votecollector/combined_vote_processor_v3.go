@@ -31,7 +31,7 @@ import (
 // the proposer's vote (decorator pattern).
 // nolint:unused
 type combinedVoteProcessorFactoryBaseV3 struct {
-	committee   hotstuff.Committee
+	committee   hotstuff.VoterCommittee
 	onQCCreated hotstuff.OnQCCreated
 	packer      hotstuff.Packer
 }
@@ -40,7 +40,7 @@ type combinedVoteProcessorFactoryBaseV3 struct {
 // Caller must treat all errors as exceptions
 // nolint:unused
 func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
+	allParticipants, err := f.committee.IdentitiesByEpoch(block.View, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
 	}
@@ -59,7 +59,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	dkg, err := f.committee.DKG(block.BlockID)
+	dkg, err := f.committee.DKG(block.View)
 	if err != nil {
 		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
 	}
