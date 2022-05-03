@@ -481,11 +481,11 @@ func (s *TCSuite) SetupTest() {
 	s.signers = s.participants[:7]
 
 	rand.Seed(time.Now().UnixNano())
-	view := uint64(rand.Uint32()) + 1
+	view := uint64(int(rand.Uint32()) + len(s.participants))
 
 	highQCViews := make([]uint64, 0, len(s.signers))
-	for range s.signers {
-		highQCViews = append(highQCViews, view)
+	for i := range s.signers {
+		highQCViews = append(highQCViews, view-uint64(i)-1)
 	}
 
 	// create a block that has the signers in its QC
@@ -514,6 +514,7 @@ func (s *TCSuite) SetupTest() {
 	s.validator = New(s.committee, nil, s.verifier)
 }
 
+// TestTCOk tests if happy-path returns correct result
 func (s *TCSuite) TestTCOk() {
 	s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(nil).Once()
 
@@ -522,8 +523,39 @@ func (s *TCSuite) TestTCOk() {
 	assert.NoError(s.T(), err, "a valid TC should be accepted")
 }
 
+// TestTCEmptySigners tests if correct error is returned when signers are empty
 func (s *TCSuite) TestTCEmptySigners() {
+	s.tc.SignerIDs = []flow.Identifier{}
+	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	assert.True(s.T(), model.IsInvalidTCError(err), "tc must have at least one signer, an ErrorInvalidTC error should be raised")
+}
+
+// TestTCInvalidSigners tests if correct error is returned when signers are invalid
+func (s *TCSuite) TestTCInvalidSigners() {
 	s.participants = s.participants[1:] // remove participant[0] from the list of valid consensus participant
 	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
 	assert.True(s.T(), model.IsInvalidTCError(err), "if some signers are invalid consensus participants, an ErrorInvalidTC error should be raised")
+}
+
+// TestTCHighQCViews tests if correct error is returned when high qc views are invalid
+func (s *TCSuite) TestTCHighQCViews() {
+	s.tc.TOHighQCViews = s.tc.TOHighQCViews[1:]
+	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	assert.True(s.T(), model.IsInvalidTCError(err), "if highQCViews len is not equal to signers len, an ErrorInvalidTC error should be raised")
+}
+
+// TestTCHighestQCFromFuture tests if correct error is returned when included QC is higher than TC's view
+func (s *TCSuite) TestTCHighestQCFromFuture() {
+	// highest QC from future view
+	s.tc.TOHighestQC.View = s.tc.View + 1
+	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	assert.True(s.T(), model.IsInvalidTCError(err), "if TOHighestQC.View > TC.View, an ErrorInvalidTC error should be raised")
+}
+
+// TestTCHighestQCIsNotHighest tests if correct error is returned when included QC is not highest
+func (s *TCSuite) TestTCHighestQCIsNotHighest() {
+	// highest QC view is not equal to max(TOHighestQCViews)
+	s.tc.TOHighQCViews[0] = s.tc.TOHighestQC.View + 1
+	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	assert.True(s.T(), model.IsInvalidTCError(err), "if max(highQCViews) != TOHighestQC.View, an ErrorInvalidTC error should be raised")
 }

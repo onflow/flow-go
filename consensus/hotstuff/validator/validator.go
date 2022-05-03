@@ -55,8 +55,8 @@ func (v *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 		}
 	}
 
-	if highestQCView < tc.TOHighestQC.View {
-		return newInvalidTCError(tc, fmt.Errorf(""))
+	if highestQCView != tc.TOHighestQC.View {
+		return newInvalidTCError(tc, fmt.Errorf("included QC should be equal to highest contributed view"))
 	}
 
 	// 1. Check if there is super-majority of votes
