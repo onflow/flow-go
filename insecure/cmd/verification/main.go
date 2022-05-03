@@ -2,12 +2,13 @@ package main
 
 import (
 	"github.com/onflow/flow-go/cmd"
+	insecmd "github.com/onflow/flow-go/insecure/cmd"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func main() {
 	verificationBuilder := cmd.NewVerificationNodeBuilder(
-		cmd.FlowNode(flow.RoleVerification.String()))
+		insecmd.NewCorruptedNodeBuilder(flow.RoleVerification.String()).FlowNodeBuilder)
 	verificationBuilder.LoadFlags()
 
 	if err := verificationBuilder.FlowNodeBuilder.Initialize(); err != nil {
