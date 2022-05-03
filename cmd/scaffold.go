@@ -239,7 +239,7 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component("network", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		//NOTE: if the codec used in the network component is ever changed any code relying on
+		// NOTE: if the codec used in the network component is ever changed any code relying on
 		// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
 		codec := cborcodec.NewCodec()
 
