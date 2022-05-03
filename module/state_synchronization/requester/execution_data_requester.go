@@ -183,6 +183,10 @@ func New(
 		e.config.MaxSearchAhead,          // max number of unsent notifications to allow before pausing new fetches
 	)
 	// notifies notificationConsumer when new ExecutionData blobs are available
+	// SetPostNotifier will notify executionDataNotifier AFTER e.blockConsumer.LastProcessedIndex is updated.
+	// Even though it doesn't guarantee to notify for every height at least once, the notificationConsumer is
+	// able to guarantee to process every height at least once, because the notificationConsumer finds new job 
+	// using executionDataReader which finds new height using e.blockConsumer.LastProcessedIndex
 	e.blockConsumer.SetPostNotifier(func(module.JobID) { executionDataNotifier.Notify() })
 
 	// jobqueue Jobs object tracks downloaded execution data by height. This is used by the
