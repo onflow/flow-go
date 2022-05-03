@@ -14,12 +14,12 @@ import (
 // The encoding method is RLP.
 type ConsensusSigDataPacker struct {
 	packer.SigDataPacker
-	committees hotstuff.Committee
+	committees hotstuff.VoterCommittee
 }
 
 var _ hotstuff.Packer = &ConsensusSigDataPacker{}
 
-func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataPacker {
+func NewConsensusSigDataPacker(committees hotstuff.VoterCommittee) *ConsensusSigDataPacker {
 	return &ConsensusSigDataPacker{
 		committees: committees,
 	}
@@ -29,7 +29,7 @@ func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataP
 // To pack the block signature data, we first build a compact data type, and then encode it into bytes.
 // Expected error returns during normal operations:
 //  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
-func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
+func (p *ConsensusSigDataPacker) Pack(view uint64, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
 	// breaking staking and random beacon signers into signerIDs and sig type for compaction
 	// each signer must have its signerID and sig type stored at the same index in the two slices
 	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
@@ -37,9 +37,9 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	sigTypes := make([]hotstuff.SigType, 0, count)
 
 	// retrieve all authorized consensus participants at the given block
-	consensus, err := p.committees.Identities(blockID, filter.Any)
+	consensus, err := p.committees.IdentitiesByEpoch(view, filter.Any)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
+		return nil, nil, fmt.Errorf("could not find consensus committee by view (%d): %w", view, err)
 	}
 
 	// lookup is a map from node identifier to node identity
@@ -52,7 +52,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 			signerIDs = append(signerIDs, stakingSigner)
 			sigTypes = append(sigTypes, hotstuff.SigTypeStaking)
 		} else {
-			return nil, nil, fmt.Errorf("staking signer %v not found in the committee at block: %v", stakingSigner, blockID)
+			return nil, nil, fmt.Errorf("staking signer %x not found in the committee at view %d", stakingSigner, view)
 		}
 	}
 
@@ -62,14 +62,14 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 			signerIDs = append(signerIDs, beaconSigner)
 			sigTypes = append(sigTypes, hotstuff.SigTypeRandomBeacon)
 		} else {
-			return nil, nil, fmt.Errorf("random beacon signer %v not found in the committee at block: %v", beaconSigner, blockID)
+			return nil, nil, fmt.Errorf("random beacon signer %x not found in the committee at view %d", beaconSigner, view)
 		}
 	}
 
 	// serialize the sig type for compaction
 	serialized, err := serializeToBitVector(sigTypes)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not serialize sig types to bytes at block: %v, %w", blockID, err)
+		return nil, nil, fmt.Errorf("could not serialize sig types to bytes at view: %d, %w", view, err)
 	}
 
 	data := packer.SignatureData{
@@ -89,12 +89,12 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 }
 
 // Unpack de-serializes the provided signature data.
-// blockID is the block that the aggregated sig is signed for
+// view is the view of the block that the aggregated sig is signed for
 // sig is the aggregated signature data
 // It returns:
 //  - (sigData, nil) if successfully unpacked the signature data
 //  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
-func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(view uint64, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	data, err := p.Decode(sigData)
 	if err != nil {
@@ -108,9 +108,9 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 	}
 
 	// read all the possible signer IDs at the given block
-	consensus, err := p.committees.Identities(blockID, filter.Any)
+	consensus, err := p.committees.IdentitiesByEpoch(view, filter.Any)
 	if err != nil {
-		return nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
+		return nil, fmt.Errorf("could not find consensus committees by block view (%d): %w", view, err)
 	}
 
 	// lookup is a map from node identifier to node identity
@@ -126,8 +126,8 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 		signerID := signerIDs[i]
 		_, ok := lookup[signerID]
 		if !ok {
-			return nil, fmt.Errorf("unknown signer ID (%v) at the given block (%v): %w",
-				signerID, blockID, model.ErrInvalidFormat)
+			return nil, fmt.Errorf("unknown signer ID (%x) at the given block view %d: %w",
+				signerID, view, model.ErrInvalidFormat)
 		}
 
 		if sigType == hotstuff.SigTypeStaking {
