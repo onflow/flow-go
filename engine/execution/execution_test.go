@@ -128,7 +128,7 @@ func TestExecutionFlow(t *testing.T) {
 	// we need 1 byte
 	child.Header.ParentVoterIndices = voterIndices
 
-	log.Info().Msgf("child block ID: %v, indices: %v", child.Header.ID(), child.Header.ParentVoterIndices)
+	log.Info().Msgf("child block ID: %v, indices: %x", child.Header.ID(), child.Header.ParentVoterIndices)
 
 	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
@@ -282,9 +282,6 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 	// make collection
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
 
-	signerIndices, err := signature.EncodeSignersToIndices(
-		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
-	require.NoError(t, err)
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 	// make block
 	block := unittest.BlockWithParentAndProposerFixture(parent, conID.NodeID, 1)
@@ -292,6 +289,11 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
+
+	signerIndices, err := signature.EncodeSignersToIndices(
+		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
+	require.NoError(t, err)
+
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
 			{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
@@ -310,7 +312,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	require.NoError(t, err)
 
 	signerIndices, err := signature.EncodeSignersToIndices(
-		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
+		[]flow.Identifier{colID.NodeID}, []flow.Identifier{colID.NodeID})
 	require.NoError(t, err)
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID})
 
@@ -331,21 +333,9 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	return tx, col, block, proposal, seq + 1
 }
 
-// Test the following behaviors:
-// (1) ENs sync statecommitment with each other
-// (2) a failed transaction will not change statecommitment
-//
-// We prepare 3 transactions in 3 blocks:
-// tx1 will deploy a contract
-// tx2 will always panic
-// tx3 will be succeed and change statecommitment
-// and then create 2 EN nodes, both have tx1 executed. To test the synchronization,
-// we send tx2 and tx3 in 2 blocks to only EN1, and check that tx2 will not change statecommitment for
-// verifying behavior (1);
-// and check EN2 should have the same statecommitment as EN1 since they sync
-// with each other for verifying behavior (2).
-// TODO: state sync is disabled, we are only verifying 2) for now.
-func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
+// Test a successful tx should change the statecommitment,
+// but a failed Tx should not change the statecommitment.
+func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
 	chainID := flow.Emulator

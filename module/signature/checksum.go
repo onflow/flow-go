@@ -67,7 +67,7 @@ func CompareAndExtract(identities []flow.Identifier, prefixed []byte) ([]byte, e
 
 	match := CompareChecksum(sum, identities)
 	if !match {
-		return nil, fmt.Errorf("data %v does not match with checksum %v", data, sum)
+		return nil, fmt.Errorf("data %x does not match with checksum %x", data, sum)
 	}
 
 	return data, nil
