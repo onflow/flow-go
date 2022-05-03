@@ -25,8 +25,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages from nodes that are not authorized to send the message
-func TestAuthorizedSenderValidator_UnAuthorized(t *testing.T) {
+// TestAuthorizedSenderValidator_Unauthorized tests that the authorized sender validator rejects messages from nodes that are not authorized to send the message
+func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
 	sn1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
