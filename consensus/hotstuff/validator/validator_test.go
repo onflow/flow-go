@@ -488,6 +488,10 @@ func (s *TCSuite) SetupTest() {
 		highQCViews = append(highQCViews, view-uint64(i)-1)
 	}
 
+	rand.Shuffle(len(highQCViews), func(i, j int) {
+		highQCViews[i], highQCViews[j] = highQCViews[j], highQCViews[i]
+	})
+
 	// create a block that has the signers in its QC
 	parent := helper.MakeBlock(helper.WithBlockView(view - 1))
 	s.block = helper.MakeBlock(helper.WithBlockView(view),
@@ -530,13 +534,6 @@ func (s *TCSuite) TestTCEmptySigners() {
 	assert.True(s.T(), model.IsInvalidTCError(err), "tc must have at least one signer, an ErrorInvalidTC error should be raised")
 }
 
-// TestTCInvalidSigners tests if correct error is returned when signers are invalid
-func (s *TCSuite) TestTCInvalidSigners() {
-	s.participants = s.participants[1:] // remove participant[0] from the list of valid consensus participant
-	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
-	assert.True(s.T(), model.IsInvalidTCError(err), "if some signers are invalid consensus participants, an ErrorInvalidTC error should be raised")
-}
-
 // TestTCHighQCViews tests if correct error is returned when high qc views are invalid
 func (s *TCSuite) TestTCHighQCViews() {
 	s.tc.TOHighQCViews = s.tc.TOHighQCViews[1:]
@@ -558,4 +555,58 @@ func (s *TCSuite) TestTCHighestQCIsNotHighest() {
 	s.tc.TOHighQCViews[0] = s.tc.TOHighestQC.View + 1
 	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
 	assert.True(s.T(), model.IsInvalidTCError(err), "if max(highQCViews) != TOHighestQC.View, an ErrorInvalidTC error should be raised")
+}
+
+// TestTCInvalidSigners tests if correct error is returned when signers are invalid
+func (s *TCSuite) TestTCInvalidSigners() {
+	s.participants = s.participants[1:] // remove participant[0] from the list of valid consensus participant
+	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	assert.True(s.T(), model.IsInvalidTCError(err), "if some signers are invalid consensus participants, an ErrorInvalidTC error should be raised")
+}
+
+// TestTCThresholdNotReached tests if correct error is returned when TC's singers don't have enough weight
+func (s *TCSuite) TestTCThresholdNotReached() {
+	s.tc.SignerIDs = s.tc.SignerIDs[:1]
+	s.tc.TOHighQCViews = s.tc.TOHighQCViews[:1]
+	// make sure that there is the highest view
+	s.tc.TOHighQCViews[0] = s.tc.TOHighestQC.View
+
+	// adjust signers to be less than total weight
+	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	assert.True(s.T(), model.IsInvalidTCError(err), "if signers don't have enough weight, an ErrorInvalidTC error should be raised")
+}
+
+// TestTCInvalidHighestQC tests if correct error is returned when included highest QC is invalid
+func (s *TCSuite) TestTCInvalidHighestQC() {
+	*s.verifier = mocks.Verifier{}
+	s.verifier.On("VerifyQC", s.signers, s.tc.TOHighestQC.SigData, s.tc.TOHighestQC.View, s.tc.TOHighestQC.BlockID).Return(fmt.Errorf("invalid qc: %w", model.ErrInvalidFormat)).Once()
+	err := s.validator.ValidateTC(s.tc) // the QC should not be validated anymore
+	assert.True(s.T(), model.IsInvalidTCError(err), "if included QC is invalid, an ErrorInvalidTC error should be raised")
+}
+
+// TestTCInvalidSignature tests a few scenarios when the signature is invalid or TC signers is malformed
+func (s *TCSuite) TestTCInvalidSignature() {
+	s.Run("invalid-format", func() {
+		*s.verifier = mocks.Verifier{}
+		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(model.ErrInvalidFormat).Once()
+		err := s.validator.ValidateTC(s.tc)
+		assert.True(s.T(), model.IsInvalidTCError(err), "if included TC's inputs are invalid, an ErrorInvalidTC error should be raised")
+	})
+	s.Run("invalid-signature", func() {
+		*s.verifier = mocks.Verifier{}
+		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(model.ErrInvalidSignature).Once()
+		err := s.validator.ValidateTC(s.tc)
+		assert.True(s.T(), model.IsInvalidTCError(err), "if included TC's signature is invalid, an ErrorInvalidTC error should be raised")
+	})
+	s.Run("verify-sig-exception", func() {
+		exception := errors.New("verify-sig-exception")
+		*s.verifier = mocks.Verifier{}
+		s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		s.verifier.On("VerifyTC", s.signers, []byte(s.tc.SigData), s.tc.View, s.tc.TOHighQCViews).Return(exception).Once()
+		err := s.validator.ValidateTC(s.tc)
+		assert.ErrorAs(s.T(), err, &exception, "if included TC's signature is invalid, an exception should be propagated")
+		assert.False(s.T(), model.IsInvalidTCError(err))
+	})
 }
