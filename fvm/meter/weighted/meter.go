@@ -30,12 +30,14 @@ var (
 
 		// Values
 
-		common.MemoryKindBool:                    8,
-		common.MemoryKindAddress:                 32,
-		common.MemoryKindString:                  138,
-		common.MemoryKindCharacter:               24,
-		common.MemoryKindMetaType:                0,
-		common.MemoryKindNumber:                  8,
+		common.MemoryKindBool:      8,
+		common.MemoryKindAddress:   32,
+		common.MemoryKindString:    138,
+		common.MemoryKindCharacter: 24,
+		common.MemoryKindMetaType:  0,
+		common.MemoryKindNumber:    8,
+		// weights for these values include the cost of the Go struct itself (first number)
+		// as well as the overhead for creation of the underlying atree (second number)
 		common.MemoryKindArrayBase:               57 + 48,
 		common.MemoryKindDictionaryBase:          33 + 96,
 		common.MemoryKindCompositeBase:           233 + 96,
