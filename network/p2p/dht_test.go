@@ -8,7 +8,6 @@ import (
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,7 +49,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	// wait for clients to connect to DHT servers and update their routing tables
 	require.Eventually(t, func() bool {
 		for i, clientNode := range dhtClientNodes {
-			if clientNode.routing.(*dht.IpfsDHT).RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
+			if clientNode.RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
 				return false
 			}
 		}
@@ -63,7 +62,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 
 	// wait for the first server to connect to the second and update its routing table
 	require.Eventually(t, func() bool {
-		return dhtServerNodes[0].routing.(*dht.IpfsDHT).RoutingTable().Find(getDhtServerAddr(1).ID) != ""
+		return dhtServerNodes[0].RoutingTable().Find(getDhtServerAddr(1).ID) != ""
 	}, time.Second*5, ticksForAssertEventually, "dht servers failed to connect")
 
 	// check that all even numbered clients can create streams with all odd numbered clients
