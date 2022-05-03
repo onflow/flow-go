@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-cid"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -36,8 +37,26 @@ type ProvideJob struct {
 	Done            <-chan error
 }
 
-// TODO: make sure that when integrating this with execution node, that we don't
-// cancel the passed in context until the job is done.
+func NewProvider(
+	logger zerolog.Logger,
+	codec encoding.Codec,
+	compressor network.Compressor,
+	blobService network.BlobService,
+	opts ...ProviderOption,
+) *Provider {
+	p := &Provider{
+		logger:      logger.With().Str("component", "execution_data_provider").Logger(),
+		maxBlobSize: execution_data.DefaultMaxBlobSize,
+		serializer:  execution_data.NewSerializer(codec, compressor),
+		blobService: blobService,
+	}
+
+	for _, opt := range opts {
+		opt(p)
+	}
+
+	return p
+}
 
 func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh <-chan blobs.Blob) <-chan error {
 	ch := make(chan error, 1)

@@ -34,6 +34,18 @@ type Pruner struct {
 
 type PrunerOption func(*Pruner)
 
+func WithHeightRangeTarget(heightRangeTarget uint64) PrunerOption {
+	return func(p *Pruner) {
+		p.heightRangeTarget = heightRangeTarget
+	}
+}
+
+func WithThreshold(threshold uint64) PrunerOption {
+	return func(p *Pruner) {
+		p.threshold = threshold
+	}
+}
+
 func NewPruner(storage *tracker.Storage, blobService network.BlobService, opts ...PrunerOption) (*Pruner, error) {
 	lastPrunedHeight, err := storage.GetPrunedHeight()
 	if err != nil {
@@ -69,6 +81,14 @@ func NewPruner(storage *tracker.Storage, blobService network.BlobService, opts .
 	}
 
 	return p, nil
+}
+
+func (p *Pruner) NotifyFulfilledHeight(height uint64) {
+	if util.CheckClosed(p.cm.ShutdownSignal()) {
+		return
+	}
+
+	p.fulfilledHeightsIn <- height
 }
 
 func (p *Pruner) SetHeightRangeTarget(heightRangeTarget uint64) error {

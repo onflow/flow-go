@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -60,7 +61,7 @@ func main() {
 		processedBlockHeight *storage.ConsumerProgress // used in block consumer
 		chunkQueue           *storage.ChunksQueue      // used in chunk consumer
 
-		syncCore                *synchronization.Core // used in follower engine
+		syncCore                *chainsync.Core       // used in follower engine
 		pendingBlocks           *buffer.PendingBlocks // used in follower engine
 		assignerEngine          *assigner.Engine      // the assigner engine
 		fetcherEngine           *fetcher.Engine       // the fetcher engine
@@ -168,7 +169,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

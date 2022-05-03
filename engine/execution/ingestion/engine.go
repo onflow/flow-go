@@ -638,6 +638,14 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	if err != nil {
 		e.log.Err(err).Msg("failed in process block's children")
 	}
+
+	err, ok := <-computationResult.ExecutionDataProvideJob.Done
+	if ok {
+		e.log.Err(err).
+			Hex("block_id", logging.Entity(executableBlock)).
+			Str("execution_data_id", receipt.ExecutionResult.ExecutionDataID.String()).
+			Msg("failed to provide execution data blobs")
+	}
 }
 
 // we've executed the block, now we need to check:

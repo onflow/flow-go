@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
@@ -17,17 +18,18 @@ type ComputationOrder struct {
 }
 
 type ComputationResult struct {
-	ExecutableBlock    *entity.ExecutableBlock
-	StateSnapshots     []*delta.SpockSnapshot
-	StateCommitments   []flow.StateCommitment
-	Proofs             [][]byte
-	Events             []flow.EventsList
-	EventsHashes       []flow.Identifier
-	ServiceEvents      flow.EventsList
-	TransactionResults []flow.TransactionResult
-	ComputationUsed    uint64
-	StateReads         uint64
-	TrieUpdates        []*ledger.TrieUpdate
+	ExecutableBlock         *entity.ExecutableBlock
+	StateSnapshots          []*delta.SpockSnapshot
+	StateCommitments        []flow.StateCommitment
+	Proofs                  [][]byte
+	Events                  []flow.EventsList
+	EventsHashes            []flow.Identifier
+	ServiceEvents           flow.EventsList
+	TransactionResults      []flow.TransactionResult
+	ComputationUsed         uint64
+	StateReads              uint64
+	TrieUpdates             []*ledger.TrieUpdate
+	ExecutionDataProvideJob *provider.ProvideJob
 }
 
 func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {

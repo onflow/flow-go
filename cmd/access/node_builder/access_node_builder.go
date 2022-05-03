@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 
 	"github.com/onflow/flow-go/cmd"
@@ -159,7 +160,7 @@ type FlowAccessNodeBuilder struct {
 	// components
 	LibP2PNode                 *p2p.Node
 	FollowerState              protocol.MutableState
-	SyncCore                   *synchronization.Core
+	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
 	FinalizationDistributor    *pubsub.FinalizationDistributor
 	FinalizedHeader            *synceng.FinalizedHeaderCache
@@ -232,7 +233,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
+		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig)
 		builder.SyncCore = syncCore
 
 		return err

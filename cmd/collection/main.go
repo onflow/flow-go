@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/module/chainsync"
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 
@@ -80,7 +81,7 @@ func main() {
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
-		mainChainSyncCore *synchronization.Core
+		mainChainSyncCore *chainsync.Core
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
@@ -208,7 +209,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
+			mainChainSyncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {

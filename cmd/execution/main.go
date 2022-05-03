@@ -12,7 +12,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/ipfs/go-bitswap"
+	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
@@ -63,11 +63,11 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	chainsync "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -102,7 +102,6 @@ func main() {
 		triedir                       string
 		executionDataDir              string
 		collector                     module.ExecutionMetrics
-		executionDataServiceCollector module.ExecutionDataServiceMetrics
 		mTrieCacheSize                uint32
 		transactionResultsCacheSize   uint
 		checkpointDistance            uint
@@ -130,10 +129,8 @@ func main() {
 		blockDataUploaders            []uploader.Uploader
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
-		executionDataService          state_synchronization.ExecutionDataService
-		executionDataCIDCache         state_synchronization.ExecutionDataCIDComparator
-		executionDataCIDCacheSize     uint = 20000
-		edsDatastoreTTL               time.Duration
+		executionDataGetter           execution_data.ExecutionDataGetter
+		executionDataDatastore        datastore.Batching
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -168,7 +165,6 @@ func main() {
 			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
 			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
-			flags.DurationVar(&edsDatastoreTTL, "execution-data-service-datastore-ttl", 0, "TTL for new blobs added to the execution data service blobstore")
 		}).
 		ValidateFlags(func() error {
 			if enableBlockDataUpload {
@@ -185,7 +181,7 @@ func main() {
 
 	nodeBuilder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
-			return stateSyncCommands.NewReadExecutionDataCommand(executionDataService)
+			return stateSyncCommands.NewReadExecutionDataCommand(executionDataGetter)
 		}).
 		AdminCommand("set-uploader-enabled", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return uploaderCommands.NewToggleUploaderCommand()
@@ -217,10 +213,6 @@ func main() {
 		}).
 		Module("execution metrics", func(node *cmd.NodeConfig) error {
 			collector = metrics.NewExecutionCollector(node.Tracer)
-			return nil
-		}).
-		Module("execution data service metrics", func(node *cmd.NodeConfig) error {
-			executionDataServiceCollector = metrics.NewExecutionDataServiceCollector()
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
@@ -319,6 +311,24 @@ func main() {
 			}
 			return nil
 		}).
+		Module("execution data datastore", func(node *cmd.NodeConfig) error {
+			err := os.MkdirAll(executionDataDir, 0700)
+			if err != nil {
+				return err
+			}
+			dsOpts := &badger.DefaultOptions
+			ds, err := badger.NewDatastore(executionDataDir, dsOpts)
+			if err != nil {
+				return err
+			}
+			executionDataDatastore = ds
+			nodeBuilder.ShutdownFunc(ds.Close)
+			return nil
+		}).
+		Module("execution data getter", func(node *cmd.NodeConfig) error {
+			// TODO
+			return nil
+		}).
 		Component("Write-Ahead Log", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(), node.MetricsRegisterer, collector, triedir, int(mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 			return diskWAL, err
@@ -371,68 +381,24 @@ func main() {
 
 			return compactor, nil
 		}).
-		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			err := os.MkdirAll(executionDataDir, 0700)
-
+		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			bs, err := node.Network.RegisterBlobService(engine.ExecutionDataService, executionDataDatastore)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to register blob service: %w", err)
 			}
 
-			dsOpts := &badger.DefaultOptions
-			dsOpts.TTL = edsDatastoreTTL
+			codec := &cbor.Codec{}
+			compressor := compressor.NewLz4Compressor()
 
-			ds, err := badger.NewDatastore(executionDataDir, dsOpts)
-
-			if err != nil {
-				return nil, err
-			}
-
-			nodeBuilder.ShutdownFunc(ds.Close)
-
-			// TODO: if the node is not starting from the beginning of the spork, it may be useful to prepopulate
-			// the cache with the existing Execution Data blob trees. Currently, the cache is empty every time the
-			// node restarts, meaning that there will initially be no prioritization of requests.
-			executionDataCIDCache = state_synchronization.NewExecutionDataCIDComparator(executionDataCIDCacheSize)
-			// TODO
-
-			bs, err := node.Network.RegisterBlobService(
-				engine.ExecutionDataService,
-				ds,
-				p2p.WithBitswapOptions(
-					bitswap.WithTaskComparator(
-						func(ta, tb *bitswap.TaskInfo) bool {
-							// TODO: before merging, update this to use
-							// blobRecord comparison code
-							if !ta.HaveBlock {
-								return false
-							} else if !tb.HaveBlock {
-								return true
-							}
-
-							return executionDataCIDCache.Compare(ta.Cid, tb.Cid)
-						},
-					),
-				))
-
-			if err != nil {
-				return nil, err
-			}
-
-			eds := state_synchronization.NewExecutionDataService(
-				&cbor.Codec{},
-				compressor.NewLz4Compressor(),
-				bs,
-				executionDataServiceCollector,
+			executionDataProvider := exedataprovider.NewProvider(
 				node.Logger,
+				codec,
+				compressor,
+				bs,
 			)
 
-			executionDataService = eds
-
-			return eds, nil
-		}).
-		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			extraLogPath := path.Join(triedir, "extralogs")
-			err := os.MkdirAll(extraLogPath, 0777)
+			err = os.MkdirAll(extraLogPath, 0777)
 			if err != nil {
 				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
 			}
@@ -462,7 +428,7 @@ func main() {
 				scriptLogThreshold,
 				scriptExecutionTimeLimit,
 				blockDataUploaders,
-				executionDataService,
+				executionDataProvider,
 			)
 			if err != nil {
 				return nil, err
