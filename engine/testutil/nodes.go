@@ -696,11 +696,23 @@ type RoundRobinLeaderSelection struct {
 	me         flow.Identifier
 }
 
-func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return s.identities.Filter(selector), nil
 }
 
-func (s *RoundRobinLeaderSelection) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+	id, found := s.identities.ByNodeID(participantID)
+	if !found {
+		return nil, fmt.Errorf("not found")
+	}
+	return id, nil
+}
+
+func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
+	return s.identities.Filter(selector), nil
+}
+
+func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
 	id, found := s.identities.ByNodeID(participantID)
 	if !found {
 		return nil, fmt.Errorf("not found")
@@ -716,7 +728,7 @@ func (s *RoundRobinLeaderSelection) Self() flow.Identifier {
 	return s.me
 }
 
-func (s *RoundRobinLeaderSelection) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
+func (s *RoundRobinLeaderSelection) DKG(_ uint64) (hotstuff.DKG, error) {
 	return nil, fmt.Errorf("error")
 }
 
