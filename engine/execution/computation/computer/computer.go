@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"time"
 
@@ -333,6 +334,12 @@ func (e *blockComputer) executeTransaction(
 	startedAt := time.Now()
 	txID := txBody.ID()
 
+	// measure runtime heap memory allocated before executing the transaction
+	var memAllocBefore uint64
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	memAllocBefore = m.TotalAlloc
+
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
 	txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
 	txSpan.LogFields(log.String("tx_id", txID.String()))
@@ -398,12 +405,17 @@ func (e *blockComputer) executeTransaction(
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
 
+	// measure runtime heap memory allocated after executing the transaction
+	runtime.ReadMemStats(&m)
+	memAllocAfter := m.TotalAlloc
+
 	lg := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).
 		Str("block_id", res.ExecutableBlock.ID().String()).
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+		Uint64("TestmemAlloc", memAllocAfter-memAllocBefore).
 		Logger()
 
 	if tx.Err != nil {
