@@ -27,9 +27,16 @@ GOARCH := $(shell go env GOARCH)
 # The location of the k8s YAML files
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
-# docker container registry
-export CONTAINER_REGISTRY := gcr.io/flow-container-registry
+# Allow registry to be overwritten
+ifdef CONTAINER_REGISTRY
+	export CONTAINER_REGISTRY := $(CONTAINER_REGISTRY)
+else
+	export CONTAINER_REGISTRY := gcr.io/flow-container-registry
+endif
 export DOCKER_BUILDKIT := 1
+
+short_commit:
+	@echo $(SHORT_COMMIT)
 
 # setup the crypto package under the GOPATH: needed to test packages importing flow-go/crypto
 .PHONY: crypto_setup_gopath

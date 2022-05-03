@@ -1,0 +1,111 @@
+name: Daily-Scheduled-Build
+
+on:
+  push:
+    tags: 
+      - '*'
+
+env:
+  BASE_BRANCH: master
+  BUCKET_NAME: 'flow-internal-tooling-bucket'
+  GO_VERSION: '1.17'
+
+jobs:
+  tag-version:
+    name: Tag Scheduled Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          ref: $BASE_BRANCH
+
+      - name: Get Short Commit
+        run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
+        id: short_commit
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.0
+        with:
+          custom_tag: daily-${{ steps.version.outputs.SHORT_COMMIT }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+  
+  docker-push:
+    name: Build and push container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Short Commit
+        run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
+        id: short_commit
+
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: $GO_VERSION
+
+      - name: Checkout Created Tag
+        uses: actions/checkout@v3
+        with:
+          ref: daily-${{ steps.version.outputs.SHORT_COMMIT }}
+        
+      - name: Build relic
+        run: make crypto_setup_gopath
+
+      - name: Docker login
+        uses: docker/login-action@v1
+        with:
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.GCR_SERVICE_KEY }}
+
+      - name: Docker build
+        run: make docker-build-flow
+
+      - name: Docker push
+        run: make docker-push-flow
+  
+  build-util:
+    name: Build and upload utils
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Short Commit
+        run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
+        id: short_commit
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: $GO_VERSION
+
+      - name: Checkout Created Tag
+        uses: actions/checkout@v3
+        with:
+          ref: daily-${{ steps.version.outputs.SHORT_COMMIT }}
+
+      - name: Build tools
+        run: |
+          make tool-util
+          make tool-bootstrap
+          make tool-transit
+  
+      - id: 'upload-util'
+        uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          credentials_json: '${{ secrets.GCP_CD_CREDS }}'
+          destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/util
+          path: './util'
+
+      - id: 'upload-bootstrap'
+        uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          credentials_json: '${{ secrets.GCP_CD_CREDS }}'
+          destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/bootstrap
+          path: './boostrap'
+
+      - id: 'upload-util'
+        uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          credentials_json: '${{ secrets.GCP_CD_CREDS }}'
+          destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/transit
+          path: './util'
