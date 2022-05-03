@@ -305,7 +305,7 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 		AggregatedRandomBeaconSig:    aggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: reconstructedBeaconSig,
 	}
-	signerIDs, sigData, err := p.packer.Pack(p.block.BlockID, blockSigData)
+	signerIDs, sigData, err := p.packer.Pack(p.block.View, blockSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}

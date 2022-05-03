@@ -121,7 +121,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 
 	// unpack sig data using packer
-	blockSigData, err := c.packer.Unpack(block.BlockID, signers.NodeIDs(), sigData)
+	blockSigData, err := c.packer.Unpack(block.View, signers.NodeIDs(), sigData)
 	if err != nil {
 		return fmt.Errorf("could not split signature: %w", err)
 	}
