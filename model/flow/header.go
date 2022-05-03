@@ -3,6 +3,7 @@ package flow
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"sync"
 	"time"
 
@@ -43,6 +44,9 @@ type Header struct {
 
 	ProposerSigData []byte // signature of the proposer over the new block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+
+	LastViewTC *TimeoutCertificate // Timeout certificate for previous view, it can be nil
+	// it has to be present if previous round ended with timeout.
 }
 
 // Body returns the immutable part of the block header.
@@ -57,6 +61,7 @@ func (h Header) Body() interface{} {
 		ParentVoterIDs     []Identifier
 		ParentVoterSigData []byte
 		ProposerID         Identifier
+		LastViewTC         interface{}
 	}{
 		ChainID:            h.ChainID,
 		ParentID:           h.ParentID,
@@ -67,6 +72,7 @@ func (h Header) Body() interface{} {
 		ParentVoterIDs:     h.ParentVoterIDs,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
+		LastViewTC:         h.LastViewTC.Body(),
 	}
 }
 
@@ -117,7 +123,8 @@ func (h Header) ID() Identifier {
 			h.PayloadHash == prevHeader.PayloadHash &&
 			bytes.Equal(h.ProposerSigData, prevHeader.ProposerSigData) &&
 			bytes.Equal(h.ParentVoterSigData, prevHeader.ParentVoterSigData) &&
-			h.ProposerID == prevHeader.ProposerID {
+			h.ProposerID == prevHeader.ProposerID &&
+			reflect.DeepEqual(h.LastViewTC, prevHeader.LastViewTC) {
 
 			// cache hit, return the previous identifier
 			return previdHeader
