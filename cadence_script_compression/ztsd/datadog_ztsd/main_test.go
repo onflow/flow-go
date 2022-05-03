@@ -77,3 +77,30 @@ func TestCompressAllContracts(t *testing.T) {
 
 	t.Logf("Average Compression Ratio: %.2f , Average Compression Speed: %.2f MB/s", avgRatio, avgSpeed)
 }
+
+func TestDecompressAllContracts(t *testing.T) {
+	contracts := csc.ReadContracts(contracsDir)
+
+	sumMbPerSec := 0.00
+	for _, c := range contracts {
+		compressed, err := ztsd.Compress(nil, c.Data)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		start := time.Now()
+		dst, err := ztsd.Decompress(nil, compressed)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
+		sumMbPerSec = sumMbPerSec + mbpersec
+
+		t.Logf("Name: %s | Orig Size: %d | Compressed Size: %d | UnCompressed Size: %d | Speed: %.2f MB/s", c.Name, c.Size, len(compressed), len(dst), mbpersec)
+	}
+
+	avgSpeed := sumMbPerSec / float64(len(contracts))
+
+	t.Logf("Average DeCompression Speed: %.2f MB/s", avgSpeed)
+}

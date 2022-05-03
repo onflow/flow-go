@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"io"
 	"testing"
 	"time"
 
@@ -30,19 +28,9 @@ func TestCompressLargeSize(t *testing.T) {
 	sumRatio := 0.00
 	for _, name := range contractNames {
 		c := contracts[name]
-		dst := make([]byte, 0)
-
-		r := bytes.NewReader(c.Data)
-		w := bytes.NewBuffer(dst)
 
 		start := time.Now()
-		err := Compress(r, w)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		dst = w.Bytes()
-
+		dst := compress(c.Data, t)
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
 
@@ -66,16 +54,7 @@ func TestCompressAllContracts(t *testing.T) {
 	for _, c := range contracts {
 		start := time.Now()
 
-		dst := make([]byte, 0)
-
-		r := bytes.NewReader(c.Data)
-		w := bytes.NewBuffer(dst)
-		err := Compress(r, w)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		dst = w.Bytes()
+		dst := compress(c.Data, t)
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
@@ -92,15 +71,46 @@ func TestCompressAllContracts(t *testing.T) {
 	t.Logf("Average Compression Ratio: %.2f , Average Compression Speed: %.2f MB/s", avgRatio, avgSpeed)
 }
 
-func Compress(in io.Reader, out io.Writer) error {
-	enc, err := z.NewWriter(out, []z.EOption{z.WithEncoderLevel(z.SpeedFastest)}...)
-	if err != nil {
-		return err
+func TestDecompressAllContracts(t *testing.T) {
+	contracts := csc.ReadContracts(contracsDir)
+
+	sumMbPerSec := 0.00
+	for _, c := range contracts {
+		compressed := compress(c.Data, t)
+
+		start := time.Now()
+		dst := decompress(compressed, t)
+
+		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
+		sumMbPerSec = sumMbPerSec + mbpersec
+
+		t.Logf("Name: %s | Orig Size: %d | Compressed Size: %d | UnCompressed Size: %d | Speed: %.2f MB/s", c.Name, c.Size, len(compressed), len(dst), mbpersec)
 	}
-	_, err = io.Copy(enc, in)
+
+	avgSpeed := sumMbPerSec / float64(len(contracts))
+
+	t.Logf("Average DeCompression Speed: %.2f MB/s", avgSpeed)
+}
+
+func compress(data []byte, t *testing.T) []byte {
+	enc, err := z.NewWriter(nil, []z.EOption{z.WithEncoderLevel(z.SpeedFastest)}...)
 	if err != nil {
-		enc.Close()
-		return err
+		t.Fatal(err)
 	}
-	return enc.Close()
+
+	return enc.EncodeAll(data, nil)
+}
+
+func decompress(data []byte, t *testing.T) []byte {
+	dec, err := z.NewReader(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d, err := dec.DecodeAll(data, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return d
 }

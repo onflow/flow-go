@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 	"testing"
 	"time"
 
@@ -28,22 +29,15 @@ func TestCompressLargeSize(t *testing.T) {
 
 	sumMbPerSec := 0.00
 	sumRatio := 0.00
+
+	writer := brotli.NewWriter(new(bytes.Buffer))
 	for _, name := range contractNames {
 		c := contracts[name]
-		dst := make([]byte, 0)
-
-		r := bytes.NewReader(c.Data)
-		w := bytes.NewBuffer(dst)
-		bw := brotli.NewWriter(w)
 
 		start := time.Now()
-		_, _ = io.Copy(bw, r)
-
+		dst := compress(writer, c.Data)
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
-
-		_ = bw.Close() // Make sure the writer is closed
-		dst = w.Bytes()
 
 		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
 		sumRatio = sumRatio + ratio
@@ -61,21 +55,12 @@ func TestCompressAllContracts(t *testing.T) {
 	contracts := csc.ReadContracts(contracsDir)
 	sumMbPerSec := 0.00
 	sumRatio := 0.00
+	writer := brotli.NewWriter(new(bytes.Buffer))
 	for _, c := range contracts {
-		dst := make([]byte, 0)
-
-		r := bytes.NewReader(c.Data)
-		w := bytes.NewBuffer(dst)
-		bw := brotli.NewWriter(w)
-
 		start := time.Now()
-		_, _ = io.Copy(bw, r)
-
+		dst := compress(writer, c.Data)
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
-:
-		_ = bw.Close() // Make sure the writer is closed
-		dst = w.Bytes()
 
 		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
 		sumRatio = sumRatio + ratio
@@ -87,4 +72,50 @@ func TestCompressAllContracts(t *testing.T) {
 	avgSpeed := sumMbPerSec / float64(len(contracts))
 
 	t.Logf("Average Compression Ratio: %.2f , Average Compression Speed: %.2f MB/s", avgRatio, avgSpeed)
+}
+
+func TestDecompressAllContracts(t *testing.T) {
+	contracts := csc.ReadContracts(contracsDir)
+
+	sumMbPerSec := 0.00
+	writer := brotli.NewWriter(new(bytes.Buffer))
+	for _, c := range contracts {
+		compressed := compress(writer, c.Data)
+
+		start := time.Now()
+		dst := decompress(compressed, t)
+
+		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
+		sumMbPerSec = sumMbPerSec + mbpersec
+
+		t.Logf("Name: %s | Orig Size: %d | Compressed Size: %d | UnCompressed Size: %d | Speed: %.2f MB/s", c.Name, c.Size, len(compressed), len(dst), mbpersec)
+	}
+
+	avgSpeed := sumMbPerSec / float64(len(contracts))
+
+	t.Logf("Average DeCompression Speed: %.2f MB/s", avgSpeed)
+}
+
+func compress(writer *brotli.Writer, data []byte) []byte {
+	dst := make([]byte, 0)
+	r := bytes.NewReader(data)
+	w := bytes.NewBuffer(dst)
+
+	writer.Reset(w)
+	_, _ = io.Copy(writer, r)
+
+	_ = writer.Close() // Make sure the writer is closed
+
+	return w.Bytes()
+}
+
+func decompress(data []byte, t *testing.T) []byte {
+	r := bytes.NewReader(data)
+	br := brotli.NewReader(r)
+	b, err := ioutil.ReadAll(br)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return b
 }

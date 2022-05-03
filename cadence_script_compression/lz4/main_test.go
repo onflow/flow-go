@@ -30,18 +30,8 @@ func TestCompressLargeSize(t *testing.T) {
 	sumRatio := 0.00
 	for _, name := range contractNames {
 		c := contracts[name]
-		dst := make([]byte, 0)
-
-		r := bytes.NewReader(c.Data)
-		w := bytes.NewBuffer(dst)
-
-		zw := lz4.NewWriter(w)
-
 		start := time.Now()
-		_, _ = io.Copy(zw, r)
-		_ = zw.Close() // Make sure the writer is closed
-
-		dst = w.Bytes()
+		dst := compress(c.Data)
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
@@ -64,19 +54,9 @@ func TestCompressAllContracts(t *testing.T) {
 	sumMbPerSec := 0.00
 	sumRatio := 0.00
 	for _, c := range contracts {
-		dst := make([]byte, 0)
-
-		r := bytes.NewReader(c.Data)
-		w := bytes.NewBuffer(dst)
-
-		zw := lz4.NewWriter(w)
 
 		start := time.Now()
-		_, _ = io.Copy(zw, r)
-		_ = zw.Close() // Make sure the writer is closed
-
-		dst = w.Bytes()
-
+		dst := compress(c.Data)
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
 
@@ -90,4 +70,49 @@ func TestCompressAllContracts(t *testing.T) {
 	avgSpeed := sumMbPerSec / float64(len(contracts))
 
 	t.Logf("Average Compression Ratio: %.2f , Average Compression Speed: %.2f MB/s", avgRatio, avgSpeed)
+}
+
+func TestDecompressAllContracts(t *testing.T) {
+	contracts := csc.ReadContracts(contracsDir)
+
+	sumMbPerSec := 0.00
+	for _, c := range contracts {
+		compressed := compress(c.Data)
+
+		start := time.Now()
+		dst := decompress(compressed)
+
+		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
+		sumMbPerSec = sumMbPerSec + mbpersec
+
+		t.Logf("Name: %s | Orig Size: %d | Compressed Size: %d | UnCompressed Size: %d | Speed: %.2f MB/s", c.Name, c.Size, len(compressed), len(dst), mbpersec)
+	}
+
+	avgSpeed := sumMbPerSec / float64(len(contracts))
+
+	t.Logf("Average DeCompression Speed: %.2f MB/s", avgSpeed)
+}
+
+func compress(data []byte) []byte {
+	dst := make([]byte, 0)
+	r := bytes.NewReader(data)
+	w := bytes.NewBuffer(dst)
+
+	zw := lz4.NewWriter(w)
+
+	_, _ = io.Copy(zw, r)
+	_ = zw.Close() // Make sure the writer is closed
+
+	return w.Bytes()
+}
+
+func decompress(data []byte) []byte {
+	dst := make([]byte, 0)
+	r := bytes.NewReader(data)
+	w := bytes.NewBuffer(dst)
+
+	zr := lz4.NewReader(r)
+	_, _ = io.Copy(w, zr)
+
+	return w.Bytes()
 }
