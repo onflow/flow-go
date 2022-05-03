@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
+	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 	"github.com/teivah/onecontext"
 	"golang.org/x/sync/errgroup"
@@ -63,6 +64,8 @@ type handler struct {
 	retryBaseTimeout time.Duration
 	numWorkers       int
 
+	logger zerolog.Logger
+
 	component.Component
 }
 
@@ -74,6 +77,7 @@ func newHandler(
 	maxBlobSize int,
 	retryBaseTimeout time.Duration,
 	numWorkers int,
+	logger zerolog.Logger,
 ) *handler {
 	jobsIn, jobsOut := util.UnboundedChannel()
 
@@ -87,6 +91,7 @@ func newHandler(
 		maxBlobSize:      maxBlobSize,
 		retryBaseTimeout: retryBaseTimeout,
 		numWorkers:       numWorkers,
+		logger:           logger.With().Str("subcomponent", "handler").Logger(),
 	}
 
 	cmb := component.NewComponentManagerBuilder()
@@ -105,9 +110,11 @@ func (h *handler) submitJob(j *job) {
 }
 
 func (h *handler) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-h.fulfiller.Ready()
-	<-h.blobService.Ready()
-	ready()
+	if util.WaitClosed(ctx, h.fulfiller.Ready()) == nil && util.WaitClosed(ctx, h.blobService.Ready()) == nil {
+		ready()
+	} else {
+		return
+	}
 
 	for {
 		select {
@@ -126,11 +133,7 @@ func (h *handler) isRetryable(err error) bool {
 	}
 
 	var blobSizeLimitExceededErr *blobSizeLimitExceededError
-	if errors.As(err, &blobSizeLimitExceededErr) {
-		return false
-	}
-
-	return true
+	return !errors.As(err, &blobSizeLimitExceededErr)
 }
 
 func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
@@ -138,10 +141,8 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 	defer cancel()
 
 	if err := retry.Fibonacci(getCtx, h.retryBaseTimeout, func(ctx context.Context) error {
-		select {
-		case <-ctx.Done():
+		if util.CheckClosed(ctx.Done()) {
 			return ctx.Err()
-		default:
 		}
 
 		jr := &jobResult{
@@ -178,21 +179,23 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 
 		return nil
 	}); err != nil {
-		// TODO: log
+		h.logger.Debug().
+			Err(err).
+			Str("result_id", j.resultID.String()).
+			Str("block_id", j.blockID.String()).
+			Str("execution_data_id", j.executionDataID.String()).
+			Msg("failed to get execution data")
 	}
 }
 
 func (h *handler) getExecutionData(ctx context.Context, j *job) (*execution_data.BlockExecutionData, error) {
 	var bed *execution_data.BlockExecutionData
-	var err error
-
 	blobGetter := h.blobService.GetSession(ctx)
 
-	h.storage.RunConcurrently(func() {
-		edRoot, getRootErr := h.getExecutionDataRoot(ctx, j.blockHeight, j.executionDataID, blobGetter)
-		if getRootErr != nil {
-			err = fmt.Errorf("failed to get execution data root: %w", err)
-			return
+	err := h.storage.Update(func(trackBlobs func(uint64, ...cid.Cid) error) error {
+		edRoot, err := h.getExecutionDataRoot(ctx, j.blockHeight, j.executionDataID, blobGetter, trackBlobs)
+		if err != nil {
+			return fmt.Errorf("failed to get execution data root: %w", err)
 		}
 
 		g, gCtx := errgroup.WithContext(ctx)
@@ -208,6 +211,7 @@ func (h *handler) getExecutionData(ctx context.Context, j *job) (*execution_data
 					j.blockHeight,
 					chunkDataID,
 					blobGetter,
+					trackBlobs,
 				)
 
 				if err != nil {
@@ -220,15 +224,16 @@ func (h *handler) getExecutionData(ctx context.Context, j *job) (*execution_data
 			})
 		}
 
-		if gErr := g.Wait(); gErr != nil {
-			err = gErr
-			return
+		if err := g.Wait(); err != nil {
+			return err
 		}
 
 		bed = &execution_data.BlockExecutionData{
 			BlockID:             edRoot.BlockID,
 			ChunkExecutionDatas: chunkExecutionDatas,
 		}
+
+		return nil
 	})
 
 	return bed, err
@@ -239,10 +244,13 @@ func (h *handler) getExecutionDataRoot(
 	blockHeight uint64,
 	rootID flow.Identifier,
 	blobGetter network.BlobGetter,
+	trackBlobs func(uint64, ...cid.Cid) error,
 ) (*execution_data.BlockExecutionDataRoot, error) {
 	rootCid := flow.IdToCid(rootID)
 
-	h.storage.TrackBlobs(blockHeight, rootCid)
+	if err := trackBlobs(blockHeight, rootCid); err != nil {
+		return nil, fmt.Errorf("failed to track root blob: %w", err)
+	}
 
 	blob, err := blobGetter.GetBlob(ctx, rootCid)
 	if err != nil {
@@ -267,15 +275,18 @@ func (h *handler) getChunkExecutionData(
 	blockHeight uint64,
 	chunkExecutionDataID cid.Cid,
 	blobGetter network.BlobGetter,
+	trackBlobs func(uint64, ...cid.Cid) error,
 ) (*execution_data.ChunkExecutionData, error) {
 	cids := []cid.Cid{chunkExecutionDataID}
 
 	for i := 0; ; i++ {
-		h.storage.TrackBlobs(blockHeight, cids...)
+		if err := trackBlobs(blockHeight, cids...); err != nil {
+			return nil, fmt.Errorf("failed to track blobs for level %d of blob tree: %w", i, err)
+		}
 
 		v, err := h.getBlobs(ctx, cids)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get level %d of blob tree for chunk execution data %s: %w", i, chunkExecutionDataID.String(), err)
+			return nil, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
 		}
 
 		switch v := v.(type) {

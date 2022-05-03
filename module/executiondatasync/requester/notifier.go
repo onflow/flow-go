@@ -16,15 +16,21 @@ type notification struct {
 	executionData *execution_data.BlockExecutionData
 }
 
+type subRequest struct {
+	sub  *notificationSub
+	done chan struct{}
+}
+
 type notifier struct {
 	notificationsIn  chan<- interface{}
 	notificationsOut <-chan interface{}
 
-	subs   chan *notificationSub
-	unsubs chan *notificationSub
+	subs   chan *subRequest
+	unsubs chan *subRequest
 
 	subscriptions map[*notificationSub]struct{}
 
+	cm *component.ComponentManager
 	component.Component
 }
 
@@ -33,15 +39,15 @@ func newNotifier() *notifier {
 	n := &notifier{
 		notificationsIn:  notificationsIn,
 		notificationsOut: notificationsOut,
-		subs:             make(chan *notificationSub),
-		unsubs:           make(chan *notificationSub),
+		subs:             make(chan *subRequest),
+		unsubs:           make(chan *subRequest),
 		subscriptions:    make(map[*notificationSub]struct{}),
 	}
 
-	cm := component.NewComponentManagerBuilder().
+	n.cm = component.NewComponentManagerBuilder().
 		AddWorker(n.loop).
 		Build()
-	n.Component = cm
+	n.Component = n.cm
 
 	return n
 }
@@ -50,10 +56,35 @@ func (n *notifier) notify(blockHeight uint64, executionData *execution_data.Bloc
 	n.notificationsIn <- &notification{blockHeight, executionData}
 }
 
-func (n *notifier) subscribe(sub *notificationSub) func() {
-	n.subs <- sub
-	return func() {
-		n.unsubs <- sub
+func (n *notifier) subscribe(sub *notificationSub) (func() error, error) {
+	done := make(chan struct{})
+	select {
+	case n.subs <- &subRequest{sub, done}:
+		select {
+		case <-done:
+			return n.unsubFunc(sub), nil
+		case <-n.cm.ShutdownSignal():
+			return nil, component.ErrComponentShutdown
+		}
+	case <-n.cm.ShutdownSignal():
+		return nil, component.ErrComponentShutdown
+	}
+}
+
+func (n *notifier) unsubFunc(sub *notificationSub) func() error {
+	return func() error {
+		done := make(chan struct{})
+		select {
+		case n.unsubs <- &subRequest{sub, done}:
+			select {
+			case <-done:
+				return nil
+			case <-n.cm.ShutdownSignal():
+				return component.ErrComponentShutdown
+			}
+		case <-n.cm.ShutdownSignal():
+			return component.ErrComponentShutdown
+		}
 	}
 }
 
@@ -65,9 +96,11 @@ func (n *notifier) loop(ctx irrecoverable.SignalerContext, ready component.Ready
 		case <-ctx.Done():
 			return
 		case sub := <-n.subs:
-			n.subscriptions[sub] = struct{}{}
+			n.subscriptions[sub.sub] = struct{}{}
+			close(sub.done)
 		case sub := <-n.unsubs:
-			delete(n.subscriptions, sub)
+			delete(n.subscriptions, sub.sub)
+			close(sub.done)
 		case notif := <-n.notificationsOut:
 			notification := notif.(*notification)
 			for sub := range n.subscriptions {

@@ -229,14 +229,6 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
-	// loop through seals and index ID -> result ID
-	for _, seal := range block.Payload.Seals {
-		err := e.executionResults.Index(seal.BlockID, seal.ResultID)
-		if err != nil {
-			return fmt.Errorf("could not index block for execution result: %w", err)
-		}
-	}
-
 	// queue requesting each of the collections from the collection node
 	e.requestCollections(block.Payload.Guarantees)
 

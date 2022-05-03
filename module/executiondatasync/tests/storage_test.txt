@@ -86,6 +86,7 @@ func TestStorageConcurrency(t *testing.T) {
 // TODO: setup value threshold, because all values are small.
 // TODO: setup value log GC on all DB's including blob store for execution node.
 // TODO: including blobstore for both!!n https://pkg.go.dev/github.com/ipfs/go-ds-badger#Datastore.CollectGarbage
+// including tracker storage and blobstore for both AN and EN
 
 // TODO: test a shutdown and restart of DB.
 // Test a restart right after purging to the limit, ie where
@@ -148,10 +149,11 @@ func TestStorageConcurrency(t *testing.T) {
 // everything <= that height have been both sealed and downloaded.
 // This is where we resume from when we restart.
 
-// Adder and Getter can take in an instance of Synchronizer, and we can use that to synchronize
-
 // TODO: for the hander, we should test all kinds of various edge cases
 // E.g duplicate CID's in the same level, cid not found in the blobservice, etc
 
-// TODO: requester components should wait for each other to be ready
-// Note: The subscription just needs to be setup before HotStuff is constructed
+// Note: The subscription needs to be setup before HotStuff is constructed
+
+// TODO: upon restart, we should prune the storage in case it was interrupted during the previous shutdown
+
+// TODO: metric to track how many receipts are skipped due to not having the corresponding block locally?

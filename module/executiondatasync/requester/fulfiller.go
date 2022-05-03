@@ -1,6 +1,8 @@
 package requester
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -88,7 +90,7 @@ loop:
 	f.storage.SetFulfilledHeight(f.fulfilledHeight)
 }
 
-func (f *fulfiller) handleJobResult(j *jobResult) {
+func (f *fulfiller) handleJobResult(ctx irrecoverable.SignalerContext, j *jobResult) {
 	if j.blockHeight <= f.fulfilledHeight {
 		return
 	}
@@ -99,8 +101,7 @@ func (f *fulfiller) handleJobResult(j *jobResult) {
 		}
 
 		if j.err != nil {
-			// TODO: error getting sealed execution data
-			// we should throw an irrecoverable error
+			ctx.Throw(fmt.Errorf("failed to get sealed execution data for block height %d: %w", j.blockHeight, j.err))
 		}
 
 		f.fulfilled[j.blockHeight] = j
@@ -119,7 +120,7 @@ func (f *fulfiller) handleJobResult(j *jobResult) {
 	}
 }
 
-func (f *fulfiller) handleSealedResult(sealedResultID flow.Identifier) {
+func (f *fulfiller) handleSealedResult(ctx irrecoverable.SignalerContext, sealedResultID flow.Identifier) {
 	f.sealedHeight++
 	f.sealedResults[f.sealedHeight] = sealedResultID
 
@@ -128,8 +129,7 @@ func (f *fulfiller) handleSealedResult(sealedResultID flow.Identifier) {
 
 		if j, ok := completedJobs[sealedResultID]; ok {
 			if j.err != nil {
-				// TODO: error getting sealed execution data
-				// we should throw an irrecoverable error
+				ctx.Throw(fmt.Errorf("failed to get sealed execution data for block height %d: %w", j.blockHeight, j.err))
 			}
 
 			f.fulfilled[f.sealedHeight] = j
@@ -142,17 +142,20 @@ func (f *fulfiller) handleSealedResult(sealedResultID flow.Identifier) {
 }
 
 func (f *fulfiller) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-f.notifier.Ready()
-	ready()
+	if util.WaitClosed(ctx, f.notifier.Ready()) == nil {
+		ready()
+	} else {
+		return
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case j := <-f.jobsOut:
-			f.handleJobResult(j.(*jobResult))
+			f.handleJobResult(ctx, j.(*jobResult))
 		case sealedResultID := <-f.resultsOut:
-			f.handleSealedResult(sealedResultID.(flow.Identifier))
+			f.handleSealedResult(ctx, sealedResultID.(flow.Identifier))
 		}
 	}
 }

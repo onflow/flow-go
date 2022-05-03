@@ -39,7 +39,7 @@ type ProvideJob struct {
 // TODO: make sure that when integrating this with execution node, that we don't
 // cancel the passed in context until the job is done.
 
-func (p *Provider) storeBlobs(ctx context.Context, blockHeight uint64, blobCh <-chan blobs.Blob) <-chan error {
+func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh <-chan blobs.Blob) <-chan error {
 	ch := make(chan error, 1)
 	go func() {
 		defer close(ch)
@@ -51,28 +51,29 @@ func (p *Provider) storeBlobs(ctx context.Context, blockHeight uint64, blobCh <-
 			cids = append(cids, blob.Cid())
 		}
 
-		p.storage.RunConcurrently(func() {
-			// TODO: should we create a child context for the AddBlobs which gets cancelled
-			// before return?
+		if err := p.storage.Update(func(trackBlobs func(uint64, ...cid.Cid) error) error {
+			ctx, cancel := context.WithCancel(parent)
+			defer cancel()
 
-			if err := p.storage.TrackBlobs(blockHeight, cids...); err != nil {
-				ch <- fmt.Errorf("failed to track blobs: %w", err)
-				return
+			if err := trackBlobs(blockHeight, cids...); err != nil {
+				return fmt.Errorf("failed to track blobs: %w", err)
 			}
 
 			if err := p.blobService.AddBlobs(ctx, blobs); err != nil {
-				ch <- fmt.Errorf("failed to add blobs: %w", err)
-				return
+				return fmt.Errorf("failed to add blobs: %w", err)
 			}
-		})
+
+			return nil
+		}); err != nil {
+			ch <- err
+		}
 	}()
 
 	return ch
 }
 
 func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (*ProvideJob, error) {
-	blobCh := make(chan blobs.Blob) // TODO: make unbounded, otherwise we could have deadlock
-	// TODO: actually, could we just make sure the channel has enough buffer space?
+	blobCh := make(chan blobs.Blob)
 	defer close(blobCh)
 
 	errCh := p.storeBlobs(ctx, blockHeight, blobCh)

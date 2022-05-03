@@ -633,6 +633,21 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
 
+		for _, seal := range block.Payload.Seals {
+			err := operation.IndexExecutionResult(seal.BlockID, seal.ResultID)(tx)
+			if err == nil {
+				continue
+			}
+
+			if !errors.Is(err, storage.ErrAlreadyExists) {
+				return fmt.Errorf("could not index sealed execution result: %w", err)
+			}
+
+			if err := operation.ReindexExecutionResult(seal.BlockID, seal.ResultID)(tx); err != nil {
+				return fmt.Errorf("could not reindex sealed execution result: %w", err)
+			}
+		}
+
 		// emit protocol events within the scope of the Badger transaction to
 		// guarantee at-least-once delivery
 		m.consumer.BlockFinalized(header)

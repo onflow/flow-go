@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -37,6 +39,8 @@ type dispatcher struct {
 	handler   *handler
 	fulfiller *fulfiller
 
+	logger zerolog.Logger
+
 	component.Component
 }
 
@@ -46,6 +50,7 @@ func newDispatcher(
 	results storage.ExecutionResults,
 	handler *handler,
 	fulfiller *fulfiller,
+	logger zerolog.Logger,
 ) *dispatcher {
 	receiptsIn, receiptsOut := util.UnboundedChannel()
 	finalizedBlocksIn, finalizedBlocksOut := util.UnboundedChannel()
@@ -64,6 +69,7 @@ func newDispatcher(
 		results:            results,
 		handler:            handler,
 		fulfiller:          fulfiller,
+		logger:             logger.With().Str("subcomponent", "dispatcher").Logger(),
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -78,8 +84,6 @@ func newDispatcher(
 }
 
 func (d *dispatcher) submitReceipt(receipt *flow.ExecutionReceipt) {
-	// TODO: do we also want an upper bound on height?
-	// For example, we could say that we ignore anything past the latest incorporated height?
 	d.receiptsIn <- receipt
 }
 
@@ -98,7 +102,12 @@ func (d *dispatcher) processReceipts(ctx irrecoverable.SignalerContext, ready co
 			receipt := r.(*flow.ExecutionReceipt)
 			block, err := d.blocks.ByID(receipt.ExecutionResult.BlockID)
 			if err != nil {
-				// TODO: log
+				d.logger.Debug().
+					Err(err).
+					Str("result_id", receipt.ExecutionResult.ID().String()).
+					Str("receipt_id", receipt.ID().String()).
+					Str("block_id", receipt.ExecutionResult.BlockID.String()).
+					Msg("could not retrieve corresponding block for execution receipt, skipping")
 				continue
 			}
 
@@ -113,8 +122,11 @@ func (d *dispatcher) processReceipts(ctx irrecoverable.SignalerContext, ready co
 }
 
 func (d *dispatcher) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-d.fulfiller.Ready()
-	ready()
+	if util.WaitClosed(ctx, d.fulfiller.Ready()) == nil {
+		ready()
+	} else {
+		return
+	}
 
 	for {
 		select {
@@ -154,8 +166,11 @@ func (d *dispatcher) processFinalizedBlocks(ctx irrecoverable.SignalerContext, r
 }
 
 func (d *dispatcher) processResults(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-d.handler.Ready()
-	ready()
+	if util.WaitClosed(ctx, d.handler.Ready()) == nil {
+		ready()
+	} else {
+		return
+	}
 
 	for {
 		select {
@@ -217,7 +232,7 @@ func (d *dispatcher) handleSealedResult(ctx irrecoverable.SignalerContext, rinfo
 
 func (d *dispatcher) handleResult(ctx irrecoverable.SignalerContext, rinfo *resultInfo) {
 	if d.sealedHeight >= rinfo.blockHeight {
-		// TODO: log something
+		// skip processing heights that are already sealed
 		return
 	}
 
