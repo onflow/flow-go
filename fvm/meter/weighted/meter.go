@@ -56,7 +56,7 @@ var (
 
 		common.MemoryKindAtreeArrayDataSlab:      72,
 		common.MemoryKindAtreeArrayMetaDataSlab:  1024,
-		common.MemoryKindAtreeMapDataSlab:        140,
+		common.MemoryKindAtreeMapDataSlab:        144,
 		common.MemoryKindAtreeMapMetaDataSlab:    1024,
 		common.MemoryKindAtreeMapElementOverhead: 64,
 
