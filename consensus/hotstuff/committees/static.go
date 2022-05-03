@@ -40,11 +40,23 @@ type Static struct {
 	dkg          protocol.DKG
 }
 
-func (s Static) Identities(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (s Static) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return s.participants.Filter(selector), nil
 }
 
-func (s Static) Identity(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+func (s Static) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+	identity, ok := s.participants.ByNodeID(participantID)
+	if !ok {
+		return nil, fmt.Errorf("unknown partipant")
+	}
+	return identity, nil
+}
+
+func (s Static) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
+	return s.participants.Filter(selector), nil
+}
+
+func (s Static) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
 	identity, ok := s.participants.ByNodeID(participantID)
 	if !ok {
 		return nil, fmt.Errorf("unknown partipant")
@@ -60,7 +72,7 @@ func (s Static) Self() flow.Identifier {
 	return s.myID
 }
 
-func (s Static) DKG(_ flow.Identifier) (hotstuff.DKG, error) {
+func (s Static) DKG(_ uint64) (hotstuff.DKG, error) {
 	return s.dkg, nil
 }
 
