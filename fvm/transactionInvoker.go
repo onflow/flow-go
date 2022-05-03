@@ -126,23 +126,18 @@ func (i *TransactionInvoker) Process(
 		}
 
 		location := common.TransactionLocation(proc.ID[:])
-		var err error
-		// disable this transaction as it eats through memory
-		if txIDStr == "51be45d5d298403e7798e5c8048102529acae4b05e16f795220f2ac1034ccf64" {
-			txError = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
-		} else {
-			err = vm.Runtime.ExecuteTransaction(
-				runtime.Script{
-					Source:    proc.Transaction.Script,
-					Arguments: proc.Transaction.Arguments,
-				},
-				runtime.Context{
-					Interface:         env,
-					Location:          location,
-					PredeclaredValues: predeclaredValues,
-				},
-			)
-		}
+
+		err := vm.Runtime.ExecuteTransaction(
+			runtime.Script{
+				Source:    proc.Transaction.Script,
+				Arguments: proc.Transaction.Arguments,
+			},
+			runtime.Context{
+				Interface:         env,
+				Location:          location,
+				PredeclaredValues: predeclaredValues,
+			},
+		)
 		if err != nil {
 			var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
 			if errors.As(err, &interactionLimiExceededErr) {
