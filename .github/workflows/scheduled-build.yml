@@ -103,7 +103,7 @@ jobs:
           destination: $BUCKET_NAME/daily/${{ steps.version.outputs.SHORT_COMMIT }}/bootstrap
           path: './boostrap'
 
-      - id: 'upload-util'
+      - id: 'upload-transit'
         uses: 'google-github-actions/upload-cloud-storage@v0'
         with:
           credentials_json: '${{ secrets.GCP_CD_CREDS }}'
