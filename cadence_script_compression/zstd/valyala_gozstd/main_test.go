@@ -41,7 +41,7 @@ func TestCompressLargeSize(t *testing.T) {
 		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
 		sumRatio = sumRatio + ratio
 
-		t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
+		//t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
 	}
 
 	avgRatio := sumRatio / float64(len(contractNames))
@@ -67,7 +67,7 @@ func TestCompressAllContracts(t *testing.T) {
 		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
 		sumRatio = sumRatio + ratio
 
-		t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
+		//t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
 	}
 
 	avgRatio := sumRatio / float64(len(contracts))
@@ -105,7 +105,7 @@ func TestCompressAllCDictBestCompression(t *testing.T) {
 		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
 		sumRatio = sumRatio + ratio
 
-		t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
+		//t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
 	}
 
 	avgRatio := sumRatio / float64(len(contracts))
@@ -143,7 +143,7 @@ func TestCompressAllCDictBestSpeed(t *testing.T) {
 		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
 		sumRatio = sumRatio + ratio
 
-		t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
+		//t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
 	}
 
 	avgRatio := sumRatio / float64(len(contracts))
@@ -160,7 +160,7 @@ func TestDecompressAllContracts(t *testing.T) {
 		compressed := zstd.Compress(nil, c.Data)
 
 		start := time.Now()
-		dst, err := zstd.Decompress(nil, compressed)
+		_, err := zstd.Decompress(nil, compressed)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -168,7 +168,7 @@ func TestDecompressAllContracts(t *testing.T) {
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
 
-		t.Logf("Name: %s | Orig Size: %d | Compressed Size: %d | UnCompressed Size: %d | Speed: %.2f MB/s", c.Name, c.Size, len(compressed), len(dst), mbpersec)
+		//t.Logf("Name: %s | Orig Size: %d | Compressed Size: %d | UnCompressed Size: %d | Speed: %.2f MB/s", c.Name, c.Size, len(compressed), len(dst), mbpersec)
 	}
 
 	avgSpeed := sumMbPerSec / float64(len(contracts))
