@@ -11,7 +11,7 @@ import (
 //
 // For the purposes of validating votes, timeouts, quorum certificates, and timeout certificates
 // we consider a committee which is static over the course of an epoch. Although committee
-// members may be ejected, or have their weight change during an epoch, we ignore these changes,
+// members may be ejected, or have their weight change during an epoch, we ignore these changes.
 // For these purposes we use the VoterCommittee and *ByEpoch methods.
 //
 // When validating proposals, we take into account changes to the committee during the course of
@@ -19,7 +19,7 @@ import (
 // from that node. For these purposes we use the Committee and *ByBlock methods.
 
 // VoterCommittee defines the consensus committee for the purposes of validating votes, timeouts,
-// quorum certificates, and timeout certificates. Any consensus committee member who was legitimate
+// quorum certificates, and timeout certificates. Any consensus committee member who was authorized to contribute to consensus
 // AT THE BEGINNING of the epoch may produce valid votes and timeouts for the entire epoch, even
 // if they are later ejected. So for validating votes/timeouts we use *ByEpoch methods.
 //
