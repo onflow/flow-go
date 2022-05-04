@@ -221,6 +221,7 @@ func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
+				nil,
 			)
 			return builder.RpcEng, nil
 		}).

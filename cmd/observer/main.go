@@ -14,8 +14,7 @@ func main() {
 		anb.Logger.Fatal().Err(err).Send()
 	}
 
-	var builder nodebuilder.AccessNodeBuilder
-	builder = nodebuilder.NewUnstakedAccessNodeBuilder(anb)
+	var builder nodebuilder.AccessNodeBuilder = nodebuilder.NewUnstakedAccessNodeBuilder(anb)
 
 	if err := builder.Initialize(); err != nil {
 		anb.Logger.Fatal().Err(err).Send()
@@ -27,4 +26,3 @@ func main() {
 	}
 	node.Run()
 }
-

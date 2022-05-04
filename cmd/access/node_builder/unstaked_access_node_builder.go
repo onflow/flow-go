@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
@@ -312,6 +313,30 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return newUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
+	}).Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		builder.RpcEng = rpc.New(
+			node.Logger,
+			node.State,
+			builder.rpcConf,
+			builder.CollectionRPC,
+			builder.HistoricalAccessRPCs,
+			node.Storage.Blocks,
+			node.Storage.Headers,
+			node.Storage.Collections,
+			node.Storage.Transactions,
+			node.Storage.Receipts,
+			node.Storage.Results,
+			node.RootChainID,
+			builder.TransactionMetrics,
+			builder.collectionGRPCPort,
+			builder.executionGRPCPort,
+			builder.retryEnabled,
+			builder.rpcMetricsEnabled,
+			builder.apiRatelimits,
+			builder.apiBurstlimits,
+			nil,
+		)
+		return builder.RpcEng, nil
 	})
 }
 
