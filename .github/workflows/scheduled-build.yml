@@ -6,7 +6,6 @@ on:
       - 'spb/add-workflows'
 
 env:
-  BASE_BRANCH: master
   BUCKET_NAME: 'flow-internal-tooling-bucket'
   GO_VERSION: '1.17'
 
@@ -18,7 +17,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
         with:
-          ref: $BASE_BRANCH
+          ref: master
 
       - name: Get Short Commit
         run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
