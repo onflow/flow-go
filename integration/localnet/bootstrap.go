@@ -717,7 +717,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string, prof
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
-				"TARGET":  "./cmd/access", // hardcoded to access for now until we make it a separate cmd
+				"TARGET":  "./cmd/observer",
 				"VERSION": build.Semver(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,
