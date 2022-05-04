@@ -24,22 +24,12 @@ linters:
     - gosec
 
 issues:
-  exclude:
-    - "builder.Module undefined"
-    - "builder.Component undefined"
-    - "builder.Metrics undefined"
-    - "builder.ComplianceConfig undefined"
-    - "builder.BaseFlags undefined"
-    - "builder.BuildConsensusFollower"
-    - "StakedAccessNodeBuilder has no field or method"
-    - "FlowAccessNodeBuilder has no field or method"
-    - "ObserverNodeBuilder has no field or method"
-    # Disable false positives
-
   exclude-rules:
     - path: _test\.go # disable some linters on test files
       linters:
-        - typecheck
+        - unused
     # typecheck currently not handling the way we do function inheritance well
     # disabling for now
-
+    - path: 'cmd/access/node_build/*' 
+      linters:
+        - typecheck

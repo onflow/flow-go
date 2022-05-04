@@ -40,7 +40,6 @@ jobs:
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-pkg-cache: true
         # Make sure we get accurate results
-        skip-cache: true
         only-new-issues: true
         skip-build-cache: true
     - name: Run ShellCheck
@@ -114,3 +113,38 @@ jobs:
         timeout_minutes: 15
         max_attempts: 2
         command: ./tools/test_monitor/run-tests.sh
+  flow-legacy-client-compatibility-test:
+    name: Client Compatibility Tests With Observer
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version:
+          - 1.16
+          - 1.17
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version}}
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Build relic
+      run: make crypto_setup_gopath
+    - name: Docker build
+      run: make install-tools
+    - name: Install Flow Client
+      run: sh -ci "$(curl -fsSL https://storage.googleapis.com/flow-cli/install.sh)" && mv ~/.local/bin/flow /tmp
+    - name: Set up Localnet
+      run: bash -c 'cd integration/localnet/ && make -e OBSERVER=1 init && make start'
+    - name: Ensure Observer is started
+      run: docker ps -q -f name=localnet_observer_1_1
+    - name: Get Version ensuring the official client build can connect
+      run: /tmp/flow -f integration/localnet/flow-localnet.json -n observer version
+    - name: Get Status ensuring the official client build can connect
+      run: /tmp/flow -f integration/localnet/flow-localnet.json -n observer status
+    - name: Wait for finalized blocks and check them with Observer
+      # || true = non-breaking due to rpc change. We do access and observer together to fetch the same block
+      run: /tmp/flow -f integration/localnet/flow-localnet.json -n access blocks get latest && (/tmp/flow -f integration/localnet/flow-localnet.json -n observer blocks get latest || true)
+    - name: Stop localnet
+      run: bash -c 'cd integration/localnet/ && make stop'
