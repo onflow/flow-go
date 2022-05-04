@@ -184,8 +184,9 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 			return newInvalidBlockError(block, fmt.Errorf("last view has ended with timeout but proposal doesn't include LastViewTC"))
 		}
 
+		// check if included TC is for previous view
 		if proposal.Block.View != proposal.LastViewTC.View+1 {
-			return newInvalidBlockError(block, fmt.Errorf("TC missing"))
+			return newInvalidBlockError(block, fmt.Errorf("expected TC for view %d got %d", proposal.Block.View-1, proposal.LastViewTC.View))
 		}
 
 		// check if proposal extends the highest QC from TC.

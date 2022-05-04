@@ -231,6 +231,27 @@ func (ps *ProposalSuite) TestProposalQCError() {
 	assert.False(ps.T(), model.IsInvalidBlockError(err), "if we can't verify the QC, we should not generate a invalid error")
 }
 
+// TestProposalWithLastViewTC tests different scenarios where last view has ended with TC
+// this requires including a valid LastViewTC.
+func (ps *ProposalSuite) TestProposalWithLastViewTC() {
+	ps.Fail("implement me")
+	ps.Run("happy-path", func() {
+
+	})
+	ps.Run("no-tc", func() {
+
+	})
+	ps.Run("tc-for-wrong-view", func() {
+
+	})
+	ps.Run("proposal-not-safe-to-extend", func() {
+
+	})
+	ps.Run("included-tc-invalid", func() {
+
+	})
+}
+
 func TestValidateVote(t *testing.T) {
 	suite.Run(t, new(VoteSuite))
 }
