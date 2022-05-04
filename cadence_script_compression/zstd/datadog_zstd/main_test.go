@@ -1,14 +1,20 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"io/ioutil"
 	"testing"
 	"time"
 
-	ztsd "github.com/DataDog/zstd"
+	"github.com/DataDog/zstd"
 	csc "github.com/onflow/flow-go/cadence_script_compression"
 )
 
-const contracsDir = "../../contracts/mainnet"
+const (
+	contracsDir = "../../contracts/mainnet"
+	dictionary  = "../MAINNET_DICT"
+)
 
 func TestCompressLargeSize(t *testing.T) {
 	// get a sample of contracts with large size compared to rest of the contracts
@@ -29,7 +35,7 @@ func TestCompressLargeSize(t *testing.T) {
 		start := time.Now()
 
 		dst := make([]byte, 0)
-		dst, err := ztsd.Compress(dst, c.Data)
+		dst, err := zstd.Compress(dst, c.Data)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -58,10 +64,90 @@ func TestCompressAllContracts(t *testing.T) {
 		start := time.Now()
 
 		dst := make([]byte, 0)
-		dst, err := ztsd.Compress(dst, c.Data)
+		dst, err := zstd.Compress(dst, c.Data)
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
+		sumMbPerSec = sumMbPerSec + mbpersec
+
+		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
+		sumRatio = sumRatio + ratio
+
+		t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
+	}
+
+	avgRatio := sumRatio / float64(len(contracts))
+	avgSpeed := sumMbPerSec / float64(len(contracts))
+
+	t.Logf("Average Compression Ratio: %.2f , Average Compression Speed: %.2f MB/s", avgRatio, avgSpeed)
+}
+
+func TestCompressAllWithDictBestCompression(t *testing.T) {
+	contracts := csc.ReadContracts(contracsDir)
+
+	sumMbPerSec := 0.00
+	sumRatio := 0.00
+
+	dict, err := ioutil.ReadFile(dictionary)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range contracts {
+		start := time.Now()
+
+		dst := make([]byte, 0)
+		w := bytes.NewBuffer(dst)
+
+		writer := zstd.NewWriterLevelDict(w, zstd.BestCompression, dict)
+		r := bytes.NewReader(c.Data)
+
+		_, _ = io.Copy(writer, r)
+		_ = writer.Close() // Make sure the writer is closed
+
+		dst = w.Bytes()
+
+		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
+		sumMbPerSec = sumMbPerSec + mbpersec
+
+		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
+		sumRatio = sumRatio + ratio
+
+		t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
+	}
+
+	avgRatio := sumRatio / float64(len(contracts))
+	avgSpeed := sumMbPerSec / float64(len(contracts))
+
+	t.Logf("Average Compression Ratio: %.2f , Average Compression Speed: %.2f MB/s", avgRatio, avgSpeed)
+}
+
+func TestCompressAllWithDictBestSpeed(t *testing.T) {
+	contracts := csc.ReadContracts(contracsDir)
+
+	sumMbPerSec := 0.00
+	sumRatio := 0.00
+
+	dict, err := ioutil.ReadFile(dictionary)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range contracts {
+		start := time.Now()
+
+		dst := make([]byte, 0)
+		w := bytes.NewBuffer(dst)
+
+		writer := zstd.NewWriterLevelDict(w, zstd.BestSpeed, dict)
+		r := bytes.NewReader(c.Data)
+
+		_, _ = io.Copy(writer, r)
+		_ = writer.Close() // Make sure the writer is closed
+
+		dst = w.Bytes()
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
@@ -83,13 +169,13 @@ func TestDecompressAllContracts(t *testing.T) {
 
 	sumMbPerSec := 0.00
 	for _, c := range contracts {
-		compressed, err := ztsd.Compress(nil, c.Data)
+		compressed, err := zstd.Compress(nil, c.Data)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		start := time.Now()
-		dst, err := ztsd.Decompress(nil, compressed)
+		dst, err := zstd.Decompress(nil, compressed)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 const (
 	contracsDir = "../../contracts/mainnet"
+	dictionary  = "../MAINNET_DICT"
 )
 
 func TestCompressLargeSize(t *testing.T) {
@@ -71,6 +73,68 @@ func TestCompressAllContracts(t *testing.T) {
 	t.Logf("Average Compression Ratio: %.2f , Average Compression Speed: %.2f MB/s", avgRatio, avgSpeed)
 }
 
+func TestCompressAllWithDictBestCompression(t *testing.T) {
+	contracts := csc.ReadContracts(contracsDir)
+
+	sumMbPerSec := 0.00
+	sumRatio := 0.00
+
+	dict, err := ioutil.ReadFile(dictionary)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range contracts {
+		start := time.Now()
+
+		dst := compressWithDict(c.Data, dict, z.SpeedBestCompression, t)
+
+		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
+		sumMbPerSec = sumMbPerSec + mbpersec
+
+		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
+		sumRatio = sumRatio + ratio
+
+		t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
+	}
+
+	avgRatio := sumRatio / float64(len(contracts))
+	avgSpeed := sumMbPerSec / float64(len(contracts))
+
+	t.Logf("Average Compression Ratio: %.2f , Average Compression Speed: %.2f MB/s", avgRatio, avgSpeed)
+}
+
+func TestCompressAllWithDictBestSpeed(t *testing.T) {
+	contracts := csc.ReadContracts(contracsDir)
+
+	sumMbPerSec := 0.00
+	sumRatio := 0.00
+
+	dict, err := ioutil.ReadFile(dictionary)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, c := range contracts {
+		start := time.Now()
+
+		dst := compressWithDict(c.Data, dict, z.SpeedBestCompression, t)
+
+		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
+		sumMbPerSec = sumMbPerSec + mbpersec
+
+		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
+		sumRatio = sumRatio + ratio
+
+		t.Logf("Name: %s | UnCompressed Size: %d | Compressed Size: %d | Speed: %.2f MB/s | Ratio: %.2f", c.Name, c.Size, len(dst), mbpersec, ratio)
+	}
+
+	avgRatio := sumRatio / float64(len(contracts))
+	avgSpeed := sumMbPerSec / float64(len(contracts))
+
+	t.Logf("Average Compression Ratio: %.2f , Average Compression Speed: %.2f MB/s", avgRatio, avgSpeed)
+}
+
 func TestDecompressAllContracts(t *testing.T) {
 	contracts := csc.ReadContracts(contracsDir)
 
@@ -94,6 +158,15 @@ func TestDecompressAllContracts(t *testing.T) {
 
 func compress(data []byte, t *testing.T) []byte {
 	enc, err := z.NewWriter(nil, []z.EOption{z.WithEncoderLevel(z.SpeedFastest)}...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return enc.EncodeAll(data, nil)
+}
+
+func compressWithDict(data []byte, dict []byte, speed z.EncoderLevel, t *testing.T) []byte {
+	enc, err := z.NewWriter(nil, []z.EOption{z.WithEncoderLevel(speed), z.WithEncoderDict(dict)}...)
 	if err != nil {
 		t.Fatal(err)
 	}
