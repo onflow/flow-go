@@ -138,6 +138,8 @@ func (c *Consumer) Size() uint {
 
 // LastProcessedIndex returns the last processed job index
 func (c *Consumer) LastProcessedIndex() uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.processedIndex
 }
 
