@@ -313,6 +313,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // the finalized state; if a parent of children is validly processed, it means
 // the children are also still on a valid chain and all missing links are there;
 // no need to do all the processing again.
+// Expected errors during normal operations:
+// * engine.OutdatedInputError if the block proposal is orphaned
+// * engine.InvalidInputError if the block proposal is invalid
 func (e *Engine) processBlockProposal(ctx context.Context, proposal *messages.BlockProposal) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
@@ -344,19 +347,17 @@ func (e *Engine) processBlockProposal(ctx context.Context, proposal *messages.Bl
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
 	err := e.state.Extend(ctx, block)
-	// if the error is a known invalid extension of the protocol state, then
-	// the input is invalid
-	if state.IsInvalidExtensionError(err) {
-		return engine.NewInvalidInputErrorf("invalid extension of protocol state: %w", err)
-	}
-
-	// if the error is a known outdated extension of the protocol state, then
-	// the input is outdated
-	if state.IsOutdatedExtensionError(err) {
-		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
-	}
-
 	if err != nil {
+		// The proposal must represent a valid extension of the protocol state, otherwise it is invalid.
+		if state.IsInvalidExtensionError(err) {
+			log.Error().Err(err).Msg("dropping INVALID block")
+			return nil
+		}
+		if state.IsOutdatedExtensionError(err) {
+			log.Warn().Err(err).Msg("dropping outdated block (likely from some node fallen-behind)")
+			return nil
+		}
+
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
 
