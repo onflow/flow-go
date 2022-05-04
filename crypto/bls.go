@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -14,7 +15,8 @@ package crypto
 //     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
 //  - hash to curve is using the optimized SWU map
 //    (https://eprint.iacr.org/2019/403.pdf section 4)
-//  - expanding the message is using a cSHAKE-based KMAC128 with a domain separation tag
+//  - expanding the message is using a cSHAKE-based KMAC128 with a domain separation tag.
+//    KMAC128 serves as the expand_message_xof function as per draft-irtf-cfrg-hash-to-curve.
 //  - signature verification checks the membership of signature in G1
 //  - the public key membership check in G2 is implemented separately from the signature verification.
 //  - membership check in G1 is implemented using fast Bowe's check (https://eprint.iacr.org/2019/814.pdf)
@@ -51,7 +53,7 @@ type blsBLS12381Algo struct {
 var blsInstance *blsBLS12381Algo
 
 // NewBLSKMAC returns a new KMAC128 instance with the right parameters
-// chosen for BLS signatures and verifications.
+// chosen for BLS hashing to curve (the expand_message_xof step).
 //
 // It expands the message into 1024 bits (required for the optimal SwU hash to curve).
 // tag is the domain separation tag, it is recommended to use a different tag for each signature domain.
@@ -67,6 +69,8 @@ func NewBLSKMAC(tag string) hash.Hasher {
 // returns a customized KMAC instance for BLS
 func internalBLSKMAC(tag string) hash.Hasher {
 	// postfix the tag with the BLS ciphersuite
+	// The tag is an UTF-8 encoding of the string. UTF-8 is a non-ambiguous encoding
+	// as required by draft-irtf-cfrg-hash-to-curve (similarly to the recommended ASCII).
 	key := []byte(tag + blsCipherSuite)
 	// blsKMACFunction is the customizer used for KMAC in BLS
 	const blsKMACFunction = "H2C"
