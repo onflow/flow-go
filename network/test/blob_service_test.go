@@ -9,7 +9,6 @@ import (
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	"github.com/ipfs/go-datastore/query"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
@@ -182,30 +181,6 @@ func (suite *BlobServiceTestSuite) TestGetBlobsWithSession() {
 			suite.Assert().NoError(err)
 		}
 	}
-}
-
-// This test ensures that datastore key lengths and values that we depend upon in
-// the state synchronization state tracker don't change between versions.
-// If a dependency change causes this test to break, it means that the blockstore /
-// datastore implementations have changed their key formatting, and we need to
-// update our code accordingly.
-// TODO: move this to state synchronization test suite
-func (suite *BlobServiceTestSuite) TestDatastoreKey() {
-	results, err := suite.datastores[0].Query(context.Background(), query.Query{
-		KeysOnly: true,
-	})
-	suite.Require().NoError(err)
-
-	defer results.Close()
-
-	result, ok := results.NextSync()
-	suite.Require().True(ok)
-
-	blobCid := suite.blobCids[0]
-
-	suite.Assert().Equal(result.Entry.Key[0], network.BlobServiceDatastoreKeyPrefix)
-	suite.Assert().Equal(network.BlobServiceDatastoreKeyForCid(blobCid).String(), result.Entry.Key)
-	suite.Assert().Equal(len(result.Entry.Key), network.BlobServiceDatastoreKeyLength)
 }
 
 func (suite *BlobServiceTestSuite) TestHas() {

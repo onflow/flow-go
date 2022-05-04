@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/network"
 )
 
 const (
@@ -16,8 +15,7 @@ const (
 )
 
 type Pruner struct {
-	storage     *tracker.Storage
-	blobService network.BlobService
+	storage *tracker.Storage
 
 	fulfilledHeightsIn    chan<- interface{}
 	fulfilledHeightsOut   <-chan interface{}
@@ -46,7 +44,7 @@ func WithThreshold(threshold uint64) PrunerOption {
 	}
 }
 
-func NewPruner(storage *tracker.Storage, blobService network.BlobService, opts ...PrunerOption) (*Pruner, error) {
+func NewPruner(storage *tracker.Storage, opts ...PrunerOption) (*Pruner, error) {
 	lastPrunedHeight, err := storage.GetPrunedHeight()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pruned height: %w", err)
@@ -62,7 +60,6 @@ func NewPruner(storage *tracker.Storage, blobService network.BlobService, opts .
 
 	p := &Pruner{
 		storage:               storage,
-		blobService:           blobService,
 		fulfilledHeightsIn:    fulfilledHeightsIn,
 		fulfilledHeightsOut:   fulfilledHeightsOut,
 		thresholdChan:         make(chan uint64),
@@ -110,11 +107,7 @@ func (p *Pruner) SetThreshold(threshold uint64) error {
 }
 
 func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	if util.WaitClosed(ctx, p.blobService.Ready()) == nil {
-		ready()
-	} else {
-		return
-	}
+	ready()
 
 	for {
 		select {

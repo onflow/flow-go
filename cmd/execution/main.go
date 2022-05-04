@@ -12,6 +12,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence/runtime"
@@ -60,13 +61,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/buffer"
 	chainsync "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -131,6 +136,9 @@ func main() {
 		blockdataUploaderRetryTimeout        = 1 * time.Second
 		executionDataGetter           execution_data.ExecutionDataGetter
 		executionDataDatastore        datastore.Batching
+		executionDataPruner           *pruner.Pruner
+		executionDataBlobservice      network.BlobService
+		executionDataBlobstore        blobs.Blobstore
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -142,7 +150,7 @@ func main() {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
-			flags.StringVar(&executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data_blobstore"), "directory to use for Execution Data blobstore")
+			flags.StringVar(&executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data"), "directory to use for storing Execution Data")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
@@ -312,12 +320,13 @@ func main() {
 			return nil
 		}).
 		Module("execution data datastore", func(node *cmd.NodeConfig) error {
-			err := os.MkdirAll(executionDataDir, 0700)
+			datastoreDir := filepath.Join(executionDataDir, "blobstore")
+			err := os.MkdirAll(datastoreDir, 0700)
 			if err != nil {
 				return err
 			}
 			dsOpts := &badger.DefaultOptions
-			ds, err := badger.NewDatastore(executionDataDir, dsOpts)
+			ds, err := badger.NewDatastore(datastoreDir, dsOpts)
 			if err != nil {
 				return err
 			}
@@ -326,7 +335,7 @@ func main() {
 			return nil
 		}).
 		Module("execution data getter", func(node *cmd.NodeConfig) error {
-			// TODO
+			// TODO: create the blobstore as well
 			return nil
 		}).
 		Component("Write-Ahead Log", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -386,6 +395,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("failed to register blob service: %w", err)
 			}
+			executionDataBlobservice = bs
 
 			codec := &cbor.Codec{}
 			compressor := compressor.NewLz4Compressor()
@@ -533,6 +543,33 @@ func main() {
 			)
 			return checkerEng, nil
 		}).
+		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			sealed, err := node.State.Sealed().Head()
+			if err != nil {
+				return nil, fmt.Errorf("cannot get the sealed block: %w", err)
+			}
+
+			trackerDir := filepath.Join(executionDataDir, "tracker")
+			storage, err := tracker.OpenStorage(
+				trackerDir,
+				sealed.Height,
+				node.Logger,
+				tracker.WithPruneCallback(func(c cid.Cid) error {
+					// TODO: use a proper context here
+					return executionDataBlobstore.DeleteBlob(context.TODO(), c)
+				}),
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			executionDataPruner, err = pruner.NewPruner(
+				storage,
+				pruner.WithHeightRangeTarget(65000),
+				pruner.WithThreshold(65000),
+			)
+			return executionDataPruner, err
+		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
@@ -577,6 +614,7 @@ func main() {
 				syncFast,
 				checkAuthorizedAtBlock,
 				pauseExecution,
+				executionDataPruner,
 			)
 
 			// TODO: we should solve these mutual dependencies better

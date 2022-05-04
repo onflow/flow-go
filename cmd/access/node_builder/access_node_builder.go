@@ -1,17 +1,24 @@
 package node_builder
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/compliance"
 
@@ -31,10 +38,15 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	exedatarequester "github.com/onflow/flow-go/module/executiondatasync/requester"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -42,6 +54,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	netcache "github.com/onflow/flow-go/network/cache"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
@@ -99,6 +112,7 @@ type AccessNodeConfig struct {
 	retryEnabled                 bool
 	rpcMetricsEnabled            bool
 	baseOptions                  []cmd.Option
+	executionDataDir             string
 
 	PublicNetworkConfig PublicNetworkConfig
 }
@@ -375,6 +389,85 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder
 	return builder
 }
 
+func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() AccessNodeBuilder {
+	var executionDataDatastore datastore.Batching
+	var trackerStorage *tracker.Storage
+	var requester *exedatarequester.Requester
+
+	builder.Module("execution data datastore", func(node *cmd.NodeConfig) error {
+		datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
+		err := os.MkdirAll(datastoreDir, 0700)
+		if err != nil {
+			return err
+		}
+		dsOpts := &badger.DefaultOptions
+		executionDataDatastore, err = badger.NewDatastore(datastoreDir, dsOpts)
+		if err != nil {
+			return err
+		}
+		builder.ShutdownFunc(executionDataDatastore.Close)
+		return nil
+	}).
+		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			bs, err := node.Network.RegisterBlobService(engine.ExecutionDataService, executionDataDatastore)
+			if err != nil {
+				return nil, fmt.Errorf("failed to register blob service: %w", err)
+			}
+			sealed, err := node.State.Sealed().Head()
+			if err != nil {
+				return nil, fmt.Errorf("cannot get the sealed block: %w", err)
+			}
+
+			trackerDir := filepath.Join(builder.executionDataDir, "tracker")
+			trackerStorage, err = tracker.OpenStorage(
+				trackerDir,
+				sealed.Height,
+				node.Logger,
+				tracker.WithPruneCallback(func(c cid.Cid) error {
+					// TODO: use a proper context here
+					return bs.DeleteBlob(context.TODO(), c)
+				}),
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			requester, err = exedatarequester.NewRequester(
+				sealed.Height,
+				trackerStorage,
+				node.Storage.Blocks,
+				node.Storage.Results,
+				bs,
+				&cbor.Codec{},
+				compressor.NewLz4Compressor(),
+				builder.FinalizationDistributor,
+				node.Logger,
+			)
+			return requester, err
+		}).
+		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			executionDataPruner, err := pruner.NewPruner(
+				trackerStorage,
+				pruner.WithHeightRangeTarget(65000),
+				pruner.WithThreshold(65000),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create execution data pruner: %w", err)
+			}
+
+			_, err = requester.AddConsumer(func(blockHeight uint64, executionData *execution_data.BlockExecutionData) {
+				executionDataPruner.NotifyFulfilledHeight(blockHeight)
+			})
+			if err != nil {
+				return nil, fmt.Errorf("could not subscribe execution data pruner to requester notifications: %w", err)
+			}
+
+			return executionDataPruner, nil
+		})
+
+	return builder
+}
+
 type Option func(*AccessNodeConfig)
 
 func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
@@ -428,6 +521,7 @@ func (builder *FlowAccessNodeBuilder) ParseFlags() error {
 
 func (builder *FlowAccessNodeBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
+		homedir, _ := os.UserHomeDir()
 		defaultConfig := DefaultAccessNodeConfig()
 
 		flags.UintVar(&builder.collectionGRPCPort, "collection-ingress-port", defaultConfig.collectionGRPCPort, "the grpc ingress port for all collection nodes")
@@ -459,6 +553,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
+		flags.StringVar(&builder.executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data"), "directory to use for storing Execution Data")
 	}).ValidateFlags(func() error {
 		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-unstaked-node is true")
