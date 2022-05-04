@@ -851,7 +851,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	committee := &mockhotstuff.Committee{}
+	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
 	committee.On("DKG", block.BlockID).Return(inmemDKG, nil)
 
@@ -930,7 +930,7 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 	block := model.BlockFromFlow(&header, header.View-1)
 
 	// create a packer
-	committee := &mockhotstuff.Committee{}
+	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("Identities", block.BlockID, mock.Anything).Return(allSigners, nil)
 	packer := signature.NewConsensusSigDataPacker(committee)
 

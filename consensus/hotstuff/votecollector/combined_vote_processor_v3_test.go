@@ -984,7 +984,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	committee := &mockhotstuff.Committee{}
+	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
 	committee.On("DKG", block.BlockID).Return(inmemDKG, nil)
 

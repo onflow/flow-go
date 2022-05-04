@@ -58,7 +58,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
@@ -159,7 +159,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	// even if the node failed DKG, and has no random beacon private key,
 	// but other nodes, who completed and succeeded DKG, have a public key
 	// for this failed node, which can be used to verify signature from
@@ -189,7 +189,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 // Test_VerifyQC checks that a QC without any signers is rejected right away without calling into any sub-components
 func Test_VerifyQC(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)
 

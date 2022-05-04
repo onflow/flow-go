@@ -47,7 +47,7 @@ func TestHotStuffFollower(t *testing.T) {
 type HotStuffFollowerSuite struct {
 	suite.Suite
 
-	committee  *mockhotstuff.Committee
+	committee  *mockhotstuff.DynamicCommittee
 	headers    *mockstorage.Headers
 	updater    *mockmodule.Finalizer
 	verifier   *mockhotstuff.Verifier
@@ -68,7 +68,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.mockConsensus = &MockConsensus{identities: identities}
 
 	// mock consensus committee
-	s.committee = &mockhotstuff.Committee{}
+	s.committee = &mockhotstuff.DynamicCommittee{}
 	s.committee.On("Identities", mock.Anything, mock.Anything).Return(
 		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)

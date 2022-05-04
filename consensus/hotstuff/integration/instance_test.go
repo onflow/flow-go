@@ -53,7 +53,7 @@ type Instance struct {
 	pendings       map[flow.Identifier]*model.Proposal // indexed by parent ID
 
 	// mocked dependencies
-	committee    *mocks.Committee
+	committee    *mocks.DynamicCommittee
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	persist      *mocks.Persister
@@ -126,7 +126,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		queue:    make(chan interface{}, 1024),
 
 		// instance mocks
-		committee:    &mocks.Committee{},
+		committee:    &mocks.DynamicCommittee{},
 		builder:      &module.Builder{},
 		persist:      &mocks.Persister{},
 		signer:       &mocks.Signer{},

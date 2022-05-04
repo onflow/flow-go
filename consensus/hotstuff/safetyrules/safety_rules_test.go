@@ -37,7 +37,7 @@ func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitte
 	signer := &mocks.Signer{}
 	signer.On("CreateVote", mock.Anything).Return(expectVote, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	me := unittest.IdentityFixture()
 	committee.On("Self").Return(me.NodeID, nil)
 	if isCommitteeMember {

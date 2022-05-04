@@ -265,7 +265,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	block := helper.MakeBlock(helper.WithBlockView(view),
 		helper.WithBlockProposer(leader.NodeID))
 
-	committee := &mockhotstuff.Committee{}
+	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("Identities", block.BlockID, mock.Anything).Return(stakingSigners, nil)
 
 	votes := make([]*model.Vote, 0, len(stakingSigners))

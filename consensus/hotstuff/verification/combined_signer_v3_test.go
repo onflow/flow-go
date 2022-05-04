@@ -57,7 +57,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
@@ -125,7 +125,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	// even if the node failed DKG, and has no random beacon private key,
 	// but other nodes, who completed and succeeded DKG, have a public key
 	// for this failed node, which can be used to verify signature from
@@ -165,7 +165,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	dkg := &mocks.DKG{}
 	dkg.On("GroupKey").Return(privGroupKey.PublicKey(), nil)
 	dkg.On("Size").Return(uint(20))
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	// generate 17 BLS keys as stubs for staking keys and use them to generate an aggregated staking sig
