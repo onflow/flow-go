@@ -172,6 +172,34 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		}
 		return fmt.Errorf("unexpected error verifying qc: %w", err)
 	}
+
+	// The Block must contain a proof that the primary legitimately entered the respective view.
+	// Transitioning to proposal.Block.View is possible either by observing a QC or a TC for the
+	// previous round. If and only if the QC is _not_ for the previous round we require a TC for
+	// the previous view to be present.
+	lastViewSuccessful := proposal.Block.View == proposal.Block.QC.View+1
+	if !lastViewSuccessful {
+		// check if proposal is correctly structured
+		if proposal.LastViewTC == nil {
+			return newInvalidBlockError(block, fmt.Errorf("last view has ended with timeout but proposal doesn't include LastViewTC"))
+		}
+
+		if proposal.Block.View != proposal.LastViewTC.View+1 {
+			return newInvalidBlockError(block, fmt.Errorf("TC missing"))
+		}
+
+		// check if proposal extends the highest QC from TC.
+		if proposal.Block.QC.View < proposal.LastViewTC.TOHighestQC.View {
+			return newInvalidBlockError(block, fmt.Errorf("proposal's QC is lower than locked QC"))
+		}
+
+		// check if included TC is valid
+		err = v.ValidateTC(proposal.LastViewTC)
+		if err != nil {
+			return newInvalidBlockError(block, fmt.Errorf(""))
+		}
+	}
+
 	return nil
 }
 
