@@ -290,11 +290,9 @@ docker-build-access-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access  --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
-# Observer is currently simply access node, this target is added for compatibility with deployment pipeline
-# Once proper observer is separated in the code, we should just need to change TARGET parameter below
 .PHONY: docker-build-observer
 docker-build-observer:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/observer:latest" -t "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)" .
 
@@ -448,6 +446,10 @@ docker-run-verification:
 .PHONY: docker-run-access
 docker-run-access:
 	docker run -p 9000:9000 -p 3569:3569 -p 8080:8080  -p 8000:8000 "$(CONTAINER_REGISTRY)/access:latest" --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries access-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+.PHONY: docker-run-observer
+docker-run-observer:
+	docker run -p 9000:9000 -p 3569:3569 -p 8080:8080  -p 8000:8000 "$(CONTAINER_REGISTRY)/observer:latest" --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries observer-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 .PHONY: docker-run-ghost
 docker-run-ghost:
