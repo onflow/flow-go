@@ -95,4 +95,3 @@ require (
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
-replace github.com/onflow/cadence => ../cadence
