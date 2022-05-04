@@ -37,22 +37,12 @@ var _ component.Component = (*blobService)(nil)
 type BlobServiceConfig struct {
 	ReprovideInterval time.Duration    // the interval at which the DHT provider entries are refreshed
 	BitswapOptions    []bitswap.Option // options to pass to the Bitswap service
-	BitswapNetwork    bsnet.BitSwapNetwork
-	ContentRouting    routing.ContentRouting
 }
 
 // WithReprovideInterval sets the interval at which DHT provider entries are refreshed
 func WithReprovideInterval(d time.Duration) network.BlobServiceOption {
 	return func(bs network.BlobService) {
 		bs.(*blobService).config.ReprovideInterval = d
-	}
-}
-
-// WithBitswap configures the blobstore to use Bitswap as the underlying exchange
-func WithBitswap(host host.Host, r routing.ContentRouting, prefix string) network.BlobServiceOption {
-	return func(bs network.BlobService) {
-		bs.(*blobService).config.BitswapNetwork = bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
-		bs.(*blobService).config.ContentRouting = r
 	}
 }
 
@@ -74,9 +64,13 @@ func WithHashOnRead(enabled bool) network.BlobServiceOption {
 
 // NewBlobService creates a new BlobService.
 func NewBlobService(
+	host host.Host,
+	r routing.ContentRouting,
+	prefix string,
 	ds datastore.Batching,
 	opts ...network.BlobServiceOption,
 ) *blobService {
+	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
 	bs := &blobService{
 		config: &BlobServiceConfig{
 			ReprovideInterval: 12 * time.Hour,
@@ -88,70 +82,43 @@ func NewBlobService(
 		opt(bs)
 	}
 
-	builder := component.NewComponentManagerBuilder().
-		AddWorker(bs.runBlockService).
-		AddWorker(bs.shutdownHandler)
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			bs.blockService = blockservice.New(bs.blockStore, bitswap.New(ctx, bsNetwork, bs.blockStore, bs.config.BitswapOptions...))
 
-	if bs.config.BitswapNetwork != nil {
-		builder.AddWorker(bs.runReprovider)
-	}
+			ready()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			bs.reprovider = simple.NewReprovider(ctx, bs.config.ReprovideInterval, r, simple.NewBlockstoreProvider(bs.blockStore))
 
-	bs.Component = builder.Build()
+			ready()
+
+			bs.reprovider.Run()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+
+			<-bs.Ready() // wait for variables to be initialized
+			<-ctx.Done()
+
+			var err *multierror.Error
+
+			err = multierror.Append(err, bs.reprovider.Close())
+			err = multierror.Append(err, bs.blockService.Close())
+
+			if err.ErrorOrNil() != nil {
+				ctx.Throw(err)
+			}
+		}).
+		Build()
+
+	bs.Component = cm
 
 	return bs
 }
 
-func (bs *blobService) runBlockService(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	if bs.config.BitswapNetwork == nil {
-		bs.blockService = blockservice.New(bs.blockStore, nil)
-	} else {
-		bs.blockService = blockservice.New(
-			bs.blockStore,
-			bitswap.New(ctx, bs.config.BitswapNetwork, bs.blockStore, bs.config.BitswapOptions...),
-		)
-	}
-
-	ready()
-}
-
-func (bs *blobService) runReprovider(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	bs.reprovider = simple.NewReprovider(ctx,
-		bs.config.ReprovideInterval,
-		bs.config.ContentRouting,
-		simple.NewBlockstoreProvider(bs.blockStore),
-	)
-
-	ready()
-
-	bs.reprovider.Run()
-}
-
-func (bs *blobService) shutdownHandler(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-
-	<-bs.Ready() // wait for variables to be initialized
-	<-ctx.Done()
-
-	var err *multierror.Error
-
-	if bs.reprovider != nil {
-		err = multierror.Append(err, bs.reprovider.Close())
-	}
-
-	if bs.config.BitswapNetwork != nil {
-		err = multierror.Append(err, bs.blockService.Close())
-	}
-
-	if err.ErrorOrNil() != nil {
-		ctx.Throw(err)
-	}
-}
-
 func (bs *blobService) TriggerReprovide(ctx context.Context) error {
-	if bs.reprovider != nil {
-		return bs.reprovider.Trigger(ctx)
-	}
-	return nil
+	return bs.reprovider.Trigger(ctx)
 }
 
 func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error) {

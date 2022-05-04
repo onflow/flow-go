@@ -178,8 +178,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 }
 
 func (m *Middleware) NewBlobService(channel network.Channel, ds datastore.Batching, opts ...network.BlobServiceOption) network.BlobService {
-	opts = append(opts, WithBitswap(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String()))
-	return NewBlobService(ds, opts...)
+	return NewBlobService(m.libP2PNode.Host(), m.libP2PNode.routing, channel.String(), ds, opts...)
 }
 
 func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.PingInfoProvider) network.PingService {

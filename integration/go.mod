@@ -16,6 +16,11 @@ require (
 	github.com/go-openapi/strfmt v0.20.1 // indirect
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/go-yaml/yaml v2.1.0+incompatible
+	github.com/ipfs/go-blockservice v0.2.0
+	github.com/ipfs/go-cid v0.1.0
+	github.com/ipfs/go-datastore v0.5.1
+	github.com/ipfs/go-ds-badger2 v0.1.3
+	github.com/ipfs/go-ipfs-blockstore v0.2.0
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/onflow/cadence v0.23.3
