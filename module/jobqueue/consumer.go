@@ -133,6 +133,9 @@ func (c *Consumer) Stop() {
 
 // Size returns number of in-memory jobs that consumer is processing.
 func (c *Consumer) Size() uint {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	return uint(len(c.processings))
 }
 
@@ -140,6 +143,7 @@ func (c *Consumer) Size() uint {
 func (c *Consumer) LastProcessedIndex() uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	return c.processedIndex
 }
 
