@@ -72,7 +72,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 
 	// very first call to updatepeer
 	suite.Run("updatePeers only connects to all peers the first time", func() {
-		pm.RequestPeerUpdate()
+		pm.ForceUpdatePeers()
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 1)
 	})
 
@@ -82,7 +82,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		newPIDs := suite.generatePeerIDs(1)
 		pids = append(pids, newPIDs...)
 
-		pm.RequestPeerUpdate()
+		pm.ForceUpdatePeers()
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
 	})
 
@@ -91,7 +91,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		// delete an id
 		pids = removeRandomElement(pids)
 
-		pm.RequestPeerUpdate()
+		pm.ForceUpdatePeers()
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 3)
 	})
 
@@ -105,7 +105,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		newPIDs := suite.generatePeerIDs(2)
 		pids = append(pids, newPIDs...)
 
-		pm.RequestPeerUpdate()
+		pm.ForceUpdatePeers()
 
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 4)
 	})

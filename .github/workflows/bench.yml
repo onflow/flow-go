@@ -29,8 +29,8 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          # 1.17 to get shuffle on bench tests
-          go-version: "^1.17"
+          # 1.17 min to get shuffle on bench tests
+          go-version: "^1.18"
 
       - name: Build relic
         run: make crypto_setup_gopath
