@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -88,13 +89,18 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 
 	t.Run("NewBLSKMAC sanity check", func(t *testing.T) {
 		// test the parameter lengths of "NewBLSKMAC" are in the correct range
-		// h is nil if the kamc inputs are invalid
+		// h is nil if the kmac inputs are invalid
 		h := internalBLSKMAC("test")
 		assert.NotNil(t, h)
 
 		// test the application and PoP prefixes are different and have the same length
 		assert.NotEqual(t, applicationTagPrefix, popTagPrefix)
 		assert.Equal(t, len(applicationTagPrefix), len(popTagPrefix))
+
+		// test that the app/PoP prefix + ciphersuite exceeds 16 bytes as per draft-irtf-cfrg-hash-to-curve
+		// The tags used by internalBLSKMAC are at least (len(popTagPrefix) + len(ciphersuite)) long
+		minTagLen := len(popTagPrefix) + len(blsCipherSuite)
+		assert.GreaterOrEqual(t, minTagLen, 16)
 	})
 }
 
