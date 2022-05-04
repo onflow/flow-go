@@ -23,7 +23,7 @@ import (
 // a signature from a random beacon signer, which verifies both the signature share and
 // the reconstructed threshold signature.
 type CombinedVerifierV3 struct {
-	committee     hotstuff.VoterCommittee
+	committee     hotstuff.Replicas
 	stakingHasher hash.Hasher
 	beaconHasher  hash.Hasher
 	packer        hotstuff.Packer
@@ -34,7 +34,7 @@ var _ hotstuff.Verifier = (*CombinedVerifierV3)(nil)
 // NewCombinedVerifierV3 creates a new combined verifier with the given dependencies.
 // - the hotstuff committee's state is used to retrieve the public keys for the staking signature;
 // - the packer is used to unpack QC for verification;
-func NewCombinedVerifierV3(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifierV3 {
+func NewCombinedVerifierV3(committee hotstuff.DynamicCommittee, packer hotstuff.Packer) *CombinedVerifierV3 {
 	return &CombinedVerifierV3{
 		committee:     committee,
 		stakingHasher: crypto.NewBLSKMAC(encoding.ConsensusVoteTag),

@@ -12,7 +12,7 @@ import (
 
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
-	committee hotstuff.Committee
+	committee hotstuff.DynamicCommittee
 	forks     hotstuff.ForksReader
 	verifier  hotstuff.Verifier
 }
@@ -21,7 +21,7 @@ var _ hotstuff.Validator = (*Validator)(nil)
 
 // New creates a new Validator instance
 func New(
-	committee hotstuff.Committee,
+	committee hotstuff.DynamicCommittee,
 	forks hotstuff.ForksReader,
 	verifier hotstuff.Verifier,
 ) *Validator {
@@ -45,7 +45,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
-	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive weight)
+	// IdentityList returned by hotstuff.DynamicCommittee contains only legitimate consensus participants for the specified block (must have positive weight)
 	allParticipants, err := v.committee.IdentitiesByEpoch(block.View, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
@@ -108,7 +108,6 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	}
 
 	// check the proposer is a valid committee member at the most recent state on this fork
-	// TODO: Idea - replace *ByBlock with ValidAtBlock(blockID, signerID) (bool, error)
 	_, err = v.committee.IdentityByBlock(block.BlockID, block.ProposerID)
 	if model.IsInvalidSignerError(err) {
 		return newInvalidBlockError(block, fmt.Errorf("proposer %x is leader but is not a valid committee member", block.ProposerID))

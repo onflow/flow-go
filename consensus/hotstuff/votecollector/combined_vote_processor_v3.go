@@ -31,7 +31,7 @@ import (
 // the proposer's vote (decorator pattern).
 // nolint:unused
 type combinedVoteProcessorFactoryBaseV3 struct {
-	committee   hotstuff.VoterCommittee
+	committee   hotstuff.Replicas
 	onQCCreated hotstuff.OnQCCreated
 	packer      hotstuff.Packer
 }

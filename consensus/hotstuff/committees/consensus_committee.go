@@ -72,7 +72,8 @@ type Consensus struct {
 	epochs map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
 }
 
-var _ hotstuff.Committee = (*Consensus)(nil)
+var _ hotstuff.Replicas = (*Consensus)(nil)
+var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
 
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 

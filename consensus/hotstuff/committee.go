@@ -12,22 +12,23 @@ import (
 // For the purposes of validating votes, timeouts, quorum certificates, and timeout certificates
 // we consider a committee which is static over the course of an epoch. Although committee
 // members may be ejected, or have their weight change during an epoch, we ignore these changes.
-// For these purposes we use the VoterCommittee and *ByEpoch methods.
+// For these purposes we use the Replicas and *ByEpoch methods.
 //
 // When validating proposals, we take into account changes to the committee during the course of
 // an epoch. In particular, if a node is ejected, we will immediately reject all future proposals
-// from that node. For these purposes we use the Committee and *ByBlock methods.
+// from that node. For these purposes we use the DynamicCommittee and *ByBlock methods.
 
-// VoterCommittee defines the consensus committee for the purposes of validating votes, timeouts,
-// quorum certificates, and timeout certificates. Any consensus committee member who was authorized to contribute to consensus
-// AT THE BEGINNING of the epoch may produce valid votes and timeouts for the entire epoch, even
-// if they are later ejected. So for validating votes/timeouts we use *ByEpoch methods.
+// Replicas defines the consensus committee for the purposes of validating votes, timeouts,
+// quorum certificates, and timeout certificates. Any consensus committee member who was
+// authorized to contribute to consensus AT THE BEGINNING of the epoch may produce valid
+// votes and timeouts for the entire epoch, even if they are later ejected.
+// So for validating votes/timeouts we use *ByEpoch methods.
 //
 // Since the voter committee is considered static over an epoch:
 // * we can query identities by view
 // * we don't need the full block ancestry prior to validating messages
 //
-type VoterCommittee interface {
+type Replicas interface {
 
 	// LeaderForView returns the identity of the leader for a given view.
 	// CAUTION: per liveness requirement of HotStuff, the leader must be fork-independent.
@@ -59,6 +60,8 @@ type VoterCommittee interface {
 	//
 	// Returns the following expected errors for invalid inputs:
 	//   * committees.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//
+	// TODO: should return identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	IdentitiesByEpoch(view uint64, selector flow.IdentityFilter) (flow.IdentityList, error)
 
 	// IdentityByEpoch returns the full Identity for specified HotStuff participant.
@@ -68,10 +71,12 @@ type VoterCommittee interface {
 	//
 	// Returns the following expected errors for invalid inputs:
 	//   * committees.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//
+	// TODO: should return identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.Identity, error)
 }
 
-// Committee extends VoterCommittee to provide the consensus committee for the purposes
+// DynamicCommittee extends Replicas to provide the consensus committee for the purposes
 // of validating proposals. The proposer committee reflects block-to-block changes in the
 // identity table to support immediately rejecting proposals from nodes after they are ejected.
 // For validating proposals, we use *ByBlock methods.
@@ -79,8 +84,8 @@ type VoterCommittee interface {
 // Since the proposer committee can change at any block:
 // * we query by block ID
 // * we must have incorporated the full block ancestry prior to validating messages
-type Committee interface {
-	VoterCommittee
+type DynamicCommittee interface {
+	Replicas
 
 	// IdentitiesByBlock returns a list of the legitimate HotStuff participants for the given block.
 	// The list of participants is filtered by the provided selector.

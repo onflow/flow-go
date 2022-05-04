@@ -16,7 +16,7 @@ import (
 // committees are epoch-scoped.
 //
 // Clusters build blocks on a cluster chain but must obtain identity table
-// information from the main chain. Thus, block ID parameters in this Committee
+// information from the main chain. Thus, block ID parameters in this DynamicCommittee
 // implementation reference blocks on the cluster chain, which in turn reference
 // blocks on the main chain - this implementation manages that translation.
 type Cluster struct {
@@ -31,8 +31,8 @@ type Cluster struct {
 	initialClusterMembers flow.IdentityList
 }
 
-var _ hotstuff.VoterCommittee = (*Cluster)(nil)
-var _ hotstuff.Committee = (*Cluster)(nil)
+var _ hotstuff.Replicas = (*Cluster)(nil)
+var _ hotstuff.DynamicCommittee = (*Cluster)(nil)
 
 func NewClusterCommittee(
 	state protocol.State,

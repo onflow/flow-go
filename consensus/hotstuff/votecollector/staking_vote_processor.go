@@ -29,7 +29,7 @@ import (
 // by `votecollector.VoteProcessorFactory` which adds the logic to verify
 // the proposer's vote (decorator pattern).
 type stakingVoteProcessorFactoryBase struct {
-	committee   hotstuff.VoterCommittee
+	committee   hotstuff.Replicas
 	onQCCreated hotstuff.OnQCCreated
 }
 

@@ -13,8 +13,8 @@ type SafetyRules struct {
 	signer        hotstuff.Signer
 	forks         hotstuff.ForksReader
 	persist       hotstuff.Persister
-	committee     hotstuff.VoterCommittee // only produce votes when we are valid committee members
-	lastVotedView uint64                  // need to keep track of the last view we voted for so we don't double vote accidentally
+	committee     hotstuff.Replicas // only produce votes when we are valid committee members
+	lastVotedView uint64            // need to keep track of the last view we voted for so we don't double vote accidentally
 }
 
 // New creates a new SafetyRules instance
@@ -22,7 +22,7 @@ func New(
 	signer hotstuff.Signer,
 	forks hotstuff.ForksReader,
 	persist hotstuff.Persister,
-	committee hotstuff.VoterCommittee,
+	committee hotstuff.Replicas,
 	lastVotedView uint64,
 ) *SafetyRules {
 

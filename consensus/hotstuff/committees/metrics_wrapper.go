@@ -9,20 +9,20 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// CommitteeMetricsWrapper implements the hotstuff.Committee interface.
-// It wraps a hotstuff.Committee instance and measures the time which the HotStuff's core logic
-// spends in the hotstuff.Committee component, i.e. the time determining consensus committee
+// CommitteeMetricsWrapper implements the hotstuff.DynamicCommittee interface.
+// It wraps a hotstuff.DynamicCommittee instance and measures the time which the HotStuff's core logic
+// spends in the hotstuff.DynamicCommittee component, i.e. the time determining consensus committee
 // relations. The measured time durations are reported as values for the
 // CommitteeProcessingDuration metric.
 type CommitteeMetricsWrapper struct {
-	committee hotstuff.Committee
+	committee hotstuff.DynamicCommittee
 	metrics   module.HotstuffMetrics
 }
 
-var _ hotstuff.VoterCommittee = (*CommitteeMetricsWrapper)(nil)
-var _ hotstuff.Committee = (*CommitteeMetricsWrapper)(nil)
+var _ hotstuff.Replicas = (*CommitteeMetricsWrapper)(nil)
+var _ hotstuff.DynamicCommittee = (*CommitteeMetricsWrapper)(nil)
 
-func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetrics) *CommitteeMetricsWrapper {
+func NewMetricsWrapper(committee hotstuff.DynamicCommittee, metrics module.HotstuffMetrics) *CommitteeMetricsWrapper {
 	return &CommitteeMetricsWrapper{
 		committee: committee,
 		metrics:   metrics,

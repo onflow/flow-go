@@ -14,12 +14,12 @@ import (
 // The encoding method is RLP.
 type ConsensusSigDataPacker struct {
 	packer.SigDataPacker
-	committees hotstuff.VoterCommittee
+	committees hotstuff.Replicas
 }
 
 var _ hotstuff.Packer = &ConsensusSigDataPacker{}
 
-func NewConsensusSigDataPacker(committees hotstuff.VoterCommittee) *ConsensusSigDataPacker {
+func NewConsensusSigDataPacker(committees hotstuff.Replicas) *ConsensusSigDataPacker {
 	return &ConsensusSigDataPacker{
 		committees: committees,
 	}

@@ -521,10 +521,10 @@ func main() {
 			)
 
 			// initialize Main consensus committee's state
-			var committee hotstuff.Committee
+			var committee hotstuff.DynamicCommittee
 			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+				return nil, fmt.Errorf("could not create committee state for main consensus: %w", err)
 			}
 			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
