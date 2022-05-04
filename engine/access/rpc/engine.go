@@ -15,6 +15,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	observer "github.com/onflow/flow-go/apiservice"
+
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/engine"
@@ -84,6 +86,7 @@ func New(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
+	proxy *observer.FlowAPIService,
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -166,15 +169,26 @@ func New(log zerolog.Logger,
 		chain:              chainID.Chain(),
 	}
 
-	accessproto.RegisterAccessAPIServer(
-		eng.unsecureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
-	)
-
-	accessproto.RegisterAccessAPIServer(
-		eng.secureGrpcServer,
-		access.NewHandler(backend, chainID.Chain()),
-	)
+	if proxy != nil {
+		(*proxy).LocalCache = access.NewHandler(backend, chainID.Chain())
+		accessproto.RegisterAccessAPIServer(
+			eng.unsecureGrpcServer,
+			proxy,
+		)
+		accessproto.RegisterAccessAPIServer(
+			eng.secureGrpcServer,
+			proxy,
+		)
+	} else {
+		accessproto.RegisterAccessAPIServer(
+			eng.unsecureGrpcServer,
+			access.NewHandler(backend, chainID.Chain()),
+		)
+		accessproto.RegisterAccessAPIServer(
+			eng.secureGrpcServer,
+			access.NewHandler(backend, chainID.Chain()),
+		)
+	}
 
 	if rpcMetricsEnabled {
 		// Not interested in legacy metrics, so initialize here
