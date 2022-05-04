@@ -313,7 +313,7 @@ func (e *Manager) ComputeBlock(
 
 	e.edCache.Insert(block.Block.Header, blobTree)
 	e.log.Info().Hex("block_id", logging.Entity(block.Block)).Hex("execution_data_id", rootID[:]).Msg("execution data ID computed")
-	// result.ExecutionDataID = rootID
+	result.ExecutionDataID = rootID
 
 	return result, nil
 }

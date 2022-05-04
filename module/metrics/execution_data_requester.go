@@ -49,7 +49,7 @@ func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
 	highestDownloadHeight := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataRequester,
-		Name:      "execution_requester_highest_notification_height",
+		Name:      "execution_requester_highest_download_height",
 		Help:      "highest block height for which execution data has been received",
 	})
 

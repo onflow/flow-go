@@ -434,11 +434,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil
 			})
 
-			bs, err = node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
-			if err != nil {
-				return err
-			}
-
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
@@ -452,6 +447,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			return nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
+			bs, err = node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
+			if err != nil {
+				return nil, fmt.Errorf("could not register blob service: %w", err)
+			}
+
 			builder.ExecutionDataService = state_synchronization.NewExecutionDataService(
 				new(cbor.Codec),
 				compressor.NewLz4Compressor(),

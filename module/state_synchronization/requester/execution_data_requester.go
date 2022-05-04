@@ -173,7 +173,7 @@ func New(
 	// last processed height. Once the execution data is fetched and stored, it notifies
 	// `executionDataNotifier`.
 	e.blockConsumer = jobqueue.NewComponentConsumer(
-		log.With().Str("module", "block_consumer").Logger(),
+		e.log.With().Str("module", "block_consumer").Logger(),
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
 		processedHeight,                  // read and persist the downloaded height
 		sealedBlockReader,                // read sealed blocks by height
@@ -185,7 +185,7 @@ func New(
 	// notifies notificationConsumer when new ExecutionData blobs are available
 	// SetPostNotifier will notify executionDataNotifier AFTER e.blockConsumer.LastProcessedIndex is updated.
 	// Even though it doesn't guarantee to notify for every height at least once, the notificationConsumer is
-	// able to guarantee to process every height at least once, because the notificationConsumer finds new job 
+	// able to guarantee to process every height at least once, because the notificationConsumer finds new job
 	// using executionDataReader which finds new height using e.blockConsumer.LastProcessedIndex
 	e.blockConsumer.SetPostNotifier(func(module.JobID) { executionDataNotifier.Notify() })
 
@@ -301,12 +301,13 @@ func (e *executionDataRequester) processBlockJob(ctx irrecoverable.SignalerConte
 	err = e.processSealedHeight(ctx, header.ID(), header.Height)
 	if err == nil {
 		jobComplete()
+		return
 	}
 
 	// errors are thrown as irrecoverable errors except context cancellation, and invalid blobs
 	// invalid blobs are logged, and never completed, which will halt downloads after maxSearchAhead
 	// is reached.
-	e.log.Err(err).Str("job_id", string(job.ID())).Msg("error encountered while processing block job")
+	e.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error encountered while processing block job")
 }
 
 // processSealedHeight downloads ExecutionData for the given block height.
@@ -319,6 +320,12 @@ func (e *executionDataRequester) processSealedHeight(ctx irrecoverable.SignalerC
 	attempt := 0
 	return retry.Do(ctx, backoff, func(context.Context) error {
 		if attempt > 0 {
+			e.log.Debug().
+				Str("block_id", blockID.String()).
+				Uint64("height", height).
+				Uint64("attempt", uint64(attempt)).
+				Msgf("retrying download")
+
 			e.metrics.FetchRetried()
 		}
 		attempt++
@@ -345,13 +352,22 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	result, err := e.results.ByBlockID(blockID)
 
-	// By the time the block is sealed, the ExecutionResult must be in the db
-	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to lookup execution result for block: %w", err))
+	// The ExecutionResult may not have been downloaded yet. This error should be retried
+	if errors.Is(err, storage.ErrNotFound) {
+		logger.Debug().Msg("execution result not found")
+		return err
 	}
+
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to lookup execution result for block %s: %w", blockID, err))
+	}
+
+	logger = logger.With().Str("execution_data_id", result.ExecutionDataID.String()).Logger()
 
 	start := time.Now()
 	e.metrics.ExecutionDataFetchStarted()
+
+	logger.Debug().Msg("downloading execution data")
 
 	_, err = e.fetchExecutionData(ctx, result.ExecutionDataID)
 
@@ -360,9 +376,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 	if isInvalidBlobError(err) {
 		// This means an execution result was sealed with an invalid execution data id (invalid data).
 		// Eventually, verification nodes will verify that the execution data is valid, and not sign the receipt
-		logger.Error().Err(err).
-			Str("execution_data_id", result.ExecutionDataID.String()).
-			Msg("HALTING REQUESTER: invalid execution data found")
+		logger.Error().Err(err).Msg("HALTING REQUESTER: invalid execution data found")
 
 		return err
 	}
@@ -376,9 +390,7 @@ func (e *executionDataRequester) processFetchRequest(ctx irrecoverable.SignalerC
 
 	// Any other error is unexpected
 	if err != nil {
-		logger.Error().Err(err).
-			Str("execution_data_id", result.ExecutionDataID.String()).
-			Msg("unexpected error fetching execution data")
+		logger.Error().Err(err).Msg("unexpected error fetching execution data")
 
 		ctx.Throw(err)
 	}
