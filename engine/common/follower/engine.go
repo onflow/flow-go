@@ -308,11 +308,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	return nil
 }
 
-// processBlockAndDescendants processes `proposal` and its pending descendants recursively.
-// The function assumes that `proposal` is connected to the finalized state. By induction,
-// any children are therefore also connected to the finalized state and can be processed as well.
-// No errors are expected during normal operations.
-func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messages.BlockProposal) error {
+// processBlockProposal processes blocks that are already known to connect to
+// the finalized state; if a parent of children is validly processed, it means
+// the children are also still on a valid chain and all missing links are there;
+// no need to do all the processing again.
+// Expected errors during normal operations:
+// * engine.OutdatedInputError if the block proposal is orphaned
+// * engine.InvalidInputError if the block proposal is invalid
+func (e *Engine) processBlockProposal(ctx context.Context, proposal *messages.BlockProposal) error {
 
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
 	defer span.Finish()
@@ -343,16 +346,13 @@ func (e *Engine) processBlockAndDescendants(ctx context.Context, proposal *messa
 	// The full block check is done by the consensus participants.
 	err := e.state.Extend(ctx, block)
 	if err != nil {
-		// block is outdated by the time we started processing it
-		// => some other node generating the proposal is probably behind is catching up.
-		if state.IsOutdatedExtensionError(err) {
-			log.Info().Err(err).Msg("dropped processing of abandoned fork; this might be an indicator that some consensus node is behind")
+		// The proposal must represent a valid extension of the protocol state, otherwise it is invalid.
+		if state.IsInvalidExtensionError(err) {
+			log.Error().Err(err).Msg("dropping INVALID block")
 			return nil
 		}
-		// the block is invalid; log as error as we desire honest participation
-		// ToDo: potential slashing
-		if state.IsInvalidExtensionError(err) {
-			log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+		if state.IsOutdatedExtensionError(err) {
+			log.Warn().Err(err).Msg("dropping outdated block (likely from some node fallen-behind)")
 			return nil
 		}
 
