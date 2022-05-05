@@ -16,8 +16,8 @@ const (
 	codeDBType = 2 // specifies a database type
 
 	// codes for views with special meaning
-	codeStartedView = 10 // latest view hotstuff started
-	codeVotedView   = 11 // latest view hotstuff voted on
+	codeSafetyData   = 10 // safety data for hotstuff state
+	codeLivenessData = 11 // liveness data for hotstuff state
 
 	// codes for fields associated with the root state
 	codeRootQuorumCertificate = 12

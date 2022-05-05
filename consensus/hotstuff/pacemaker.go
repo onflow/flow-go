@@ -7,6 +7,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type LivenessData struct {
+	CurrentView uint64
+	LastViewTC  *flow.TimeoutCertificate
+	HighestQC   *flow.QuorumCertificate
+}
+
 // PaceMaker for HotStuff. The component is passive in that it only reacts to method calls.
 // The PaceMaker does not perform state transitions on its own. Timeouts are emitted through
 // channels. Each timeout has its own dedicated channel, which is garbage collected after the

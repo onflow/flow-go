@@ -2,36 +2,37 @@ package operation
 
 import (
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// InsertStartedView inserts a view into the database.
-func InsertStartedView(chainID flow.ChainID, view uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeStartedView, chainID), view)
+// InsertSafetyData inserts safety data into the database.
+func InsertSafetyData(chainID flow.ChainID, safetyData *hotstuff.SafetyData) func(*badger.Txn) error {
+	return insert(makePrefix(codeSafetyData, chainID), safetyData)
 }
 
-// UpdateStartedView updates the view in the database.
-func UpdateStartedView(chainID flow.ChainID, view uint64) func(*badger.Txn) error {
-	return update(makePrefix(codeStartedView, chainID), view)
+// UpdateSafetyData updates safety data in the database.
+func UpdateSafetyData(chainID flow.ChainID, safetyData *hotstuff.SafetyData) func(*badger.Txn) error {
+	return update(makePrefix(codeSafetyData, chainID), safetyData)
 }
 
-// RetrieveStartedView retrieves a view from the database.
-func RetrieveStartedView(chainID flow.ChainID, view *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeStartedView, chainID), view)
+// RetrieveSafetyData retrieves safety data from the database.
+func RetrieveSafetyData(chainID flow.ChainID, safetyData *hotstuff.SafetyData) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeSafetyData, chainID), safetyData)
 }
 
-// InsertVotedView inserts a view into the database.
-func InsertVotedView(chainID flow.ChainID, view uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeVotedView, chainID), view)
+// InsertLivenessData inserts liveness data into the database.
+func InsertLivenessData(chainID flow.ChainID, livenessData *hotstuff.LivenessData) func(*badger.Txn) error {
+	return insert(makePrefix(codeLivenessData, chainID), livenessData)
 }
 
-// UpdateVotedView updates the view in the database.
-func UpdateVotedView(chainID flow.ChainID, view uint64) func(*badger.Txn) error {
-	return update(makePrefix(codeVotedView, chainID), view)
+// UpdateLivenessData updates liveness data in the database.
+func UpdateLivenessData(chainID flow.ChainID, livenessData *hotstuff.LivenessData) func(*badger.Txn) error {
+	return update(makePrefix(codeLivenessData, chainID), livenessData)
 }
 
-// RetrieveVotedView retrieves a view from the database.
-func RetrieveVotedView(chainID flow.ChainID, view *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeVotedView, chainID), view)
+// RetrieveLivenessData retrieves liveness data from the database.
+func RetrieveLivenessData(chainID flow.ChainID, livenessData *hotstuff.LivenessData) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeLivenessData, chainID), livenessData)
 }
