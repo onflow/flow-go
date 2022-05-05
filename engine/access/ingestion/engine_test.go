@@ -2,7 +2,6 @@ package ingestion
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -126,7 +125,6 @@ func (suite *Suite) TestOnFinalizedBlock() {
 		indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
 		require.NoError(suite.T(), err)
 		guarantee.SignerIndices = indices
-		fmt.Println("guarantee ID: ", guarantee.ID())
 	}
 
 	hotstuffBlock := hotmodel.Block{
