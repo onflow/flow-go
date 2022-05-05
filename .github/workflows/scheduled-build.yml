@@ -12,7 +12,7 @@ env:
 
 jobs:
   tag-version:
-    name: Tag Scheduled Build
+    name: Tag and Upload artifacts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -31,10 +31,6 @@ jobs:
           custom_tag: daily-${{ steps.version.outputs.SHORT_COMMIT }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
   
-  docker-push:
-    name: Build and push container
-    runs-on: ubuntu-latest
-    steps:
       - name: Checkout repo
         uses: actions/checkout@v3
         with:
@@ -70,10 +66,6 @@ jobs:
       - name: Docker push
         run: make docker-push-flow
   
-  build-util:
-    name: Build and upload utils
-    runs-on: ubuntu-latest
-    steps:
       - name: Checkout repo
         uses: actions/checkout@v3
         with:
