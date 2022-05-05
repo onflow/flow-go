@@ -25,7 +25,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.0
         with:
           custom_tag: daily-${{ steps.version.outputs.SHORT_COMMIT }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_ACCESS_TOKEN }}
   
       - name: Checkout repo
         uses: actions/checkout@v3
