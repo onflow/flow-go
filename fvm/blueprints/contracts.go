@@ -14,6 +14,9 @@ import (
 const ContractDeploymentAuthorizedAddressesPathDomain = "storage"
 const ContractDeploymentAuthorizedAddressesPathIdentifier = "authorizedAddressesToDeployContracts"
 
+const IsContractDeploymentRestrictedPathDomain = "storage"
+const IsContractDeploymentRestrictedPathIdentifier = "isContractDeploymentRestricted"
+
 const setContractDeploymentAuthorizersTransactionTemplate = `
 transaction(addresses: [Address], path: StoragePath) {
 	prepare(signer: AuthAccount) {
@@ -43,6 +46,37 @@ func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, au
 		AddAuthorizer(serviceAccount).
 		AddArgument(arg1).
 		AddArgument(arg2), nil
+}
+
+const setIsContractDeploymentRestrictedTransactionTemplate = `
+transaction(restricted: Bool, path: StoragePath) {
+	prepare(signer: AuthAccount) {
+		signer.load<Bool>(from: path)
+		signer.save(restricted, to: path)
+	}
+}
+`
+
+// SetIsContractDeploymentRestrictedTransaction sets the restricted flag for contract deployment
+func SetIsContractDeploymentRestrictedTransaction(serviceAccount flow.Address, restricted bool) (*flow.TransactionBody, error) {
+	argRestricted, err := jsoncdc.Encode(cadence.Bool(restricted))
+	if err != nil {
+		return nil, err
+	}
+
+	argPath, err := jsoncdc.Encode(cadence.Path{
+		Domain:     IsContractDeploymentRestrictedPathDomain,
+		Identifier: IsContractDeploymentRestrictedPathIdentifier,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(setIsContractDeploymentRestrictedTransactionTemplate)).
+		AddAuthorizer(serviceAccount).
+		AddArgument(argRestricted).
+		AddArgument(argPath), nil
 }
 
 const deployContractTransactionTemplate = `

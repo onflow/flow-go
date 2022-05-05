@@ -96,7 +96,16 @@ func NewTransactionEnvironment(
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
-		ctx.RestrictedDeploymentEnabled,
+		func() bool {
+			enabled, defined := env.GetIsContractDeploymentRestricted()
+			if !defined {
+				// If the contract deployment bool is not set by the state
+				// fallback to the default value set by the configuration
+				// after the contract deployment bool is set by the state on all chains, this logic can be simplified
+				return ctx.RestrictedDeploymentEnabled
+			}
+			return enabled
+		},
 		env.GetAuthorizedAccountsForContractUpdates,
 		env.useContractAuditVoucher,
 	)
@@ -214,6 +223,38 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 		return defaultAccounts
 	}
 	return addresses
+}
+
+// GetAuthorizedAccountsForContractUpdates returns a list of addresses that
+// are authorized to update/deploy contracts
+//
+// It reads a storage path from service account and parse the addresses.
+// if any issue occurs on the process (missing registers, stored value properly not set)
+// it gracefully handle it and falls back to default behaviour (only service account be authorized)
+func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, defined bool) {
+	restricted, defined = false, false
+	service := runtime.Address(e.ctx.Chain.ServiceAddress())
+
+	value, err := e.vm.Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.IsContractDeploymentRestrictedPathDomain,
+			Identifier: blueprints.IsContractDeploymentRestrictedPathIdentifier,
+		},
+		runtime.Context{Interface: e},
+	)
+	if err != nil {
+		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
+		return restricted, defined
+	}
+	restrictedCadence, ok := value.(cadence.Bool)
+	if !ok {
+		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
+		return restricted, defined
+	}
+	defined = true
+	restricted = restrictedCadence.ToGoValue().(bool)
+	return restricted, defined
 }
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
