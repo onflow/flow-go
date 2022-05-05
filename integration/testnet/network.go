@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -1196,6 +1197,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*Bootstra
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
+	}
+
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("invalid root snapshot qcs: %w", err)
 	}
 
 	err = WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
