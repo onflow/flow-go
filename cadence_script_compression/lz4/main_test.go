@@ -99,7 +99,11 @@ func compress(data []byte) []byte {
 	w := bytes.NewBuffer(dst)
 
 	zw := lz4.NewWriter(w)
-
+	err := zw.Apply(lz4.CompressionLevelOption(lz4.Fast))
+	if err != nil {
+		panic(err)
+	}
+	
 	_, _ = io.Copy(zw, r)
 	_ = zw.Close() // Make sure the writer is closed
 
