@@ -1112,7 +1112,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*Bootstra
 		members := clusterAssignments[i]
 		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members, clusterQC.SignerIndices)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not decode cluster QC signer indices: %w", err)
 		}
 		qcsWithSignerIDs = append(qcsWithSignerIDs, &flow.QuorumCertificateWithSignerIDs{
 			View:      clusterQC.View,
