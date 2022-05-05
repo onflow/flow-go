@@ -7,6 +7,7 @@ on:
 
 env:
   BUCKET_NAME: 'flow-internal-tooling-bucket'
+  DEFAULT_BRANCH: master
   GO_VERSION: '1.17'
 
 jobs:
@@ -17,7 +18,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
         with:
-          ref: master
+          ref: ${{ env.DEFAULT_BRANCH }}
 
       - name: Get Short Commit
         run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
@@ -75,7 +76,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: $GO_VERSION
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Checkout Created Tag
         uses: actions/checkout@v3
@@ -106,5 +107,5 @@ jobs:
         uses: 'google-github-actions/upload-cloud-storage@v0'
         with:
           credentials_json: '${{ secrets.GCP_CD_CREDS }}'
-          destination: ${{ secrets.TOOLING_BUCKET_NAME }}/daily/${{ steps.version.outputs.SHORT_COMMIT }}/transit
+          destination: ${{ env.BUCKET_NAME }}/daily/${{ steps.version.outputs.SHORT_COMMIT }}/transit
           path: './util'
