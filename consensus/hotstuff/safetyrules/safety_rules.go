@@ -29,10 +29,10 @@ func New(
 ) *SafetyRules {
 
 	return &SafetyRules{
-		signer:        signer,
-		forks:         forks,
-		persist:       persist,
-		committee:     committee,
+		signer:    signer,
+		forks:     forks,
+		persist:   persist,
+		committee: committee,
 	}
 }
 
@@ -102,7 +102,7 @@ func (r *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCerti
 	}
 
 	if !r.IsSafeToTimeout(curView, highestQC, highestTC) {
-		return nil, model.NoTimeoutError{}
+		return nil, model.NoTimeoutError{Msg: "not safe to time out under current conditions"}
 	}
 
 	timeout, err := r.signer.CreateTimeout(curView, highestQC, highestTC)
@@ -133,25 +133,26 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 
 	// block's view must be greater than the view that we have voted for
 	if proposal.Block.View <= r.safetyData.HighestAcknowledgedView {
-		return model.NoVoteError{}
+		return model.NoVoteError{Msg: "not safe to vote, we have already voted for this view"}
 	}
 
 	// This check satisfies voting rule 1 and 2a.
-	if blockView == qcView + 1 {
+	if blockView == qcView+1 {
 		return nil
 	}
 
 	// This check satisfies voting rule 1 and 2b.
 	lastViewTC := proposal.LastViewTC
 	if lastViewTC != nil {
-		if blockView == lastViewTC.View + 1 {
+		if blockView == lastViewTC.View+1 {
 			if qcView >= lastViewTC.TOHighestQC.View {
 				return nil
 			} else {
 				return fmt.Errorf("QC's view %d should be at least %d", qcView, lastViewTC.TOHighestQC.View)
 			}
 		} else {
-			return fmt.Errorf("last view TC %d is not sequential for block %d", lastViewTC.View, blockView}
+			return fmt.Errorf("last view TC %d is not sequential for block %d", lastViewTC.View, blockView)
+		}
 	}
 
 	return fmt.Errorf("block's view %d is not sequential %d, last view TC not included", blockView, qcView)
@@ -161,9 +162,9 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 func (r *SafetyRules) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) bool {
 	if highestQC.View < r.safetyData.LockedOneChainView ||
 		curView+1 <= r.safetyData.HighestAcknowledgedView ||
-		curView <= highestQC.View  {
+		curView <= highestQC.View {
 		return false
 	}
 
-	return (curView == highestQC.View + 1) || (curView == highestTC.View + 1)
+	return (curView == highestQC.View+1) || (curView == highestTC.View+1)
 }

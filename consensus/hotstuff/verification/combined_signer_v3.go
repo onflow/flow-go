@@ -3,6 +3,7 @@ package verification
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -29,6 +30,8 @@ type CombinedSignerV3 struct {
 	beaconKeyStore module.RandomBeaconKeyStore
 	beaconHasher   hash.Hasher
 }
+
+var _ hotstuff.Signer = (*CombinedSignerV3)(nil)
 
 // NewCombinedSignerV3 creates a new combined signer with the given dependencies:
 // - the staking signer is used to create and verify aggregatable signatures for Hotstuff
@@ -89,6 +92,25 @@ func (c *CombinedSignerV3) CreateVote(block *model.Block) (*model.Vote, error) {
 	}
 
 	return vote, nil
+}
+
+// CreateTimeout will create a signed timeout object for the given view.
+func (c *CombinedSignerV3) CreateTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+	// create timeout object specific message
+	msg := MakeTimeoutMessage(curView, highestQC.View)
+	sigData, err := c.staking.Sign(msg, c.stakingHasher)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
+	}
+
+	timeout := &model.TimeoutObject{
+		View:       curView,
+		HighestQC:  highestQC,
+		LastViewTC: highestTC,
+		SignerID:   c.staking.NodeID(),
+		SigData:    sigData,
+	}
+	return timeout, nil
 }
 
 // genSigData generates the signature data for our local node for the given block.

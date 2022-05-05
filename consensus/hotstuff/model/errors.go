@@ -26,6 +26,19 @@ func IsNoVoteError(err error) bool {
 	return errors.As(err, &e)
 }
 
+// NoTimeoutError contains the reason of why the voter didn't time out for current view.
+type NoTimeoutError struct {
+	Msg string
+}
+
+func (e NoTimeoutError) Error() string { return e.Msg }
+
+// IsNoTimeoutError returns whether an error is NoTimeoutError
+func IsNoTimeoutError(err error) bool {
+	var e NoTimeoutError
+	return errors.As(err, &e)
+}
+
 // ConfigurationError indicates that a constructor or component was initialized with
 // invalid or inconsistent parameters.
 type ConfigurationError struct {
