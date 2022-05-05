@@ -8,14 +8,31 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type SafetyData struct {
+	// LockedOneChainView is the head block's view of the newest 1-chain this replica has voted for.
+	// The 1-chain can be indirect.
+	//     <·· <QC>[B0] <- <QC_B0>[B1] <- [my vote for B1]
+	// In the depicted scenario, the replica voted for block B1, which forms a (potentially indirect)
+	// 1-chain on top of B0. The replica updated LockedOneChainView to the max of the current value and
+	// QC_B0.View = B0.View. Thereby, the safety module guarantees that the replica will not sign
+	// a TimeoutObject that would allow a malicious leader to fork below the latest finalized block.
+	LockedOneChainView uint64 // highest preferred QC, replica updates this value when voting for block (equivalent to highestQCView from Safety rules algorithm)
+	// HighestAcknowledgedView is the highest view where we have voted or triggered a timeout
+	HighestAcknowledgedView uint64
+	// LastTimeout is the last timeout that was produced by this node
+	LastTimeout *model.TimeoutObject
+}
+
 // SafetyRules produces votes for the given block
 type SafetyRules struct {
-	signer        hotstuff.Signer
-	forks         hotstuff.ForksReader
-	persist       hotstuff.Persister
-	committee     hotstuff.Replicas // only produce votes when we are valid committee members
-	lastVotedView uint64            // need to keep track of the last view we voted for so we don't double vote accidentally
+	signer     hotstuff.Signer
+	forks      hotstuff.ForksReader
+	persist    hotstuff.Persister
+	committee  hotstuff.Replicas // only produce votes when we are valid committee members
+	safetyData *SafetyData
 }
+
+var _ hotstuff.SafetyRules = (*SafetyRules)(nil)
 
 // New creates a new SafetyRules instance
 func New(
@@ -31,7 +48,6 @@ func New(
 		forks:         forks,
 		persist:       persist,
 		committee:     committee,
-		lastVotedView: lastVotedView,
 	}
 }
 
@@ -45,20 +61,22 @@ func New(
 //  * (nil, model.NoVoteError): If the voter decides that it does not want to vote for the given block.
 //    This is a sentinel error and _expected_ during normal operation.
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-func (v *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error) {
+func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*model.Vote, error) {
 	block := proposal.Block
 	// sanity checks:
 	if curView != block.View {
 		return nil, fmt.Errorf("expecting block for current view %d, but block's view is %d", curView, block.View)
 	}
-	if curView <= v.lastVotedView {
-		return nil, fmt.Errorf("current view (%d) must be larger than the last voted view (%d)", curView, v.lastVotedView)
+
+	err := r.IsSafeToVote(proposal)
+	if err != nil {
+		return nil, fmt.Errorf("not safe to vote for proposal %x: %w", proposal.Block.BlockID, err)
 	}
 
 	// Do not produce a vote for blocks where we are not a valid committee member.
 	// HotStuff will ask for a vote for the first block of the next epoch, even if we
 	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
-	_, err := v.committee.IdentityByEpoch(block.View, v.committee.Self())
+	_, err = r.committee.IdentityByEpoch(block.View, r.committee.Self())
 	if model.IsInvalidSignerError(err) {
 		return nil, model.NoVoteError{Msg: "not voting committee member for block"}
 	}
@@ -66,21 +84,20 @@ func (v *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 		return nil, fmt.Errorf("could not get self identity: %w", err)
 	}
 
-	// generate vote if block is safe to vote for
-	if !v.forks.IsSafeBlock(block) {
-		return nil, model.NoVoteError{Msg: "not safe block"}
-	}
-	vote, err := v.signer.CreateVote(block)
+	vote, err := r.signer.CreateVote(block)
 	if err != nil {
 		return nil, fmt.Errorf("could not vote for block: %w", err)
 	}
 
-	// vote for the current view has been produced, update lastVotedView
-	// to prevent from voting for the same view again
-	v.lastVotedView = curView
-	err = v.persist.PutVoted(curView)
+	// vote for the current view has been produced, update safetyData
+	r.safetyData.HighestAcknowledgedView = curView
+	if r.safetyData.LockedOneChainView < block.QC.View {
+		r.safetyData.LockedOneChainView = block.QC.View
+	}
+
+	err = r.persist.PutSafetyData(r.safetyData)
 	if err != nil {
-		return nil, fmt.Errorf("could not persist last voted: %w", err)
+		return nil, fmt.Errorf("could not persist safety data: %w", err)
 	}
 
 	return vote, nil
@@ -93,16 +110,75 @@ func (v *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 //  * (nil, model.NoTimeoutError): If the safety module decides that it is not safe to timeout under current conditions.
 //    This is a sentinel error and _expected_ during normal operation.
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
-func (v *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
-	panic("to be implemented")
+func (r *SafetyRules) ProduceTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+	lastTimeout := r.safetyData.LastTimeout
+	if lastTimeout != nil && lastTimeout.View == curView {
+		return lastTimeout, nil
+	}
+
+	if !r.IsSafeToTimeout(curView, highestQC, highestTC) {
+		return nil, model.NoTimeoutError{}
+	}
+
+	timeout, err := r.signer.CreateTimeout(curView, highestQC, highestTC)
+	if err != nil {
+		return nil, fmt.Errorf("could not timeout at view %d: %w", curView, err)
+	}
+
+	r.safetyData.HighestAcknowledgedView = curView
+	r.safetyData.LastTimeout = timeout
+
+	err = r.persist.PutSafetyData(r.safetyData)
+	if err != nil {
+		return nil, fmt.Errorf("could not persist safety data: %w", err)
+	}
+
+	return timeout, nil
 }
 
 // IsSafeToVote checks if this proposal is valid in terms of voting rules, if voting for this proposal won't break safety rules.
-func (v *SafetyRules) IsSafeToVote(proposal *model.Proposal) bool {
-	panic("to be implemented")
+func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
+	blockView := proposal.Block.View
+	qcView := proposal.Block.QC.View
+
+	// block's view must be larger than the view of the included QC
+	if blockView <= qcView {
+		return fmt.Errorf("block's view %d must be larger than the view of the included QC %d", blockView, qcView)
+	}
+
+	// block's view must be greater than the view that we have voted for
+	if proposal.Block.View <= r.safetyData.HighestAcknowledgedView {
+		return model.NoVoteError{}
+	}
+
+	// This check satisfies voting rule 1 and 2a.
+	if blockView == qcView + 1 {
+		return nil
+	}
+
+	// This check satisfies voting rule 1 and 2b.
+	lastViewTC := proposal.LastViewTC
+	if lastViewTC != nil {
+		if blockView == lastViewTC.View + 1 {
+			if qcView >= lastViewTC.TOHighestQC.View {
+				return nil
+			} else {
+				return fmt.Errorf("QC's view %d should be at least %d", qcView, lastViewTC.TOHighestQC.View)
+			}
+		} else {
+			return fmt.Errorf("last view TC %d is not sequential for block %d", lastViewTC.View, blockView}
+	}
+
+	return fmt.Errorf("block's view %d is not sequential %d, last view TC not included", blockView, qcView)
 }
 
 // IsSafeToTimeout checks if it's safe to timeout with proposed data, if timing out won't break safety rules.
-func (v *SafetyRules) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) bool {
-	panic("to be implemented")
+func (r *SafetyRules) IsSafeToTimeout(curView uint64, highestQC *flow.QuorumCertificate, highestTC *flow.TimeoutCertificate) bool {
+	if highestQC.View < r.safetyData.LockedOneChainView ||
+		curView+1 <= r.safetyData.HighestAcknowledgedView ||
+		curView <= highestQC.View  {
+		return false
+	}
+
+	return (curView == highestQC.View + 1) || (curView == highestTC.View + 1)
 }
