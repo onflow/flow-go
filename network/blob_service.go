@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ipfs/go-cid"
 
@@ -50,3 +51,5 @@ type BlobService interface {
 }
 
 type BlobServiceOption func(BlobService)
+
+var ErrNotFound = errors.New("blobservice: key not found")

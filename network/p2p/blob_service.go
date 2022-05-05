@@ -110,7 +110,12 @@ func (bs *blobService) TriggerReprovide(ctx context.Context) error {
 }
 
 func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error) {
-	return bs.blockService.GetBlock(ctx, c)
+	blob, err := bs.blockService.GetBlock(ctx, c)
+	if err == blockservice.ErrNotFound {
+		return nil, network.ErrNotFound
+	}
+
+	return blob, err
 }
 
 func (bs *blobService) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan blobs.Blob {

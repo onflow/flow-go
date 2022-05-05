@@ -2,6 +2,7 @@ package blobs
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -33,6 +34,8 @@ type Blobstore interface {
 	HashOnRead(enabled bool)
 }
 
+var ErrNotFound = errors.New("blobstore: blob not found")
+
 type blobstoreImpl struct {
 	bs blockstore.Blockstore
 }
@@ -50,7 +53,12 @@ func (bs *blobstoreImpl) Has(ctx context.Context, c cid.Cid) (bool, error) {
 }
 
 func (bs *blobstoreImpl) Get(ctx context.Context, c cid.Cid) (Blob, error) {
-	return bs.bs.Get(ctx, c)
+	blob, err := bs.bs.Get(ctx, c)
+	if err == blockstore.ErrNotFound {
+		return nil, ErrNotFound
+	}
+
+	return blob, err
 }
 
 func (bs *blobstoreImpl) GetSize(ctx context.Context, c cid.Cid) (int, error) {

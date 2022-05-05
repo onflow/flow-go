@@ -254,17 +254,19 @@ func (h *handler) getExecutionDataRoot(
 
 	blob, err := blobGetter.GetBlob(ctx, rootCid)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get execution data root blob: %w", err)
+		// TODO: technically, we should check if the error is ErrNotFound
+		// otherwise don't wrap it with BlobNotFoundError
+		return nil, execution_data.NewBlobNotFoundError(rootCid)
 	}
 
 	v, err := h.serializer.Deserialize(bytes.NewBuffer(blob.RawData()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize execution data root blob: %w", err)
+		return nil, execution_data.NewMalformedDataError(err)
 	}
 
 	edRoot, ok := v.(*execution_data.BlockExecutionDataRoot)
 	if !ok {
-		return nil, fmt.Errorf("execution data root blob is not a BlockExecutionDataRoot")
+		return nil, execution_data.NewMalformedDataError(fmt.Errorf("execution data root blob does not deserialize to a BlockExecutionDataRoot"))
 	}
 
 	return edRoot, nil
@@ -294,6 +296,8 @@ func (h *handler) getChunkExecutionData(
 			return v, nil
 		case *[]cid.Cid:
 			cids = *v
+		default:
+			return nil, execution_data.NewMalformedDataError(fmt.Errorf("blob tree contains unexpected type %T at level %d", v, i))
 		}
 	}
 }

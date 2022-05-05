@@ -1,11 +1,16 @@
 package execution_data
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
 	"github.com/ipfs/go-cid"
+
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/network"
 )
 
 // ExecutionDataGetter handles getting execution data from a blobstore
@@ -15,6 +20,97 @@ type ExecutionDataGetter interface {
 	// - MalformedDataError if some level of the blob tree cannot be properly deserialized
 	// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 	GetExecutionData(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error)
+}
+
+type getter struct {
+	blobstore  blobs.Blobstore
+	serializer *Serializer
+}
+
+func NewExecutionDataGetter(blobstore blobs.Blobstore, codec encoding.Codec, compressor network.Compressor) *getter {
+	return &getter{blobstore, NewSerializer(codec, compressor)}
+}
+
+func (g *getter) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error) {
+	rootCid := flow.IdToCid(rootID)
+
+	rootBlob, err := g.blobstore.Get(ctx, rootCid)
+	if err != nil {
+		// TODO: technically, we should check if the error is ErrNotFound
+		// otherwise don't wrap it with BlobNotFoundError
+		return nil, NewBlobNotFoundError(rootCid)
+	}
+
+	rootData, err := g.serializer.Deserialize(bytes.NewBuffer(rootBlob.RawData()))
+	if err != nil {
+		return nil, NewMalformedDataError(err)
+	}
+
+	executionDataRoot, ok := rootData.(*BlockExecutionDataRoot)
+	if !ok {
+		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a BlockExecutionDataRoot"))
+	}
+
+	blockExecutionData := &BlockExecutionData{
+		BlockID:             executionDataRoot.BlockID,
+		ChunkExecutionDatas: make([]*ChunkExecutionData, len(executionDataRoot.ChunkExecutionDataIDs)),
+	}
+
+	for i, chunkExecutionDataID := range executionDataRoot.ChunkExecutionDataIDs {
+		chunkExecutionData, err := g.getChunkExecutionData(ctx, chunkExecutionDataID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get chunk execution data at index %d: %w", i, err)
+		}
+
+		blockExecutionData.ChunkExecutionDatas[i] = chunkExecutionData
+	}
+
+	return blockExecutionData, nil
+}
+
+func (g *getter) getChunkExecutionData(ctx context.Context, chunkExecutionDataID cid.Cid) (*ChunkExecutionData, error) {
+	cids := []cid.Cid{chunkExecutionDataID}
+
+	for i := 0; ; i++ {
+		v, err := g.getBlobs(ctx, cids)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
+		}
+
+		switch v := v.(type) {
+		case *ChunkExecutionData:
+			return v, nil
+		case *[]cid.Cid:
+			cids = *v
+		default:
+			return nil, NewMalformedDataError(fmt.Errorf("blob tree contains unexpected type %T at level %d", v, i))
+		}
+	}
+}
+
+func (g *getter) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
+	buf := new(bytes.Buffer)
+
+	for _, cid := range cids {
+		blob, err := g.blobstore.Get(ctx, cid)
+		if err != nil {
+			// TODO: technically, we should check if the error is ErrNotFound
+			// otherwise don't wrap it with BlobNotFoundError
+			return nil, NewBlobNotFoundError(cid)
+		}
+
+		_, err = buf.Write(blob.RawData())
+		if err != nil {
+			return nil, fmt.Errorf("failed to write blob %s to deserialization buffer: %w", cid.String(), err)
+		}
+	}
+
+	v, err := g.serializer.Deserialize(buf)
+	if err != nil {
+		return nil, NewMalformedDataError(err)
+	}
+
+	return v, nil
 }
 
 // MalformedDataError is returned when malformed data is found at some level of the requested

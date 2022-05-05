@@ -57,6 +57,7 @@ import (
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -137,8 +138,9 @@ func main() {
 		executionDataGetter           execution_data.ExecutionDataGetter
 		executionDataDatastore        datastore.Batching
 		executionDataPruner           *pruner.Pruner
-		executionDataBlobservice      network.BlobService
 		executionDataBlobstore        blobs.Blobstore
+		executionDataCodec            encoding.Codec     = &cbor.Codec{}
+		executionDataCompressor       network.Compressor = compressor.NewLz4Compressor()
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -335,7 +337,8 @@ func main() {
 			return nil
 		}).
 		Module("execution data getter", func(node *cmd.NodeConfig) error {
-			// TODO: create the blobstore as well
+			executionDataBlobstore = blobs.NewBlobstore(executionDataDatastore)
+			executionDataGetter = execution_data.NewExecutionDataGetter(executionDataBlobstore, executionDataCodec, executionDataCompressor)
 			return nil
 		}).
 		Component("Write-Ahead Log", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -395,15 +398,11 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("failed to register blob service: %w", err)
 			}
-			executionDataBlobservice = bs
-
-			codec := &cbor.Codec{}
-			compressor := compressor.NewLz4Compressor()
 
 			executionDataProvider := exedataprovider.NewProvider(
 				node.Logger,
-				codec,
-				compressor,
+				executionDataCodec,
+				executionDataCompressor,
 				bs,
 			)
 
