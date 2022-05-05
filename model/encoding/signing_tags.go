@@ -11,8 +11,8 @@ func tag(domain string) string {
 	return protocolPrefix + domain
 }
 
-// Flow protocol version and prefix
-const protocolPrefix = "FLOW-V0.0_"
+// Flow protocol version and ciphersuite
+const protocolPrefix = "FLOW-V00-CS00-with-"
 
 var (
 	// all the tags below are application tags, the crypto library API guarantees
@@ -20,17 +20,17 @@ var (
 	// proofs of possession of BLS private keys.
 
 	// RandomBeaconTag is used for threshold signatures in the random beacon
-	RandomBeaconTag = tag("Random-Beacon")
+	RandomBeaconTag = tag("Random_Beacon")
 	// ConsensusVoteTag is used for Consensus Hotstuff votes
-	ConsensusVoteTag = tag("Consensus-Vote")
+	ConsensusVoteTag = tag("Consensus_Vote")
 	// CollectorVoteTag is used for Collection Hotstuff votes
-	CollectorVoteTag = tag("Collector-Vote")
+	CollectorVoteTag = tag("Collector_Vote")
 	// ExecutionReceiptTag is used for execution receipts
-	ExecutionReceiptTag = tag("Execution-Receipt")
+	ExecutionReceiptTag = tag("Execution_Receipt")
 	// ResultApprovalTag is used for result approvals
-	ResultApprovalTag = tag("Result-Approval")
+	ResultApprovalTag = tag("Result_Approval")
 	// SPOCKTag is used to generate SPoCK proofs
 	SPOCKTag = tag("SPoCK")
 	// DKGMessageTag is used for DKG messages
-	DKGMessageTag = tag("DKG-Message")
+	DKGMessageTag = tag("DKG_Message")
 )

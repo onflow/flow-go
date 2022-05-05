@@ -59,8 +59,14 @@ const (
 	opSwUInputLenBLSBLS12381 = 2 * (fieldSize + (securityBits / 8))
 	// minimum output size as required by the chosen implementation of hash to curve
 	minHashSizeBLSBLS12381 = opSwUInputLenBLSBLS12381
-	// Cipher suite with all the settings
-	blsCipherSuite = "BLS_SIG_BLS12381G1_XOF:KMAC128_SSWU_RO_POP_"
+	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
+	h2cSuiteID = "BLS12381G1_XOF:KMAC128_SSWU_RO_"
+	// scheme implemented as a countermasure for Rogue attacks of the form : SchemeTag_
+	schemeTag = "POP_"
+	// Cipher suite used for BLS signatures of the form : BLS_SIG_ || h2cSuiteID || SchemeTag_
+	blsSigCipherSuite = "BLS_SIG_" + h2cSuiteID + schemeTag
+	// Cipher suite used for BLS PoP of the form : BLS_POP_ || h2cSuiteID || SchemeTag_
+	blsPOPCipherSuite = "BLS_POP_" + h2cSuiteID + schemeTag
 
 	// ECDSA
 
