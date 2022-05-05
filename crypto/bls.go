@@ -61,22 +61,24 @@ var blsInstance *blsBLS12381Algo
 // to generate proofs of possession.
 func NewBLSKMAC(tag string) hash.Hasher {
 	// application tag is guaranteed to be different than the tag used
-	// to generate proofs of possession.
-	appTag := applicationTagPrefix + tag
-	return internalBLSKMAC(appTag)
+	// to generate proofs of possession
+	// postfix the domain tag with the BLS ciphersuite
+	key := tag + blsSigCipherSuite
+	return internalBLSKMAC(key)
 }
 
-// returns a customized KMAC instance for BLS
-func internalBLSKMAC(tag string) hash.Hasher {
-	// postfix the tag with the BLS ciphersuite
-	// The tag is an UTF-8 encoding of the string. UTF-8 is a non-ambiguous encoding
-	// as required by draft-irtf-cfrg-hash-to-curve (similarly to the recommended ASCII).
-	key := []byte(tag + blsCipherSuite)
+// returns a customized KMAC instance for BLS, given a key.
+// The key is used a customizer rather than a MAC key.
+func internalBLSKMAC(key string) hash.Hasher {
+	// UTF-8 is used by Go to convert strings into bytes.
+	// UTF-8 is a non-ambiguous encoding as required by draft-irtf-cfrg-hash-to-curve
+	// (similarly to the recommended ASCII).
+
 	// blsKMACFunction is the customizer used for KMAC in BLS
 	const blsKMACFunction = "H2C"
 	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
 	// (tested by TestBLSBLS12381Hasher)
-	kmac, _ := hash.NewKMAC_128(key, []byte(blsKMACFunction), minHashSizeBLSBLS12381)
+	kmac, _ := hash.NewKMAC_128([]byte(key), []byte(blsKMACFunction), minHashSizeBLSBLS12381)
 	return kmac
 }
 
