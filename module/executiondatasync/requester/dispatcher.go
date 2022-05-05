@@ -190,6 +190,13 @@ func (d *dispatcher) processResults(ctx irrecoverable.SignalerContext, ready com
 func (d *dispatcher) dispatchJob(ctx irrecoverable.SignalerContext, resultID, executionDataID, blockID flow.Identifier, blockHeight uint64) context.CancelFunc {
 	jobCtx, cancel := context.WithCancel(ctx)
 
+	d.logger.Debug().
+		Str("execution_data_id", executionDataID.String()).
+		Str("result_id", resultID.String()).
+		Str("block_id", blockID.String()).
+		Uint64("block_height", blockHeight).
+		Msg("dispatching job")
+
 	d.handler.submitJob(&job{
 		ctx:             jobCtx,
 		executionDataID: executionDataID,

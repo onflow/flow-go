@@ -70,6 +70,14 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 			cids = append(cids, blob.Cid())
 		}
 
+		if zerolog.GlobalLevel() <= zerolog.DebugLevel && p.logger.GetLevel() <= zerolog.DebugLevel {
+			cidArr := zerolog.Arr()
+			for _, cid := range cids {
+				cidArr = cidArr.Str(cid.String())
+			}
+			p.logger.Debug().Array("cids", cidArr).Uint64("height", blockHeight).Msg("storing blobs")
+		}
+
 		if err := p.storage.Update(func(trackBlobs func(uint64, ...cid.Cid) error) error {
 			ctx, cancel := context.WithCancel(parent)
 			defer cancel()
@@ -92,6 +100,9 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 }
 
 func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (*ProvideJob, error) {
+	logger := p.logger.With().Uint64("height", blockHeight).Str("block_id", executionData.BlockID.String()).Logger()
+	logger.Debug().Msg("providing execution data")
+
 	blobCh := make(chan blobs.Blob)
 	defer close(blobCh)
 
@@ -104,10 +115,12 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 		chunkExecutionData := chunkExecutionData
 
 		g.Go(func() error {
+			logger.Debug().Int("chunk_index", i).Msg("adding chunk execution data")
 			cedID, err := p.addChunkExecutionData(gCtx, chunkExecutionData, blobCh)
 			if err != nil {
 				return fmt.Errorf("failed to add chunk execution data at index %d: %w", i, err)
 			}
+			logger.Debug().Int("chunk_index", i).Str("chunk_execution_data_id", cedID.String()).Msg("chunk execution data added")
 
 			chunkDataIDs[i] = cedID
 			return nil
@@ -126,6 +139,7 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 	if err != nil {
 		return nil, fmt.Errorf("failed to add execution data root: %w", err)
 	}
+	logger.Debug().Str("root_id", rootID.String()).Msg("root ID computed")
 
 	return &ProvideJob{rootID, errCh}, nil
 }

@@ -140,7 +140,15 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 	getCtx, cancel := onecontext.Merge(parentCtx, j.ctx)
 	defer cancel()
 
+	logger := h.logger.With().
+		Str("result_id", j.resultID.String()).
+		Str("block_id", j.blockID.String()).
+		Str("execution_data_id", j.executionDataID.String()).
+		Logger()
+
 	if err := retry.Fibonacci(getCtx, h.retryBaseTimeout, func(ctx context.Context) error {
+		logger.Debug().Msg("attempting to get execution data")
+
 		if util.CheckClosed(ctx.Done()) {
 			return ctx.Err()
 		}
@@ -156,6 +164,7 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 			}
 
 			if h.isRetryable(err) {
+				logger.Err(err).Msg("failed to get execution data, will retry")
 				return retry.RetryableError(err)
 			}
 
@@ -174,17 +183,13 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 			return err
 		}
 
+		logger.Debug().Msg("submitting execution data to fulfiller")
 		jr.executionData = executionData
 		h.fulfiller.submitJobResult(jr)
 
 		return nil
 	}); err != nil {
-		h.logger.Debug().
-			Err(err).
-			Str("result_id", j.resultID.String()).
-			Str("block_id", j.blockID.String()).
-			Str("execution_data_id", j.executionDataID.String()).
-			Msg("failed to get execution data")
+		logger.Err(err).Msg("failed to get execution data")
 	}
 }
 

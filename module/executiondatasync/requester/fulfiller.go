@@ -3,6 +3,8 @@ package requester
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -31,6 +33,8 @@ type fulfiller struct {
 	resultsIn  chan<- interface{}
 	resultsOut <-chan interface{}
 
+	logger zerolog.Logger
+
 	notifier *notifier
 	storage  *tracker.Storage
 
@@ -41,6 +45,7 @@ func newFulfiller(
 	fulfilledHeight uint64,
 	notifier *notifier,
 	storage *tracker.Storage,
+	logger zerolog.Logger,
 ) *fulfiller {
 	jobsIn, jobsOut := util.UnboundedChannel()
 	resultsIn, resultsOut := util.UnboundedChannel()
@@ -57,6 +62,7 @@ func newFulfiller(
 		sealedHeight:    fulfilledHeight,
 		notifier:        notifier,
 		storage:         storage,
+		logger:          logger.With().Str("subcomponent", "fulfiller").Logger(),
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -76,7 +82,7 @@ func (f *fulfiller) submitSealedResult(resultID flow.Identifier) {
 	f.resultsIn <- resultID
 }
 
-func (f *fulfiller) fulfill() {
+func (f *fulfiller) fulfill() error {
 loop:
 	if j, ok := f.fulfilled[f.fulfilledHeight+1]; ok {
 		f.fulfilledHeight++
@@ -87,7 +93,9 @@ loop:
 		goto loop
 	}
 
-	f.storage.SetFulfilledHeight(f.fulfilledHeight)
+	f.logger.Debug().Uint64("height", f.fulfilledHeight).Msg("updating fulfilled height")
+
+	return f.storage.SetFulfilledHeight(f.fulfilledHeight)
 }
 
 func (f *fulfiller) handleJobResult(ctx irrecoverable.SignalerContext, j *jobResult) {
@@ -107,7 +115,9 @@ func (f *fulfiller) handleJobResult(ctx irrecoverable.SignalerContext, j *jobRes
 		f.fulfilled[j.blockHeight] = j
 
 		if j.blockHeight == f.fulfilledHeight+1 {
-			f.fulfill()
+			if err := f.fulfill(); err != nil {
+				ctx.Throw(fmt.Errorf("failed to fulfill: %w", err))
+			}
 		}
 	} else {
 		jmap, ok := f.jobResults[j.blockHeight]
@@ -135,7 +145,9 @@ func (f *fulfiller) handleSealedResult(ctx irrecoverable.SignalerContext, sealed
 			f.fulfilled[f.sealedHeight] = j
 
 			if f.sealedHeight == f.fulfilledHeight+1 {
-				f.fulfill()
+				if err := f.fulfill(); err != nil {
+					ctx.Throw(fmt.Errorf("failed to fulfill: %w", err))
+				}
 			}
 		}
 	}

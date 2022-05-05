@@ -71,9 +71,9 @@ func NewRequester(
 		return nil, fmt.Errorf("failed to get latest fulfilled height: %w", err)
 	}
 
-	logger = logger.With().Str("component", "requester").Logger()
-	notifier := newNotifier()
-	fulfiller := newFulfiller(fulfilledHeight, notifier, trackerStorage)
+	logger = logger.With().Str("component", "execution_data_requester").Logger()
+	notifier := newNotifier(logger)
+	fulfiller := newFulfiller(fulfilledHeight, notifier, trackerStorage, logger)
 	handler := newHandler(
 		fulfiller,
 		trackerStorage,
@@ -183,6 +183,13 @@ func (r *Requester) runDispatcher(results storage.ExecutionResults, fulfilledHei
 			if err != nil {
 				ctx.Throw(fmt.Errorf("failed to retrieve sealed result for block %s: %w", blk.ID().String(), err))
 			}
+
+			r.logger.Info().
+				Str("result_id", sealedResult.ID().String()).
+				Str("execution_data_id", sealedResult.ExecutionDataID.String()).
+				Str("block_id", sealedResult.BlockID.String()).
+				Uint64("block_height", h).
+				Msg("pre-submitting job")
 
 			r.fulfiller.submitSealedResult(sealedResult.ID())
 			r.handler.submitJob(&job{

@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
+	"github.com/rs/zerolog"
 )
 
 type notificationSub struct {
@@ -30,11 +31,13 @@ type notifier struct {
 
 	subscriptions map[*notificationSub]struct{}
 
+	logger zerolog.Logger
+
 	cm *component.ComponentManager
 	component.Component
 }
 
-func newNotifier() *notifier {
+func newNotifier(logger zerolog.Logger) *notifier {
 	notificationsIn, notificationsOut := util.UnboundedChannel()
 	n := &notifier{
 		notificationsIn:  notificationsIn,
@@ -42,6 +45,7 @@ func newNotifier() *notifier {
 		subs:             make(chan *subRequest),
 		unsubs:           make(chan *subRequest),
 		subscriptions:    make(map[*notificationSub]struct{}),
+		logger:           logger.With().Str("subcomponent", "notifier").Logger(),
 	}
 
 	n.cm = component.NewComponentManagerBuilder().
@@ -103,6 +107,10 @@ func (n *notifier) loop(ctx irrecoverable.SignalerContext, ready component.Ready
 			close(sub.done)
 		case notif := <-n.notificationsOut:
 			notification := notif.(*notification)
+			n.logger.Debug().
+				Uint64("block_height", notification.blockHeight).
+				Str("block_id", notification.executionData.BlockID.String()).
+				Msg("sending notifications")
 			for sub := range n.subscriptions {
 				sub.consumer(notification.blockHeight, notification.executionData)
 			}
