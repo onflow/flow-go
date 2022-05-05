@@ -10,9 +10,13 @@ import (
 // CheckSumLen is fixed to be 16 bytes, which is also md5.Size
 const CheckSumLen = 32
 
+func checksum(data []byte) [CheckSumLen]byte {
+	return flow.MakeID(data)
+}
+
 // CheckSumFromIdentities returns checksum for the given identities
 func CheckSumFromIdentities(identities []flow.Identifier) [CheckSumLen]byte {
-	return flow.MakeID(EncodeIdentities(identities))
+	return checksum(EncodeIdentities(identities))
 }
 
 // EncodeIdentities will concatenation all the identities into bytes
@@ -26,49 +30,61 @@ func EncodeIdentities(identities []flow.Identifier) []byte {
 }
 
 // PrefixCheckSum prefix the given data with the checksum of the given identifier list
-func PrefixCheckSum(identities []flow.Identifier, data []byte) []byte {
-	sum := CheckSumFromIdentities(identities)
-	prefixed := make([]byte, len(sum)+len(data))
+func PrefixCheckSum(canonicalList []flow.Identifier, signrIndices []byte) []byte {
+	sum := CheckSumFromIdentities(canonicalList)
+	prefixed := make([]byte, len(sum)+len(signrIndices))
 	copy(prefixed[0:len(sum)], sum[:])
-	copy(prefixed[len(sum):], data[:])
+	copy(prefixed[len(sum):], signrIndices[:])
 	return prefixed
 }
 
-// SplitCheckSum splits the given bytes into two parts: prefixed checksum of the identifier list
-// and the data.
-func SplitCheckSum(prefixed []byte) ([CheckSumLen]byte, []byte, error) {
-	if len(prefixed) < CheckSumLen {
+// SplitCheckSum splits the given bytes into two parts:
+// - prefixed checksum of the canonical identifier list
+// - the signerIndices
+// the prefixed checksum is used to verify if the decoder is decoding the signer indices
+// using the same canonical identifier list
+func SplitCheckSum(checkSumPrefixedSignerIndices []byte) ([CheckSumLen]byte, []byte, error) {
+	if len(checkSumPrefixedSignerIndices) < CheckSumLen {
 		return [CheckSumLen]byte{}, nil,
-			fmt.Errorf("expect at least %v bytes, but got %v", CheckSumLen, len(prefixed))
+			fmt.Errorf("expect checkSumPrefixedSignerIndices to have at least %v bytes, but got %v",
+				CheckSumLen, len(checkSumPrefixedSignerIndices))
 	}
 
 	var sum [CheckSumLen]byte
-	copy(sum[:], prefixed[:CheckSumLen])
-	data := prefixed[CheckSumLen:]
-	return sum, data, nil
+	copy(sum[:], checkSumPrefixedSignerIndices[:CheckSumLen])
+	signerIndices := checkSumPrefixedSignerIndices[CheckSumLen:]
+
+	return sum, signerIndices, nil
 }
 
-// CompareChecksum compares if the given checksum matches with the checksum of the given identifier list
-func CompareChecksum(sum [CheckSumLen]byte, identities []flow.Identifier) bool {
-	computedSum := CheckSumFromIdentities(identities)
-	return bytes.Equal(sum[:], computedSum[:])
-}
-
-// CompareAndExtract reads the checksum from the given prefixed data bytes, and compare with the checksum
-// of the given identifier list.
-// it returns the data if the checksum matches.
-// it returns error if the checksum doesn't match
-func CompareAndExtract(identities []flow.Identifier, prefixed []byte) ([]byte, error) {
-	// the prefixed bytes contains both the checksum and the signer indices, split them
-	sum, data, err := SplitCheckSum(prefixed)
+// CompareAndExtract reads the checksum from the given checkSumPrefixedSIgnerIndices
+// bytes, and compare with the checksum of the given identifier list.
+// it returns the signer indices if the checksum matches.
+// it returns error if splitting the checksum fails or
+// 										 the splitted checksum doesn't match
+// - canonicalList is the canonical list from decoder's view
+// - checkSumPrefixedSignerIndices is the signer indices created by the encoder,
+//   and prefixed with the checksum of the canonical list from encoder's view.
+func CompareAndExtract(canonicalList []flow.Identifier, checkSumPrefixedSignerIndices []byte) ([]byte, error) {
+	// the checkSumPrefixedSignerIndices bytes contains two parts:
+	// 1. the checksum of the canonical identifier list from encoder's view
+	// 2. the signer indices
+	// so split them
+	encoderChecksum, signerIndices, err := SplitCheckSum(checkSumPrefixedSignerIndices)
 	if err != nil {
 		return nil, fmt.Errorf("could not split checksum: %w", err)
 	}
 
-	match := CompareChecksum(sum, identities)
+	// this canonicalList here is from decoder's view.
+	// by comparing the checksum of the canonical list from encoder's view
+	// and the full canonical list from decoder's view, we can tell if the encoder
+	// encodes the signer indices using the same list as decoder.
+	decoderChecksum := CheckSumFromIdentities(canonicalList)
+	match := bytes.Equal(encoderChecksum[:], decoderChecksum[:])
 	if !match {
-		return nil, fmt.Errorf("data %x does not match with checksum %x", data, sum)
+		return nil, fmt.Errorf("decoder sees a canonical list %v, which has a different checksum %x than the encoder's checksum %x",
+			canonicalList, decoderChecksum, encoderChecksum)
 	}
 
-	return data, nil
+	return signerIndices, nil
 }
