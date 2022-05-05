@@ -103,7 +103,7 @@ func compress(data []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	_, _ = io.Copy(zw, r)
 	_ = zw.Close() // Make sure the writer is closed
 

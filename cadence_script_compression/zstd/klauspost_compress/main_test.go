@@ -118,7 +118,7 @@ func TestCompressAllWithDictBestSpeed(t *testing.T) {
 	for _, c := range contracts {
 		start := time.Now()
 
-		dst := compressWithDict(c.Data, dict, z.SpeedBestCompression, t)
+		dst := compressWithDict(c.Data, dict, z.SpeedFastest, t)
 
 		mbpersec := csc.CompressionSpeed(float64(len(c.Data)), start)
 		sumMbPerSec = sumMbPerSec + mbpersec
