@@ -198,7 +198,7 @@ func EncodeSignersToIndices(
 		}
 	}
 	if len(signersLookup) > 0 {
-		return nil, fmt.Errorf("unknown signers %v", signersLookup)
+		return nil, fmt.Errorf("unknown signers IDs in the keys of %v", signersLookup)
 	}
 
 	prefixed := PrefixCheckSum(canonicalIdentifiers, signerIndices)
