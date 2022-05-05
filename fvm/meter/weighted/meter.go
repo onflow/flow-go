@@ -56,11 +56,13 @@ var (
 		common.MemoryKindBoundFunction:           25,
 		common.MemoryKindBigInt:                  50,
 
-		common.MemoryKindAtreeArrayDataSlab:      80,
-		common.MemoryKindAtreeArrayMetaDataSlab:  1024,
-		common.MemoryKindAtreeMapDataSlab:        144,
-		common.MemoryKindAtreeMapMetaDataSlab:    1024,
-		common.MemoryKindAtreeMapElementOverhead: 64,
+		common.MemoryKindAtreeArrayDataSlab:          80,
+		common.MemoryKindAtreeArrayMetaDataSlab:      1024,
+		common.MemoryKindAtreeArrayElementOverhead:   16,
+		common.MemoryKindAtreeMapDataSlab:            144,
+		common.MemoryKindAtreeMapMetaDataSlab:        1024,
+		common.MemoryKindAtreeMapElementOverhead:     64,
+		common.MemoryKindAtreeMapPreAllocatedElement: 24,
 
 		common.MemoryKindPrimitiveStaticType:     8,
 		common.MemoryKindCompositeStaticType:     17,
