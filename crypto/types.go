@@ -66,6 +66,7 @@ const (
 	// Cipher suite used for BLS signatures of the form : BLS_SIG_ || h2cSuiteID || SchemeTag_
 	blsSigCipherSuite = "BLS_SIG_" + h2cSuiteID + schemeTag
 	// Cipher suite used for BLS PoP of the form : BLS_POP_ || h2cSuiteID || SchemeTag_
+	// The PoP cipher suite is guaranteed to be different than all signature ciphersuites
 	blsPOPCipherSuite = "BLS_POP_" + h2cSuiteID + schemeTag
 
 	// ECDSA
