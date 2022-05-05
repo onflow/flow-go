@@ -35,6 +35,11 @@ jobs:
     name: Build and push container
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+
       - name: Get Short Commit
         run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
         id: short_commit
@@ -42,7 +47,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: $GO_VERSION
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Checkout Created Tag
         uses: actions/checkout@v3
@@ -69,6 +74,11 @@ jobs:
     name: Build and upload utils
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+
       - name: Get Short Commit
         run: echo "::set-output name=SHORT_COMMIT::$(make short_commit)"
         id: short_commit
