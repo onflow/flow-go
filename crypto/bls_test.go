@@ -88,20 +88,30 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 	})
 
 	t.Run("NewBLSKMAC sanity check", func(t *testing.T) {
-		// test the parameter lengths of "NewBLSKMAC" are in the correct range
-		// h is nil if the kmac inputs are invalid
-		h := internalBLSKMAC("test")
+		// test the parameter lengths of NewBLSKMAC are in the correct range
+		// h would be nil if the kmac inputs are invalid
+		h := internalBLSKMAC(blsSigCipherSuite)
 		assert.NotNil(t, h)
-
-		// test the application and PoP prefixes are different and have the same length
-		assert.NotEqual(t, applicationTagPrefix, popTagPrefix)
-		assert.Equal(t, len(applicationTagPrefix), len(popTagPrefix))
-
-		// test that the app/PoP prefix + ciphersuite exceeds 16 bytes as per draft-irtf-cfrg-hash-to-curve
-		// The tags used by internalBLSKMAC are at least (len(popTagPrefix) + len(ciphersuite)) long
-		minTagLen := len(popTagPrefix) + len(blsCipherSuite)
-		assert.GreaterOrEqual(t, minTagLen, 16)
 	})
+
+	t.Run("constants sanity check", func(t *testing.T) {
+		// test that the ciphersuites exceed 16 bytes as per draft-irtf-cfrg-hash-to-curve
+		// The tags used by internalBLSKMAC are at least len(ciphersuite) long
+		assert.GreaterOrEqual(t, len(blsSigCipherSuite), 16)
+		assert.GreaterOrEqual(t, len(blsPOPCipherSuite), 16)
+	})
+
+	t.Run("orthogonal PoP and signature hashing", func(t *testing.T) {
+		data := []byte("random_data")
+		// empty tag hasher
+		sigKmac := NewBLSKMAC("")
+		h1 := sigKmac.ComputeHash(data)
+
+		// PoP hasher
+		h2 := popKMAC.ComputeHash(data)
+		assert.NotEqual(t, h1, h2)
+	})
+
 }
 
 // TestBLSEncodeDecode tests encoding and decoding of BLS keys
