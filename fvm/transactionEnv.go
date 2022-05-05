@@ -225,12 +225,7 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 	return addresses
 }
 
-// GetAuthorizedAccountsForContractUpdates returns a list of addresses that
-// are authorized to update/deploy contracts
-//
-// It reads a storage path from service account and parse the addresses.
-// if any issue occurs on the process (missing registers, stored value properly not set)
-// it gracefully handle it and falls back to default behaviour (only service account be authorized)
+// GetIsContractDeploymentRestricted returns if contract deployment restriction is defined in the state and the value of it
 func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, defined bool) {
 	restricted, defined = false, false
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())
@@ -244,12 +239,16 @@ func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, d
 		runtime.Context{Interface: e},
 	)
 	if err != nil {
-		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.
+			Debug().
+			Msg("Failed to read IsContractDeploymentRestricted from the service account. Using value from context instead.")
 		return restricted, defined
 	}
 	restrictedCadence, ok := value.(cadence.Bool)
 	if !ok {
-		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.
+			Debug().
+			Msg("Failed to parse IsContractDeploymentRestricted from the service account. Using value from context instead.")
 		return restricted, defined
 	}
 	defined = true
