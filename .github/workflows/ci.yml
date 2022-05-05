@@ -40,8 +40,7 @@ jobs:
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-pkg-cache: true
         # Make sure we get accurate results
-        only-new-issues: true
-        skip-build-cache: true
+        # Some of these may be needed if observer code is integrated: only-new-issues: true, skip-build-cache: true
     - name: Run ShellCheck
       uses: ludeeus/action-shellcheck@master
       with:
