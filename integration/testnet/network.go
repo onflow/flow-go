@@ -1323,19 +1323,19 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		}
 
 		// gather cluster participants
-		participants := make([]bootstrap.NodeInfo, 0, len(cluster))
+		clusterCommittee := make([]bootstrap.NodeInfo, 0, len(cluster))
 		for _, conf := range confs {
 			_, exists := lookup[conf.NodeID]
 			if exists {
-				participants = append(participants, conf.NodeInfo)
+				clusterCommittee = append(clusterCommittee, conf.NodeInfo)
 			}
 		}
-		if len(cluster) != len(participants) { // sanity check
+		if len(cluster) != len(clusterCommittee) { // sanity check
 			return nil, nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
 		}
 
 		// generate qc for root cluster block
-		qc, err := run.GenerateClusterRootQC(participants, bootstrap.ToIdentityList(participants), block)
+		qc, err := run.GenerateClusterRootQC(clusterCommittee, bootstrap.ToIdentityList(clusterCommittee), block)
 		if err != nil {
 			return nil, nil, nil, err
 		}
