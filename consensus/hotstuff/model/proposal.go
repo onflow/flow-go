@@ -7,8 +7,9 @@ import (
 // Proposal represent a new proposed block within HotStuff (and thus a
 // a header in the bigger picture), signed by the proposer.
 type Proposal struct {
-	Block   *Block
-	SigData []byte
+	Block      *Block
+	SigData    []byte
+	LastViewTC *flow.TimeoutCertificate
 }
 
 // ProposerVote extracts the proposer vote from the proposal

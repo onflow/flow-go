@@ -11,9 +11,8 @@ import (
 // SafetyRules produces votes for the given block
 type SafetyRules struct {
 	signer     hotstuff.Signer
-	forks      hotstuff.ForksReader
 	persist    hotstuff.Persister
-	committee  hotstuff.Replicas // only produce votes when we are valid committee members
+	committee  hotstuff.DynamicCommittee // only produce votes when we are valid committee members
 	safetyData *hotstuff.SafetyData
 }
 
@@ -22,17 +21,15 @@ var _ hotstuff.SafetyRules = (*SafetyRules)(nil)
 // New creates a new SafetyRules instance
 func New(
 	signer hotstuff.Signer,
-	forks hotstuff.ForksReader,
 	persist hotstuff.Persister,
-	committee hotstuff.Replicas,
-	lastVotedView uint64,
+	committee hotstuff.DynamicCommittee,
+	safetyData *hotstuff.SafetyData,
 ) *SafetyRules {
-
 	return &SafetyRules{
-		signer:    signer,
-		forks:     forks,
-		persist:   persist,
-		committee: committee,
+		signer:     signer,
+		persist:    persist,
+		committee:  committee,
+		safetyData: safetyData,
 	}
 }
 
@@ -61,7 +58,7 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 	// Do not produce a vote for blocks where we are not a valid committee member.
 	// HotStuff will ask for a vote for the first block of the next epoch, even if we
 	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
-	_, err = r.committee.IdentityByEpoch(block.View, r.committee.Self())
+	_, err = r.committee.IdentityByBlock(block.BlockID, r.committee.Self())
 	if model.IsInvalidSignerError(err) {
 		return nil, model.NoVoteError{Msg: "not voting committee member for block"}
 	}
