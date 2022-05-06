@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -33,7 +34,6 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
-
 	// get the latest sealed header
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
@@ -99,8 +99,12 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// encode to MD5 as low compute/memory lookup key
 	encodedScript := md5.Sum(script) //nolint:gosec
 
+	// record start time
+	execStartTime := time.Now()
+
 	// try each of the execution nodes found
 	var errors *multierror.Error
+
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
@@ -108,6 +112,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
 				timestamp, seen := b.seenScripts[encodedScript]
+
 				// log if the script is unique in the time window
 				if !seen || executionTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow {
 					b.log.Debug().
@@ -119,8 +124,20 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 					b.seenScripts[encodedScript] = executionTime
 				}
 			}
+
+			fmt.Println("HELLO HELLO HELLO")
+			fmt.Println("HELLO HELLO HELLO")
+			fmt.Println("HELLO HELLO HELLO")
+			fmt.Println("HELLO HELLO HELLO")
+			
+			// log execution time
+			b.log.Debug().
+				Dur("exec_time", time.Since(execStartTime)).
+				Int("script_size", len(script))
+
 			return result, nil
 		}
+
 		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
 		if status.Code(err) == codes.InvalidArgument {
 			b.log.Debug().Err(err).
@@ -133,6 +150,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		}
 		errors = multierror.Append(errors, err)
 	}
+
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
 		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
