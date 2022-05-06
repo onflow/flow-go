@@ -32,7 +32,7 @@ func TestCheckSum(t *testing.T) {
 		require.NotEqual(t, signature.CheckSumFromIdentities(ids[:2]), signature.CheckSumFromIdentities(ids[2:])) // no overlap
 	})
 
-	t.Run("checksum length always 16", func(t *testing.T) {
+	t.Run("checksum length always constant", func(t *testing.T) {
 		ids := unittest.IdentifierListFixture(4)
 		require.Len(t, signature.CheckSumFromIdentities(nil), signature.CheckSumLen)
 		require.Len(t, signature.CheckSumFromIdentities(ids), signature.CheckSumLen)
