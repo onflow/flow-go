@@ -16,12 +16,13 @@ import (
 // staticEpochInfo contains leader selection and the initial committee for one epoch.
 // This data structure must not be mutated after construction.
 type staticEpochInfo struct {
-	firstView uint64
-	finalView uint64
-	leaders   *leader.LeaderSelection
+	firstView uint64                  // first view of the epoch (inclusive)
+	finalView uint64                  // final view of the epoch (inclusive)
+	leaders   *leader.LeaderSelection // pre-computed leader selection for the epoch
 	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
-	initialCommittee flow.IdentityList
-	dkg              hotstuff.DKG
+	initialCommittee     flow.IdentityList
+	weightThresholdForQC uint64 // computed based on initial committee weights
+	dkg                  hotstuff.DKG
 }
 
 // newStaticEpochInfo returns the static epoch information from the epoch.
@@ -50,11 +51,12 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 	}
 
 	epochInfo := &staticEpochInfo{
-		firstView:        firstView,
-		finalView:        finalView,
-		leaders:          leaders,
-		initialCommittee: initialCommittee,
-		dkg:              dkg,
+		firstView:            firstView,
+		finalView:            finalView,
+		leaders:              leaders,
+		initialCommittee:     initialCommittee,
+		weightThresholdForQC: WeightThresholdToBuildQC(initialCommittee.TotalWeight()),
+		dkg:                  dkg,
 	}
 	return epochInfo, nil
 }
@@ -194,6 +196,17 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	return epochInfo.leaders.LeaderForView(view)
 }
 
+// WeightThresholdForView returns the minimum weight required to build a valid
+// QC in the given view. The weight threshold only changes at epoch boundaries
+// and is computed based on the initial committee weights.
+func (c *Consensus) WeightThresholdForView(view uint64) (uint64, error) {
+	epochInfo, err := c.staticEpochInfoByView(view)
+	if err != nil {
+		return 0, err
+	}
+	return epochInfo.weightThresholdForQC, nil
+}
+
 func (c *Consensus) Self() flow.Identifier {
 	return c.me
 }
@@ -201,7 +214,7 @@ func (c *Consensus) Self() flow.Identifier {
 // DKG returns the DKG for epoch which includes the given view.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
 //   * unspecific error in case of unexpected problems and bugs
 func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
@@ -217,7 +230,7 @@ func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 // view, we will attempt to cache the next epoch.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known
 //   * unspecific error in case of unexpected problems and bugs
 func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error) {
 

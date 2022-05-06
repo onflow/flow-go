@@ -35,8 +35,15 @@ type Replicas interface {
 	//          Therefore, a node retains its proposer view slots even if it is slashed.
 	//          Its proposal is simply considered invalid, as it is not from a legitimate participant.
 	// Returns the following expected errors for invalid inputs:
-	//   * committees.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	LeaderForView(view uint64) (flow.Identifier, error)
+
+	// WeightThresholdForView returns the minimum weight required to form a QC
+	// for the given view. This weight threshold is computed using the total weight
+	// of the initial committee and is static over the course of an epoch.
+	// Returns the following expected errors for invalid inputs:
+	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	WeightThresholdForView(view uint64) (uint64, error)
 
 	// Self returns our own node identifier.
 	// TODO: ultimately, the own identity of the node is necessary for signing.
@@ -59,7 +66,7 @@ type Replicas interface {
 	// CAUTION: DO NOT use this method for validating block proposals.
 	//
 	// Returns the following expected errors for invalid inputs:
-	//   * committees.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	//
 	// TODO: should return identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	IdentitiesByEpoch(view uint64, selector flow.IdentityFilter) (flow.IdentityList, error)
@@ -70,7 +77,7 @@ type Replicas interface {
 	//  * model.InvalidSignerError if participantID does NOT correspond to an authorized HotStuff participant at the specified block.
 	//
 	// Returns the following expected errors for invalid inputs:
-	//   * committees.ErrViewForUnknownEpoch if no epoch containing the given view is known
+	//   * model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 	//
 	// TODO: should return identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.Identity, error)
@@ -108,19 +115,4 @@ type DynamicCommittee interface {
 
 type DKG interface {
 	protocol.DKG
-}
-
-// ComputeWeightThresholdForBuildingQC returns the weight that is minimally required for building a QC
-func ComputeWeightThresholdForBuildingQC(totalWeight uint64) uint64 {
-	// Given totalWeight, we need the smallest integer t such that 2 * totalWeight / 3 < t
-	// Formally, the minimally required weight is: 2 * Floor(totalWeight/3) + max(1, totalWeight mod 3)
-	floorOneThird := totalWeight / 3 // integer division, includes floor
-	res := 2 * floorOneThird
-	divRemainder := totalWeight % 3
-	if divRemainder <= 1 {
-		res = res + 1
-	} else {
-		res += divRemainder
-	}
-	return res
 }

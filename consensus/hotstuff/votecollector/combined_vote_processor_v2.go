@@ -77,7 +77,10 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 	}
 
 	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
-	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight())
+	minRequiredWeight, err := f.committee.WeightThresholdForView(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("could not get weight threshold for view %d: %w", block.View, err)
+	}
 
 	return NewCombinedVoteProcessor(
 		log,

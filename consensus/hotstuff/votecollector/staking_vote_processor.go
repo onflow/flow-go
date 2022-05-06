@@ -55,7 +55,10 @@ func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *mode
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight())
+	minRequiredWeight, err := f.committee.WeightThresholdForView(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("could not get weight threshold for view %d: %w", block.View, err)
+	}
 
 	return &StakingVoteProcessor{
 		log:               log,

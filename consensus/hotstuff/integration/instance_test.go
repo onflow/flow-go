@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
@@ -351,7 +352,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		in.queue <- qc
 	}
 
-	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(uint64(in.participants.Count()) * weight)
+	minRequiredWeight := committees.WeightThresholdToBuildQC(uint64(in.participants.Count()) * weight)
 	voteProcessorFactory := &mocks.VoteProcessorFactory{}
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
 		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
