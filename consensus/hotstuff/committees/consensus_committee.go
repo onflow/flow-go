@@ -13,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// ErrViewForUnknownEpoch is returned when a by-view query is made with a view
-// outside all cached epochs. This can happen when a query is made for a view in the
+// ErrViewForUnknownEpoch is returned when Epoch information is queried for a view that is 
+// outside of all cached epochs. This can happen when a query is made for a view in the
 // next epoch, if that epoch is not committed yet. This can also happen when an
 // old epoch is queried (>3 in the past), even if that epoch does exist in storage.
 var ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
@@ -64,7 +64,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 }
 
 // Consensus represents the main committee for consensus nodes. The consensus
-// committee persists across epochs.
+// committee might be active for multiple successive epochs.
 type Consensus struct {
 	mu     sync.RWMutex
 	state  protocol.State              // the protocol state

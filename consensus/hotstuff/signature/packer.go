@@ -39,7 +39,7 @@ func (p *ConsensusSigDataPacker) Pack(view uint64, sig *hotstuff.BlockSignatureD
 	// retrieve all authorized consensus participants at the given block
 	consensus, err := p.committees.IdentitiesByEpoch(view, filter.Any)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not find consensus committee by view (%d): %w", view, err)
+		return nil, nil, fmt.Errorf("could not find consensus committee for view %d: %w", view, err)
 	}
 
 	// lookup is a map from node identifier to node identity
@@ -110,7 +110,7 @@ func (p *ConsensusSigDataPacker) Unpack(view uint64, signerIDs []flow.Identifier
 	// read all the possible signer IDs at the given block
 	consensus, err := p.committees.IdentitiesByEpoch(view, filter.Any)
 	if err != nil {
-		return nil, fmt.Errorf("could not find consensus committees by block view (%d): %w", view, err)
+		return nil, fmt.Errorf("could not find consensus committees for view %d: %w", view, err)
 	}
 
 	// lookup is a map from node identifier to node identity
@@ -126,7 +126,7 @@ func (p *ConsensusSigDataPacker) Unpack(view uint64, signerIDs []flow.Identifier
 		signerID := signerIDs[i]
 		_, ok := lookup[signerID]
 		if !ok {
-			return nil, fmt.Errorf("unknown signer ID (%x) at the given block view %d: %w",
+			return nil, fmt.Errorf("unknown signer ID (%x) at view %d: %w",
 				signerID, view, model.ErrInvalidFormat)
 		}
 

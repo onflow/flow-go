@@ -695,7 +695,8 @@ type RoundRobinLeaderSelection struct {
 	identities flow.IdentityList
 	me         flow.Identifier
 }
-
+var _ hotstuff.Replicas = (*Consensus)(nil)
+var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
 func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return s.identities.Filter(selector), nil
 }

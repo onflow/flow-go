@@ -151,7 +151,6 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		return nil, newInvalidVoteError(vote, fmt.Errorf("vote's view %d is inconsistent with referenced block (view %d)", vote.View, block.View))
 	}
 
-	// TODO - need to deal with proposer vote differently
 	voter, err := v.committee.IdentityByEpoch(block.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)

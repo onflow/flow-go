@@ -72,6 +72,7 @@ func IsSporkRootSnapshot(snapshot Snapshot) (bool, error) {
 }
 
 // IsEpochCommitted returns whether the epoch is committed.
+// No errors are expected during normal operations. 
 func IsEpochCommitted(epoch Epoch) (bool, error) {
 	_, err := epoch.DKG()
 	// check for sentinel errors indicating un-setup or un-committed epoch

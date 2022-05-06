@@ -100,7 +100,7 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	epoch1Identities := flow.IdentityList{realIdentity, zeroWeightConsensusIdentity, ejectedConsensusIdentity, validNonConsensusIdentity}
 
-	// a single epoch 2 identity
+	// a single consensus node for epoch 2:
 	epoch2Identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	epoch2Identities := flow.IdentityList{epoch2Identity}
 
