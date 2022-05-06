@@ -13,17 +13,13 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// ErrViewForUnknownEpoch is returned when Epoch information is queried for a view that is 
-// outside of all cached epochs. This can happen when a query is made for a view in the
-// next epoch, if that epoch is not committed yet. This can also happen when an
-// old epoch is queried (>3 in the past), even if that epoch does exist in storage.
-var ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
-
 // staticEpochInfo contains leader selection and the initial committee for one epoch.
+// This data structure must not be mutated after construction.
 type staticEpochInfo struct {
-	firstView        uint64
-	finalView        uint64
-	leaders          *leader.LeaderSelection
+	firstView uint64
+	finalView uint64
+	leaders   *leader.LeaderSelection
+	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	initialCommittee flow.IdentityList
 	dkg              hotstuff.DKG
 }
@@ -43,11 +39,11 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection: %w", err)
 	}
-	initialidentities, err := epoch.InitialIdentities()
+	initialIdentities, err := epoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not initial identities: %w", err)
 	}
-	initialCommittee := initialidentities.Filter(filter.IsVotingConsensusCommitteeMember)
+	initialCommittee := initialIdentities.Filter(filter.IsVotingConsensusCommitteeMember)
 	dkg, err := epoch.DKG()
 	if err != nil {
 		return nil, fmt.Errorf("could not get dkg: %w", err)
@@ -142,7 +138,7 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 // the given view.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
 //   * unspecific error in case of unexpected problems and bugs
 //
@@ -158,8 +154,10 @@ func (c *Consensus) IdentitiesByEpoch(view uint64, selector flow.IdentityFilter)
 // contains the given view.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
+//   * model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
+//     authorized consensus participants.
 //   * unspecific error in case of unexpected problems and bugs
 //
 func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.Identity, error) {
@@ -177,7 +175,7 @@ func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.
 // LeaderForView returns the node ID of the leader for the given view.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
 //   * unspecific error in case of unexpected problems and bugs
 //
@@ -244,14 +242,14 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 	}
 	// we don't know about the epoch for this view yet, return the sentinel
 	if !ok {
-		return nil, ErrViewForUnknownEpoch
+		return nil, model.ErrViewForUnknownEpoch
 	}
 	// we successfully cached the next epoch, return the corresponding static info
 	// if it contains the given view
 	if nextEpochInfo.firstView <= view && view <= nextEpochInfo.finalView {
 		return nextEpochInfo, nil
 	}
-	return nil, ErrViewForUnknownEpoch
+	return nil, model.ErrViewForUnknownEpoch
 }
 
 // tryPrepareNextEpoch tries to cache the next epoch, returning the cached static
@@ -270,7 +268,6 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 func (c *Consensus) tryPrepareNextEpoch() (*staticEpochInfo, bool, error) {
 	next := c.state.Final().Epochs().Next()
 	committed, err := protocol.IsEpochCommitted(next)
-	fmt.Println("committed? ", committed, err)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not check if epoch is committed: %w", err)
 	}

@@ -28,6 +28,7 @@ type Cluster struct {
 	// a filter that returns all members of the cluster committee allowed to vote
 	clusterMemberFilter flow.IdentityFilter
 	// initial set of cluster members, WITHOUT updated weight
+	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	initialClusterMembers flow.IdentityList
 }
 
@@ -120,14 +121,16 @@ func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifie
 	return identity, nil
 }
 
-// IdentitiesByEpoch returns the initial cluster members for this epoch. Since clusters
-// only exist for one epoch, we don't need to check the view.
+// IdentitiesByEpoch returns the initial cluster members for this epoch. The view
+// parameter is the view in the cluster consensus. Since clusters only exist for
+// one epoch, we don't need to check the view.
 func (c *Cluster) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return c.initialClusterMembers.Filter(selector), nil
 }
 
 // IdentityByEpoch returns the node from the initial cluster members for this epoch.
-// Since clusters only exist for one epoch, we don't need to check the view.
+// The view parameter is the view in the cluster consensus. Since clusters only exist
+// for one epoch, we don't need to check the view.
 func (c *Cluster) IdentityByEpoch(_ uint64, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
 	if !ok {
