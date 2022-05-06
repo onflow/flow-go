@@ -9,6 +9,7 @@ import (
 
 const eventTypeQuery = "type"
 const blockQuery = "block_ids"
+const MaxAllowedEventRequestHeightRange = 250
 
 type GetEvents struct {
 	StartHeight uint64

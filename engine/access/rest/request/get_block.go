@@ -10,7 +10,6 @@ const heightQuery = "height"
 const startHeightQuery = "start_height"
 const endHeightQuery = "end_height"
 const MaxAllowedBlockRequestHeightRange = 50
-const MaxAllowedEventRequestHeightRange = 250
 const idParam = "id"
 
 type GetBlock struct {
