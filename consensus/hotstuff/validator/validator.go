@@ -51,6 +51,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	// authorized to sign during this epoch. Ejection and dynamic weight adjustments
 	// are not taken into account here. By using an epoch-static set of authorized
 	// signers, we can check QC validity without needing all ancestor blocks.
+	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	allParticipants, err := v.committee.IdentitiesByEpoch(block.View, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
@@ -61,6 +62,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	// determine whether signers reach minimally required weight threshold for consensus
+	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	threshold, err := v.committee.WeightThresholdForView(block.View)
 	if err != nil {
 		return fmt.Errorf("could not get weight threshold for view %d: %w", block.View, err)
@@ -107,6 +109,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	}
 
 	// check the proposer is the leader for the proposed block's view
+	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	leader, err := v.committee.LeaderForView(block.View)
 	if err != nil {
 		return fmt.Errorf("error determining leader for block %x: %w", block.BlockID, err)
@@ -161,6 +164,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		return nil, newInvalidVoteError(vote, fmt.Errorf("vote's view %d is inconsistent with referenced block (view %d)", vote.View, block.View))
 	}
 
+	// TODO: handle model.ErrViewForUnknownEpoch when front-loading verification
 	voter, err := v.committee.IdentityByEpoch(block.View, vote.SignerID)
 	if model.IsInvalidSignerError(err) {
 		return nil, newInvalidVoteError(vote, err)
