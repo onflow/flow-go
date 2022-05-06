@@ -24,3 +24,19 @@ func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Iden
 		return indices[identity1.NodeID] < indices[identity2.NodeID]
 	}
 }
+
+func IdentityListCanonical(identities flow.IdentityList) bool {
+	if len(identities) == 0 {
+		return true
+	}
+
+	prev := identities[0].ID()
+	for i := 1; i < len(identities); i++ {
+		id := identities[i].ID()
+		if !IdentifierCanonical(prev, id) {
+			return false
+		}
+	}
+
+	return true
+}
