@@ -3,15 +3,25 @@ package signature
 import (
 	"bytes"
 	"fmt"
+	"hash/crc32"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// CheckSumLen is fixed to be 16 bytes, which is also md5.Size
-const CheckSumLen = 32
+// CheckSumLen is fixed to be 4 bytes
+const CheckSumLen = 4
 
 func checksum(data []byte) [CheckSumLen]byte {
-	return flow.MakeID(data)
+	// since the checksum is only for detecting honest mistake,
+	// crc32 is enough
+	sum := crc32.ChecksumIEEE(data)
+	// converting the uint32 checksum value into [4]byte
+	return [CheckSumLen]byte{
+		byte(sum >> 24),
+		byte(sum >> 16),
+		byte(sum >> 8),
+		byte(sum),
+	}
 }
 
 // CheckSumFromIdentities returns checksum for the given identities
