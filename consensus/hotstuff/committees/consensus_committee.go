@@ -307,11 +307,10 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error)
 		return nil, fmt.Errorf("could not get counter for current epoch: %w", err)
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// this is a no-op if we have already computed leaders for this epoch
+	// this is a no-op if we have already computed static info for this epoch
+	c.mu.RLock()
 	epochInfo, exists := c.epochs[counter]
+	c.mu.RUnlock()
 	if exists {
 		return epochInfo, nil
 	}
@@ -320,9 +319,23 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error)
 	if err != nil {
 		return nil, fmt.Errorf("could not create static epoch info for epch %d: %w", counter, err)
 	}
-	// cache the epoch info
-	c.epochs[counter] = epochInfo
 
+	// sanity check: ensure new epoch has contiguous views with the prior epoch
+	c.mu.RLock()
+	prevEpochInfo, exists := c.epochs[counter-1]
+	c.mu.RUnlock()
+	if exists {
+		if epochInfo.firstView != prevEpochInfo.finalView+1 {
+			return nil, fmt.Errorf("non-contiguous view ranges between consecutive epochs (epoch_%d=[%d,%d], epoch_%d=[%d,%d])",
+				counter-1, prevEpochInfo.firstView, prevEpochInfo.finalView,
+				counter, epochInfo.firstView, epochInfo.finalView)
+		}
+	}
+
+	// cache the epoch info
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.epochs[counter] = epochInfo
 	// now prune any old epochs, if we have exceeded our maximum of 3
 	// if we have fewer than 3 epochs, this is a no-op
 	c.pruneEpochInfo()
