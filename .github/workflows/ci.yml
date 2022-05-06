@@ -139,10 +139,12 @@ jobs:
     - name: Wait for a default waiting period until a clean state
       # This will not cause flakiness.
       # The waiting time is a reasonable time to expect an observer to be responsive
-      run: sleep 5
+      run: sleep 10
     - name: Get Status ensuring the observer endpoint is online
-      run: ~/.local/bin/flow -f integration/localnet/flow-localnet.json -n observer status -o json | grep '"status":"ONLINE"'
+      # observer reference will be replaced with access after gRPC proxying
+      run: ~/.local/bin/flow -f integration/localnet/flow-localnet.json -n access status -o json | grep '"status":"ONLINE"'
     - name: Wait for finalized blocks and check them with Access
-      run: ~/.local/bin/flow -f integration/localnet/flow-localnet.json -n observer blocks get latest
+      # observer reference will be replaced with access after gRPC proxying
+      run: ~/.local/bin/flow -f integration/localnet/flow-localnet.json -n access blocks get latest
     - name: Stop localnet
       run: bash -c 'cd integration/localnet/ && make stop'
