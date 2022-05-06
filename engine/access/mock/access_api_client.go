@@ -617,6 +617,96 @@ func (_m *AccessAPIClient) GetTransactionResult(ctx context.Context, in *access.
 	return r0, r1
 }
 
+// GetTransactionResultByIndex provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetTransactionResultByIndex(ctx context.Context, in *access.GetTransactionByIndexRequest, opts ...grpc.CallOption) (*access.TransactionResultResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *access.TransactionResultResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetTransactionByIndexRequest, ...grpc.CallOption) *access.TransactionResultResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResultResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetTransactionByIndexRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetTransactionResultsByBlockID provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetTransactionResultsByBlockID(ctx context.Context, in *access.GetTransactionsByBlockIDRequest, opts ...grpc.CallOption) (*access.TransactionResultsResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *access.TransactionResultsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetTransactionsByBlockIDRequest, ...grpc.CallOption) *access.TransactionResultsResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResultsResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetTransactionsByBlockIDRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetTransactionsByBlockID provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetTransactionsByBlockID(ctx context.Context, in *access.GetTransactionsByBlockIDRequest, opts ...grpc.CallOption) (*access.TransactionsResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *access.TransactionsResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetTransactionsByBlockIDRequest, ...grpc.CallOption) *access.TransactionsResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionsResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetTransactionsByBlockIDRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Ping provides a mock function with given fields: ctx, in, opts
 func (_m *AccessAPIClient) Ping(ctx context.Context, in *access.PingRequest, opts ...grpc.CallOption) (*access.PingResponse, error) {
 	_va := make([]interface{}, len(opts))

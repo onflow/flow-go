@@ -84,6 +84,14 @@ func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.Trans
 	return *t, nil
 }
 
+func TransactionsToMessages(transactions []*flow.TransactionBody) []*entities.Transaction {
+	transactionMessages := make([]*entities.Transaction, len(transactions))
+	for i, t := range transactions {
+		transactionMessages[i] = TransactionToMessage(*t)
+	}
+	return transactionMessages
+}
+
 func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	proposalKeyMessage := &entities.Transaction_ProposalKey{
 		Address:        tb.ProposalKey.Address.Bytes(),
@@ -274,6 +282,23 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	}
 
 	return &bh, nil
+}
+
+func BlockToMessageLight(h *flow.Block) *entities.Block {
+	id := h.ID()
+
+	parentID := h.Header.ParentID
+	t := timestamppb.New(h.Header.Timestamp)
+	cg := CollectionGuaranteesToMessages(h.Payload.Guarantees)
+
+	return &entities.Block{
+		Id:                   id[:],
+		Height:               h.Header.Height,
+		ParentId:             parentID[:],
+		Timestamp:            t,
+		CollectionGuarantees: cg,
+		Signatures:           [][]byte{h.Header.ParentVoterSigData},
+	}
 }
 
 func MessageToBlock(m *entities.Block) (*flow.Block, error) {

@@ -83,7 +83,6 @@ func TestPrivateSend_Valid(t *testing.T) {
 	// expected DKGMessageOut
 	expectedMsg := msg.PrivDKGMessageOut{
 		DKGMessage: msg.NewDKGMessage(
-			orig,
 			msgb,
 			dkgInstanceID,
 		),
@@ -156,11 +155,12 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 		NewBrokerTunnel(),
 	)
 
-	expectedMsg := msg.NewDKGMessage(
-		orig,
-		msgb,
-		dkgInstanceID,
-	)
+	dkgMessage := msg.NewDKGMessage(msgb, dkgInstanceID)
+	expectedMsg := msg.PrivDKGMessageIn{
+		OriginID:             committee[0].NodeID,
+		DKGMessage:           dkgMessage,
+		CommitteeMemberIndex: uint64(orig),
+	}
 
 	// launch a background routine to capture messages forwared to the private
 	// message channel
@@ -177,78 +177,12 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 	// simulate receiving an incoming message through the broker
 	receiver.tunnel.SendIn(
 		msg.PrivDKGMessageIn{
-			DKGMessage: expectedMsg,
+			DKGMessage: dkgMessage,
 			OriginID:   committee[orig].NodeID,
 		},
 	)
 
 	unittest.RequireCloseBefore(t, doneCh, 50*time.Millisecond, "message not received")
-}
-
-// TestProcessPrivateMessage_InvalidOrigin checks that incoming DKG messages are
-// discarded if their origin is invalid, or if there is a discrepancy between
-// the origin defined in the message, and the network identifier of the origin
-// (as provided by the network utilities).
-func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
-	committee, locals := initCommittee(2)
-
-	// receiving broker
-	receiver := NewBroker(
-		zerolog.Logger{},
-		dkgInstanceID,
-		committee,
-		locals[dest],
-		dest,
-		[]module.DKGContractClient{&mock.DKGContractClient{}},
-		NewBrokerTunnel(),
-	)
-
-	// Launch a background routine to capture messages forwared to the private
-	// message channel. No messages should be received because we are only
-	// sending invalid ones.
-	doneCh := make(chan struct{})
-	go func() {
-		msgCh := receiver.GetPrivateMsgCh()
-		for {
-			<-msgCh
-			close(doneCh)
-		}
-	}()
-
-	// check that the Message's Orig field is not out of index
-	badIndexes := []int{-1, 2}
-	for _, badIndex := range badIndexes {
-		dkgMsg := msg.NewDKGMessage(
-			badIndex,
-			msgb,
-			dkgInstanceID,
-		)
-		// simulate receiving an incoming message with bad Origin index field
-		// through the broker
-		receiver.tunnel.SendIn(
-			msg.PrivDKGMessageIn{
-				DKGMessage: dkgMsg,
-				OriginID:   committee[orig].NodeID,
-			},
-		)
-	}
-
-	// check that the Message's Orig field matches the sender's network
-	// identifier
-	dkgMsg := msg.NewDKGMessage(
-		orig,
-		msgb,
-		dkgInstanceID,
-	)
-	// simulate receiving an incoming message through the broker
-	receiver.tunnel.SendIn(
-		msg.PrivDKGMessageIn{
-			DKGMessage: dkgMsg,
-			OriginID:   unittest.IdentifierFixture(),
-		},
-	)
-
-	unittest.RequireNeverClosedWithin(t, doneCh, 50*time.Millisecond, "no invalid incoming message should be forwarded")
 }
 
 // TestBroadcastMessage checks that the broker correctly wraps the message
@@ -324,12 +258,11 @@ func TestPoll(t *testing.T) {
 
 	blockID := unittest.IdentifierFixture()
 	bcastMsgs := []msg.BroadcastDKGMessage{}
-	expectedMsgs := []msg.DKGMessage{}
 	for i := 0; i < 3; i++ {
 		bmsg, err := sender.prepareBroadcastMessage([]byte(fmt.Sprintf("msg%d", i)))
 		require.NoError(t, err)
+		bmsg.NodeID = committee[0].NodeID
 		bcastMsgs = append(bcastMsgs, bmsg)
-		expectedMsgs = append(expectedMsgs, bmsg.DKGMessage)
 	}
 
 	// check that the dkg contract client is called correctly
@@ -340,7 +273,7 @@ func TestPoll(t *testing.T) {
 	sender.dkgContractClients[0] = contractClient
 
 	// launch a background routine to capture messages forwarded to the msgCh
-	receivedMsgs := []msg.DKGMessage{}
+	receivedMsgs := []msg.BroadcastDKGMessage{}
 	doneCh := make(chan struct{})
 	go func() {
 		msgCh := sender.GetBroadcastMsgCh()
@@ -361,7 +294,7 @@ func TestPoll(t *testing.T) {
 
 	// check that the messages have been received and forwarded to the msgCh
 	unittest.AssertClosesBefore(t, doneCh, time.Second)
-	require.Equal(t, expectedMsgs, receivedMsgs)
+	require.Equal(t, bcastMsgs, receivedMsgs)
 
 	// check that the message offset has been incremented
 	require.Equal(t, uint(len(bcastMsgs)), sender.messageOffset)
@@ -395,4 +328,47 @@ func TestLogHook(t *testing.T) {
 	sender.Disqualify(1, "testing")
 	sender.FlagMisbehavior(1, "test")
 	require.Equal(t, 2, hookCalls)
+}
+
+// TestProcessPrivateMessage_InvalidOrigin checks that incoming DKG messages are
+// discarded if the sender is not part of the DKG committee.
+func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
+	committee, locals := initCommittee(2)
+
+	// receiving broker
+	receiver := NewBroker(
+		zerolog.Logger{},
+		dkgInstanceID,
+		committee,
+		locals[dest],
+		dest,
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
+		NewBrokerTunnel(),
+	)
+
+	// Launch a background routine to capture messages forwared to the private
+	// message channel. No messages should be received because we are only
+	// sending invalid ones.
+	doneCh := make(chan struct{})
+	go func() {
+		msgCh := receiver.GetPrivateMsgCh()
+		for {
+			<-msgCh
+			close(doneCh)
+		}
+	}()
+
+	dkgMsg := msg.NewDKGMessage(
+		msgb,
+		dkgInstanceID,
+	)
+	// simulate receiving an incoming message with an OriginID of a non-committee member
+	receiver.tunnel.SendIn(
+		msg.PrivDKGMessageIn{
+			DKGMessage: dkgMsg,
+			OriginID:   unittest.IdentifierFixture(),
+		},
+	)
+
+	unittest.RequireNeverClosedWithin(t, doneCh, 50*time.Millisecond, "no invalid incoming message should be forwarded")
 }

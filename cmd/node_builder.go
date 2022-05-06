@@ -13,13 +13,18 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/module/compliance"
+
+	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -52,13 +57,13 @@ type NodeBuilder interface {
 	// InitIDProviders initializes the ID providers needed by various components
 	InitIDProviders()
 
-	// EnqueueNetworkInit enqueues the default network component with the given context
+	// EnqueueNetworkInit enqueues the default networking layer.
 	EnqueueNetworkInit()
 
-	// EnqueueMetricsServerInit enqueues the metrics component
+	// EnqueueMetricsServerInit enqueues the metrics component.
 	EnqueueMetricsServerInit()
 
-	// Enqueues the Tracer component
+	// EnqueueTracer enqueues the Tracer component.
 	EnqueueTracer()
 
 	// Module enables setting up dependencies of the engine with the builder context
@@ -144,9 +149,15 @@ type BaseConfig struct {
 	receiptsCacheSize               uint
 	db                              *badger.DB
 	PreferredUnicastProtocols       []string
-	NetworkReceivedMessageCacheSize int
-	topologyProtocolName            string
-	topologyEdgeProbability         float64
+	NetworkReceivedMessageCacheSize uint32
+	TopologyProtocolName            string
+	TopologyEdgeProbability         float64
+	HeroCacheMetricsEnable          bool
+	SyncCoreConfig                  synchronization.Config
+	CodecFactory                    func() network.Codec
+	// ComplianceConfig configures either the compliance engine (consensus nodes)
+	// or the follower engine (all other node roles)
+	ComplianceConfig compliance.Config
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -169,6 +180,7 @@ type NodeConfig struct {
 	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
+	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
@@ -223,8 +235,12 @@ func DefaultBaseConfig() *BaseConfig {
 		MetricsEnabled:                  true,
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
-		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
-		topologyProtocolName:            string(topology.TopicBased),
-		topologyEdgeProbability:         topology.MaximumEdgeProbability,
+		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
+		TopologyProtocolName:            string(topology.TopicBased),
+		TopologyEdgeProbability:         topology.MaximumEdgeProbability,
+		HeroCacheMetricsEnable:          false,
+		SyncCoreConfig:                  synchronization.DefaultConfig(),
+		CodecFactory:                    func() network.Codec { return cbor.NewCodec() },
+		ComplianceConfig:                compliance.DefaultConfig(),
 	}
 }
