@@ -138,8 +138,8 @@ jobs:
       run: ~/.local/bin/flow -f integration/localnet/flow-localnet.json -n observer version
     - name: Get Status ensuring the official client build can connect
       run: ~/.local/bin/flow -f integration/localnet/flow-localnet.json -n observer status
-    - name: Wait for finalized blocks and check them with Observer
-      # || true = non-breaking due to rpc change. We do access and observer together to fetch the same block
-      run: ~/.local/bin/flow -f integration/localnet/flow-localnet.json -n access blocks get latest && (~/.local/bin/flow -f integration/localnet/flow-localnet.json -n observer blocks get latest || true)
+    - name: Wait for finalized blocks and check them with Access
+      # Any future changes will test a proper gRPC API on bot Access and Observer.
+      run: ~/.local/bin/flow -f integration/localnet/flow-localnet.json -n access blocks get latest
     - name: Stop localnet
       run: bash -c 'cd integration/localnet/ && make stop'
