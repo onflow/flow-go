@@ -9,7 +9,8 @@ import (
 const heightQuery = "height"
 const startHeightQuery = "start_height"
 const endHeightQuery = "end_height"
-const MaxAllowedHeights = 50
+const MaxAllowedBlockRequestHeightRange = 50
+const MaxAllowedEventRequestHeightRange = 250
 const idParam = "id"
 
 type GetBlock struct {
@@ -66,12 +67,12 @@ func (g *GetBlock) Parse(rawHeights []string, rawStart string, rawEnd string) er
 		return fmt.Errorf("start height must be less than or equal to end height")
 	}
 	// check if range exceeds maximum but only if end is not equal to special value which is not known yet
-	if g.EndHeight-g.StartHeight >= MaxAllowedHeights && g.EndHeight != FinalHeight && g.EndHeight != SealedHeight {
-		return fmt.Errorf("height range %d exceeds maximum allowed of %d", g.EndHeight-g.StartHeight, MaxAllowedHeights)
+	if g.EndHeight-g.StartHeight >= MaxAllowedBlockRequestHeightRange && g.EndHeight != FinalHeight && g.EndHeight != SealedHeight {
+		return fmt.Errorf("height range %d exceeds maximum allowed of %d", g.EndHeight-g.StartHeight, MaxAllowedBlockRequestHeightRange)
 	}
 
-	if len(heights) > MaxAllowedHeights {
-		return fmt.Errorf("at most %d heights can be requested at a time", MaxAllowedHeights)
+	if len(heights) > MaxAllowedBlockRequestHeightRange {
+		return fmt.Errorf("at most %d heights can be requested at a time", MaxAllowedBlockRequestHeightRange)
 	}
 
 	// check that if sealed or final are used they are provided as only value as mix and matching heights with sealed is not encouraged
