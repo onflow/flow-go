@@ -50,3 +50,13 @@ type PendingBlock struct {
 	Header   *flow.Header
 	Payload  *Payload
 }
+
+// ToGuarantee converts the finalized cluster block to collection guarantee
+func ToGuarantee(finalized *Block) *flow.CollectionGuarantee {
+	return &flow.CollectionGuarantee{
+		CollectionID:     finalized.Payload.Collection.ID(),
+		ReferenceBlockID: finalized.Payload.ReferenceBlockID,
+		SignerIDs:        finalized.Header.ParentVoterIDs,
+		Signature:        finalized.Header.ParentVoterSigData,
+	}
+}

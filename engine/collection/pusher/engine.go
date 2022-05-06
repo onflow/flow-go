@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -122,11 +123,12 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 		return fmt.Errorf("invalid remote request to submit collection guarantee (from=%x)", originID)
 	}
 
-	return e.SubmitCollectionGuarantee(&req.Guarantee)
+	return e.SubmitCollectionGuarantee(req.FinalizedClusterBlock)
 }
 
 // SubmitCollectionGuarantee submits the collection guarantee to all consensus nodes.
-func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+func (e *Engine) SubmitCollectionGuarantee(finalized *cluster.Block) error {
+	guarantee := cluster.ToGuarantee(finalized)
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus nodes: %w", err)
@@ -141,7 +143,10 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 
 	e.engMetrics.MessageSent(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)
 
-	e.log.Debug().
+	e.log.Info().
+		Uint64("block_height", finalized.Header.Height).
+		Hex("block_id", logging.ID(finalized.Header.ID())).
+		Hex("proposer", finalized.Header.ProposerID[:]).
 		Hex("guarantee_id", logging.ID(guarantee.ID())).
 		Hex("ref_block_id", logging.ID(guarantee.ReferenceBlockID)).
 		Msg("submitting collection guarantee")
