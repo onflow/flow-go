@@ -12,6 +12,8 @@ import (
 
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
+	// TODO: change to hotstuff.Replicas when front-loading QC verification
+	// https://github.com/onflow/flow-go/pull/2328#discussion_r866494368
 	committee hotstuff.DynamicCommittee
 	forks     hotstuff.ForksReader
 	verifier  hotstuff.Verifier
@@ -44,8 +46,11 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		return newInvalidBlockError(block, fmt.Errorf("qc's View %d doesn't match referenced block's View %d", qc.View, block.View))
 	}
 
-	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
-	// IdentityList returned by hotstuff.DynamicCommittee contains only legitimate consensus participants for the specified block (must have positive weight)
+	// Retrieve the initial identities of consensus participants for this epoch,
+	// and those that signed the QC. IdentitiesByEpoch contains all nodes that were
+	// authorized to sign during this epoch. Ejection and dynamic weight adjustments
+	// are not taken into account here. By using an epoch-static set of authorized
+	// signers, we can check QC validity without needing all ancestor blocks.
 	allParticipants, err := v.committee.IdentitiesByEpoch(block.View, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
@@ -111,6 +116,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	}
 
 	// check the proposer is a valid committee member at the most recent state on this fork
+	// TODO: move this check into SafetyRules when front-loading the verification
 	_, err = v.committee.IdentityByBlock(block.BlockID, block.ProposerID)
 	if model.IsInvalidSignerError(err) {
 		return newInvalidBlockError(block, fmt.Errorf("proposer %x is leader but is not a valid committee member", block.ProposerID))
@@ -120,6 +126,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	}
 
 	// check that we have the parent for the proposal
+	// TODO: remove this check when front-loading the verification
 	parent, found := v.forks.GetBlock(qc.BlockID)
 	if !found {
 		// Forks is _allowed_ to (but obliged to) prune blocks whose view is below the newest finalized block.

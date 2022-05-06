@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -47,7 +48,7 @@ func (s Static) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilte
 func (s Static) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
 	identity, ok := s.participants.ByNodeID(participantID)
 	if !ok {
-		return nil, fmt.Errorf("unknown partipant")
+		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
 	return identity, nil
 }
@@ -59,7 +60,7 @@ func (s Static) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.
 func (s Static) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
 	identity, ok := s.participants.ByNodeID(participantID)
 	if !ok {
-		return nil, fmt.Errorf("unknown partipant")
+		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
 	return identity, nil
 }

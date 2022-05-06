@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/consensus"
@@ -697,8 +698,8 @@ type RoundRobinLeaderSelection struct {
 	me         flow.Identifier
 }
 
-var _ hotstuff.Replicas = (*Consensus)(nil)
-var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
+var _ hotstuff.Replicas = (*RoundRobinLeaderSelection)(nil)
+var _ hotstuff.DynamicCommittee = (*RoundRobinLeaderSelection)(nil)
 
 func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return s.identities.Filter(selector), nil
@@ -707,8 +708,9 @@ func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier, selecto
 func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
 	id, found := s.identities.ByNodeID(participantID)
 	if !found {
-		return nil, fmt.Errorf("not found")
+		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
+
 	return id, nil
 }
 
@@ -719,7 +721,7 @@ func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64, selector flow.Id
 func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
 	id, found := s.identities.ByNodeID(participantID)
 	if !found {
-		return nil, fmt.Errorf("not found")
+		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
 	return id, nil
 }
