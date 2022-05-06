@@ -36,6 +36,7 @@ func IdentityListCanonical(identities flow.IdentityList) bool {
 		if !IdentifierCanonical(prev, id) {
 			return false
 		}
+		prev = id
 	}
 
 	return true
