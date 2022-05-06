@@ -70,22 +70,24 @@ func (s *Suite) SetupSuite() {
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
-	// generates one verification node
+	// generates one corrupted verification node
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+	verConfig.Corrupted = true
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
-	// generates two execution nodes
+	// generates two corrupted execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+	exe1Config.Corrupted = true
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	s.exe2ID = unittest.IdentifierFixture()
@@ -94,6 +96,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)))
+	exe2Config.Corrupted = true
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
@@ -120,7 +123,7 @@ func (s *Suite) SetupSuite() {
 
 	// generates, initializes, and starts the Flow network
 	netConfig := testnet.NewNetworkConfig(
-		"verification_tests",
+		"wintermute_tests",
 		s.nodeConfigs,
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),

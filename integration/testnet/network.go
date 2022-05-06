@@ -588,7 +588,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		BootstrapSnapshot:           bootstrapSnapshot,
 	}
 
-	// check that at-least 2 full access nodes must be configure in your test suite
+	// check that at-least 2 full access nodes must be configured in your test suite
 	// in order to provide a secure GRPC connection for LN & SN nodes
 	accessNodeIDS := make([]string, 0)
 	for _, n := range confs {
@@ -1210,6 +1210,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			AdditionalFlags:       conf.AdditionalFlags,
 			Debug:                 conf.Debug,
 			SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
+			Corrupted:             conf.Corrupted,
 		}
 
 		confs = append(confs, containerConf)
