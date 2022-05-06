@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/consensus"
@@ -695,8 +696,10 @@ type RoundRobinLeaderSelection struct {
 	identities flow.IdentityList
 	me         flow.Identifier
 }
+
 var _ hotstuff.Replicas = (*Consensus)(nil)
 var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
+
 func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return s.identities.Filter(selector), nil
 }
@@ -723,6 +726,10 @@ func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow
 
 func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier, error) {
 	return s.identities[int(view)%len(s.identities)].NodeID, nil
+}
+
+func (s *RoundRobinLeaderSelection) WeightThresholdForView(_ uint64) (uint64, error) {
+	return committees.WeightThresholdToBuildQC(s.identities.TotalWeight()), nil
 }
 
 func (s *RoundRobinLeaderSelection) Self() flow.Identifier {
