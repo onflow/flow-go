@@ -60,13 +60,13 @@ require (
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.2.0
 	github.com/onflow/cadence v0.23.3
-	github.com/onflow/flow v0.2.5
+	github.com/onflow/flow v0.3.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.0
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.24.0
 	github.com/onflow/flow-go/crypto v0.24.3
-	github.com/onflow/flow/protobuf/go/flow v0.2.6-0.20220428230726-b96f72277b2a // indirect branch: leo-add-signer-indices
+	github.com/onflow/flow/protobuf/go/flow v0.3.0 // indirect branch: leo-add-signer-indices
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
