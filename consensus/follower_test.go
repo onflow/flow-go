@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -40,7 +41,6 @@ import (
 //   * Especially, we assume that Forks works according to specification, i.e. that the determination of
 //     finalized blocks is correct and events are emitted in the desired order (both are tested separately).
 func TestHotStuffFollower(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 	suite.Run(t, new(HotStuffFollowerSuite))
 }
 
@@ -69,19 +69,21 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock consensus committee
 	s.committee = &mockhotstuff.DynamicCommittee{}
-	s.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
+	s.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
+		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
 	)
 	for _, identity := range identities {
-		s.committee.On("Identity", mock.Anything, identity.NodeID).Return(identity, nil)
+		s.committee.On("IdentityByEpoch", mock.Anything, identity.NodeID).Return(identity, nil)
+		s.committee.On("IdentityByBlock", mock.Anything, identity.NodeID).Return(identity, nil)
 	}
 	s.committee.On("LeaderForView", mock.Anything).Return(
 		func(view uint64) flow.Identifier { return identities[int(view)%len(identities)].NodeID },
 		nil,
 	)
+	s.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(identities.TotalWeight()), nil)
 
 	// mock storage headers
 	s.headers = &mockstorage.Headers{}

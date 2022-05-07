@@ -13,7 +13,6 @@ import (
 )
 
 func TestProduceVote(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 	t.Run("should vote for block", testVoterOK)
 	t.Run("should not vote for unsafe block", testUnsafe)
 	t.Run("should not vote for block with its view below the current view", testBelowVote)
@@ -41,9 +40,11 @@ func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitte
 	me := unittest.IdentityFixture()
 	committee.On("Self").Return(me.NodeID, nil)
 	if isCommitteeMember {
-		committee.On("Identity", mock.Anything, me.NodeID).Return(me, nil)
+		committee.On("IdentityByEpoch", mock.Anything, me.NodeID).Return(me, nil)
+		committee.On("IdentityByBlock", mock.Anything, me.NodeID).Return(me, nil)
 	} else {
-		committee.On("Identity", mock.Anything, me.NodeID).Return(nil, model.NewInvalidSignerErrorf(""))
+		committee.On("IdentityByEpoch", mock.Anything, me.NodeID).Return(nil, model.NewInvalidSignerErrorf(""))
+		committee.On("IdentityByBlock", mock.Anything, me.NodeID).Return(nil, model.NewInvalidSignerErrorf(""))
 	}
 
 	voter := New(signer, forks, persist, committee, lastVotedView)
