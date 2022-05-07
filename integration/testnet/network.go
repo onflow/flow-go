@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -1113,7 +1114,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*Bootstra
 		members := clusterAssignments[i]
 		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members, clusterQC.SignerIndices)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not decode cluster QC signer indices: %w", err)
 		}
 		qcsWithSignerIDs = append(qcsWithSignerIDs, &flow.QuorumCertificateWithSignerIDs{
 			View:      clusterQC.View,
@@ -1197,6 +1198,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*Bootstra
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
+	}
+
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("invalid root snapshot qcs: %w", err)
 	}
 
 	err = WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
@@ -1303,7 +1309,8 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 //   * a cluster-specific root QC
 func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.Block, flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
-	participants := toParticipants(confs)
+	participantsUnsorted := toParticipants(confs)
+	participants := participantsUnsorted.Sort(order.Canonical)
 	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
 	clusters, err := factory.NewClusterList(assignments, collectors)
@@ -1324,19 +1331,22 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		}
 
 		// gather cluster participants
-		participants := make([]bootstrap.NodeInfo, 0, len(cluster))
+		clusterNodeInfos := make([]bootstrap.NodeInfo, 0, len(cluster))
 		for _, conf := range confs {
 			_, exists := lookup[conf.NodeID]
 			if exists {
-				participants = append(participants, conf.NodeInfo)
+				clusterNodeInfos = append(clusterNodeInfos, conf.NodeInfo)
 			}
 		}
-		if len(cluster) != len(participants) { // sanity check
+		if len(cluster) != len(clusterNodeInfos) { // sanity check
 			return nil, nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
 		}
 
 		// generate qc for root cluster block
-		qc, err := run.GenerateClusterRootQC(participants, bootstrap.ToIdentityList(participants), block)
+		fmt.Println("clusterNodeInfos", clusterNodeInfos)
+		// must order in canonical ordering otherwise decoding signer indices from cluster QC would fail
+		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(order.Canonical)
+		qc, err := run.GenerateClusterRootQC(clusterNodeInfos, clusterCommittee, block)
 		if err != nil {
 			return nil, nil, nil, err
 		}

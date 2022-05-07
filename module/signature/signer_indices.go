@@ -57,6 +57,9 @@ import (
 //    - Again, we right-pad with zeros to full bytes, As we only had 7 signers, the sigType slice is 1byte long
 //             01011110
 //
+// the signer indices is prefixed with a checksum of the canonicalIdentifiers, which can be used by the decoder
+// to verify if the decoder is using the same canonicalIdentifiers as the encoder to decode the signer indices.
+//
 // ERROR RETURNS
 // During normal operations, no error returns are expected. This is because encoding signer sets is generally
 // part of the node's internal work to generate messages. Hence, the inputs to this method come from other
@@ -104,7 +107,9 @@ func EncodeSignerToIndicesAndSigType(
 		return nil, nil, fmt.Errorf("unknown or duplicated beacon signers %v", beaconSignersLookup)
 	}
 
-	return signerIndices, sigTypes, nil
+	prefixed := PrefixCheckSum(canonicalIdentifiers, signerIndices)
+
+	return prefixed, sigTypes, nil
 }
 
 // DecodeSigTypeToStakingAndBeaconSigners decodes the bit-vector `sigType` to the set of
@@ -173,6 +178,8 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 // identities who are ineligible to sign the given resource. For example, canonicalIdentifiers in the context
 // of a cluster consensus quorum certificate would include authorized members of the cluster and
 // exclude ejected members of the cluster, or unejected collection nodes from a different cluster.
+// the signer indices is prefixed with a checksum of the canonicalIdentifiers, which can be used by the decoder
+// to verify if the decoder is using the same canonicalIdentifiers as the encoder to decode the signer indices.
 func EncodeSignersToIndices(
 	canonicalIdentifiers flow.IdentifierList,
 	signerIDs flow.IdentifierList,
@@ -191,10 +198,12 @@ func EncodeSignersToIndices(
 		}
 	}
 	if len(signersLookup) > 0 {
-		return nil, fmt.Errorf("unknown signers %v", signersLookup)
+		return nil, fmt.Errorf("unknown signers IDs in the keys of %v", signersLookup)
 	}
 
-	return signerIndices, nil
+	prefixed := PrefixCheckSum(canonicalIdentifiers, signerIndices)
+
+	return prefixed, nil
 }
 
 // DecodeSignerIndicesToIdentifiers decodes the given compacted bit vector into signerIDs
@@ -206,10 +215,19 @@ func EncodeSignersToIndices(
 //  * IllegallyPaddedIndexSliceError is the vector is padded with bits other than 0
 func DecodeSignerIndicesToIdentifiers(
 	canonicalIdentifiers flow.IdentifierList,
-	signerIndices []byte,
+	prefixed []byte,
 ) (flow.IdentifierList, error) {
+	// the prefixed contains the checksum of the canonicalIdentifiers that the signerIndices
+	// creator saw.
+	// extract the checksum and compare with the canonicalIdentifiers to see if both
+	// the signerIndices creator and validator see the same list.
+	signerIndices, err := CompareAndExtract(canonicalIdentifiers, prefixed)
+	if err != nil {
+		return nil, fmt.Errorf("could not extract signer indices from prefixed data: %w", err)
+	}
+
 	numberCanonicalNodes := len(canonicalIdentifiers)
-	err := validPadding(signerIndices, numberCanonicalNodes)
+	err = validPadding(signerIndices, numberCanonicalNodes)
 	if err != nil {
 		return nil, fmt.Errorf("signerIndices are invalid: %w", err)
 	}
@@ -233,8 +251,17 @@ func DecodeSignerIndicesToIdentifiers(
 //  * IllegallyPaddedIndexSliceError is the vector is padded with bits other than 0
 func DecodeSignerIndicesToIdentities(
 	canonicalIdentities flow.IdentityList,
-	signerIndices []byte,
+	prefixed []byte,
 ) (flow.IdentityList, error) {
+	// the prefixed contains the checksum of the canonicalIdentifiers that the signerIndices
+	// creator saw.
+	// extract the checksum and compare with the canonicalIdentifiers to see if both
+	// the signerIndices creator and validator see the same list.
+	signerIndices, err := CompareAndExtract(canonicalIdentities.NodeIDs(), prefixed)
+	if err != nil {
+		return nil, fmt.Errorf("could not extract signer indices from prefixed data: %w", err)
+	}
+
 	numberCanonicalNodes := len(canonicalIdentities)
 	if e := validPadding(signerIndices, numberCanonicalNodes); e != nil {
 		return nil, fmt.Errorf("signerIndices padding are invalid: %w", e)

@@ -390,7 +390,7 @@ func (e *Engine) reloadBlock(
 	err = e.enqueueBlockAndCheckExecutable(blockByCollection, executionQueues, block, false)
 
 	if err != nil {
-		return fmt.Errorf("could not enqueue block on reloading: %w", err)
+		return fmt.Errorf("could not enqueue block %x on reloading: %w", blockID, err)
 	}
 
 	return nil
@@ -455,7 +455,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("could not enqueue block: %w", err)
+		return fmt.Errorf("could not enqueue block %v: %w", blockID, err)
 	}
 
 	return nil
