@@ -245,7 +245,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		}
 
 		livenessData := &hotstuff.LivenessData{
-			CurrentView: highest.Header.View,
+			CurrentView: highest.Header.View + 1,
 			// TODO(active-pacemaker): update last view TC when available
 			//LastViewTC:  highest.Header.LastViewTC,
 			HighestQC: model.BlockFromFlow(highest.Header,

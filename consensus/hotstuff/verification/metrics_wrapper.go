@@ -1,11 +1,11 @@
 package verification
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 

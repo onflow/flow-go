@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"sync"
 	"time"
 
@@ -22,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
-	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
@@ -310,11 +310,6 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		Logger()
 	notifier := notifications.NewLogConsumer(log)
 
-	// initialize the pacemaker
-	controller := timeout.NewController(cfg.Timeouts)
-	in.pacemaker, err = pacemaker.New(DefaultStart(), controller, notifier)
-	require.NoError(t, err)
-
 	// initialize the block producer
 	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)
 	require.NoError(t, err)
@@ -327,6 +322,17 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		SignerIDs: in.participants.NodeIDs(),
 	}
 	rootBlockQC := &forks.BlockQC{Block: rootBlock, QC: rootQC}
+
+	livnessData := &hotstuff.LivenessData{
+		CurrentView: rootQC.View + 1,
+		HighestQC:   rootQC,
+	}
+
+	// initialize the pacemaker
+	controller := timeout.NewController(cfg.Timeouts)
+	in.pacemaker, err = pacemaker.New(livnessData.CurrentView, controller, notifier)
+	require.NoError(t, err)
+
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)
 	require.NoError(t, err)
 
@@ -374,8 +380,13 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
 	require.NoError(t, err)
 
-	// initialize the voter
-	in.voter = safetyrules.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())
+	safetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      rootBlock.View,
+		HighestAcknowledgedView: rootBlock.View,
+	}
+
+	// initialize the safety rules
+	in.voter = safetyrules.New(in.signer, in.persist, in.committee, safetyData)
 
 	// initialize the event handler
 	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
