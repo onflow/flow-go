@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	cluster "github.com/onflow/flow-go/state/cluster/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,6 +29,9 @@ func TestFinalizer(t *testing.T) {
 		// seed the RNG
 		rand.Seed(time.Now().UnixNano())
 
+		// reference block on the main consensus chain
+		refBlock := unittest.BlockHeaderFixture()
+		// genesis block for the cluster chain
 		genesis := model.Genesis()
 
 		metrics := metrics.NewNoopCollector()
@@ -52,6 +56,8 @@ func TestFinalizer(t *testing.T) {
 			stateRoot, err := cluster.NewStateRoot(genesis)
 			require.NoError(t, err)
 			state, err = cluster.Bootstrap(db, stateRoot)
+			require.NoError(t, err)
+			err = db.Update(operation.InsertHeader(refBlock.ID(), &refBlock))
 			require.NoError(t, err)
 		}
 
@@ -88,7 +94,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a new block on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
+			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block)
 
 			// finalize the block
@@ -111,6 +117,7 @@ func TestFinalizer(t *testing.T) {
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
 			block.Header.ParentID = unittest.IdentifierFixture()
+			block.SetPayload(model.EmptyPayload(refBlock.ID()))
 			insert(block)
 
 			// try to finalize - this should fail
@@ -127,7 +134,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.EmptyPayload(flow.ZeroID))
+			block.SetPayload(model.EmptyPayload(refBlock.ID()))
 			insert(block)
 
 			// finalize the block
@@ -138,6 +145,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block.ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
 
 			// collection should not have been propagated
 			prov.AssertNotCalled(t, "SubmitLocal", mock.Anything)
@@ -160,7 +168,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
+			block.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block)
 
 			// finalize the block
@@ -176,20 +184,21 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block.ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
 
 			// block should be passed to provider
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block.Payload.Collection.ID(),
-					SignerIDs:    block.Header.ParentVoterIDs,
-					Signature:    block.Header.ParentVoterSigData,
+					CollectionID:     block.Payload.Collection.ID(),
+					ReferenceBlockID: refBlock.ID(),
+					SignerIDs:        block.Header.ParentVoterIDs,
+					Signature:        block.Header.ParentVoterSigData,
 				},
 			})
 		})
 
-		// when finalizing a block with un-finalized ancestors, those ancestors
-		// should be finalized as well
+		// when finalizing a block with un-finalized ancestors, those ancestors should be finalized as well
 		t.Run("finalize multiple blocks together", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
@@ -207,12 +216,12 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
+			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx2))
+			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
 			// finalize block2 (should indirectly finalize block1 as well)
@@ -227,21 +236,24 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block2.ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
 
 			// both blocks should be passed to provider
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 2)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.Header.ParentVoterIDs,
-					Signature:    block1.Header.ParentVoterSigData,
+					CollectionID:     block1.Payload.Collection.ID(),
+					ReferenceBlockID: refBlock.ID(),
+					SignerIDs:        block1.Header.ParentVoterIDs,
+					Signature:        block1.Header.ParentVoterSigData,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block2.Payload.Collection.ID(),
-					SignerIDs:    block2.Header.ParentVoterIDs,
-					Signature:    block2.Header.ParentVoterSigData,
+					CollectionID:     block2.Payload.Collection.ID(),
+					ReferenceBlockID: refBlock.ID(),
+					SignerIDs:        block2.Header.ParentVoterIDs,
+					Signature:        block2.Header.ParentVoterSigData,
 				},
 			})
 		})
@@ -263,12 +275,12 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
+			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx2))
+			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
 			// finalize block1 (should NOT finalize block2)
@@ -284,20 +296,21 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 
 			// block should be passed to provider
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.Header.ParentVoterIDs,
-					Signature:    block1.Header.ParentVoterSigData,
+					CollectionID:     block1.Payload.Collection.ID(),
+					ReferenceBlockID: refBlock.ID(),
+					SignerIDs:        block1.Header.ParentVoterIDs,
+					Signature:        block1.Header.ParentVoterSigData,
 				},
 			})
 		})
 
-		// when finalizing a block with a conflicting fork, the fork should
-		// not be finalized.
+		// when finalizing a block with a conflicting fork, the fork should not be finalized.
 		t.Run("conflicting fork", func(t *testing.T) {
 			bootstrap()
 			defer cleanup()
@@ -315,15 +328,15 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
+			block1.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
 			block2 := unittest.ClusterBlockWithParent(genesis)
-			block2.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx2))
+			block2.SetPayload(model.PayloadFromTransactions(refBlock.ID(), &tx2))
 			insert(block2)
 
-			// finalize block2
+			// finalize block1
 			err := finalizer.MakeFinal(block1.ID())
 			assert.Nil(t, err)
 
@@ -336,16 +349,28 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
+			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
 
 			// block should be passed to provider
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.Header.ParentVoterIDs,
-					Signature:    block1.Header.ParentVoterSigData,
+					CollectionID:     block1.Payload.Collection.ID(),
+					ReferenceBlockID: refBlock.ID(),
+					SignerIDs:        block1.Header.ParentVoterIDs,
+					Signature:        block1.Header.ParentVoterSigData,
 				},
 			})
 		})
 	})
+}
+
+// assertClusterBlocksIndexedByReferenceHeight checks the given cluster blocks have
+// been indexed by the given reference block height, which is expected as part of
+// finalization.
+func assertClusterBlocksIndexedByReferenceHeight(t *testing.T, db *badger.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
+	var ids []flow.Identifier
+	err := db.View(operation.LookupClusterBlocksByReferenceHeightRange(refHeight, refHeight, &ids))
+	require.NoError(t, err)
+	assert.ElementsMatch(t, clusterBlockIDs, ids)
 }

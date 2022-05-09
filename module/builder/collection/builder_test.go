@@ -234,7 +234,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 	suite.Assert().Len(builtCollection.Transactions, 3)
 	// payload should include only the transactions with a valid reference block
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(validMempoolTransactions)...))
-	// should not contain the the unknown-reference transaction
+	// should not contain the unknown-reference transaction
 	suite.Assert().False(collectionContains(builtCollection, unknownReferenceTx.ID()))
 }
 
@@ -276,6 +276,13 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	assert.Len(t, builtCollection.Transactions, 2)
 	assert.True(t, collectionContains(builtCollection, tx2.ID(), tx3.ID()))
 	assert.False(t, collectionContains(builtCollection, tx1.ID()))
+}
+
+// TestBuildOn_AncientConflictingFinalizedBlock tests transaction deduplication
+// in the presence of very old cluster blocks which nevertheless have overlapping
+// reference block range with the block we are building.
+func (suite *BuilderSuite) TestBuildOn_AncientConflictingFinalizedBlock() {
+
 }
 
 func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
@@ -393,6 +400,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	// create 1000 blocks containing 1000 transactions
 	//TODO for now limit this test to no more blocks than we look back by
 	// when de-duplicating transactions.
+	// asdf
 	for i := 0; i < flow.DefaultTransactionExpiry-1; i++ {
 
 		// create a transaction
@@ -405,7 +413,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 		// 1/3 of the time create a conflicting fork that will be invalidated
 		// don't do this the first and last few times to ensure we don't
-		// try to fork genesis and the the last block is the valid fork.
+		// try to fork genesis and the last block is the valid fork.
 		conflicting := rand.Intn(3) == 0 && i > 5 && i < 995
 
 		// by default, build on the head - if we are building a

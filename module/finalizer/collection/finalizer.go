@@ -84,7 +84,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 		// in order to validate the validity of all changes, we need to iterate
 		// through the blocks that need to be finalized from oldest to youngest;
-		// we thus start at the youngest remember all of the intermediary steps
+		// we thus start at the youngest remember all the intermediary steps
 		// while tracing back until we reach the finalized state
 		steps := []*flow.Header{&header}
 		parentID := header.ParentID
@@ -102,27 +102,38 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		// each header, we reconstruct the block and then apply the related
 		// changes to the protocol state
 		for i := len(steps) - 1; i >= 0; i-- {
+			clusterBlockID := steps[i].ID()
 
 			// look up the transactions included in the payload
 			step := steps[i]
 			var payload cluster.Payload
-			err = procedure.RetrieveClusterPayload(step.ID(), &payload)(tx)
+			err = procedure.RetrieveClusterPayload(clusterBlockID, &payload)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve cluster payload: %w", err)
+				return fmt.Errorf("could not retrieve payload for cluster block (id=%x): %w", clusterBlockID, err)
+			}
+			// look up the reference block height to populate index
+			var refBlock flow.Header
+			err = operation.RetrieveHeader(payload.ReferenceBlockID, &refBlock)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve reference block (id=%x): %w", payload.ReferenceBlockID, err)
 			}
 
 			// remove the transactions from the memory pool
 			for _, colTx := range payload.Collection.Transactions {
 				txID := colTx.ID()
-				// ignore result -- we don't care whether the transaction was
-				// in the pool or not
+				// ignore result -- we don't care whether the transaction was in the pool
 				_ = f.transactions.Rem(txID)
 			}
 
 			// finalize the block in cluster state
-			err = procedure.FinalizeClusterBlock(step.ID())(tx)
+			err = procedure.FinalizeClusterBlock(clusterBlockID)(tx)
 			if err != nil {
-				return fmt.Errorf("could not finalize block: %w", err)
+				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
+			}
+			// index the finalized cluster block by reference block height
+			err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, clusterBlockID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index cluster block (id=%x) by reference height (%d): %w", clusterBlockID, refBlock.Height, err)
 			}
 
 			block := &cluster.Block{
