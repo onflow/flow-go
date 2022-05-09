@@ -120,6 +120,7 @@ func (builder *StakedAccessNodeBuilder) enqueueRelayNetwork() {
 func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 	builder.
 		BuildConsensusFollower().
+		BuildExecutionDataRequester().
 		Module("collection node client", func(node *cmd.NodeConfig) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(builder.rpcConf.CollectionAddr) == "" {

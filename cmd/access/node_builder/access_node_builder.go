@@ -375,7 +375,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().
@@ -389,7 +389,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() AccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var executionDataDatastore datastore.Batching
 	var trackerStorage *tracker.Storage
 	var requester *exedatarequester.Requester
