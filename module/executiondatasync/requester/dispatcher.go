@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
@@ -39,7 +40,8 @@ type dispatcher struct {
 	handler   *handler
 	fulfiller *fulfiller
 
-	logger zerolog.Logger
+	logger  zerolog.Logger
+	metrics module.ExecutionDataRequesterMetrics
 
 	component.Component
 }
@@ -51,6 +53,7 @@ func newDispatcher(
 	handler *handler,
 	fulfiller *fulfiller,
 	logger zerolog.Logger,
+	metrics module.ExecutionDataRequesterMetrics,
 ) *dispatcher {
 	receiptsIn, receiptsOut := util.UnboundedChannel()
 	finalizedBlocksIn, finalizedBlocksOut := util.UnboundedChannel()
@@ -70,6 +73,7 @@ func newDispatcher(
 		handler:            handler,
 		fulfiller:          fulfiller,
 		logger:             logger.With().Str("subcomponent", "dispatcher").Logger(),
+		metrics:            metrics,
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -108,6 +112,7 @@ func (d *dispatcher) processReceipts(ctx irrecoverable.SignalerContext, ready co
 					Str("receipt_id", receipt.ID().String()).
 					Str("block_id", receipt.ExecutionResult.BlockID.String()).
 					Msg("could not retrieve corresponding block for execution receipt, skipping")
+				d.metrics.ReceiptSkipped()
 				continue
 			}
 
@@ -222,10 +227,11 @@ func (d *dispatcher) handleSealedResult(ctx irrecoverable.SignalerContext, rinfo
 				requested = true
 			} else {
 				cancel()
+				d.metrics.RequestCanceled()
 			}
 		}
 
-		delete(d.jobs, d.sealedHeight)
+		delete(d.jobs, rinfo.blockHeight)
 
 		// if the sealed execution data has already been requested,
 		// there is nothing left to do

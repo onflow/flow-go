@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -26,6 +28,7 @@ func WithBlobSizeLimit(size int) ProviderOption {
 
 type Provider struct {
 	logger      zerolog.Logger
+	metrics     module.ExecutionDataProviderMetrics
 	maxBlobSize int
 	serializer  *execution_data.Serializer
 	blobService network.BlobService
@@ -39,6 +42,7 @@ type ProvideJob struct {
 
 func NewProvider(
 	logger zerolog.Logger,
+	metrics module.ExecutionDataProviderMetrics,
 	codec encoding.Codec,
 	compressor network.Compressor,
 	blobService network.BlobService,
@@ -46,6 +50,7 @@ func NewProvider(
 ) *Provider {
 	p := &Provider{
 		logger:      logger.With().Str("component", "execution_data_provider").Logger(),
+		metrics:     metrics,
 		maxBlobSize: execution_data.DefaultMaxBlobSize,
 		serializer:  execution_data.NewSerializer(codec, compressor),
 		blobService: blobService,
@@ -63,11 +68,15 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 	go func() {
 		defer close(ch)
 
+		start := time.Now()
+
 		var blobs []blobs.Blob
 		var cids []cid.Cid
+		var totalSize uint64
 		for blob := range blobCh {
 			blobs = append(blobs, blob)
 			cids = append(cids, blob.Cid())
+			totalSize += uint64(len(blob.RawData()))
 		}
 
 		if zerolog.GlobalLevel() <= zerolog.DebugLevel && p.logger.GetLevel() <= zerolog.DebugLevel {
@@ -78,7 +87,7 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 			p.logger.Debug().Array("cids", cidArr).Uint64("height", blockHeight).Msg("storing blobs")
 		}
 
-		if err := p.storage.Update(func(trackBlobs func(uint64, ...cid.Cid) error) error {
+		err := p.storage.Update(func(trackBlobs func(uint64, ...cid.Cid) error) error {
 			ctx, cancel := context.WithCancel(parent)
 			defer cancel()
 
@@ -91,8 +100,14 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 			}
 
 			return nil
-		}); err != nil {
+		})
+		duration := time.Since(start)
+
+		if err != nil {
 			ch <- err
+			p.metrics.AddBlobsFailed()
+		} else {
+			p.metrics.AddBlobsSucceeded(duration, totalSize)
 		}
 	}()
 
@@ -102,6 +117,8 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (*ProvideJob, error) {
 	logger := p.logger.With().Uint64("height", blockHeight).Str("block_id", executionData.BlockID.String()).Logger()
 	logger.Debug().Msg("providing execution data")
+
+	start := time.Now()
 
 	blobCh := make(chan blobs.Blob)
 	defer close(blobCh)
@@ -140,6 +157,9 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 		return nil, fmt.Errorf("failed to add execution data root: %w", err)
 	}
 	logger.Debug().Str("root_id", rootID.String()).Msg("root ID computed")
+
+	duration := time.Since(start)
+	p.metrics.RootIDComputed(duration, len(executionData.ChunkExecutionDatas))
 
 	return &ProvideJob{rootID, errCh}, nil
 }

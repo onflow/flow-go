@@ -2,15 +2,15 @@ package metrics
 
 // Prometheus metric namespaces
 const (
-	namespaceNetwork      = "network"
-	namespaceStorage      = "storage"
-	namespaceAccess       = "access"
-	namespaceCollection   = "collection"
-	namespaceConsensus    = "consensus"
-	namespaceVerification = "verification"
-	namespaceExecution    = "execution"
-	namespaceLoader       = "loader"
-	namespaceStateSync    = "state_synchronization"
+	namespaceNetwork           = "network"
+	namespaceStorage           = "storage"
+	namespaceAccess            = "access"
+	namespaceCollection        = "collection"
+	namespaceConsensus         = "consensus"
+	namespaceVerification      = "verification"
+	namespaceExecution         = "execution"
+	namespaceLoader            = "loader"
+	namespaceExecutionDataSync = "execution_data_sync"
 )
 
 // Network subsystems represent the various layers of networking.
@@ -66,9 +66,11 @@ const (
 	subsystemChunkConsumer   = "chunk_consumer"
 )
 
-// State Synchronization Subsystems
+// Execution Data Sync Subsystems
 const (
-	subsystemExecutionDataService = "execution_data_service"
+	subsystemExeDataRequester = "requester"
+	subsystemExeDataProvider  = "provider"
+	subsystemExeDataPruner    = "pruner"
 )
 
 // METRIC NAMING GUIDELINES

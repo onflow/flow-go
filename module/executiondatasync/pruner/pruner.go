@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -28,7 +29,8 @@ type Pruner struct {
 	heightRangeTarget uint64
 	threshold         uint64
 
-	logger zerolog.Logger
+	logger  zerolog.Logger
+	metrics module.ExecutionDataPrunerMetrics
 
 	component.Component
 	cm *component.ComponentManager
@@ -48,7 +50,7 @@ func WithThreshold(threshold uint64) PrunerOption {
 	}
 }
 
-func NewPruner(logger zerolog.Logger, storage *tracker.Storage, opts ...PrunerOption) (*Pruner, error) {
+func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics, storage *tracker.Storage, opts ...PrunerOption) (*Pruner, error) {
 	lastPrunedHeight, err := storage.GetPrunedHeight()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pruned height: %w", err)
@@ -72,6 +74,7 @@ func NewPruner(logger zerolog.Logger, storage *tracker.Storage, opts ...PrunerOp
 		lastPrunedHeight:      lastPrunedHeight,
 		heightRangeTarget:     defaultHeightRangeTarget,
 		threshold:             defaultThreshold,
+		metrics:               metrics,
 	}
 	p.cm = component.NewComponentManagerBuilder().
 		AddWorker(p.loop).
@@ -132,6 +135,8 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 
 				duration := time.Since(start)
 				p.logger.Info().Dur("duration", duration).Msg("pruned storage")
+
+				p.metrics.Pruned(pruneHeight, duration)
 
 				p.lastPrunedHeight = pruneHeight
 			}

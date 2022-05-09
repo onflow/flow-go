@@ -399,8 +399,14 @@ func main() {
 				return nil, fmt.Errorf("failed to register blob service: %w", err)
 			}
 
+			var providerMetrics module.ExecutionDataProviderMetrics = metrics.NewNoopCollector()
+			if node.MetricsEnabled {
+				providerMetrics = metrics.NewExecutionDataProviderCollector()
+			}
+
 			executionDataProvider := exedataprovider.NewProvider(
 				node.Logger,
+				providerMetrics,
 				executionDataCodec,
 				executionDataCompressor,
 				bs,
@@ -562,7 +568,14 @@ func main() {
 				return nil, err
 			}
 
+			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
+			if node.MetricsEnabled {
+				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
+			}
+
 			executionDataPruner, err = pruner.NewPruner(
+				node.Logger,
+				prunerMetrics,
 				storage,
 				pruner.WithHeightRangeTarget(65000),
 				pruner.WithThreshold(65000),

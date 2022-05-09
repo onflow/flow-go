@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -54,6 +55,7 @@ func NewRequester(
 	compressor network.Compressor,
 	finalizationDistributor *pubsub.FinalizationDistributor,
 	logger zerolog.Logger,
+	metrics module.ExecutionDataRequesterMetrics,
 	opts ...RequesterOption,
 ) (*Requester, error) {
 	config := &RequesterConfig{
@@ -73,7 +75,7 @@ func NewRequester(
 
 	logger = logger.With().Str("component", "execution_data_requester").Logger()
 	notifier := newNotifier(logger)
-	fulfiller := newFulfiller(fulfilledHeight, notifier, trackerStorage, logger)
+	fulfiller := newFulfiller(fulfilledHeight, notifier, trackerStorage, logger, metrics)
 	handler := newHandler(
 		fulfiller,
 		trackerStorage,
@@ -83,8 +85,9 @@ func NewRequester(
 		config.RetryBaseDelay,
 		config.NumConcurrentWorkers,
 		logger,
+		metrics,
 	)
-	dispatcher := newDispatcher(startHeight, blocks, results, handler, fulfiller, logger)
+	dispatcher := newDispatcher(startHeight, blocks, results, handler, fulfiller, logger, metrics)
 
 	r := &Requester{
 		notifier:          notifier,

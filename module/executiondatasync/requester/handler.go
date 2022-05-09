@@ -11,9 +11,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 	"github.com/teivah/onecontext"
+	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -64,7 +66,8 @@ type handler struct {
 	retryBaseTimeout time.Duration
 	numWorkers       int
 
-	logger zerolog.Logger
+	logger  zerolog.Logger
+	metrics module.ExecutionDataRequesterMetrics
 
 	component.Component
 }
@@ -78,6 +81,7 @@ func newHandler(
 	retryBaseTimeout time.Duration,
 	numWorkers int,
 	logger zerolog.Logger,
+	metrics module.ExecutionDataRequesterMetrics,
 ) *handler {
 	jobsIn, jobsOut := util.UnboundedChannel()
 
@@ -92,6 +96,7 @@ func newHandler(
 		retryBaseTimeout: retryBaseTimeout,
 		numWorkers:       numWorkers,
 		logger:           logger.With().Str("subcomponent", "handler").Logger(),
+		metrics:          metrics,
 	}
 
 	cmb := component.NewComponentManagerBuilder()
@@ -146,24 +151,33 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 		Str("execution_data_id", j.executionDataID.String()).
 		Logger()
 
+	attempts := 0
+
 	if err := retry.Fibonacci(getCtx, h.retryBaseTimeout, func(ctx context.Context) error {
 		logger.Debug().Msg("attempting to get execution data")
+		attempts++
 
 		if util.CheckClosed(ctx.Done()) {
 			return ctx.Err()
 		}
 
+		start := time.Now()
 		jr := &jobResult{
 			resultID:    j.resultID,
 			blockHeight: j.blockHeight,
 		}
-		executionData, err := h.getExecutionData(getCtx, j)
+		executionData, size, err := h.getExecutionData(getCtx, j)
+		duration := time.Since(start)
+
 		if err != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return ctxErr
+			if util.CheckClosed(ctx.Done()) {
+				return ctx.Err()
 			}
 
-			if h.isRetryable(err) {
+			retryable := h.isRetryable(err)
+			h.metrics.RequestFailed(duration, retryable)
+
+			if retryable {
 				logger.Err(err).Msg("failed to get execution data, will retry")
 				return retry.RetryableError(err)
 			}
@@ -172,6 +186,8 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 			h.fulfiller.submitJobResult(jr)
 			return err
 		}
+
+		h.metrics.RequestSucceeded(j.blockHeight, duration, size, attempts)
 
 		if executionData.BlockID != j.blockID {
 			err := &mismatchedBlockIDError{
@@ -193,9 +209,10 @@ func (h *handler) handle(parentCtx irrecoverable.SignalerContext, j *job) {
 	}
 }
 
-func (h *handler) getExecutionData(ctx context.Context, j *job) (*execution_data.BlockExecutionData, error) {
+func (h *handler) getExecutionData(ctx context.Context, j *job) (*execution_data.BlockExecutionData, uint64, error) {
 	var bed *execution_data.BlockExecutionData
 	blobGetter := h.blobService.GetSession(ctx)
+	totalSize := atomic.NewUint64(0)
 
 	err := h.storage.Update(func(trackBlobs func(uint64, ...cid.Cid) error) error {
 		edRoot, err := h.getExecutionDataRoot(ctx, j.blockHeight, j.executionDataID, blobGetter, trackBlobs)
@@ -211,7 +228,7 @@ func (h *handler) getExecutionData(ctx context.Context, j *job) (*execution_data
 			chunkDataID := chunkDataID
 
 			g.Go(func() error {
-				ced, err := h.getChunkExecutionData(
+				ced, size, err := h.getChunkExecutionData(
 					gCtx,
 					j.blockHeight,
 					chunkDataID,
@@ -224,6 +241,7 @@ func (h *handler) getExecutionData(ctx context.Context, j *job) (*execution_data
 				}
 
 				chunkExecutionDatas[i] = ced
+				totalSize.Add(size)
 
 				return nil
 			})
@@ -241,7 +259,7 @@ func (h *handler) getExecutionData(ctx context.Context, j *job) (*execution_data
 		return nil
 	})
 
-	return bed, err
+	return bed, totalSize.Load(), err
 }
 
 func (h *handler) getExecutionDataRoot(
@@ -283,58 +301,67 @@ func (h *handler) getChunkExecutionData(
 	chunkExecutionDataID cid.Cid,
 	blobGetter network.BlobGetter,
 	trackBlobs func(uint64, ...cid.Cid) error,
-) (*execution_data.ChunkExecutionData, error) {
+) (*execution_data.ChunkExecutionData, uint64, error) {
 	cids := []cid.Cid{chunkExecutionDataID}
 
 	for i := 0; ; i++ {
 		if err := trackBlobs(blockHeight, cids...); err != nil {
-			return nil, fmt.Errorf("failed to track blobs for level %d of blob tree: %w", i, err)
+			return nil, 0, fmt.Errorf("failed to track blobs for level %d of blob tree: %w", i, err)
 		}
 
-		v, err := h.getBlobs(ctx, cids)
+		v, size, err := h.getBlobs(ctx, cids)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
+			return nil, 0, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
 		}
 
 		switch v := v.(type) {
 		case *execution_data.ChunkExecutionData:
-			return v, nil
+			return v, size, nil
 		case *[]cid.Cid:
 			cids = *v
 		default:
-			return nil, execution_data.NewMalformedDataError(fmt.Errorf("blob tree contains unexpected type %T at level %d", v, i))
+			return nil, 0, execution_data.NewMalformedDataError(fmt.Errorf("blob tree contains unexpected type %T at level %d", v, i))
 		}
 	}
 }
 
 // getBlobs gets the given CIDs from the blobservice, reassembles the blobs, and deserializes the reassembled data into an object.
-func (h *handler) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
-	blobCh, errCh := h.retrieveBlobs(ctx, cids)
+func (h *handler) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, uint64, error) {
+	blobCh, resultCh := h.retrieveBlobs(ctx, cids)
 	bcr := blobs.NewBlobChannelReader(blobCh)
 	v, deserializeErr := h.serializer.Deserialize(bcr)
-	retrieveErr := <-errCh
+	result := <-resultCh
 
-	if retrieveErr != nil {
-		return nil, retrieveErr
+	if result.err != nil {
+		return nil, 0, result.err
 	}
 
 	if deserializeErr != nil {
-		return nil, execution_data.NewMalformedDataError(deserializeErr)
+		return nil, 0, execution_data.NewMalformedDataError(deserializeErr)
 	}
 
-	return v, nil
+	return v, result.totalSize, nil
+}
+
+type retrieveBlobsResult struct {
+	err       error
+	totalSize uint64
 }
 
 // retrieveBlobs retrieves the blobs for the given CIDs from the blobservice.
-func (h *handler) retrieveBlobs(parent context.Context, cids []cid.Cid) (<-chan blobs.Blob, <-chan error) {
+func (h *handler) retrieveBlobs(parent context.Context, cids []cid.Cid) (<-chan blobs.Blob, <-chan *retrieveBlobsResult) {
 	blobsOut := make(chan blobs.Blob, len(cids))
-	errCh := make(chan error, 1)
+	resultCh := make(chan *retrieveBlobsResult, 1)
 
 	go func() {
+		result := &retrieveBlobsResult{}
 		ctx, cancel := context.WithCancel(parent)
 		defer cancel()
 		defer close(blobsOut)
-		defer close(errCh)
+		defer func() {
+			resultCh <- result
+			close(resultCh)
+		}()
 
 		blobChan := h.blobService.GetBlobs(ctx, cids) // initiate a batch request for the given CIDs
 		cachedBlobs := make(map[cid.Cid]blobs.Blob)
@@ -354,9 +381,9 @@ func (h *handler) retrieveBlobs(parent context.Context, cids []cid.Cid) (<-chan 
 					// the blob channel may be closed as a result of the context being canceled,
 					// in which case we should return the context error.
 					if ctxErr := ctx.Err(); ctxErr != nil {
-						errCh <- ctxErr
+						result.err = ctxErr
 					} else {
-						errCh <- err
+						result.err = err
 					}
 
 					return
@@ -370,11 +397,12 @@ func (h *handler) retrieveBlobs(parent context.Context, cids []cid.Cid) (<-chan 
 				delete(cidCounts, c)
 			}
 
+			result.totalSize += uint64(len(blob.RawData()))
 			blobsOut <- blob
 		}
 	}()
 
-	return blobsOut, errCh
+	return blobsOut, resultCh
 }
 
 // findBlob retrieves blobs from the given channel, caching them along the way, until it either

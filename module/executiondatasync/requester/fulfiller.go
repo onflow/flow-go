@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
@@ -33,7 +34,8 @@ type fulfiller struct {
 	resultsIn  chan<- interface{}
 	resultsOut <-chan interface{}
 
-	logger zerolog.Logger
+	logger  zerolog.Logger
+	metrics module.ExecutionDataRequesterMetrics
 
 	notifier *notifier
 	storage  *tracker.Storage
@@ -46,6 +48,7 @@ func newFulfiller(
 	notifier *notifier,
 	storage *tracker.Storage,
 	logger zerolog.Logger,
+	metrics module.ExecutionDataRequesterMetrics,
 ) *fulfiller {
 	jobsIn, jobsOut := util.UnboundedChannel()
 	resultsIn, resultsOut := util.UnboundedChannel()
@@ -63,6 +66,7 @@ func newFulfiller(
 		notifier:        notifier,
 		storage:         storage,
 		logger:          logger.With().Str("subcomponent", "fulfiller").Logger(),
+		metrics:         metrics,
 	}
 
 	cm := component.NewComponentManagerBuilder().
@@ -95,7 +99,11 @@ loop:
 
 	f.logger.Debug().Uint64("height", f.fulfilledHeight).Msg("updating fulfilled height")
 
-	return f.storage.SetFulfilledHeight(f.fulfilledHeight)
+	err := f.storage.SetFulfilledHeight(f.fulfilledHeight)
+	if err == nil {
+		f.metrics.FulfilledHeight(f.fulfilledHeight)
+	}
+	return err
 }
 
 func (f *fulfiller) handleJobResult(ctx irrecoverable.SignalerContext, j *jobResult) {
@@ -105,6 +113,12 @@ func (f *fulfiller) handleJobResult(ctx irrecoverable.SignalerContext, j *jobRes
 
 	if j.blockHeight <= f.sealedHeight {
 		if j.resultID != f.sealedResults[j.blockHeight] {
+			f.logger.Debug().
+				Str("result_id", j.resultID.String()).
+				Str("block_id", j.executionData.BlockID.String()).
+				Uint64("block_height", j.blockHeight).
+				Msg("dropping job result")
+			f.metrics.ResultDropped()
 			return
 		}
 
@@ -137,17 +151,26 @@ func (f *fulfiller) handleSealedResult(ctx irrecoverable.SignalerContext, sealed
 	if completedJobs, ok := f.jobResults[f.sealedHeight]; ok {
 		delete(f.jobResults, f.sealedHeight)
 
-		if j, ok := completedJobs[sealedResultID]; ok {
-			if j.err != nil {
-				ctx.Throw(fmt.Errorf("failed to get sealed execution data for block height %d: %w", j.blockHeight, j.err))
-			}
-
-			f.fulfilled[f.sealedHeight] = j
-
-			if f.sealedHeight == f.fulfilledHeight+1 {
-				if err := f.fulfill(); err != nil {
-					ctx.Throw(fmt.Errorf("failed to fulfill: %w", err))
+		for resultID, j := range completedJobs {
+			if resultID == sealedResultID {
+				if j.err != nil {
+					ctx.Throw(fmt.Errorf("failed to get sealed execution data for block height %d: %w", j.blockHeight, j.err))
 				}
+
+				f.fulfilled[f.sealedHeight] = j
+
+				if f.sealedHeight == f.fulfilledHeight+1 {
+					if err := f.fulfill(); err != nil {
+						ctx.Throw(fmt.Errorf("failed to fulfill: %w", err))
+					}
+				}
+			} else {
+				f.logger.Debug().
+					Str("result_id", resultID.String()).
+					Str("block_id", j.executionData.BlockID.String()).
+					Uint64("block_height", j.blockHeight).
+					Msg("discarding job result")
+				f.metrics.ResultDropped()
 			}
 		}
 	}

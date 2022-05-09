@@ -1,18 +1,4 @@
-package tracker
 
-import (
-	"context"
-	"sync"
-	"testing"
-
-	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
-)
 
 // TODO: write a concurrency test with a bunch of threads creating status trackers and
 // everything and running concurrently, and also a separate thread that's pruning,
@@ -21,59 +7,7 @@ import (
 // run this multiple times in a loop
 // let the loop variables dictate number of concurrent trackers, and total number of heights
 
-type storageConcurrencyTest struct {
-	nextHeightToRequest *atomic.Uint64
-	storage             *state_synchronization.Storage
-	maxHeight           uint64
-	// TODO: add all blobstore stuff at the very beginning
-	blobs  map[uint64][]blobs.Blob
-	bstore blockstore.Blockstore
-	start  chan struct{}
-}
 
-func (sct *storageConcurrencyTest) setup(maxHeight uint64) {
-	sct.maxHeight = maxHeight
-	sct.nextHeightToRequest = atomic.NewUint64(0)
-	sct.blobs = make(map[uint64][]blobs.Blob)
-	sct.start = make(chan struct{})
-
-}
-
-func (sct *storageConcurrencyTest) worker(wg *sync.WaitGroup, t *testing.T, storage *state_synchronization.Storage) {
-	defer wg.Done()
-
-	<-sct.start
-
-	var h uint64
-	for h <= sct.maxHeight {
-		h = sct.nextHeightToRequest.Inc()
-
-		blockID := unittest.IdentifierFixture()
-		// TODO: update this to be the ID of the root blob
-		rootID := unittest.IdentifierFixture()
-
-		tracker := storage.GetStatusTracker(blockID, h, rootID)
-		require.NoError(t, tracker.StartTransfer())
-
-		blobs := sct.blobs[h]
-		sct.bstore.PutMany(context.Background(), blobs)
-
-		cids := make([]cid.Cid, len(blobs))
-		for i, blob := range blobs {
-			cids[i] = blob.Cid()
-		}
-		require.NoError(t, tracker.TrackBlobs(cids))
-
-		_, err := tracker.FinishTransfer()
-		require.NoError(t, err)
-	}
-
-	// TODO: prune at the very end of the test and check if all the cids are deleted
-	// Then call Check, localFinalizedHeight, and StoredDataLowerBound again
-}
-
-func TestStorageConcurrency(t *testing.T) {
-}
 
 // TODO: write a basic test to check that Prune actually deletes everything we expect
 
@@ -144,16 +78,7 @@ func TestStorageConcurrency(t *testing.T) {
 // https://stackoverflow.com/questions/28432658/does-go-garbage-collect-parts-of-slices/28432812#28432812
 // https://medium.com/capital-one-tech/building-an-unbounded-channel-in-go-789e175cd2cd
 
-// storage:
-// keep track of latest "fulfilled" height: latest height such that
-// everything <= that height have been both sealed and downloaded.
-// This is where we resume from when we restart.
-
 // TODO: for the hander, we should test all kinds of various edge cases
 // E.g duplicate CID's in the same level, cid not found in the blobservice, etc
 
 // Note: The subscription needs to be setup before HotStuff is constructed
-
-// TODO: upon restart, we should prune the storage in case it was interrupted during the previous shutdown
-
-// TODO: metric to track how many receipts are skipped due to not having the corresponding block locally?

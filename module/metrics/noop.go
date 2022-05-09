@@ -152,14 +152,21 @@ func (nc *NoopCollector) ExecutionSync(syncing bool)                            
 func (nc *NoopCollector) DiskSize(uint64)                                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
 func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)                    {}
-func (nc *NoopCollector) ExecutionDataAddStarted()                                              {}
-func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)                  {}
-func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
-func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)                  {}
-func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
-func (nc *NoopCollector) OnKeyPutSuccess()                                                      {}
-func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                                    {}
-func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                       {}
-func (nc *NoopCollector) OnKeyPutFailure()                                                      {}
-func (nc *NoopCollector) OnKeyGetSuccess()                                                      {}
-func (nc *NoopCollector) OnKeyGetFailure()                                                      {}
+func (nc *NoopCollector) RootIDComputed(duration time.Duration, numberOfChunks int)             {}
+func (nc *NoopCollector) AddBlobsSucceeded(duration time.Duration, totalSize uint64)            {}
+func (nc *NoopCollector) AddBlobsFailed()                                                       {}
+func (nc *NoopCollector) FulfilledHeight(blockHeight uint64)                                    {}
+func (nc *NoopCollector) ReceiptSkipped()                                                       {}
+func (nc *NoopCollector) RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int) {
+}
+func (nc *NoopCollector) RequestFailed(duration time.Duration, retryable bool) {}
+func (nc *NoopCollector) RequestCanceled()                                     {}
+func (nc *NoopCollector) ResultDropped()                                       {}
+func (nc *NoopCollector) Pruned(height uint64, duration time.Duration)         {}
+func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                  {}
+func (nc *NoopCollector) OnKeyPutSuccess()                                     {}
+func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                   {}
+func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                      {}
+func (nc *NoopCollector) OnKeyPutFailure()                                     {}
+func (nc *NoopCollector) OnKeyGetSuccess()                                     {}
+func (nc *NoopCollector) OnKeyGetFailure()                                     {}

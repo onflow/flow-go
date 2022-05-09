@@ -432,6 +432,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() AccessNodeBu
 				return nil, err
 			}
 
+			var requesterMetrics module.ExecutionDataRequesterMetrics = metrics.NewNoopCollector()
+			if node.MetricsEnabled {
+				requesterMetrics = metrics.NewExecutionDataRequesterCollector()
+			}
+
 			requester, err = exedatarequester.NewRequester(
 				sealed.Height,
 				trackerStorage,
@@ -442,11 +447,19 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() AccessNodeBu
 				compressor.NewLz4Compressor(),
 				builder.FinalizationDistributor,
 				node.Logger,
+				requesterMetrics,
 			)
 			return requester, err
 		}).
 		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
+			if node.MetricsEnabled {
+				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
+			}
+
 			executionDataPruner, err := pruner.NewPruner(
+				node.Logger,
+				prunerMetrics,
 				trackerStorage,
 				pruner.WithHeightRangeTarget(65000),
 				pruner.WithThreshold(65000),

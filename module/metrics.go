@@ -341,6 +341,25 @@ type ProviderMetrics interface {
 	ChunkDataPackRequested()
 }
 
+type ExecutionDataProviderMetrics interface {
+	RootIDComputed(duration time.Duration, numberOfChunks int)
+	AddBlobsSucceeded(duration time.Duration, totalSize uint64)
+	AddBlobsFailed()
+}
+
+type ExecutionDataRequesterMetrics interface {
+	FulfilledHeight(blockHeight uint64)
+	ReceiptSkipped()
+	RequestSucceeded(blockHeight uint64, duration time.Duration, totalSize uint64, numberOfAttempts int)
+	RequestFailed(duration time.Duration, retryable bool)
+	RequestCanceled()
+	ResultDropped()
+}
+
+type ExecutionDataPrunerMetrics interface {
+	Pruned(height uint64, duration time.Duration)
+}
+
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
