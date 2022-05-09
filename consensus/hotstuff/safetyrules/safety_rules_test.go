@@ -75,6 +75,7 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 }
 
 // TestCreateVote_ShouldVote test basic happy path scenario where we vote for first block after bootstrap
+// and next view ended with TC
 func (s *SafetyRulesTestSuite) TestCreateVote_ShouldVote() {
 	expectedSafetyData := &hotstuff.SafetyData{
 		LockedOneChainView:      s.proposal.Block.QC.View,
@@ -97,6 +98,57 @@ func (s *SafetyRulesTestSuite) TestCreateVote_ShouldVote() {
 	otherVote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.True(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), otherVote)
+
+	lastViewTC := helper.MakeTC(
+		helper.WithTCView(s.proposal.Block.View+1),
+		helper.WithTCHighestQC(s.proposal.Block.QC))
+
+	// voting on proposal where last view ended with TC
+	proposalWithTC := helper.MakeProposal(
+		helper.WithBlock(
+			helper.MakeBlock(
+				helper.WithParentBlock(s.bootstrapBlock),
+				helper.WithBlockView(s.proposal.Block.View+2))),
+		helper.WithLastViewTC(lastViewTC))
+
+	expectedSafetyData = &hotstuff.SafetyData{
+		LockedOneChainView:      s.proposal.Block.QC.View,
+		HighestAcknowledgedView: proposalWithTC.Block.View,
+		LastTimeout:             nil,
+	}
+
+	expectedVote = makeVote(proposalWithTC.Block)
+	s.signer.On("CreateVote", proposalWithTC.Block).Return(expectedVote, nil).Once()
+	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
+
+	vote, err = s.safety.ProduceVote(proposalWithTC, proposalWithTC.Block.View)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), vote)
+	require.Equal(s.T(), expectedVote, vote)
+	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
+}
+
+// TestCreateVote_UpdateLockedOneChainView tests that LockedOneChainView is updated when sees a higher QC
+func (s *SafetyRulesTestSuite) TestCreateVote_UpdateLockedOneChainView() {
+	s.safety.safetyData.LockedOneChainView = 0
+
+	require.NotEqual(s.T(), s.safety.safetyData.LockedOneChainView, s.proposal.Block.QC.View,
+		"in this test LockedOneChainView is lower so it needs to be updated")
+
+	expectedSafetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      s.proposal.Block.QC.View,
+		HighestAcknowledgedView: s.proposal.Block.View,
+		LastTimeout:             nil,
+	}
+
+	expectedVote := makeVote(s.proposal.Block)
+	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
+	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
+
+	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), vote)
+	require.Equal(s.T(), expectedVote, vote)
 }
 
 // TestCreateVote_InvalidCurrentView tests that no vote is created if proposal is for invalid view
@@ -129,7 +181,7 @@ func (s *SafetyRulesTestSuite) TestCreateVote_InvalidVoterIdentity() {
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
 	require.ErrorAs(s.T(), err, &exception)
-	s.persister.AssertNotCalled(s.T(), "PutSaf etyData")
+	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
 // TestCreateVote_CreateVoteException tests that no vote is created if vote creation raised an exception
@@ -230,7 +282,8 @@ func (s *SafetyRulesTestSuite) TestCreateVote_VotingOnUnsafeProposal() {
 	s.signer.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-// TestProduceTimeout_ShouldTimeout
+// TestProduceTimeout_ShouldTimeout tests that we can produce timeout in cases where
+// last view was successful or not. Also tests last timeout caching.
 func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	view := s.proposal.Block.View
 	highestQC := helper.MakeQC(helper.WithQCView(view - 1))
@@ -280,6 +333,69 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	timeout, err = s.safety.ProduceTimeout(view, highestQC, nil)
 	require.True(s.T(), model.IsNoTimeoutError(err))
 	require.Nil(s.T(), timeout)
+}
+
+// TestProduceTimeout_NotSafeToTimeout tests that we don't produce a timeout when it's not safe
+func (s *SafetyRulesTestSuite) TestProduceTimeout_NotSafeToTimeout() {
+
+	s.Run("highest-qc-below-locked-round", func() {
+		view := s.proposal.Block.View
+		highestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView - 1))
+
+		timeout, err := s.safety.ProduceTimeout(view, highestQC, nil)
+		require.True(s.T(), model.IsNoTimeoutError(err))
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("cur-view-below-highest-acknowledged-view", func() {
+		view := s.safetyData.HighestAcknowledgedView
+		highestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+
+		timeout, err := s.safety.ProduceTimeout(view-2, highestQC, nil)
+		require.True(s.T(), model.IsNoTimeoutError(err))
+		require.Nil(s.T(), timeout)
+	})
+	s.Run("cur-view-below-highest-QC", func() {
+		highestQC := helper.MakeQC(helper.WithQCView(s.safetyData.LockedOneChainView))
+		view := highestQC.View
+
+		timeout, err := s.safety.ProduceTimeout(view, highestQC, nil)
+		require.True(s.T(), model.IsNoTimeoutError(err))
+		require.Nil(s.T(), timeout)
+	})
+
+	s.signer.AssertNotCalled(s.T(), "CreateTimeout")
+	s.signer.AssertNotCalled(s.T(), "PutSafetyData")
+}
+
+// TestProduceTimeout_CreateTimeoutException tests that no timeout is created if timeout creation raised an exception
+func (s *SafetyRulesTestSuite) TestProduceTimeout_CreateTimeoutException() {
+	view := s.proposal.Block.View
+	highestQC := helper.MakeQC(helper.WithQCView(view - 1))
+
+	exception := errors.New("create-vote-exception")
+	s.signer.On("CreateTimeout", view, highestQC, (*flow.TimeoutCertificate)(nil)).Return(nil, exception).Once()
+	vote, err := s.safety.ProduceTimeout(view, highestQC, nil)
+	require.Nil(s.T(), vote)
+	require.ErrorAs(s.T(), err, &exception)
+	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
+}
+
+// TestCreateTimeout_PersistStateException tests that no timeout is created if persisting state failed
+func (s *SafetyRulesTestSuite) TestCreateTimeout_PersistStateException() {
+	exception := errors.New("persister-exception")
+	s.persister.On("PutSafetyData", mock.Anything).Return(exception)
+
+	view := s.proposal.Block.View
+	highestQC := helper.MakeQC(helper.WithQCView(view - 1))
+	expectedTimeout := &model.TimeoutObject{
+		View:      view,
+		HighestQC: highestQC,
+	}
+
+	s.signer.On("CreateTimeout", view, highestQC, (*flow.TimeoutCertificate)(nil)).Return(expectedTimeout, nil).Once()
+	timeout, err := s.safety.ProduceTimeout(view, highestQC, nil)
+	require.Nil(s.T(), timeout)
+	require.ErrorAs(s.T(), err, &exception)
 }
 
 //func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitteeMember bool) (*model.Proposal, *model.Vote, *SafetyRules) {
