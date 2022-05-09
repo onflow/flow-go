@@ -14,6 +14,11 @@ const DefaultProtocolVersion = 0
 
 // DefaultTransactionExpiry is the default expiry for transactions, measured
 // in blocks. Equivalent to 10 minutes for a 1-second block time.
+//
+// Let E by the transaction expiry. If a transaction T specifies a reference
+// block R with height H, then T may be included in any block B where:
+// * R<-*B - ie. B has R as an ancestor, and
+// * R.height < B.height <= R.height+E
 const DefaultTransactionExpiry = 10 * 60
 
 // DefaultTransactionExpiryBuffer is the default buffer time between a transaction being ingested by a
