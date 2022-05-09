@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -18,6 +19,8 @@ type SignerMetricsWrapper struct {
 	signer  hotstuff.Signer
 	metrics module.HotstuffMetrics
 }
+
+var _ hotstuff.Signer = (*SignerMetricsWrapper)(nil)
 
 func NewMetricsWrapper(signer hotstuff.Signer, metrics module.HotstuffMetrics) *SignerMetricsWrapper {
 	return &SignerMetricsWrapper{
@@ -53,6 +56,15 @@ func (w SignerMetricsWrapper) CreateVote(block *model.Block) (*model.Vote, error
 	vote, err := w.signer.CreateVote(block)
 	w.metrics.SignerProcessingDuration(time.Since(processStart))
 	return vote, err
+}
+
+func (w SignerMetricsWrapper) CreateTimeout(curView uint64,
+	highestQC *flow.QuorumCertificate,
+	highestTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+	processStart := time.Now()
+	timeout, err := w.signer.CreateTimeout(curView, highestQC, highestTC)
+	w.metrics.SignerProcessingDuration(time.Since(processStart))
+	return timeout, err
 }
 
 // func (w SignerMetricsWrapper) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {

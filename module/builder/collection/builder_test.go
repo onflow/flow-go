@@ -78,7 +78,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
-	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis)
+	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
 	suite.Require().Nil(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().Nil(err)
@@ -847,7 +847,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		suite.blocks = blocks
 		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
-		stateRoot, err := clusterkv.NewStateRoot(suite.genesis)
+		stateRoot, err := clusterkv.NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
 
 		state, err := clusterkv.Bootstrap(suite.db, stateRoot)
 		assert.Nil(b, err)

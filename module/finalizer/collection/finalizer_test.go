@@ -49,7 +49,7 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
-			stateRoot, err := cluster.NewStateRoot(genesis)
+			stateRoot, err := cluster.NewStateRoot(genesis, unittest.QuorumCertificateFixture())
 			require.NoError(t, err)
 			state, err = cluster.Bootstrap(db, stateRoot)
 			require.NoError(t, err)
