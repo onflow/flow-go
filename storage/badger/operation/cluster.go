@@ -37,14 +37,49 @@ func RetrieveClusterFinalizedHeight(clusterID flow.ChainID, number *uint64) func
 	return retrieve(makePrefix(codeClusterHeight, clusterID), number)
 }
 
+// TODO - rename next 2 methods (ClusterBLock)
 // IndexCollectionReference inserts the reference block ID for a cluster
 // block payload (ie. collection) keyed by the cluster block ID
 func IndexCollectionReference(clusterBlockID, refID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeCollectionReference, clusterBlockID), refID)
+	return insert(makePrefix(codeClusterBlockToRefBlock, clusterBlockID), refID)
 }
 
 // LookupCollectionReference looks up the reference block ID for a cluster
 // block payload (ie. collection) keyed by the cluster block ID.
 func LookupCollectionReference(clusterBlockID flow.Identifier, refID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeCollectionReference, clusterBlockID), refID)
+	return retrieve(makePrefix(codeClusterBlockToRefBlock, clusterBlockID), refID)
+}
+
+// IndexClusterBlockByReferenceHeight indexes a cluster block ID by its reference
+// block height. The cluster block ID is included in the key for more efficient
+// traversal.
+// Only finalized cluster blocks should be included in this index.
+// The key looks like: <prefix 0:1><ref_height 1:9><cluster_block_id 9:41>
+//
+// TODO: should we include chain ID in prefix? It is not needed for correctness, including
+//  it would slightly reduce the needed traversal around epoch boundaries
+func IndexClusterBlockByReferenceHeight(refHeight uint64, clusterBlockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeRefHeightToClusterBlock, refHeight, clusterBlockID), nil)
+}
+
+// LookupClusterBlocksByReferenceHeightRange traverses the ref_height->cluster_block
+// index and returns any finalized cluster blocks which have a reference block with
+// height in the given range. This is used to avoid including duplicate transaction
+// when building or validating a new collection.
+func LookupClusterBlocksByReferenceHeightRange(start, end uint64, clusterBlockIDs *[]flow.Identifier) func(*badger.Txn) error {
+	startPrefix := makePrefix(codeRefHeightToClusterBlock, start)
+	endPrefix := makePrefix(codeRefHeightToClusterBlock, end)
+
+	return iterate(startPrefix, endPrefix, func() (checkFunc, createFunc, handleFunc) {
+		check := func(key []byte) bool {
+			clusterBlockIDBytes := key[9:]
+			var clusterBlockID flow.Identifier
+			copy(clusterBlockID[:], clusterBlockIDBytes)
+			*clusterBlockIDs = append(*clusterBlockIDs, clusterBlockID)
+
+			// the info we need is stored in the key, never process the value
+			return false
+		}
+		return check, nil, nil
+	}, withPrefetchValues(false))
 }
