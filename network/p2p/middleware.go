@@ -500,7 +500,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 	if !engine.PublicChannels().Contains(channel) {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators,
-			//NOTE: The AuthorizedSenderValidator will assert the sZender is a staked node
+			// NOTE: The AuthorizedSenderValidator will assert the sender is a staked node
 			psValidator.AuthorizedSenderValidator(m.log, channel, m.ov.Identity),
 		)
 	}
