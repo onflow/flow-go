@@ -106,7 +106,8 @@ func NewTransactionEnvironment(
 			}
 			return enabled
 		},
-		env.GetAuthorizedAccountsForContractUpdates,
+		env.GetAccountsAuthorizedForContractUpdate,
+		env.GetAccountsAuthorizedForContractRemoval,
 		env.useContractAuditVoucher,
 	)
 
@@ -194,32 +195,50 @@ func (e *TransactionEnv) isTraceable() bool {
 	return e.ctx.Tracer != nil && e.traceSpan != nil
 }
 
-// GetAuthorizedAccountsForContractUpdates returns a list of addresses that
-// are authorized to update/deploy contracts
+// GetAccountsAuthorizedForContractUpdate returns a list of addresses authorized to update/deploy contracts
+func (e *TransactionEnv) GetAccountsAuthorizedForContractUpdate() []common.Address {
+	return e.GetAuthorizedAccounts(
+		cadence.Path{
+			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
+			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
+		})
+}
+
+// GetAccountsAuthorizedForContractRemoval returns a list of addresses authorized to remove contracts
+func (e *TransactionEnv) GetAccountsAuthorizedForContractRemoval() []common.Address {
+	return e.GetAuthorizedAccounts(
+		cadence.Path{
+			Domain:     blueprints.ContractRemovalAuthorizedAddressesPathDomain,
+			Identifier: blueprints.ContractRemovalAuthorizedAddressesPathIdentifier,
+		})
+}
+
+// GetAuthorizedAccounts returns a list of addresses authorized by the service account.
+// Used to determine which accounts are permitted to deploy, update, or remove contracts.
 //
 // It reads a storage path from service account and parse the addresses.
-// if any issue occurs on the process (missing registers, stored value properly not set)
-// it gracefully handle it and falls back to default behaviour (only service account be authorized)
-func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
+// If any issue occurs on the process (missing registers, stored value properly not set),
+// it gracefully handles it and falls back to default behaviour (only service account be authorized).
+func (e *TransactionEnv) GetAuthorizedAccounts(path cadence.Path) []common.Address {
 	// set default to service account only
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())
 	defaultAccounts := []runtime.Address{service}
 
 	value, err := e.vm.Runtime.ReadStored(
 		service,
-		cadence.Path{
-			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
-		},
+		path,
 		runtime.Context{Interface: e},
 	)
+
+	const warningMsg = "failed to read contract authorized accounts from service account. using default behaviour instead."
+
 	if err != nil {
-		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.Warn().Msg(warningMsg)
 		return defaultAccounts
 	}
 	addresses, ok := utils.CadenceValueToAddressSlice(value)
 	if !ok {
-		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.Warn().Msg(warningMsg)
 		return defaultAccounts
 	}
 	return addresses

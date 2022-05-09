@@ -16,7 +16,7 @@ import (
 )
 
 type RestrictedDeploymentEnabledFunc func() bool
-type AuthorizedAccountsForContractDeploymentFunc func() []common.Address
+type AuthorizedAccountsFunc func() []common.Address
 type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (bool, error)
 
 // ContractHandler handles all interaction
@@ -25,11 +25,12 @@ type UseContractAuditVoucherFunc func(address runtime.Address, code []byte) (boo
 // only commit them when called so smart contract
 // updates can be delayed until end of the tx execution
 type ContractHandler struct {
-	accounts                    state.Accounts
-	draftUpdates                map[programs.ContractUpdateKey]programs.ContractUpdate
-	restrictedDeploymentEnabled RestrictedDeploymentEnabledFunc
-	authorizedAccounts          AuthorizedAccountsForContractDeploymentFunc
-	useContractAuditVoucher     UseContractAuditVoucherFunc
+	accounts                     state.Accounts
+	draftUpdates                 map[programs.ContractUpdateKey]programs.ContractUpdate
+	restrictedDeploymentEnabled  RestrictedDeploymentEnabledFunc
+	authorizedDeploymentAccounts AuthorizedAccountsFunc
+	authorizedRemovalAccounts    AuthorizedAccountsFunc
+	useContractAuditVoucher      UseContractAuditVoucherFunc
 	// handler doesn't have to be thread safe and right now
 	// is only used in a single thread but a mutex has been added
 	// here to prevent accidental multi-thread use in the future
@@ -38,15 +39,17 @@ type ContractHandler struct {
 
 func NewContractHandler(accounts state.Accounts,
 	restrictedDeploymentEnabled RestrictedDeploymentEnabledFunc,
-	authorizedAccounts AuthorizedAccountsForContractDeploymentFunc,
+	authorizedDeploymentAccounts AuthorizedAccountsFunc,
+	authorizedRemovalAccounts AuthorizedAccountsFunc,
 	useContractAuditVoucher UseContractAuditVoucherFunc,
 ) *ContractHandler {
 	return &ContractHandler{
-		accounts:                    accounts,
-		draftUpdates:                make(map[programs.ContractUpdateKey]programs.ContractUpdate),
-		restrictedDeploymentEnabled: restrictedDeploymentEnabled,
-		authorizedAccounts:          authorizedAccounts,
-		useContractAuditVoucher:     useContractAuditVoucher,
+		accounts:                     accounts,
+		draftUpdates:                 make(map[programs.ContractUpdateKey]programs.ContractUpdate),
+		restrictedDeploymentEnabled:  restrictedDeploymentEnabled,
+		authorizedDeploymentAccounts: authorizedDeploymentAccounts,
+		authorizedRemovalAccounts:    authorizedRemovalAccounts,
+		useContractAuditVoucher:      useContractAuditVoucher,
 	}
 }
 
@@ -80,7 +83,7 @@ func (h *ContractHandler) SetContract(
 		return err
 	}
 
-	if !exists && !h.isAuthorized(signingAccounts) {
+	if !exists && !h.isAuthorizedForDeployment(signingAccounts) {
 		// check if there's an audit voucher for the contract
 		voucherAvailable, err := h.useContractAuditVoucher(address, code)
 		if err != nil {
@@ -115,9 +118,13 @@ func (h *ContractHandler) SetContract(
 	return nil
 }
 
-func (h *ContractHandler) RemoveContract(address runtime.Address, name string, signingAccounts []runtime.Address) (err error) {
+func (h *ContractHandler) RemoveContract(
+	address runtime.Address,
+	name string,
+	signingAccounts []runtime.Address,
+) (err error) {
 	// check if authorized
-	if !h.isAuthorized(signingAccounts) {
+	if !h.isAuthorizedForRemoval(signingAccounts) {
 		err = errors.NewOperationAuthorizationErrorf("RemoveContract", "removing contracts requires authorization from specific accounts")
 		return fmt.Errorf("removing contract failed: %w", err)
 	}
@@ -205,10 +212,18 @@ func (h *ContractHandler) UpdateKeys() []programs.ContractUpdateKey {
 	return keys
 }
 
-func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address) bool {
+func (h *ContractHandler) isAuthorizedForDeployment(signingAccounts []runtime.Address) bool {
+	return h.isAuthorized(signingAccounts, h.authorizedDeploymentAccounts)
+}
+
+func (h *ContractHandler) isAuthorizedForRemoval(signingAccounts []runtime.Address) bool {
+	return h.isAuthorized(signingAccounts, h.authorizedRemovalAccounts)
+}
+
+func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address, authorizedAccounts AuthorizedAccountsFunc) bool {
 	if h.restrictedDeploymentEnabled() {
-		accs := h.authorizedAccounts()
-		for _, authorized := range accs {
+		accts := authorizedAccounts()
+		for _, authorized := range accts {
 			for _, signer := range signingAccounts {
 				if signer == authorized {
 					// a single authorized singer is enough

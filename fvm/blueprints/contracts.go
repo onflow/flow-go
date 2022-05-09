@@ -14,6 +14,9 @@ import (
 const ContractDeploymentAuthorizedAddressesPathDomain = "storage"
 const ContractDeploymentAuthorizedAddressesPathIdentifier = "authorizedAddressesToDeployContracts"
 
+const ContractRemovalAuthorizedAddressesPathDomain = "storage"
+const ContractRemovalAuthorizedAddressesPathIdentifier = "authorizedAddressesToRemoveContracts"
+
 const IsContractDeploymentRestrictedPathDomain = "storage"
 const IsContractDeploymentRestrictedPathIdentifier = "isContractDeploymentRestricted"
 
@@ -36,6 +39,28 @@ func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, au
 	arg2, err := jsoncdc.Encode(cadence.Path{
 		Domain:     ContractDeploymentAuthorizedAddressesPathDomain,
 		Identifier: ContractDeploymentAuthorizedAddressesPathIdentifier,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(setContractDeploymentAuthorizersTransactionTemplate)).
+		AddAuthorizer(serviceAccount).
+		AddArgument(arg1).
+		AddArgument(arg2), nil
+}
+
+// SetContractRemovalAuthorizersTransaction returns a transaction for updating list of authorized accounts allowed to remove contracts
+func SetContractRemovalAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBody, error) {
+	arg1, err := jsoncdc.Encode(utils.AddressSliceToCadenceValue(utils.FlowAddressSliceToCadenceAddressSlice(authorized)))
+	if err != nil {
+		return nil, err
+	}
+
+	arg2, err := jsoncdc.Encode(cadence.Path{
+		Domain:     ContractRemovalAuthorizedAddressesPathDomain,
+		Identifier: ContractRemovalAuthorizedAddressesPathIdentifier,
 	})
 	if err != nil {
 		return nil, err

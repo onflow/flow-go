@@ -91,6 +91,7 @@ func NewScriptEnvironment(
 			return true
 		},
 		func() []common.Address { return []common.Address{} },
+		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
 	if fvmContext.BlockHeader != nil {
