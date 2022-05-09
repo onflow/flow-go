@@ -67,11 +67,10 @@ func SplitCheckSum(checkSumPrefixedSignerIndices []byte) ([CheckSumLen]byte, []b
 	return sum, signerIndices, nil
 }
 
-// CompareAndExtract reads the checksum from the given checkSumPrefixedSIgnerIndices
+// CompareAndExtract reads the checksum from the given checkSumPrefixedSignerIndices
 // bytes, and compare with the checksum of the given identifier list.
 // it returns the signer indices if the checksum matches.
-// it returns error if splitting the checksum fails or
-// 										 the splitted checksum doesn't match
+// it returns error if splitting the checksum fails or the splitted checksum doesn't match
 // - canonicalList is the canonical list from decoder's view
 // - checkSumPrefixedSignerIndices is the signer indices created by the encoder,
 //   and prefixed with the checksum of the canonical list from encoder's view.

@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// Test that the CheckSumFromIdentities method is able to produce checksum for empty identity list,
+// and produce the correct checksum
 func TestCheckSum(t *testing.T) {
 	t.Run("no identity", func(t *testing.T) {
 		require.Equal(t, signature.CheckSumFromIdentities(nil), signature.CheckSumFromIdentities(nil))
@@ -42,6 +44,9 @@ func TestCheckSum(t *testing.T) {
 	})
 }
 
+// Test that if an encoder generates a checksum with a committee and added to some random data
+// using PrefixCheckSum method, then an decoder using the same committee to call CompareAndExtract
+// is able to extract the same data as the encoder.
 func TestPrefixCheckSum(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		committeeSize := rapid.IntRange(0, 300).Draw(t, "committeeSize").(int)

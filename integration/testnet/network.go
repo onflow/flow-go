@@ -1341,13 +1341,12 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 			return nil, nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
 		}
 
-		// generate qc for root cluster block
-		fmt.Println("clusterNodeInfos", clusterNodeInfos)
 		// must order in canonical ordering otherwise decoding signer indices from cluster QC would fail
 		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(order.Canonical)
 		qc, err := run.GenerateClusterRootQC(clusterNodeInfos, clusterCommittee, block)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, fmt.Errorf("fail to generate cluster root QC with clusterNodeInfos %v, %w",
+				clusterNodeInfos, err)
 		}
 
 		// add block and qc to list
