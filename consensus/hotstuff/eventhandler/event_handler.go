@@ -231,11 +231,6 @@ func (e *EventHandler) startNewView() error {
 
 	curView := e.paceMaker.CurView()
 
-	err := e.persist.PutStarted(curView)
-	if err != nil {
-		return fmt.Errorf("could not persist current view: %w", err)
-	}
-
 	currentLeader, err := e.committee.LeaderForView(curView)
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)

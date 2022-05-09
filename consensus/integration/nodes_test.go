@@ -479,15 +479,15 @@ func createNode(
 
 	persist := persister.New(db, rootHeader.ChainID)
 
-	started, err := persist.GetStarted()
+	livenessData, err := persist.GetLivenessData()
 	require.NoError(t, err)
 
 	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
-	voteCollectors := voteaggregator.NewVoteCollectors(log, started, workerpool.New(2), createCollectorFactoryMethod)
+	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
-	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, started, voteCollectors)
+	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, livenessData.CurrentView, voteCollectors)
 	require.NoError(t, err)
 
 	hotstuffModules := &consensus.HotstuffModules{
