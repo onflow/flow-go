@@ -204,6 +204,12 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 	}
 }
 
+func withPrefetchValues(prefetch bool) func(*badger.IteratorOptions) {
+	return func(options *badger.IteratorOptions) {
+		options.PrefetchValues = false
+	}
+}
+
 // iterate iterates over a range of keys defined by a start and end key. The
 // start key may be higher than the end key, in which case we iterate in
 // reverse order.
@@ -219,12 +225,15 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 //
 // TODO: this function is unbounded – pass context.Context to this or calling
 // functions to allow timing functions out.
-func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
+func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*badger.IteratorOptions)) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// initialize the default options and comparison modifier for iteration
 		modifier := 1
 		options := badger.DefaultIteratorOptions
+		for _, apply := range opts {
+			apply(&options)
+		}
 
 		// In order to satisfy this function's prefix-wise inclusion semantics,
 		// we append 0xff bytes to the largest of start and end.
