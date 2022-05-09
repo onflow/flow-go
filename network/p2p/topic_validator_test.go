@@ -387,7 +387,7 @@ func checkReceive(ctx context.Context, t *testing.T, expectedData []byte, sub *p
 		wg.Add(1)
 		go func() {
 			_, err := sub.Next(ctx)
-			require.Error(t, err)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
 			wg.Done()
 		}()
 	}
