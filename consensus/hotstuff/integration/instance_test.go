@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
@@ -139,14 +140,15 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.headers[cfg.Root.ID()] = cfg.Root
 
 	// program the hotstuff committee state
-	in.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
+	in.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
+		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return in.participants.Filter(selector)
 		},
 		nil,
 	)
 	for _, participant := range in.participants {
-		in.committee.On("Identity", mock.Anything, participant.NodeID).Return(participant, nil)
+		in.committee.On("IdentityByBlock", mock.Anything, participant.NodeID).Return(participant, nil)
+		in.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 	in.committee.On("Self").Return(in.localID)
 	in.committee.On("LeaderForView", mock.Anything).Return(
@@ -154,6 +156,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			return in.participants[int(view)%len(in.participants)].NodeID
 		}, nil,
 	)
+	in.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(in.participants.TotalWeight()), nil)
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
@@ -351,7 +354,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		in.queue <- qc
 	}
 
-	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(uint64(in.participants.Count()) * weight)
+	minRequiredWeight := committees.WeightThresholdToBuildQC(uint64(in.participants.Count()) * weight)
 	voteProcessorFactory := &mocks.VoteProcessorFactory{}
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
 		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {

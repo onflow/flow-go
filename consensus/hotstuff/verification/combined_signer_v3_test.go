@@ -24,7 +24,6 @@ import (
 // Test that when DKG key is available for a view, a signed block can pass the validation
 // the sig is a random beacon sig.
 func TestCombinedSignWithDKGKeyV3(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 	// prepare data
 	dkgKey := unittest.RandomBeaconPriv()
 	pk := dkgKey.PublicKey()
@@ -92,7 +91,6 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 // Test that when DKG key is not available for a view, a signed block can pass the validation
 // the sig is a staking sig
 func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 	// prepare data
 	dkgKey := unittest.RandomBeaconPriv()
 	pk := dkgKey.PublicKey()
@@ -155,7 +153,6 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 
 // Test_VerifyQC checks that a QC where either signer list is empty is rejected as invalid
 func Test_VerifyQCV3(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 	header := unittest.BlockHeaderFixture()
 	block := model.BlockFromFlow(&header, header.View-1)
 	msg := MakeVoteMessage(block.View, block.BlockID)
@@ -190,7 +187,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	// first, we check that our testing setup works for a correct QC
 	t.Run("valid QC", func(t *testing.T) {
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&unpackedSigData, nil)
+		packer.On("Unpack", block.View, mock.Anything, packedSigData).Return(&unpackedSigData, nil)
 
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
@@ -208,7 +205,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.AggregatedStakingSig = []byte{}
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", block.View, mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
 		require.NoError(t, err)
@@ -223,7 +220,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.StakingSigners = []flow.Identifier{}
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", block.View, mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
 		require.ErrorIs(t, err, model.ErrInvalidFormat)
@@ -236,7 +233,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.RandomBeaconSigners = []flow.Identifier{}
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", block.View, mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
 		require.ErrorIs(t, err, model.ErrInvalidFormat)
@@ -252,7 +249,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		sd.AggregatedRandomBeaconSig = aggregatedSignature(t, privRbKeyShares[:5], msg, encoding.RandomBeaconTag)
 
 		packer := &mocks.Packer{}
-		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
+		packer.On("Unpack", block.View, mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
 		err := verifier.VerifyQC(allSigners, packedSigData, block)
 		require.ErrorIs(t, err, model.ErrInvalidFormat)

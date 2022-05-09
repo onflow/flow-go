@@ -5,29 +5,14 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/suite"
-	"testing"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func TestSafetyRules(t *testing.T) {
-	//unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
-	//t.Run("should vote for bootstrapBlock", TestProduceVote_Ok)
-	//t.Run("should not vote for unsafe bootstrapBlock", testUnsafe)
-	//t.Run("should not vote for bootstrapBlock with its view below the current view", testBelowVote)
-	//t.Run("should not vote for bootstrapBlock with its view above the current view", testAboveVote)
-	//t.Run("should not vote for bootstrapBlock with the same view as the last voted view", testEqualLastVotedView)
-	//t.Run("should not vote for bootstrapBlock with its view below the last voted view", testBelowLastVotedView)
-	//t.Run("should not vote for the same view again", testVotingAgain)
-	//t.Run("should not vote while not a committee member", testVotingWhileNonCommitteeMember)
-	suite.Run(t, new(SafetyRulesTestSuite))
-}
 
 // SafetyRulesTestSuite is a test suite for testing SafetyRules related functionality.
 // SafetyRulesTestSuite setups mocks for injected modules and creates hotstuff.SafetyData
@@ -398,143 +383,6 @@ func (s *SafetyRulesTestSuite) TestCreateTimeout_PersistStateException() {
 	require.ErrorAs(s.T(), err, &exception)
 }
 
-//func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitteeMember bool) (*model.Proposal, *model.Vote, *SafetyRules) {
-//	bootstrapBlock := helper.MakeBlock(helper.WithBlockView(blockView))
-//	expectVote := makeVote(bootstrapBlock)
-//
-//	forks := &mocks.ForksReader{}
-//	forks.On("IsSafeBlock", bootstrapBlock).Return(isBlockSafe)
-//
-//	persist := &mocks.Persister{}
-//	persist.On("PutVoted", mock.Anything).Return(nil)
-//
-//	signer := &mocks.Signer{}
-//	signer.On("CreateVote", mock.Anything).Return(expectVote, nil)
-//
-//	committee := &mocks.DynamicCommittee{}
-//	me := unittest.IdentityFixture()
-//	committee.On("Self").Return(me.NodeID, nil)
-//	if isCommitteeMember {
-//		committee.On("Identity", mock.Anything, me.NodeID).Return(me, nil)
-//	} else {
-//		committee.On("Identity", mock.Anything, me.NodeID).Return(nil, model.NewInvalidSignerErrorf(""))
-//	}
-//
-//	voter := New(signer, forks, persist, committee, lastVotedView)
-//	return &model.Proposal{
-//		Block:   bootstrapBlock,
-//		SigData: nil,
-//	}, expectVote, voter
-//}
-//
-//func TestProduceVote_Ok(t *testing.T) {
-//	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(2), true, true
-//
-//	// create voter
-//	bootstrapBlock, expectVote, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
-//
-//	// produce vote
-//	vote, err := voter.ProduceVote(bootstrapBlock, curView)
-//
-//	require.NoError(t, err)
-//	require.Equal(t, vote, expectVote)
-//}
-//
-//func testUnsafe(t *testing.T) {
-//	// create unsafe bootstrapBlock
-//	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(2), false, true
-//
-//	// create voter
-//	bootstrapBlock, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
-//
-//	_, err := voter.ProduceVote(bootstrapBlock, curView)
-//	require.Error(t, err)
-//	require.Contains(t, err.Error(), "not safe")
-//	require.True(t, model.IsNoVoteError(err))
-//}
-//
-//func testBelowVote(t *testing.T) {
-//	// curView < blockView
-//	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(2), uint64(2), true, true
-//
-//	// create voter
-//	bootstrapBlock, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
-//
-//	_, err := voter.ProduceVote(bootstrapBlock, curView)
-//	require.Error(t, err)
-//	require.Contains(t, err.Error(), "expecting bootstrapBlock for current view")
-//	require.False(t, model.IsNoVoteError(err))
-//}
-//
-//func testAboveVote(t *testing.T) {
-//	// curView > blockView
-//	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(4), uint64(2), true, true
-//
-//	// create voter
-//	bootstrapBlock, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
-//
-//	_, err := voter.ProduceVote(bootstrapBlock, curView)
-//	require.Error(t, err)
-//	require.Contains(t, err.Error(), "expecting bootstrapBlock for current view")
-//	require.False(t, model.IsNoVoteError(err))
-//}
-//
-//func testEqualLastVotedView(t *testing.T) {
-//	// curView == lastVotedView
-//	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(3), true, true
-//
-//	// create voter
-//	bootstrapBlock, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
-//
-//	_, err := voter.ProduceVote(bootstrapBlock, curView)
-//	require.Error(t, err)
-//	require.Contains(t, err.Error(), "must be larger than the last voted view")
-//	require.False(t, model.IsNoVoteError(err))
-//}
-//
-//func testBelowLastVotedView(t *testing.T) {
-//	// curView < lastVotedView
-//	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(4), true, true
-//
-//	// create voter
-//	bootstrapBlock, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
-//
-//	_, err := voter.ProduceVote(bootstrapBlock, curView)
-//	require.Error(t, err)
-//	require.Contains(t, err.Error(), "must be larger than the last voted view")
-//	require.False(t, model.IsNoVoteError(err))
-//}
-//
-//func testVotingAgain(t *testing.T) {
-//	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(2), true, true
-//
-//	// create voter
-//	bootstrapBlock, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
-//
-//	// produce vote
-//	_, err := voter.ProduceVote(bootstrapBlock, curView)
-//	require.NoError(t, err)
-//
-//	// produce vote again for the same view
-//	_, err = voter.ProduceVote(bootstrapBlock, curView)
-//	require.Error(t, err)
-//	require.Contains(t, err.Error(), "must be larger than the last voted view")
-//	require.False(t, model.IsNoVoteError(err))
-//}
-//
-//func testVotingWhileNonCommitteeMember(t *testing.T) {
-//	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(2), true, false
-//
-//	// create voter
-//	bootstrapBlock, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
-//
-//	// produce vote
-//	_, err := voter.ProduceVote(bootstrapBlock, curView)
-//
-//	require.Error(t, err)
-//	require.True(t, model.IsNoVoteError(err))
-//}
-//
 func makeVote(block *model.Block) *model.Vote {
 	return &model.Vote{
 		BlockID: block.BlockID,

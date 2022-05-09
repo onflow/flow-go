@@ -11,6 +11,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -241,7 +242,6 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 // We start with leader proposing a block, then new leader collects votes and builds a QC.
 // Need to verify that QC that was produced is valid and can be embedded in new proposal.
 func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	view := uint64(20)
@@ -266,7 +266,8 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		helper.WithBlockProposer(leader.NodeID))
 
 	committee := &mockhotstuff.DynamicCommittee{}
-	committee.On("Identities", block.BlockID, mock.Anything).Return(stakingSigners, nil)
+	committee.On("IdentitiesByEpoch", block.View, mock.Anything).Return(stakingSigners, nil)
+	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
 
 	votes := make([]*model.Vote, 0, len(stakingSigners))
 

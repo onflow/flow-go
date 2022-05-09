@@ -13,19 +13,16 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// ErrViewForUnknownEpoch is returned when a by-view query is made with a view
-// outside all cached epochs. This can happen when a query is made for a view in the
-// next epoch, if that epoch is not committed yet. This can also happen when an
-// old epoch is queried (>3 in the past), even if that epoch does exist in storage.
-var ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
-
 // staticEpochInfo contains leader selection and the initial committee for one epoch.
+// This data structure must not be mutated after construction.
 type staticEpochInfo struct {
-	firstView        uint64
-	finalView        uint64
-	leaders          *leader.LeaderSelection
-	initialCommittee flow.IdentityList
-	dkg              hotstuff.DKG
+	firstView uint64                  // first view of the epoch (inclusive)
+	finalView uint64                  // final view of the epoch (inclusive)
+	leaders   *leader.LeaderSelection // pre-computed leader selection for the epoch
+	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
+	initialCommittee     flow.IdentityList
+	weightThresholdForQC uint64 // computed based on initial committee weights
+	dkg                  hotstuff.DKG
 }
 
 // newStaticEpochInfo returns the static epoch information from the epoch.
@@ -43,28 +40,29 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection: %w", err)
 	}
-	initialidentities, err := epoch.InitialIdentities()
+	initialIdentities, err := epoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not initial identities: %w", err)
 	}
-	initialCommittee := initialidentities.Filter(filter.IsVotingConsensusCommitteeMember)
+	initialCommittee := initialIdentities.Filter(filter.IsVotingConsensusCommitteeMember)
 	dkg, err := epoch.DKG()
 	if err != nil {
 		return nil, fmt.Errorf("could not get dkg: %w", err)
 	}
 
 	epochInfo := &staticEpochInfo{
-		firstView:        firstView,
-		finalView:        finalView,
-		leaders:          leaders,
-		initialCommittee: initialCommittee,
-		dkg:              dkg,
+		firstView:            firstView,
+		finalView:            finalView,
+		leaders:              leaders,
+		initialCommittee:     initialCommittee,
+		weightThresholdForQC: WeightThresholdToBuildQC(initialCommittee.TotalWeight()),
+		dkg:                  dkg,
 	}
 	return epochInfo, nil
 }
 
 // Consensus represents the main committee for consensus nodes. The consensus
-// committee persists across epochs.
+// committee might be active for multiple successive epochs.
 type Consensus struct {
 	mu     sync.RWMutex
 	state  protocol.State              // the protocol state
@@ -142,7 +140,7 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 // the given view.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
 //   * unspecific error in case of unexpected problems and bugs
 //
@@ -158,8 +156,10 @@ func (c *Consensus) IdentitiesByEpoch(view uint64, selector flow.IdentityFilter)
 // contains the given view.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
+//   * model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
+//     authorized consensus participants.
 //   * unspecific error in case of unexpected problems and bugs
 //
 func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.Identity, error) {
@@ -177,7 +177,7 @@ func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.
 // LeaderForView returns the node ID of the leader for the given view.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
 //   * unspecific error in case of unexpected problems and bugs
 //
@@ -196,6 +196,17 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	return epochInfo.leaders.LeaderForView(view)
 }
 
+// WeightThresholdForView returns the minimum weight required to build a valid
+// QC in the given view. The weight threshold only changes at epoch boundaries
+// and is computed based on the initial committee weights.
+func (c *Consensus) WeightThresholdForView(view uint64) (uint64, error) {
+	epochInfo, err := c.staticEpochInfoByView(view)
+	if err != nil {
+		return 0, err
+	}
+	return epochInfo.weightThresholdForQC, nil
+}
+
 func (c *Consensus) Self() flow.Identifier {
 	return c.me
 }
@@ -203,7 +214,7 @@ func (c *Consensus) Self() flow.Identifier {
 // DKG returns the DKG for epoch which includes the given view.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
 //   * unspecific error in case of unexpected problems and bugs
 func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
@@ -219,7 +230,7 @@ func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 // view, we will attempt to cache the next epoch.
 //
 // Error returns:
-//   * ErrViewForUnknownEpoch if no committed epoch containing the given view is known
+//   * model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known
 //   * unspecific error in case of unexpected problems and bugs
 func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error) {
 
@@ -244,14 +255,14 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 	}
 	// we don't know about the epoch for this view yet, return the sentinel
 	if !ok {
-		return nil, ErrViewForUnknownEpoch
+		return nil, model.ErrViewForUnknownEpoch
 	}
 	// we successfully cached the next epoch, return the corresponding static info
 	// if it contains the given view
 	if nextEpochInfo.firstView <= view && view <= nextEpochInfo.finalView {
 		return nextEpochInfo, nil
 	}
-	return nil, ErrViewForUnknownEpoch
+	return nil, model.ErrViewForUnknownEpoch
 }
 
 // tryPrepareNextEpoch tries to cache the next epoch, returning the cached static
@@ -270,7 +281,6 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 func (c *Consensus) tryPrepareNextEpoch() (*staticEpochInfo, bool, error) {
 	next := c.state.Final().Epochs().Next()
 	committed, err := protocol.IsEpochCommitted(next)
-	fmt.Println("committed? ", committed, err)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not check if epoch is committed: %w", err)
 	}
@@ -297,11 +307,10 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error)
 		return nil, fmt.Errorf("could not get counter for current epoch: %w", err)
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// this is a no-op if we have already computed leaders for this epoch
+	// this is a no-op if we have already computed static info for this epoch
+	c.mu.RLock()
 	epochInfo, exists := c.epochs[counter]
+	c.mu.RUnlock()
 	if exists {
 		return epochInfo, nil
 	}
@@ -310,9 +319,23 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error)
 	if err != nil {
 		return nil, fmt.Errorf("could not create static epoch info for epch %d: %w", counter, err)
 	}
-	// cache the epoch info
-	c.epochs[counter] = epochInfo
 
+	// sanity check: ensure new epoch has contiguous views with the prior epoch
+	c.mu.RLock()
+	prevEpochInfo, exists := c.epochs[counter-1]
+	c.mu.RUnlock()
+	if exists {
+		if epochInfo.firstView != prevEpochInfo.finalView+1 {
+			return nil, fmt.Errorf("non-contiguous view ranges between consecutive epochs (epoch_%d=[%d,%d], epoch_%d=[%d,%d])",
+				counter-1, prevEpochInfo.firstView, prevEpochInfo.finalView,
+				counter, epochInfo.firstView, epochInfo.finalView)
+		}
+	}
+
+	// cache the epoch info
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.epochs[counter] = epochInfo
 	// now prune any old epochs, if we have exceeded our maximum of 3
 	// if we have fewer than 3 epochs, this is a no-op
 	c.pruneEpochInfo()

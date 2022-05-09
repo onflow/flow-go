@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -20,7 +21,6 @@ import (
 )
 
 func TestValidateProposal(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 	suite.Run(t, new(ProposalSuite))
 }
 
@@ -66,14 +66,16 @@ func (ps *ProposalSuite) SetupTest() {
 	// set up the mocked hotstuff DynamicCommittee state
 	ps.committee = &mocks.DynamicCommittee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.leader.NodeID, nil)
-	ps.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
+	ps.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(ps.participants.TotalWeight()), nil)
+	ps.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
+		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return ps.participants.Filter(selector)
 		},
 		nil,
 	)
 	for _, participant := range ps.participants {
-		ps.committee.On("Identity", mock.Anything, participant.NodeID).Return(participant, nil)
+		ps.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
+		ps.committee.On("IdentityByBlock", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 
 	// the finalized view is the one of the parent of the
@@ -148,7 +150,8 @@ func (ps *ProposalSuite) TestProposalWrongLeader() {
 	*ps.committee = mocks.DynamicCommittee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.participants[1].NodeID, nil)
 	for _, participant := range ps.participants {
-		ps.committee.On("Identity", mock.Anything, participant.NodeID).Return(participant, nil)
+		ps.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
+		ps.committee.On("IdentityByBlock", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 
 	// check that validation fails now
@@ -278,7 +281,6 @@ func (ps *ProposalSuite) TestProposalQCError() {
 }
 
 func TestValidateVote(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 	suite.Run(t, new(VoteSuite))
 }
 
@@ -319,7 +321,7 @@ func (vs *VoteSuite) SetupTest() {
 
 	// the leader for the block view is the correct one
 	vs.committee = &mocks.DynamicCommittee{}
-	vs.committee.On("Identity", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
+	vs.committee.On("IdentityByEpoch", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
 
 	// set up the validator with the mocked dependencies
 	vs.validator = New(vs.committee, vs.forks, vs.verifier)
@@ -364,7 +366,7 @@ func (vs *VoteSuite) TestVoteSignatureError() {
 // Hence, we expect the validator to return a `model.InvalidVoteError`.
 func (vs *VoteSuite) TestVoteInvalidSignerID() {
 	*vs.committee = mocks.DynamicCommittee{}
-	vs.committee.On("Identity", vs.block.BlockID, vs.vote.SignerID).Return(nil, model.NewInvalidSignerErrorf(""))
+	vs.committee.On("IdentityByEpoch", vs.block.View, vs.vote.SignerID).Return(nil, model.NewInvalidSignerErrorf(""))
 
 	// A `model.InvalidSignerError` from the committee should be interpreted as
 	// the Vote being invalid, i.e. we expect an InvalidVoteError to be returned
@@ -390,7 +392,6 @@ func (vs *VoteSuite) TestVoteSignatureInvalid() {
 }
 
 func TestValidateQC(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 	suite.Run(t, new(QCSuite))
 }
 
@@ -422,12 +423,13 @@ func (qs *QCSuite) SetupTest() {
 
 	// return the correct participants and identities from view state
 	qs.committee = &mocks.DynamicCommittee{}
-	qs.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
+	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
+		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return qs.participants.Filter(selector)
 		},
 		nil,
 	)
+	qs.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(qs.participants.TotalWeight()), nil)
 
 	// set up the mocked verifier to verify the QC correctly
 	qs.verifier = &mocks.Verifier{}
@@ -457,7 +459,7 @@ func (qs *QCSuite) TestQCInvalidSignersError() {
 func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 	// change the hotstuff.DynamicCommittee to fail on retrieving participants
 	*qs.committee = mocks.DynamicCommittee{}
-	qs.committee.On("Identities", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
+	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
 
 	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidBlock
 	err := qs.validator.ValidateQC(qs.qc, qs.block)

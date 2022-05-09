@@ -28,7 +28,6 @@ const pmTimeout = 10 * time.Millisecond
 // If 2 nodes are down in a 7 nodes cluster, the rest of 5 nodes can
 // still make progress and reach consensus
 func Test2TimeoutOutof7Instances(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
@@ -102,7 +101,6 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 // still make progress, but no block will be finalized, because
 // finalization requires 2-direct chain and a QC
 func Test1TimeoutOutof4Instances(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "COMMITTEE_BY_VIEW - updating in next pr")
 
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,

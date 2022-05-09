@@ -100,7 +100,7 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	epoch1Identities := flow.IdentityList{realIdentity, zeroWeightConsensusIdentity, ejectedConsensusIdentity, validNonConsensusIdentity}
 
-	// a single epoch 2 identity
+	// a single consensus node for epoch 2:
 	epoch2Identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	epoch2Identities := flow.IdentityList{epoch2Identity}
 
@@ -162,7 +162,7 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epoch", func(t *testing.T) {
 			_, err := com.IdentityByEpoch(randUint64(101, 1_000_000), epoch2Identity.NodeID)
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrViewForUnknownEpoch))
+			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
 
@@ -198,7 +198,7 @@ func TestConsensus_IdentitiesByEpoch(t *testing.T) {
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epochs", func(t *testing.T) {
 			_, err := com.IdentityByEpoch(randUint64(201, 1_000_000), epoch2Identity.NodeID)
 			require.Error(t, err)
-			require.True(t, errors.Is(err, ErrViewForUnknownEpoch))
+			require.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
 }
@@ -261,7 +261,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 			// get leader for view in next epoch when it is not set up yet
 			_, err := committee.LeaderForView(randUint64(201, 300))
 			assert.Error(t, err)
-			assert.True(t, errors.Is(err, ErrViewForUnknownEpoch))
+			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
 
@@ -303,7 +303,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 		t.Run("beyond known epochs", func(t *testing.T) {
 			_, err := committee.LeaderForView(randUint64(301, 1_000_000))
 			assert.Error(t, err)
-			assert.True(t, errors.Is(err, ErrViewForUnknownEpoch))
+			assert.True(t, errors.Is(err, model.ErrViewForUnknownEpoch))
 		})
 	})
 }
