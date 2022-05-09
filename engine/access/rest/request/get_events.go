@@ -9,7 +9,7 @@ import (
 
 const eventTypeQuery = "type"
 const blockQuery = "block_ids"
-const MaxAllowedEventRequestHeightRange = 250
+const MaxEventRequestHeightRange = 250
 
 type GetEvents struct {
 	StartHeight uint64
@@ -77,8 +77,8 @@ func (g *GetEvents) Parse(rawType string, rawStart string, rawEnd string, rawBlo
 			return fmt.Errorf("start height must be less than or equal to end height")
 		}
 		// check if range exceeds maximum but only if end is not equal to special value which is not known yet
-		if g.EndHeight-g.StartHeight >= MaxAllowedEventRequestHeightRange && g.EndHeight != FinalHeight && g.EndHeight != SealedHeight {
-			return fmt.Errorf("height range %d exceeds maximum allowed of %d", g.EndHeight-g.StartHeight, MaxAllowedEventRequestHeightRange)
+		if g.EndHeight-g.StartHeight >= MaxEventRequestHeightRange && g.EndHeight != FinalHeight && g.EndHeight != SealedHeight {
+			return fmt.Errorf("height range %d exceeds maximum allowed of %d", g.EndHeight-g.StartHeight, MaxEventRequestHeightRange)
 		}
 	}
 
