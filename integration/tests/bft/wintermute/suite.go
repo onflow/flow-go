@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/insecure/attacknetwork"
+	"github.com/onflow/flow-go/insecure/wintermute"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -38,11 +41,19 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return cli
 }
 
+// AccessClient returns a client to interact with the access node api on testnet.
+func (s *Suite) AccessClient() *testnet.Client {
+	chain := s.net.Root().Header.ChainID.Chain()
+	cli, err := testnet.NewClient(fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	require.NoError(s.T(), err, "could not get access client")
+	return cli
+}
+
 // SetupSuite runs a bare minimum Flow network to function correctly with the following roles:
 // - Two collector nodes
 // - Four consensus nodes
-// - two execution node
-// - One verification node
+// - two corrupted execution node
+// - One corrupted verification node
 // - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
@@ -135,6 +146,24 @@ func (s *Suite) SetupSuite() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	s.net.Start(ctx)
+
+	// create dummy orchestrator
+
+	corruptedIDs := make(flow.IdentifierList, 3)
+	corruptedIDs = append(corruptedIDs, s.exe1ID)
+	corruptedIDs = append(corruptedIDs, s.exe2ID)
+	corruptedIDs = append(corruptedIDs, s.verID)
+
+	allIDs := make(flow.IdentityList, 6)
+	allIDs = append(s.nodeConfigs[0].Identifier)
+
+	dummyOrchestrator := wintermute.NewOrchestrator(unittest.Logger(), corruptedIDs, allIDs)
+
+	// start attack network
+	const serverAddress = "localhost:0"
+	codec := cbor.NewCodec()
+	attacknetwork.NewAttackNetwork(unittest.Logger(), serverAddress, codec)
+	attackNetwork, err := NewAttackNetwork(unittest.Logger(), serverAddress, codec, orchestrator, connector, corruptedIds)
 
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
