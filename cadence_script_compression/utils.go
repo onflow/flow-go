@@ -75,5 +75,5 @@ func CompressionRatio(uncompressed, compressed float64) float64 {
 }
 
 func CompressionSpeed(size float64, start time.Time) float64 {
-	return (size / (1 << 20)) / (float64(time.Since(start)) / (float64(time.Second)))
+	return (size / (1 << 20)) / time.Since(start).Seconds()
 }
