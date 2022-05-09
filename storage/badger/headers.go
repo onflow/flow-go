@@ -180,3 +180,39 @@ func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch s
 	writeBatch := batch.GetWriter()
 	return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
 }
+
+func (h *Headers) RemoveChunkBlockIndexByChunkID(chunkID flow.Identifier) error {
+	return h.db.Update(operation.RemoveBlockIDByChunkID(chunkID))
+}
+
+// RollbackExecutedBlock update the executed block header to the given header.
+// only useful for execution node to roll back executed block height
+func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
+	return operation.RetryOnConflict(h.db.Update, func(txn *badger.Txn) error {
+		var blockID flow.Identifier
+		err := operation.RetrieveExecutedBlock(&blockID)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot lookup executed block: %w", err)
+		}
+
+		var highest flow.Header
+		err = operation.RetrieveHeader(blockID, &highest)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot retrieve executed header: %w", err)
+		}
+
+		// only rollback if the given height is below the current executed height
+		if header.Height >= highest.Height {
+			return fmt.Errorf("cannot roolback. expect the target height %v to be lower than highest executed height %v, but actually is not",
+				header.Height, highest.Height,
+			)
+		}
+
+		err = operation.UpdateExecutedBlock(header.ID())(txn)
+		if err != nil {
+			return fmt.Errorf("cannot update highest executed block: %w", err)
+		}
+
+		return nil
+	})
+}

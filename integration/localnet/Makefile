@@ -3,7 +3,7 @@ CONSENSUS = 3
 EXECUTION = 2
 VERIFICATION = 1
 ACCESS = 2
-UNSTAKED_ACCESS = 0
+OBSERVER = 0
 NCLUSTERS=1
 EPOCHLEN=10000   # 0 means use default
 STAKINGLEN=2000 # 0 means use default
@@ -26,7 +26,7 @@ init:
 		-execution=$(EXECUTION) \
 		-verification=$(VERIFICATION) \
 		-access=$(ACCESS) \
-		-unstaked-access=$(UNSTAKED_ACCESS) \
+		-observer=$(OBSERVER) \
 		-nclusters=$(NCLUSTERS) \
 		-epoch-length=$(EPOCHLEN) \
 		-epoch-staking-phase-length=$(STAKINGLEN) \

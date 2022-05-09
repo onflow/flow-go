@@ -61,6 +61,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
@@ -120,6 +121,7 @@ func main() {
 		checkAuthorizedAtBlock        func(blockID flow.Identifier) (bool, error)
 		diskWAL                       *wal.DiskWAL
 		scriptLogThreshold            time.Duration
+		scriptExecutionTimeLimit      time.Duration
 		chdpQueryTimeout              uint
 		chdpDeliveryTimeout           uint
 		enableBlockDataUpload         bool
@@ -153,6 +155,7 @@ func main() {
 			flags.UintVar(&chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.DurationVar(&scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold, "threshold for logging script execution")
+			flags.DurationVar(&scriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit, "script execution time limit")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.UintVar(&transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
@@ -459,6 +462,7 @@ func main() {
 				cadenceExecutionCache,
 				committer,
 				scriptLogThreshold,
+				scriptExecutionTimeLimit,
 				blockDataUploaders,
 				executionDataService,
 				executionDataCIDCache,
@@ -484,7 +488,6 @@ func main() {
 				node.Storage.Collections,
 				chunkDataPacks,
 				results,
-				node.Storage.Receipts,
 				myReceipts,
 				events,
 				serviceEvents,
@@ -671,6 +674,7 @@ func main() {
 				followerCore,
 				syncCore,
 				node.Tracer,
+				compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
