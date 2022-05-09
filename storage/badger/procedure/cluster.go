@@ -180,7 +180,7 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 		}
 
 		// insert the reference block ID
-		err = operation.IndexCollectionReference(blockID, payload.ReferenceBlockID)(tx)
+		err = operation.IndexReferenceBlockByClusterBlock(blockID, payload.ReferenceBlockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert reference block ID: %w", err)
 		}
@@ -195,7 +195,7 @@ func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) f
 
 		// lookup the reference block ID
 		var refID flow.Identifier
-		err := operation.LookupCollectionReference(blockID, &refID)(tx)
+		err := operation.LookupReferenceBlockByClusterBlock(blockID, &refID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve reference block ID: %w", err)
 		}
