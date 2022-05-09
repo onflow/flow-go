@@ -2,17 +2,25 @@ package encoding
 
 // List of domain separation tags for protocol signatures.
 //
-// Each Protocol-level signature involves hashing an entity.
-// To prevent domain malleability attacks and to simulate multiple
-// orthogonal random oracles, the hashing process includes
-// a domain tag that specifies the type of the signed object.
+// Protocol-level signature uses BLS signature scheme.
+// Each signature involves hashing entity bytes during the
+// the hash to curve operation.
+// To scope the signature to a specific sub-protocol and simulate multiple
+// orthogonal random oracles, the hashing process includes a domain separation specific
+// where the signature is used.
 
+// Flow protocol prefix
+const protocolPrefix = "FLOW-"
+
+// version and ciphersuite index
+const version = "-V00-CS00-with-"
+
+// an example of domain tag output is :
+// FLOW-CERTAIN_DOMAIN-V00-CS00-with-
+// The
 func tag(domain string) string {
-	return protocolPrefix + domain
+	return protocolPrefix + domain + version
 }
-
-// Flow protocol version and ciphersuite
-const protocolPrefix = "FLOW-V00-CS00-with-"
 
 var (
 	// all the tags below are application tags, the crypto library API guarantees
