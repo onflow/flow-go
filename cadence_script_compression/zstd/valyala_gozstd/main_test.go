@@ -36,6 +36,15 @@ func TestCompressVariableSize(t *testing.T) {
 	}
 
 	contracts := csc.ReadContracts(contracsDir)
+	dictFile, err := ioutil.ReadFile(dictionary)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dict, err := zstd.NewCDictLevel(dictFile, 22)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, name := range contractNames {
 		c := contracts[name]
@@ -43,7 +52,7 @@ func TestCompressVariableSize(t *testing.T) {
 		dst := make([]byte, 0)
 
 		start := time.Now()
-		dst = zstd.Compress(dst, c.Data)
+		dst = zstd.CompressDict(dst, c.Data, dict)
 
 		compressionSpeed := csc.CompressionSpeed(float64(len(c.Data)), start)
 		ratio := csc.CompressionRatio(float64(len(c.Data)), float64(len(dst)))
