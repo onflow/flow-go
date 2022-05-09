@@ -1025,7 +1025,7 @@ func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, par
 
 		err := component.RunComponent(ctx, componentFactory, v.errorHandler)
 		if err != nil && !errors.Is(err, ctx.Err()) {
-			ctx.Throw(fmt.Errorf("component %s shutdown unexpectedly: %w", v.name, err))
+			ctx.Throw(fmt.Errorf("component %s encountered an unhandled irrecoverable error: %w", v.name, err))
 		}
 
 		log.Info().Msg("component shutdown complete")

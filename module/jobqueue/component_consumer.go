@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -52,7 +53,12 @@ func NewComponentConsumer(
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			worker.Start(ctx)
-			<-worker.Ready()
+			if err := util.WaitClosed(ctx, worker.Ready()); err != nil {
+				c.log.Info().Msg("job consumer startup aborted")
+				<-worker.Done()
+				c.log.Info().Msg("job consumer shutdown complete")
+				return
+			}
 
 			c.log.Info().Msg("job consumer starting")
 			err := c.consumer.Start(defaultIndex)

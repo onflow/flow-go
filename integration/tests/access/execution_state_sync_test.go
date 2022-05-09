@@ -48,7 +48,7 @@ type ExecutionStateSyncSuite struct {
 
 func (s *ExecutionStateSyncSuite) SetupTest() {
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
-		Str("testfile", "unstaked.go").
+		Str("testfile", "execution_state_sync_test.go").
 		Str("testcase", s.T().Name()).
 		Logger()
 
@@ -79,7 +79,7 @@ func (s *ExecutionStateSyncSuite) Ghost() *client.GhostClient {
 }
 
 func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
-	// staked access node
+	// access node
 	s.bridgeID = unittest.IdentifierFixture()
 	bridgeANConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
@@ -121,7 +121,6 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		// TODO: add observer
 	}
 
-	// consensus followers
 	conf := testnet.NewNetworkConfig("execution state sync test", net)
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf)
 }
