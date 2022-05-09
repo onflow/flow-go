@@ -2,17 +2,23 @@ package safetyrules
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
+	"testing"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func TestSafetyRules(t *testing.T) {
+	suite.Run(t, new(SafetyRulesTestSuite))
+}
 
 // SafetyRulesTestSuite is a test suite for testing SafetyRules related functionality.
 // SafetyRulesTestSuite setups mocks for injected modules and creates hotstuff.SafetyData
@@ -292,6 +298,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 
 	// producing timeout with same arguments should return cached version
 	otherTimeout, err := s.safety.ProduceTimeout(view, highestQC, nil)
+	require.NoError(s.T(), err)
 	require.Equal(s.T(), timeout, otherTimeout)
 
 	// to create new TO we need to provide a TC
@@ -313,6 +320,7 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_ShouldTimeout() {
 	// creating new timeout should invalidate cache
 	otherTimeout, err = s.safety.ProduceTimeout(view+1, highestQC, lastViewTC)
 	require.NoError(s.T(), err)
+	require.NotNil(s.T(), otherTimeout)
 
 	// creating timeout for previous view(that was already cached) should result in error
 	timeout, err = s.safety.ProduceTimeout(view, highestQC, nil)
