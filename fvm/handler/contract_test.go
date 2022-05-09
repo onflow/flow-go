@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/programs"
+
 	"github.com/onflow/flow-go/fvm/handler"
 	stateMock "github.com/onflow/flow-go/fvm/mock/state"
 	"github.com/onflow/flow-go/fvm/state"
@@ -98,6 +100,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 }
 
 func TestContract_DeploymentVouchers(t *testing.T) {
+
 	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
 	accounts := state.NewAccounts(sth)
 
@@ -111,9 +114,12 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 	err = accounts.Create(nil, addressNoVoucher)
 	require.NoError(t, err)
 
-	contractHandler := handler.NewContractHandler(accounts,
+	contractHandler := handler.NewContractHandler(
+		accounts,
 		true,
-		func() []common.Address { return []common.Address{} },
+		func() []common.Address {
+			return []common.Address{}
+		},
 		func(address runtime.Address, code []byte) (bool, error) {
 			if address.String() == addressWithVoucher.String() {
 				return true, nil
@@ -122,12 +128,92 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 		})
 
 	// set contract without voucher
-	err = contractHandler.SetContract(addressNoVoucherRuntime, "testContract1", []byte("ABC"), []common.Address{addressNoVoucherRuntime})
+	err = contractHandler.SetContract(
+		addressNoVoucherRuntime,
+		"TestContract1",
+		[]byte("pub contract TestContract1 {}"),
+		[]common.Address{
+			addressNoVoucherRuntime,
+		},
+	)
 	require.Error(t, err)
 	require.False(t, contractHandler.HasUpdates())
 
 	// try to set contract with voucher
-	err = contractHandler.SetContract(addressWithVoucherRuntime, "testContract2", []byte("ABC"), []common.Address{addressWithVoucherRuntime})
+	err = contractHandler.SetContract(
+		addressWithVoucherRuntime,
+		"TestContract2",
+		[]byte("pub contract TestContract2 {}"),
+		[]common.Address{
+			addressWithVoucherRuntime,
+		},
+	)
+	require.NoError(t, err)
+	require.True(t, contractHandler.HasUpdates())
+}
+
+func TestContract_ContractUpdate(t *testing.T) {
+
+	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
+	accounts := state.NewAccounts(sth)
+
+	flowAddress := flow.HexToAddress("01")
+	runtimeAddress := runtime.Address(flowAddress)
+	err := accounts.Create(nil, flowAddress)
+	require.NoError(t, err)
+
+	var authorizationChecked bool
+
+	contractHandler := handler.NewContractHandler(
+		accounts,
+		true,
+		func() []common.Address {
+			return []common.Address{}
+		},
+		func(address runtime.Address, code []byte) (bool, error) {
+			// Ensure the voucher check is only called once,
+			// for the initial contract deployment,
+			// and not for the subsequent update
+			require.False(t, authorizationChecked)
+			authorizationChecked = true
+			return true, nil
+		},
+	)
+
+	// deploy contract with voucher
+	err = contractHandler.SetContract(
+		runtimeAddress,
+		"TestContract",
+		[]byte("pub contract TestContract {}"),
+		[]common.Address{
+			runtimeAddress,
+		},
+	)
+	require.NoError(t, err)
+	require.True(t, contractHandler.HasUpdates())
+
+	contractUpdateKeys, err := contractHandler.Commit()
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		[]programs.ContractUpdateKey{
+			{
+				Address: flowAddress,
+				Name:    "TestContract",
+			},
+		},
+		contractUpdateKeys,
+	)
+
+	// try to update contract without voucher
+	err = contractHandler.SetContract(
+		runtimeAddress,
+		"TestContract",
+		[]byte("pub contract TestContract {}"),
+		[]common.Address{
+			runtimeAddress,
+		},
+	)
 	require.NoError(t, err)
 	require.True(t, contractHandler.HasUpdates())
 }
@@ -135,14 +221,20 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 	mockAccounts := &stateMock.Accounts{}
 
-	mockAccounts.On("SetContract", mock.Anything, mock.Anything, mock.Anything).Return(func(contractName string, address flow.Address, contract []byte) error {
-		return fmt.Errorf("%s %s", contractName, address.Hex())
-	})
+	mockAccounts.On("ContractExists", mock.Anything, mock.Anything).
+		Return(false, nil)
 
-	contractHandler := handler.NewContractHandler(mockAccounts,
+	mockAccounts.On("SetContract", mock.Anything, mock.Anything, mock.Anything).
+		Return(func(contractName string, address flow.Address, contract []byte) error {
+			return fmt.Errorf("%s %s", contractName, address.Hex())
+		})
+
+	contractHandler := handler.NewContractHandler(
+		mockAccounts,
 		false,
 		nil,
-		nil)
+		nil,
+	)
 
 	address1 := runtime.Address(flow.HexToAddress("0000000000000001"))
 	address2 := runtime.Address(flow.HexToAddress("0000000000000002"))
