@@ -116,6 +116,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		// check that all transactions within the collection are valid
 		minRefID := flow.ZeroID
 		minRefHeight := uint64(math.MaxUint64)
+		maxRefHeight := uint64(0)
 		for _, flowTx := range payload.Collection.Transactions {
 			refBlock, err := m.headers.ByBlockID(flowTx.ReferenceBlockID)
 			if errors.Is(err, storage.ErrNotFound) {
@@ -129,6 +130,9 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			if refBlock.Height < minRefHeight {
 				minRefHeight = refBlock.Height
 				minRefID = flowTx.ReferenceBlockID
+			}
+			if refBlock.Height > maxRefHeight {
+				maxRefHeight = refBlock.Height
 			}
 		}
 
@@ -168,37 +172,22 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 			txLookup[tx.ID()] = struct{}{}
 		}
 
-		var duplicateTxIDs flow.IdentifierList
-		ancestorID := block.Header.ParentID
-		for {
-			ancestor, err := m.headers.ByBlockID(ancestorID)
-			if err != nil {
-				return fmt.Errorf("could not retrieve ancestor header: %w", err)
-			}
-
-			if ancestor.Height <= limit {
-				break
-			}
-
-			payload, err := m.payloads.ByBlockID(ancestorID)
-			if err != nil {
-				return fmt.Errorf("could not retrieve ancestor payload: %w", err)
-			}
-
-			for _, tx := range payload.Collection.Transactions {
-				txID := tx.ID()
-				_, duplicated := txLookup[txID]
-				if duplicated {
-					duplicateTxIDs = append(duplicateTxIDs, txID)
-				}
-			}
-			ancestorID = ancestor.ParentID
+		// first, check for duplicate transactions in the un-finalized ancestry
+		duplicateTxIDs, err := m.checkDupeTransactionsInUnfinalizedAncestry(block, txLookup, final.Height)
+		if err != nil {
+			return fmt.Errorf("could not check for duplicate txs in un-finalized ancestry: %w", err)
+		}
+		if len(duplicateTxIDs) > 0 {
+			return state.NewInvalidExtensionErrorf("payload includes duplicate transactions in un-finalized ancestry (duplicates: %s)", duplicateTxIDs)
 		}
 
-		// if we have duplicate transactions, fail
+		// second, check for duplicate transactions in the finalized ancestry
+		duplicateTxIDs, err = m.checkDupeTransactionsInFinalizedAncestry(txLookup, minRefHeight, maxRefHeight)
+		if err != nil {
+			return fmt.Errorf("could not check for duplicate txs in finalized ancestry: %w", err)
+		}
 		if len(duplicateTxIDs) > 0 {
-			return state.NewInvalidExtensionErrorf("payload includes duplicate transactions (duplicates: %s)",
-				duplicateTxIDs)
+			return state.NewInvalidExtensionErrorf("payload includes duplicate transactions in finalized ancestry (duplicates: %s)", duplicateTxIDs)
 		}
 
 		return nil
@@ -216,4 +205,80 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		return fmt.Errorf("could not insert cluster block: %w", err)
 	}
 	return nil
+}
+
+// checkDupeTransactionsInUnfinalizedAncestry checks for duplicate transactions in the un-finalized
+// ancestry of the given block, and returns a list of all duplicates if there are any.
+func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
+	var duplicateTxIDs []flow.Identifier
+
+	ancestorID := block.Header.ParentID
+	for {
+		ancestor, err := m.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve ancestor header: %w", err)
+		}
+
+		if ancestor.Height <= finalHeight {
+			break
+		}
+
+		payload, err := m.payloads.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve ancestor payload: %w", err)
+		}
+
+		for _, tx := range payload.Collection.Transactions {
+			txID := tx.ID()
+			_, duplicated := includedTransactions[txID]
+			if duplicated {
+				duplicateTxIDs = append(duplicateTxIDs, txID)
+			}
+		}
+		ancestorID = ancestor.ParentID
+	}
+
+	return duplicateTxIDs, nil
+}
+
+// checkDupeTransactionsInFinalizedAncestry checks for duplicate transactions in the finalized
+// ancestry, and returns a list of all duplicates if there are any.
+func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransactions map[flow.Identifier]struct{}, minRefHeight, maxRefHeight uint64) ([]flow.Identifier, error) {
+	var duplicatedTxIDs []flow.Identifier
+
+	// Let E be the global transaction expiry constant, measured in blocks
+	//
+	// 1. a cluster block's reference block height is equal to the lowest reference
+	//    block height of all its constituent transactions
+	// 2. a transaction with reference block height T is eligible for inclusion in
+	//    any collection with reference block height C where C<=T<C+E
+	// TODO: need to change anything to enforce the above? comment in builder?
+	//
+	// Therefore, to guarantee that we find all possible duplicates, we need to check
+	// all collections with reference block height in the range (C-E,C+E)
+
+	// the finalized cluster blocks which could possibly contain any conflicting transactions
+	var clusterBlockIDs []flow.Identifier
+	start := minRefHeight - flow.DefaultMaxCollectionByteSize + 1
+	end := maxRefHeight
+	err := m.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
+	}
+
+	for _, blockID := range clusterBlockIDs {
+		payload, err := m.payloads.ByBlockID(blockID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve cluster payload (block_id=%x) to de-duplicate: %w", blockID, err)
+		}
+		for _, tx := range payload.Collection.Transactions {
+			txID := tx.ID()
+			_, duplicated := includedTransactions[txID]
+			if duplicated {
+				duplicatedTxIDs = append(duplicatedTxIDs, txID)
+			}
+		}
+	}
+
+	return duplicatedTxIDs, nil
 }
