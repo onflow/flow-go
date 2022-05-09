@@ -197,6 +197,14 @@ func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
 	return proposal
 }
 
+func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
+	proposal := &messages.ClusterBlockProposal{
+		Header:  block.Header,
+		Payload: block.Payload,
+	}
+	return proposal
+}
+
 func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
 	pending := flow.PendingBlock{
 		OriginID: block.Header.ProposerID,
@@ -1950,4 +1958,16 @@ func MachineAccountFixture(t *testing.T) (bootstrap.NodeMachineAccountInfo, *sdk
 		},
 	}
 	return info, acct
+}
+
+func TransactionResultsFixture(n int) []flow.TransactionResult {
+	results := make([]flow.TransactionResult, 0, n)
+	for i := 0; i < n; i++ {
+		results = append(results, flow.TransactionResult{
+			TransactionID:   IdentifierFixture(),
+			ErrorMessage:    "whatever",
+			ComputationUsed: uint64(rand.Uint32()),
+		})
+	}
+	return results
 }

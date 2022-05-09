@@ -146,6 +146,7 @@ func (s *DKGSuite) deployDKGContract() {
 	s.adminDKGContractClient = dkg.NewClient(
 		zerolog.Nop(),
 		s.adminEmulatorClient,
+		flow.ZeroID,
 		s.dkgSigner,
 		s.dkgAddress.String(),
 		s.dkgAddress.String(), 0)
@@ -267,6 +268,7 @@ func (s *DKGSuite) createNode(account *nodeAccount) *node {
 	contractClient := dkg.NewClient(
 		zerolog.Nop(),
 		emulatorClient,
+		flow.ZeroID,
 		account.accountSigner,
 		s.dkgAddress.String(),
 		account.accountAddress.String(),

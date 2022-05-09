@@ -33,13 +33,17 @@ type Client struct {
 func NewClient(
 	log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
+	flowClientANID flow.Identifier,
 	signer sdkcrypto.Signer,
 	dkgContractAddress,
 	accountAddress string,
 	accountKeyIndex uint,
 ) *Client {
 
-	log = log.With().Str("component", "dkg_contract_client").Logger()
+	log = log.With().
+		Str("component", "dkg_contract_client").
+		Str("flow_client_an_id", flowClientANID.String()).
+		Logger()
 	base := epochs.NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, dkgContractAddress)
 
 	env := templates.Environment{DkgAddress: dkgContractAddress}
