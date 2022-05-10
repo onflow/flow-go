@@ -1,0 +1,76 @@
+=== RUN   TestCompressVariableSize
+    main_test.go:76: contract name: 504cbf9620ea384e.SomePlaceCounter.cdc
+        orig size/compressed size: 251/75
+        compression speed: 0.42 MB/s
+        compression ratio: 3.35
+        decompression speed: 1.98 MB/s
+    main_test.go:76: contract name: 26f07529cfd446c3.PonsCertificationContract.cdc
+        orig size/compressed size: 534/147
+        compression speed: 0.93 MB/s
+        compression ratio: 3.63
+        decompression speed: 65.72 MB/s
+    main_test.go:76: contract name: ae3baa0d314e546b.DigiyoAdminReceiver.cdc
+        orig size/compressed size: 837/204
+        compression speed: 1.26 MB/s
+        compression ratio: 4.10
+        decompression speed: 118.54 MB/s
+    main_test.go:76: contract name: 01ab36aaf654a13e.RaribleFee.cdc
+        orig size/compressed size: 1090/221
+        compression speed: 1.30 MB/s
+        compression ratio: 4.93
+        decompression speed: 127.77 MB/s
+    main_test.go:76: contract name: ac98da57ce4dd4ef.MessageBoard.cdc
+        orig size/compressed size: 1353/340
+        compression speed: 1.50 MB/s
+        compression ratio: 3.98
+        decompression speed: 174.23 MB/s
+    main_test.go:76: contract name: 923f5c3c39a7649d.ListedTokens.cdc
+        orig size/compressed size: 2872/453
+        compression speed: 1.56 MB/s
+        compression ratio: 6.34
+        decompression speed: 248.91 MB/s
+    main_test.go:76: contract name: 097bafa4e0b48eef.CharityNFT.cdc
+        orig size/compressed size: 3914/556
+        compression speed: 2.68 MB/s
+        compression ratio: 7.04
+        decompression speed: 360.89 MB/s
+    main_test.go:76: contract name: 97165bb37258eec7.SplinterlandsItem.cdc
+        orig size/compressed size: 11702/1340
+        compression speed: 1.93 MB/s
+        compression ratio: 8.73
+        decompression speed: 346.91 MB/s
+    main_test.go:76: contract name: 329feb3ab062d289.AmericanAirlines_NFT.cdc
+        orig size/compressed size: 23478/1564
+        compression speed: 1.37 MB/s
+        compression ratio: 15.01
+        decompression speed: 630.02 MB/s
+    main_test.go:76: contract name: b715b81853fef53f.AllDay.cdc
+        orig size/compressed size: 26205/3479
+        compression speed: 2.58 MB/s
+        compression ratio: 7.53
+        decompression speed: 483.97 MB/s
+    main_test.go:76: contract name: 0b2a3299cc857e29.TopShot.cdc
+        orig size/compressed size: 44575/5190
+        compression speed: 2.26 MB/s
+        compression ratio: 8.59
+        decompression speed: 511.10 MB/s
+    main_test.go:76: contract name: 2817a7313c740232.TenantService.cdc
+        orig size/compressed size: 60130/6504
+        compression speed: 2.15 MB/s
+        compression ratio: 9.25
+        decompression speed: 84.04 MB/s
+    main_test.go:76: contract name: 3885d9d426d2ef5c.SpaceModel.cdc
+        orig size/compressed size: 602177/185984
+        compression speed: 3.76 MB/s
+        compression ratio: 3.24
+        decompression speed: 381.43 MB/s
+    main_test.go:76: contract name: 3885d9d426d2ef5c.EndModel.cdc
+        orig size/compressed size: 405918/137525
+        compression speed: 4.17 MB/s
+        compression ratio: 2.95
+        decompression speed: 298.92 MB/s
+    main_test.go:76: contract name: 3885d9d426d2ef5c.Model.cdc
+        orig size/compressed size: 703397/221294
+        compression speed: 3.24 MB/s
+        compression ratio: 3.18
+        decompression speed: 274.21 MB/s
