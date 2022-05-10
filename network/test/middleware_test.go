@@ -122,11 +122,12 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	var errChan <-chan error
 	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
 
+	mwCtx := m.mwCtx
 	go func() {
 		select {
 		case err := <-errChan:
 			m.T().Error("middlewares encountered fatal error", err)
-		case <-m.mwCtx.Done():
+		case <-mwCtx.Done():
 			return
 		}
 	}()
@@ -427,7 +428,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	require.NoError(m.Suite.T(), err)
 
 	// check message reception on target
-	unittest.RequireCloseBefore(m.T(), ch, 15*time.Second, "source node failed to send large message to target")
+	unittest.RequireCloseBefore(m.T(), ch, 60*time.Second, "source node failed to send large message to target")
 
 	m.ov[targetIndex].AssertExpectations(m.T())
 }
