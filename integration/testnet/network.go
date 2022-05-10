@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
+	"github.com/onflow/flow-go/insecure/cmd"
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
@@ -952,6 +953,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		hostPort := "2345"
 		containerPort := "2345/tcp"
 		nodeContainer.bindPort(hostPort, containerPort)
+	}
+
+	if nodeConf.Corrupted {
+		nodeContainer.exposePort(strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
 	}
 
 	suiteContainer := net.suite.Container(*opts)
