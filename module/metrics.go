@@ -400,7 +400,14 @@ type ExecutionMetrics interface {
 	ExecutionBlockDataUploadFinished(dur time.Duration)
 }
 
+type BackendScriptsMetrics interface {
+	// Record the round trip time while executing a script
+	ExecuteScriptRTT(dur time.Duration, size int)
+}
+
 type TransactionMetrics interface {
+	BackendScriptsMetrics
+
 	// TransactionReceived starts tracking of transaction execution/finalization/sealing
 	TransactionReceived(txID flow.Identifier, when time.Time)
 
