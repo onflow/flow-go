@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
@@ -262,7 +263,6 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}
-	fmt.Println("found cluster blocks: ", clusterBlockIDs)
 
 	for _, blockID := range clusterBlockIDs {
 		// TODO: could add LightByBlockID and retrieve only tx IDs

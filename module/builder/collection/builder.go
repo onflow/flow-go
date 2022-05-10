@@ -165,7 +165,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		var totalByteSize uint64
 		var totalGas uint64
 		for _, tx := range b.transactions.All() {
-			fmt.Println("considering transaction for inclusion: ", tx.ID())
 
 			// if we have reached maximum number of transactions, stop
 			if uint(len(transactions)) >= b.config.MaxCollectionSize {
@@ -215,7 +214,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			// ensure the reference block is not too old
 			txID := tx.ID()
 			if refHeader.Height < minPossibleRefHeight {
-				fmt.Println("expired tx", txID, refHeader.Height, minPossibleRefHeight)
 				// the transaction is expired, it will never be valid
 				b.transactions.Rem(txID)
 				continue
@@ -223,13 +221,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			// check that the transaction was not already used in un-finalized history
 			if lookup.isUnfinalizedAncestor(txID) {
-				fmt.Println("confict with unfinalized ancestor: ", txID)
 				continue
 			}
 
 			// check that the transaction was not already included in finalized history.
 			if lookup.isFinalizedAncestor(txID) {
-				fmt.Println("confict with finalized ancestor: ", txID)
 				// remove from mempool, conflicts with finalized block will never be valid
 				b.transactions.Rem(txID)
 				continue
@@ -248,8 +244,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			// update per-payer transaction count
 			limiter.transactionIncluded(tx)
-
-			fmt.Println("adding transaction: ", txID)
 
 			transactions = append(transactions, tx)
 			totalByteSize += txByteSize
@@ -371,6 +365,9 @@ func (b *Builder) populateFinalizedAncestryLookup(minRefHeight, maxRefHeight uin
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
 	start := minRefHeight - flow.DefaultTransactionExpiry + 1
+	if start > minRefHeight {
+		start = 0 // overflow check
+	}
 	end := maxRefHeight
 	err := b.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
 	if err != nil {
