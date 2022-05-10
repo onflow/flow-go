@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/rs/zerolog"
@@ -149,21 +150,51 @@ func (s *Suite) SetupSuite() {
 
 	// create dummy orchestrator
 
-	corruptedIDs := make(flow.IdentifierList, 3)
-	corruptedIDs = append(corruptedIDs, s.exe1ID)
-	corruptedIDs = append(corruptedIDs, s.exe2ID)
-	corruptedIDs = append(corruptedIDs, s.verID)
+	corruptedIdentifierList := make(flow.IdentifierList, 3)
+	corruptedIdentifierList = append(corruptedIdentifierList, s.exe1ID)
+	corruptedIdentifierList = append(corruptedIdentifierList, s.exe2ID)
+	corruptedIdentifierList = append(corruptedIdentifierList, s.verID)
 
-	allIDs := make(flow.IdentityList, 6)
-	allIDs = append(s.nodeConfigs[0].Identifier)
+	corruptedIdentityList := make(flow.IdentityList, 3)
+	corruptedIdentityList = append(corruptedIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithNodeID(s.exe1ID)))
+	corruptedIdentityList = append(corruptedIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithNodeID(s.exe2ID)))
+	corruptedIdentityList = append(corruptedIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithNodeID(s.verID)))
 
-	dummyOrchestrator := wintermute.NewOrchestrator(unittest.Logger(), corruptedIDs, allIDs)
+	allIdentityList := make(flow.IdentityList, 9)
+
+	// 4 honest consensus nodes
+	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithNodeID(s.nodeIDs[0])))
+	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithNodeID(s.nodeIDs[1])))
+	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithNodeID(s.nodeIDs[2])))
+	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithNodeID(s.nodeIDs[3])))
+
+	// 2 honest collection nodes
+	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection), unittest.WithNodeID(coll1Config.Identifier)))
+	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection), unittest.WithNodeID(coll2Config.Identifier)))
+
+	// add corrupted node identities
+	allIdentityList = append(allIdentityList, corruptedIdentityList...)
+
+	dummyOrchestrator := wintermute.NewOrchestrator(unittest.Logger(), corruptedIdentifierList, allIdentityList)
 
 	// start attack network
 	const serverAddress = "localhost:0"
+	const ccfPort = 0
 	codec := cbor.NewCodec()
-	attacknetwork.NewAttackNetwork(unittest.Logger(), serverAddress, codec)
-	attackNetwork, err := NewAttackNetwork(unittest.Logger(), serverAddress, codec, orchestrator, connector, corruptedIds)
+	connector := attacknetwork.NewCorruptedConnector(corruptedIdentityList, ccfPort)
+	attackNetwork, err := attacknetwork.NewAttackNetwork(unittest.Logger(), serverAddress, codec, dummyOrchestrator, connector, corruptedIdentityList)
+	require.NoError(s.T(), err)
+	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go func() {
+		select {
+		case err := <-errChan:
+			s.T().Error("attackNetwork startup encountered fatal error", err)
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	attackNetwork.Start(attackCtx)
 
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
