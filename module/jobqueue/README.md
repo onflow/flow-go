@@ -51,7 +51,7 @@ This ensures each job will be processed at least once. Note: given the at least 
 
 ### Using Workers to work on each job
 
-When Job consumer finds a new job, it uses an implementation of the `Worker` interface to process each job. The `Worker`s `Run` method accepts a `module.Job` interface. So it's the user's responsibility to handle the conversion between `module.Job` and the underlying data type. 
+When Job consumer finds a new job, it uses an implementation of the `Worker` interface to process each job. The `Worker`s `Run` method accepts a `module.Job` interface. So it's the user's responsibility to handle the conversion between `module.Job` and the underlying data type.
 
 In the scenario of processing finalized blocks, implementing symmetric functions like BlockToJob and JobToBlock are recommended for this conversion.
 
@@ -65,8 +65,6 @@ For instance, verification node uses 2-jobqueue pipeline to find chunks from eac
 ## Considerations
 
 ### Push vs Pull
-The jobqueue architecture is optimized for "pull" style processes, where the consumer pulls jobs from a source when workers are available. All current implementations are using this style since it lends well to asynchronously processing jobs based on block heights.
+The jobqueue architecture is optimized for "pull" style processes, where the job producer simply notify the job consumer about new jobs without creating any job, and job consumer pulls jobs from a source when workers are available. All current implementations are using this pull style since it lends well to asynchronously processing jobs based on block heights.
 
-Some use cases require "push" style jobs where there is a job producer that creates jobs, and a consumer that processes work from the producer. This is possible with the jobqueue, but requires the producer persist the jobs to a database, then implement the `Head` and `AtIndex` methods that allow accessing jobs by sequential `uint64` indexes.
-
-In existing pull use cases, the sync engine is effectively the job producer.
+Some use cases might require "push" style jobs where there is a job producer that create new jobs, and a consumer that processes work from the producer. This is possible with the jobqueue, but requires the producer persist the jobs to a database, then implement the `Head` and `AtIndex` methods that allow accessing jobs by sequential `uint64` indexes.
