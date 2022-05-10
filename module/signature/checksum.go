@@ -2,6 +2,7 @@ package signature
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"hash/crc32"
 
@@ -16,12 +17,9 @@ func checksum(data []byte) [CheckSumLen]byte {
 	// crc32 is enough
 	sum := crc32.ChecksumIEEE(data)
 	// converting the uint32 checksum value into [4]byte
-	return [CheckSumLen]byte{
-		byte(sum >> 24),
-		byte(sum >> 16),
-		byte(sum >> 8),
-		byte(sum),
-	}
+	var sumBytes [CheckSumLen]byte
+	binary.BigEndian.PutUint32(sumBytes[:], sum)
+	return sumBytes
 }
 
 // CheckSumFromIdentities returns checksum for the given identities
