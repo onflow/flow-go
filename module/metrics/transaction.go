@@ -21,8 +21,8 @@ type TransactionCollector struct {
 	timeToExecuted             prometheus.Summary
 	timeToFinalizedExecuted    prometheus.Summary
 	transactionSubmission      *prometheus.CounterVec
-	executeScriptRTT           prometheus.Counter
-	executeScriptSize          prometheus.Histogram
+	executeScriptDuration      prometheus.Counter
+	executeScriptSize          prometheus.Counter
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -83,17 +83,17 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "counter for the success/failure of transaction submissions",
 		}, []string{"result"}),
-		executeScriptRTT: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "execute_script_rtt",
+		executeScriptDuration: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "execute_script_rtt_duration",
 			Namespace: namespaceAccess,
-			Subsystem: "TEMP",
+			Subsystem: subsystemTransactionSubmission,
 			Help:      "counter for the round trip time for executing a script",
 		}),
-		executeScriptSize: promauto.NewHistogram(prometheus.HistogramOpts{
-			Name:      "execute_script_size",
+		executeScriptSize: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "execute_script_rtt_size",
 			Namespace: namespaceAccess,
-			Subsystem: "TEMP",
-			Help:      "histogram for the size in bytes of scripts being executed",
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "counter for the size in bytes of scripts being executed",
 		}),
 	}
 
@@ -101,8 +101,8 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 }
 
 func (tc *TransactionCollector) ExecuteScriptRTT(dur time.Duration, size int) {
-	tc.executeScriptRTT.Add(float64(dur) / float64(time.Millisecond))
-	tc.executeScriptSize.Observe(float64(size))
+	tc.executeScriptDuration.Add(float64(dur) / float64(time.Millisecond))
+	tc.executeScriptSize.Add(float64(size))
 }
 
 func (tc *TransactionCollector) TransactionReceived(txID flow.Identifier, when time.Time) {
