@@ -36,7 +36,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 	return func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult {
 		identity, ok := getIdentity(from)
 		if !ok {
-			log.Warn().Str("peer_id", from.String()).Msg("could not get identity of sender")
+			log.Warn().Str("peer_id", from.String()).Msg("could not verify identity of sender")
 			return pubsub.ValidationReject
 		}
 
