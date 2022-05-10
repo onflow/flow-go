@@ -143,6 +143,26 @@ type FlowNetwork struct {
 	BootstrapSnapshot           *inmem.Snapshot
 }
 
+// CorruptedIdentities returns the identities of corrupted nodes in testnet (for BFT testing).
+func (net *FlowNetwork) CorruptedIdentities() flow.IdentityList {
+	// lists up the corrupted identifiers
+	corruptedIdentifiers := flow.IdentifierList{}
+	for _, c := range net.config.Nodes {
+		if c.Corrupted {
+			corruptedIdentifiers = append(corruptedIdentifiers, c.Identifier)
+		}
+	}
+
+	// extracts corrupted identities to corrupted identifiers
+	corruptedIdentities := flow.IdentityList{}
+	for _, c := range net.Containers {
+		if corruptedIdentifiers.Contains(c.Config.Identity().NodeID) {
+			corruptedIdentities = append(corruptedIdentities, c.Config.Identity())
+		}
+	}
+	return corruptedIdentities
+}
+
 // Identities returns a list of identities, one for each node in the network.
 func (net *FlowNetwork) Identities() flow.IdentityList {
 	il := make(flow.IdentityList, 0, len(net.Containers))
