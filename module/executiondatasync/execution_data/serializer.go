@@ -44,25 +44,31 @@ func getPrototype(code byte) (interface{}, error) {
 }
 
 // Serializer is used to serialize / deserialize Execution Data and CID lists for the
-// Execution Data Service. An object is serialized by encoding and compressing it using
-// the given codec and compressor.
+// Execution Data Service.
+type Serializer interface {
+	Serialize(io.Writer, interface{}) error
+	Deserialize(io.Reader) (interface{}, error)
+}
+
+// serializer implements the Serializer interface. Object are serialized by encoding and
+// compressing them using the given codec and compressor.
 //
 // The serialized data is prefixed with a single byte header that identifies the underlying
 // data format. This allows adding new data types in a backwards compatible way.
-type Serializer struct {
+type serializer struct {
 	codec      encoding.Codec
 	compressor network.Compressor
 }
 
-func NewSerializer(codec encoding.Codec, compressor network.Compressor) *Serializer {
-	return &Serializer{
+func NewSerializer(codec encoding.Codec, compressor network.Compressor) *serializer {
+	return &serializer{
 		codec:      codec,
 		compressor: compressor,
 	}
 }
 
 // writePrototype writes the header code for the given value to the given writer
-func (s *Serializer) writePrototype(w io.Writer, v interface{}) error {
+func (s *serializer) writePrototype(w io.Writer, v interface{}) error {
 	var code byte
 	var err error
 
@@ -84,7 +90,7 @@ func (s *Serializer) writePrototype(w io.Writer, v interface{}) error {
 }
 
 // Serialize encodes and compresses the given value to the given writer
-func (s *Serializer) Serialize(w io.Writer, v interface{}) error {
+func (s *serializer) Serialize(w io.Writer, v interface{}) error {
 	if err := s.writePrototype(w, v); err != nil {
 		return fmt.Errorf("failed to write prototype: %w", err)
 	}
@@ -110,7 +116,7 @@ func (s *Serializer) Serialize(w io.Writer, v interface{}) error {
 }
 
 // readPrototype reads a header code from the given reader and returns a prototype value
-func (s *Serializer) readPrototype(r io.Reader) (interface{}, error) {
+func (s *serializer) readPrototype(r io.Reader) (interface{}, error) {
 	var code byte
 	var err error
 
@@ -130,7 +136,7 @@ func (s *Serializer) readPrototype(r io.Reader) (interface{}, error) {
 }
 
 // Deserialize decompresses and decodes the data from the given reader
-func (s *Serializer) Deserialize(r io.Reader) (interface{}, error) {
+func (s *serializer) Deserialize(r io.Reader) (interface{}, error) {
 	v, err := s.readPrototype(r)
 
 	if err != nil {

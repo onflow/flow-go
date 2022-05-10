@@ -119,6 +119,9 @@ func (r *Requester) AddConsumer(consumer BlockExecutionDataConsumer) (func() err
 	return r.notifier.subscribe(&notificationSub{consumer})
 }
 
+// HandleReceipt handles a new Execution Receipt received from the network.
+// TODO: once the network API has been refactored to support multiple engines per channel,
+// we should allow the requester to subscribe to the receipt broadcast channel itself.
 func (r *Requester) HandleReceipt(receipt *flow.ExecutionReceipt) {
 	if util.CheckClosed(r.cm.ShutdownSignal()) {
 		return

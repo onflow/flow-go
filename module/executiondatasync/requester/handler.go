@@ -60,7 +60,7 @@ type handler struct {
 	fulfiller   *fulfiller
 	storage     *tracker.Storage
 	blobService network.BlobService
-	serializer  *execution_data.Serializer
+	serializer  execution_data.Serializer
 
 	maxBlobSize      int
 	retryBaseTimeout time.Duration
@@ -76,7 +76,7 @@ func newHandler(
 	fulfiller *fulfiller,
 	storage *tracker.Storage,
 	blobService network.BlobService,
-	serializer *execution_data.Serializer,
+	serializer execution_data.Serializer,
 	maxBlobSize int,
 	retryBaseTimeout time.Duration,
 	numWorkers int,

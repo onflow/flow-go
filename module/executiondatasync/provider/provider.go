@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
@@ -30,7 +29,7 @@ type Provider struct {
 	logger      zerolog.Logger
 	metrics     module.ExecutionDataProviderMetrics
 	maxBlobSize int
-	serializer  *execution_data.Serializer
+	serializer  execution_data.Serializer
 	blobService network.BlobService
 	storage     *tracker.Storage
 }
@@ -43,8 +42,7 @@ type ProvideJob struct {
 func NewProvider(
 	logger zerolog.Logger,
 	metrics module.ExecutionDataProviderMetrics,
-	codec encoding.Codec,
-	compressor network.Compressor,
+	serializer execution_data.Serializer,
 	blobService network.BlobService,
 	opts ...ProviderOption,
 ) *Provider {
@@ -52,7 +50,7 @@ func NewProvider(
 		logger:      logger.With().Str("component", "execution_data_provider").Logger(),
 		metrics:     metrics,
 		maxBlobSize: execution_data.DefaultMaxBlobSize,
-		serializer:  execution_data.NewSerializer(codec, compressor),
+		serializer:  serializer,
 		blobService: blobService,
 	}
 
