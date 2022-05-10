@@ -14,7 +14,7 @@ func main() {
 		anb.Logger.Fatal().Err(err).Send()
 	}
 
-	var builder nodebuilder.AccessNodeBuilder = nodebuilder.NewUnstakedAccessNodeBuilder(anb)
+	var builder nodebuilder.ObserverBuilder = nodebuilder.NewObserverServiceBuilder(anb)
 
 	if err := builder.Initialize(); err != nil {
 		anb.Logger.Fatal().Err(err).Send()

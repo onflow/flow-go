@@ -33,21 +33,21 @@ import (
 	"github.com/onflow/flow-go/utils/io"
 )
 
-type UnstakedAccessNodeBuilder struct {
+type ObserverServiceBuilder struct {
 	*FlowAccessNodeBuilder
 	peerID peer.ID
 }
 
-func NewUnstakedAccessNodeBuilder(builder *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
-	// the unstaked access node gets a version of the root snapshot file that does not contain any node addresses
+func NewObserverServiceBuilder(builder *FlowAccessNodeBuilder) *ObserverServiceBuilder {
+	// the observer access node gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	builder.SkipNwAddressBasedValidations = true
-	return &UnstakedAccessNodeBuilder{
+	return &ObserverServiceBuilder{
 		FlowAccessNodeBuilder: builder,
 	}
 }
 
-func (builder *UnstakedAccessNodeBuilder) initNodeInfo() error {
+func (builder *ObserverServiceBuilder) initNodeInfo() error {
 	// use the networking key that has been passed in the config, or load from the configured file
 	networkingKey := builder.AccessNodeConfig.NetworkKey
 	if networkingKey == nil {
@@ -74,12 +74,12 @@ func (builder *UnstakedAccessNodeBuilder) initNodeInfo() error {
 	}
 
 	builder.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
-	builder.NodeConfig.StakingKey = nil           // no staking key for the unstaked node
+	builder.NodeConfig.StakingKey = nil           // no staking key for the observer node
 
 	return nil
 }
 
-func (builder *UnstakedAccessNodeBuilder) InitIDProviders() {
+func (builder *ObserverServiceBuilder) InitIDProviders() {
 	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, builder.ProtocolEvents)
 		if err != nil {
@@ -118,7 +118,7 @@ func (builder *UnstakedAccessNodeBuilder) InitIDProviders() {
 	})
 }
 
-func (builder *UnstakedAccessNodeBuilder) Initialize() error {
+func (builder *ObserverServiceBuilder) Initialize() error {
 	if err := builder.deriveBootstrapPeerIdentities(); err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() error {
 	return nil
 }
 
-func (builder *UnstakedAccessNodeBuilder) validateParams() error {
+func (builder *ObserverServiceBuilder) validateParams() error {
 	if builder.BaseConfig.BindAddr == cmd.NotSet || builder.BaseConfig.BindAddr == "" {
 		return errors.New("bind address not specified")
 	}
@@ -170,7 +170,7 @@ func (builder *UnstakedAccessNodeBuilder) validateParams() error {
 	return nil
 }
 
-// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the unstaked node.
+// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer node.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 // 		DHT as client and seeded with the given bootstrap peers
@@ -179,7 +179,7 @@ func (builder *UnstakedAccessNodeBuilder) validateParams() error {
 //		No connection gater
 // 		No connection manager
 // 		Default libp2p pubsub options
-func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
+func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
 		var pis []peer.AddrInfo
 
@@ -218,17 +218,17 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.Pr
 	}
 }
 
-// initUnstakedLocal initializes the unstaked node ID, network key and network address
+// initUnstakedLocal initializes the observer node ID, network key and network address
 // Currently, it reads a node-info.priv.json like any other node.
 // TODO: read the node ID from the special bootstrap files
-func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(node *cmd.NodeConfig) error {
+func (builder *ObserverServiceBuilder) initUnstakedLocal() func(node *cmd.NodeConfig) error {
 	return func(node *cmd.NodeConfig) error {
-		// for an unstaked node, set the identity here explicitly since it will not be found in the protocol state
+		// for an observer node, set the identity here explicitly since it will not be found in the protocol state
 		self := &flow.Identity{
 			NodeID:        node.NodeID,
 			NetworkPubKey: node.NetworkKey.PublicKey(),
-			StakingPubKey: nil,             // no staking key needed for the unstaked node
-			Role:          flow.RoleAccess, // unstaked node can only run as an access node
+			StakingPubKey: nil,             // no staking key needed for the observer node
+			Role:          flow.RoleAccess, // observer node can only run as an access node
 			Address:       builder.BindAddr,
 		}
 
@@ -243,35 +243,35 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(node *cmd.Nod
 
 // enqueueMiddleware enqueues the creation of the network middleware
 // this needs to be done before sync engine participants module
-func (builder *UnstakedAccessNodeBuilder) enqueueMiddleware() {
+func (builder *ObserverServiceBuilder) enqueueMiddleware() {
 	builder.
 		Module("network middleware", func(node *cmd.NodeConfig) error {
 
-			// NodeID for the unstaked node on the unstaked network
-			unstakedNodeID := node.NodeID
+			// NodeID for the observer node on the observer network
+			observerNodeID := node.NodeID
 
 			// Networking key
-			unstakedNetworkKey := node.NetworkKey
+			observerNetworkKey := node.NetworkKey
 
-			libP2PFactory := builder.initLibP2PFactory(unstakedNetworkKey)
+			libP2PFactory := builder.initLibP2PFactory(observerNetworkKey)
 
-			msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, unstakedNodeID)
+			msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, observerNodeID)
 
-			builder.initMiddleware(unstakedNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
+			builder.initMiddleware(observerNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
 
 			return nil
 		})
 }
 
-// Build enqueues the sync engine and the follower engine for the unstaked access node.
-// Currently, the unstaked AN only runs the follower engine.
-func (builder *UnstakedAccessNodeBuilder) Build() (cmd.Node, error) {
+// Build enqueues the sync engine and the follower engine for the observer access node.
+// Currently, the observer AN only runs the follower engine.
+func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
 	return builder.FlowAccessNodeBuilder.Build()
 }
 
-// enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
-func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
+// enqueueUnstakedNetworkInit enqueues the observer network component initialized for the observer node
+func (builder *ObserverServiceBuilder) enqueueUnstakedNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
@@ -304,13 +304,13 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 	})
 }
 
-// enqueueConnectWithStakedAN enqueues the upstream connector component which connects the libp2p host of the unstaked
+// enqueueConnectWithStakedAN enqueues the upstream connector component which connects the libp2p host of the observer
 // AN with the staked AN.
 // Currently, there is an issue with LibP2P stopping advertisements of subscribed topics if no peers are connected
-// (https://github.com/libp2p/go-libp2p-pubsub/issues/442). This means that an unstaked AN could end up not being
-// discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
+// (https://github.com/libp2p/go-libp2p-pubsub/issues/442). This means that an observer could end up not being
+// discovered by other observers if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
-func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
+func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return newUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	}).Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -342,7 +342,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
-func (builder *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
+func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
