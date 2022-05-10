@@ -260,12 +260,16 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
-	start := minRefHeight - flow.DefaultMaxCollectionByteSize + 1
+	start := minRefHeight - flow.DefaultTransactionExpiry + 1
+	if start > minRefHeight {
+		start = 0 // overflow check
+	}
 	end := maxRefHeight
 	err := m.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}
+	fmt.Println("found cluster blocks: ", clusterBlockIDs)
 
 	for _, blockID := range clusterBlockIDs {
 		// TODO: could add LightByBlockID and retrieve only tx IDs
