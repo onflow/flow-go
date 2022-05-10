@@ -160,13 +160,6 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		// TODO ensure the reference block is part of the main chain
 		_ = refBlock
 
-		// we go back a fixed number of  blocks to check payload for now
-		// TODO look back based on reference block ID and expiry https://github.com/dapperlabs/flow-go/issues/3556
-		limit := block.Header.Height - flow.DefaultTransactionExpiry
-		if limit > block.Header.Height { // overflow check
-			limit = 0
-		}
-
 		// check for duplicate transactions in block's ancestry
 		txLookup := make(map[flow.Identifier]struct{})
 		for _, tx := range block.Payload.Collection.Transactions {
