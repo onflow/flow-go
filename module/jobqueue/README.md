@@ -61,3 +61,12 @@ In order to report job completion, the worker needs to call job consumer's `Noti
 Multiple jobqueues can be combined to form a pipeline. This is useful in the scenario that the first job queue will process each finalized block and create jobs to process data depending on the block, and having the second job queue to process each job created by the worker of the first job queue.
 
 For instance, verification node uses 2-jobqueue pipeline to find chunks from each block and create jobs if the block has chunks that it needs to verify, and the second job queue will allow verification node to verify each chunk with a max number of workers.
+
+## Considerations
+
+### Push vs Pull
+The jobqueue architecture is optimized for "pull" style processes, where the consumer pulls jobs from a source when workers are available. All current implementations are using this style since it lends well to asynchronously processing jobs based on block heights.
+
+Some use cases require "push" style jobs where there is a job producer that creates jobs, and a consumer that processes work from the producer. This is possible with the jobqueue, but requires the producer persist the jobs to a database, then implement the `Head` and `AtIndex` methods that allow accessing jobs by sequential `uint64` indexes.
+
+In existing pull use cases, the sync engine is effectively the job producer.
