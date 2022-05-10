@@ -19,7 +19,7 @@ import (
 // AuthorizedSenderValidator using the getIdentity func will check if the role of the sender
 // is part of the authorized roles list for the channel being communicated on. A node is considered
 // to be authorized to send a message if all of the following are true.
-// 1. The node is staked
+// 1. The node is authorized.
 // 2. The message type is a known message type (can be decoded with cbor codec).
 // 3. The authorized roles list for the channel contains the senders role.
 // 4. The node is not ejected
