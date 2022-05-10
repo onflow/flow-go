@@ -76,7 +76,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 	}
 }
 
-// isAuthorizedSender checks if node is an authorized role and is not ejected
+// isAuthorizedSender checks if node is an authorized role and is not ejected.
 func isAuthorizedSender(identity *flow.Identity, channel network.Channel, code uint8) error {
 	// get authorized roles list
 	roles, err := getRoles(channel, code)
