@@ -1,4 +1,4 @@
-package observer
+package node_builder
 
 import (
 	"encoding/json"
