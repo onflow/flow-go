@@ -50,23 +50,23 @@ import (
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
-// AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
-// These functions are shared by staked and unstaked access node builders.
-// The Staked network allows the staked nodes to communicate among themselves, while the unstaked network allows the
-// unstaked nodes and a staked Access node to communicate.
+// ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
+// These functions are shared by staked and observer node builders.
+// The Staked network allows the staked nodes to communicate among themselves, while the public network allows the
+// observers and a staked Access node to communicate.
 //
-//                                 unstaked network                           staked network
+//                                 public network                           staked network
 //  +------------------------+
-//  | Unstaked Access Node 1 |<--------------------------|
+//  | observer Node 1        |<--------------------------|
 //  +------------------------+                           v
 //  +------------------------+                         +--------------------+                 +------------------------+
-//  | Unstaked Access Node 2 |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
+//  | observer Node 2        |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
 //  +------------------------+                         +--------------------+                 +------------------------+
 //  +------------------------+                           ^
-//  | Unstaked Access Node 3 |<--------------------------|
+//  | observer Node 3        |<--------------------------|
 //  +------------------------+
 
-type AccessNodeBuilder interface {
+type ObserverBuilder interface {
 	cmd.NodeBuilder
 
 	// IsStaked returns True if this is a staked Access Node, False otherwise
@@ -83,7 +83,7 @@ type AccessNodeConfig struct {
 	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
-	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports unstaked access nodes/unstaked consensus follower engines
+	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports observer nodes consensus follower engines
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -150,9 +150,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 	}
 }
 
-// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
+// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and observer node
 // It is composed of the FlowNodeBuilder, the AccessNodeConfig and contains all the components and modules needed for the
-// staked and unstaked access nodes
+// staked and observer nodes
 type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	*AccessNodeConfig
@@ -175,7 +175,7 @@ type FlowAccessNodeBuilder struct {
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
-	// for the unstaked access node, the sync engine participants provider is the libp2p peer store which is not
+	// for the observer node, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
@@ -188,7 +188,7 @@ type FlowAccessNodeBuilder struct {
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
-// These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
+// These are the identities of the staked and observers also acting as the DHT bootstrap server
 func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
 	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
 	// line params)
@@ -361,7 +361,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() ObserverBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().
@@ -455,8 +455,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
-		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
-		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 	}).ValidateFlags(func() error {
@@ -542,7 +542,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 
 		// create the identity of the peer by setting only the relevant fields
 		ids[i] = &flow.Identity{
-			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the unstaked network it does not apply
+			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
 			NetworkPubKey: networkKey,
