@@ -12,27 +12,30 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// NitroPaceMaker implements the hotstuff.PaceMaker
+// ActivePaceMaker implements the hotstuff.PaceMaker
 // Its an aggressive pacemaker with exponential increase on timeout as well as
 // exponential decrease on progress. Progress is defined as entering view V
 // for which the replica knows a QC with V = QC.view + 1
-type NitroPaceMaker struct {
-	currentView    uint64
+type ActivePaceMaker struct {
 	timeoutControl *timeout.Controller
 	notifier       hotstuff.Consumer
+	persist        hotstuff.Persister
+	livenessData   *hotstuff.LivenessData
 	started        *atomic.Bool
 }
 
-// New creates a new NitroPaceMaker instance
+var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
+
+// New creates a new ActivePaceMaker instance
 // startView is the view for the pacemaker to start from
 // timeoutController controls the timeout trigger.
 // notifier provides callbacks for pacemaker events.
-func New(startView uint64, timeoutController *timeout.Controller, notifier hotstuff.Consumer) (*NitroPaceMaker, error) {
-	if startView < 1 {
+func New(livenessData *hotstuff.LivenessData, timeoutController *timeout.Controller, notifier hotstuff.Consumer) (*ActivePaceMaker, error) {
+	if livenessData.CurrentView < 1 {
 		return nil, model.NewConfigurationErrorf("Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)")
 	}
-	pm := NitroPaceMaker{
-		currentView:    startView,
+	pm := ActivePaceMaker{
+		livenessData:   livenessData,
 		timeoutControl: timeoutController,
 		notifier:       notifier,
 		started:        atomic.NewBool(false),
@@ -40,43 +43,55 @@ func New(startView uint64, timeoutController *timeout.Controller, notifier hotst
 	return &pm, nil
 }
 
-// gotoView updates the current view to newView. Currently, the calling code
+// updateLivenessData updates the current view, qc, tc. Currently, the calling code
 // ensures that the view number is STRICTLY monotonously increasing. The method
-// gotoView panics as a last resort if FlowPaceMaker is modified to violate this condition.
-// Hence, gotoView will _always_ return a NewViewEvent for an _increased_ view number.
-func (p *NitroPaceMaker) gotoView(newView uint64) *model.NewViewEvent {
-	if newView <= p.currentView {
+// updateLivenessData panics as a last resort if ActivePaceMaker is modified to violate this condition.
+// No errors are expected, any error should be threaded as exception
+func (p *ActivePaceMaker) updateLivenessData(newView uint64, qc *flow.QuorumCertificate, tc *flow.TimeoutCertificate) error {
+	if newView <= p.livenessData.CurrentView {
 		// This should never happen: in the current implementation, it is trivially apparent that
 		// newView is _always_ larger than currentView. This check is to protect the code from
 		// future modifications that violate the necessary condition for
 		// STRICTLY monotonously increasing view numbers.
-		panic(fmt.Sprintf("cannot move from view %d to %d: currentView must be strictly monotonously increasing", p.currentView, newView))
+		panic(fmt.Sprintf("cannot move from view %d to %d: currentView must be strictly monotonously increasing",
+			p.livenessData.CurrentView, newView))
 	}
-	p.currentView = newView
+
+	p.livenessData.CurrentView = newView
+	if p.livenessData.HighestQC.View < qc.View {
+		p.livenessData.HighestQC = qc
+	}
+	p.livenessData.LastViewTC = tc
+	err := p.persist.PutLivenessData(p.livenessData)
+	if err != nil {
+		return fmt.Errorf("could not persist liveness data: %w", err)
+	}
+
 	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, newView)
 	p.notifier.OnStartingTimeout(timerInfo)
-	return &model.NewViewEvent{View: p.currentView}
+	return nil
 }
 
 // CurView returns the current view
-func (p *NitroPaceMaker) CurView() uint64 {
-	return p.currentView
+func (p *ActivePaceMaker) CurView() uint64 {
+	return p.livenessData.CurrentView
 }
 
 // TimeoutChannel returns the timeout channel for current active timeout.
 // Note the returned timeout channel returns only one timeout, which is the current
 // timeout.
 // To get the timeout for the next timeout, you need to call TimeoutChannel() again.
-func (p *NitroPaceMaker) TimeoutChannel() <-chan time.Time {
+func (p *ActivePaceMaker) TimeoutChannel() <-chan time.Time {
 	return p.timeoutControl.Channel()
 }
 
 // ProcessQC notifies the pacemaker with a new QC, which might allow pacemaker to
-// fast forward its view.
-func (p *NitroPaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
-	if qc.View < p.currentView {
-		return nil, false
+// fast-forward its view.
+func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
+	if qc.View < p.CurView() {
+		return nil, nil
 	}
+
 	// qc.view = p.currentView + k for k ≥ 0
 	// 2/3 of replicas have already voted for round p.currentView + k, hence proceeded past currentView
 	// => 2/3 of replicas are at least in view qc.view + 1.
@@ -84,39 +99,56 @@ func (p *NitroPaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEv
 	p.timeoutControl.OnProgressBeforeTimeout()
 
 	newView := qc.View + 1
+	err := p.updateLivenessData(newView, qc, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	p.notifier.OnQcTriggeredViewChange(qc, newView)
-	return p.gotoView(newView), true
+	return &model.NewViewEvent{View: newView}, nil
 }
 
-func (p *NitroPaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, bool) {
-	panic("not yet implemented")
+func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error) {
+	if tc == nil || tc.View < p.CurView() {
+		return nil, nil
+	}
+
+	newView := tc.View + 1
+	err := p.updateLivenessData(newView, tc.TOHighestQC, tc)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(active-pacemaker): notify about TC change
+	//p.notifier.OnQcTriggeredViewChange(qc, newView)
+	return &model.NewViewEvent{View: newView}, nil
 }
 
-func (p *NitroPaceMaker) OnPartialTC(curView uint64) {
+func (p *ActivePaceMaker) OnPartialTC(curView uint64) {
 	panic("not yet implemented")
 }
 
 // HighestQC returns QC with the highest view discovered by PaceMaker.
-func (p *NitroPaceMaker) HighestQC() *flow.QuorumCertificate {
-	panic("not yet implemented")
+func (p *ActivePaceMaker) HighestQC() *flow.QuorumCertificate {
+	return p.livenessData.HighestQC
 }
 
 // LastViewTC returns TC for last view, this could be nil if previous round
 // has entered with a QC.
-func (p *NitroPaceMaker) LastViewTC() *flow.TimeoutCertificate {
-	panic("not yet implemented")
+func (p *ActivePaceMaker) LastViewTC() *flow.TimeoutCertificate {
+	return p.livenessData.LastViewTC
 }
 
 // Start starts the pacemaker
-func (p *NitroPaceMaker) Start() {
+func (p *ActivePaceMaker) Start() {
 	if p.started.Swap(true) {
 		return
 	}
-	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, p.currentView)
+	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, p.CurView())
 	p.notifier.OnStartingTimeout(timerInfo)
 }
 
 // BlockRateDelay returns the delay for broadcasting its own proposals.
-func (p *NitroPaceMaker) BlockRateDelay() time.Duration {
+func (p *ActivePaceMaker) BlockRateDelay() time.Duration {
 	return p.timeoutControl.BlockRateDelay()
 }
