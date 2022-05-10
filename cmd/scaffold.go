@@ -246,6 +246,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component(ConduitFactoryComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		cf := conduit.NewDefaultConduitFactory()
 		fnb.ConduitFactory = cf
+		node.Logger.Info().Hex("node_id", logging.ID(node.NodeID)).Msg("default conduit factory initiated")
 
 		return cf, nil
 	})
