@@ -67,7 +67,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 				Str("role", identity.Role.String()).
 				Str("message_type", what).
 				Str("network_channel", channel.String()).
-				Msg("rejecting message")
+				Msg("sender is not authorized, rejecting message")
 
 			return pubsub.ValidationReject
 		}
