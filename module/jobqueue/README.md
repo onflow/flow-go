@@ -4,7 +4,7 @@ The jobqueue package implemented a reusable job queue system for async message p
 
 The most common use case is to work on each finalized block async.
 
-For instance, the verification node verify each finalized block. The block processing needs to be async because if not, the verification node might get overwhelmed by the large amount of blocks to be processed when they got finalized quickly during the period that the node went back online and catching up blocks from other peers.
+For instance, verification nodes must verify each finalized block. This needs to happen async, otherwise a verification node might get overwhelmed during periods when a large amount of blocks are finalized quickly (e.g. when a node comes back online and is catching up from other peers).
 
 So the goal for the jobqueue system are:
 1. guarantee each finalized block will be processed eventually
