@@ -111,12 +111,6 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			if err != nil {
 				return fmt.Errorf("could not retrieve payload for cluster block (id=%x): %w", clusterBlockID, err)
 			}
-			// look up the reference block height to populate index
-			var refBlock flow.Header
-			err = operation.RetrieveHeader(payload.ReferenceBlockID, &refBlock)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve reference block (id=%x): %w", payload.ReferenceBlockID, err)
-			}
 
 			// remove the transactions from the memory pool
 			for _, colTx := range payload.Collection.Transactions {
@@ -130,11 +124,6 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			if err != nil {
 				return fmt.Errorf("could not finalize cluster block (id=%x): %w", clusterBlockID, err)
 			}
-			// index the finalized cluster block by reference block height
-			err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, clusterBlockID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not index cluster block (id=%x) by reference height (%d): %w", clusterBlockID, refBlock.Height, err)
-			}
 
 			block := &cluster.Block{
 				Header:  step,
@@ -142,9 +131,22 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			}
 			f.metrics.ClusterBlockFinalized(block)
 
-			// don't bother submitting empty collections
+			// if the finalized collection is empty, we don't need to include it
+			// in the reference height index or submit it to consensus nodes
 			if len(payload.Collection.Transactions) == 0 {
 				continue
+			}
+
+			// look up the reference block height to populate index
+			var refBlock flow.Header
+			err = operation.RetrieveHeader(payload.ReferenceBlockID, &refBlock)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve reference block (id=%x): %w", payload.ReferenceBlockID, err)
+			}
+			// index the finalized cluster block by reference block height
+			err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, clusterBlockID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index cluster block (id=%x) by reference height (%d): %w", clusterBlockID, refBlock.Height, err)
 			}
 
 			//TODO when we incorporate HotStuff AND require BFT, the consensus

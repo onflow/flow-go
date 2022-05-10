@@ -145,7 +145,6 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
 
 			// collection should not have been propagated
 			prov.AssertNotCalled(t, "SubmitLocal", mock.Anything)

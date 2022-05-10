@@ -370,7 +370,7 @@ func (b *Builder) populateFinalizedAncestryLookup(minRefHeight, maxRefHeight uin
 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
-	start := minRefHeight - flow.DefaultMaxCollectionByteSize + 1
+	start := minRefHeight - flow.DefaultTransactionExpiry + 1
 	end := maxRefHeight
 	err := b.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
 	if err != nil {

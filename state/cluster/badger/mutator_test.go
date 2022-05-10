@@ -133,6 +133,23 @@ func (suite *MutatorSuite) Block() model.Block {
 	return suite.BlockWithParent(suite.genesis)
 }
 
+func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
+	err := suite.db.Update(func(tx *badger.Txn) error {
+		var refBlock flow.Header
+		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
+		if err != nil {
+			return err
+		}
+		err = procedure.FinalizeClusterBlock(block.ID())(tx)
+		if err != nil {
+			return err
+		}
+		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(tx)
+		return err
+	})
+	suite.Assert().NoError(err)
+}
+
 func (suite *MutatorSuite) Tx(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	final, err := suite.protoState.Final().Head()
 	suite.Require().Nil(err)
@@ -244,8 +261,7 @@ func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 	suite.Assert().Nil(err)
 
 	// finalize the block
-	err = suite.db.Update(procedure.FinalizeClusterBlock(block1.ID()))
-	suite.Assert().Nil(err)
+	suite.FinalizeBlock(block1)
 
 	// insert another block on top of genesis
 	// since we have already finalized block 1, this is invalid
@@ -362,7 +378,7 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	suite.Assert().Nil(err)
 
 	// should be able to finalize block 1
-	err = suite.db.Update(procedure.FinalizeClusterBlock(block1.ID()))
+	suite.FinalizeBlock(block1)
 	suite.Assert().Nil(err)
 
 	// create a block building on block1 ALSO containing tx1
