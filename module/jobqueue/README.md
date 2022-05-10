@@ -13,11 +13,11 @@ So the goal for the jobqueue system are:
 4. the number of concurrent workers is configurable so that the node won't get overwhelmed when too many jobs are created (i.e. too many blocks are finalized in a short period of time)
 
 ## JobQueue components
-To achieve the above goal, the jobqueue system contains the following components/interface:
-1. A Jobs module to find jobs by job index
-2. A storage.ConsumerProgress to store job processing progress
-3. A Worker module to process job and report job completion.
-4. A Consumer to find new jobs, create workers for each job using the above modules, and manage job processing status internally.
+To achieve the above goal, the jobqueue system contains the following components/interfaces:
+1. A `Jobs` module to find jobs by job index
+2. A `storage.ConsumerProgress` to store job processing progress
+3. A `Worker` module to process jobs and report job completion.
+4. A `Consumer` that orchestrates the job processing by finding new jobs, creating workers for each job using the above modules, and managing job processing status internally.
 
 ### Using module.Jobs to find jobs
 There is no JobProducer in jobqueue design. Job queue assumes each job can be indexed by a uint64 value, just like each finalized block (or sealed block) can be indexed by block height.
@@ -33,29 +33,29 @@ Therefore modules.Job interface abstracts it into a method: `AtIndex`.
 Job consumer relies on the modules.Jobs to find jobs. However, modules.Jobs doesn't provide a way to notify as soon as a new job is available. So it's consumer's job to keep track of the values returned by module.Jobs's `Head` method and find jobs that are new.
 
 ### Using Check method to notify job consumer for checking new jobs
-Job consumer provides the Check method for users to notify new jobs available.
+Job consumer provides the `Check` method for users to notify new jobs available.
 
-Once called, job consumer will iterate through each height with the AtIndex method. It stops when one of the following condition is true:
+Once called, job consumer will iterate through each height with the `AtIndex` method. It stops when one of the following condition is true:
 1. no job was found at a index
 2. no more workers to work on them
 3. max search ahead is reached (will explain later)
 
-Check method is concurrent safe, meaning even if job consumer is notified concurrently about new jobs available, job consumer will check at most once to find new jobs.
+`Check` method is concurrent safe, meaning even if job consumer is notified concurrently about new jobs available, job consumer will check at most once to find new jobs.
 
-Whenever a worker finishes a job, job consumer will also call Check internally.
+Whenever a worker finishes a job, job consumer will also call `Check` internally.
 
 ### Storing job consuming progress in storage.ConsumerProgress
-Job consumer stores the last processed job index in storage.ConsumerProgress, so that on startup, job consumer can read the last processed job index from storage and compare with the last available job index from modules.Jobs's Head method to resume job processing.
+Job consumer stores the last processed job index in `storage.ConsumerProgress`, so that on startup, the job consumer can read the last processed job index from storage and compare with the last available job index from `module.Jobs`'s `Head` method to resume job processing.
 
-This ensures each job will be processed at least once.
+This ensures each job will be processed at least once. Note: given the at least once execution, the `Worker` should gracefully handle duplicate runs of the same job.
 
 ### Using Workers to work on each job
 
-When Job consumer finds new job, it uses the Worker interface to process each job. Each job is also an interface, so it's user's responsiblity to handle the conversion between job and the actual job data type. So that the modules.Job can return a job to converted back to the actual job data for worker to work on.
+When Job consumer finds a new job, it uses an implementation of the `Worker` interface to process each job. The `Worker`s `Run` method accepts a `module.Job` interface. So it's the user's responsibility to handle the conversion between `module.Job` and the underlying data type. 
 
 In the scenario of processing finalized blocks, implementing symmetric functions like BlockToJob and JobToBlock are recommended for this conversion.
 
-In order to report job completion, the worker needs to call job consumer's NotifyJobIsDone method.
+In order to report job completion, the worker needs to call job consumer's `NotifyJobIsDone` method.
 
 ## Pipeline Pattern
 Multiple jobqueues can be combined to form a pipeline. This is useful in the scenario that the first job queue will process each finalized block and create jobs to process data depending on the block, and having the second job queue to process each job created by the worker of the first job queue.
