@@ -7,8 +7,8 @@ import (
 	"io"
 	"math/rand"
 	"testing"
-	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/stretchr/testify/assert"
@@ -16,15 +16,10 @@ import (
 	goassert "gotest.tools/assert"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/encoding/cbor"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-var defaultSerializer = execution_data.NewSerializer(new(cbor.Codec), compressor.NewLz4Compressor())
 
 func getBlobstore() blobs.Blobstore {
 	return blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
@@ -49,7 +44,7 @@ func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *executi
 
 	for {
 		buf := &bytes.Buffer{}
-		require.NoError(t, defaultSerializer.Serialize(buf, ced))
+		require.NoError(t, execution_data.DefaultSerializer.Serialize(buf, ced))
 
 		if buf.Len() >= int(minSerializedSize) {
 			t.Logf("Chunk execution data size: %d", buf.Len())
@@ -76,38 +71,29 @@ func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePe
 	return bed
 }
 
-func getExecutionData(
-	eds execution_data.ExecutionDataStore,
-	rootID flow.Identifier,
-	timeout time.Duration,
-) (*execution_data.BlockExecutionData, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+func getAllKeys(t *testing.T, bs blobs.Blobstore) []cid.Cid {
+	cidChan, err := bs.AllKeysChan(context.Background())
+	require.NoError(t, err)
 
-	return eds.GetExecutionData(ctx, rootID)
-}
+	var cids []cid.Cid
 
-func addExecutionData(
-	eds execution_data.ExecutionDataStore,
-	bed *execution_data.BlockExecutionData,
-	timeout time.Duration,
-) (flow.Identifier, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	for cid := range cidChan {
+		cids = append(cids, cid)
+	}
 
-	return eds.AddExecutionData(ctx, bed)
+	return cids
 }
 
 func TestHappyPath(t *testing.T) {
 	t.Parallel()
 
-	eds := getExecutionDataStore(getBlobstore(), defaultSerializer)
+	eds := getExecutionDataStore(getBlobstore(), execution_data.DefaultSerializer)
 
 	test := func(numChunks int, minSerializedSizePerChunk uint64) {
 		expected := generateBlockExecutionData(t, numChunks, minSerializedSizePerChunk)
-		rootId, err := addExecutionData(eds, expected, time.Second)
+		rootId, err := eds.AddExecutionData(context.Background(), expected)
 		require.NoError(t, err)
-		actual, err := getExecutionData(eds, rootId, time.Second)
+		actual, err := eds.GetExecutionData(context.Background(), rootId)
 		require.NoError(t, err)
 		goassert.DeepEqual(t, expected, actual)
 	}
@@ -146,7 +132,7 @@ func (cts *corruptedTailSerializer) Serialize(w io.Writer, v interface{}) error 
 		if cts.i == cts.corruptedChunk {
 			buf := &bytes.Buffer{}
 
-			err := defaultSerializer.Serialize(buf, v)
+			err := execution_data.DefaultSerializer.Serialize(buf, v)
 			if err != nil {
 				return err
 			}
@@ -159,7 +145,7 @@ func (cts *corruptedTailSerializer) Serialize(w io.Writer, v interface{}) error 
 		}
 	}
 
-	return defaultSerializer.Serialize(w, v)
+	return execution_data.DefaultSerializer.Serialize(w, v)
 }
 
 func (cts *corruptedTailSerializer) Deserialize(r io.Reader) (interface{}, error) {
@@ -171,11 +157,11 @@ func TestMalformedData(t *testing.T) {
 
 	test := func(bed *execution_data.BlockExecutionData, serializer execution_data.Serializer) {
 		blobstore := getBlobstore()
-		defaultEds := getExecutionDataStore(blobstore, defaultSerializer)
+		defaultEds := getExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 		malformedEds := getExecutionDataStore(blobstore, serializer)
-		rootID, err := addExecutionData(malformedEds, bed, time.Second)
+		rootID, err := malformedEds.AddExecutionData(context.Background(), bed)
 		require.NoError(t, err)
-		_, err = getExecutionData(defaultEds, rootID, time.Second)
+		_, err = defaultEds.GetExecutionData(context.Background(), rootID)
 		var malformedDataErr *execution_data.MalformedDataError
 		assert.ErrorAs(t, err, &malformedDataErr)
 	}
@@ -185,4 +171,25 @@ func TestMalformedData(t *testing.T) {
 
 	test(bed, &randomSerializer{})                   // random bytes
 	test(bed, newCorruptedTailSerializer(numChunks)) // serialized execution data with random bytes replaced at the end of a random chunk
+}
+
+func TestGetIncompleteData(t *testing.T) {
+	t.Parallel()
+
+	blobstore := getBlobstore()
+	eds := getExecutionDataStore(blobstore, execution_data.DefaultSerializer)
+
+	bed := generateBlockExecutionData(t, 5, 10*execution_data.DefaultMaxBlobSize)
+	rootID, err := eds.AddExecutionData(context.Background(), bed)
+	require.NoError(t, err)
+
+	cids := getAllKeys(t, blobstore)
+	t.Logf("%d blobs in blob tree", len(cids))
+
+	cidToDelete := cids[rand.Intn(len(cids))]
+	blobstore.DeleteBlob(context.Background(), cidToDelete)
+
+	_, err = eds.GetExecutionData(context.Background(), rootID)
+	var blobNotFoundError *execution_data.BlobNotFoundError
+	assert.ErrorAs(t, err, &blobNotFoundError)
 }

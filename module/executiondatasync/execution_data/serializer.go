@@ -7,8 +7,12 @@ import (
 	"github.com/ipfs/go-cid"
 
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/compressor"
 )
+
+var DefaultSerializer = NewSerializer(&cbor.Codec{}, compressor.NewLz4Compressor())
 
 // header codes to distinguish between different types of data
 const (

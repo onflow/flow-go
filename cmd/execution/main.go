@@ -57,7 +57,6 @@ import (
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -71,7 +70,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -137,7 +135,6 @@ func main() {
 		executionDataDatastore        datastore.Batching
 		executionDataPruner           *pruner.Pruner
 		executionDataBlobstore        blobs.Blobstore
-		executionDataSerializer       execution_data.Serializer = execution_data.NewSerializer(&cbor.Codec{}, compressor.NewLz4Compressor())
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -335,7 +332,7 @@ func main() {
 		}).
 		Module("execution data getter", func(node *cmd.NodeConfig) error {
 			executionDataBlobstore = blobs.NewBlobstore(executionDataDatastore)
-			executionDataStore = execution_data.NewExecutionDataStore(executionDataBlobstore, executionDataSerializer)
+			executionDataStore = execution_data.NewExecutionDataStore(executionDataBlobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
 		Component("Write-Ahead Log", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -404,7 +401,7 @@ func main() {
 			executionDataProvider := exedataprovider.NewProvider(
 				node.Logger,
 				providerMetrics,
-				executionDataSerializer,
+				execution_data.DefaultSerializer,
 				bs,
 			)
 

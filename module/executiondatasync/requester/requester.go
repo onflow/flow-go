@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -51,8 +50,7 @@ func NewRequester(
 	blocks storage.Blocks,
 	results storage.ExecutionResults,
 	blobService network.BlobService,
-	codec encoding.Codec,
-	compressor network.Compressor,
+	serializer execution_data.Serializer,
 	finalizationDistributor *pubsub.FinalizationDistributor,
 	logger zerolog.Logger,
 	metrics module.ExecutionDataRequesterMetrics,
@@ -80,7 +78,7 @@ func NewRequester(
 		fulfiller,
 		trackerStorage,
 		blobService,
-		execution_data.NewSerializer(codec, compressor),
+		serializer,
 		config.MaxBlobSize,
 		config.RetryBaseDelay,
 		config.NumConcurrentWorkers,

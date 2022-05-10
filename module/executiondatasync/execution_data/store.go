@@ -3,6 +3,7 @@ package execution_data
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ipfs/go-cid"
@@ -121,9 +122,11 @@ func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*
 
 	rootBlob, err := s.blobstore.Get(ctx, rootCid)
 	if err != nil {
-		// TODO: technically, we should check if the error is ErrNotFound
-		// otherwise don't wrap it with BlobNotFoundError
-		return nil, NewBlobNotFoundError(rootCid)
+		if errors.Is(err, blobs.ErrNotFound) {
+			return nil, NewBlobNotFoundError(rootCid)
+		}
+
+		return nil, err
 	}
 
 	rootData, err := s.serializer.Deserialize(bytes.NewBuffer(rootBlob.RawData()))
@@ -179,9 +182,11 @@ func (s *store) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, erro
 	for _, cid := range cids {
 		blob, err := s.blobstore.Get(ctx, cid)
 		if err != nil {
-			// TODO: technically, we should check if the error is ErrNotFound
-			// otherwise don't wrap it with BlobNotFoundError
-			return nil, NewBlobNotFoundError(cid)
+			if errors.Is(err, blobs.ErrNotFound) {
+				return nil, NewBlobNotFoundError(cid)
+			}
+
+			return nil, err
 		}
 
 		_, err = buf.Write(blob.RawData())
