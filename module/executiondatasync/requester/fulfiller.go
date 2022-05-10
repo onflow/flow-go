@@ -123,6 +123,7 @@ func (f *fulfiller) handleJobResult(ctx irrecoverable.SignalerContext, j *jobRes
 		}
 
 		if j.err != nil {
+			// sealed execution data failed with non-retryable error
 			ctx.Throw(fmt.Errorf("failed to get sealed execution data for block height %d: %w", j.blockHeight, j.err))
 		}
 
@@ -149,11 +150,13 @@ func (f *fulfiller) handleSealedResult(ctx irrecoverable.SignalerContext, sealed
 	f.sealedResults[f.sealedHeight] = sealedResultID
 
 	if completedJobs, ok := f.jobResults[f.sealedHeight]; ok {
+		// once we know the sealed result ID, we can discard all unneeded job results
 		delete(f.jobResults, f.sealedHeight)
 
 		for resultID, j := range completedJobs {
 			if resultID == sealedResultID {
 				if j.err != nil {
+					// sealed execution data failed with non-retryable error
 					ctx.Throw(fmt.Errorf("failed to get sealed execution data for block height %d: %w", j.blockHeight, j.err))
 				}
 
