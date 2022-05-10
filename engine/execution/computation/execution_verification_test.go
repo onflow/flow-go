@@ -305,9 +305,9 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 
 		// ensure event is emitted
 		require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-		require.Empty(t, cr.TransactionResults[2].ErrorMessage)
-		require.Len(t, cr.Events[0], 4)
-		require.Len(t, cr.Events[2], 4)
+		require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+		require.Len(t, cr.Events[0], 8)
+		require.Len(t, cr.Events[1], 4)
 	})
 }
 
