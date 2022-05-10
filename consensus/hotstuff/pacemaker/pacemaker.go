@@ -30,7 +30,10 @@ var _ hotstuff.PaceMaker = (*ActivePaceMaker)(nil)
 // startView is the view for the pacemaker to start from
 // timeoutController controls the timeout trigger.
 // notifier provides callbacks for pacemaker events.
-func New(livenessData *hotstuff.LivenessData, timeoutController *timeout.Controller, notifier hotstuff.Consumer) (*ActivePaceMaker, error) {
+func New(livenessData *hotstuff.LivenessData,
+	timeoutController *timeout.Controller,
+	notifier hotstuff.Consumer,
+	persist hotstuff.Persister) (*ActivePaceMaker, error) {
 	if livenessData.CurrentView < 1 {
 		return nil, model.NewConfigurationErrorf("Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)")
 	}
@@ -38,6 +41,7 @@ func New(livenessData *hotstuff.LivenessData, timeoutController *timeout.Control
 		livenessData:   livenessData,
 		timeoutControl: timeoutController,
 		notifier:       notifier,
+		persist:        persist,
 		started:        atomic.NewBool(false),
 	}
 	return &pm, nil
@@ -92,12 +96,12 @@ func (p *ActivePaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewE
 		return nil, nil
 	}
 
+	p.timeoutControl.OnProgressBeforeTimeout()
+
 	// qc.view = p.currentView + k for k ≥ 0
 	// 2/3 of replicas have already voted for round p.currentView + k, hence proceeded past currentView
 	// => 2/3 of replicas are at least in view qc.view + 1.
 	// => replica can skip ahead to view qc.view + 1
-	p.timeoutControl.OnProgressBeforeTimeout()
-
 	newView := qc.View + 1
 	err := p.updateLivenessData(newView, qc, nil)
 	if err != nil {
