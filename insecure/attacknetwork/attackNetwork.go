@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const networkingProtocolTCP = "tcp"
@@ -107,6 +108,7 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 			return fmt.Errorf("could not establish corruptible connection to node %x: %w", corruptedNodeId.NodeID, err)
 		}
 		a.corruptedConnections[corruptedNodeId.NodeID] = connection
+		a.logger.Info().Hex("node_id", logging.ID(corruptedNodeId.NodeID)).Msg("attacker successfully registered on corrupted node")
 	}
 
 	// registers attack network for orchestrator.
