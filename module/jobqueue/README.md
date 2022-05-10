@@ -7,10 +7,10 @@ The most common use case is to work on each finalized block async.
 For instance, verification nodes must verify each finalized block. This needs to happen async, otherwise a verification node might get overwhelmed during periods when a large amount of blocks are finalized quickly (e.g. when a node comes back online and is catching up from other peers).
 
 So the goal for the jobqueue system are:
-1. guarantee each finalized block will be processed eventually
-2. in the event of a crash failure, the worker can be scheduled so that no finalized block will be skipped.
-3. allow concurrent processing of multiple jobs (i.e, finalized blocks)
-4. the number of concurrent workers are configable so that the node won't get overwhelmed when too many jobs are created (i.e too many blocks are finalized in a short period of time)
+1. guarantee each job (i.e. finalized block) will be processed eventually
+2. in the event of a crash failure, the jobqueue state is persisted and workers can be rescheduled so that no job is skipped.
+3. allow concurrent processing of multiple jobs
+4. the number of concurrent workers is configurable so that the node won't get overwhelmed when too many jobs are created (i.e. too many blocks are finalized in a short period of time)
 
 ## JobQueue components
 To achieve the above goal, the jobqueue system contains the following components/interface:
