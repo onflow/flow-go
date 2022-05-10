@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/insecure/corruptible"
@@ -10,7 +11,7 @@ import (
 )
 
 // CorruptibleConduitFactoryPort is the port number that gRPC server of the conduit factory of corrupted nodes is listening on.
-const CorruptibleConduitFactoryPort = "4300"
+const CorruptibleConduitFactoryPort = 4300
 
 // CorruptedNodeBuilder creates a general flow node builder with corruptible conduit factory.
 type CorruptedNodeBuilder struct {
@@ -40,7 +41,7 @@ func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
 			return nil, fmt.Errorf("could not extract host address: %w", err)
 		}
 
-		address := net.JoinHostPort(host, CorruptibleConduitFactoryPort)
+		address := net.JoinHostPort(host, strconv.Itoa(CorruptibleConduitFactoryPort))
 		ccf := corruptible.NewCorruptibleConduitFactory(
 			cnb.FlowNodeBuilder.Logger,
 			cnb.FlowNodeBuilder.RootChainID,

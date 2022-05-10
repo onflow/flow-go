@@ -2,23 +2,21 @@ package wintermute
 
 import (
 	"context"
+	"testing"
+
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
-)
 
-func TestWintermute(t *testing.T) {
-	suite.Run(t, new(WintermuteTestSuite))
-}
+	"github.com/onflow/flow-go/integration/tests/lib"
+)
 
 type WintermuteTestSuite struct {
 	Suite
 }
 
-func (suite *WintermuteTestSuite) TestDummyOrchestrator() {
-
+func TestDummyOrchestrator(t *testing.T) {
+	suite.Run(t, new(WintermuteTestSuite))
 }
 
 func (suite *WintermuteTestSuite) TestSealingAndVerificationHappyPath() {
@@ -53,5 +51,6 @@ func (suite *WintermuteTestSuite) TestSealingAndVerificationHappyPath() {
 		suite.ApprovalState.WaitForResultApproval(suite.T(), suite.verID, resultBId, uint64(i))
 	}
 
-	// TODO add checking for received messages from orchestrator
+	// waits until blockB is sealed by consensus nodes after result approvals for all of its chunks emitted.
+	suite.BlockState.WaitForSealed(suite.T(), blockB.Header.Height)
 }
