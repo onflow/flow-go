@@ -252,10 +252,11 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 	//    block height of all its constituent transactions
 	// 2. a transaction with reference block height T is eligible for inclusion in
 	//    any collection with reference block height C where C<=T<C+E
-	// TODO: need to change anything to enforce the above? comment in builder?
 	//
 	// Therefore, to guarantee that we find all possible duplicates, we need to check
-	// all collections with reference block height in the range (C-E,C+E)
+	// all collections with reference block height in the range (C-E,C+E). Since we
+	// know the actual maximum reference height included in this collection, we can
+	// further limit the search range to (C-E,maxRefHeight]
 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
@@ -267,6 +268,7 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 	}
 
 	for _, blockID := range clusterBlockIDs {
+		// TODO: could add LightByBlockID and retrieve only tx IDs
 		payload, err := m.payloads.ByBlockID(blockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve cluster payload (block_id=%x) to de-duplicate: %w", blockID, err)
