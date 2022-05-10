@@ -2,7 +2,6 @@ package collection_test
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -114,10 +113,7 @@ func (suite *BuilderSuite) SetupTest() {
 		})
 		added := suite.pool.Add(&transaction)
 		suite.Assert().True(added)
-		fmt.Println("adding transaction: ", transaction.ID())
 	}
-	fmt.Println("protocol root: ", root.ID())
-	fmt.Println("cluster root: ", suite.genesis.ID())
 
 	suite.builder = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
 }
