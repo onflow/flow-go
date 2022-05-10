@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -412,4 +413,88 @@ func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
 	// although it conflicts with block1, it is on a different fork
 	err = suite.state.Extend(&block2)
 	suite.Assert().Nil(err)
+}
+
+func (suite *MutatorSuite) TestExtend_LargeHistory() {
+	t := suite.T()
+
+	// get a valid reference block ID
+	final, err := suite.protoState.Final().Head()
+	require.NoError(t, err)
+	refID := final.ID()
+
+	// keep track of the head of the chain
+	head := *suite.genesis
+
+	// keep track of transactions in orphaned forks (eligible for inclusion in future block)
+	var invalidatedTransactions []*flow.TransactionBody
+	// keep track of the oldest transactions (further back in ancestry than the expiry window)
+	var oldTransactions []*flow.TransactionBody
+
+	// create a large history of blocks with invalidated forks every 3 blocks on
+	// average - build until the height exceeds transaction expiry
+	for i := 0; ; i++ {
+
+		// create a transaction
+		tx := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
+			tx.ReferenceBlockID = refID
+			tx.ProposalKey.SequenceNumber = uint64(i)
+		})
+
+		// 1/3 of the time create a conflicting fork that will be invalidated
+		// don't do this the first and last few times to ensure we don't
+		// try to fork genesis and the last block is the valid fork.
+		conflicting := rand.Intn(3) == 0 && i > 5 && i < 995
+
+		// by default, build on the head - if we are building a
+		// conflicting fork, build on the parent of the head
+		parent := head
+		if conflicting {
+			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
+			assert.NoError(t, err)
+			// add the transaction to the invalidated list
+			invalidatedTransactions = append(invalidatedTransactions, &tx)
+		} else if head.Header.Height < 50 {
+			oldTransactions = append(oldTransactions, &tx)
+		}
+
+		// create a block containing the transaction
+		block := unittest.ClusterBlockWithParent(&head)
+		payload := suite.Payload(&tx)
+		block.SetPayload(payload)
+		err = suite.state.Extend(&block)
+		assert.NoError(t, err)
+
+		// reset the valid head if we aren't building a conflicting fork
+		if !conflicting {
+			head = block
+			suite.FinalizeBlock(block)
+			assert.NoError(t, err)
+		}
+
+		// stop building blocks once we've built a history which exceeds the transaction
+		// expiry length - this tests that deduplication works properly against old blocks
+		// which nevertheless have a potentially conflicting reference block
+		if head.Header.Height > flow.DefaultTransactionExpiry+100 {
+			break
+		}
+	}
+
+	t.Log("conflicting: ", len(invalidatedTransactions))
+
+	t.Run("should be able to extend with transactions in orphaned forks", func(t *testing.T) {
+		block := unittest.ClusterBlockWithParent(&head)
+		payload := suite.Payload(invalidatedTransactions...)
+		block.SetPayload(payload)
+		err = suite.state.Extend(&block)
+		assert.NoError(t, err)
+	})
+
+	t.Run("should be unable to extend with conflicting transactions within reference height range of extending block", func(t *testing.T) {
+		block := unittest.ClusterBlockWithParent(&head)
+		payload := suite.Payload(oldTransactions...)
+		block.SetPayload(payload)
+		err = suite.state.Extend(&block)
+		assert.Error(t, err)
+	})
 }
