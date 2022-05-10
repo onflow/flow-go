@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
-	"fmt"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -13,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -27,6 +27,7 @@ type backendScripts struct {
 	connFactory       ConnectionFactory
 	log               zerolog.Logger
 	seenScripts       map[[md5.Size]byte]time.Time // to keep track of unique scripts sent by clients. bounded to 1MB (2^16*2*8) due to fixed key size
+	metrics           module.BackendScriptsMetrics
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -125,15 +126,11 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 				}
 			}
 
-			fmt.Println("HELLO HELLO HELLO")
-			fmt.Println("HELLO HELLO HELLO")
-			fmt.Println("HELLO HELLO HELLO")
-			fmt.Println("HELLO HELLO HELLO")
-			
 			// log execution time
-			b.log.Debug().
-				Dur("exec_time", time.Since(execStartTime)).
-				Int("script_size", len(script))
+			b.metrics.ExecuteScriptRTT(
+				time.Since(execStartTime),
+				len(script),
+			)
 
 			return result, nil
 		}

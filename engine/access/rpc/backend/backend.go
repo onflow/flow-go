@@ -106,6 +106,7 @@ func New(
 			state:             state,
 			log:               log,
 			seenScripts:       make(map[[md5.Size]byte]time.Time),
+			metrics:           transactionMetrics,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
