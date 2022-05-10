@@ -3539,6 +3539,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			tx := fvm.Transaction(txBody, 0)
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
+			require.Greater(t, tx.MemoryUsed, uint64(20_000_000_000))
 
 			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
 		},
