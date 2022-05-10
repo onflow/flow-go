@@ -42,7 +42,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 
 		if identity.Ejected {
 			log.Warn().
-				Err(fmt.Errorf("node %s is an ejected node", identity.NodeID)).
+				Err(fmt.Errorf("sender %s is an ejected node", identity.NodeID)).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
 				Msg("rejecting message")
