@@ -3,18 +3,21 @@ package wintermute
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/insecure/attacknetwork"
-	"github.com/onflow/flow-go/insecure/wintermute"
+	insecmd "github.com/onflow/flow-go/insecure/cmd"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 // Suite represents a test suite evaluating the integration of the test net
@@ -87,8 +90,6 @@ func (s *Suite) SetupSuite() {
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.WarnLevel),
-		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
@@ -97,8 +98,6 @@ func (s *Suite) SetupSuite() {
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
@@ -106,8 +105,6 @@ func (s *Suite) SetupSuite() {
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		// only verification and execution nodes run with preferred unicast protocols
-		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.PreferredUnicasts)),
 		testnet.AsCorrupted())
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
@@ -148,42 +145,20 @@ func (s *Suite) SetupSuite() {
 	s.cancel = cancel
 	s.net.Start(ctx)
 
-	// create dummy orchestrator
-
-	corruptedIdentifierList := make(flow.IdentifierList, 3)
-	corruptedIdentifierList = append(corruptedIdentifierList, s.exe1ID)
-	corruptedIdentifierList = append(corruptedIdentifierList, s.exe2ID)
-	corruptedIdentifierList = append(corruptedIdentifierList, s.verID)
-
-	corruptedIdentityList := make(flow.IdentityList, 3)
-	corruptedIdentityList = append(corruptedIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithNodeID(s.exe1ID)))
-	corruptedIdentityList = append(corruptedIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithNodeID(s.exe2ID)))
-	corruptedIdentityList = append(corruptedIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithNodeID(s.verID)))
-
-	allIdentityList := make(flow.IdentityList, 9)
-
-	// 4 honest consensus nodes
-	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithNodeID(s.nodeIDs[0])))
-	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithNodeID(s.nodeIDs[1])))
-	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithNodeID(s.nodeIDs[2])))
-	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithNodeID(s.nodeIDs[3])))
-
-	// 2 honest collection nodes
-	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection), unittest.WithNodeID(coll1Config.Identifier)))
-	allIdentityList = append(allIdentityList, unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection), unittest.WithNodeID(coll2Config.Identifier)))
-
-	// add corrupted node identities
-	allIdentityList = append(allIdentityList, corruptedIdentityList...)
-
-	dummyOrchestrator := wintermute.NewOrchestrator(unittest.Logger(), corruptedIdentifierList, allIdentityList)
+	dummyOrchestrator := NewDummyOrchestrator(logger)
 
 	// start attack network
-	const serverAddress = "localhost:0"
-	const ccfPort = 0
+	const serverAddress = "localhost:0" // we let OS picking an available port for attack network
 	codec := cbor.NewCodec()
-	connector := attacknetwork.NewCorruptedConnector(corruptedIdentityList, ccfPort)
-	attackNetwork, err := attacknetwork.NewAttackNetwork(unittest.Logger(), serverAddress, codec, dummyOrchestrator, connector, corruptedIdentityList)
+	connector := attacknetwork.NewCorruptedConnector(s.net.CorruptedIdentities(), insecmd.CorruptibleConduitFactoryPort)
+	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
+		serverAddress,
+		codec,
+		dummyOrchestrator,
+		connector,
+		s.net.CorruptedIdentities())
 	require.NoError(s.T(), err)
+
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
@@ -195,15 +170,16 @@ func (s *Suite) SetupSuite() {
 	}()
 
 	attackNetwork.Start(attackCtx)
+	unittest.RequireCloseBefore(s.T(), attackNetwork.Ready(), 1*time.Second, "could not start attack network on time")
 
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
+
+	cancel()
+	unittest.RequireCloseBefore(s.T(), attackNetwork.Done(), 1*time.Second, "could not stop attack network on time")
 }
 
 // TearDownSuite tears down the test network of Flow
 func (s *Suite) TearDownSuite() {
-	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
-	s.cancel()
-	s.log.Info().Msg("================> Finish TearDownTest")
 }
