@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,9 +25,11 @@ import (
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mocks"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	stateProtocol "github.com/onflow/flow-go/state/protocol"
@@ -66,6 +69,7 @@ type testingContext struct {
 	identity            *flow.Identity
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 	collectionRequester *module.MockRequester
+	identities          flow.IdentityList
 }
 
 func runWithEngine(t *testing.T, f func(testingContext)) {
@@ -114,7 +118,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		providerEngine.AssertExpectations(t)
 	}()
 
-	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
+	identityListUnsorted := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
+	identityList := identityListUnsorted.Sort(order.Canonical)
 
 	executionState.On("DiskSize").Return(int64(1024*1024), nil).Maybe()
 
@@ -189,6 +194,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		snapshot:            snapshot,
 		identity:            myIdentity,
 		broadcastedReceipts: make(map[flow.Identifier]*flow.ExecutionReceipt),
+		identities:          identityList,
 	})
 
 	<-engine.Done()
@@ -334,7 +340,8 @@ func (ctx testingContext) mockSnapshot(header *flow.Header, identities flow.Iden
 
 func (ctx testingContext) mockSnapshotWithBlockID(blockID flow.Identifier, identities flow.IdentityList) {
 	cluster := new(protocol.Cluster)
-	cluster.On("Members").Return(identities)
+	// filter only collections as cluster members
+	cluster.On("Members").Return(identities.Filter(filter.HasRole(flow.RoleCollection)))
 
 	epoch := new(protocol.Epoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
@@ -706,18 +713,24 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		// It should rather not occur during normal execution because StartState won't be set
 		// before parent has finished, but we should handle this edge case that it is set as well.
 
-		// A <- B <- C <- D
+		// A (0 collection) <- B (0 collection) <- C (0 collection) <- D (1 collection)
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
 		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
-		colSigner := unittest.IdentifierFixture()
+		collectionIdentities := ctx.identities.Filter(filter.HasRole(flow.RoleCollection))
+		colSigner := collectionIdentities[0].ID()
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header)
 		blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
 		// the default fixture uses a 10 collectors committee, but in this test case, there are only 4,
 		// so we need to update the signer indices.
 		// set the first identity as signer
-		blockC.Block.Payload.Guarantees[0].SignerIndices = unittest.SignerIndicesByIndices(4, []int{0})
+		log.Info().Msgf("canonical collection list %v", collectionIdentities.NodeIDs())
+		log.Info().Msgf("full list %v", ctx.identities)
+		indices, err :=
+			signature.EncodeSignersToIndices(collectionIdentities.NodeIDs(), []flow.Identifier{colSigner})
+		require.NoError(t, err)
+		blockC.Block.Payload.Guarantees[0].SignerIndices = indices
 
 		// block D to make sure execution resumes after block C multiple execution has been prevented
 		blockD := unittest.ExecutableBlockFixtureWithParent(nil, blockC.Block.Header)
@@ -737,10 +750,12 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits)
 
-		ctx.mockSnapshotWithBlockID(unittest.FixedReferenceBlockID(), unittest.IdentityListFixture(1))
-		ctx.mockSnapshot(blockB.Block.Header, unittest.IdentityListFixture(1))
-		ctx.mockSnapshot(blockC.Block.Header, unittest.IdentityListFixture(1))
-		ctx.mockSnapshot(blockD.Block.Header, unittest.IdentityListFixture(1))
+		// mock the cluster canonical list at the collection guarantee's reference block
+		// use the same canonical list as used for building signer indices
+		ctx.mockSnapshotWithBlockID(unittest.FixedReferenceBlockID(), ctx.identities)
+		ctx.mockSnapshot(blockB.Block.Header, ctx.identities)
+		ctx.mockSnapshot(blockC.Block.Header, ctx.identities)
+		ctx.mockSnapshot(blockD.Block.Header, ctx.identities)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		ctx.snapshot.On("Head").Return(&blockA, nil)
@@ -794,7 +809,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		}).Times(1)
 
 		wg.Add(1) // wait for block B to be executed
-		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
+		err = ctx.engine.handleBlock(context.Background(), blockB.Block)
 		require.NoError(t, err)
 
 		wg.Add(1) // wait for block C to be executed

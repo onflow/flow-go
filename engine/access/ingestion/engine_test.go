@@ -17,11 +17,13 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/mocknetwork"
 
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/signature"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -113,9 +115,16 @@ func (suite *Suite) TestOnFinalizedBlock() {
 		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
 	))
 
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
 	refBlockID := unittest.IdentifierFixture()
 	for _, guarantee := range block.Payload.Guarantees {
 		guarantee.ReferenceBlockID = refBlockID
+		// guarantee signers must be cluster committee members, so that access will fetch collection from
+		// the signers that are specified by guarantee.SignerIndices
+		indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+		require.NoError(suite.T(), err)
+		guarantee.SignerIndices = indices
 	}
 
 	hotstuffBlock := hotmodel.Block{
@@ -134,7 +143,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
 
 	cluster := new(protocol.Cluster)
-	cluster.On("Members").Return(unittest.IdentityListFixture(32*4), nil)
+	cluster.On("Members").Return(clusterCommittee, nil)
 	epoch := new(protocol.Epoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
@@ -313,6 +322,9 @@ func (suite *Suite) TestRequestMissingCollections() {
 	blocks := make([]flow.Block, blkCnt)
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+
 	// generate the test blocks and collections
 	var collIDs []flow.Identifier
 	refBlockID := unittest.IdentifierFixture()
@@ -330,6 +342,12 @@ func (suite *Suite) TestRequestMissingCollections() {
 		for _, c := range block.Payload.Guarantees {
 			collIDs = append(collIDs, c.CollectionID)
 			c.ReferenceBlockID = refBlockID
+
+			// guarantee signers must be cluster committee members, so that access will fetch collection from
+			// the signers that are specified by guarantee.SignerIndices
+			indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+			require.NoError(suite.T(), err)
+			c.SignerIndices = indices
 		}
 	}
 
@@ -385,7 +403,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 	suite.request.On("Force").Return()
 
 	cluster := new(protocol.Cluster)
-	cluster.On("Members").Return(unittest.IdentityListFixture(32*4), nil)
+	cluster.On("Members").Return(clusterCommittee, nil)
 	epoch := new(protocol.Epoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
@@ -446,6 +464,9 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 	heightMap := make(map[uint64]*flow.Block, blkCnt)
 	collMap := make(map[flow.Identifier]*flow.LightCollection, blkCnt*collPerBlk)
 
+	// prepare cluster committee members
+	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole(flow.RoleCollection))
+
 	refBlockID := unittest.IdentifierFixture()
 	// generate the test blocks, cgs and collections
 	for i := 0; i < blkCnt; i++ {
@@ -457,6 +478,12 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 				cg.CollectionID = coll.ID()
 				cg.ReferenceBlockID = refBlockID
 			})
+
+			// guarantee signers must be cluster committee members, so that access will fetch collection from
+			// the signers that are specified by guarantee.SignerIndices
+			indices, err := signature.EncodeSignersToIndices(clusterCommittee.NodeIDs(), clusterCommittee.NodeIDs())
+			require.NoError(suite.T(), err)
+			cg.SignerIndices = indices
 			guarantees[j] = cg
 		}
 		block := unittest.BlockFixture()
@@ -488,7 +515,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		})
 
 	cluster := new(protocol.Cluster)
-	cluster.On("Members").Return(unittest.IdentityListFixture(32*4), nil)
+	cluster.On("Members").Return(clusterCommittee, nil)
 	epoch := new(protocol.Epoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)
