@@ -45,6 +45,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 				Err(fmt.Errorf("sender %s is an ejected node", identity.NodeID)).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
+				Str("node_id", identity.NodeID.String()).
 				Msg("rejecting message")
 			return pubsub.ValidationReject
 		}
@@ -56,6 +57,7 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
+				Str("node_id", identity.NodeID.String()).
 				Msg("rejecting message")
 			return pubsub.ValidationReject
 		}
@@ -65,8 +67,8 @@ func AuthorizedSenderValidator(log zerolog.Logger, channel network.Channel, getI
 				Err(err).
 				Str("peer_id", from.String()).
 				Str("role", identity.Role.String()).
+				Str("node_id", identity.NodeID.String()).
 				Str("message_type", what).
-				Str("network_channel", channel.String()).
 				Msg("sender is not authorized, rejecting message")
 
 			return pubsub.ValidationReject
