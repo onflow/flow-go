@@ -54,7 +54,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -327,7 +328,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
-		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+		cleaner := bstorage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 		conCache := buffer.NewPendingBlocks()
 
 		followerEng, err := follower.New(
@@ -412,8 +413,8 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
-	var processedBlockHeight *storage.ConsumerProgress
-	var processedNotifications *storage.ConsumerProgress
+	var processedBlockHeight storage.ConsumerProgress
+	var processedNotifications storage.ConsumerProgress
 
 	builder.
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
@@ -438,12 +439,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// uses the datastore's DB
-			processedBlockHeight = storage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			processedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// uses the datastore's DB
-			processedNotifications = storage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
