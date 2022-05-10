@@ -106,7 +106,7 @@ func getRoles(channel network.Channel, msgTypeCode uint8) (flow.RoleList, error)
 	// get message type codes for all messages communicated on the channel
 	codes, ok := cborcodec.ChannelToMsgCodes[channel]
 	if !ok {
-		return nil, fmt.Errorf("could not get message codes for unknown channel")
+		return nil, fmt.Errorf("could not get message codes for unknown channel: %s", channel)
 	}
 
 	// check if message type code is in list of codes corresponding to channel
