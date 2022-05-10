@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -576,7 +577,7 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_IsNext
 // in the newview, I'm not the leader, and I have the cur block,
 // and the block is not a safe node to vote, and I'm not the next leader
 func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NotSafeNode_NotNextLeader() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	// voting block exists
 	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
 	// a qc is built
@@ -645,7 +646,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_OlderThanCurView_CanBuildQCFr
 // received a valid proposal that has newer view, and cannot build qc from votes for this block,
 // the proposal's QC triggered view change
 func (es *EventHandlerSuite) TestOnReceiveProposal_NewerThanCurView_CannotBuildQCFromVotes_ViewChange() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	proposal := createProposal(es.initView+1, es.initView)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
@@ -664,7 +665,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_NewerThanCurView_CannotBuildQ
 // received a valid proposal that has newer view, and can build qc from votes for this block,
 // the proposal's QC triggered view change
 func (es *EventHandlerSuite) TestOnReceiveProposal_NewerThanCurView_CanBuildQCFromVotes_ViewChange() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	proposal := createProposal(es.initView+1, es.initView)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
@@ -684,7 +685,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_NewerThanCurView_CanBuildQCFr
 // received a valid proposal whose QC that has newer view, and cannot build qc from votes for this block,
 // the proposal's QC triggered view change
 func (es *EventHandlerSuite) TestOnReceiveProposal_QCNewerThanCurView_CannotBuildQCFromVotes_ViewChanged() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	proposal := createProposal(es.initView+2, es.initView+1)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 
@@ -765,7 +766,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_Unverifiable() {
 }
 
 func (es *EventHandlerSuite) TestOnTimeout() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	err := es.eventhandler.OnLocalTimeout()
 	// timeout will trigger viewchange
 	es.endView++
@@ -774,7 +775,7 @@ func (es *EventHandlerSuite) TestOnTimeout() {
 }
 
 func (es *EventHandlerSuite) Test100Timeout() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	for i := 0; i < 100; i++ {
 		err := es.eventhandler.OnLocalTimeout()
 		es.endView++
@@ -823,7 +824,7 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 
 // a follower receives 100 blocks
 func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
-	es.T().Skip("active-pacemaker, to be fixed")
+	unittest.SkipUnless(es.T(), unittest.TEST_TODO, "active-pacemaker")
 	for i := 0; i < 100; i++ {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i), es.initView+uint64(i)-1)
