@@ -174,12 +174,10 @@ func (s *Suite) SetupSuite() {
 
 	// starts tracking blocks by the ghost node
 	s.Track(s.T(), ctx, s.Ghost())
-
-	cancel()
-	unittest.RequireCloseBefore(s.T(), attackNetwork.Done(), 1*time.Second, "could not stop attack network on time")
 }
 
 // TearDownSuite tears down the test network of Flow
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
+	s.cancel()
 }
