@@ -280,4 +280,24 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 			})
 		})
 	})
+
+	// TODO these tests should not be included in the master branch.
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		t.Run("index should not exist initially", func(t *testing.T) {
+			var exists bool
+			err := db.View(operation.ClusterBlocksByReferenceHeightIndexExists(&exists))
+			assert.NoError(t, err)
+			assert.False(t, exists)
+		})
+		t.Run("index should exist after adding any item", func(t *testing.T) {
+			// add something to the index
+			err := db.Update(operation.IndexClusterBlockByReferenceHeight(rand.Uint64(), unittest.IdentifierFixture()))
+			assert.NoError(t, err)
+
+			var exists bool
+			err = db.View(operation.ClusterBlocksByReferenceHeightIndexExists(&exists))
+			assert.NoError(t, err)
+			assert.True(t, exists)
+		})
+	})
 }

@@ -78,3 +78,31 @@ func LookupClusterBlocksByReferenceHeightRange(start, end uint64, clusterBlockID
 		return check, nil, nil
 	}, withPrefetchValues(false))
 }
+
+// ClusterBlocksByReferenceHeightIndexExists checks whether the cluster block by reference
+// height exists.
+//
+// TODO this method should not be included in the master branch.
+func ClusterBlocksByReferenceHeightIndexExists(exists *bool) func(*badger.Txn) error {
+	prefix := makePrefix(codeRefHeightToClusterBlock)
+	return func(tx *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false
+		it := tx.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); {
+			*exists = true
+			return nil
+		}
+		return nil
+	}
+}
+
+// BatchIndexClusterBlockByReferenceHeight is IndexReferenceBlockByClusterBlock
+// for use in a write batch.
+//
+// TODO this method should not be included in the master branch.
+func BatchIndexClusterBlockByReferenceHeight(refHeight uint64, clusterBlockID flow.Identifier) func(*badger.WriteBatch) error {
+	return batchInsert(makePrefix(codeRefHeightToClusterBlock, refHeight, clusterBlockID), nil)
+}
