@@ -27,6 +27,7 @@ func TestBackfillClusterBlockByReferenceHeightIndex(t *testing.T) {
 	// set up mocks for 2 epochs previous=9, current=10
 	state := new(protocol.State)
 	snap := new(protocol.Snapshot)
+	params := new(protocol.Params)
 
 	currentEpoch := new(protocol.Epoch)
 	currentCluster := new(protocol.Cluster)
@@ -46,13 +47,30 @@ func TestBackfillClusterBlockByReferenceHeightIndex(t *testing.T) {
 
 	epochs := mocks.NewEpochQuery(t, 10, currentEpoch, prevEpoch)
 	state.On("Final").Return(snap)
+	state.On("Params").Return(params)
 	snap.On("Epochs").Return(epochs)
+	root := flow.Genesis(flow.Emulator)
+	var finalizedHeader *flow.Header
+	params.On("Root").Return(root.Header, nil)
+	snap.On("Head").Return(
+		func() *flow.Header { return finalizedHeader },
+		func() error { return nil },
+	)
 
 	const (
 		N_REF_BLOCKS     = 100
 		N_CLUSTER_BLOCKS = 1_000
 		BACKFILL_NUM     = 900
 	)
+
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		t.Run("empty state", func(t *testing.T) {
+			// set finalized head to be root - indicates we have an empty state
+			finalizedHeader = root.Header
+			err := BackfillClusterBlockByReferenceHeightIndex(db, unittest.Logger(), me.NodeID, state, BACKFILL_NUM)
+			assert.NoError(t, err)
+		})
+	})
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		t.Run("all blocks within current epoch", func(t *testing.T) {
@@ -64,6 +82,9 @@ func TestBackfillClusterBlockByReferenceHeightIndex(t *testing.T) {
 				err := db.Update(operation.InsertHeader(block.ID(), &block))
 				require.NoError(t, err)
 			}
+
+			// set the latest finalized block
+			finalizedHeader = refBlocks[len(refBlocks)-1]
 
 			// keep track of expected index
 			index := make(map[uint64][]flow.Identifier)
@@ -148,6 +169,9 @@ func TestBackfillClusterBlockByReferenceHeightIndex(t *testing.T) {
 				err := db.Update(operation.InsertHeader(block.ID(), &block))
 				require.NoError(t, err)
 			}
+
+			// set the latest finalized block
+			finalizedHeader = refBlocks[len(refBlocks)-1]
 
 			// keep track of expected index
 			index := make(map[uint64][]flow.Identifier)

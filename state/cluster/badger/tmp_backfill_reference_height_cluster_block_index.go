@@ -32,7 +32,8 @@ func BackfillClusterBlockByReferenceHeightIndex(db *badger.DB, log zerolog.Logge
 
 	log.Info().Msg("backfilling cluster block reference height index")
 
-	// STEP 1 - check whether the index is populated already, if so exit
+	// STEP 1 - check whether the index is populated already, or we are starting up
+	// from a fresh root snapshot, in either case exit
 	var exists bool
 	err := db.View(operation.ClusterBlocksByReferenceHeightIndexExists(&exists))
 	if err != nil {
@@ -40,6 +41,18 @@ func BackfillClusterBlockByReferenceHeightIndex(db *badger.DB, log zerolog.Logge
 	}
 	if exists {
 		log.Info().Msg("cluster block reference height index already exists, exiting...")
+		return nil
+	}
+	root, err := state.Params().Root()
+	if err != nil {
+		return fmt.Errorf("could not get root block: %w", err)
+	}
+	head, err := final.Head()
+	if err != nil {
+		return fmt.Errorf("could not get final head: %w", err)
+	}
+	if root.ID() == head.ID() {
+		log.Info().Msg("starting with a fresh state - no need to backfill cluster block reference height index, exiting...")
 		return nil
 	}
 
