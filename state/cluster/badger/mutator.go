@@ -164,7 +164,11 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		// check for duplicate transactions in block's ancestry
 		txLookup := make(map[flow.Identifier]struct{})
 		for _, tx := range block.Payload.Collection.Transactions {
-			txLookup[tx.ID()] = struct{}{}
+			txID := tx.ID()
+			if _, exists := txLookup[txID]; exists {
+				return state.NewInvalidExtensionErrorf("collection contains transaction (id=%x) more than once", txID)
+			}
+			txLookup[txID] = struct{}{}
 		}
 
 		// first, check for duplicate transactions in the un-finalized ancestry
