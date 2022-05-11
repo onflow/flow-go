@@ -2,6 +2,7 @@ package computation
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -246,7 +247,68 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		}
 		require.Equal(t, 3, transactionEvents)
 	})
+	t.Run("with contract deploy and update", func(t *testing.T) {
 
+		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
+			`pub contract Foo {
+				pub event FooEvent(x: Int, y: Int)
+
+				pub fun event() { 
+					emit FooEvent(x: 2, y: 1)
+				}
+			}`), "Foo")
+
+		emitTx := &flow.TransactionBody{
+			Script: []byte(fmt.Sprintf(`
+			import Foo from 0x%s
+			transaction {
+				prepare() {}
+				execute {
+					Foo.event()
+				}
+			}`, chain.ServiceAddress())),
+		}
+
+		updateTx := flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(""+
+			`transaction {
+				prepare(signer: AuthAccount) {
+					signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+				}
+			}`, "Foo", hex.EncodeToString([]byte(""+
+			`pub contract Foo {
+				pub event FooEvent(x: Int, y: Int)
+
+				pub fun event2() { 
+					emit FooEvent(x: 2, y: 1)
+				}
+			}
+			`))))).AddAuthorizer(chain.ServiceAddress())
+
+		err := testutil.SignTransactionAsServiceAccount(deployTx, 0, chain)
+		require.NoError(t, err)
+
+		err = testutil.SignTransactionAsServiceAccount(emitTx, 1, chain)
+		require.NoError(t, err)
+
+		err = testutil.SignTransactionAsServiceAccount(updateTx, 2, chain)
+		require.NoError(t, err)
+
+		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
+			{
+				deployTx,
+				emitTx, // this tx loads the contract into the programs cache
+			},
+			{
+				updateTx,
+			},
+		}, fvm.DefaultTransactionFees, fvm.DefaultMinimumStorageReservation)
+
+		// ensure event is emitted
+		require.Empty(t, cr.TransactionResults[0].ErrorMessage)
+		require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+		require.Len(t, cr.Events[0], 8)
+		require.Len(t, cr.Events[1], 4)
+	})
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {
