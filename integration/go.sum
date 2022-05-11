@@ -1414,8 +1414,8 @@ github.com/onflow/cadence v0.11.2/go.mod h1:8NwJGO535nnY/+QWEMDc2rhvOFChToWQ9Bg7
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
 github.com/onflow/cadence v0.17.0/go.mod h1:iR/tZpP+1YhM8iRnOBPiBIs7on5dE3hk2ZfunCRQswE=
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
-github.com/onflow/cadence v0.23.5-0.20220511132510-d9169fa0b487 h1:BjpVRmPMLDPekcTA3L2pdIgA6ymaJrDBdD9e6eJoVx8=
-github.com/onflow/cadence v0.23.5-0.20220511132510-d9169fa0b487/go.mod h1:9aMe+SF+4xIeBWUED6DlJbx50O5ez9lApJKiT0Nqlmw=
+github.com/onflow/cadence v0.23.3-patch.1 h1:Tw4UOxK67T6qA+t10Ug2kD0APV6IdHUnZALGYpvAdPs=
+github.com/onflow/cadence v0.23.3-patch.1/go.mod h1:Y++seAx3qsNjjZYTQhClD86D5aF951cMHVPL94Z64J8=
 github.com/onflow/flow v0.2.5 h1:d1LCeE+w+ef4QAC0zEAxfJn+N09bNKL8zXnfrihiSrs=
 github.com/onflow/flow v0.2.5/go.mod h1:lzyAYmbu1HfkZ9cfnL5/sjrrsnJiUU8fRL26CqLP7+c=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.0 h1:S8UxLG4H2bAx9YjRjVY2/pYIFwrzlg2Q/kbFVQmkql0=
