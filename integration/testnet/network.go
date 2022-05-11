@@ -200,6 +200,7 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 		t.Logf("%v (%v) before starting flow network, found docker container %v with ports %v", time.Now().UTC(), t.Name(), container.Names, container.Ports)
 	}
 
+	t.Log("starting flow network")
 	net.suite.Start(ctx)
 
 	containers, err = cli.ContainerList(ctx, types.ContainerListOptions{})
@@ -426,7 +427,8 @@ func (n *NetworkConfig) Swap(i, j int) {
 // to network creation.
 type NodeConfig struct {
 	Role                  flow.Role
-	Stake                 uint64
+	Corrupted             bool
+	Weight                uint64
 	Identifier            flow.Identifier
 	LogLevel              zerolog.Level
 	Ghost                 bool
@@ -438,7 +440,7 @@ type NodeConfig struct {
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 	c := NodeConfig{
 		Role:       role,
-		Stake:      1_250_000,                    // sufficient to exceed minimum for all roles https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowIDTableStaking.cdc#L1161
+		Weight:     flow.DefaultInitialWeight,
 		Identifier: unittest.IdentifierFixture(), // default random ID
 		LogLevel:   zerolog.DebugLevel,           // log at debug by default
 	}
@@ -700,6 +702,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 // AddNode creates a node container with the given config and adds it to the
 // network.
 func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf ContainerConfig) error {
+	profilerDir := "/profiler"
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
 		Name:      nodeConf.ContainerName,
@@ -711,8 +714,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
+				fmt.Sprintf("--profiler-dir=%s", profilerDir),
 				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
 				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
+				fmt.Sprintf("--herocache-metrics-collector=%t", true), // to cache integration issues with this collector (if any)
 			}, nodeConf.AdditionalFlags...),
 		},
 		HostConfig: &container.HostConfig{},
@@ -741,6 +746,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	err = os.Mkdir(flowDataDir, 0700)
 	require.NoError(t, err)
 
+	flowProfilerDir := filepath.Join(tmpdir, profilerDir)
+	err = os.Mkdir(flowProfilerDir, 0755)
+	require.NoError(t, err)
+
 	// create a directory for the bootstrap files
 	// we create a node-specific bootstrap directory to enable testing nodes
 	// bootstrapping from different root state snapshots and epochs
@@ -759,6 +768,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	opts.HostConfig.Binds = append(
 		opts.HostConfig.Binds,
 		fmt.Sprintf("%s:%s:rw", flowDataDir, DefaultFlowDataDir),
+		fmt.Sprintf("%s:%s:rw", flowProfilerDir, profilerDir),
 		fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, DefaultBootstrapDir),
 	)
 
@@ -962,7 +972,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 			conf.NodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
-			0,               // no stake
+			0,               // no weight
 			conf.NetworkingPrivKey,
 			dummyStakingKey,
 		)
@@ -992,7 +1002,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
-	// generate the follower node keys (follow nodes do not run as docker containers)
+	// generate the follower node keys (follower nodes do not run as docker containers)
 	followerInfos, err := followerNodeInfos(networkConf.ConsensusFollowers)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
@@ -1187,7 +1197,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			conf.Identifier,
 			conf.Role,
 			addr,
-			conf.Stake,
+			conf.Weight,
 			networkKeys[i],
 			stakingKeys[i],
 		)

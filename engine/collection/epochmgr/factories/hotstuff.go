@@ -68,6 +68,8 @@ func (f *HotStuffFactory) CreateModules(
 	// setup metrics/logging with the new chain ID
 	metrics := f.createMetrics(cluster.ChainID())
 	notifier := pubsub.NewDistributor()
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	notifier.AddConsumer(finalizationDistributor)
 	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
@@ -115,20 +117,22 @@ func (f *HotStuffFactory) CreateModules(
 		finalizedBlock.View+1,
 		notifier,
 		voteProcessorFactory,
+		finalizationDistributor,
 	)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	return &consensus.HotstuffModules{
-		Forks:                forks,
-		Validator:            validator,
-		Notifier:             notifier,
-		Committee:            committee,
-		Signer:               signer,
-		Persist:              persister.New(f.db, cluster.ChainID()),
-		Aggregator:           aggregator,
-		QCCreatedDistributor: qcDistributor,
+		Forks:                   forks,
+		Validator:               validator,
+		Notifier:                notifier,
+		Committee:               committee,
+		Signer:                  signer,
+		Persist:                 persister.New(f.db, cluster.ChainID()),
+		Aggregator:              aggregator,
+		QCCreatedDistributor:    qcDistributor,
+		FinalizationDistributor: finalizationDistributor,
 	}, metrics, nil
 }
 

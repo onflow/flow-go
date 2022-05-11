@@ -7,11 +7,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,8 +25,10 @@ import (
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	crypto2 "github.com/onflow/flow-go/fvm/crypto"
+	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/meter"
+	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -611,7 +615,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		tx := fvm.Transaction(txBody, 0)
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
-		assert.NoError(t, tx.Err)
+		require.NoError(t, tx.Err)
 	})
 
 	t.Run("account update with set code succeeds when there is a matching audit voucher", func(t *testing.T) {
@@ -1616,7 +1620,13 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	assert.Equal(t, flow.HexToAddress("05"), address)
 }
 
-func TestSignatureVerification(t *testing.T) {
+var createMessage = func(m string) (signableMessage []byte, message cadence.Array) {
+	signableMessage = []byte(m)
+	message = testutil.BytesToCadenceArray(signableMessage)
+	return signableMessage, message
+}
+
+func TestKeyListSignature(t *testing.T) {
 
 	t.Parallel()
 
@@ -1632,22 +1642,39 @@ func TestSignatureVerification(t *testing.T) {
 	}
 
 	type hashAlgorithm struct {
-		name      string
-		newHasher func() hash.Hasher
+		name   string
+		hasher func(string) hash.Hasher
 	}
+
+	// Hardcoded tag as required by the crypto.keyList Cadence contract
+	// TODO: update to a random tag once the Cadence contract is updated
+	// to accept custom tags
+	tag := "FLOW-V0.0-user"
 
 	hashAlgorithms := []hashAlgorithm{
 		{
 			"SHA3_256",
-			hash.NewSHA3_256,
+			func(tag string) hash.Hasher {
+				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA3_256, tag)
+				require.Nil(t, err)
+				return hasher
+			},
 		},
 		{
 			"SHA2_256",
-			hash.NewSHA2_256,
+			func(tag string) hash.Hasher {
+				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA2_256, tag)
+				require.Nil(t, err)
+				return hasher
+			},
 		},
 		{
 			"KECCAK_256",
-			hash.NewKeccak_256,
+			func(tag string) hash.Hasher {
+				hasher, err := fvmCrypto.NewPrefixedHashing(hash.Keccak_256, tag)
+				require.Nil(t, err)
+				return hasher
+			},
 		},
 	}
 
@@ -1721,24 +1748,8 @@ func TestSignatureVerification(t *testing.T) {
 				return privateKey, publicKey
 			}
 
-			createMessage := func(m string) (signableMessage []byte, message cadence.Array) {
-				signableMessage = []byte(m)
-
-				message = testutil.BytesToCadenceArray(signableMessage)
-
-				return signableMessage, message
-			}
-
-			signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
-				message := m
-				if hashAlgorithm.name != "KMAC128_BLS_BLS12_381" {
-					message = append(
-						flow.UserDomainTag[:],
-						m...,
-					)
-				}
-
-				signature, err := privateKey.Sign(message, hashAlgorithm.newHasher())
+			signMessage := func(privateKey crypto.PrivateKey, message []byte) cadence.Array {
+				signature, err := privateKey.Sign(message, hashAlgorithm.hasher(tag))
 				require.NoError(t, err)
 
 				return testutil.BytesToCadenceArray(signature)
@@ -1944,10 +1955,492 @@ func TestSignatureVerification(t *testing.T) {
 		crypto.BLSBLS12381,
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
-		func() hash.Hasher {
-			return crypto.NewBLSKMAC(flow.UserTagString)
+		func(tag string) hash.Hasher {
+			return crypto.NewBLSKMAC(tag)
 		},
 	})
+}
+
+func TestBLSMultiSignature(t *testing.T) {
+
+	t.Parallel()
+
+	type signatureAlgorithm struct {
+		name       string
+		seedLength int
+		algorithm  crypto.SigningAlgorithm
+	}
+
+	signatureAlgorithms := []signatureAlgorithm{
+		{"BLS_BLS12_381", crypto.KeyGenSeedMinLenBLSBLS12381, crypto.BLSBLS12381},
+		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+	}
+	BLSSignatureAlgorithm := signatureAlgorithms[0]
+
+	randomSK := func(t *testing.T, signatureAlgorithm signatureAlgorithm) crypto.PrivateKey {
+		seed := make([]byte, signatureAlgorithm.seedLength)
+		n, err := rand.Read(seed)
+		require.Equal(t, n, signatureAlgorithm.seedLength)
+		require.NoError(t, err)
+		sk, err := crypto.GeneratePrivateKey(signatureAlgorithm.algorithm, seed)
+		require.NoError(t, err)
+		return sk
+	}
+
+	testVerifyPoP := func() {
+		t.Run("verifyBLSPoP", newVMTest().run(
+			func(
+				t *testing.T,
+				vm *fvm.VirtualMachine,
+				chain flow.Chain,
+				ctx fvm.Context,
+				view state.View,
+				programs *programs.Programs,
+			) {
+
+				code := func(signatureAlgorithm signatureAlgorithm) []byte {
+					return []byte(
+						fmt.Sprintf(
+							`
+								import Crypto
+		
+								pub fun main(
+									publicKey: [UInt8],
+									proof: [UInt8]
+								): Bool {
+									let p = PublicKey(
+										publicKey: publicKey, 
+										signatureAlgorithm: SignatureAlgorithm.%s
+									)
+									return p.verifyPoP(proof)
+								}
+								`,
+							signatureAlgorithm.name,
+						),
+					)
+				}
+
+				t.Run("valid and correct BLS key", func(t *testing.T) {
+
+					sk := randomSK(t, BLSSignatureAlgorithm)
+					publicKey := testutil.BytesToCadenceArray(
+						sk.PublicKey().Encode(),
+					)
+
+					proof, err := crypto.BLSGeneratePOP(sk)
+					require.NoError(t, err)
+					pop := testutil.BytesToCadenceArray(
+						proof,
+					)
+
+					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
+						jsoncdc.MustEncode(publicKey),
+						jsoncdc.MustEncode(pop),
+					)
+
+					err = vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.NoError(t, script.Err)
+					assert.Equal(t, cadence.NewBool(true), script.Value)
+
+				})
+
+				t.Run("valid but incorrect BLS key", func(t *testing.T) {
+
+					sk := randomSK(t, BLSSignatureAlgorithm)
+					publicKey := testutil.BytesToCadenceArray(
+						sk.PublicKey().Encode(),
+					)
+
+					otherSk := randomSK(t, BLSSignatureAlgorithm)
+					proof, err := crypto.BLSGeneratePOP(otherSk)
+					require.NoError(t, err)
+
+					pop := testutil.BytesToCadenceArray(
+						proof,
+					)
+					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
+						jsoncdc.MustEncode(publicKey),
+						jsoncdc.MustEncode(pop),
+					)
+
+					err = vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.NoError(t, script.Err)
+					assert.Equal(t, cadence.NewBool(false), script.Value)
+
+				})
+
+				for _, signatureAlgorithm := range signatureAlgorithms[1:] {
+					t.Run("valid non BLS key/"+signatureAlgorithm.name, func(t *testing.T) {
+						sk := randomSK(t, signatureAlgorithm)
+						publicKey := testutil.BytesToCadenceArray(
+							sk.PublicKey().Encode(),
+						)
+
+						random := make([]byte, crypto.SignatureLenBLSBLS12381)
+						_, err := rand.Read(random)
+						require.NoError(t, err)
+						pop := testutil.BytesToCadenceArray(
+							random,
+						)
+
+						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
+							jsoncdc.MustEncode(publicKey),
+							jsoncdc.MustEncode(pop),
+						)
+
+						err = vm.Run(ctx, script, view, programs)
+						assert.Error(t, err)
+					})
+				}
+			},
+		))
+	}
+
+	testBLSSignatureAggregation := func() {
+		t.Run("aggregateBLSSignatures", newVMTest().run(
+			func(
+				t *testing.T,
+				vm *fvm.VirtualMachine,
+				chain flow.Chain,
+				ctx fvm.Context,
+				view state.View,
+				programs *programs.Programs,
+			) {
+
+				code := []byte(
+					`
+							import Crypto
+	
+							pub fun main(
+							signatures: [[UInt8]],
+							): [UInt8]? {
+								return BLS.aggregateSignatures(signatures)!
+							}
+						`,
+				)
+
+				// random message
+				input := make([]byte, 100)
+				_, err := rand.Read(input)
+				require.NoError(t, err)
+
+				// generate keys and signatures
+				numSigs := 50
+				sigs := make([]crypto.Signature, 0, numSigs)
+
+				kmac := crypto.NewBLSKMAC("test tag")
+				for i := 0; i < numSigs; i++ {
+					sk := randomSK(t, BLSSignatureAlgorithm)
+					// a valid BLS signature
+					s, err := sk.Sign(input, kmac)
+					require.NoError(t, err)
+					sigs = append(sigs, s)
+				}
+
+				t.Run("valid BLS signatures", func(t *testing.T) {
+
+					signatures := make([]cadence.Value, 0, numSigs)
+					for _, sig := range sigs {
+						s := testutil.BytesToCadenceArray(sig)
+						signatures = append(signatures, s)
+					}
+
+					script := fvm.Script(code).WithArguments(
+						jsoncdc.MustEncode(cadence.Array{
+							Values: signatures,
+							ArrayType: cadence.VariableSizedArrayType{
+								ElementType: cadence.VariableSizedArrayType{
+									ElementType: cadence.UInt8Type{},
+								},
+							},
+						}),
+					)
+
+					err = vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.NoError(t, script.Err)
+
+					expectedSig, err := crypto.AggregateBLSSignatures(sigs)
+					require.NoError(t, err)
+					assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedSig)}, script.Value)
+				})
+
+				t.Run("at least one invalid BLS signature", func(t *testing.T) {
+
+					signatures := make([]cadence.Value, 0, numSigs)
+					// alter one random signature
+					tmp := sigs[numSigs/2]
+					sigs[numSigs/2] = crypto.BLSInvalidSignature()
+
+					for _, sig := range sigs {
+						s := testutil.BytesToCadenceArray(sig)
+						signatures = append(signatures, s)
+					}
+
+					script := fvm.Script(code).WithArguments(
+						jsoncdc.MustEncode(cadence.Array{
+							Values: signatures,
+							ArrayType: cadence.VariableSizedArrayType{
+								ElementType: cadence.VariableSizedArrayType{
+									ElementType: cadence.UInt8Type{},
+								},
+							},
+						}),
+					)
+
+					// revert the change
+					sigs[numSigs/2] = tmp
+
+					err = vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.Error(t, script.Err)
+					assert.Equal(t, nil, script.Value)
+				})
+
+				t.Run("empty signature list", func(t *testing.T) {
+
+					signatures := []cadence.Value{}
+					script := fvm.Script(code).WithArguments(
+						jsoncdc.MustEncode(cadence.Array{
+							Values: signatures,
+							ArrayType: cadence.VariableSizedArrayType{
+								ElementType: cadence.VariableSizedArrayType{
+									ElementType: cadence.UInt8Type{},
+								},
+							},
+						}),
+					)
+
+					err = vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.Error(t, script.Err)
+					assert.Equal(t, nil, script.Value)
+				})
+			},
+		))
+	}
+
+	testKeyAggregation := func() {
+		t.Run("aggregateBLSPublicKeys", newVMTest().run(
+			func(
+				t *testing.T,
+				vm *fvm.VirtualMachine,
+				chain flow.Chain,
+				ctx fvm.Context,
+				view state.View,
+				programs *programs.Programs,
+			) {
+
+				code := func(signatureAlgorithm signatureAlgorithm) []byte {
+					return []byte(
+						fmt.Sprintf(
+							`
+								import Crypto
+		
+								pub fun main(
+									publicKeys: [[UInt8]]
+								): [UInt8]? {
+									let pks: [PublicKey] = []
+									for pk in publicKeys {
+										pks.append(PublicKey(
+											publicKey: pk, 
+											signatureAlgorithm: SignatureAlgorithm.%s
+										))
+									}
+									return BLS.aggregatePublicKeys(pks)!.publicKey
+								}
+								`,
+							signatureAlgorithm.name,
+						),
+					)
+				}
+
+				pkNum := 100
+				pks := make([]crypto.PublicKey, 0, pkNum)
+
+				t.Run("valid BLS keys", func(t *testing.T) {
+
+					publicKeys := make([]cadence.Value, 0, pkNum)
+					for i := 0; i < pkNum; i++ {
+						sk := randomSK(t, BLSSignatureAlgorithm)
+						pk := sk.PublicKey()
+						pks = append(pks, pk)
+						publicKeys = append(
+							publicKeys,
+							testutil.BytesToCadenceArray(pk.Encode()),
+						)
+					}
+
+					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
+						jsoncdc.MustEncode(cadence.Array{
+							Values: publicKeys,
+							ArrayType: cadence.VariableSizedArrayType{
+								ElementType: cadence.VariableSizedArrayType{
+									ElementType: cadence.UInt8Type{},
+								},
+							},
+						}),
+					)
+
+					err := vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.NoError(t, script.Err)
+					expectedPk, err := crypto.AggregateBLSPublicKeys(pks)
+					require.NoError(t, err)
+
+					assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedPk.Encode())}, script.Value)
+				})
+
+				for _, signatureAlgorithm := range signatureAlgorithms[1:] {
+					t.Run("non BLS keys/"+signatureAlgorithm.name, func(t *testing.T) {
+
+						publicKeys := make([]cadence.Value, 0, pkNum)
+						for i := 0; i < pkNum; i++ {
+							sk := randomSK(t, signatureAlgorithm)
+							pk := sk.PublicKey()
+							pks = append(pks, pk)
+							publicKeys = append(
+								publicKeys,
+								testutil.BytesToCadenceArray(sk.PublicKey().Encode()),
+							)
+						}
+
+						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
+							jsoncdc.MustEncode(cadence.Array{
+								Values: publicKeys,
+								ArrayType: cadence.VariableSizedArrayType{
+									ElementType: cadence.VariableSizedArrayType{
+										ElementType: cadence.UInt8Type{},
+									},
+								},
+							}),
+						)
+
+						err := vm.Run(ctx, script, view, programs)
+						assert.Error(t, err)
+					})
+				}
+
+				t.Run("empty list", func(t *testing.T) {
+
+					publicKeys := []cadence.Value{}
+					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
+						jsoncdc.MustEncode(cadence.Array{
+							Values: publicKeys,
+							ArrayType: cadence.VariableSizedArrayType{
+								ElementType: cadence.VariableSizedArrayType{
+									ElementType: cadence.UInt8Type{},
+								},
+							},
+						}),
+					)
+
+					err := vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.Error(t, script.Err)
+					assert.Equal(t, nil, script.Value)
+				})
+			},
+		))
+	}
+
+	testBLSCombinedAggregations := func() {
+		t.Run("Combined Aggregations", newVMTest().run(
+			func(
+				t *testing.T,
+				vm *fvm.VirtualMachine,
+				chain flow.Chain,
+				ctx fvm.Context,
+				view state.View,
+				programs *programs.Programs,
+			) {
+
+				message, cadenceMessage := createMessage("random_message")
+				tag := "random_tag"
+
+				code := []byte(`
+							import Crypto
+
+							pub fun main(
+								publicKeys: [[UInt8]],
+								signatures: [[UInt8]],
+								message:  [UInt8],
+								tag: String,
+							): Bool {
+								let pks: [PublicKey] = []
+								for pk in publicKeys {
+									pks.append(PublicKey(
+										publicKey: pk,
+										signatureAlgorithm: SignatureAlgorithm.BLS_BLS12_381
+									))
+								}
+								let aggPk = BLS.aggregatePublicKeys(pks)!
+								let aggSignature = BLS.aggregateSignatures(signatures)!
+								let boo = aggPk.verify(
+									signature: aggSignature, 
+									signedData: message, 
+									domainSeparationTag: tag, 
+									hashAlgorithm: HashAlgorithm.KMAC128_BLS_BLS12_381)
+								return boo
+							}
+							`)
+
+				num := 50
+				publicKeys := make([]cadence.Value, 0, num)
+				signatures := make([]cadence.Value, 0, num)
+
+				kmac := crypto.NewBLSKMAC(string(tag))
+				for i := 0; i < num; i++ {
+					sk := randomSK(t, BLSSignatureAlgorithm)
+					pk := sk.PublicKey()
+					publicKeys = append(
+						publicKeys,
+						testutil.BytesToCadenceArray(pk.Encode()),
+					)
+					sig, err := sk.Sign(message, kmac)
+					require.NoError(t, err)
+					signatures = append(
+						signatures,
+						testutil.BytesToCadenceArray(sig),
+					)
+				}
+
+				script := fvm.Script(code).WithArguments(
+					jsoncdc.MustEncode(cadence.Array{ // keys
+						Values: publicKeys,
+						ArrayType: cadence.VariableSizedArrayType{
+							ElementType: cadence.VariableSizedArrayType{
+								ElementType: cadence.UInt8Type{},
+							},
+						},
+					}),
+					jsoncdc.MustEncode(cadence.Array{ // signatures
+						Values: signatures,
+						ArrayType: cadence.VariableSizedArrayType{
+							ElementType: cadence.VariableSizedArrayType{
+								ElementType: cadence.UInt8Type{},
+							},
+						},
+					}),
+					jsoncdc.MustEncode(cadenceMessage),
+					jsoncdc.MustEncode(cadence.String(tag)),
+				)
+
+				err := vm.Run(ctx, script, view, programs)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+				assert.Equal(t, cadence.NewBool(true), script.Value)
+			},
+		))
+	}
+
+	testVerifyPoP()
+	testKeyAggregation()
+	testBLSSignatureAggregation()
+	testBLSCombinedAggregations()
 }
 
 func TestHashing(t *testing.T) {
@@ -2196,7 +2689,7 @@ func TestHashing(t *testing.T) {
 				result2 = append(result2, value.(cadence.UInt8).ToGoValue().(uint8))
 			}
 
-			result3, err := crypto2.HashWithTag(crypto2.RuntimeToCryptoHashingAlgorithm(algo), "", data)
+			result3, err := fvmCrypto.HashWithTag(fvmCrypto.RuntimeToCryptoHashingAlgorithm(algo), "", data)
 			require.NoError(t, err)
 
 			require.Equal(t, result1, result2)
@@ -2499,77 +2992,41 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			}),
 	)
 }
-func TestSigningWithTags(t *testing.T) {
 
-	checkWithTag := func(tag []byte, shouldWork bool) func(t *testing.T) {
-		return newVMTest().
-			run(
-				func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-					// Create an account private key.
-					privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-					require.NoError(t, err)
+// TestHappyPathSigning checks that a signing a transaction with `Sign` doesn't produce an error.
+// Transaction verification tests are in `TestVerifySignatureFromTransaction`.
+func TestHappyPathTransactionSigning(t *testing.T) {
 
-					// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-					accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
-					require.NoError(t, err)
+	newVMTest().run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			// Create an account private key.
+			privateKey, err := testutil.GenerateAccountPrivateKey()
+			require.NoError(t, err)
 
-					txBody := flow.NewTransactionBody().
-						SetScript([]byte(`transaction(){}`))
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, view, programs, []flow.AccountPrivateKey{privateKey}, chain)
+			require.NoError(t, err)
 
-					txBody.SetProposalKey(accounts[0], 0, 0)
-					txBody.SetPayer(accounts[0])
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`transaction(){}`))
 
-					hasher, err := exeUtils.NewHasher(privateKeys[0].HashAlgo)
-					require.NoError(t, err)
+			txBody.SetProposalKey(accounts[0], 0, 0)
+			txBody.SetPayer(accounts[0])
 
-					sig, err := txBody.SignMessageWithTag(txBody.EnvelopeMessage(), tag, privateKeys[0].PrivateKey, hasher)
-					require.NoError(t, err)
-					txBody.AddEnvelopeSignature(accounts[0], 0, sig)
+			hasher, err := exeUtils.NewHasher(privateKey.HashAlgo)
+			require.NoError(t, err)
 
-					tx := fvm.Transaction(txBody, 0)
+			sig, err := txBody.Sign(txBody.EnvelopeMessage(), privateKey.PrivateKey, hasher)
+			require.NoError(t, err)
+			txBody.AddEnvelopeSignature(accounts[0], 0, sig)
 
-					err = vm.Run(ctx, tx, view, programs)
-					require.NoError(t, err)
-					if shouldWork {
-						require.NoError(t, tx.Err)
-					} else {
-						require.Error(t, tx.Err)
-						require.IsType(t, tx.Err, &errors.InvalidProposalSignatureError{})
-					}
-				},
-			)
-	}
+			tx := fvm.Transaction(txBody, 0)
 
-	cases := []struct {
-		name      string
-		tag       []byte
-		shouldWok bool
-	}{
-		{
-			name:      "no tag",
-			tag:       nil,
-			shouldWok: false,
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
 		},
-		{
-			name:      "transaction tag",
-			tag:       flow.TransactionDomainTag[:],
-			shouldWok: true,
-		},
-		{
-			name:      "user tag",
-			tag:       flow.UserDomainTag[:],
-			shouldWok: false,
-		},
-	}
-
-	for i, c := range cases {
-		works := "works"
-		if !c.shouldWok {
-			works = "doesn't work"
-		}
-		t.Run(fmt.Sprintf("Signing Transactions %d: with %s %s", i, c.name, works), checkWithTag(c.tag, c.shouldWok))
-	}
-
+	)
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {
@@ -2605,8 +3062,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		checkResult   func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure)
 	}
 
-	txFees := fvm.DefaultTransactionFees.ToGoValue().(uint64)
-	fundingAmount := uint64(1_0000_0000)
+	txFees := uint64(10_000)             // 0.0001
+	fundingAmount := uint64(100_000_000) // 1.0
 	transferAmount := uint64(123_456)
 	minimumStorageReservation := fvm.DefaultMinimumStorageReservation.ToGoValue().(uint64)
 
@@ -2650,6 +3107,34 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Equal(t, txFees+transferAmount, balanceBefore-balanceAfter)
+			},
+		},
+		{
+			name:          "Transaction fees are deducted and fe deduction is emitted",
+			fundWith:      fundingAmount,
+			tryToTransfer: transferAmount,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+				var feeDeduction flow.Event //fee deduction event
+				for _, e := range tx.Events {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", fvm.FlowFeesAddress(flow.Testnet.Chain())) {
+						feeDeduction = e
+						break
+					}
+				}
+				require.NotEmpty(t, feeDeduction.Payload)
+
+				payload, err := jsoncdc.Decode(feeDeduction.Payload)
+				require.NoError(t, err)
+
+				event := payload.(cadence.Event)
+
+				require.Equal(t, txFees, event.Fields[0].ToGoValue())
+				// Inclusion effort should be equivalent to 1.0 UFix64
+				require.Equal(t, uint64(100_000_000), event.Fields[1].ToGoValue())
+				// Execution effort should be non-0
+				require.Greater(t, event.Fields[2].ToGoValue(), uint64(0))
+
 			},
 		},
 		{
@@ -2900,7 +3385,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			txBody.SetPayer(address)
 
 			if tc.gasLimit == 0 {
-				txBody.SetGasLimit(fvm.DefaultGasLimit)
+				txBody.SetGasLimit(fvm.DefaultComputationLimit)
 			} else {
 				txBody.SetGasLimit(tc.gasLimit)
 			}
@@ -2951,6 +3436,218 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			runTx(tc)),
 		)
 	}
+}
+
+func TestSettingExecutionWeights(t *testing.T) {
+	t.Run("transaction should fail with high weights", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionEffortWeights(
+			weightedMeter.ExecutionWeights{
+				common.ComputationKindLoop: 100_000 << weightedMeter.MeterInternalPrecisionBytes,
+			},
+		),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					var a = 0
+					while a < 100 {
+						a = a + 1
+					}
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
+	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionEffortWeights(
+			weightedMeter.ExecutionWeights{
+				meter.ComputationKindCreateAccount: (fvm.DefaultComputationLimit + 1) << weightedMeter.MeterInternalPrecisionBytes,
+			},
+		),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					AuthAccount(payer: signer)
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
+
+	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionEffortWeights(
+			weightedMeter.ExecutionWeights{
+				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
+			},
+		),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					AuthAccount(payer: signer)
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
+
+	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionEffortWeights(
+			weightedMeter.ExecutionWeights{
+				meter.ComputationKindCreateAccount: 100_000_000 << weightedMeter.MeterInternalPrecisionBytes,
+			},
+		),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+                  prepare(signer: AuthAccount) {
+					AuthAccount(payer: signer)
+                  }
+                }
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			assert.True(t, errors.IsComputationLimitExceededError(tx.Err))
+		},
+	))
+	t.Run("transaction should not use up more computation that the transaction body itself", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+		fvm.WithExecutionEffortWeights(
+			weightedMeter.ExecutionWeights{
+				common.ComputationKindStatement: 1 << weightedMeter.MeterInternalPrecisionBytes,
+			},
+		),
+	).withContextOptions(
+		fvm.WithAccountStorageLimit(true),
+		fvm.WithTransactionFeesEnabled(true),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			// Use the maximum amount of computation so that the transaction still passes.
+			loops := uint64(997)
+			maxExecutionEffort := uint64(999)
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+				transaction() {prepare(signer: AuthAccount){var i=0;  while i < %d {i = i +1 } } execute{}}
+			`, loops))).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress()).
+				SetGasLimit(maxExecutionEffort)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			// expected used is number of loops + 2 invocations.
+			assert.Equal(t, loops+2, tx.ComputationUsed)
+
+			// increasing the number of loops should fail the transaction.
+			loops = loops + 1
+			txBody = flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+				transaction() {prepare(signer: AuthAccount){var i=0;  while i < %d {i = i +1 } } execute{}}
+			`, loops))).
+				SetProposalKey(chain.ServiceAddress(), 0, 1).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress()).
+				SetGasLimit(maxExecutionEffort)
+
+			err = testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
+			require.NoError(t, err)
+
+			tx = fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			require.Error(t, tx.Err)
+			// computation used should the actual computation used.
+			assert.Equal(t, loops+2, tx.ComputationUsed)
+
+			for _, event := range tx.Events {
+				// the fee deduction event should only contain the max gas worth of execution effort.
+				if strings.Contains(string(event.Type), "FlowFees.FeesDeducted") {
+					ev, err := jsoncdc.Decode(event.Payload)
+					require.NoError(t, err)
+					assert.Equal(t, maxExecutionEffort, ev.(cadence.Event).Fields[2].ToGoValue().(uint64))
+				}
+			}
+		},
+	))
 }
 
 func TestStorageUsed(t *testing.T) {
@@ -3011,4 +3708,122 @@ func TestStorageUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, cadence.NewUInt64(5), script.Value)
+}
+
+func TestEnforcingComputationLimit(t *testing.T) {
+	t.Parallel()
+
+	rt := fvm.NewInterpreterRuntime()
+	chain := flow.Testnet.Chain()
+	vm := fvm.NewVirtualMachine(rt)
+
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvoker(zerolog.Nop()),
+		),
+	)
+
+	simpleView := utils.NewSimpleView()
+
+	const computationLimit = 5
+
+	type test struct {
+		name           string
+		code           string
+		payerIsServAcc bool
+		ok             bool
+		expCompUsed    uint64
+	}
+
+	tests := []test{
+		{
+			name: "infinite while loop",
+			code: `
+		      while true {}
+		    `,
+			payerIsServAcc: false,
+			ok:             false,
+			expCompUsed:    computationLimit + 1,
+		},
+		{
+			name: "limited while loop",
+			code: `
+              var i = 0
+              while i < 5 {
+                  i = i + 1
+              }
+            `,
+			payerIsServAcc: false,
+			ok:             false,
+			expCompUsed:    computationLimit + 1,
+		},
+		{
+			name: "too many for-in loop iterations",
+			code: `
+              for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {}
+            `,
+			payerIsServAcc: false,
+			ok:             false,
+			expCompUsed:    computationLimit + 1,
+		},
+		{
+			name: "too many for-in loop iterations",
+			code: `
+              for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {}
+            `,
+			payerIsServAcc: true,
+			ok:             true,
+			expCompUsed:    11,
+		},
+		{
+			name: "some for-in loop iterations",
+			code: `
+              for i in [1, 2, 3, 4] {}
+            `,
+			payerIsServAcc: false,
+			ok:             true,
+			expCompUsed:    5,
+		},
+	}
+
+	for _, test := range tests {
+
+		t.Run(test.name, func(t *testing.T) {
+
+			script := []byte(
+				fmt.Sprintf(
+					`
+                      transaction {
+                          prepare() {
+                              %s
+                          }
+                      }
+                    `,
+					test.code,
+				),
+			)
+
+			txBody := flow.NewTransactionBody().
+				SetScript(script).
+				SetGasLimit(computationLimit)
+
+			if test.payerIsServAcc {
+				txBody.SetPayer(chain.ServiceAddress()).
+					SetGasLimit(0)
+			}
+			tx := fvm.Transaction(txBody, 0)
+
+			err := vm.Run(ctx, tx, simpleView, programs.NewEmptyPrograms())
+			require.NoError(t, err)
+			require.Equal(t, test.expCompUsed, tx.ComputationUsed)
+			if test.ok {
+				require.NoError(t, tx.Err)
+			} else {
+				require.Error(t, tx.Err)
+			}
+
+		})
+	}
 }

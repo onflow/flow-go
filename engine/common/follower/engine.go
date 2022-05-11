@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -25,6 +26,7 @@ import (
 type Engine struct {
 	unit           *engine.Unit
 	log            zerolog.Logger
+	config         compliance.Config
 	me             module.Local
 	engMetrics     module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
@@ -53,11 +55,18 @@ func New(
 	follower module.HotStuffFollower,
 	sync module.BlockRequester,
 	tracer module.Tracer,
+	opts ...compliance.Opt,
 ) (*Engine, error) {
+
+	config := compliance.DefaultConfig()
+	for _, apply := range opts {
+		apply(&config)
+	}
 
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "follower").Logger(),
+		config:         config,
 		me:             me,
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,
@@ -213,6 +222,20 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("could not check proposal: %w", err)
+	}
+
+	// ignore proposals which are too far ahead of our local finalized state
+	// instead, rely on sync engine to catch up finalization more effectively, and avoid
+	// large subtree of blocks to be cached.
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get latest finalized header: %w", err)
+	}
+	if header.Height > final.Height && header.Height-final.Height > e.config.SkipNewProposalsThreshold {
+		log.Debug().
+			Uint64("final_height", final.Height).
+			Msg("dropping block too far ahead of locally finalized height")
+		return nil
 	}
 
 	// there are two possibilities if the proposal is neither already pending
@@ -402,8 +425,8 @@ func (e *Engine) prunePendingCache() {
 		return
 	}
 
-	// remove all pending blocks at or below the finalized height
-	e.pending.PruneByHeight(final.Height)
+	// remove all pending blocks at or below the finalized view
+	e.pending.PruneByView(final.View)
 
 	// always record the metric
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, e.pending.Size())

@@ -30,7 +30,9 @@ import (
 )
 
 const (
-	DefaultCacheSize = 10e4
+	// DefaultReceiveCacheSize represents size of receive cache that keeps hash of incoming messages
+	// for sake of deduplication.
+	DefaultReceiveCacheSize = 10e4
 	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
 	eventIDPackingPrefix = "libp2ppacking"
 )
@@ -63,9 +65,9 @@ type Network struct {
 	mw                          network.Middleware
 	top                         network.Topology // used to determine fanout connections
 	metrics                     module.NetworkMetrics
-	rcache                      *netcache.ReceiveCache // used to deduplicate incoming messages
+	receiveCache                *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
-	subMngr                     network.SubscriptionManager // used to keep track of subscribed channels
+	subscriptionManager         network.SubscriptionManager // used to keep track of subscribed channels
 	conduitFactory              network.ConduitFactory
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
@@ -107,15 +109,14 @@ func NewNetwork(
 	codec network.Codec,
 	me module.Local,
 	mwFactory func() (network.Middleware, error),
-	csize int,
 	top network.Topology,
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
 	identityProvider id.IdentityProvider,
+	receiveCache *netcache.ReceiveCache,
 	options ...NetworkOptFunction,
 ) (*Network, error) {
 
-	rcache := netcache.NewReceiveCache(uint32(csize), log)
 	mw, err := mwFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
@@ -126,10 +127,10 @@ func NewNetwork(
 		codec:                       codec,
 		me:                          me,
 		mw:                          mw,
-		rcache:                      rcache,
+		receiveCache:                receiveCache,
 		top:                         top,
 		metrics:                     metrics,
-		subMngr:                     sm,
+		subscriptionManager:         sm,
 		identityProvider:            identityProvider,
 		conduitFactory:              conduit.NewDefaultConduitFactory(),
 		registerEngineRequests:      make(chan *registerEngineRequest),
@@ -223,7 +224,7 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
 
-	err := n.subMngr.Register(channel, engine)
+	err := n.subscriptionManager.Register(channel, engine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register engine for channel %s: %w", channel, err)
 	}
@@ -308,7 +309,7 @@ func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batc
 // UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
 // receive messages from that channel.
 func (n *Network) UnRegisterChannel(channel network.Channel) error {
-	err := n.subMngr.Unregister(channel)
+	err := n.subscriptionManager.Unregister(channel)
 	if err != nil {
 		return fmt.Errorf("failed to unregister engine for channel %s: %w", channel, err)
 	}
@@ -329,7 +330,7 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	n.Lock()
 	defer n.Unlock()
 
-	subscribedChannels := n.subMngr.Channels()
+	subscribedChannels := n.subscriptionManager.Channels()
 
 	top, err := n.top.GenerateFanout(n.Identities(), subscribedChannels)
 	if err != nil {
@@ -348,7 +349,7 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if !n.rcache.Add(message.EventID) {
+	if !n.receiveCache.Add(message.EventID) {
 		log := n.logger.With().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
@@ -526,15 +527,21 @@ func (n *Network) sendOnChannel(channel network.Channel, message interface{}, ta
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QMessage)
-	eng, err := n.subMngr.GetEngine(qm.Target)
+
+	logger := n.logger.With().
+		Str("channel_id", qm.Target.String()).
+		Str("sender_id", qm.SenderID.String()).
+		Logger()
+
+	eng, err := n.subscriptionManager.GetEngine(qm.Target)
 	if err != nil {
-		n.logger.Error().
-			Err(err).
-			Str("channel_id", qm.Target.String()).
-			Str("sender_id", qm.SenderID.String()).
-			Msg("failed to submit message")
+		logger.Err(err).Msg("failed to submit message")
 		return
 	}
+
+	logger.Debug().Msg("submitting message to engine")
+
+	n.metrics.MessageProcessingStarted(qm.Target.String())
 
 	// submits the message to the engine synchronously and
 	// tracks its processing time.
@@ -542,14 +549,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 	err = eng.Process(qm.Target, qm.SenderID, qm.Payload)
 	if err != nil {
-		n.logger.Error().
-			Err(err).
-			Str("channel_id", qm.Target.String()).
-			Str("sender_id", qm.SenderID.String()).
-			Msg("failed to process message")
+		logger.Err(err).Msg("failed to process message")
 	}
 
-	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
+	n.metrics.MessageProcessingFinished(qm.Target.String(), time.Since(startTimestamp))
 }
 
 func EventId(channel network.Channel, payload []byte) (hash.Hash, error) {

@@ -52,7 +52,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 				Address:       "1.flow.com",
 				NetworkPubKey: unittest.MustDecodePublicKeyHex(crypto.ECDSAP256, "378dbf45d85c614feb10d8bd4f78f4b6ef8eec7d987b937e123255444657fb3da031f232a507e323df3a6f6b8f50339c51d188e80c0e7a92420945cc6ca893fc"),
 				StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
-				Stake:         100,
+				Weight:        100,
 			},
 			{
 				Role:          flow.RoleCollection,
@@ -60,7 +60,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 				Address:       "2.flow.com",
 				NetworkPubKey: unittest.MustDecodePublicKeyHex(crypto.ECDSAP256, "378dbf45d85c614feb10d8bd4f78f4b6ef8eec7d987b937e123255444657fb3da031f232a507e323df3a6f6b8f50339c51d188e80c0e7a92420945cc6ca893fc"),
 				StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
-				Stake:         100,
+				Weight:        100,
 			},
 			{
 				Role:          flow.RoleCollection,
@@ -68,7 +68,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 				Address:       "3.flow.com",
 				NetworkPubKey: unittest.MustDecodePublicKeyHex(crypto.ECDSAP256, "378dbf45d85c614feb10d8bd4f78f4b6ef8eec7d987b937e123255444657fb3da031f232a507e323df3a6f6b8f50339c51d188e80c0e7a92420945cc6ca893fc"),
 				StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
-				Stake:         100,
+				Weight:        100,
 			},
 			{
 				Role:          flow.RoleCollection,
@@ -76,7 +76,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 				Address:       "4.flow.com",
 				NetworkPubKey: unittest.MustDecodePublicKeyHex(crypto.ECDSAP256, "378dbf45d85c614feb10d8bd4f78f4b6ef8eec7d987b937e123255444657fb3da031f232a507e323df3a6f6b8f50339c51d188e80c0e7a92420945cc6ca893fc"),
 				StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
-				Stake:         100,
+				Weight:        100,
 			},
 			{
 				Role:          flow.RoleConsensus,
@@ -84,7 +84,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 				Address:       "11.flow.com",
 				NetworkPubKey: unittest.MustDecodePublicKeyHex(crypto.ECDSAP256, "cfdfe8e4362c8f79d11772cb7277ab16e5033a63e8dd5d34caf1b041b77e5b2d63c2072260949ccf8907486e4cfc733c8c42ca0e4e208f30470b0d950856cd47"),
 				StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "8207559cd7136af378bba53a8f0196dee3849a3ab02897c1995c3e3f6ca0c4a776c3ae869d1ddbb473090054be2400ad06d7910aa2c5d1780220fdf3765a3c1764bce10c6fe66a5a2be51a422e878518bd750424bb56b8a0ecf0f8ad2057e83f"),
-				Stake:         100,
+				Weight:        100,
 			},
 			{
 				Role:          flow.RoleExecution,
@@ -92,7 +92,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 				Address:       "21.flow.com",
 				NetworkPubKey: unittest.MustDecodePublicKeyHex(crypto.ECDSAP256, "d64318ba0dbf68f3788fc81c41d507c5822bf53154530673127c66f50fe4469ccf1a054a868a9f88506a8999f2386d86fcd2b901779718cba4fb53c2da258f9e"),
 				StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "880b162b7ec138b36af401d07868cb08d25746d905395edbb4625bdf105d4bb2b2f4b0f4ae273a296a6efefa7ce9ccb914e39947ce0e83745125cab05d62516076ff0173ed472d3791ccef937597c9ea12381d76f547a092a4981d77ff3fba83"),
-				Stake:         100,
+				Weight:        100,
 			},
 			{
 				Role:          flow.RoleVerification,
@@ -100,7 +100,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 				Address:       "31.flow.com",
 				NetworkPubKey: unittest.MustDecodePublicKeyHex(crypto.ECDSAP256, "697241208dcc9142b6f53064adc8ff1c95760c68beb2ba083c1d005d40181fd7a1b113274e0163c053a3addd47cd528ec6a1f190cf465aac87c415feaae011ae"),
 				StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "b1f97d0a06020eca97352e1adde72270ee713c7daf58da7e74bf72235321048b4841bdfc28227964bf18e371e266e32107d238358848bcc5d0977a0db4bda0b4c33d3874ff991e595e0f537c7b87b4ddce92038ebc7b295c9ea20a1492302aa7"),
-				Stake:         100,
+				Weight:        100,
 			},
 		},
 	}

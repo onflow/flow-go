@@ -45,7 +45,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	// Retrieve full Identities of all legitimate consensus participants and the Identities of the qc's signers
-	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive stake)
+	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive weight)
 	allParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
@@ -55,10 +55,10 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		return newInvalidBlockError(block, model.NewInvalidSignerErrorf("some qc signers are duplicated or invalid consensus participants at block %x", block.BlockID))
 	}
 
-	// determine whether signers reach minimally required stake threshold for consensus
-	threshold := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake()) // compute required stake threshold
-	if signers.TotalStake() < threshold {
-		return newInvalidBlockError(block, fmt.Errorf("qc signers have insufficient stake of %d (required=%d)", signers.TotalStake(), threshold))
+	// determine whether signers reach minimally required weight threshold for consensus
+	threshold := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight()) // compute required weight threshold
+	if signers.TotalWeight() < threshold {
+		return newInvalidBlockError(block, fmt.Errorf("qc signers have insufficient weight of %d (required=%d)", signers.TotalWeight(), threshold))
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state

@@ -331,10 +331,10 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 				// we don't alter chunk data pack content
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
-				identity.Stake = 0
+				identity.Weight = 0
 				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
-			msg: "unstaked-origin-id",
+			msg: "zero-weight-origin-id",
 		},
 		{
 			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {

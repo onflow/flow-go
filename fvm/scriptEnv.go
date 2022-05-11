@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -21,6 +22,8 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,19 +36,19 @@ var _ Environment = &ScriptEnv{}
 
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
-	ctx                Context
-	sth                *state.StateHolder
-	vm                 *VirtualMachine
-	accounts           state.Accounts
-	contracts          *handler.ContractHandler
-	programs           *handler.ProgramsHandler
-	accountKeys        *handler.AccountKeyHandler
-	metrics            *handler.MetricsHandler
-	computationHandler handler.ComputationMeteringHandler
-	uuidGenerator      *state.UUIDGenerator
-	logs               []string
-	rng                *rand.Rand
-	traceSpan          opentracing.Span
+	ctx           Context
+	sth           *state.StateHolder
+	vm            *VirtualMachine
+	accounts      state.Accounts
+	contracts     *handler.ContractHandler
+	programs      *handler.ProgramsHandler
+	accountKeys   *handler.AccountKeyHandler
+	metrics       *handler.MetricsHandler
+	uuidGenerator *state.UUIDGenerator
+	logs          []string
+	rng           *rand.Rand
+	traceSpan     opentracing.Span
+	reqContext    context.Context
 }
 
 func (e *ScriptEnv) Context() *Context {
@@ -57,7 +60,8 @@ func (e *ScriptEnv) VM() *VirtualMachine {
 }
 
 func NewScriptEnvironment(
-	ctx Context,
+	reqContext context.Context,
+	fvmContext Context,
 	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
@@ -67,19 +71,18 @@ func NewScriptEnvironment(
 	uuidGenerator := state.NewUUIDGenerator(sth)
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-	metrics := handler.NewMetricsHandler(ctx.Metrics)
-	computationHandler := handler.NewComputationMeteringHandler(ctx.GasLimit)
+	metrics := handler.NewMetricsHandler(fvmContext.Metrics)
 
 	env := &ScriptEnv{
-		ctx:                ctx,
-		sth:                sth,
-		vm:                 vm,
-		metrics:            metrics,
-		accounts:           accounts,
-		accountKeys:        accountKeys,
-		uuidGenerator:      uuidGenerator,
-		programs:           programsHandler,
-		computationHandler: computationHandler,
+		ctx:           fvmContext,
+		sth:           sth,
+		vm:            vm,
+		metrics:       metrics,
+		accounts:      accounts,
+		accountKeys:   accountKeys,
+		uuidGenerator: uuidGenerator,
+		programs:      programsHandler,
+		reqContext:    reqContext,
 	}
 
 	env.contracts = handler.NewContractHandler(
@@ -88,11 +91,38 @@ func NewScriptEnvironment(
 		func() []common.Address { return []common.Address{} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
-	if ctx.BlockHeader != nil {
-		env.seedRNG(ctx.BlockHeader)
+	if fvmContext.BlockHeader != nil {
+		env.seedRNG(fvmContext.BlockHeader)
 	}
 
+	env.setMeteringWeights()
+
 	return env
+}
+
+func (e *ScriptEnv) setMeteringWeights() {
+	var m *weighted.Meter
+	var ok bool
+	// only set the weights if the meter is a weighted.Meter
+	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
+		return
+	}
+
+	computationWeights, memoryWeights, err := getExecutionWeights(e, e.accounts)
+
+	if err != nil {
+		e.ctx.Logger.
+			Info().
+			Err(err).
+			Msg("could not set execution weights. Using defaults")
+		return
+	}
+
+	m.SetComputationWeights(computationWeights)
+	m.SetMemoryWeights(memoryWeights)
+}
+
+func (e *ScriptEnv) ResourceOwnerChanged(_ *interpreter.CompositeValue, _ common.Address, _ common.Address) {
 }
 
 func (e *ScriptEnv) seedRNG(header *flow.Header) {
@@ -126,9 +156,14 @@ func (e *ScriptEnv) GetValue(owner, key []byte) ([]byte, error) {
 		string(key),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("getting value failed: %w", err)
+		return nil, fmt.Errorf("get value failed: %w", err)
 	}
 	valueByteSize = len(v)
+
+	err = e.meterComputation(meter.ComputationKindGetValue, uint(valueByteSize))
+	if err != nil {
+		return nil, fmt.Errorf("get value failed: %w", err)
+	}
 	return v, nil
 }
 
@@ -142,14 +177,18 @@ func (e *ScriptEnv) SetValue(owner, key, value []byte) error {
 		)
 		defer sp.Finish()
 	}
+	err := e.meterComputation(meter.ComputationKindSetValue, uint(len(value)))
+	if err != nil {
+		return fmt.Errorf("set value failed: %w", err)
+	}
 
-	err := e.accounts.SetValue(
+	err = e.accounts.SetValue(
 		flow.BytesToAddress(owner),
 		string(key),
 		value,
 	)
 	if err != nil {
-		return fmt.Errorf("setting value failed: %w", err)
+		return fmt.Errorf("set value failed: %w", err)
 	}
 	return nil
 }
@@ -160,16 +199,17 @@ func (e *ScriptEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 		defer sp.Finish()
 	}
 
+	err = e.meterComputation(meter.ComputationKindValueExists, 1)
+	if err != nil {
+		return false, fmt.Errorf("check value existence failed: %w", err)
+	}
+
 	v, err := e.GetValue(owner, key)
 	if err != nil {
-		return false, fmt.Errorf("checking value existence failed: %w", err)
+		return false, fmt.Errorf("check value existence failed: %w", err)
 	}
 
 	return len(v) > 0, nil
-}
-
-func (e *ScriptEnv) AccountExists(address common.Address) (exists bool, err error) {
-	return e.accounts.Exists(flow.Address(address))
 }
 
 func (e *ScriptEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
@@ -178,9 +218,14 @@ func (e *ScriptEnv) GetStorageUsed(address common.Address) (value uint64, err er
 		defer sp.Finish()
 	}
 
+	err = e.meterComputation(meter.ComputationKindGetStorageUsed, 1)
+	if err != nil {
+		return value, fmt.Errorf("get storage used failed: %w", err)
+	}
+
 	value, err = e.accounts.GetStorageUsed(flow.Address(address))
 	if err != nil {
-		return value, fmt.Errorf("getting storage used failed: %w", err)
+		return value, fmt.Errorf("get storage used failed: %w", err)
 	}
 
 	return value, nil
@@ -190,6 +235,11 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageCapacity)
 		defer sp.Finish()
+	}
+
+	err = e.meterComputation(meter.ComputationKindGetStorageCapacity, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get storage capacity failed: %w", err)
 	}
 
 	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
@@ -215,6 +265,11 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 		defer sp.Finish()
 	}
 
+	err = e.meterComputation(meter.ComputationKindGetAccountBalance, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get account balance failed: %w", err)
+	}
+
 	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountBalance(address)
 
@@ -229,6 +284,11 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
 		defer sp.Finish()
+	}
+
+	err = e.meterComputation(meter.ComputationKindGetAccountAvailableBalance, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get account available balance failed: %w", err)
 	}
 
 	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
@@ -251,6 +311,12 @@ func (e *ScriptEnv) ResolveLocation(
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvResolveLocation)
 		defer sp.Finish()
 	}
+
+	err := e.meterComputation(meter.ComputationKindResolveLocation, 1)
+	if err != nil {
+		return nil, fmt.Errorf("resolve location failed: %w", err)
+	}
+
 	addressLocation, isAddress := location.(common.AddressLocation)
 
 	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
@@ -272,12 +338,12 @@ func (e *ScriptEnv) ResolveLocation(
 
 		err := e.accounts.CheckAccountNotFrozen(address)
 		if err != nil {
-			return nil, fmt.Errorf("resolving location failed: %w", err)
+			return nil, fmt.Errorf("resolve location failed: %w", err)
 		}
 
 		contractNames, err := e.contracts.GetContractNames(addressLocation.Address)
 		if err != nil {
-			return nil, fmt.Errorf("resolving location failed: %w", err)
+			return nil, fmt.Errorf("resolve location failed: %w", err)
 		}
 
 		// if there are no contractNames deployed,
@@ -318,11 +384,16 @@ func (e *ScriptEnv) GetAccountContractNames(address runtime.Address) ([]string, 
 		defer sp.Finish()
 	}
 
+	err := e.meterComputation(meter.ComputationKindGetAccountContractNames, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get account contract names failed: %w", err)
+	}
+
 	a := flow.Address(address)
 
 	freezeError := e.accounts.CheckAccountNotFrozen(a)
 	if freezeError != nil {
-		return nil, fmt.Errorf("get account contract names: %w", freezeError)
+		return nil, fmt.Errorf("get account contract names failed: %w", freezeError)
 	}
 
 	return e.accounts.GetContractNames(a)
@@ -334,6 +405,11 @@ func (e *ScriptEnv) GetCode(location runtime.Location) ([]byte, error) {
 		defer sp.Finish()
 	}
 
+	err := e.meterComputation(meter.ComputationKindGetCode, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get code failed: %w", err)
+	}
+
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
 		return nil, errors.NewInvalidLocationErrorf(location, "expecting an AddressLocation, but other location types are passed")
@@ -341,7 +417,7 @@ func (e *ScriptEnv) GetCode(location runtime.Location) ([]byte, error) {
 
 	address := flow.Address(contractLocation.Address)
 
-	err := e.accounts.CheckAccountNotFrozen(address)
+	err = e.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
 		return nil, fmt.Errorf("get code failed: %w", err)
 	}
@@ -358,6 +434,11 @@ func (e *ScriptEnv) GetProgram(location common.Location) (*interpreter.Program, 
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetProgram)
 		defer sp.Finish()
+	}
+
+	err := e.meterComputation(meter.ComputationKindGetProgram, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get program failed: %w", err)
 	}
 
 	if addressLocation, ok := location.(common.AddressLocation); ok {
@@ -383,7 +464,12 @@ func (e *ScriptEnv) SetProgram(location common.Location, program *interpreter.Pr
 		defer sp.Finish()
 	}
 
-	err := e.programs.Set(location, program)
+	err := e.meterComputation(meter.ComputationKindSetProgram, 1)
+	if err != nil {
+		return fmt.Errorf("set program failed: %w", err)
+	}
+
+	err = e.programs.Set(location, program)
 	if err != nil {
 		return fmt.Errorf("set program failed: %w", err)
 	}
@@ -406,7 +492,7 @@ func (e *ScriptEnv) Logs() []string {
 	return e.logs
 }
 
-func (e *ScriptEnv) EmitEvent(event cadence.Event) error {
+func (e *ScriptEnv) EmitEvent(_ cadence.Event) error {
 	return errors.NewOperationNotSupportedError("EmitEvent")
 }
 
@@ -424,26 +510,57 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
 	}
 
+	err := e.meterComputation(meter.ComputationKindGenerateUUID, 1)
+	if err != nil {
+		return 0, fmt.Errorf("generate uuid failed: %w", err)
+	}
+
 	uuid, err := e.uuidGenerator.GenerateUUID()
 	if err != nil {
-		return 0, fmt.Errorf("generating uuid failed: %w", err)
+		return 0, fmt.Errorf("generate uuid failed: %w", err)
 	}
 	return uuid, err
 }
 
-func (e *ScriptEnv) GetComputationLimit() uint64 {
-	return e.computationHandler.Limit()
+func (e *ScriptEnv) checkContext() error {
+	// in the future this context check should be done inside the cadence
+	select {
+	case <-e.reqContext.Done():
+		err := e.reqContext.Err()
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.NewScriptExecutionTimedOutError()
+		}
+		return errors.NewScriptExecutionCancelledError(err)
+	default:
+		return nil
+	}
 }
 
-func (e *ScriptEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.AddUsed(used)
+func (e *ScriptEnv) meterComputation(kind common.ComputationKind, intensity uint) error {
+	// this method is called on every unit of operation, so
+	// checking the context here is the most likely would capture
+	// timeouts or cancellation as soon as they happen, though
+	// we might revisit this when optimizing script execution
+	// by only checking on specific kind of meterComputation calls.
+	if err := e.checkContext(); err != nil {
+		return err
+	}
+
+	if e.sth.EnforceComputationLimits {
+		return e.sth.State().MeterComputation(kind, intensity)
+	}
+	return nil
 }
 
-func (e *ScriptEnv) GetComputationUsed() uint64 {
-	return e.computationHandler.Used()
+func (e *ScriptEnv) MeterComputation(kind common.ComputationKind, intensity uint) error {
+	return e.meterComputation(kind, intensity)
 }
 
-func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
+func (e *ScriptEnv) ComputationUsed() uint64 {
+	return uint64(e.sth.State().TotalComputationUsed())
+}
+
+func (e *ScriptEnv) DecodeArgument(b []byte, _ cadence.Type) (cadence.Value, error) {
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvDecodeArgument)
 		defer sp.Finish()
@@ -464,6 +581,11 @@ func (e *ScriptEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgo
 		defer sp.Finish()
 	}
 
+	err := e.meterComputation(meter.ComputationKindHash, 1)
+	if err != nil {
+		return nil, fmt.Errorf("hash failed: %w", err)
+	}
+
 	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	return crypto.HashWithTag(hashAlgo, tag, data)
 }
@@ -481,8 +603,12 @@ func (e *ScriptEnv) VerifySignature(
 		defer sp.Finish()
 	}
 
+	err := e.meterComputation(meter.ComputationKindVerifySignature, 1)
+	if err != nil {
+		return false, fmt.Errorf("verify signature failed: %w", err)
+	}
+
 	valid, err := crypto.VerifySignatureFromRuntime(
-		e.ctx.SignatureVerifier,
 		signature,
 		tag,
 		signedData,
@@ -492,13 +618,18 @@ func (e *ScriptEnv) VerifySignature(
 	)
 
 	if err != nil {
-		return false, fmt.Errorf("verifying signature failed: %w", err)
+		return false, fmt.Errorf("verify signature failed: %w", err)
 	}
 
 	return valid, nil
 }
 
-func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
+func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) error {
+	err := e.meterComputation(meter.ComputationKindValidatePublicKey, 1)
+	if err != nil {
+		return fmt.Errorf("validate public key failed: %w", err)
+	}
+
 	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
@@ -509,6 +640,11 @@ func (e *ScriptEnv) GetCurrentBlockHeight() (uint64, error) {
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetCurrentBlockHeight)
 		defer sp.Finish()
+	}
+
+	err := e.meterComputation(meter.ComputationKindGetCurrentBlockHeight, 1)
+	if err != nil {
+		return 0, fmt.Errorf("get current block height failed: %w", err)
 	}
 
 	if e.ctx.BlockHeader == nil {
@@ -542,6 +678,11 @@ func (e *ScriptEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error)
 		defer sp.Finish()
 	}
 
+	err := e.meterComputation(meter.ComputationKindGetBlockAtHeight, 1)
+	if err != nil {
+		return runtime.Block{}, false, fmt.Errorf("get block at height failed: %w", err)
+	}
+
 	if e.ctx.Blocks == nil {
 		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
 	}
@@ -555,21 +696,21 @@ func (e *ScriptEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error)
 	if errors.Is(err, storage.ErrNotFound) {
 		return runtime.Block{}, false, nil
 	} else if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("getting block at height failed for height %v: %w", height, err)
+		return runtime.Block{}, false, fmt.Errorf("get block at height failed for height %v: %w", height, err)
 	}
 
 	return runtimeBlockFromHeader(header), true, nil
 }
 
-func (e *ScriptEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+func (e *ScriptEnv) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
 	return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
 }
 
-func (e *ScriptEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
+func (e *ScriptEnv) AddEncodedAccountKey(_ runtime.Address, _ []byte) error {
 	return errors.NewOperationNotSupportedError("AddEncodedAccountKey")
 }
 
-func (e *ScriptEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+func (e *ScriptEnv) RevokeEncodedAccountKey(_ runtime.Address, _ int) (publicKey []byte, err error) {
 	return nil, errors.NewOperationNotSupportedError("RevokeEncodedAccountKey")
 }
 
@@ -583,10 +724,15 @@ func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.
 		defer sp.Finish()
 	}
 
+	err := e.meterComputation(meter.ComputationKindGetAccountKey, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get account key failed: %w", err)
+	}
+
 	if e.accountKeys != nil {
 		accKey, err := e.accountKeys.GetAccountKey(address, index)
 		if err != nil {
-			return nil, fmt.Errorf("getting account key failed: %w", err)
+			return nil, fmt.Errorf("get account key failed: %w", err)
 		}
 		return accKey, err
 	}
@@ -594,11 +740,11 @@ func (e *ScriptEnv) GetAccountKey(address runtime.Address, index int) (*runtime.
 	return nil, errors.NewOperationNotSupportedError("GetAccountKey")
 }
 
-func (e *ScriptEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
+func (e *ScriptEnv) RevokeAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {
 	return nil, errors.NewOperationNotSupportedError("RevokeAccountKey")
 }
 
-func (e *ScriptEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
+func (e *ScriptEnv) UpdateAccountContractCode(_ runtime.Address, _ string, _ []byte) (err error) {
 	return errors.NewOperationNotSupportedError("UpdateAccountContractCode")
 }
 
@@ -608,18 +754,23 @@ func (e *ScriptEnv) GetAccountContractCode(address runtime.Address, name string)
 		defer sp.Finish()
 	}
 
+	err = e.meterComputation(meter.ComputationKindGetAccountContractCode, 1)
+	if err != nil {
+		return nil, fmt.Errorf("get account contract code failed: %w", err)
+	}
+
 	code, err = e.GetCode(common.AddressLocation{
 		Address: address,
 		Name:    name,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("getting account contract code failed: %w", err)
+		return nil, fmt.Errorf("get account contract code failed: %w", err)
 	}
 
 	return code, nil
 }
 
-func (e *ScriptEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+func (e *ScriptEnv) RemoveAccountContractCode(_ runtime.Address, _ string) (err error) {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 }
 
@@ -685,9 +836,26 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
 func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	err := e.meterComputation(meter.ComputationKindAllocateStorageIndex, 1)
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
+	}
+
 	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
+}
+
+func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
+	return crypto.VerifyPOP(pk, sig)
+}
+
+func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
+	return crypto.AggregateSignatures(sigs)
+}
+
+func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	return crypto.AggregatePublicKeys(keys)
 }

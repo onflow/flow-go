@@ -99,14 +99,9 @@ func (_m *ExecutionMetrics) ForestNumberOfTrees(number uint64) {
 	_m.Called(number)
 }
 
-// LatestTrieMaxDepth provides a mock function with given fields: number
-func (_m *ExecutionMetrics) LatestTrieMaxDepth(number uint64) {
-	_m.Called(number)
-}
-
-// LatestTrieMaxDepthDiff provides a mock function with given fields: number
-func (_m *ExecutionMetrics) LatestTrieMaxDepthDiff(number uint64) {
-	_m.Called(number)
+// LatestTrieMaxDepthTouched provides a mock function with given fields: maxDepth
+func (_m *ExecutionMetrics) LatestTrieMaxDepthTouched(maxDepth uint16) {
+	_m.Called(maxDepth)
 }
 
 // LatestTrieRegCount provides a mock function with given fields: number
@@ -115,8 +110,18 @@ func (_m *ExecutionMetrics) LatestTrieRegCount(number uint64) {
 }
 
 // LatestTrieRegCountDiff provides a mock function with given fields: number
-func (_m *ExecutionMetrics) LatestTrieRegCountDiff(number uint64) {
+func (_m *ExecutionMetrics) LatestTrieRegCountDiff(number int64) {
 	_m.Called(number)
+}
+
+// LatestTrieRegSize provides a mock function with given fields: size
+func (_m *ExecutionMetrics) LatestTrieRegSize(size uint64) {
+	_m.Called(size)
+}
+
+// LatestTrieRegSizeDiff provides a mock function with given fields: size
+func (_m *ExecutionMetrics) LatestTrieRegSizeDiff(size int64) {
+	_m.Called(size)
 }
 
 // ProofSize provides a mock function with given fields: bytes

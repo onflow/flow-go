@@ -337,8 +337,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
-	stake := uint64(1000)
-	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(stake)
+	weight := uint64(1000)
+	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
 	stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
@@ -351,7 +351,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		in.queue <- qc
 	}
 
-	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(uint64(in.participants.Count()) * stake)
+	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(uint64(in.participants.Count()) * weight)
 	voteProcessorFactory := &mocks.VoteProcessorFactory{}
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
 		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
@@ -360,12 +360,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				stakingSigAggtor, rbRector,
 				onQCCreated,
 				packer,
-				minRequiredStake,
+				minRequiredWeight,
 			)
 		}, nil)
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
-	voteCollectors := voteaggregator.NewVoteCollectors(DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
+	voteCollectors := voteaggregator.NewVoteCollectors(log, DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
 	in.aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
