@@ -58,7 +58,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.2.0
-	github.com/onflow/cadence v0.23.5-0.20220510154848-5d59150b6105
+	github.com/onflow/cadence v0.23.5-0.20220511132510-d9169fa0b487
 	github.com/onflow/flow v0.2.5
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.11.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.11.0
