@@ -7,18 +7,19 @@ import (
 )
 
 func main() {
-	exeBuilder := cmd.NewExecutionNodeBuilder(insecmd.NewCorruptedNodeBuilder(flow.RoleExecution.String()).FlowNodeBuilder)
-	exeBuilder.LoadFlags()
+	corruptedBuilder := insecmd.NewCorruptedNodeBuilder(flow.RoleExecution.String())
+	corruptedExecutionBuilder := cmd.NewExecutionNodeBuilder(corruptedBuilder.FlowNodeBuilder)
+	corruptedExecutionBuilder.LoadFlags()
 
-	if err := exeBuilder.FlowNodeBuilder.Initialize(); err != nil {
-		exeBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+	if err := corruptedBuilder.Initialize(); err != nil {
+		corruptedExecutionBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
-	exeBuilder.LoadComponentsAndModules()
+	corruptedExecutionBuilder.LoadComponentsAndModules()
 
-	node, err := exeBuilder.FlowNodeBuilder.Build()
+	node, err := corruptedExecutionBuilder.FlowNodeBuilder.Build()
 	if err != nil {
-		exeBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		corruptedExecutionBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 	node.Run()
 }
