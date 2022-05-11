@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
-	access "github.com/onflow/flow-go/cmd/access/node_builder"
+	access "github.com/onflow/flow-go/cmd/observer/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
@@ -148,9 +148,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	return options
 }
 
-func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessNodeBuilder, error) {
+func buildAccessNode(accessNodeOptions []access.Option) (*access.ObserverServiceBuilder, error) {
 	anb := access.FlowAccessNode(accessNodeOptions...)
-	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
+	nodeBuilder := access.NewObserverServiceBuilder(anb)
 
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
