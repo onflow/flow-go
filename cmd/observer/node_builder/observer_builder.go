@@ -92,13 +92,13 @@ type ObserverBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type ObserverServiceConfig struct {
-	staked                       bool
+	staked                       bool // deprecated
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
 	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
-	supportsPublicFollower       bool              // True if this is a staked Access node which also supports observers, and consensus follower engines
+	supportsPublicFollower       bool              // True if this is an Access node which also supports observers, and consensus follower engines
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -153,7 +153,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		nodeInfoFile:                 "",
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
-		staked:                       true,
+		staked:                       false, // deprecated but kept to support temporary boostrap code
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
 		supportsPublicFollower:       false,
@@ -423,8 +423,8 @@ func FlowAccessNode(opts ...Option) *FlowObserverServiceBuilder {
 	}
 }
 func (builder *FlowObserverServiceBuilder) IsStaked() bool {
-	// TODO We should set this to false always when all testing is done on observers
-	return builder.staked
+	// We should set this to false always for observers and other unstaked usage
+	return false
 }
 
 func (builder *FlowObserverServiceBuilder) ParseFlags() error {
