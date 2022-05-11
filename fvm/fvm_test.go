@@ -2925,8 +2925,11 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
 			require.NoError(t, err)
 
+			// non-existent account
 			lastAddress, err := chain.AddressAtIndex((1 << 45) - 1)
+			require.NoError(t, err)
 
+			// transfer tokens to non-existent account
 			txBody := transferTokensTx(chain).
 				AddAuthorizer(accounts[0]).
 				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
@@ -2943,7 +2946,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
-			require.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+			require.Equal(t, (&errors.StorageNotInitialized{}).Code(), tx.Err.Code())
 		}),
 	)
 
