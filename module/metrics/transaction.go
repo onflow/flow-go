@@ -21,8 +21,7 @@ type TransactionCollector struct {
 	timeToExecuted             prometheus.Summary
 	timeToFinalizedExecuted    prometheus.Summary
 	transactionSubmission      *prometheus.CounterVec
-	executeScriptDuration      prometheus.Counter
-	executeScriptSize          prometheus.Counter
+	executeScriptDuration      *prometheus.CounterVec
 }
 
 func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log zerolog.Logger,
@@ -83,26 +82,33 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "counter for the success/failure of transaction submissions",
 		}, []string{"result"}),
-		executeScriptDuration: promauto.NewCounter(prometheus.CounterOpts{
+		executeScriptDuration: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "execute_script_rtt_duration",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "counter for the round trip time for executing a script",
-		}),
-		executeScriptSize: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "execute_script_rtt_size",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionSubmission,
-			Help:      "counter for the size in bytes of scripts being executed",
-		}),
+		}, []string{"script_size"}),
 	}
 
 	return tc
 }
 
 func (tc *TransactionCollector) ExecuteScriptRTT(dur time.Duration, size int) {
-	tc.executeScriptDuration.Add(float64(dur) / float64(time.Millisecond))
-	tc.executeScriptSize.Add(float64(size))
+	sizeKb := size / 1024
+	sizeLabel := "100+kb" //"1kb,10kb,100kb, 100+kb" -> [0,1] [2,10] [11,100] [100, +inf]
+
+	if sizeKb <= 1 {
+		sizeLabel = "1kb"
+	} else if sizeKb <= 10 {
+		sizeLabel = "10kb"
+	} else if sizeKb <= 100 {
+		sizeLabel = "100kb"
+	}
+
+	// record the script
+	tc.executeScriptDuration.With(prometheus.Labels{
+		"script_size": sizeLabel,
+	}).Add(float64(dur.Milliseconds()))
 }
 
 func (tc *TransactionCollector) TransactionReceived(txID flow.Identifier, when time.Time) {
