@@ -98,7 +98,7 @@ type AccessNodeConfig struct {
 	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
-	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports observers consensus follower engines
+	supportsPublicFollower       bool              // True if this is a staked Access node which also supports observers, and consensus follower engines
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -156,7 +156,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		staked:                       true,
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
-		supportsUnstakedFollower:     false,
+		supportsPublicFollower:       false,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
@@ -466,10 +466,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports observers")
+		flags.BoolVar(&builder.supportsPublicFollower, "supports-unstaked-node", defaultConfig.supportsPublicFollower, "true if this staked access node supports observers")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 	}).ValidateFlags(func() error {
-		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
+		if builder.supportsPublicFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-unstaked-node is true")
 		}
 
@@ -662,7 +662,7 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 
 	builder.enqueueMiddleware()
 
-	builder.enqueueUnstakedNetworkInit()
+	builder.enqueuePublicNetworkInit()
 
 	builder.enqueueConnectWithStakedAN()
 
@@ -745,7 +745,7 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 	}
 }
 
-// initObserverLocal initializes the observer ID, network key and network address
+// initObserverLocal initializes the observer's ID, network key and network address
 // Currently, it reads a node-info.priv.json like any other node.
 // TODO: read the node ID from the special bootstrap files
 func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
@@ -797,8 +797,8 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	return builder.FlowAccessNodeBuilder.Build()
 }
 
-// enqueueUnstakedNetworkInit enqueues the observer network component initialized for the observer
-func (builder *ObserverServiceBuilder) enqueueUnstakedNetworkInit() {
+// enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
+func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
