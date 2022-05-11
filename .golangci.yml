@@ -30,9 +30,9 @@ issues:
         - unused
     # typecheck currently not handling the way we do function inheritance well
     # disabling for now
-    - path: 'cmd/access/node_build/*' 
+    - path: 'cmd/access/node_builder/*'
       linters:
         - typecheck
-    - path: 'observer/*'
+    - path: 'cmd/observer/node_builder/*'
       linters:
         - typecheck
