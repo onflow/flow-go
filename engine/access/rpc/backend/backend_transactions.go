@@ -182,11 +182,10 @@ func (b *backendTransactions) SendRawTransaction(
 
 func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Identifier) (*flow.TransactionBody, error) {
 	// look up transaction from storage
-	start := time.Now()
 	tx, err := b.transactions.ByID(txID)
-	b.transactionMetrics.GetTransactionResultRTT(time.Since(start), len(tx.Script))
+	txErr := convertStorageError(err)
 
-	if txErr := convertStorageError(err); txErr != nil {
+	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
 			return b.getHistoricalTransaction(ctx, txID)
 		}
@@ -232,7 +231,10 @@ func (b *backendTransactions) GetTransactionResult(
 	txID flow.Identifier,
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
+	start := time.Now()
 	tx, err := b.transactions.ByID(txID)
+	b.transactionMetrics.GetTransactionResultRTT(time.Since(start), len(tx.Script))
+
 	txErr := convertStorageError(err)
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
