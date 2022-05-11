@@ -133,7 +133,7 @@ jobs:
     - name: Set up Localnet
       run: bash -c 'cd integration/localnet/ && make -e OBSERVER=1 init && make start'
     - name: Ensure Observer is started
-      run: docker ps -q -f name=localnet_observer_1_1
+      run: docker ps -f name=localnet_observer_1_1 | grep localnet_observer
     - name: Get Client Version ensuring the client is provisioned
       run: ~/.local/bin/flow -f integration/localnet/flow-localnet.json -n observer version
     - name: Wait for a default waiting period until a clean state
