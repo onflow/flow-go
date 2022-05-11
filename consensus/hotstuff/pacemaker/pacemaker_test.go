@@ -191,3 +191,34 @@ func (s *ActivePaceMakerTestSuite) TestProcessQC_IgnoreOldQC() {
 	s.notifier.AssertExpectations(s.T())
 	require.Equal(s.T(), uint64(3), s.paceMaker.CurView())
 }
+
+// TestOnPartialTC_TriggersTimeout tests that ActivePaceMaker ignores partial TCs and triggers
+// timeout for active view
+func (s *ActivePaceMakerTestSuite) TestOnPartialTC_TriggersTimeout() {
+	// report previously known view
+	s.paceMaker.OnPartialTC(s.livenessData.CurrentView - 1)
+	// this shouldn't trigger a timeout
+	select {
+	case <-s.paceMaker.TimeoutChannel():
+		s.Fail("triggered timeout channel")
+	case <-time.After(time.Duration(startRepTimeout/2) * time.Millisecond):
+	}
+
+	qc := helper.MakeQC(helper.WithQCView(s.livenessData.CurrentView + 1))
+
+	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(qc.View+1, model.ReplicaTimeout)).Return().Once()
+	s.notifier.On("OnQcTriggeredViewChange", qc, qc.View+1).Return().Once()
+	nve, err := s.paceMaker.ProcessQC(qc)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), nve)
+
+	// reporting partial TC for current view should result in closing of timeout channel
+	s.paceMaker.OnPartialTC(s.paceMaker.CurView())
+
+	select {
+	case <-s.paceMaker.TimeoutChannel():
+	case <-time.After(time.Duration(startRepTimeout/2) * time.Millisecond):
+		s.Fail("Timeout has to be triggered earlier than configured")
+	}
+}

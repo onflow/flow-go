@@ -69,6 +69,13 @@ func (t *Controller) StartTimeout(mode model.TimeoutMode, view uint64) *model.Ti
 	return &timerInfo
 }
 
+// TriggerTimeout triggers current active timeout, does nothing if timer has already expired
+func (t *Controller) TriggerTimeout() {
+	if t.timer != nil && t.timer.Stop() {
+		t.timer.Reset(0)
+	}
+}
+
 func (t *Controller) computeTimeoutDuration(mode model.TimeoutMode) time.Duration {
 	var duration time.Duration
 	switch mode {

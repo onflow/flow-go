@@ -127,8 +127,10 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 	return &model.NewViewEvent{View: newView}, nil
 }
 
-func (p *ActivePaceMaker) OnPartialTC(curView uint64) {
-	panic("not yet implemented")
+func (p *ActivePaceMaker) OnPartialTC(newView uint64) {
+	if p.CurView() == newView {
+		p.timeoutControl.TriggerTimeout()
+	}
 }
 
 // HighestQC returns QC with the highest view discovered by PaceMaker.
