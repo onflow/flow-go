@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -204,22 +205,12 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 // checkDupeTransactionsInUnfinalizedAncestry checks for duplicate transactions in the un-finalized
 // ancestry of the given block, and returns a list of all duplicates if there are any.
 func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster.Block, includedTransactions map[flow.Identifier]struct{}, finalHeight uint64) ([]flow.Identifier, error) {
+
 	var duplicateTxIDs []flow.Identifier
-
-	ancestorID := block.Header.ParentID
-	for {
-		ancestor, err := m.headers.ByBlockID(ancestorID)
+	err := fork.TraverseBackward(m.headers, block.Header.ParentID, func(ancestor *flow.Header) error {
+		payload, err := m.payloads.ByBlockID(ancestor.ID())
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve ancestor header: %w", err)
-		}
-
-		if ancestor.Height <= finalHeight {
-			break
-		}
-
-		payload, err := m.payloads.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve ancestor payload: %w", err)
+			return fmt.Errorf("could not retrieve ancestor payload: %w", err)
 		}
 
 		for _, tx := range payload.Collection.Transactions {
@@ -229,10 +220,10 @@ func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster
 				duplicateTxIDs = append(duplicateTxIDs, txID)
 			}
 		}
-		ancestorID = ancestor.ParentID
-	}
+		return nil
+	}, fork.ExcludingHeight(finalHeight))
 
-	return duplicateTxIDs, nil
+	return duplicateTxIDs, err
 }
 
 // checkDupeTransactionsInFinalizedAncestry checks for duplicate transactions in the finalized
