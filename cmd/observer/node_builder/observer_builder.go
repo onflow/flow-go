@@ -68,30 +68,30 @@ import (
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
 // These functions are shared by staked and observer builders.
 // The Staked network allows the staked nodes to communicate among themselves, while the public network allows the
-// observers and a staked Access node to communicate.
+// observers and an Access node to communicate.
 //
 //                                 public network                           staked network
 //  +------------------------+
-//  | observer 1        |<--------------------------|
+//  | observer 1             |<--------------------------|
 //  +------------------------+                           v
-//  +------------------------+                         +--------------------+                 +------------------------+
-//  | observer 2        |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
-//  +------------------------+                         +--------------------+                 +------------------------+
+//  +------------------------+                         +----------------------+              +------------------------+
+//  | observer 2             |<----------------------->| Access Node (staked) |<------------>| All other staked Nodes |
+//  +------------------------+                         +----------------------+              +------------------------+
 //  +------------------------+                           ^
-//  | observer 3        |<--------------------------|
+//  | observer 3             |<--------------------------|
 //  +------------------------+
 
 type ObserverBuilder interface {
 	cmd.NodeBuilder
 
-	// IsStaked returns True if this is a staked Access Node, False otherwise
+	// IsStaked returns True if this is an Access Node, False otherwise
 	IsStaked() bool
 }
 
-// AccessNodeConfig defines all the user defined parameters required to bootstrap an access node
+// ObserverServiceConfig defines all the user defined parameters required to bootstrap an access node
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
-type AccessNodeConfig struct {
+type ObserverServiceConfig struct {
 	staked                       bool
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
@@ -125,9 +125,9 @@ type PublicNetworkConfig struct {
 	Metrics     module.NetworkMetrics
 }
 
-// DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
-func DefaultAccessNodeConfig() *AccessNodeConfig {
-	return &AccessNodeConfig{
+// DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
+func DefaultObserverServiceConfig() *ObserverServiceConfig {
+	return &ObserverServiceConfig{
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
@@ -165,12 +165,12 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 	}
 }
 
-// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and observer
-// It is composed of the FlowNodeBuilder, the AccessNodeConfig and contains all the components and modules needed for the
+// FlowObserverServiceBuilder provides the common functionality needed to bootstrap a Flow staked and observer
+// It is composed of the FlowNodeBuilder, the ObserverServiceConfig and contains all the components and modules needed for the
 // staked and observers
-type FlowAccessNodeBuilder struct {
+type FlowObserverServiceBuilder struct {
 	*cmd.FlowNodeBuilder
-	*AccessNodeConfig
+	*ObserverServiceConfig
 
 	// components
 	LibP2PNode                 *p2p.Node
@@ -204,7 +204,7 @@ type FlowAccessNodeBuilder struct {
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
 // These are the identities of the staked and observers also acting as the DHT bootstrap server
-func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
+func (builder *FlowObserverServiceBuilder) deriveBootstrapPeerIdentities() error {
 	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
 	// line params)
 	if builder.bootstrapIdentities != nil {
@@ -221,7 +221,7 @@ func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
 	return nil
 }
 
-func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
+func (builder *FlowObserverServiceBuilder) buildFollowerState() *FlowObserverServiceBuilder {
 	builder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.
 		// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -246,7 +246,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
+func (builder *FlowObserverServiceBuilder) buildSyncCore() *FlowObserverServiceBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
 		syncCore, err := synchronization.New(node.Logger, node.SyncCoreConfig)
 		builder.SyncCore = syncCore
@@ -257,7 +257,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
+func (builder *FlowObserverServiceBuilder) buildCommittee() *FlowObserverServiceBuilder {
 	builder.Module("committee", func(node *cmd.NodeConfig) error {
 		// initialize consensus committee's membership state
 		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -271,7 +271,7 @@ func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder {
+func (builder *FlowObserverServiceBuilder) buildLatestHeader() *FlowObserverServiceBuilder {
 	builder.Module("latest header", func(node *cmd.NodeConfig) error {
 		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 		builder.Finalized, builder.Pending = finalized, pending
@@ -282,7 +282,7 @@ func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder {
+func (builder *FlowObserverServiceBuilder) buildFollowerCore() *FlowObserverServiceBuilder {
 	builder.Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
@@ -305,7 +305,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
+func (builder *FlowObserverServiceBuilder) buildFollowerEngine() *FlowObserverServiceBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
 		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
@@ -338,7 +338,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuilder {
+func (builder *FlowObserverServiceBuilder) buildFinalizedHeader() *FlowObserverServiceBuilder {
 	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
 		if err != nil {
@@ -352,7 +352,7 @@ func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuil
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
+func (builder *FlowObserverServiceBuilder) buildSyncEngine() *FlowObserverServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
 			node.Logger,
@@ -376,7 +376,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() ObserverBuilder {
+func (builder *FlowObserverServiceBuilder) BuildConsensusFollower() ObserverBuilder {
 	builder.
 		buildFollowerState().
 		buildSyncCore().
@@ -390,43 +390,44 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() ObserverBuilder {
 	return builder
 }
 
-type Option func(*AccessNodeConfig)
+type Option func(*ObserverServiceConfig)
 
 func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
-	return func(config *AccessNodeConfig) {
+	return func(config *ObserverServiceConfig) {
 		config.bootstrapIdentities = bootstrapNodes
 	}
 }
 
 func WithNetworkKey(key crypto.PrivateKey) Option {
-	return func(config *AccessNodeConfig) {
+	return func(config *ObserverServiceConfig) {
 		config.NetworkKey = key
 	}
 }
 
 func WithBaseOptions(baseOptions []cmd.Option) Option {
-	return func(config *AccessNodeConfig) {
+	return func(config *ObserverServiceConfig) {
 		config.baseOptions = baseOptions
 	}
 }
 
-func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
-	config := DefaultAccessNodeConfig()
+func FlowAccessNode(opts ...Option) *FlowObserverServiceBuilder {
+	config := DefaultObserverServiceConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	return &FlowAccessNodeBuilder{
-		AccessNodeConfig:        config,
+	return &FlowObserverServiceBuilder{
+		ObserverServiceConfig:   config,
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
 }
-func (builder *FlowAccessNodeBuilder) IsStaked() bool {
+func (builder *FlowObserverServiceBuilder) IsStaked() bool {
+	// TODO We should set this to false always when all testing is done on observers
 	return builder.staked
 }
 
-func (builder *FlowAccessNodeBuilder) ParseFlags() error {
+func (builder *FlowObserverServiceBuilder) ParseFlags() error {
 
 	builder.BaseFlags()
 
@@ -435,9 +436,9 @@ func (builder *FlowAccessNodeBuilder) ParseFlags() error {
 	return builder.ParseAndPrintFlags()
 }
 
-func (builder *FlowAccessNodeBuilder) extraFlags() {
+func (builder *FlowObserverServiceBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
-		defaultConfig := DefaultAccessNodeConfig()
+		defaultConfig := DefaultObserverServiceConfig()
 
 		flags.UintVar(&builder.collectionGRPCPort, "collection-ingress-port", defaultConfig.collectionGRPCPort, "the grpc ingress port for all collection nodes")
 		flags.UintVar(&builder.executionGRPCPort, "execution-ingress-port", defaultConfig.executionGRPCPort, "the grpc ingress port for all execution nodes")
@@ -480,7 +481,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 // initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
 // participants and topology used to choose peers from the list of participants. The list of participants can later be
 // updated by calling network.SetIDs.
-func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
+func (builder *FlowObserverServiceBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
@@ -561,22 +562,22 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 }
 
 type ObserverServiceBuilder struct {
-	*FlowAccessNodeBuilder
+	*FlowObserverServiceBuilder
 	peerID peer.ID
 }
 
-func NewObserverServiceBuilder(builder *FlowAccessNodeBuilder) *ObserverServiceBuilder {
-	// the observer access node gets a version of the root snapshot file that does not contain any node addresses
+func NewObserverServiceBuilder(builder *FlowObserverServiceBuilder) *ObserverServiceBuilder {
+	// the observer node gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	builder.SkipNwAddressBasedValidations = true
 	return &ObserverServiceBuilder{
-		FlowAccessNodeBuilder: builder,
+		FlowObserverServiceBuilder: builder,
 	}
 }
 
 func (builder *ObserverServiceBuilder) initNodeInfo() error {
 	// use the networking key that has been passed in the config, or load from the configured file
-	networkingKey := builder.AccessNodeConfig.NetworkKey
+	networkingKey := builder.ObserverServiceConfig.NetworkKey
 	if networkingKey == nil {
 		var err error
 		networkingKey, err = loadNetworkingKey(builder.observerNetworkingKeyPath)
@@ -682,7 +683,7 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 	if builder.BaseConfig.BindAddr == cmd.NotSet || builder.BaseConfig.BindAddr == "" {
 		return errors.New("bind address not specified")
 	}
-	if builder.AccessNodeConfig.NetworkKey == nil && builder.AccessNodeConfig.observerNetworkingKeyPath == cmd.NotSet {
+	if builder.ObserverServiceConfig.NetworkKey == nil && builder.ObserverServiceConfig.observerNetworkingKeyPath == cmd.NotSet {
 		return errors.New("networking key not provided")
 	}
 	if len(builder.bootstrapIdentities) > 0 {
@@ -790,11 +791,11 @@ func (builder *ObserverServiceBuilder) enqueueMiddleware() {
 		})
 }
 
-// Build enqueues the sync engine and the follower engine for the observer access node.
-// Currently, the observer AN only runs the follower engine.
+// Build enqueues the sync engine and the follower engine for the observer.
+// Currently, the observer only runs the follower engine.
 func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	builder.BuildConsensusFollower()
-	return builder.FlowAccessNodeBuilder.Build()
+	return builder.FlowObserverServiceBuilder.Build()
 }
 
 // enqueuePublicNetworkInit enqueues the observer network component initialized for the observer
