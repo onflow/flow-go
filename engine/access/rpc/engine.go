@@ -169,26 +169,15 @@ func New(log zerolog.Logger,
 		chain:              chainID.Chain(),
 	}
 
+	var localCache accessproto.AccessAPIServer
+	localCache = access.NewHandler(backend, chainID.Chain())
 	if proxy != nil {
-		(*proxy).LocalCache = access.NewHandler(backend, chainID.Chain())
-		accessproto.RegisterAccessAPIServer(
-			eng.unsecureGrpcServer,
-			proxy,
-		)
-		accessproto.RegisterAccessAPIServer(
-			eng.secureGrpcServer,
-			proxy,
-		)
-	} else {
-		accessproto.RegisterAccessAPIServer(
-			eng.unsecureGrpcServer,
-			access.NewHandler(backend, chainID.Chain()),
-		)
-		accessproto.RegisterAccessAPIServer(
-			eng.secureGrpcServer,
-			access.NewHandler(backend, chainID.Chain()),
-		)
+		proxy.LocalCache = localCache
+		localCache = proxy
 	}
+
+	accessproto.RegisterAccessAPIServer(eng.unsecureGrpcServer, localCache)
+	accessproto.RegisterAccessAPIServer(eng.secureGrpcServer, localCache)
 
 	if rpcMetricsEnabled {
 		// Not interested in legacy metrics, so initialize here
