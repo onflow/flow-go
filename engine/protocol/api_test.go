@@ -94,7 +94,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 }
 
 func (suite *Suite) RunTest(
-	f func(handler *protocol.ProtocolAPI, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers, results *storage.ExecutionResults),
+	f func(handler *protocol.API, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers, results *storage.ExecutionResults),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		headers, _, _, _, _, blocks, _, _, _, results := util.StorageLayer(suite.T(), db)
