@@ -30,18 +30,18 @@ var (
 
 		// Values
 
-		common.MemoryKindBool:                    8,
-		common.MemoryKindAddress:                 32,
-		common.MemoryKindString:                  138,
-		common.MemoryKindCharacter:               24,
-		common.MemoryKindMetaType:                0,
-		common.MemoryKindNumber:                  8,
-		common.MemoryKindArrayBase:               57,
-		common.MemoryKindArrayLength:             1024,
-		common.MemoryKindDictionaryBase:          33,
-		common.MemoryKindDictionarySize:          1024,
-		common.MemoryKindCompositeBase:           233,
-		common.MemoryKindCompositeSize:           1024,
+		common.MemoryKindBool:      8,
+		common.MemoryKindAddress:   32,
+		common.MemoryKindString:    138,
+		common.MemoryKindCharacter: 24,
+		common.MemoryKindMetaType:  0,
+		common.MemoryKindNumber:    8,
+		// weights for these values include the cost of the Go struct itself (first number)
+		// as well as the overhead for creation of the underlying atree (second number)
+		common.MemoryKindArrayBase:               57 + 48,
+		common.MemoryKindDictionaryBase:          33 + 96,
+		common.MemoryKindCompositeBase:           233 + 96,
+		common.MemoryKindSimpleComposite:         73,
 		common.MemoryKindOptional:                41,
 		common.MemoryKindNil:                     1,
 		common.MemoryKindVoid:                    1,
@@ -56,6 +56,18 @@ var (
 		common.MemoryKindBoundFunction:           25,
 		common.MemoryKindBigInt:                  50,
 
+		// Atree
+
+		common.MemoryKindAtreeArrayDataSlab:          80,
+		common.MemoryKindAtreeArrayMetaDataSlab:      1024,
+		common.MemoryKindAtreeArrayElementOverhead:   16,
+		common.MemoryKindAtreeMapDataSlab:            144,
+		common.MemoryKindAtreeMapMetaDataSlab:        1024,
+		common.MemoryKindAtreeMapElementOverhead:     64,
+		common.MemoryKindAtreeMapPreAllocatedElement: 24,
+
+		// Static Types
+
 		common.MemoryKindPrimitiveStaticType:     8,
 		common.MemoryKindCompositeStaticType:     17,
 		common.MemoryKindInterfaceStaticType:     17,
@@ -67,6 +79,58 @@ var (
 		common.MemoryKindReferenceStaticType:     41,
 		common.MemoryKindCapabilityStaticType:    17,
 		common.MemoryKindFunctionStaticType:      9,
+
+		// Cadence Values
+
+		common.MemoryKindCadenceVoid:           1,
+		common.MemoryKindCadenceOptional:       17,
+		common.MemoryKindCadenceBool:           8,
+		common.MemoryKindCadenceString:         16,
+		common.MemoryKindCadenceCharacter:      16,
+		common.MemoryKindCadenceAddress:        8,
+		common.MemoryKindCadenceInt:            50,
+		common.MemoryKindCadenceNumber:         1,
+		common.MemoryKindCadenceArrayBase:      41,
+		common.MemoryKindCadenceArrayLength:    16,
+		common.MemoryKindCadenceDictionaryBase: 41,
+		common.MemoryKindCadenceDictionarySize: 0, // go array w/ metered elements
+		common.MemoryKindCadenceKeyValuePair:   33,
+		common.MemoryKindCadenceStructBase:     33,
+		common.MemoryKindCadenceStructSize:     16,
+		common.MemoryKindCadenceResourceBase:   33,
+		common.MemoryKindCadenceResourceSize:   16,
+		common.MemoryKindCadenceEventBase:      33,
+		common.MemoryKindCadenceEventSize:      16,
+		common.MemoryKindCadenceContractBase:   33,
+		common.MemoryKindCadenceContractSize:   16,
+		common.MemoryKindCadenceEnumBase:       33,
+		common.MemoryKindCadenceEnumSize:       16,
+		common.MemoryKindCadenceLink:           1,
+		common.MemoryKindCadencePath:           33,
+		common.MemoryKindCadenceTypeValue:      17,
+		common.MemoryKindCadenceCapability:     1,
+
+		// Cadence Types
+
+		common.MemoryKindCadenceSimpleType:             1,
+		common.MemoryKindCadenceOptionalType:           17,
+		common.MemoryKindCadenceVariableSizedArrayType: 17,
+		common.MemoryKindCadenceConstantSizedArrayType: 25,
+		common.MemoryKindCadenceDictionaryType:         33,
+		common.MemoryKindCadenceField:                  33,
+		common.MemoryKindCadenceParameter:              49,
+		common.MemoryKindCadenceStructType:             81,
+		common.MemoryKindCadenceResourceType:           81,
+		common.MemoryKindCadenceEventType:              81,
+		common.MemoryKindCadenceContractType:           81,
+		common.MemoryKindCadenceStructInterfaceType:    81,
+		common.MemoryKindCadenceResourceInterfaceType:  81,
+		common.MemoryKindCadenceContractInterfaceType:  81,
+		common.MemoryKindCadenceFunctionType:           41,
+		common.MemoryKindCadenceReferenceType:          25,
+		common.MemoryKindCadenceRestrictedType:         57,
+		common.MemoryKindCadenceCapabilityType:         17,
+		common.MemoryKindCadenceEnumType:               97,
 
 		// Misc
 

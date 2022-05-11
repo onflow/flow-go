@@ -33,7 +33,8 @@ type ContractHandler struct {
 func NewContractHandler(accounts state.Accounts,
 	restrictedDeploymentEnabled bool,
 	authorizedAccounts AuthorizedAccountsForContractDeploymentFunc,
-	useContractAuditVoucher UseContractAuditVoucherFunc) *ContractHandler {
+	useContractAuditVoucher UseContractAuditVoucherFunc,
+) *ContractHandler {
 	return &ContractHandler{
 		accounts:                    accounts,
 		draftUpdates:                make(map[programs.ContractUpdateKey]programs.ContractUpdate),
@@ -53,25 +54,54 @@ func (h *ContractHandler) GetContract(address runtime.Address, name string) (cod
 	return
 }
 
-func (h *ContractHandler) SetContract(address runtime.Address, name string, code []byte, signingAccounts []runtime.Address) (err error) {
-	// check if authorized
-	if !h.isAuthorized(signingAccounts) {
+func (h *ContractHandler) SetContract(
+	address runtime.Address,
+	name string,
+	code []byte,
+	signingAccounts []runtime.Address,
+) (err error) {
+
+	flowAddress := flow.Address(address)
+
+	// Initial contract deployments must be authorized by signing accounts,
+	// or there must be an audit voucher available.
+	//
+	// Contract updates are always allowed.
+
+	var exists bool
+	exists, err = h.accounts.ContractExists(name, flowAddress)
+	if err != nil {
+		return err
+	}
+
+	if !exists && !h.isAuthorized(signingAccounts) {
 		// check if there's an audit voucher for the contract
 		voucherAvailable, err := h.useContractAuditVoucher(address, code)
 		if err != nil {
-			errInner := errors.NewOperationAuthorizationErrorf("SetContract", "failed to check audit vouchers")
+			errInner := errors.NewOperationAuthorizationErrorf(
+				"SetContract",
+				"failed to check audit vouchers",
+			)
 			return fmt.Errorf("setting contract failed: %w - %s", errInner, err)
 		}
 		if !voucherAvailable {
-			err = errors.NewOperationAuthorizationErrorf("SetContract", "setting contracts requires authorization from specific accounts")
-			return fmt.Errorf("setting contract failed: %w", err)
+			err = errors.NewOperationAuthorizationErrorf(
+				"SetContract",
+				"deploying contracts requires authorization from specific accounts",
+			)
+			return fmt.Errorf("deploying contract failed: %w", err)
 		}
 	}
 
-	add := flow.Address(address)
-	uk := programs.ContractUpdateKey{Address: add, Name: name}
-	u := programs.ContractUpdate{ContractUpdateKey: uk, Code: code}
-	h.draftUpdates[uk] = u
+	contractUpdateKey := programs.ContractUpdateKey{
+		Address: flowAddress,
+		Name:    name,
+	}
+
+	h.draftUpdates[contractUpdateKey] = programs.ContractUpdate{
+		ContractUpdateKey: contractUpdateKey,
+		Code:              code,
+	}
 
 	return nil
 }
