@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -165,7 +166,7 @@ func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 // The tests assumes the used hash-to-field and map-to-curve are identical in the 2 signatures:
 // - hash-to-field : use XMD_SHA256 in both signatures
 // - map to curve : Flow and BLST use an SWU mapping consistent with the test vector in
-// https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#appendix-J.9.1
+// https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#appendix-J.9.1
 // (Flow map to curve is tested agaisnt the IRTF draft in TestMapToG1, BLST map to curve is not
 // tested in this repo)
 //

@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package crypto
@@ -79,7 +80,7 @@ func BenchmarkScalarMult(b *testing.B) {
 // Sanity-check of the map-to-G1 with regards to the IRTF draft hash-to-curve
 func TestMapToG1(t *testing.T) {
 
-	// test vectors from https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#appendix-J.9.1
+	// test vectors from https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-14#appendix-J.9.1
 	dst := []byte("QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_")
 
 	msgs := [][]byte{
