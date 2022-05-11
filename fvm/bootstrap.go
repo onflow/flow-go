@@ -37,6 +37,8 @@ type BootstrapProcedure struct {
 	restrictedAccountCreationEnabled cadence.Bool
 
 	// TODO: restrictedContractDeployment should be a bool after RestrictedDeploymentEnabled is removed from the context
+	// restrictedContractDeployment of nil means that the contract deployment is taken from the fvm Context instead of from the state.
+	// This can be used to mimic behaviour on chain before the restrictedContractDeployment is set with a service account transaction.
 	restrictedContractDeployment *bool
 
 	transactionFees        BootstrapProcedureFeeParameters
