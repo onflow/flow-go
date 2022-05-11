@@ -123,8 +123,7 @@ func (p *ActivePaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewView
 		return nil, err
 	}
 
-	// TODO(active-pacemaker): notify about TC change
-	//p.notifier.OnQcTriggeredViewChange(qc, newView)
+	p.notifier.OnTcTriggeredViewChange(tc, newView)
 	return &model.NewViewEvent{View: newView}, nil
 }
 

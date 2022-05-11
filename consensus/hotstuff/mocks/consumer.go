@@ -95,6 +95,11 @@ func (_m *Consumer) OnStartingTimeout(_a0 *model.TimerInfo) {
 	_m.Called(_a0)
 }
 
+// OnTcTriggeredViewChange provides a mock function with given fields: tc, newView
+func (_m *Consumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+	_m.Called(tc, newView)
+}
+
 // OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
 func (_m *Consumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
 	_m.Called(vote, invalidProposal)

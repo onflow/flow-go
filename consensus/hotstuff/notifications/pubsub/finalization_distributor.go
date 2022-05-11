@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 )
 
 type OnBlockFinalizedConsumer = func(block *model.Block)
@@ -13,6 +13,7 @@ type OnBlockIncorporatedConsumer = func(block *model.Block)
 
 // FinalizationDistributor subscribes for finalization events from hotstuff and distributes it to subscribers
 type FinalizationDistributor struct {
+	notifications.NoopConsumer
 	blockFinalizedConsumers       []OnBlockFinalizedConsumer
 	blockIncorporatedConsumers    []OnBlockIncorporatedConsumer
 	hotStuffFinalizationConsumers []hotstuff.FinalizationConsumer
@@ -78,32 +79,3 @@ func (p *FinalizationDistributor) OnDoubleProposeDetected(block1, block2 *model.
 		consumer.OnDoubleProposeDetected(block1, block2)
 	}
 }
-
-func (p *FinalizationDistributor) OnReceiveVote(uint64, *model.Vote) {}
-
-func (p *FinalizationDistributor) OnReceiveProposal(uint64, *model.Proposal) {}
-
-func (p *FinalizationDistributor) OnEnteringView(uint64, flow.Identifier) {}
-
-func (p *FinalizationDistributor) OnQcTriggeredViewChange(*flow.QuorumCertificate, uint64) {}
-
-func (p *FinalizationDistributor) OnProposingBlock(*model.Proposal) {}
-
-func (p *FinalizationDistributor) OnVoting(*model.Vote) {}
-
-func (p *FinalizationDistributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
-}
-
-func (p *FinalizationDistributor) OnStartingTimeout(*model.TimerInfo) {}
-
-func (p *FinalizationDistributor) OnReachedTimeout(*model.TimerInfo) {}
-
-func (p *FinalizationDistributor) OnQcIncorporated(*flow.QuorumCertificate) {}
-
-func (p *FinalizationDistributor) OnForkChoiceGenerated(uint64, *flow.QuorumCertificate) {}
-
-func (p *FinalizationDistributor) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
-
-func (p *FinalizationDistributor) OnInvalidVoteDetected(*model.Vote) {}
-
-func (p *FinalizationDistributor) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}

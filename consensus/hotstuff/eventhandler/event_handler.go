@@ -419,8 +419,11 @@ func (e *EventHandler) processQC(qc *flow.QuorumCertificate) error {
 		return fmt.Errorf("cannot add QC to forks: %w", err)
 	}
 
-	_, viewChanged := e.paceMaker.ProcessQC(qc)
-	if !viewChanged {
+	newViewEvent, err := e.paceMaker.ProcessQC(qc)
+	if err != nil {
+		return fmt.Errorf("could not process QC: %w", err)
+	}
+	if newViewEvent == nil {
 		log.Debug().Msg("QC didn't trigger view change, nothing to do")
 		return nil
 	}

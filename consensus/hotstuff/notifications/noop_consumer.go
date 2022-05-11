@@ -33,6 +33,8 @@ func (*NoopConsumer) OnEnteringView(uint64, flow.Identifier) {}
 
 func (c *NoopConsumer) OnQcTriggeredViewChange(*flow.QuorumCertificate, uint64) {}
 
+func (c *NoopConsumer) OnTcTriggeredViewChange(*flow.TimeoutCertificate, uint64) {}
+
 func (c *NoopConsumer) OnProposingBlock(*model.Proposal) {}
 
 func (c *NoopConsumer) OnVoting(*model.Vote) {}

@@ -83,7 +83,7 @@ func (_m *PaceMaker) OnPartialTC(curView uint64) {
 }
 
 // ProcessQC provides a mock function with given fields: qc
-func (_m *PaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
+func (_m *PaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, error) {
 	ret := _m.Called(qc)
 
 	var r0 *model.NewViewEvent
@@ -95,18 +95,18 @@ func (_m *PaceMaker) ProcessQC(qc *flow.QuorumCertificate) (*model.NewViewEvent,
 		}
 	}
 
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(*flow.QuorumCertificate) bool); ok {
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*flow.QuorumCertificate) error); ok {
 		r1 = rf(qc)
 	} else {
-		r1 = ret.Get(1).(bool)
+		r1 = ret.Error(1)
 	}
 
 	return r0, r1
 }
 
 // ProcessTC provides a mock function with given fields: tc
-func (_m *PaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, bool) {
+func (_m *PaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent, error) {
 	ret := _m.Called(tc)
 
 	var r0 *model.NewViewEvent
@@ -118,11 +118,11 @@ func (_m *PaceMaker) ProcessTC(tc *flow.TimeoutCertificate) (*model.NewViewEvent
 		}
 	}
 
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(*flow.TimeoutCertificate) bool); ok {
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*flow.TimeoutCertificate) error); ok {
 		r1 = rf(tc)
 	} else {
-		r1 = ret.Get(1).(bool)
+		r1 = ret.Error(1)
 	}
 
 	return r0, r1

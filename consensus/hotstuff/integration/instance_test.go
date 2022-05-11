@@ -330,7 +330,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
-	in.pacemaker, err = pacemaker.New(livnessData.CurrentView, controller, notifier)
+	in.pacemaker, err = pacemaker.New(livnessData, controller, notifier, in.persist)
 	require.NoError(t, err)
 
 	forkalizer, err := finalizer.New(rootBlockQC, in.finalizer, notifier)

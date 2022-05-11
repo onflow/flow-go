@@ -124,6 +124,14 @@ func (t *TelemetryConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, 
 		Msg("OnQcTriggeredViewChange")
 }
 
+func (t *TelemetryConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+	t.pathHandler.NextStep().
+		Uint64("tc_block_view", tc.View).
+		Uint64("next_view", newView).
+		Uint64("tc_highest_qc_view", tc.TOHighestQC.View).
+		Msg("OnTcTriggeredViewChange")
+}
+
 func (t *TelemetryConsumer) OnProposingBlock(proposal *model.Proposal) {
 	block := proposal.Block
 	step := t.pathHandler.NextStep()

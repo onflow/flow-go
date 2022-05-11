@@ -83,6 +83,14 @@ type Consumer interface {
 	// and must handle repetition of the same events (with some processing overhead).
 	OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64)
 
+	// OnTcTriggeredViewChange notifications are produced by PaceMaker when it moves to a new view
+	// based on processing a TC. The arguments specify the tc (first argument), which triggered
+	// the view change, and the newView to which the PaceMaker transitioned (second argument).
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64)
+
 	// OnProposingBlock notifications are produced by the EventHandler when the replica, as
 	// leader for the respective view, proposing a block.
 	// Prerequisites:

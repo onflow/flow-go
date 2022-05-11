@@ -132,7 +132,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	}
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
-	//s.notifier.On("OnQcTriggeredViewChange", qc, uint64(4)).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", tc, uint64(4)).Return().Once()
 	nve, err := s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
 	s.notifier.AssertExpectations(s.T())
@@ -150,7 +150,7 @@ func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
 	}
 	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(13, model.ReplicaTimeout)).Return().Once()
-	//s.notifier.On("OnQcTriggeredViewChange", qc, uint64(13)).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", tc, uint64(13)).Return().Once()
 	nve, err = s.paceMaker.ProcessTC(tc)
 	require.NoError(s.T(), err)
 	require.True(s.T(), nve.View == 13)

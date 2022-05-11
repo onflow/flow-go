@@ -77,6 +77,14 @@ func (lc *LogConsumer) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newVi
 		Msg("QC triggered view change")
 }
 
+func (lc *LogConsumer) OnTcTriggeredViewChange(tc *flow.TimeoutCertificate, newView uint64) {
+	lc.log.Debug().
+		Uint64("tc_view", tc.View).
+		Uint64("tc_highest_qc_view", tc.TOHighestQC.View).
+		Uint64("new_view", newView).
+		Msg("TC triggered view change")
+}
+
 func (lc *LogConsumer) OnProposingBlock(block *model.Proposal) {
 	lc.logBasicBlockData(lc.log.Debug(), block.Block).
 		Msg("proposing block")
