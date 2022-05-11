@@ -231,9 +231,9 @@ func (b *backendTransactions) GetTransactionResult(
 	txID flow.Identifier,
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
-	start := time.Now()
+	// start := time.Now()
 	tx, err := b.transactions.ByID(txID)
-	b.transactionMetrics.GetTransactionResultRTT(time.Since(start), len(tx.Script))
+	// b.transactionMetrics.GetTransactionResultRTT(time.Since(start), len(tx.Script))
 
 	txErr := convertStorageError(err)
 	if txErr != nil {
