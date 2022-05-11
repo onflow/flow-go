@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/apiservice"
 	"strings"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -314,6 +315,10 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return newUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	}).Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		proxy, err := apiservice.NewFlowAPIService(builder.bootstrapIdentities, builder.PeerUpdateInterval)
+		if err != nil {
+			return nil, err
+		}
 		builder.RpcEng = rpc.New(
 			node.Logger,
 			node.State,
@@ -334,7 +339,7 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 			builder.rpcMetricsEnabled,
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
-			nil,
+			proxy,
 		)
 		return builder.RpcEng, nil
 	})
