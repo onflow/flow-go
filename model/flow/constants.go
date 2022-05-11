@@ -42,22 +42,25 @@ const DefaultMaxAddressIndex = 20_000_000
 // badger value log GC. Equivalent to 10 mins for a 1 second block time
 const DefaultValueLogGCFrequency = 10 * 60
 
+// DomainTagLength is set to 32 bytes.
+//
+// Signatures on Flow that needs to be scoped to a certain domain need to
+// have the same length in order to avoid tag collision issues, when prefixing the
+// message to sign.
 const DomainTagLength = 32
 
 const TransactionTagString = "FLOW-V0.0-transaction"
 
-const UserTagString = "FLOW-V0.0-user"
-
 // TransactionDomainTag is the prefix of all signed transaction payloads.
 //
-// A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
+// The tag is the string `TransactionTagString` encoded as UTF-8 bytes,
+// right padded to a total length of 32 bytes.
 var TransactionDomainTag = paddedDomainTag(TransactionTagString)
 
-// UserDomainTag is the prefix of all signed user space payloads.
+// paddedDomainTag padds string tags to form the actuatl domain separation tag used for signing
+// and verifiying.
 //
 // A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
-var UserDomainTag = paddedDomainTag(UserTagString)
-
 func paddedDomainTag(s string) [DomainTagLength]byte {
 	var tag [DomainTagLength]byte
 

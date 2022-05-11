@@ -22,7 +22,7 @@ import (
 func TestFilterSubscribe(t *testing.T) {
 	// TODO: skip for now due to bug in libp2p gossipsub implementation:
 	// https://github.com/libp2p/go-libp2p-pubsub/issues/449
-	unittest.SkipUnless(t, unittest.TEST_WIP, "skip for now due to bug in libp2p gossipsub implementation: https://github.com/libp2p/go-libp2p-pubsub/issues/449")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "skip for now due to bug in libp2p gossipsub implementation: https://github.com/libp2p/go-libp2p-pubsub/issues/449")
 
 	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))

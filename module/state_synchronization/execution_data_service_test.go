@@ -14,7 +14,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/libp2p/go-libp2p"
+	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -224,9 +224,9 @@ func TestHappyPath(t *testing.T) {
 
 	test := func(minSerializedSize uint64) {
 		expected, _ := executionData(t, eds.serializer, minSerializedSize)
-		rootCid, err := addExecutionData(eds, expected, time.Second)
+		rootCid, err := addExecutionData(eds, expected, 5*time.Second)
 		require.NoError(t, err)
-		actual, err := getExecutionData(eds, rootCid, time.Second)
+		actual, err := getExecutionData(eds, rootCid, 5*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, true, reflect.DeepEqual(expected, actual))
 	}
@@ -242,8 +242,8 @@ func TestMalformedData(t *testing.T) {
 	eds := executionDataService(mockBlobService(bs))
 
 	test := func(data []byte) {
-		rootID := writeBlobTree(t, eds.serializer, data, bs, time.Second)
-		_, err := getExecutionData(eds, rootID, time.Second)
+		rootID := writeBlobTree(t, eds.serializer, data, bs, 5*time.Second)
+		_, err := getExecutionData(eds, rootID, 5*time.Second)
 		var malformedDataError *MalformedDataError
 		assert.ErrorAs(t, err, &malformedDataError)
 	}
@@ -266,11 +266,11 @@ func TestOversizedBlob(t *testing.T) {
 	eds := executionDataService(mockBlobService(bs))
 
 	test := func(data []byte) {
-		cid, err := putBlob(bs, data, time.Second)
+		cid, err := putBlob(bs, data, 5*time.Second)
 		require.NoError(t, err)
 		fid, err := flow.CidToId(cid)
 		require.NoError(t, err)
-		_, err = getExecutionData(eds, fid, time.Second)
+		_, err = getExecutionData(eds, fid, 5*time.Second)
 		var blobSizeLimitExceededError *BlobSizeLimitExceededError
 		assert.ErrorAs(t, err, &blobSizeLimitExceededError)
 	}
@@ -293,7 +293,7 @@ func TestOversizedBlob(t *testing.T) {
 		if i == 3 {
 			blob = data[i*blobSize:]
 		}
-		cid, err := putBlob(bs, blob, time.Second)
+		cid, err := putBlob(bs, blob, 5*time.Second)
 		require.NoError(t, err)
 		cids = append(cids, cid)
 	}
@@ -309,7 +309,7 @@ func TestOversizedBlob(t *testing.T) {
 		if i == 4 {
 			blob = data[i*defaultMaxBlobSize:]
 		}
-		cid, err := putBlob(bs, blob, time.Second)
+		cid, err := putBlob(bs, blob, 5*time.Second)
 		require.NoError(t, err)
 		cids = append(cids, cid)
 	}
@@ -325,15 +325,15 @@ func TestGetContextCanceled(t *testing.T) {
 	eds := executionDataService(mockBlobService(bs))
 
 	ed, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-	rootCid, err := addExecutionData(eds, ed, time.Second)
+	rootCid, err := addExecutionData(eds, ed, 5*time.Second)
 	require.NoError(t, err)
 
-	cids := allKeys(t, bs, time.Second)
+	cids := allKeys(t, bs, 5*time.Second)
 	t.Logf("%d blobs in blob tree", len(cids))
 
-	require.NoError(t, deleteBlob(bs, cids[rand.Intn(len(cids))], time.Second))
+	require.NoError(t, deleteBlob(bs, cids[rand.Intn(len(cids))], 5*time.Second))
 
-	_, err = getExecutionData(eds, rootCid, time.Second)
+	_, err = getExecutionData(eds, rootCid, 5*time.Second)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
@@ -345,10 +345,10 @@ func TestAddContextCanceled(t *testing.T) {
 	eds := executionDataService(bex)
 
 	ed, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-	_, err := addExecutionData(eds, ed, time.Second)
+	_, err := addExecutionData(eds, ed, 5*time.Second)
 	require.NoError(t, err)
 
-	cids := allKeys(t, bs, time.Second)
+	cids := allKeys(t, bs, 5*time.Second)
 	t.Logf("%d blobs in blob tree", len(cids))
 
 	blockingCid := cids[rand.Intn(len(cids))]
@@ -366,7 +366,7 @@ func TestAddContextCanceled(t *testing.T) {
 			return bs.PutMany(ctx, blobs)
 		})
 
-	_, err = addExecutionData(eds, ed, time.Second)
+	_, err = addExecutionData(eds, ed, 5*time.Second)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
@@ -378,10 +378,10 @@ func TestGetIncompleteData(t *testing.T) {
 	eds := executionDataService(bex)
 
 	ed, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-	rootCid, err := addExecutionData(eds, ed, time.Second)
+	rootCid, err := addExecutionData(eds, ed, 5*time.Second)
 	require.NoError(t, err)
 
-	cids := allKeys(t, bs, time.Second)
+	cids := allKeys(t, bs, 5*time.Second)
 	t.Logf("%d blobs in blob tree", len(cids))
 
 	missingCid := cids[rand.Intn(len(cids))]
@@ -408,7 +408,7 @@ func TestGetIncompleteData(t *testing.T) {
 			return ch
 		})
 
-	_, err = getExecutionData(eds, rootCid, time.Second)
+	_, err = getExecutionData(eds, rootCid, 5*time.Second)
 	var blobNotFoundError *BlobNotFoundError
 	assert.ErrorAs(t, err, &blobNotFoundError)
 }
@@ -474,17 +474,18 @@ func TestWithNetwork(t *testing.T) {
 	eds2 := executionDataService(service2)
 
 	expected, _ := executionData(t, eds1.serializer, 10*defaultMaxBlobSize)
-	rootCid, err := addExecutionData(eds1, expected, time.Second)
+	rootCid, err := addExecutionData(eds1, expected, 5*time.Second)
 	require.NoError(t, err)
 
-	actual, err := getExecutionData(eds2, rootCid, time.Second)
+	actual, err := getExecutionData(eds2, rootCid, 5*time.Second)
 	require.NoError(t, err)
 
 	assert.Equal(t, true, reflect.DeepEqual(expected, actual))
 }
 
 func TestReprovider(t *testing.T) {
-	t.Parallel()
+	// test is flaky when run in parallel
+	// t.Parallel()
 
 	parent, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -495,7 +496,7 @@ func TestReprovider(t *testing.T) {
 	mockBs := mockBlobService(blockstore.NewBlockstore(ds))
 	mockEds := executionDataService(mockBs)
 	expected, _ := executionData(t, mockEds.serializer, 10*defaultMaxBlobSize)
-	rootCid, err := addExecutionData(mockEds, expected, time.Second)
+	rootCid, err := addExecutionData(mockEds, expected, 5*time.Second)
 	require.NoError(t, err)
 
 	h1, err := libp2p.New()
@@ -549,7 +550,7 @@ func TestReprovider(t *testing.T) {
 
 	eds := executionDataService(service3)
 
-	actual, err := getExecutionData(eds, rootCid, time.Second)
+	actual, err := getExecutionData(eds, rootCid, 5*time.Second)
 	require.NoError(t, err)
 
 	assert.Equal(t, true, reflect.DeepEqual(expected, actual))
