@@ -66,19 +66,19 @@ import (
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
-// These functions are shared by staked and observer node builders.
+// These functions are shared by staked and observer builders.
 // The Staked network allows the staked nodes to communicate among themselves, while the public network allows the
 // observers and a staked Access node to communicate.
 //
 //                                 public network                           staked network
 //  +------------------------+
-//  | observer Node 1        |<--------------------------|
+//  | observer 1        |<--------------------------|
 //  +------------------------+                           v
 //  +------------------------+                         +--------------------+                 +------------------------+
-//  | observer Node 2        |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
+//  | observer 2        |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
 //  +------------------------+                         +--------------------+                 +------------------------+
 //  +------------------------+                           ^
-//  | observer Node 3        |<--------------------------|
+//  | observer 3        |<--------------------------|
 //  +------------------------+
 
 type ObserverBuilder interface {
@@ -98,7 +98,7 @@ type AccessNodeConfig struct {
 	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
-	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports observer nodes consensus follower engines
+	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports observers consensus follower engines
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -165,9 +165,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 	}
 }
 
-// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and observer node
+// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and observer
 // It is composed of the FlowNodeBuilder, the AccessNodeConfig and contains all the components and modules needed for the
-// staked and observer nodes
+// staked and observers
 type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	*AccessNodeConfig
@@ -190,7 +190,7 @@ type FlowAccessNodeBuilder struct {
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
-	// for the observer node, the sync engine participants provider is the libp2p peer store which is not
+	// for the observer, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
@@ -398,12 +398,6 @@ func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
 	}
 }
 
-func SupportsUnstakedNode(enable bool) Option {
-	return func(config *AccessNodeConfig) {
-		config.supportsUnstakedFollower = enable
-	}
-}
-
 func WithNetworkKey(key crypto.PrivateKey) Option {
 	return func(config *AccessNodeConfig) {
 		config.NetworkKey = key
@@ -470,9 +464,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
-		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
-		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
+		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports observers")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
 	}).ValidateFlags(func() error {
 		if builder.supportsUnstakedFollower && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -514,7 +508,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	return net, nil
 }
 
-func unstakedNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
+func publicNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		// filter out messages sent by this node itself
 		validator.ValidateNotSender(selfID),
@@ -566,7 +560,6 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 	return ids, nil
 }
 
-
 type ObserverServiceBuilder struct {
 	*FlowAccessNodeBuilder
 	peerID peer.ID
@@ -608,7 +601,7 @@ func (builder *ObserverServiceBuilder) initNodeInfo() error {
 	}
 
 	builder.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
-	builder.NodeConfig.StakingKey = nil           // no staking key for the observer node
+	builder.NodeConfig.StakingKey = nil           // no staking key for the observer
 
 	return nil
 }
@@ -680,7 +673,7 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 		}
 	}
 
-	builder.PreInit(builder.initUnstakedLocal())
+	builder.PreInit(builder.initObserverLocal())
 
 	return nil
 }
@@ -704,7 +697,7 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 	return nil
 }
 
-// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer node.
+// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the observer.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 // 		DHT as client and seeded with the given bootstrap peers
@@ -752,17 +745,17 @@ func (builder *ObserverServiceBuilder) initLibP2PFactory(networkKey crypto.Priva
 	}
 }
 
-// initUnstakedLocal initializes the observer node ID, network key and network address
+// initObserverLocal initializes the observer ID, network key and network address
 // Currently, it reads a node-info.priv.json like any other node.
 // TODO: read the node ID from the special bootstrap files
-func (builder *ObserverServiceBuilder) initUnstakedLocal() func(node *cmd.NodeConfig) error {
+func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
 	return func(node *cmd.NodeConfig) error {
-		// for an observer node, set the identity here explicitly since it will not be found in the protocol state
+		// for an observer, set the identity here explicitly since it will not be found in the protocol state
 		self := &flow.Identity{
 			NodeID:        node.NodeID,
 			NetworkPubKey: node.NetworkKey.PublicKey(),
-			StakingPubKey: nil,             // no staking key needed for the observer node
-			Role:          flow.RoleAccess, // observer node can only run as an access node
+			StakingPubKey: nil,             // no staking key needed for the observer
+			Role:          flow.RoleAccess, // observer can only run as an access node
 			Address:       builder.BindAddr,
 		}
 
@@ -781,7 +774,7 @@ func (builder *ObserverServiceBuilder) enqueueMiddleware() {
 	builder.
 		Module("network middleware", func(node *cmd.NodeConfig) error {
 
-			// NodeID for the observer node on the observer network
+			// NodeID for the observer on the observer network
 			observerNodeID := node.NodeID
 
 			// Networking key
@@ -789,7 +782,7 @@ func (builder *ObserverServiceBuilder) enqueueMiddleware() {
 
 			libP2PFactory := builder.initLibP2PFactory(observerNetworkKey)
 
-			msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, observerNodeID)
+			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, observerNodeID)
 
 			builder.initMiddleware(observerNodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
 
@@ -804,7 +797,7 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 	return builder.FlowAccessNodeBuilder.Build()
 }
 
-// enqueueUnstakedNetworkInit enqueues the observer network component initialized for the observer node
+// enqueueUnstakedNetworkInit enqueues the observer network component initialized for the observer
 func (builder *ObserverServiceBuilder) enqueueUnstakedNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
