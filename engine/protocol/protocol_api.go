@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type API interface {
+type ProtocolAPI interface {
 	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, error)
 	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, error)
 	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, error)
@@ -30,7 +30,7 @@ func New(
 	state protocol.State,
 	blocks storage.Blocks,
 	headers storage.Headers,
-) API {
+) ProtocolAPI {
 	b := &backend{
 
 		headers: headers,
