@@ -42,8 +42,8 @@ func (bw *BlobChannelWriter) Write(data []byte) (int, error) {
 	var n int
 	for n < len(data) {
 		size := bw.maxBlobSize - bw.buf.Len()
-		if size > len(data) {
-			size = len(data)
+		if n+size > len(data) {
+			size = len(data) - n
 		}
 
 		m, err := bw.buf.Write(data[n : n+size])

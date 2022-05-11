@@ -46,7 +46,7 @@ type Requester struct {
 
 func NewRequester(
 	startHeight uint64,
-	trackerStorage *tracker.Storage,
+	trackerStorage tracker.Storage,
 	blocks storage.Blocks,
 	results storage.ExecutionResults,
 	blobService network.BlobService,

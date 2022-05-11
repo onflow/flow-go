@@ -52,4 +52,4 @@ type BlobService interface {
 
 type BlobServiceOption func(BlobService)
 
-var ErrNotFound = errors.New("blobservice: key not found")
+var ErrBlobNotFound = errors.New("blobservice: key not found")

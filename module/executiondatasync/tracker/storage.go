@@ -84,28 +84,40 @@ func getBatchItemCountLimit(db *badger.DB, writeCountPerItem int64, writeSizePer
 	}
 }
 
-type Storage struct {
+type TrackBlobsFn func(uint64, ...cid.Cid) error
+type UpdateFn func(TrackBlobsFn) error
+type PruneCallback func(cid.Cid) error
+
+type Storage interface {
+	Update(UpdateFn) error
+	GetFulfilledHeight() (uint64, error)
+	SetFulfilledHeight(height uint64) error
+	GetPrunedHeight() (uint64, error)
+	Prune(height uint64) error
+}
+
+type storage struct {
 	mu            sync.RWMutex
 	db            *badger.DB
-	pruneCallback func(cid.Cid) error
+	pruneCallback PruneCallback
 	logger        zerolog.Logger
 }
 
-type StorageOption func(*Storage)
+type StorageOption func(*storage)
 
-func WithPruneCallback(callback func(cid.Cid) error) StorageOption {
-	return func(s *Storage) {
+func WithPruneCallback(callback PruneCallback) StorageOption {
+	return func(s *storage) {
 		s.pruneCallback = callback
 	}
 }
 
-func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*Storage, error) {
+func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*storage, error) {
 	db, err := badger.Open(badger.LSMOnlyOptions(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("could not open tracker db: %w", err)
 	}
 
-	storage := &Storage{
+	storage := &storage{
 		db:            db,
 		pruneCallback: func(c cid.Cid) error { return nil },
 		logger:        logger.With().Str("module", "tracker_storage").Logger(),
@@ -122,7 +134,7 @@ func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts 
 	return storage, nil
 }
 
-func (s *Storage) init(startHeight uint64) error {
+func (s *storage) init(startHeight uint64) error {
 	_, fulfilledHeightErr := s.GetFulfilledHeight()
 	prunedHeight, prunedHeightErr := s.GetPrunedHeight()
 
@@ -143,7 +155,7 @@ func (s *Storage) init(startHeight uint64) error {
 	return nil
 }
 
-func (s *Storage) bootstrap(startHeight uint64) error {
+func (s *storage) bootstrap(startHeight uint64) error {
 	fulfilledHeightKey := makeGlobalStateKey(globalStateFulfilledHeight)
 	fulfilledHeightValue := make([]byte, 8)
 	binary.LittleEndian.PutUint64(fulfilledHeightValue, startHeight)
@@ -165,13 +177,13 @@ func (s *Storage) bootstrap(startHeight uint64) error {
 	})
 }
 
-func (s *Storage) Update(f func(func(uint64, ...cid.Cid) error) error) error {
+func (s *storage) Update(f UpdateFn) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return f(s.trackBlobs)
 }
 
-func (s *Storage) SetFulfilledHeight(height uint64) error {
+func (s *storage) SetFulfilledHeight(height uint64) error {
 	fulfilledHeightKey := makeGlobalStateKey(globalStateFulfilledHeight)
 	fulfilledHeightValue := make([]byte, 8)
 	binary.LittleEndian.PutUint64(fulfilledHeightValue, height)
@@ -185,7 +197,7 @@ func (s *Storage) SetFulfilledHeight(height uint64) error {
 	})
 }
 
-func (s *Storage) GetFulfilledHeight() (uint64, error) {
+func (s *storage) GetFulfilledHeight() (uint64, error) {
 	fulfilledHeightKey := makeGlobalStateKey(globalStateFulfilledHeight)
 	var fulfilledHeight uint64
 
@@ -210,7 +222,7 @@ func (s *Storage) GetFulfilledHeight() (uint64, error) {
 	return fulfilledHeight, nil
 }
 
-func (s *Storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) error {
+func (s *storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) error {
 	if err := txn.Set(makeBlobRecordKey(blockHeight, c), nil); err != nil {
 		return fmt.Errorf("failed to add blob record: %w", err)
 	}
@@ -244,7 +256,7 @@ func (s *Storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) erro
 	return nil
 }
 
-func (s *Storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
+func (s *storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 	cidsPerBatch := 16
 	maxCidsPerBatch := getBatchItemCountLimit(s.db, 2, blobRecordKeyLength+latestHeightKeyLength+8)
 	if maxCidsPerBatch < cidsPerBatch {
@@ -276,7 +288,7 @@ func (s *Storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 	return nil
 }
 
-func (s *Storage) batchDelete(deleteInfos []*deleteInfo) error {
+func (s *storage) batchDelete(deleteInfos []*deleteInfo) error {
 	return s.db.Update(func(txn *badger.Txn) error {
 		for _, dInfo := range deleteInfos {
 			if err := txn.Delete(makeBlobRecordKey(dInfo.height, dInfo.cid)); err != nil {
@@ -294,7 +306,7 @@ func (s *Storage) batchDelete(deleteInfos []*deleteInfo) error {
 	})
 }
 
-func (s *Storage) batchDeleteItemLimit() int {
+func (s *storage) batchDeleteItemLimit() int {
 	itemsPerBatch := 256
 	maxItemsPerBatch := getBatchItemCountLimit(s.db, 2, blobRecordKeyLength+latestHeightKeyLength)
 	if maxItemsPerBatch < itemsPerBatch {
@@ -303,7 +315,7 @@ func (s *Storage) batchDeleteItemLimit() int {
 	return itemsPerBatch
 }
 
-func (s *Storage) Prune(height uint64) error {
+func (s *storage) Prune(height uint64) error {
 	blobRecordPrefix := []byte{prefixBlobRecord}
 	itemsPerBatch := s.batchDeleteItemLimit()
 	var batch []*deleteInfo
@@ -392,7 +404,7 @@ func (s *Storage) Prune(height uint64) error {
 	return nil
 }
 
-func (s *Storage) setPrunedHeight(height uint64) error {
+func (s *storage) setPrunedHeight(height uint64) error {
 	prunedHeightKey := makeGlobalStateKey(globalStatePrunedHeight)
 	prunedHeightValue := make([]byte, 8)
 	binary.LittleEndian.PutUint64(prunedHeightValue, height)
@@ -406,7 +418,7 @@ func (s *Storage) setPrunedHeight(height uint64) error {
 	})
 }
 
-func (s *Storage) GetPrunedHeight() (uint64, error) {
+func (s *storage) GetPrunedHeight() (uint64, error) {
 	prunedHeightKey := makeGlobalStateKey(globalStatePrunedHeight)
 	var prunedHeight uint64
 

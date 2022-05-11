@@ -58,7 +58,7 @@ type handler struct {
 	jobsOut <-chan interface{}
 
 	fulfiller   *fulfiller
-	storage     *tracker.Storage
+	storage     tracker.Storage
 	blobService network.BlobService
 	serializer  execution_data.Serializer
 
@@ -74,7 +74,7 @@ type handler struct {
 
 func newHandler(
 	fulfiller *fulfiller,
-	storage *tracker.Storage,
+	storage tracker.Storage,
 	blobService network.BlobService,
 	serializer execution_data.Serializer,
 	maxBlobSize int,
@@ -214,7 +214,7 @@ func (h *handler) getExecutionData(ctx context.Context, j *job) (*execution_data
 	blobGetter := h.blobService.GetSession(ctx)
 	totalSize := atomic.NewUint64(0)
 
-	err := h.storage.Update(func(trackBlobs func(uint64, ...cid.Cid) error) error {
+	err := h.storage.Update(func(trackBlobs tracker.TrackBlobsFn) error {
 		edRoot, err := h.getExecutionDataRoot(ctx, j.blockHeight, j.executionDataID, blobGetter, trackBlobs)
 		if err != nil {
 			return fmt.Errorf("failed to get execution data root: %w", err)
@@ -277,9 +277,11 @@ func (h *handler) getExecutionDataRoot(
 
 	blob, err := blobGetter.GetBlob(ctx, rootCid)
 	if err != nil {
-		// TODO: technically, we should check if the error is ErrNotFound
-		// otherwise don't wrap it with BlobNotFoundError
-		return nil, execution_data.NewBlobNotFoundError(rootCid)
+		if errors.Is(err, network.ErrBlobNotFound) {
+			return nil, execution_data.NewBlobNotFoundError(rootCid)
+		}
+
+		return nil, fmt.Errorf("failed to get root blob: %w", err)
 	}
 
 	v, err := h.serializer.Deserialize(bytes.NewBuffer(blob.RawData()))

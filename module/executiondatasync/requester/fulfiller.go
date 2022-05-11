@@ -38,7 +38,7 @@ type fulfiller struct {
 	metrics module.ExecutionDataRequesterMetrics
 
 	notifier *notifier
-	storage  *tracker.Storage
+	storage  tracker.Storage
 
 	component.Component
 }
@@ -46,7 +46,7 @@ type fulfiller struct {
 func newFulfiller(
 	fulfilledHeight uint64,
 	notifier *notifier,
-	storage *tracker.Storage,
+	storage tracker.Storage,
 	logger zerolog.Logger,
 	metrics module.ExecutionDataRequesterMetrics,
 ) *fulfiller {

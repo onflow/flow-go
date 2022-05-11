@@ -126,7 +126,7 @@ func (s *store) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*
 			return nil, NewBlobNotFoundError(rootCid)
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("failed to get root blob: %w", err)
 	}
 
 	rootData, err := s.serializer.Deserialize(bytes.NewBuffer(rootBlob.RawData()))
@@ -186,7 +186,7 @@ func (s *store) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, erro
 				return nil, NewBlobNotFoundError(cid)
 			}
 
-			return nil, err
+			return nil, fmt.Errorf("failed to get blob: %w", err)
 		}
 
 		_, err = buf.Write(blob.RawData())

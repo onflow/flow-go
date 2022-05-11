@@ -31,7 +31,7 @@ type Provider struct {
 	maxBlobSize int
 	serializer  execution_data.Serializer
 	blobService network.BlobService
-	storage     *tracker.Storage
+	storage     tracker.Storage
 }
 
 type ProvideJob struct {
@@ -44,6 +44,7 @@ func NewProvider(
 	metrics module.ExecutionDataProviderMetrics,
 	serializer execution_data.Serializer,
 	blobService network.BlobService,
+	storage tracker.Storage,
 	opts ...ProviderOption,
 ) *Provider {
 	p := &Provider{
@@ -52,6 +53,7 @@ func NewProvider(
 		maxBlobSize: execution_data.DefaultMaxBlobSize,
 		serializer:  serializer,
 		blobService: blobService,
+		storage:     storage,
 	}
 
 	for _, opt := range opts {
@@ -77,15 +79,13 @@ func (p *Provider) storeBlobs(parent context.Context, blockHeight uint64, blobCh
 			totalSize += uint64(len(blob.RawData()))
 		}
 
-		if zerolog.GlobalLevel() <= zerolog.DebugLevel && p.logger.GetLevel() <= zerolog.DebugLevel {
-			cidArr := zerolog.Arr()
-			for _, cid := range cids {
-				cidArr = cidArr.Str(cid.String())
-			}
-			p.logger.Debug().Array("cids", cidArr).Uint64("height", blockHeight).Msg("storing blobs")
+		cidArr := zerolog.Arr()
+		for _, cid := range cids {
+			cidArr = cidArr.Str(cid.String())
 		}
+		p.logger.Debug().Array("cids", cidArr).Uint64("height", blockHeight).Msg("storing blobs")
 
-		err := p.storage.Update(func(trackBlobs func(uint64, ...cid.Cid) error) error {
+		err := p.storage.Update(func(trackBlobs tracker.TrackBlobsFn) error {
 			ctx, cancel := context.WithCancel(parent)
 			defer cancel()
 

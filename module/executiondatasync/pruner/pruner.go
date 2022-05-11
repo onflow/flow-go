@@ -18,7 +18,7 @@ const (
 )
 
 type Pruner struct {
-	storage *tracker.Storage
+	storage tracker.Storage
 
 	fulfilledHeightsIn    chan<- interface{}
 	fulfilledHeightsOut   <-chan interface{}
@@ -50,7 +50,7 @@ func WithThreshold(threshold uint64) PrunerOption {
 	}
 }
 
-func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics, storage *tracker.Storage, opts ...PrunerOption) (*Pruner, error) {
+func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics, storage tracker.Storage, opts ...PrunerOption) (*Pruner, error) {
 	lastPrunedHeight, err := storage.GetPrunedHeight()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pruned height: %w", err)

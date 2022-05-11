@@ -135,6 +135,7 @@ func main() {
 		executionDataDatastore        datastore.Batching
 		executionDataPruner           *pruner.Pruner
 		executionDataBlobstore        blobs.Blobstore
+		executionDataTracker          tracker.Storage
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -387,6 +388,40 @@ func main() {
 
 			return compactor, nil
 		}).
+		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			sealed, err := node.State.Sealed().Head()
+			if err != nil {
+				return nil, fmt.Errorf("cannot get the sealed block: %w", err)
+			}
+
+			trackerDir := filepath.Join(executionDataDir, "tracker")
+			executionDataTracker, err = tracker.OpenStorage(
+				trackerDir,
+				sealed.Height,
+				node.Logger,
+				tracker.WithPruneCallback(func(c cid.Cid) error {
+					// TODO: use a proper context here
+					return executionDataBlobstore.DeleteBlob(context.TODO(), c)
+				}),
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
+			if node.MetricsEnabled {
+				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
+			}
+
+			executionDataPruner, err = pruner.NewPruner(
+				node.Logger,
+				prunerMetrics,
+				executionDataTracker,
+				pruner.WithHeightRangeTarget(65000),
+				pruner.WithThreshold(65000),
+			)
+			return executionDataPruner, err
+		}).
 		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			bs, err := node.Network.RegisterBlobService(engine.ExecutionDataService, executionDataDatastore)
 			if err != nil {
@@ -403,6 +438,7 @@ func main() {
 				providerMetrics,
 				execution_data.DefaultSerializer,
 				bs,
+				executionDataTracker,
 			)
 
 			extraLogPath := path.Join(triedir, "extralogs")
@@ -540,40 +576,6 @@ func main() {
 				node.Storage.Seals,
 			)
 			return checkerEng, nil
-		}).
-		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			sealed, err := node.State.Sealed().Head()
-			if err != nil {
-				return nil, fmt.Errorf("cannot get the sealed block: %w", err)
-			}
-
-			trackerDir := filepath.Join(executionDataDir, "tracker")
-			storage, err := tracker.OpenStorage(
-				trackerDir,
-				sealed.Height,
-				node.Logger,
-				tracker.WithPruneCallback(func(c cid.Cid) error {
-					// TODO: use a proper context here
-					return executionDataBlobstore.DeleteBlob(context.TODO(), c)
-				}),
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
-			if node.MetricsEnabled {
-				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
-			}
-
-			executionDataPruner, err = pruner.NewPruner(
-				node.Logger,
-				prunerMetrics,
-				storage,
-				pruner.WithHeightRangeTarget(65000),
-				pruner.WithThreshold(65000),
-			)
-			return executionDataPruner, err
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,

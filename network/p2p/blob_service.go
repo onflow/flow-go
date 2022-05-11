@@ -112,7 +112,7 @@ func (bs *blobService) TriggerReprovide(ctx context.Context) error {
 func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error) {
 	blob, err := bs.blockService.GetBlock(ctx, c)
 	if err == blockservice.ErrNotFound {
-		return nil, network.ErrNotFound
+		return nil, network.ErrBlobNotFound
 	}
 
 	return blob, err
