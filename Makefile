@@ -1,4 +1,3 @@
-
 # The short Git commit hash
 SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
@@ -66,7 +65,7 @@ install-mock-generators:
 
 .PHONY: install-tools
 install-tools: crypto_setup_tests crypto_setup_gopath check-go-version install-mock-generators
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.41.1; \
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.45.2; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -89,6 +88,10 @@ test: generate-mocks emulator-build unittest
 .PHONY: integration-test
 integration-test: docker-build-flow
 	$(MAKE) -C integration integration-test
+
+# separate integration tests for BFT because they will currently always fail if they're added to regular CI
+.PHONY: integration-test-bft
+integration-test-bft: docker-build-flow docker-build-flow-corrupted
 
 .PHONY: benchmark
 benchmark: docker-build-flow
@@ -220,82 +223,96 @@ docker-ci-integration:
 
 .PHONY: docker-build-collection
 docker-build-collection:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/collection:latest" -t "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-collection-debug
 docker-build-collection-debug:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/collection-debug:latest" -t "$(CONTAINER_REGISTRY)/collection-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-consensus-debug
 docker-build-consensus-debug:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/consensus-debug:latest" -t "$(CONTAINER_REGISTRY)/consensus-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution
 docker-build-execution:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/execution:latest" -t "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution-debug
 docker-build-execution-debug:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/execution-debug:latest" -t "$(CONTAINER_REGISTRY)/execution-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-debug:$(IMAGE_TAG)" .
+
+# build corrupted execution node for BFT testing
+.PHONY: docker-build-execution-corrupted
+docker-build-execution-corrupted:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification
 docker-build-verification:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification-debug
 docker-build-verification-debug:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/verification-debug:latest" -t "$(CONTAINER_REGISTRY)/verification-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-debug:$(IMAGE_TAG)" .
+
+# build corrupted verification node for BFT testing
+.PHONY: docker-build-verification-corrupted
+docker-build-verification-corrupted:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access
 docker-build-access:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access-debug
 docker-build-access-debug:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=access  --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access  --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
 # Observer is currently simply access node, this target is added for compatibility with deployment pipeline
 # Once proper observer is separated in the code, we should just need to change TARGET parameter below
 .PHONY: docker-build-observer
 docker-build-observer:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/observer:latest" -t "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)" .
 
 
 .PHONY: docker-build-ghost
 docker-build-ghost:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=ghost --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/ghost --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/ghost:latest" -t "$(CONTAINER_REGISTRY)/ghost:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-ghost-debug
 docker-build-ghost-debug:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=ghost --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/ghost --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/ghost-debug:latest" -t "$(CONTAINER_REGISTRY)/ghost-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/ghost-debug:$(IMAGE_TAG)" .
 
 PHONY: docker-build-bootstrap
 docker-build-bootstrap:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:latest" -t "$(CONTAINER_REGISTRY)/bootstrap:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap:$(IMAGE_TAG)" .
 
@@ -305,7 +322,7 @@ tool-bootstrap: docker-build-bootstrap
 
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --build-arg GOARCH=$(GOARCH) --no-cache \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --build-arg GOARCH=$(GOARCH) --no-cache \
 	    --target production  \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:latest" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(IMAGE_TAG)" .
 
@@ -315,69 +332,102 @@ tool-transit: docker-build-bootstrap-transit
 
 .PHONY: docker-build-loader
 docker-build-loader:
-	docker build -f ./integration/loader/Dockerfile --build-arg TARGET=loader --target production \
+	docker build -f ./integration/loader/Dockerfile --build-arg TARGET=./cmd/loader --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
 
+.PHONY: docker-build-flow-corrupted
+docker-build-flow-corrupted: docker-build-execution-corrupted docker-build-verification-corrupted
+
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader
 
 .PHONY: docker-push-collection
 docker-push-collection:
-	docker push "$(CONTAINER_REGISTRY)/collection:latest"
 	docker push "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)"
 
+.PHONY: docker-push-collection-latest
+docker-push-collection-latest: docker-push-collection
+	docker push "$(CONTAINER_REGISTRY)/collection:latest"
+
 .PHONY: docker-push-consensus
 docker-push-consensus:
-	docker push "$(CONTAINER_REGISTRY)/consensus:latest"
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)"
 
+.PHONY: docker-push-consensus-latest
+docker-push-consensus-latest: docker-push-consensus
+	docker push "$(CONTAINER_REGISTRY)/consensus:latest"
+
 .PHONY: docker-push-execution
 docker-push-execution:
-	docker push "$(CONTAINER_REGISTRY)/execution:latest"
 	docker push "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)"
 
+.PHONY: docker-push-execution-latest
+docker-push-execution-latest: docker-push-execution
+	docker push "$(CONTAINER_REGISTRY)/execution:latest"
+
 .PHONY: docker-push-verification
 docker-push-verification:
-	docker push "$(CONTAINER_REGISTRY)/verification:latest"
 	docker push "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)"
 
+.PHONY: docker-push-verification-latest
+docker-push-verification-latest: docker-push-verification
+	docker push "$(CONTAINER_REGISTRY)/verification:latest"
+
 .PHONY: docker-push-access
 docker-push-access:
-	docker push "$(CONTAINER_REGISTRY)/access:latest"
 	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
 
+.PHONY: docker-push-access-latest
+docker-push-access-latest: docker-push-access
+	docker push "$(CONTAINER_REGISTRY)/access:latest"
+
 .PHONY: docker-push-observer
 docker-push-observer:
-	docker push "$(CONTAINER_REGISTRY)/observer:latest"
 	docker push "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)"
 
+.PHONY: docker-push-observer-latest
+docker-push-observer-latest: docker-push-observer
+	docker push "$(CONTAINER_REGISTRY)/observer:latest"
+
 .PHONY: docker-push-ghost
 docker-push-ghost:
-	docker push "$(CONTAINER_REGISTRY)/ghost:latest"
 	docker push "$(CONTAINER_REGISTRY)/ghost:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)"
 
+.PHONY: docker-push-ghost-latest
+docker-push-ghost-latest: docker-push-ghost
+	docker push "$(CONTAINER_REGISTRY)/ghost:latest"
+
 .PHONY: docker-push-loader
 docker-push-loader:
-	docker push "$(CONTAINER_REGISTRY)/loader:latest"
 	docker push "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)"
+
+.PHONY: docker-push-loader-latest
+docker-push-loader-latest: docker-push-loader
+	docker push "$(CONTAINER_REGISTRY)/loader:latest"
 
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access docker-push-observer
 
+.PHONY: docker-push-flow-latest
+docker-push-flow-latest: docker-push-collection-latest docker-push-consensus-latest docker-push-execution-latest docker-push-verification-latest docker-push-access-latest docker-push-observer-latest
+
 .PHONY: docker-push-benchnet
 docker-push-benchnet: docker-push-flow docker-push-loader
+
+.PHONY: docker-push-benchnet-latest
+docker-push-benchnet-latest: docker-push-flow-latest docker-push-loader-latest
 
 .PHONY: docker-run-collection
 docker-run-collection:
@@ -408,7 +458,7 @@ docker-all-tools: tool-util tool-remove-execution-fork
 
 PHONY: docker-build-util
 docker-build-util:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=util --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=./cmd/util --build-arg GOARCH=$(GOARCH) --target production \
 		-t "$(CONTAINER_REGISTRY)/util:latest" -t "$(CONTAINER_REGISTRY)/util:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/util:$(IMAGE_TAG)" .
 
 PHONY: tool-util
@@ -417,7 +467,7 @@ tool-util: docker-build-util
 
 PHONY: docker-build-remove-execution-fork
 docker-build-remove-execution-fork:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=util/cmd/remove-execution-fork --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=./cmd/util/cmd/remove-execution-fork --build-arg GOARCH=$(GOARCH) --target production \
 		-t "$(CONTAINER_REGISTRY)/remove-execution-fork:latest" -t "$(CONTAINER_REGISTRY)/remove-execution-fork:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/remove-execution-fork:$(IMAGE_TAG)" .
 
 PHONY: tool-remove-execution-fork

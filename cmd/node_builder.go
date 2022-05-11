@@ -15,6 +15,8 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	"github.com/onflow/flow-go/module/compliance"
+
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
@@ -22,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -54,13 +57,13 @@ type NodeBuilder interface {
 	// InitIDProviders initializes the ID providers needed by various components
 	InitIDProviders()
 
-	// EnqueueNetworkInit enqueues the default network component with the given context
+	// EnqueueNetworkInit enqueues the default networking layer.
 	EnqueueNetworkInit()
 
-	// EnqueueMetricsServerInit enqueues the metrics component
+	// EnqueueMetricsServerInit enqueues the metrics component.
 	EnqueueMetricsServerInit()
 
-	// Enqueues the Tracer component
+	// EnqueueTracer enqueues the Tracer component.
 	EnqueueTracer()
 
 	// Module enables setting up dependencies of the engine with the builder context
@@ -147,10 +150,14 @@ type BaseConfig struct {
 	db                              *badger.DB
 	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize uint32
-	topologyProtocolName            string
-	topologyEdgeProbability         float64
+	TopologyProtocolName            string
+	TopologyEdgeProbability         float64
 	HeroCacheMetricsEnable          bool
 	SyncCoreConfig                  synchronization.Config
+	CodecFactory                    func() network.Codec
+	// ComplianceConfig configures either the compliance engine (consensus nodes)
+	// or the follower engine (all other node roles)
+	ComplianceConfig compliance.Config
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -173,6 +180,7 @@ type NodeConfig struct {
 	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
+	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
@@ -202,6 +210,10 @@ func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
 
+	// NOTE: if the codec used in the network component is ever changed any code relying on
+	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.
+	codecFactory := func() network.Codec { return cbor.NewCodec() }
+
 	return &BaseConfig{
 		nodeIDHex:                       NotSet,
 		AdminAddr:                       NotSet,
@@ -228,9 +240,11 @@ func DefaultBaseConfig() *BaseConfig {
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
 		NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-		topologyProtocolName:            string(topology.TopicBased),
-		topologyEdgeProbability:         topology.MaximumEdgeProbability,
+		TopologyProtocolName:            string(topology.TopicBased),
+		TopologyEdgeProbability:         topology.MaximumEdgeProbability,
 		HeroCacheMetricsEnable:          false,
 		SyncCoreConfig:                  synchronization.DefaultConfig(),
+		CodecFactory:                    codecFactory,
+		ComplianceConfig:                compliance.DefaultConfig(),
 	}
 }

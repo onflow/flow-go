@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -336,6 +337,14 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 
+		t.Run("advise to evict checkpoints from page cache", func(t *testing.T) {
+			logger := zerolog.Nop()
+			evictedFileNames, err := wal.EvictAllCheckpointsFromLinuxPageCache(dir, &logger)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(evictedFileNames))
+			require.Equal(t, path.Join(dir, "checkpoint.00000010"), evictedFileNames[0])
+		})
+
 		t.Run("corrupted checkpoints are skipped", func(t *testing.T) {
 
 			f6, err := mtrie.NewForest(size*10, metricsCollector, nil)
@@ -418,6 +427,7 @@ func Test_Checkpointing(t *testing.T) {
 			}
 
 		})
+
 	})
 }
 
@@ -534,7 +544,8 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 		file.Close()
 
 		t.Run("works without data modification", func(t *testing.T) {
-			tries, err := realWAL.LoadCheckpoint(filepath)
+			logger := zerolog.Nop()
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(tries))
 			require.Equal(t, updatedTrie, tries[0])
@@ -551,7 +562,8 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 			err = os.WriteFile(filepath, b, 0644)
 			require.NoError(t, err)
 
-			tries, err := realWAL.LoadCheckpoint(filepath)
+			logger := zerolog.Nop()
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
 			require.Error(t, err)
 			require.Nil(t, tries)
 			require.Contains(t, err.Error(), "checksum")

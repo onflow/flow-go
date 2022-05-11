@@ -99,7 +99,7 @@ ctx_t* relic_init_BLS12_381() {
     if (ALLOC != AUTO) return NULL;
 
     // initialize relic core with a new context
-    ctx_t* bls_ctx = (ctx_t*) malloc(sizeof(ctx_t));
+    ctx_t* bls_ctx = (ctx_t*) calloc(1, sizeof(ctx_t));
     core_set(bls_ctx);
     if (core_init() != RLC_OK) return NULL;
 
