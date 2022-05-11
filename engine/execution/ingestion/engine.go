@@ -190,7 +190,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
+func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot, maxBlocks int) ([]flow.Identifier, error) {
 	// get finalized height
 	final, err := finalized.Head()
 	if err != nil {
@@ -243,12 +243,15 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 		}
 
 		unexecuted = append(unexecuted, header.ID())
+		if len(unexecuted) >= maxBlocks {
+			return unexecuted, nil
+		}
 	}
 
 	return unexecuted, nil
 }
 
-func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
+func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot, maxBlocks int) ([]flow.Identifier, error) {
 	pendings, err := finalized.ValidDescendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
@@ -264,23 +267,26 @@ func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Id
 
 		if !executed {
 			unexecuted = append(unexecuted, pending)
+			if len(unexecuted) >= maxBlocks {
+				return unexecuted, nil
+			}
 		}
 	}
 
 	return unexecuted, nil
 }
 
-func (e *Engine) unexecutedBlocks() (finalized []flow.Identifier, pending []flow.Identifier, err error) {
+func (e *Engine) unexecutedBlocks(maxBlocks int) (finalized []flow.Identifier, pending []flow.Identifier, err error) {
 	// pin the snapshot so that finalizedUnexecutedBlocks and pendingUnexecutedBlocks are based
 	// on the same snapshot.
 	snapshot := e.state.Final()
 
-	finalized, err = e.finalizedUnexecutedBlocks(snapshot)
+	finalized, err = e.finalizedUnexecutedBlocks(snapshot, maxBlocks)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not read finalized unexecuted blocks")
 	}
 
-	pending, err = e.pendingUnexecutedBlocks(snapshot)
+	pending, err = e.pendingUnexecutedBlocks(snapshot, maxBlocks-len(finalized))
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not read pending unexecuted blocks")
 	}
@@ -346,30 +352,39 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 			}
 		}
 
-		finalized, pending, err := e.unexecutedBlocks()
-		if err != nil {
-			return fmt.Errorf("could not reload unexecuted blocks: %w", err)
-		}
-
-		unexecuted := append(finalized, pending...)
-
-		log := e.log.With().
-			Int("total", len(unexecuted)).
-			Int("finalized", len(finalized)).
-			Int("pending", len(pending)).
-			Uint64("last_executed", lastExecutedHeight).
-			Hex("last_executed_id", lastExecutedID[:]).
-			Logger()
-
-		log.Info().Msg("reloading unexecuted blocks")
-
-		for _, blockID := range unexecuted {
-			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
+		for {
+			const reloadBlocksChunk = 100_000
+			finalized, pending, err := e.unexecutedBlocks(reloadBlocksChunk)
 			if err != nil {
-				return fmt.Errorf("could not reload block: %v, %w", blockID, err)
+				return fmt.Errorf("could not reload unexecuted blocks: %w", err)
 			}
 
-			e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
+			unexecuted := append(finalized, pending...)
+
+			log := e.log.With().
+				Int("total", len(unexecuted)).
+				Int("finalized", len(finalized)).
+				Int("pending", len(pending)).
+				Uint64("last_executed", lastExecutedHeight).
+				Hex("last_executed_id", lastExecutedID[:]).
+				Logger()
+
+			log.Info().Msg("reloading unexecuted blocks")
+
+			for _, blockID := range unexecuted {
+				err := e.reloadBlock(blockByCollection, executionQueues, blockID)
+				if err != nil {
+					return fmt.Errorf("could not reload block: %v, %w", blockID, err)
+				}
+
+				e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
+			}
+
+			if len(finalized) == 0 && len(pending) == 0 {
+				break
+			}
+			log.Info().Msgf("reloaded unexecuted blocks chunk of %d", len(finalized)+len(pending))
+
 		}
 
 		log.Info().Msg("all unexecuted have been successfully reloaded")
