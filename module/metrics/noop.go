@@ -143,6 +143,7 @@ func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)           
 func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)                       {}
 func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                               {}
 func (nc *NoopCollector) ExecuteScriptRTT(dur time.Duration, size int)                          {}
+func (nc *NoopCollector) GetTransactionResultRTT(dur time.Duration, size int)                   {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)             {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)              {}

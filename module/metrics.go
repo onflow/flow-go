@@ -408,6 +408,9 @@ type BackendScriptsMetrics interface {
 type TransactionMetrics interface {
 	BackendScriptsMetrics
 
+	// Record the round trip time while getting a transaction result
+	GetTransactionResultRTT(dur time.Duration, size int)
+
 	// TransactionReceived starts tracking of transaction execution/finalization/sealing
 	TransactionReceived(txID flow.Identifier, when time.Time)
 

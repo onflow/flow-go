@@ -19,6 +19,11 @@ func (_m *TransactionMetrics) ExecuteScriptRTT(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
+// GetTransactionResultRTT provides a mock function with given fields: dur, size
+func (_m *TransactionMetrics) GetTransactionResultRTT(dur time.Duration, size int) {
+	_m.Called(dur, size)
+}
+
 // TransactionExecuted provides a mock function with given fields: txID, when
 func (_m *TransactionMetrics) TransactionExecuted(txID flow.Identifier, when time.Time) {
 	_m.Called(txID, when)
