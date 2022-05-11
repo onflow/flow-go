@@ -252,6 +252,9 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot, maxBlock
 }
 
 func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot, maxBlocks int) ([]flow.Identifier, error) {
+	if maxBlocks == 0 {
+		return []flow.Identifier{}, nil  
+	}
 	pendings, err := finalized.ValidDescendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
