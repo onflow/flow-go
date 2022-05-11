@@ -78,8 +78,6 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 		}
 	}
 
-	proc.MemoryUsed = uint64(st.State().TotalMemoryUsed())
-
 	return nil
 }
 
