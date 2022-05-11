@@ -99,7 +99,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	test(1, 0)                                   // small execution data (single level blob tree)
-	test(1, 5*execution_data.DefaultMaxBlobSize) // large execution data (multi level blob tree)
+	test(5, 5*execution_data.DefaultMaxBlobSize) // large execution data (multi level blob tree)
 }
 
 type randomSerializer struct{}

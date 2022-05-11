@@ -5,11 +5,13 @@ import (
 	"context"
 	"crypto/rand"
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	goassert "gotest.tools/assert"
@@ -21,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,17 +36,18 @@ func getExecutionDataStore(ds datastore.Batching) execution_data.ExecutionDataSt
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }
 
-func getProvider(ds datastore.Batching) *provider.Provider {
+func getBlobservice(ds datastore.Batching) network.BlobService {
 	blobstore := blobs.NewBlobstore(ds)
-
 	blobService := new(mocknetwork.BlobService)
 	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(blobstore.PutMany)
+	return blobService
+}
 
+func getProvider(blobService network.BlobService) *provider.Provider {
 	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.AnythingOfType("UpdateFn")).Run(func(args mock.Arguments) {
-		fn := args.Get(0).(tracker.UpdateFn)
-		fn(func(uint64, ...cid.Cid) error { return nil })
-	}).Return(nil)
+	trackerStorage.On("Update", mock.AnythingOfType("UpdateFn")).Return(func(fn tracker.UpdateFn) error {
+		return fn(func(uint64, ...cid.Cid) error { return nil })
+	})
 
 	return provider.NewProvider(
 		zerolog.Nop(),
@@ -100,7 +104,7 @@ func TestHappyPath(t *testing.T) {
 	t.Parallel()
 
 	ds := getDatastore()
-	provider := getProvider(ds)
+	provider := getProvider(getBlobservice(ds))
 	store := getExecutionDataStore(ds)
 
 	test := func(numChunks int, minSerializedSizePerChunk uint64) {
@@ -116,5 +120,32 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	test(1, 0)                                   // small execution data (single level blob tree)
-	test(1, 5*execution_data.DefaultMaxBlobSize) // large execution data (multi level blob tree)
+	test(5, 5*execution_data.DefaultMaxBlobSize) // large execution data (multi level blob tree)
+}
+
+func TestProvideContextCanceled(t *testing.T) {
+	t.Parallel()
+
+	bed := generateBlockExecutionData(t, 5, 5*execution_data.DefaultMaxBlobSize)
+
+	provider := getProvider(getBlobservice(getDatastore()))
+	job, err := provider.Provide(context.Background(), 0, bed)
+	require.NoError(t, err)
+	expectedID := job.ExecutionDataID
+
+	blobService := new(mocknetwork.BlobService)
+	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).
+		Return(func(ctx context.Context, blobs []blobs.Blob) error {
+			<-ctx.Done()
+			return ctx.Err()
+		})
+	provider = getProvider(blobService)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	job, err = provider.Provide(ctx, 0, bed)
+	require.NoError(t, err)
+	assert.Equal(t, expectedID, job.ExecutionDataID)
+	err, ok := <-job.Done
+	assert.True(t, ok)
+	assert.ErrorIs(t, err, ctx.Err())
 }
