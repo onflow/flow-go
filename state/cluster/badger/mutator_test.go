@@ -255,6 +255,18 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 	suite.Assert().Error(err)
 }
 
+func (suite *MutatorSuite) TestExtend_DuplicateTxInPayload() {
+	block := suite.Block()
+	// add the same transaction to a payload twice
+	tx := suite.Tx()
+	payload := suite.Payload(&tx, &tx)
+	block.SetPayload(payload)
+
+	// should fail to extend block with invalid payload
+	err := suite.state.Extend(&block)
+	suite.Assert().Error(err)
+}
+
 func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 	// build one block on top of genesis
 	block1 := suite.Block()
