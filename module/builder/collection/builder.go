@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -315,18 +316,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 // building on top of) and ends with the oldest unfinalized block in the ancestry.
 func (b *Builder) populateUnfinalizedAncestryLookup(parentID flow.Identifier, finalHeight uint64, lookup *transactionLookup, limiter *rateLimiter) error {
 
-	ancestorID := parentID
-	for {
-		ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor header: %w", err)
-		}
-
-		if ancestor.Height <= finalHeight {
-			break
-		}
-
-		payload, err := b.payloads.ByBlockID(ancestorID)
+	err := fork.TraverseBackward(b.clusterHeaders, parentID, func(ancestor *flow.Header) error {
+		payload, err := b.payloads.ByBlockID(ancestor.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload: %w", err)
 		}
@@ -335,10 +326,10 @@ func (b *Builder) populateUnfinalizedAncestryLookup(parentID flow.Identifier, fi
 			lookup.addUnfinalizedAncestor(tx.ID())
 			limiter.addAncestor(ancestor.Height, tx)
 		}
-		ancestorID = ancestor.ParentID
-	}
+		return nil
+	}, fork.ExcludingHeight(finalHeight))
 
-	return nil
+	return err
 }
 
 // populateFinalizedAncestryLookup traverses the reference block height index to
