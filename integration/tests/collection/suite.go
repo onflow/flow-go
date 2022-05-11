@@ -96,7 +96,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	// instantiate the network
 	nodes = append(nodes, colNodes...)
 	conf := testnet.NewNetworkConfig(name, nodes, testnet.WithClusters(nClusters))
-	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
+	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf, flow.Localnet)
 
 	// start the network
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())

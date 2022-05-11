@@ -49,7 +49,7 @@ func TestNetwork(t *testing.T) {
 
 	conf := testnet.NewNetworkConfig("network_test", nodes)
 
-	net := testnet.PrepareFlowNetwork(t, conf)
+	net := testnet.PrepareFlowNetwork(t, conf, flow.Localnet)
 
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())

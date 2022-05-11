@@ -557,7 +557,7 @@ func integrationBootstrapDir() (string, error) {
 	return ioutil.TempDir(TmpRoot, integrationBootstrap)
 }
 
-func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
+func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.ChainID) *FlowNetwork {
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 
@@ -588,7 +588,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
-	root, result, seal, confs, bootstrapSnapshot, err := BootstrapNetwork(networkConf, bootstrapDir)
+	root, result, seal, confs, bootstrapSnapshot, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
 	require.Nil(t, err)
 
 	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
@@ -1014,8 +1014,14 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	return nodeInfos, nil
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, *inmem.Snapshot, error) {
-	chainID := flow.Localnet
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID flow.ChainID) (
+	*flow.Block,
+	*flow.ExecutionResult,
+	*flow.Seal,
+	[]ContainerConfig,
+	*inmem.Snapshot,
+	error) {
+
 	chain := chainID.Chain()
 
 	// number of nodes

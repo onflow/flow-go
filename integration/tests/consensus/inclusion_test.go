@@ -84,7 +84,7 @@ func (is *InclusionSuite) SetupTest() {
 	netConfig := testnet.NewNetworkConfig("consensus_collection_guarantee_inclusion", nodeConfigs)
 
 	// initialize the network
-	is.net = testnet.PrepareFlowNetwork(is.T(), netConfig)
+	is.net = testnet.PrepareFlowNetwork(is.T(), netConfig, flow.Localnet)
 
 	// start the network
 	ctx, cancel := context.WithCancel(context.Background())

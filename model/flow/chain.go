@@ -41,7 +41,7 @@ const (
 
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {
-	return c == Emulator || c == Localnet || c == Benchnet
+	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet
 }
 
 // getChainCodeWord derives the network type used for address generation from the globally
@@ -52,7 +52,7 @@ func (c ChainID) getChainCodeWord() uint64 {
 		return 0
 	case Testnet, Canary:
 		return invalidCodeTestNetwork
-	case Emulator, Localnet, Benchnet:
+	case Emulator, Localnet, Benchnet, BftTestnet:
 		return invalidCodeTransientNetwork
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid or does not support linear code address generation", c))
@@ -167,6 +167,12 @@ var testnet = &addressedChain{
 	},
 }
 
+var bftTestNet = &addressedChain{
+	chainImpl: &linearCodeImpl{
+		chainID: BftTestnet,
+	},
+}
+
 var canary = &addressedChain{
 	chainImpl: &linearCodeImpl{
 		chainID: Canary,
@@ -212,6 +218,8 @@ func (c ChainID) Chain() Chain {
 		return emulator
 	case MonotonicEmulator:
 		return monotonicEmulator
+	case BftTestnet:
+		return bftTestNet
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid ", c))
 	}

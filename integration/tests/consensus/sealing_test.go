@@ -114,7 +114,7 @@ func (ss *SealingSuite) SetupTest() {
 	netConfig := testnet.NewNetworkConfig("consensus_execution_state_sealing", nodeConfigs)
 
 	// initialize the network
-	ss.net = testnet.PrepareFlowNetwork(ss.T(), netConfig)
+	ss.net = testnet.PrepareFlowNetwork(ss.T(), netConfig, flow.Localnet)
 
 	keys, err := ss.net.ContainerByID(ss.exeID).Config.NodeInfo.PrivateKeys()
 	require.NoError(ss.T(), err)

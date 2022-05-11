@@ -37,7 +37,17 @@ func (cnb *CorruptedNodeBuilder) Initialize() error {
 
 func (cnb *CorruptedNodeBuilder) enqueueCorruptibleConduitFactory() {
 	cnb.FlowNodeBuilder.OverrideComponent(cmd.ConduitFactoryComponent, func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		address := net.JoinHostPort(node.Me.Address(), strconv.Itoa(CorruptibleConduitFactoryPort))
+		myAddr := cnb.FlowNodeBuilder.NodeConfig.Me.Address()
+		if cnb.FlowNodeBuilder.BaseConfig.BindAddr != cmd.NotSet {
+			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
+		}
+
+		host, _, err := net.SplitHostPort(myAddr)
+		if err != nil {
+			return nil, fmt.Errorf("could not extract host address: %w", err)
+		}
+
+		address := net.JoinHostPort(host, strconv.Itoa(CorruptibleConduitFactoryPort))
 
 		ccf := corruptible.NewCorruptibleConduitFactory(
 			cnb.FlowNodeBuilder.Logger,

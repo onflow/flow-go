@@ -90,7 +90,7 @@ func init() {
 func generateBootstrapData(flowNetworkConf testnet.NetworkConfig) []testnet.ContainerConfig {
 	// Prepare localnet host folders, mapped to Docker container volumes upon `docker compose up`
 	prepareCommonHostFolders()
-	_, _, _, flowNodeContainerConfigs, _, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir)
+	_, _, _, flowNodeContainerConfigs, _, err := testnet.BootstrapNetwork(flowNetworkConf, BootstrapDir, flow.Localnet)
 	if err != nil {
 		panic(err)
 	}

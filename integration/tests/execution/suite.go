@@ -116,7 +116,7 @@ func (s *Suite) SetupTest() {
 	)
 
 	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
 
 	// start the network
 	ctx, cancel := context.WithCancel(context.Background())

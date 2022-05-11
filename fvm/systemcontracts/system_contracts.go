@@ -187,5 +187,6 @@ func init() {
 	}
 	contractAddressesByChainID[flow.Emulator] = transient
 	contractAddressesByChainID[flow.Localnet] = transient
+	contractAddressesByChainID[flow.BftTestnet] = transient
 	contractAddressesByChainID[flow.Benchnet] = transient
 }

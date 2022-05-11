@@ -146,7 +146,7 @@ func (s *Suite) SetupSuite() {
 		testnet.WithViewsInEpoch(100_000),
 	)
 
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
