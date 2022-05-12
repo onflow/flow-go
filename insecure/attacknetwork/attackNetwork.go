@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const networkingProtocolTCP = "tcp"
@@ -87,7 +86,12 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 	}
 	a.server = s
 	a.address = ln.Addr()
-	a.corruptedConnector.WithAttackerAddress(ln.Addr().String())
+	_, port, err := net.SplitHostPort(a.address.String())
+	if err != nil {
+		panic(err)
+	}
+	a.corruptedConnector.WithAttackerAddress(net.JoinHostPort("host.docker.internal", port))
+	a.logger.Info().Str("attacker_address", a.address.String()).Msg("attacker address")
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -101,15 +105,15 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 	// waits till gRPC server starts serving.
 	wg.Wait()
 
-	// creates a connection to all corrupted nodes in the attack network.
-	for _, corruptedNodeId := range a.corruptedNodeIds {
-		connection, err := a.corruptedConnector.Connect(ctx, corruptedNodeId.NodeID)
-		if err != nil {
-			return fmt.Errorf("could not establish corruptible connection to node %x: %w", corruptedNodeId.NodeID, err)
-		}
-		a.corruptedConnections[corruptedNodeId.NodeID] = connection
-		a.logger.Info().Hex("node_id", logging.ID(corruptedNodeId.NodeID)).Msg("attacker successfully registered on corrupted node")
-	}
+	//// creates a connection to all corrupted nodes in the attack network.
+	//for _, corruptedNodeId := range a.corruptedNodeIds {
+	//	connection, err := a.corruptedConnector.Connect(ctx, corruptedNodeId.NodeID)
+	//	if err != nil {
+	//		return fmt.Errorf("could not establish corruptible connection to node %x: %w", corruptedNodeId.NodeID, err)
+	//	}
+	//	a.corruptedConnections[corruptedNodeId.NodeID] = connection
+	//	a.logger.Info().Hex("node_id", logging.ID(corruptedNodeId.NodeID)).Msg("attacker successfully registered on corrupted node")
+	//}
 
 	// registers attack network for orchestrator.
 	a.orchestrator.WithAttackNetwork(a)
