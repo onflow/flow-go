@@ -351,7 +351,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Int("seals_count", len(payload.Seals)).
 		Int("receipts_count", len(payload.Receipts)).
 		Time("timestamp", header.Timestamp).
-		Hex("proposer", header.ProposerID[:]).
 		Hex("signers", header.ParentVoterIndices).
 		Dur("delay", delay).
 		Logger()

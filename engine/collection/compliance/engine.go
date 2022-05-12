@@ -359,20 +359,25 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
-	log := e.log.With().
-		Hex("block_id", logging.ID(header.ID())).
-		Uint64("block_height", header.Height).
-		Logger()
-
-	log.Debug().Msg("preparing to broadcast proposal from hotstuff")
-
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByBlockID(header.ID())
 	if err != nil {
 		return fmt.Errorf("could not get payload for block: %w", err)
 	}
 
-	log = log.With().Int("collection_size", payload.Collection.Len()).Logger()
+	log := e.log.With().
+		Str("chain_id", header.ChainID.String()).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.ID(header.ID())).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("ref_block", payload.ReferenceBlockID[:]).
+		Int("transaction_count", payload.Collection.Len()).
+		Hex("signers", header.ParentVoterIndices).
+		Dur("delay", delay).
+		Logger()
+
+	log.Debug().Msg("processing cluster broadcast request from hotstuff")
 
 	// retrieve all collection nodes in our cluster
 	recipients, err := e.state.Final().Identities(filter.And(
@@ -402,9 +407,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			return
 		}
 
-		log.Debug().
-			Str("recipients", fmt.Sprintf("%v", recipients.NodeIDs())).
-			Msg("broadcast proposal from hotstuff")
+		log.Info().Msg("cluster proposal proposed")
 
 		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		block := &cluster.Block{
