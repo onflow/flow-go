@@ -197,6 +197,14 @@ func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
 	return proposal
 }
 
+func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
+	proposal := &messages.ClusterBlockProposal{
+		Header:  block.Header,
+		Payload: block.Payload,
+	}
+	return proposal
+}
+
 func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
 	pending := flow.PendingBlock{
 		OriginID: block.Header.ProposerID,
@@ -400,15 +408,21 @@ func CidFixture() cid.Cid {
 	return blocks.NewBlock(data).Cid()
 }
 
-func BlockHeaderFixtureOnChain(chainID flow.ChainID) flow.Header {
-	height := uint64(rand.Uint32())
+func BlockHeaderFixtureOnChain(chainID flow.ChainID, opts ...func(header *flow.Header)) flow.Header {
+	height := 1 + uint64(rand.Uint32()) // avoiding edge case of height = 0 (genesis block)
 	view := height + uint64(rand.Intn(1000))
-	return BlockHeaderWithParentFixture(&flow.Header{
+	header := BlockHeaderWithParentFixture(&flow.Header{
 		ChainID:  chainID,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,
 	})
+
+	for _, opt := range opts {
+		opt(&header)
+	}
+
+	return header
 }
 
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
@@ -595,10 +609,11 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	return executableBlock
 }
 
-func ExecutableBlockFromTransactions(txss [][]*flow.TransactionBody) *entity.ExecutableBlock {
+func ExecutableBlockFromTransactions(chain flow.ChainID, txss [][]*flow.TransactionBody) *entity.ExecutableBlock {
 
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(txss))
-	block := BlockFixture()
+	blockHeader := BlockHeaderFixtureOnChain(chain)
+	block := *BlockWithParentFixture(&blockHeader)
 	block.Payload.Guarantees = nil
 
 	for _, txs := range txss {
@@ -1009,9 +1024,11 @@ func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
 		flow.RoleExecution:    {},
 		flow.RoleVerification: {},
 	}
+	// don't add identities for roles that already exist
 	for _, identity := range identities {
 		delete(required, identity.Role)
 	}
+	// add identities for missing roles
 	for role := range required {
 		identities = append(identities, IdentityFixture(WithRole(role)))
 	}
@@ -1871,7 +1888,6 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 // DKGMessageFixture creates a single DKG message with random fields
 func DKGMessageFixture() *messages.DKGMessage {
 	return &messages.DKGMessage{
-		Orig:          uint64(rand.Int()),
 		Data:          RandomBytes(10),
 		DKGInstanceID: fmt.Sprintf("test-dkg-instance-%d", uint64(rand.Int())),
 	}
@@ -1880,8 +1896,10 @@ func DKGMessageFixture() *messages.DKGMessage {
 // DKGBroadcastMessageFixture creates a single DKG broadcast message with random fields
 func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	return &messages.BroadcastDKGMessage{
-		DKGMessage: *DKGMessageFixture(),
-		Signature:  SignatureFixture(),
+		DKGMessage:           *DKGMessageFixture(),
+		CommitteeMemberIndex: uint64(rand.Int()),
+		NodeID:               IdentifierFixture(),
+		Signature:            SignatureFixture(),
 	}
 }
 
@@ -1949,4 +1967,16 @@ func MachineAccountFixture(t *testing.T) (bootstrap.NodeMachineAccountInfo, *sdk
 		},
 	}
 	return info, acct
+}
+
+func TransactionResultsFixture(n int) []flow.TransactionResult {
+	results := make([]flow.TransactionResult, 0, n)
+	for i := 0; i < n; i++ {
+		results = append(results, flow.TransactionResult{
+			TransactionID:   IdentifierFixture(),
+			ErrorMessage:    "whatever",
+			ComputationUsed: uint64(rand.Uint32()),
+		})
+	}
+	return results
 }

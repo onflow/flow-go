@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -18,7 +18,7 @@ import (
 type Suite struct {
 	suite.Suite
 	log zerolog.Logger
-	common.TestnetStateTracker
+	lib.TestnetStateTracker
 	cancel      context.CancelFunc
 	net         *testnet.FlowNetwork
 	nodeConfigs []testnet.NodeConfig
@@ -30,7 +30,7 @@ type Suite struct {
 
 func (s *Suite) Ghost() *client.GhostClient {
 	ghost := s.net.ContainerByID(s.ghostID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
@@ -64,7 +64,7 @@ func (s *Suite) SetupTest() {
 		Str("testcase", s.T().Name()).
 		Logger()
 	s.log = logger
-	s.log.Info().Msgf("================> SetupTest")
+	s.log.Info().Msg("================> SetupTest")
 
 	blockRateFlag := "--block-rate-delay=1ms"
 
@@ -128,8 +128,8 @@ func (s *Suite) SetupTest() {
 }
 
 func (s *Suite) TearDownTest() {
-	s.log.Info().Msgf("================> Start TearDownTest")
+	s.log.Info().Msg("================> Start TearDownTest")
 	s.net.Remove()
 	s.cancel()
-	s.log.Info().Msgf("================> Finish TearDownTest")
+	s.log.Info().Msg("================> Finish TearDownTest")
 }

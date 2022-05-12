@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	realModule "github.com/onflow/flow-go/module"
 	real "github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -217,7 +218,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByHeight", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return()
 
 	closed := func() <-chan struct{} {
 		channel := make(chan struct{})
@@ -310,6 +311,22 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
+}
+
+func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
+
+	// create a proposal which is far enough ahead to be dropped
+	originID := cs.participants[1].NodeID
+	block := unittest.BlockFixture()
+	block.Header.Height = cs.head.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	proposal := unittest.ProposalFromBlock(&block)
+
+	err := cs.core.OnBlockProposal(originID, proposal)
+	require.NoError(cs.T(), err)
+
+	// block should be dropped - not added to state or cache
+	cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
 
 func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {

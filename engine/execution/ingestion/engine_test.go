@@ -66,6 +66,8 @@ type testingContext struct {
 	identity            *flow.Identity
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 	collectionRequester *module.MockRequester
+
+	mu *sync.Mutex
 }
 
 func runWithEngine(t *testing.T, f func(testingContext)) {
@@ -189,6 +191,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		snapshot:            snapshot,
 		identity:            myIdentity,
 		broadcastedReceipts: make(map[flow.Identifier]*flow.ExecutionReceipt),
+
+		mu: &sync.Mutex{},
 	})
 
 	<-engine.Done()
@@ -202,7 +206,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 	expectBroadcast bool,
 	newStateCommitment flow.StateCommitment,
 	computationResult *execution.ComputationResult) *protocol.Snapshot {
-
 	if computationResult == nil {
 		computationResult = executionUnittest.ComputationResultForBlockFixture(executableBlock)
 	}
@@ -253,12 +256,12 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 
 	mocked.RunFn =
 		func(args mock.Arguments) {
-			//lock.Lock()
-			//defer lock.Unlock()
-
 			blockID := args[1].(*flow.Header).ID()
 			commit := args[2].(flow.StateCommitment)
+
+			ctx.mu.Lock()
 			commits[blockID] = commit
+			ctx.mu.Unlock()
 			onPersisted(blockID, commit)
 		}
 
@@ -303,7 +306,9 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 				assert.True(ctx.t, valid)
 			}
 
+			ctx.mu.Lock()
 			ctx.broadcastedReceipts[receipt.ExecutionResult.BlockID] = receipt
+			ctx.mu.Unlock()
 		}).
 		Return(nil)
 
@@ -334,25 +339,20 @@ func (ctx *testingContext) stateCommitmentExist(blockID flow.Identifier, commit 
 }
 
 func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]flow.StateCommitment) {
-	lock := sync.Mutex{}
+	mocked := ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything)
+	// https://github.com/stretchr/testify/issues/350#issuecomment-570478958
+	mocked.RunFn = func(args mock.Arguments) {
 
-	{
-		mocked := ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything)
-		// https://github.com/stretchr/testify/issues/350#issuecomment-570478958
-		mocked.RunFn = func(args mock.Arguments) {
-			// prevent concurrency issue
-			lock.Lock()
-			defer lock.Unlock()
-
-			blockID := args[1].(flow.Identifier)
-			commit, ok := commits[blockID]
-			if ok {
-				mocked.ReturnArguments = mock.Arguments{commit, nil}
-				return
-			}
-
-			mocked.ReturnArguments = mock.Arguments{flow.StateCommitment{}, storageerr.ErrNotFound}
+		blockID := args[1].(flow.Identifier)
+		ctx.mu.Lock()
+		commit, ok := commits[blockID]
+		ctx.mu.Unlock()
+		if ok {
+			mocked.ReturnArguments = mock.Arguments{commit, nil}
+			return
 		}
+
+		mocked.ReturnArguments = mock.Arguments{flow.StateCommitment{}, storageerr.ErrNotFound}
 	}
 }
 
@@ -573,7 +573,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 
 	runWithEngine(t, func(ctx testingContext) {
 
@@ -946,7 +946,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 
 		// Successful call to computation manager
 		ctx.computationManager.
-			On("ExecuteScript", script, [][]byte(nil), blockA.Block.Header, view).
+			On("ExecuteScript", mock.Anything, script, [][]byte(nil), blockA.Block.Header, view).
 			Return(scriptResult, nil)
 
 		// Execute our script and expect no error

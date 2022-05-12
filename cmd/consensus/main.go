@@ -47,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	chmodule "github.com/onflow/flow-go/module/chunks"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -338,7 +339,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			syncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("finalization distributor", func(node *cmd.NodeConfig) error {
@@ -572,20 +573,25 @@ func main() {
 			validator := consensus.NewValidator(mainMetrics, committee, forks)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
-			aggregator, err := consensus.NewVoteAggregator(node.Logger, lowestViewForVoteProcessing, notifier, voteProcessorFactory)
+			aggregator, err := consensus.NewVoteAggregator(node.Logger,
+				lowestViewForVoteProcessing,
+				notifier,
+				voteProcessorFactory,
+				finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
 			hotstuffModules = &consensus.HotstuffModules{
-				Notifier:             notifier,
-				Committee:            committee,
-				Signer:               signer,
-				Persist:              persist,
-				QCCreatedDistributor: qcDistributor,
-				Forks:                forks,
-				Validator:            validator,
-				Aggregator:           aggregator,
+				Notifier:                notifier,
+				Committee:               committee,
+				Signer:                  signer,
+				Persist:                 persist,
+				QCCreatedDistributor:    qcDistributor,
+				FinalizationDistributor: finalizationDistributor,
+				Forks:                   forks,
+				Validator:               validator,
+				Aggregator:              aggregator,
 			}
 
 			return aggregator, nil
@@ -652,13 +658,21 @@ func main() {
 				mutableState,
 				proposals,
 				syncCore,
-				hotstuffModules.Aggregator)
+				hotstuffModules.Aggregator,
+				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
 			}
 
 			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, complianceCore)
+			comp, err = compliance.NewEngine(
+				node.Logger,
+				node.Network,
+				node.Me,
+				prov,
+				complianceCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -679,6 +693,7 @@ func main() {
 			}
 
 			comp = comp.WithConsensus(hot)
+			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
 			return comp, nil
 		}).
 		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -789,7 +804,7 @@ func loadBeaconPrivateKey(dir string, myID flow.Identifier) (*encodable.RandomBe
 }
 
 // createDKGContractClient creates an dkgContractClient
-func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.DKGContractClient, error) {
+func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.DKGContractClient, error) {
 	var dkgClient module.DKGContractClient
 
 	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
@@ -809,6 +824,7 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 	dkgClient = dkgmodule.NewClient(
 		node.Logger,
 		flowClient,
+		anID,
 		txSigner,
 		dkgContractAddress,
 		machineAccountInfo.Address,
@@ -829,7 +845,7 @@ func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstra
 		}
 
 		node.Logger.Info().Msgf("created dkg contract client with opts: %s", opt.String())
-		dkgClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
+		dkgClient, err := createDKGContractClient(node, machineAccountInfo, flowClient, opt.AccessNodeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dkg contract client with flow client options: %s %w", flowClientOpts, err)
 		}

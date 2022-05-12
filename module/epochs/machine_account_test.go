@@ -178,3 +178,29 @@ func TestMachineAccountChecking(t *testing.T) {
 		})
 	})
 }
+
+// TestBackoff tests the backoff config behaves as expected. In particular, once
+// we reach the cap duration, all future backoffs should be equal to the cap duration.
+func TestMachineAccountValidatorBackoff_Overflow(t *testing.T) {
+
+	backoff := checkMachineAccountRetryBackoff()
+
+	// once the backoff reaches the maximum, it should remain in [(1-jitter)*max,(1+jitter*max)]
+	max := checkMachineAccountRetryMax + checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
+	min := checkMachineAccountRetryMax - checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
+
+	lastWait, stop := backoff.Next()
+	assert.False(t, stop)
+	for i := 0; i < 100; i++ {
+		wait, stop := backoff.Next()
+		assert.False(t, stop)
+		// the backoff value should either:
+		// * strictly increase, or
+		// * be within range of max duration + jitter
+		if wait < lastWait {
+			assert.Less(t, min, wait)
+			assert.Less(t, wait, max)
+		}
+		lastWait = wait
+	}
+}

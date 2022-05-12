@@ -4,6 +4,7 @@ on:
   push:
     tags: 
       - '*'
+      - "!daily-*"
 
 jobs:
   docker-push:
@@ -17,7 +18,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic
-      run: make crypto/relic/build
+      run: make crypto_setup_gopath
     # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
     # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
     - name: Docker login

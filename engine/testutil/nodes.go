@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -11,12 +12,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
@@ -55,6 +57,7 @@ import (
 	"github.com/onflow/flow-go/module/chunks"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
@@ -149,10 +152,14 @@ func GenericNodeWithStateFixture(t testing.TB,
 	chainID flow.ChainID) testmock.GenericNode {
 
 	me := LocalFixture(t, identity)
-	net, err := stub.NewNetwork(stateFixture.State, me, hub)
-	require.NoError(t, err)
+	net := stub.NewNetwork(t, identity.NodeID, hub)
+
+	parentCtx, cancel := context.WithCancel(context.Background())
+	ctx, _ := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
+		Ctx:            ctx,
+		Cancel:         cancel,
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
@@ -236,12 +243,15 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	node.Me, err = local.New(identity.Identity(), privKeys.StakingKey)
 	require.NoError(t, err)
 
-	pools := epochs.NewTransactionPools(func() mempool.Transactions { return herocache.NewTransactions(1000, node.Log) })
+	pools := epochs.NewTransactionPools(
+		func(_ uint64) mempool.Transactions {
+			return herocache.NewTransactions(1000, node.Log, metrics.NewNoopCollector())
+		})
 	transactions := storage.NewTransactions(node.Metrics, node.PublicDB)
 	collections := storage.NewCollections(node.PublicDB, transactions)
 	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.PublicDB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
 
 	selector := filter.HasRole(flow.RoleAccess, flow.RoleVerification)
@@ -511,7 +521,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
@@ -558,6 +568,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultProgramsCacheSize,
 		committer,
 		computation.DefaultScriptLogThreshold,
+		computation.DefaultScriptExecutionTimeLimit,
 		nil,
 		eds,
 		edCache,

@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 
 	"github.com/onflow/flow-go-sdk/client"
@@ -26,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	"github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
+	"github.com/onflow/flow-go/engine/collection/rpc"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
@@ -37,7 +39,6 @@ import (
 	builder "github.com/onflow/flow-go/module/builder/collection"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/ingress"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
@@ -68,9 +69,10 @@ func main() {
 		startupTimeString                      string
 		startupTime                            time.Time
 
-		followerState protocol.MutableState
-		ingestConf    ingest.Config
-		ingressConf   ingress.Config
+		followerState           protocol.MutableState
+		ingestConf              = ingest.DefaultConfig()
+		rpcConf                 rpc.Config
+		clusterComplianceConfig modulecompliance.Config
 
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
@@ -93,11 +95,11 @@ func main() {
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
-		flags.UintVar(&txLimit, "tx-limit", 50000,
+		flags.UintVar(&txLimit, "tx-limit", 50_000,
 			"maximum number of transactions in the memory pool")
-		flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
+		flags.StringVarP(&rpcConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 			"the address the ingress server listens on")
-		flags.BoolVar(&ingressConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
+		flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
 			"whether to enable the rpc metrics")
 		flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
 			"maximum per-transaction computation limit (gas limit)")
@@ -140,6 +142,8 @@ func main() {
 			"additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
+		flags.Uint64Var(&clusterComplianceConfig.SkipNewProposalsThreshold,
+			"cluster-compliance-skip-proposals-threshold", modulecompliance.DefaultConfig().SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height (cluster compliance engine)")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
 
 		// epoch qc contract flags
@@ -181,7 +185,17 @@ func main() {
 			return err
 		}).
 		Module("transactions mempool", func(node *cmd.NodeConfig) error {
-			create := func() mempool.Transactions { return herocache.NewTransactions(uint32(txLimit), node.Logger) }
+			create := func(epoch uint64) mempool.Transactions {
+				var heroCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+				if node.BaseConfig.HeroCacheMetricsEnable {
+					heroCacheMetricsCollector = metrics.CollectionNodeTransactionsCacheMetrics(node.MetricsRegisterer, epoch)
+				}
+				return herocache.NewTransactions(
+					uint32(txLimit),
+					node.Logger,
+					heroCacheMetricsCollector)
+			}
+
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
@@ -195,7 +209,7 @@ func main() {
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			mainChainSyncCore, err = synchronization.New(node.Logger, node.SyncCoreConfig)
 			return err
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -296,6 +310,7 @@ func main() {
 				followerCore,
 				mainChainSyncCore,
 				node.Tracer,
+				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -337,6 +352,7 @@ func main() {
 				node.Network,
 				node.State,
 				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				colMetrics,
 				node.Me,
 				node.RootChainID.Chain(),
@@ -345,11 +361,11 @@ func main() {
 			)
 			return ing, err
 		}).
-		Component("transaction ingress server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			server := ingress.New(ingressConf, ing, node.RootChainID)
+		Component("transaction ingress rpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			server := rpc.New(rpcConf, ing, node.Logger, node.RootChainID)
 			return server, nil
 		}).
-		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("collection provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
 				coll, err := node.Storage.Collections.ByID(collID)
 				return coll, err
@@ -414,6 +430,7 @@ func main() {
 				node.Metrics.Mempool,
 				node.State,
 				node.Storage.Transactions,
+				modulecompliance.WithSkipNewProposalsThreshold(clusterComplianceConfig.SkipNewProposalsThreshold),
 			)
 			if err != nil {
 				return nil, err
@@ -424,7 +441,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				synchronization.DefaultConfig(),
+				node.SyncCoreConfig,
 			)
 			if err != nil {
 				return nil, err
@@ -515,7 +532,7 @@ func main() {
 }
 
 // createQCContractClient creates QC contract client
-func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.QCContractClient, error) {
+func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
 
@@ -533,7 +550,7 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	txSigner := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
 
 	// create actual qc contract client, all flags and machine account info file found
-	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
+	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, anID, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
 
 	return qcContractClient, nil
 }
@@ -548,7 +565,7 @@ func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 			return nil, fmt.Errorf("failed to create flow client for qc contract client with options: %s %w", flowClientOpts, err)
 		}
 
-		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient)
+		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient, opt.AccessNodeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create qc contract client with flow client options: %s %w", flowClientOpts, err)
 		}
