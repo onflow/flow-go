@@ -171,7 +171,7 @@ type FlowAccessNodeBuilder struct {
 	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         module.TransactionMetrics
 	PingMetrics                module.PingMetrics
-	Committee                  hotstuff.Committee
+	Committee                  hotstuff.DynamicCommittee
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
@@ -245,7 +245,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
 	builder.Module("committee", func(node *cmd.NodeConfig) error {
 		// initialize consensus committee's membership state
-		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS committee
 		// Note: node.Me.NodeID() is not part of the consensus committee
 		committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 		builder.Committee = committee

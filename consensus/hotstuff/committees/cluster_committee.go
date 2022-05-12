@@ -16,7 +16,7 @@ import (
 // committees are epoch-scoped.
 //
 // Clusters build blocks on a cluster chain but must obtain identity table
-// information from the main chain. Thus, block ID parameters in this Committee
+// information from the main chain. Thus, block ID parameters in this DynamicCommittee
 // implementation reference blocks on the cluster chain, which in turn reference
 // blocks on the main chain - this implementation manages that translation.
 type Cluster struct {
@@ -27,12 +27,14 @@ type Cluster struct {
 	selection *leader.LeaderSelection
 	// a filter that returns all members of the cluster committee allowed to vote
 	clusterMemberFilter flow.IdentityFilter
-	// initial set of cluster members, WITHOUT updated weight
+	// initial set of cluster members, WITHOUT dynamic weight changes
+	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
 	initialClusterMembers flow.IdentityList
+	weightThresholdForQC  uint64 // computed based on initial cluster committee weights
 }
 
-var _ hotstuff.VoterCommittee = (*Cluster)(nil)
-var _ hotstuff.Committee = (*Cluster)(nil)
+var _ hotstuff.Replicas = (*Cluster)(nil)
+var _ hotstuff.DynamicCommittee = (*Cluster)(nil)
 
 func NewClusterCommittee(
 	state protocol.State,
@@ -58,6 +60,7 @@ func NewClusterCommittee(
 			filter.HasWeight(true),
 		),
 		initialClusterMembers: cluster.Members(),
+		weightThresholdForQC:  WeightThresholdToBuildQC(cluster.Members().TotalWeight()),
 	}
 	return com, nil
 }
@@ -120,14 +123,20 @@ func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifie
 	return identity, nil
 }
 
-// IdentitiesByEpoch returns the initial cluster members for this epoch. Since clusters
-// only exist for one epoch, we don't need to check the view.
+// IdentitiesByEpoch returns the initial cluster members for this epoch. The view
+// parameter is the view in the cluster consensus. Since clusters only exist for
+// one epoch, we don't need to check the view.
 func (c *Cluster) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return c.initialClusterMembers.Filter(selector), nil
 }
 
 // IdentityByEpoch returns the node from the initial cluster members for this epoch.
-// Since clusters only exist for one epoch, we don't need to check the view.
+// The view parameter is the view in the cluster consensus. Since clusters only exist
+// for one epoch, we don't need to check the view.
+//
+// Returns:
+//   * model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
+//     authorized participant in this cluster
 func (c *Cluster) IdentityByEpoch(_ uint64, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
 	if !ok {
@@ -140,6 +149,15 @@ func (c *Cluster) LeaderForView(view uint64) (flow.Identifier, error) {
 	return c.selection.LeaderForView(view)
 }
 
+// WeightThresholdForView returns the weight threshold required to build a QC
+// for the given view. The view parameter is the view in the cluster consensus.
+// Since clusters only exist for one epoch, and the weight threshold is static
+// over the course of an epoch, we don't need to check the view.
+//
+// No errors are expected during normal operation.
+func (c *Cluster) WeightThresholdForView(_ uint64) (uint64, error) {
+	return c.weightThresholdForQC, nil
+}
 func (c *Cluster) Self() flow.Identifier {
 	return c.me
 }

@@ -3,15 +3,16 @@ package validator
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -35,7 +36,7 @@ type ProposalSuite struct {
 	proposal     *model.Proposal
 	vote         *model.Vote
 	voter        *flow.Identity
-	committee    *mocks.VoterCommittee
+	committee    *mocks.DynamicCommittee
 	forks        *mocks.Forks
 	verifier     *mocks.Verifier
 	validator    *Validator
@@ -63,17 +64,19 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.vote = ps.proposal.ProposerVote()
 	ps.voter = ps.leader
 
-	// set up the mocked hotstuff Committee state
-	ps.committee = &mocks.VoterCommittee{}
+	// set up the mocked hotstuff DynamicCommittee state
+	ps.committee = &mocks.DynamicCommittee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.leader.NodeID, nil)
+	ps.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(ps.participants.TotalWeight()), nil)
 	ps.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(view uint64, selector flow.IdentityFilter) flow.IdentityList {
+		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return ps.participants.Filter(selector)
 		},
 		nil,
 	)
 	for _, participant := range ps.participants {
 		ps.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
+		ps.committee.On("IdentityByBlock", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 
 	// the finalized view is the one of the parent of the
@@ -144,11 +147,12 @@ func (ps *ProposalSuite) TestProposalSignatureInvalid() {
 
 func (ps *ProposalSuite) TestProposalWrongLeader() {
 
-	// change the hotstuff.Committee to return a different leader
-	*ps.committee = mocks.VoterCommittee{}
+	// change the hotstuff.DynamicCommittee to return a different leader
+	*ps.committee = mocks.DynamicCommittee{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.participants[1].NodeID, nil)
 	for _, participant := range ps.participants {
 		ps.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
+		ps.committee.On("IdentityByBlock", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 
 	// check that validation fails now
@@ -422,7 +426,7 @@ type VoteSuite struct {
 	vote      *model.Vote
 	forks     *mocks.Forks
 	verifier  *mocks.Verifier
-	committee *mocks.Committee
+	committee *mocks.DynamicCommittee
 	validator *Validator
 }
 
@@ -451,7 +455,7 @@ func (vs *VoteSuite) SetupTest() {
 	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block.View, vs.block.BlockID).Return(nil)
 
 	// the leader for the block view is the correct one
-	vs.committee = &mocks.Committee{}
+	vs.committee = &mocks.DynamicCommittee{}
 	vs.committee.On("IdentityByEpoch", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
 
 	// set up the validator with the mocked dependencies
@@ -478,11 +482,11 @@ func (vs *VoteSuite) TestVoteSignatureError() {
 
 // TestVoteInvalidSignerID checks that the Validator correctly handles a vote
 // with a SignerID that does not correspond to a valid consensus participant.
-// In this case, the `hotstuff.Committee` returns a `model.InvalidSignerError`,
+// In this case, the `hotstuff.DynamicCommittee` returns a `model.InvalidSignerError`,
 // which the Validator should recognize as a symptom for an invalid vote.
 // Hence, we expect the validator to return a `model.InvalidVoteError`.
 func (vs *VoteSuite) TestVoteInvalidSignerID() {
-	*vs.committee = mocks.Committee{}
+	*vs.committee = mocks.DynamicCommittee{}
 	vs.committee.On("IdentityByEpoch", vs.block.View, vs.vote.SignerID).Return(nil, model.NewInvalidSignerErrorf(""))
 
 	// A `model.InvalidSignerError` from the committee should be interpreted as
@@ -518,7 +522,7 @@ type QCSuite struct {
 	signers      flow.IdentityList
 	block        *model.Block
 	qc           *flow.QuorumCertificate
-	committee    *mocks.Committee
+	committee    *mocks.DynamicCommittee
 	verifier     *mocks.Verifier
 	validator    *Validator
 }
@@ -539,13 +543,14 @@ func (qs *QCSuite) SetupTest() {
 	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
 
 	// return the correct participants and identities from view state
-	qs.committee = &mocks.Committee{}
+	qs.committee = &mocks.DynamicCommittee{}
 	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
-		func(view uint64, selector flow.IdentityFilter) flow.IdentityList {
+		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return qs.participants.Filter(selector)
 		},
 		nil,
 	)
+	qs.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(qs.participants.TotalWeight()), nil)
 
 	// set up the mocked verifier to verify the QC correctly
 	qs.verifier = &mocks.Verifier{}
@@ -573,8 +578,8 @@ func (qs *QCSuite) TestQCInvalidSignersError() {
 // TestQCRetrievingParticipantsError tests that validation errors if:
 // there is an error retrieving identities of consensus participants
 func (qs *QCSuite) TestQCRetrievingParticipantsError() {
-	// change the hotstuff.Committee to fail on retrieving participants
-	*qs.committee = mocks.Committee{}
+	// change the hotstuff.DynamicCommittee to fail on retrieving participants
+	*qs.committee = mocks.DynamicCommittee{}
 	qs.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(qs.participants, errors.New("FATAL internal error"))
 
 	// verifier should escalate unspecific internal error to surrounding logic, but NOT as ErrorInvalidQC
@@ -644,7 +649,7 @@ type TCSuite struct {
 	signers      flow.IdentityList
 	block        *model.Block
 	tc           *flow.TimeoutCertificate
-	committee    *mocks.Committee
+	committee    *mocks.DynamicCommittee
 	verifier     *mocks.Verifier
 	validator    *Validator
 }
@@ -683,7 +688,7 @@ func (s *TCSuite) SetupTest() {
 		helper.WithTCHighQCViews(highQCViews))
 
 	// return the correct participants and identities from view state
-	s.committee = &mocks.Committee{}
+	s.committee = &mocks.DynamicCommittee{}
 	s.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
 		func(view uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return s.participants.Filter(selector)
