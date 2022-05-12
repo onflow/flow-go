@@ -19,20 +19,35 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const networkingProtocolTCP = "tcp"
+type runtime string
+
+const (
+	networkingProtocolTCP = "tcp"
+	dockerLocalHost       = "host.docker.internal"
+	dockerRuntime         = runtime("docker")
+	localhostRuntime      = runtime("localhost")
+)
 
 // AttackNetwork implements a middleware for mounting an attack orchestrator and empowering it to communicate with the corrupted nodes.
 type AttackNetwork struct {
 	component.Component
+	rt                   runtime // denotes whether corrupted nodes are running in docker or localhost
 	cm                   *component.ComponentManager
 	logger               zerolog.Logger
-	address              net.Addr                    // address on which the orchestrator is reachable from corrupted nodes.
+	address              string                      // address on which the orchestrator is reachable from corrupted nodes.
 	server               *grpc.Server                // touch point of corrupted nodes with the mounted orchestrator.
 	orchestrator         insecure.AttackOrchestrator // the mounted orchestrator that implements certain attack logic.
 	codec                network.Codec
 	corruptedNodeIds     flow.IdentityList                                    // identity of the corrupted nodes
 	corruptedConnections map[flow.Identifier]insecure.CorruptedNodeConnection // existing connections to the corrupted nodes.
 	corruptedConnector   insecure.CorruptedNodeConnector                      // connection generator to corrupted nodes.
+
+}
+
+// WithLocalHostRuntime denotes the attack network that corrupted nodes are running on the localhost.
+// This is typically the case for unit testing the attack network.
+func WithLocalHostRuntime(a *AttackNetwork) {
+	a.rt = localhostRuntime
 }
 
 func NewAttackNetwork(
@@ -41,15 +56,20 @@ func NewAttackNetwork(
 	codec network.Codec,
 	orchestrator insecure.AttackOrchestrator,
 	connector insecure.CorruptedNodeConnector,
-	corruptedNodeIds flow.IdentityList) (*AttackNetwork, error) {
+	corruptedNodeIds flow.IdentityList, opts ...func(*AttackNetwork)) (*AttackNetwork, error) {
 
 	attackNetwork := &AttackNetwork{
+		rt:                   dockerRuntime,
 		orchestrator:         orchestrator,
 		logger:               logger,
 		codec:                codec,
 		corruptedConnector:   connector,
 		corruptedNodeIds:     corruptedNodeIds,
 		corruptedConnections: make(map[flow.Identifier]insecure.CorruptedNodeConnection),
+	}
+
+	for _, opt := range opts {
+		opt(attackNetwork)
 	}
 
 	// setting lifecycle management module.
@@ -86,13 +106,20 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 		ctx.Throw(fmt.Errorf("could not listen on specified address: %w", err))
 	}
 	a.server = s
-	a.address = ln.Addr()
-	_, port, err := net.SplitHostPort(a.address.String())
-	if err != nil {
-		panic(err)
+	a.address = ln.Addr().String()
+
+	if a.rt == dockerRuntime {
+		// since corrupted nodes are running on docker, attacker registers itself
+		// with a docker local host address, hence being reachable from internal docker
+		// network.
+		_, port, err := net.SplitHostPort(a.address)
+		if err != nil {
+			panic(err)
+		}
+		a.address = fmt.Sprintf("%s:%s", dockerLocalHost, port)
 	}
-	a.corruptedConnector.WithAttackerAddress(net.JoinHostPort("host.docker.internal", port))
-	a.logger.Info().Str("attacker_address", a.address.String()).Msg("attacker address")
+
+	a.corruptedConnector.WithAttackerAddress(a.address)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -141,7 +168,7 @@ func (a *AttackNetwork) stop() error {
 }
 
 // ServerAddress returns the address on which the orchestrator is reachable from corrupted nodes.
-func (a AttackNetwork) ServerAddress() net.Addr {
+func (a AttackNetwork) ServerAddress() string {
 	return a.address
 }
 
