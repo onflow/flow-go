@@ -132,11 +132,12 @@ func New(log zerolog.Logger,
 
 	cacheSize := config.ConnectionPoolSize
 	if cacheSize == 0 {
-		cacheSize = 100
+		cacheSize = 10
 	}
 	cache, err := lru.New(cacheSize)
+
 	if err != nil {
-		// fmt.Errorf("cannot create conenction pool cache %w", err)
+		log.Fatal().Err(err).Msg("could not initialize connection pool cache")
 	}
 	connectionFactory := &backend.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
