@@ -74,3 +74,33 @@ func (suite *Suite) assertAllExpectations() {
 	suite.blocks.AssertExpectations(suite.T())
 	suite.headers.AssertExpectations(suite.T())
 }
+
+func (suite *Suite) TestGetLatestFinalizedBlock() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+
+	// setup the mocks
+	expected := unittest.BlockFixture()
+	header := expected.Header
+
+	suite.snapshot.
+		On("Head").
+		Return(header, nil).
+		Once()
+
+	suite.blocks.
+		On("ByID", header.ID()).
+		Return(&expected, nil).
+		Once()
+
+	backend := New(suite.state, suite.blocks, suite.headers)
+
+	// query the handler for the latest finalized header
+	actual, err := backend.GetLatestBlock(context.Background(), false)
+	suite.checkResponse(actual, err)
+
+	// make sure we got the latest header
+	suite.Require().Equal(expected, *actual)
+
+	suite.assertAllExpectations()
+}
