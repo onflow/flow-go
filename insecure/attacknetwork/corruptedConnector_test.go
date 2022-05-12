@@ -3,7 +3,6 @@ package attacknetwork
 import (
 	"context"
 	"net"
-	"strconv"
 	"testing"
 	"time"
 
@@ -23,10 +22,8 @@ func TestConnectorHappyPath(t *testing.T) {
 		// extracting port that ccf gRPC server is running on
 		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
 		require.NoError(t, err)
-		ccfPort, err := strconv.Atoi(ccfPortStr)
-		require.NoError(t, err)
 
-		connector := NewCorruptedConnector(flow.IdentityList{&corruptedId}, ccfPort)
+		connector := NewCorruptedConnector(flow.IdentityList{&corruptedId}, map[flow.Identifier]string{corruptedId.NodeID: ccfPortStr})
 		// attacker address is solely used as part of register message,
 		// hence no real network address needed.
 		attackerAddress := "dummy-attacker-address"

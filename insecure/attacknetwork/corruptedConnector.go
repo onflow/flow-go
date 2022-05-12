@@ -3,8 +3,6 @@ package attacknetwork
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
 
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
@@ -14,15 +12,15 @@ import (
 )
 
 type CorruptedConnector struct {
-	attackerAddress  string
-	corruptedNodeIds flow.IdentityList
-	ccfPort          int // conventional port for dialing remote corruptible conduit factories
+	attackerAddress      string
+	corruptedNodeIds     flow.IdentityList
+	corruptedPortMapping map[flow.Identifier]string
 }
 
-func NewCorruptedConnector(corruptedNodeIds flow.IdentityList, ccfPort int) *CorruptedConnector {
+func NewCorruptedConnector(corruptedNodeIds flow.IdentityList, corruptedPortMapping map[flow.Identifier]string) *CorruptedConnector {
 	return &CorruptedConnector{
-		corruptedNodeIds: corruptedNodeIds,
-		ccfPort:          ccfPort,
+		corruptedNodeIds:     corruptedNodeIds,
+		corruptedPortMapping: corruptedPortMapping,
 	}
 }
 
@@ -32,10 +30,12 @@ func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifi
 		return nil, fmt.Errorf("attacker address has not set on the connector")
 	}
 
-	corruptedAddress, err := c.corruptedConduitFactoryAddress(targetId)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate corruptible conduit factory address for: %w", err)
+	port, ok := c.corruptedPortMapping[targetId]
+	if !ok {
+		return nil, fmt.Errorf("could not find port mapping for corrupted id: %x", targetId)
 	}
+
+	corruptedAddress := fmt.Sprintf("localhost:%s", port)
 	gRpcClient, err := grpc.Dial(
 		corruptedAddress,
 		grpc.WithTransportCredentials(grpcinsecure.NewCredentials()))
@@ -62,19 +62,4 @@ func (c *CorruptedConnector) Connect(ctx context.Context, targetId flow.Identifi
 
 func (c *CorruptedConnector) WithAttackerAddress(address string) {
 	c.attackerAddress = address
-}
-
-// corruptedConduitFactoryAddress generates and returns the gRPC interface address of corruptible conduit factory for given identity.
-func (c *CorruptedConnector) corruptedConduitFactoryAddress(id flow.Identifier) (string, error) {
-	identity, found := c.corruptedNodeIds.ByNodeID(id)
-	if !found {
-		return "", fmt.Errorf("could not find corrupted id for identifier: %x", id)
-	}
-
-	corruptedAddress, _, err := net.SplitHostPort(identity.Address)
-	if err != nil {
-		return "", fmt.Errorf("could not extract address of corruptible conduit factory %s: %w", identity.Address, err)
-	}
-
-	return net.JoinHostPort(corruptedAddress, strconv.Itoa(c.ccfPort)), nil
 }

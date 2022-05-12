@@ -134,6 +134,7 @@ type FlowNetwork struct {
 	network                     *testingdock.Network
 	Containers                  map[string]*Container
 	ConsensusFollowers          map[flow.Identifier]consensus_follower.ConsensusFollower
+	CorruptedPortMapping        map[flow.Identifier]string // port binding for corrupted containers.
 	AccessPorts                 map[string]string
 	AccessPortsByContainerName  map[string]string
 	MetricsPortsByContainerName map[string]string
@@ -608,6 +609,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 		AccessPorts:                 make(map[string]string),
 		AccessPortsByContainerName:  make(map[string]string),
 		MetricsPortsByContainerName: make(map[string]string),
+		CorruptedPortMapping:        make(map[flow.Identifier]string),
 		root:                        root,
 		seal:                        seal,
 		result:                      result,
@@ -956,7 +958,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	}
 
 	if nodeConf.Corrupted {
-		nodeContainer.exposePort(strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
+		hostPort := testingdock.RandomPort(t)
+		nodeContainer.bindPort(hostPort, strconv.Itoa(cmd.CorruptibleConduitFactoryPort))
+		net.CorruptedPortMapping[nodeConf.NodeID] = hostPort
 	}
 
 	suiteContainer := net.suite.Container(*opts)
