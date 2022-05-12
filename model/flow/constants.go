@@ -17,7 +17,7 @@ const DefaultProtocolVersion = 0
 //
 // Let E by the transaction expiry. If a transaction T specifies a reference
 // block R with height H, then T may be included in any block B where:
-// * R<-*B - ie. B has R as an ancestor, and
+// * R<-*B - meaning B has R as an ancestor, and
 // * R.height < B.height <= R.height+E
 const DefaultTransactionExpiry = 10 * 60
 
