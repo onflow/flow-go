@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -19,13 +20,21 @@ func TestReadyDone(t *testing.T) {
 // Test that if a function is run by LaunchPeriodically and
 // takes longer than the interval, the next call will be blocked
 func TestLaunchPeriod(t *testing.T) {
+	lock := sync.Mutex{}
+
 	u := engine.NewUnit()
 	unittest.RequireCloseBefore(t, u.Ready(), time.Second, "ready did not close")
 	logs := make([]string, 0)
 	u.LaunchPeriodically(func() {
+		lock.Lock()
 		logs = append(logs, "running")
+		lock.Unlock()
+
 		time.Sleep(100 * time.Millisecond)
+
+		lock.Lock()
 		logs = append(logs, "finish")
+		lock.Unlock()
 	}, 50*time.Millisecond, 0)
 
 	// 100 * 3 is to ensure enough time for 3 periodic function to finish
@@ -34,11 +43,13 @@ func TestLaunchPeriod(t *testing.T) {
 	<-time.After((100*3 + 30) * time.Millisecond)
 
 	// This can pass
+	lock.Lock()
 	require.Equal(t, []string{
 		"running", "finish",
 		"running", "finish",
 		"running",
 	}, logs)
+	lock.Unlock()
 	unittest.RequireCloseBefore(t, u.Done(), time.Second, "done did not close")
 
 	require.Equal(t, []string{

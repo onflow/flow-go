@@ -195,7 +195,7 @@ func (b *BasicBlockExecutor) ServiceAccount(_ testing.TB) *TestBenchAccount {
 }
 
 func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*flow.TransactionBody) *execution.ComputationResult {
-	executableBlock := unittest.ExecutableBlockFromTransactions(collections)
+	executableBlock := unittest.ExecutableBlockFromTransactions(b.chain.ChainID(), collections)
 	executableBlock.StartState = &b.activeStateCommitment
 
 	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, b.programCache)

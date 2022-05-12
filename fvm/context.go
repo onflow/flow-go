@@ -3,7 +3,6 @@ package fvm
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,7 +32,6 @@ type Context struct {
 	ServiceEventCollectionEnabled bool
 	AccountFreezeAvailable        bool
 	ExtensiveTracing              bool
-	SignatureVerifier             crypto.SignatureVerifier
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
@@ -87,7 +85,6 @@ func defaultContext(logger zerolog.Logger) Context {
 		ServiceEventCollectionEnabled: false,
 		AccountFreezeAvailable:        false,
 		ExtensiveTracing:              false,
-		SignatureVerifier:             crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
