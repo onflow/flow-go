@@ -851,6 +851,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.TotalWeight()), nil)
 	committee.On("IdentitiesByEpoch", block.View, mock.Anything).Return(allIdentities, nil)
+	committee.On("IdentitiesByBlock", block.BlockID, mock.Anything).Return(allIdentities, nil)
 	committee.On("DKG", block.View).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
@@ -928,6 +929,7 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 
 	// create a packer
 	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("IdentitiesByBlock", block.BlockID, mock.Anything).Return(allSigners, nil)
 	committee.On("IdentitiesByEpoch", block.View, mock.Anything).Return(allSigners, nil)
 	packer := signature.NewConsensusSigDataPacker(committee)
 
