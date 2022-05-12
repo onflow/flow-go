@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/connectivity"
 	"io"
 	"net"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -82,6 +82,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 		}
 		cf.ConnectionsCache.Add(address, conn)
 	}
+
 	accessAPIClient := access.NewAccessAPIClient(conn)
 	closer := io.Closer(conn)
 	return accessAPIClient, closer, nil

@@ -350,11 +350,11 @@ func TestConnectionPoolStale(t *testing.T) {
 
 	ctx := context.Background()
 	// make the call to the collection node (should fail, connection closed)
-	resp, err := client.Ping(ctx, req)
+	_, err = client.Ping(ctx, req)
 	assert.Error(t, err)
 
 	// re-access, should replace stale connection in cache with new one
-	client, closer, err = proxyConnectionFactory.GetAccessAPIClient("foo")
+	client, closer, _ = proxyConnectionFactory.GetAccessAPIClient("foo")
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
 
 	var conn *grpc.ClientConn
@@ -365,7 +365,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	// check if api client can be rebuilt with retrieved connection
 	accessAPIClient := access.NewAccessAPIClient(conn)
 	ctx = context.Background()
-	resp, err = accessAPIClient.Ping(ctx, req)
+	resp, err := accessAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, resp, expected)
 }
