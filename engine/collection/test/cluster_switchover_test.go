@@ -70,7 +70,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 				signers = append(signers, identity)
 			}
 		}
-		qc, err := run.GenerateClusterRootQC(signers, rootClusterBlocks[i])
+		qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers), rootClusterBlocks[i])
 		require.NoError(t, err)
 		rootClusterQCs[i] = flow.ClusterQCVoteDataFromQC(qc)
 	}
@@ -133,7 +133,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 			// generate root cluster block
 			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers))
 			// generate cluster root qc
-			qc, err := run.GenerateClusterRootQC(signers, rootClusterBlock)
+			qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers), rootClusterBlock)
 			require.NoError(t, err)
 			commit.ClusterQCs[i] = flow.ClusterQCVoteDataFromQC(qc)
 		}
@@ -326,7 +326,7 @@ func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
 	tc.ExpectTransaction(epochCounter, clusterIndex, clusterTx.ID())
 
 	// submit the transaction to any collector in this cluster
-	err := tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
+	err := tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessTransaction(&clusterTx)
 	require.NoError(tc.T(), err)
 }
 

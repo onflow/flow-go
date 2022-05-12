@@ -3,8 +3,8 @@ package utils
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 )
 

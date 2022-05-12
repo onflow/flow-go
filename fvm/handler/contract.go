@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"bytes"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/onflow/cadence/runtime"
@@ -98,14 +100,37 @@ func (h *ContractHandler) RemoveContract(address runtime.Address, name string, s
 	return nil
 }
 
+type contractUpdateList []programs.ContractUpdate
+
+func (l contractUpdateList) Len() int      { return len(l) }
+func (l contractUpdateList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
+func (l contractUpdateList) Less(i, j int) bool {
+	switch bytes.Compare(l[i].Address[:], l[j].Address[:]) {
+	case -1:
+		return true
+	case 0:
+		return l[i].Name < l[j].Name
+	default:
+		return false
+	}
+}
+
 func (h *ContractHandler) Commit() ([]programs.ContractUpdateKey, error) {
 
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	updatedKeys := h.UpdateKeys()
+	updateList := make(contractUpdateList, 0)
+
+	for _, uk := range h.draftUpdates {
+		updateList = append(updateList, uk)
+	}
+	// sort does not need to be stable as the contract update key is unique
+	sort.Sort(updateList)
+
 	var err error
-	for _, v := range h.draftUpdates {
+	for _, v := range updateList {
 		if len(v.Code) > 0 {
 			err = h.accounts.SetContract(v.Name, v.Address, v.Code)
 			if err != nil {

@@ -25,8 +25,9 @@ type ExecutionCollector struct {
 	forestNumberOfTrees              prometheus.Gauge
 	latestTrieRegCount               prometheus.Gauge
 	latestTrieRegCountDiff           prometheus.Gauge
-	latestTrieMaxDepth               prometheus.Gauge
-	latestTrieMaxDepthDiff           prometheus.Gauge
+	latestTrieRegSize                prometheus.Gauge
+	latestTrieRegSizeDiff            prometheus.Gauge
+	latestTrieMaxDepthTouched        prometheus.Gauge
 	updated                          prometheus.Counter
 	proofSize                        prometheus.Gauge
 	updatedValuesNumber              prometheus.Counter
@@ -92,18 +93,25 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Help:      "the difference between number of unique register allocated of the latest created trie and parent trie",
 	})
 
-	latestTrieMaxDepth := promauto.NewGauge(prometheus.GaugeOpts{
+	latestTrieRegSize := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_max_depth",
-		Help:      "the maximum depth of the latest created trie",
+		Name:      "latest_trie_reg_size",
+		Help:      "the size of allocated registers (latest created trie)",
 	})
 
-	latestTrieMaxDepthDiff := promauto.NewGauge(prometheus.GaugeOpts{
+	latestTrieRegSizeDiff := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_max_depth_diff",
-		Help:      "the the difference between the max depth of the latest created trie and parent trie",
+		Name:      "latest_trie_reg_size_diff",
+		Help:      "the difference between size of unique register allocated of the latest created trie and parent trie",
+	})
+
+	latestTrieMaxDepthTouched := promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemMTrie,
+		Name:      "latest_trie_max_depth_touched",
+		Help:      "the maximum depth touched of the latest created trie",
 	})
 
 	updatedCount := promauto.NewCounter(prometheus.CounterOpts{
@@ -336,8 +344,9 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		forestNumberOfTrees:         forestNumberOfTrees,
 		latestTrieRegCount:          latestTrieRegCount,
 		latestTrieRegCountDiff:      latestTrieRegCountDiff,
-		latestTrieMaxDepth:          latestTrieMaxDepth,
-		latestTrieMaxDepthDiff:      latestTrieMaxDepthDiff,
+		latestTrieRegSize:           latestTrieRegSize,
+		latestTrieRegSizeDiff:       latestTrieRegSizeDiff,
+		latestTrieMaxDepthTouched:   latestTrieMaxDepthTouched,
 		updated:                     updatedCount,
 		proofSize:                   proofSize,
 		updatedValuesNumber:         updatedValuesNumber,
@@ -539,18 +548,23 @@ func (ec *ExecutionCollector) LatestTrieRegCount(number uint64) {
 }
 
 // LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieRegCountDiff(number uint64) {
+func (ec *ExecutionCollector) LatestTrieRegCountDiff(number int64) {
 	ec.latestTrieRegCountDiff.Set(float64(number))
 }
 
-// LatestTrieMaxDepth records the maximum depth of the last created trie
-func (ec *ExecutionCollector) LatestTrieMaxDepth(number uint64) {
-	ec.latestTrieMaxDepth.Set(float64(number))
+// LatestTrieRegSize records the size of unique register allocated (the lastest created trie)
+func (ec *ExecutionCollector) LatestTrieRegSize(size uint64) {
+	ec.latestTrieRegSize.Set(float64(size))
 }
 
-// LatestTrieMaxDepthDiff records the difference between the max depth of the latest created trie and parent trie
-func (ec *ExecutionCollector) LatestTrieMaxDepthDiff(number uint64) {
-	ec.latestTrieMaxDepthDiff.Set(float64(number))
+// LatestTrieRegSizeDiff records the difference between the size of unique register allocated of the latest created trie and parent trie
+func (ec *ExecutionCollector) LatestTrieRegSizeDiff(size int64) {
+	ec.latestTrieRegSizeDiff.Set(float64(size))
+}
+
+// LatestTrieMaxDepthTouched records the maximum depth touched of the last created trie
+func (ec *ExecutionCollector) LatestTrieMaxDepthTouched(maxDepth uint16) {
+	ec.latestTrieMaxDepthTouched.Set(float64(maxDepth))
 }
 
 // UpdateCount increase a counter of performed updates

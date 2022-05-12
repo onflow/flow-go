@@ -2,8 +2,10 @@ package node_builder
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -11,19 +13,23 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
-	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 type UnstakedAccessNodeBuilder struct {
@@ -41,8 +47,16 @@ func NewUnstakedAccessNodeBuilder(builder *FlowAccessNodeBuilder) *UnstakedAcces
 }
 
 func (builder *UnstakedAccessNodeBuilder) initNodeInfo() error {
-	// use the networking key that has been passed in the config
+	// use the networking key that has been passed in the config, or load from the configured file
 	networkingKey := builder.AccessNodeConfig.NetworkKey
+	if networkingKey == nil {
+		var err error
+		networkingKey, err = loadNetworkingKey(builder.observerNetworkingKeyPath)
+		if err != nil {
+			return fmt.Errorf("could not load networking private key: %w", err)
+		}
+	}
+
 	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingKey.PublicKey())
 	if err != nil {
 		return fmt.Errorf("could not load networking public key: %w", err)
@@ -80,7 +94,7 @@ func (builder *UnstakedAccessNodeBuilder) InitIDProviders() {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
 				var result flow.IdentifierList
 
-				pids := builder.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(builder.RootBlock.ID()))
+				pids := builder.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(builder.SporkID))
 
 				for _, pid := range pids {
 					// exclude own Identifier
@@ -124,6 +138,13 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
+	if builder.BaseConfig.MetricsEnabled {
+		builder.EnqueueMetricsServerInit()
+		if err := builder.RegisterBadgerMetrics(); err != nil {
+			return err
+		}
+	}
+
 	builder.PreInit(builder.initUnstakedLocal())
 
 	return nil
@@ -133,7 +154,7 @@ func (builder *UnstakedAccessNodeBuilder) validateParams() error {
 	if builder.BaseConfig.BindAddr == cmd.NotSet || builder.BaseConfig.BindAddr == "" {
 		return errors.New("bind address not specified")
 	}
-	if builder.AccessNodeConfig.NetworkKey == nil {
+	if builder.AccessNodeConfig.NetworkKey == nil && builder.AccessNodeConfig.observerNetworkingKeyPath == cmd.NotSet {
 		return errors.New("networking key not provided")
 	}
 	if len(builder.bootstrapIdentities) > 0 {
@@ -252,13 +273,26 @@ func (builder *UnstakedAccessNodeBuilder) Build() (cmd.Node, error) {
 func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// topology is nil since its automatically managed by libp2p
-		network, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil)
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if builder.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.NetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+		}
+		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+			builder.Logger,
+			heroCacheCollector)
+
+		err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
+		if err != nil {
+			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+		}
+
+		// topology is nil since it is automatically managed by libp2p
+		net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
 		if err != nil {
 			return nil, err
 		}
 
-		builder.Network = converter.NewNetwork(network, engine.SyncCommittee, engine.PublicSyncCommittee)
+		builder.Network = converter.NewNetwork(net, engine.SyncCommittee, engine.PublicSyncCommittee)
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
@@ -302,4 +336,23 @@ func (builder *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	)
 
 	return builder.Middleware
+}
+
+func loadNetworkingKey(path string) (crypto.PrivateKey, error) {
+	data, err := io.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not read networking key (path=%s): %w", path, err)
+	}
+
+	keyBytes, err := hex.DecodeString(strings.Trim(string(data), "\n "))
+	if err != nil {
+		return nil, fmt.Errorf("could not hex decode networking key (path=%s): %w", path, err)
+	}
+
+	networkingKey, err := crypto.DecodePrivateKey(crypto.ECDSASecp256k1, keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode networking key (path=%s): %w", path, err)
+	}
+
+	return networkingKey, nil
 }

@@ -19,25 +19,17 @@ import (
 )
 
 // GenerateClusterRootQC creates votes and generates a QC based on participant data
-func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
-	clusterRootBlock := &model.Block{
-		BlockID:     clusterBlock.ID(),
-		View:        clusterBlock.Header.View,
-		ProposerID:  clusterBlock.Header.ProposerID,
-		QC:          nil,
-		PayloadHash: clusterBlock.Header.PayloadHash,
-		Timestamp:   clusterBlock.Header.Timestamp,
-	}
+func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flow.IdentityList, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
+	clusterRootBlock := model.GenesisBlockFromFlow(clusterBlock.Header)
 
 	// STEP 1: create votes for cluster root block
-	votes, err := createRootBlockVotes(participants, clusterRootBlock)
+	votes, err := createRootBlockVotes(signers, clusterRootBlock)
 	if err != nil {
 		return nil, err
 	}
 
 	// STEP 2: create VoteProcessor
-	identities := bootstrap.ToIdentityList(participants)
-	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, nil, nil)
+	committee, err := committees.NewStaticCommittee(allCommitteeMembers, flow.Identifier{}, nil, nil)
 	if err != nil {
 		return nil, err
 	}

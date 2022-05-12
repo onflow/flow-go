@@ -2,8 +2,6 @@ package access
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -102,7 +100,7 @@ func (h *Handler) GetLatestBlock(
 		return nil, err
 	}
 
-	return blockResponse(block)
+	return blockResponse(block, req.GetFullBlockResponse())
 }
 
 // GetBlockByHeight gets a block by height.
@@ -115,10 +113,10 @@ func (h *Handler) GetBlockByHeight(
 		return nil, err
 	}
 
-	return blockResponse(block)
+	return blockResponse(block, req.GetFullBlockResponse())
 }
 
-// GetBlockByHeight gets a block by ID.
+// GetBlockByID gets a block by ID.
 func (h *Handler) GetBlockByID(
 	ctx context.Context,
 	req *access.GetBlockByIDRequest,
@@ -133,7 +131,7 @@ func (h *Handler) GetBlockByID(
 		return nil, err
 	}
 
-	return blockResponse(block)
+	return blockResponse(block, req.GetFullBlockResponse())
 }
 
 // GetCollectionByID gets a collection by ID.
@@ -216,6 +214,61 @@ func (h *Handler) GetTransactionResult(
 	}
 
 	result, err := h.api.GetTransactionResult(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return TransactionResultToMessage(result), nil
+}
+
+func (h *Handler) GetTransactionResultsByBlockID(
+	ctx context.Context,
+	req *access.GetTransactionsByBlockIDRequest,
+) (*access.TransactionResultsResponse, error) {
+	id, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	results, err := h.api.GetTransactionResultsByBlockID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return TransactionResultsToMessage(results), nil
+}
+
+func (h *Handler) GetTransactionsByBlockID(
+	ctx context.Context,
+	req *access.GetTransactionsByBlockIDRequest,
+) (*access.TransactionsResponse, error) {
+	id, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	transactions, err := h.api.GetTransactionsByBlockID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.TransactionsResponse{
+		Transactions: convert.TransactionsToMessages(transactions),
+	}, nil
+}
+
+// GetTransactionResultByIndex gets a transaction at a specific index for in a block that is executed,
+// pending or finalized transactions return errors
+func (h *Handler) GetTransactionResultByIndex(
+	ctx context.Context,
+	req *access.GetTransactionByIndexRequest,
+) (*access.TransactionResultResponse, error) {
+	blockID, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex())
 	if err != nil {
 		return nil, err
 	}
@@ -433,12 +486,17 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 	return executionResultToMessages(result)
 }
 
-func blockResponse(block *flow.Block) (*access.BlockResponse, error) {
-	msg, err := convert.BlockToMessage(block)
-	if err != nil {
-		return nil, err
+func blockResponse(block *flow.Block, fullResponse bool) (*access.BlockResponse, error) {
+	var msg *entities.Block
+	var err error
+	if fullResponse {
+		msg, err = convert.BlockToMessage(block)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		msg = convert.BlockToMessageLight(block)
 	}
-
 	return &access.BlockResponse{
 		Block: msg,
 	}, nil
@@ -456,56 +514,11 @@ func blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, erro
 }
 
 func executionResultToMessages(er *flow.ExecutionResult) (*access.ExecutionResultForBlockIDResponse, error) {
-
-	chunks := make([]*entities.Chunk, len(er.Chunks))
-
-	for i, chunk := range er.Chunks {
-		chunks[i] = chunkToMessage(chunk)
-	}
-
-	serviceEvents := make([]*entities.ServiceEvent, len(er.ServiceEvents))
-	var err error
-	for i, serviceEvent := range er.ServiceEvents {
-		serviceEvents[i], err = serviceEventToMessage(serviceEvent)
-		if err != nil {
-			return nil, fmt.Errorf("error while convering service event %d: %w", i, err)
-		}
-	}
-
-	return &access.ExecutionResultForBlockIDResponse{
-		ExecutionResult: &entities.ExecutionResult{
-			PreviousResultId: convert.IdentifierToMessage(er.PreviousResultID),
-			BlockId:          convert.IdentifierToMessage(er.BlockID),
-			Chunks:           chunks,
-			ServiceEvents:    serviceEvents,
-		},
-	}, nil
-}
-
-func serviceEventToMessage(event flow.ServiceEvent) (*entities.ServiceEvent, error) {
-
-	bytes, err := json.Marshal(event.Event)
+	execResult, err := convert.ExecutionResultToMessage(er)
 	if err != nil {
-		return nil, fmt.Errorf("cannot marshal service event: %w", err)
+		return nil, err
 	}
-
-	return &entities.ServiceEvent{
-		Type:    event.Type,
-		Payload: bytes,
-	}, nil
-}
-
-func chunkToMessage(chunk *flow.Chunk) *entities.Chunk {
-	return &entities.Chunk{
-		CollectionIndex:      uint32(chunk.CollectionIndex),
-		StartState:           convert.StateCommitmentToMessage(chunk.StartState),
-		EventCollection:      convert.IdentifierToMessage(chunk.EventCollection),
-		BlockId:              convert.IdentifierToMessage(chunk.BlockID),
-		TotalComputationUsed: chunk.TotalComputationUsed,
-		NumberOfTransactions: uint32(chunk.NumberOfTransactions),
-		Index:                chunk.Index,
-		EndState:             convert.StateCommitmentToMessage(chunk.EndState),
-	}
+	return &access.ExecutionResultForBlockIDResponse{ExecutionResult: execResult}, nil
 }
 
 func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {

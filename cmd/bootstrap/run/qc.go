@@ -65,7 +65,11 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 	for _, vote := range votes {
 		err := processor.Process(vote)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("fail to process vote %v for block %v from signer %v: %w",
+				vote.ID(),
+				block.ID(),
+				vote.SignerID,
+				err)
 		}
 	}
 
@@ -157,8 +161,8 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 			return nil, fmt.Errorf("node id cannot be zero")
 		}
 
-		if node.Stake == 0 {
-			return nil, fmt.Errorf("node (id=%s) cannot have 0 stake", node.NodeID)
+		if node.Weight == 0 {
+			return nil, fmt.Errorf("node (id=%s) cannot have 0 weight", node.NodeID)
 		}
 
 		dkgParticipant, ok := participantLookup[node.NodeID]

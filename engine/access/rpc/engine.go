@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -50,15 +51,17 @@ type Config struct {
 // An unsecured GRPC server (default port 9000), a secure GRPC server (default port 9001) and an HTTP Web proxy (default
 // port 8000) are brought up.
 type Engine struct {
-	unit                *engine.Unit
-	log                 zerolog.Logger
-	backend             *backend.Backend // the gRPC service implementation
-	unsecureGrpcServer  *grpc.Server     // the unsecure gRPC server
-	secureGrpcServer    *grpc.Server     // the secure gRPC server
-	httpServer          *http.Server
-	restServer          *http.Server
-	config              Config
-	chain               flow.Chain
+	unit               *engine.Unit
+	log                zerolog.Logger
+	backend            *backend.Backend // the gRPC service implementation
+	unsecureGrpcServer *grpc.Server     // the unsecure gRPC server
+	secureGrpcServer   *grpc.Server     // the secure gRPC server
+	httpServer         *http.Server
+	restServer         *http.Server
+	config             Config
+	chain              flow.Chain
+
+	addrLock            sync.RWMutex
 	unsecureGrpcAddress net.Addr
 	secureGrpcAddress   net.Addr
 	restAPIAddress      net.Addr
@@ -135,8 +138,7 @@ func New(log zerolog.Logger,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 	}
 
-	backend := backend.New(
-		state,
+	backend := backend.New(state,
 		collectionRPC,
 		historicalAccessNodes,
 		blocks,
@@ -153,6 +155,7 @@ func New(log zerolog.Logger,
 		config.PreferredExecutionNodeIDs,
 		config.FixedExecutionNodeIDs,
 		log,
+		backend.DefaultSnapshotHistoryLimit,
 	)
 
 	eng := &Engine{
@@ -242,14 +245,20 @@ func (e *Engine) SubmitLocal(event interface{}) {
 }
 
 func (e *Engine) UnsecureGRPCAddress() net.Addr {
+	e.addrLock.RLock()
+	defer e.addrLock.RUnlock()
 	return e.unsecureGrpcAddress
 }
 
 func (e *Engine) SecureGRPCAddress() net.Addr {
+	e.addrLock.RLock()
+	defer e.addrLock.RUnlock()
 	return e.secureGrpcAddress
 }
 
 func (e *Engine) RestApiAddress() net.Addr {
+	e.addrLock.RLock()
+	defer e.addrLock.RUnlock()
 	return e.restAPIAddress
 }
 
@@ -280,7 +289,9 @@ func (e *Engine) serveUnsecureGRPC() {
 
 	// save the actual address on which we are listening (may be different from e.config.UnsecureGRPCListenAddr if not port
 	// was specified)
+	e.addrLock.Lock()
 	e.unsecureGrpcAddress = l.Addr()
+	e.addrLock.Unlock()
 
 	e.log.Debug().Str("unsecure_grpc_address", e.unsecureGrpcAddress.String()).Msg("listening on port")
 
@@ -302,7 +313,9 @@ func (e *Engine) serveSecureGRPC() {
 		return
 	}
 
+	e.addrLock.Lock()
 	e.secureGrpcAddress = l.Addr()
+	e.addrLock.Unlock()
 
 	e.log.Debug().Str("secure_grpc_address", e.secureGrpcAddress.String()).Msg("listening on port")
 
@@ -345,7 +358,9 @@ func (e *Engine) serveREST() {
 		return
 	}
 
+	e.addrLock.Lock()
 	e.restAPIAddress = l.Addr()
+	e.addrLock.Unlock()
 
 	e.log.Debug().Str("rest_api_address", e.restAPIAddress.String()).Msg("listening on port")
 

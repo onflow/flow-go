@@ -93,6 +93,21 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 	return matched, nil
 }
 
+func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) ([]flow.Event, error) {
+	events, err := e.ByBlockID(blockID)
+	if err != nil {
+		return nil, handleError(err, flow.Event{})
+	}
+
+	var matched []flow.Event
+	for _, event := range events {
+		if event.TransactionIndex == txIndex {
+			matched = append(matched, event)
+		}
+	}
+	return matched, nil
+}
+
 // ByBlockIDEventType returns the events for the given block ID and event type
 func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType) ([]flow.Event, error) {
 	events, err := e.ByBlockID(blockID)
@@ -107,6 +122,11 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 		}
 	}
 	return matched, nil
+}
+
+// RemoveByBlockID removes events by block ID
+func (e *Events) RemoveByBlockID(blockID flow.Identifier) error {
+	return e.db.Update(operation.RemoveEventsByBlockID(blockID))
 }
 
 type ServiceEvents struct {
@@ -157,4 +177,9 @@ func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error)
 		return nil, err
 	}
 	return val.([]flow.Event), nil
+}
+
+// RemoveByBlockID removes service events by block ID
+func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
+	return e.db.Update(operation.RemoveServiceEventsByBlockID(blockID))
 }

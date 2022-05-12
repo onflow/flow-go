@@ -47,8 +47,10 @@ type Instance struct {
 	stop         Condition
 
 	// instance data
-	queue   chan interface{}
-	headers sync.Map //	headers map[flow.Identifier]*flow.Header
+	queue          chan interface{}
+	updatingBlocks sync.RWMutex
+	headers        map[flow.Identifier]*flow.Header
+	pendings       map[flow.Identifier]*model.Proposal // indexed by parent ID
 
 	// mocked dependencies
 	committee    *mocks.Committee
@@ -119,7 +121,9 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		stop:         cfg.StopCondition,
 
 		// instance data
-		queue: make(chan interface{}, 1024),
+		pendings: make(map[flow.Identifier]*model.Proposal),
+		headers:  make(map[flow.Identifier]*flow.Header),
+		queue:    make(chan interface{}, 1024),
 
 		// instance mocks
 		committee:    &mocks.Committee{},
@@ -132,7 +136,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	}
 
 	// insert root block into headers register
-	in.headers.Store(cfg.Root.ID(), cfg.Root)
+	in.headers[cfg.Root.ID()] = cfg.Root
 
 	// program the hotstuff committee state
 	in.committee.On("Identities", mock.Anything, mock.Anything).Return(
@@ -154,23 +158,28 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
 		func(parentID flow.Identifier, setter func(*flow.Header) error) *flow.Header {
-			parent, ok := in.headers.Load(parentID)
+			in.updatingBlocks.Lock()
+			defer in.updatingBlocks.Unlock()
+
+			parent, ok := in.headers[parentID]
 			if !ok {
 				return nil
 			}
 			header := &flow.Header{
 				ChainID:     "chain",
 				ParentID:    parentID,
-				Height:      parent.(*flow.Header).Height + 1,
+				Height:      parent.Height + 1,
 				PayloadHash: unittest.IdentifierFixture(),
 				Timestamp:   time.Now().UTC(),
 			}
 			require.NoError(t, setter(header))
-			in.headers.Store(header.ID(), header)
+			in.headers[header.ID()] = header
 			return header
 		},
 		func(parentID flow.Identifier, setter func(*flow.Header) error) error {
-			_, ok := in.headers.Load(parentID)
+			in.updatingBlocks.RLock()
+			_, ok := in.headers[parentID]
+			in.updatingBlocks.RUnlock()
 			if !ok {
 				return fmt.Errorf("parent block not found (parent: %x)", parentID)
 			}
@@ -231,11 +240,13 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		func(header *flow.Header, delay time.Duration) error {
 
 			// sender should always have the parent
-			parentBlob, exists := in.headers.Load(header.ParentID)
+			in.updatingBlocks.RLock()
+			parent, exists := in.headers[header.ParentID]
+			in.updatingBlocks.RUnlock()
+
 			if !exists {
 				return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", in.localID, header.ParentID)
 			}
-			parent := parentBlob.(*flow.Header)
 
 			// set the height and chain ID
 			header.ChainID = parent.ChainID
@@ -245,8 +256,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			proposal := model.ProposalFromFlow(header, parent.View)
 
 			// store locally and loop back to engine for processing
-			in.headers.Store(header.ID(), header)
-			in.queue <- proposal
+			in.ProcessBlock(proposal)
 
 			return nil
 		},
@@ -259,11 +269,13 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 			// as we don't use mocks to assert expectations, but only to
 			// simulate behaviour, we should drop the call data regularly
-			block, found := in.headers.Load(blockID)
+			in.updatingBlocks.RLock()
+			block, found := in.headers[blockID]
+			in.updatingBlocks.RUnlock()
 			if !found {
 				return fmt.Errorf("can't broadcast with unknown parent")
 			}
-			if block.(*flow.Header).Height%100 == 0 {
+			if block.Height%100 == 0 {
 				in.committee.Calls = nil
 				in.builder.Calls = nil
 				in.signer.Calls = nil
@@ -325,8 +337,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
-	stake := uint64(1000)
-	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(stake)
+	weight := uint64(1000)
+	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(weight)
 	stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
@@ -339,7 +351,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		in.queue <- qc
 	}
 
-	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(uint64(in.participants.Count()) * stake)
+	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(uint64(in.participants.Count()) * weight)
 	voteProcessorFactory := &mocks.VoteProcessorFactory{}
 	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
 		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
@@ -348,12 +360,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				stakingSigAggtor, rbRector,
 				onQCCreated,
 				packer,
-				minRequiredStake,
+				minRequiredWeight,
 			)
 		}, nil)
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
-	voteCollectors := voteaggregator.NewVoteCollectors(DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
+	voteCollectors := voteaggregator.NewVoteCollectors(log, DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
 	in.aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
@@ -432,5 +444,25 @@ func (in *Instance) Run() error {
 			}
 		}
 
+	}
+}
+
+func (in *Instance) ProcessBlock(proposal *model.Proposal) {
+	in.updatingBlocks.Lock()
+	_, parentExists := in.headers[proposal.Block.QC.BlockID]
+	defer in.updatingBlocks.Unlock()
+
+	if parentExists {
+		next := proposal
+		for next != nil {
+			in.headers[next.Block.BlockID] = model.ProposalToFlow(next)
+
+			in.queue <- next
+			// keep processing the pending blocks
+			next = in.pendings[next.Block.QC.BlockID]
+		}
+	} else {
+		// cache it in pendings by ParentID
+		in.pendings[proposal.Block.QC.BlockID] = proposal
 	}
 }

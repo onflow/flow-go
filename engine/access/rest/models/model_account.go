@@ -10,14 +10,10 @@ package models
 
 type Account struct {
 	Address string `json:"address"`
-
-	Balance string `json:"balance"`
-
-	Keys []AccountPublicKey `json:"keys,omitempty"`
-
-	Contracts map[string]string `json:"contracts,omitempty"`
-
+	// Flow balance of the account.
+	Balance    string             `json:"balance"`
+	Keys       []AccountPublicKey `json:"keys,omitempty"`
+	Contracts  map[string]string  `json:"contracts,omitempty"`
 	Expandable *AccountExpandable `json:"_expandable"`
-
-	Links *Links `json:"_links,omitempty"`
+	Links      *Links             `json:"_links,omitempty"`
 }
