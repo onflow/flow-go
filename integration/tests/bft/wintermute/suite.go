@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/insecure/attacknetwork"
-	insecmd "github.com/onflow/flow-go/insecure/cmd"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
@@ -150,7 +149,7 @@ func (s *Suite) SetupSuite() {
 	// start attack network
 	const serverAddress = "localhost:0" // we let OS picking an available port for attack network
 	codec := cbor.NewCodec()
-	connector := attacknetwork.NewCorruptedConnector(s.net.CorruptedIdentities(), insecmd.CorruptibleConduitFactoryPort)
+	connector := attacknetwork.NewCorruptedConnector(s.net.CorruptedIdentities(), s.net.CorruptedPortMapping)
 	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
 		serverAddress,
 		codec,
