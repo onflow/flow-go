@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -106,9 +105,7 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string, full
 	var write func(writer io.Writer) error
 
 	if fullSearch {
-		forest, err := mtrie.NewForest(complete.DefaultCacheSize, noopMetrics, func(evictedTrie *trie.MTrie) error {
-			return nil
-		})
+		forest, err := mtrie.NewForest(complete.DefaultCacheSize, noopMetrics, func(evictedTrie *trie.MTrie) {})
 		if err != nil {
 			return fmt.Errorf("cannot create forest: %w", err)
 		}
@@ -120,17 +117,13 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string, full
 		rootState := ledger.RootHash(state)
 
 		err = diskWal.ReplayLogsOnly(
-			func(forestSequencing *flattener.FlattenedForest) error {
-				rebuiltTries, err := flattener.RebuildTries(forestSequencing)
-				if err != nil {
-					return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
-				}
-				err = forest.AddTries(rebuiltTries)
+			func(tries []*trie.MTrie) error {
+				err = forest.AddTries(tries)
 				if err != nil {
 					return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
 				}
 
-				for _, trie := range rebuiltTries {
+				for _, trie := range tries {
 					rootHash := trie.RootHash()
 					if rootState.Equals(rootHash) {
 						return sentinel
