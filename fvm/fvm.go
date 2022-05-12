@@ -151,7 +151,15 @@ func getExecutionEffortWeights(
 			blueprints.TransactionFeesExecutionEffortWeightsPathIdentifier)
 	}
 
+	// Merge the default weights with the weights from the state.
+	// This allows for weights that are not set in the state, to be set by default.
+	// In case the network is stuck because of a transaction using an FVM feature that has 0 weight
+	// (or is not metered at all), the defaults can be changed and the network restarted
+	// instead of trying to change the weights with a transaction.
 	computationWeights = make(weighted.ExecutionEffortWeights)
+	for k, v := range weighted.DefaultComputationWeights {
+		computationWeights[k] = v
+	}
 	for k, v := range computationWeightsRaw {
 		computationWeights[common.ComputationKind(k)] = v
 	}
@@ -208,7 +216,15 @@ func getExecutionMemoryWeights(
 			blueprints.TransactionFeesExecutionMemoryWeightsPathIdentifier)
 	}
 
+	// Merge the default weights with the weights from the state.
+	// This allows for weights that are not set in the state, to be set by default.
+	// In case the network is stuck because of a transaction using an FVM feature that has 0 weight
+	// (or is not metered at all), the defaults can be changed and the network restarted
+	// instead of trying to change the weights with a transaction.
 	memoryWeights = make(weighted.ExecutionMemoryWeights)
+	for k, v := range weighted.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
 	for k, v := range memoryWeightsRaw {
 		memoryWeights[common.MemoryKind(k)] = v
 	}
