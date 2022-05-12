@@ -9,6 +9,7 @@ import (
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	lru "github.com/hashicorp/golang-lru"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	"github.com/rs/zerolog"
@@ -41,6 +42,7 @@ type Config struct {
 	MaxMsgSize                int                              // GRPC max message size
 	ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
 	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
+	ConnectionPoolSize        int                              // size of the cache for storing collection and execution connections
 	MaxHeightRange            uint                             // max size of height range requests
 	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
@@ -128,11 +130,20 @@ func New(log zerolog.Logger,
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(unsecureGrpcServer, config.HTTPListenAddr)
 
+	cacheSize := config.ConnectionPoolSize
+	if cacheSize == 0 {
+		cacheSize = 100
+	}
+	cache, err := lru.New(cacheSize)
+	if err != nil {
+		// fmt.Errorf("cannot create conenction pool cache %w", err)
+	}
 	connectionFactory := &backend.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
 		ExecutionGRPCPort:         executionGRPCPort,
 		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
+		ConnectionsCache:          cache,
 	}
 
 	backend := backend.New(state,
