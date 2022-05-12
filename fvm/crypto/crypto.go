@@ -117,10 +117,18 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) error {
 	return nil
 }
 
-// VerifySignatureFromRuntime is an adapter that performs signature verification using
-// raw values provided by the Cadence runtime.
+// VerifySignatureFromRuntime performs signature verification using raw values provided
+// by the Cadence runtime.
+//
+// The signature/hash function combinations accepted are:
+//   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256/Keccak256.
+//   - BLS (on BLS12-381 curve) with the specific KMAC128 for BLS.
+// The tag is applied to the message depending on the hash function used.
+//
+// The function errors:
+//  - NewValueErrorf for any user error
+//  - panic for any other unexpected error
 func VerifySignatureFromRuntime(
-	verifier SignatureVerifier,
 	signature []byte,
 	tag string,
 	message []byte,
@@ -146,11 +154,7 @@ func VerifySignatureFromRuntime(
 			return false, errors.NewValueErrorf(sigAlgo.String(), "cannot use hashing algorithm type %s with signature signature algorithm type %s",
 				hashAlgo, sigAlgo)
 		}
-
-		// tag length compatibility
-		if len(tag) > flow.DomainTagLength {
-			return false, errors.NewValueErrorf(tag, "tag length (%d) is larger than max length allowed (%d bytes).", len(tag), flow.DomainTagLength)
-		}
+		// tag constraints are checked when initializing a prefix-hasher
 
 		// check BLS compatibilites
 	} else if sigAlgo == crypto.BLSBLS12381 && hashAlgo != hash.KMAC128 {
@@ -160,56 +164,19 @@ func VerifySignatureFromRuntime(
 		// there are no tag constraints
 	}
 
+	// decode the public key
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
 		return false, errors.NewValueErrorf(hex.EncodeToString(rawPublicKey), "cannot decode public key: %w", err)
 	}
 
-	valid, err := verifier.Verify(
-		signature,
-		tag,
-		message,
-		publicKey,
-		hashAlgo,
-	)
-	if err != nil {
-		return false, err
-	}
-
-	return valid, nil
-}
-
-type SignatureVerifier interface {
-	Verify(
-		signature []byte,
-		tag string,
-		message []byte,
-		publicKey crypto.PublicKey,
-		hashAlgo hash.HashingAlgorithm,
-	) (bool, error)
-}
-
-type DefaultSignatureVerifier struct{}
-
-func NewDefaultSignatureVerifier() DefaultSignatureVerifier {
-	return DefaultSignatureVerifier{}
-}
-
-func (DefaultSignatureVerifier) Verify(
-	signature []byte,
-	tag string,
-	message []byte,
-	publicKey crypto.PublicKey,
-	hashAlgo hash.HashingAlgorithm,
-) (bool, error) {
-
+	// create a hasher
 	var hasher hash.Hasher
-
 	switch hashAlgo {
 	case hash.SHA2_256, hash.SHA3_256, hash.Keccak_256:
 		var err error
 		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
-			return false, errors.NewValueErrorf(err.Error(), "verification failed")
+			return false, errors.NewValueErrorf(err.Error(), "runtime verification failed")
 		}
 	case hash.KMAC128:
 		hasher = crypto.NewBLSKMAC(tag)
@@ -224,7 +191,58 @@ func (DefaultSignatureVerifier) Verify(
 		if crypto.IsInvalidInputsError(err) {
 			return false, err
 		}
-		panic(fmt.Errorf("verify signature failed with unexpected error %w", err))
+		panic(fmt.Errorf("verify runtime signature failed with unexpected error %w", err))
+	}
+
+	return valid, nil
+}
+
+// VerifySignatureFromRuntime performs signature verification using raw values provided
+// by the Cadence runtime.
+//
+// The signature/hash function combinations accepted are:
+//   - ECDSA (on both curves P-256 and secp256k1) with any of SHA2-256/SHA3-256.
+// The tag is applied to the message as a constant length prefix.
+//
+// The function errors:
+//  - NewValueErrorf for any user error
+//  - panic for any other unexpected error
+func VerifySignatureFromTransaction(
+	signature []byte,
+	message []byte,
+	pk crypto.PublicKey,
+	hashAlgo hash.HashingAlgorithm,
+) (bool, error) {
+
+	// check ECDSA compatibilites
+	if pk.Algorithm() != crypto.ECDSAP256 && pk.Algorithm() != crypto.ECDSASecp256k1 {
+		// TODO: check if we should panic
+		// This case only happens in production if there is a bug
+		return false, errors.NewUnknownFailure(fmt.Errorf(
+			pk.Algorithm().String(), "is not supported in transactions"))
+	}
+	// hashing compatibility
+	if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
+		// TODO: check if we should panic
+		// This case only happens in production if there is a bug
+		return false, errors.NewUnknownFailure(fmt.Errorf(
+			hashAlgo.String(), "is not supported in transactions"))
+	}
+
+	hasher, err := NewPrefixedHashing(hashAlgo, flow.TransactionTagString)
+	if err != nil {
+		return false, errors.NewValueErrorf(err.Error(), "transaction verification failed")
+	}
+
+	valid, err := pk.Verify(signature, message, hasher)
+	if err != nil {
+		// All inputs are guaranteed to be valid at this stage.
+		// The check for crypto.InvalidInputs is only a sanity check
+		if crypto.IsInvalidInputsError(err) {
+			return false, err
+		}
+		// unexpected error in normal operations
+		panic(fmt.Errorf("verify transaction signature failed with unexpected error %w", err))
 	}
 
 	return valid, nil

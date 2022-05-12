@@ -47,7 +47,7 @@ func TestGetBlocks(t *testing.T) {
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
 
-	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(request.MaxAllowedHeights + 1))
+	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(request.MaxBlockRequestHeightRange + 1))
 
 	testVectors := []testVector{
 		{
@@ -132,7 +132,7 @@ func TestGetBlocks(t *testing.T) {
 			description:      "Get block by more than maximum permissible number of IDs",
 			request:          getByIDsCondensedURL(t, maxIDs.Strings()), // height query param specified with no value
 			expectedStatus:   http.StatusBadRequest,
-			expectedResponse: fmt.Sprintf(`{"code":400, "message": "at most %d IDs can be requested at a time"}`, request.MaxAllowedHeights),
+			expectedResponse: fmt.Sprintf(`{"code":400, "message": "at most %d IDs can be requested at a time"}`, request.MaxBlockRequestHeightRange),
 		},
 	}
 

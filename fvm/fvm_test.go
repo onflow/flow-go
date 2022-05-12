@@ -26,7 +26,7 @@ import (
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	crypto2 "github.com/onflow/flow-go/fvm/crypto"
+	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	weightedMeter "github.com/onflow/flow-go/fvm/meter/weighted"
@@ -1627,7 +1627,7 @@ var createMessage = func(m string) (signableMessage []byte, message cadence.Arra
 	return signableMessage, message
 }
 
-func TestSignatureVerification(t *testing.T) {
+func TestKeyListSignature(t *testing.T) {
 
 	t.Parallel()
 
@@ -1643,22 +1643,39 @@ func TestSignatureVerification(t *testing.T) {
 	}
 
 	type hashAlgorithm struct {
-		name      string
-		newHasher func() hash.Hasher
+		name   string
+		hasher func(string) hash.Hasher
 	}
+
+	// Hardcoded tag as required by the crypto.keyList Cadence contract
+	// TODO: update to a random tag once the Cadence contract is updated
+	// to accept custom tags
+	tag := "FLOW-V0.0-user"
 
 	hashAlgorithms := []hashAlgorithm{
 		{
 			"SHA3_256",
-			hash.NewSHA3_256,
+			func(tag string) hash.Hasher {
+				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA3_256, tag)
+				require.Nil(t, err)
+				return hasher
+			},
 		},
 		{
 			"SHA2_256",
-			hash.NewSHA2_256,
+			func(tag string) hash.Hasher {
+				hasher, err := fvmCrypto.NewPrefixedHashing(hash.SHA2_256, tag)
+				require.Nil(t, err)
+				return hasher
+			},
 		},
 		{
 			"KECCAK_256",
-			hash.NewKeccak_256,
+			func(tag string) hash.Hasher {
+				hasher, err := fvmCrypto.NewPrefixedHashing(hash.Keccak_256, tag)
+				require.Nil(t, err)
+				return hasher
+			},
 		},
 	}
 
@@ -1732,16 +1749,8 @@ func TestSignatureVerification(t *testing.T) {
 				return privateKey, publicKey
 			}
 
-			signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
-				message := m
-				if hashAlgorithm.name != "KMAC128_BLS_BLS12_381" {
-					message = append(
-						flow.UserDomainTag[:],
-						m...,
-					)
-				}
-
-				signature, err := privateKey.Sign(message, hashAlgorithm.newHasher())
+			signMessage := func(privateKey crypto.PrivateKey, message []byte) cadence.Array {
+				signature, err := privateKey.Sign(message, hashAlgorithm.hasher(tag))
 				require.NoError(t, err)
 
 				return testutil.BytesToCadenceArray(signature)
@@ -1947,8 +1956,8 @@ func TestSignatureVerification(t *testing.T) {
 		crypto.BLSBLS12381,
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
-		func() hash.Hasher {
-			return crypto.NewBLSKMAC(flow.UserTagString)
+		func(tag string) hash.Hasher {
+			return crypto.NewBLSKMAC(tag)
 		},
 	})
 }
@@ -2681,7 +2690,7 @@ func TestHashing(t *testing.T) {
 				result2 = append(result2, value.(cadence.UInt8).ToGoValue().(uint8))
 			}
 
-			result3, err := crypto2.HashWithTag(crypto2.RuntimeToCryptoHashingAlgorithm(algo), "", data)
+			result3, err := fvmCrypto.HashWithTag(fvmCrypto.RuntimeToCryptoHashingAlgorithm(algo), "", data)
 			require.NoError(t, err)
 
 			require.Equal(t, result1, result2)
@@ -2984,77 +2993,41 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			}),
 	)
 }
-func TestSigningWithTags(t *testing.T) {
 
-	checkWithTag := func(tag []byte, shouldWork bool) func(t *testing.T) {
-		return newVMTest().
-			run(
-				func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-					// Create an account private key.
-					privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-					require.NoError(t, err)
+// TestHappyPathSigning checks that a signing a transaction with `Sign` doesn't produce an error.
+// Transaction verification tests are in `TestVerifySignatureFromTransaction`.
+func TestHappyPathTransactionSigning(t *testing.T) {
 
-					// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-					accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
-					require.NoError(t, err)
+	newVMTest().run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			// Create an account private key.
+			privateKey, err := testutil.GenerateAccountPrivateKey()
+			require.NoError(t, err)
 
-					txBody := flow.NewTransactionBody().
-						SetScript([]byte(`transaction(){}`))
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, view, programs, []flow.AccountPrivateKey{privateKey}, chain)
+			require.NoError(t, err)
 
-					txBody.SetProposalKey(accounts[0], 0, 0)
-					txBody.SetPayer(accounts[0])
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`transaction(){}`))
 
-					hasher, err := exeUtils.NewHasher(privateKeys[0].HashAlgo)
-					require.NoError(t, err)
+			txBody.SetProposalKey(accounts[0], 0, 0)
+			txBody.SetPayer(accounts[0])
 
-					sig, err := txBody.SignMessageWithTag(txBody.EnvelopeMessage(), tag, privateKeys[0].PrivateKey, hasher)
-					require.NoError(t, err)
-					txBody.AddEnvelopeSignature(accounts[0], 0, sig)
+			hasher, err := exeUtils.NewHasher(privateKey.HashAlgo)
+			require.NoError(t, err)
 
-					tx := fvm.Transaction(txBody, 0)
+			sig, err := txBody.Sign(txBody.EnvelopeMessage(), privateKey.PrivateKey, hasher)
+			require.NoError(t, err)
+			txBody.AddEnvelopeSignature(accounts[0], 0, sig)
 
-					err = vm.Run(ctx, tx, view, programs)
-					require.NoError(t, err)
-					if shouldWork {
-						require.NoError(t, tx.Err)
-					} else {
-						require.Error(t, tx.Err)
-						require.IsType(t, tx.Err, &errors.InvalidProposalSignatureError{})
-					}
-				},
-			)
-	}
+			tx := fvm.Transaction(txBody, 0)
 
-	cases := []struct {
-		name      string
-		tag       []byte
-		shouldWok bool
-	}{
-		{
-			name:      "no tag",
-			tag:       nil,
-			shouldWok: false,
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
 		},
-		{
-			name:      "transaction tag",
-			tag:       flow.TransactionDomainTag[:],
-			shouldWok: true,
-		},
-		{
-			name:      "user tag",
-			tag:       flow.UserDomainTag[:],
-			shouldWok: false,
-		},
-	}
-
-	for i, c := range cases {
-		works := "works"
-		if !c.shouldWok {
-			works = "doesn't work"
-		}
-		t.Run(fmt.Sprintf("Signing Transactions %d: with %s %s", i, c.name, works), checkWithTag(c.tag, c.shouldWok))
-	}
-
+	)
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {

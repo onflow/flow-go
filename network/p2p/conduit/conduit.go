@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -12,11 +14,23 @@ import (
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
+	*component.ComponentManager
 	adapter network.Adapter
 }
 
 func NewDefaultConduitFactory() *DefaultConduitFactory {
-	return &DefaultConduitFactory{}
+	d := &DefaultConduitFactory{}
+	// worker added so conduit factory doesn't immediately shut down when it's started
+	cm := component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+
+			<-ctx.Done()
+		}).Build()
+
+	d.ComponentManager = cm
+
+	return d
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
