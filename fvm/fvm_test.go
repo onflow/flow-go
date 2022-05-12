@@ -3625,7 +3625,9 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithExecutionEffortWeights(
 			weightedMeter.ExecutionEffortWeights{
-				common.ComputationKindStatement: 1 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+				common.ComputationKindStatement:          1 << weightedMeter.MeterExecutionInternalPrecisionBytes,
+				common.ComputationKindLoop:               0,
+				common.ComputationKindFunctionInvocation: 0,
 			},
 		),
 	).withContextOptions(
