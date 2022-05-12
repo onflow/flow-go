@@ -297,7 +297,7 @@ func (c *ConduitFactory) sendOnNetwork(event interface{},
 		return c.adapter.UnicastOnChannel(channel, event, targetIds[0])
 
 	case insecure.Protocol_PUBLISH:
-		return c.adapter.PublishOnChannel(channel, event)
+		return c.adapter.PublishOnChannel(channel, event, targetIds...)
 
 	case insecure.Protocol_MULTICAST:
 		return c.adapter.MulticastOnChannel(channel, event, num, targetIds...)
