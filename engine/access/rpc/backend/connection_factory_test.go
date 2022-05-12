@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +34,9 @@ func TestProxyAccessAPI(t *testing.T) {
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
+	// set the connection pool cache size
+	cache, _ := lru.New(5)
+	connectionFactory.ConnectionsCache = cache
 
 	proxyConnectionFactory := ProxyConnectionFactory{
 		ConnectionFactory: connectionFactory,
@@ -66,6 +70,9 @@ func TestProxyExecutionAPI(t *testing.T) {
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the execution grpc port
 	connectionFactory.ExecutionGRPCPort = en.port
+	// set the connection pool cache size
+	cache, _ := lru.New(5)
+	connectionFactory.ConnectionsCache = cache
 
 	proxyConnectionFactory := ProxyConnectionFactory{
 		ConnectionFactory: connectionFactory,
@@ -80,6 +87,92 @@ func TestProxyExecutionAPI(t *testing.T) {
 	ctx := context.Background()
 	// make the call to the execution node
 	resp, err := client.Ping(ctx, req)
+	assert.NoError(t, err)
+
+	assert.Equal(t, resp, expected)
+}
+
+func TestProxyAccessAPIConnectionReuse(t *testing.T) {
+	// create a collection node
+	cn := new(collectionNode)
+	cn.start(t)
+	defer cn.stop(t)
+
+	req := &access.PingRequest{}
+	expected := &access.PingResponse{}
+	cn.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the collection grpc port
+	connectionFactory.CollectionGRPCPort = cn.port
+	// set the connection pool cache size
+	cache, _ := lru.New(5)
+	connectionFactory.ConnectionsCache = cache
+
+	proxyConnectionFactory := ProxyConnectionFactory{
+		ConnectionFactory: connectionFactory,
+		targetAddress:     cn.listener.Addr().String(),
+	}
+
+	// get a collection API client
+	_, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
+	assert.NoError(t, err)
+	defer closer.Close()
+
+	var conn *grpc.ClientConn
+	res, ok := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
+	assert.True(t, ok)
+	conn = res.(*grpc.ClientConn)
+
+	// check if api client can be rebuilt with retrieved connection
+	accessAPIClient := access.NewAccessAPIClient(conn)
+	ctx := context.Background()
+	resp, err := accessAPIClient.Ping(ctx, req)
+	assert.NoError(t, err)
+
+	assert.Equal(t, resp, expected)
+}
+
+func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
+	// create an execution node
+	en := new(executionNode)
+	en.start(t)
+	defer en.stop(t)
+
+	req := &execution.PingRequest{}
+	expected := &execution.PingResponse{}
+	en.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the execution grpc port
+	connectionFactory.ExecutionGRPCPort = en.port
+	// set the connection pool cache size
+	cache, _ := lru.New(5)
+	connectionFactory.ConnectionsCache = cache
+
+	proxyConnectionFactory := ProxyConnectionFactory{
+		ConnectionFactory: connectionFactory,
+		targetAddress:     en.listener.Addr().String(),
+	}
+
+	// get an execution API client
+	_, closer, err := proxyConnectionFactory.GetExecutionAPIClient("foo")
+	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
+	assert.NoError(t, err)
+	defer closer.Close()
+
+	var conn *grpc.ClientConn
+	res, ok := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
+	assert.True(t, ok)
+	conn = res.(*grpc.ClientConn)
+
+	// check if api client can be rebuilt with retrieved connection
+	executionAPIClient := execution.NewExecutionAPIClient(conn)
+	ctx := context.Background()
+	resp, err := executionAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
 
 	assert.Equal(t, resp, expected)
@@ -106,6 +199,9 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	connectionFactory.ExecutionGRPCPort = en.port
 	// set the execution grpc client timeout
 	connectionFactory.ExecutionNodeGRPCTimeout = timeout
+	// set the connection pool cache size
+	cache, _ := lru.New(5)
+	connectionFactory.ConnectionsCache = cache
 
 	// create the execution API client
 	client, closer, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
@@ -141,6 +237,9 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the collection grpc client timeout
 	connectionFactory.CollectionNodeGRPCTimeout = timeout
+	// set the connection pool cache size
+	cache, _ := lru.New(5)
+	connectionFactory.ConnectionsCache = cache
 
 	// create the collection API client
 	client, closer, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
@@ -153,6 +252,122 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 
 	// assert that the client timed out
 	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+}
+
+// TestConnectionPoolFull tests that the LRU cache replaces connections when full
+func TestConnectionPoolFull(t *testing.T) {
+	// create a collection node
+	cn1, cn2, cn3 := new(collectionNode), new(collectionNode), new(collectionNode)
+	cn1.start(t)
+	cn2.start(t)
+	cn3.start(t)
+	defer cn1.stop(t)
+	defer cn2.stop(t)
+	defer cn3.stop(t)
+
+	req := &access.PingRequest{}
+	expected := &access.PingResponse{}
+	cn1.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	cn2.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+	cn3.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the collection grpc port
+	connectionFactory.CollectionGRPCPort = cn1.port
+	// set the connection pool cache size
+	cache, _ := lru.New(2)
+	connectionFactory.ConnectionsCache = cache
+
+	cn1Address := cn1.listener.Addr().String()
+	cn2Address := cn2.listener.Addr().String()
+	cn3Address := cn3.listener.Addr().String()
+
+	// get a collection API client
+	_, closer, err := connectionFactory.GetAccessAPIClient(cn1Address)
+	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
+	assert.NoError(t, err)
+	defer closer.Close()
+
+	_, closer, err = connectionFactory.GetAccessAPIClient(cn2Address)
+	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 2)
+	assert.NoError(t, err)
+	defer closer.Close()
+
+	_, closer, err = connectionFactory.GetAccessAPIClient(cn1Address)
+	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 2)
+	assert.NoError(t, err)
+	defer closer.Close()
+
+	// Expecting to replace cn2 because cn1 was accessed more recently
+	_, closer, err = connectionFactory.GetAccessAPIClient(cn3Address)
+	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 2)
+	assert.NoError(t, err)
+	defer closer.Close()
+
+	contains1 := connectionFactory.ConnectionsCache.Contains(cn1Address)
+	contains2 := connectionFactory.ConnectionsCache.Contains(cn2Address)
+	contains3 := connectionFactory.ConnectionsCache.Contains(cn3Address)
+
+	assert.True(t, contains1)
+	assert.False(t, contains2)
+	assert.True(t, contains3)
+}
+
+// TestConnectionPoolStale tests that a new connection will be established if the old one cached is stale
+func TestConnectionPoolStale(t *testing.T) {
+	// create a collection node
+	cn := new(collectionNode)
+	cn.start(t)
+	defer cn.stop(t)
+
+	req := &access.PingRequest{}
+	expected := &access.PingResponse{}
+	cn.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the collection grpc port
+	connectionFactory.CollectionGRPCPort = cn.port
+	// set the connection pool cache size
+	cache, _ := lru.New(5)
+	connectionFactory.ConnectionsCache = cache
+
+	proxyConnectionFactory := ProxyConnectionFactory{
+		ConnectionFactory: connectionFactory,
+		targetAddress:     cn.listener.Addr().String(),
+	}
+
+	// get a collection API client
+	client, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
+	assert.NoError(t, err)
+	// close connection to simulate something "going wrong" with our stored connection
+	closer.Close()
+
+	// check if key still exists
+	assert.True(t, connectionFactory.ConnectionsCache.Contains(proxyConnectionFactory.targetAddress))
+
+	ctx := context.Background()
+	// make the call to the collection node (should fail, connection closed)
+	resp, err := client.Ping(ctx, req)
+	assert.Error(t, err)
+
+	// re-access, should replace stale connection in cache with new one
+	client, closer, err = proxyConnectionFactory.GetAccessAPIClient("foo")
+	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
+
+	var conn *grpc.ClientConn
+	res, ok := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
+	assert.True(t, ok)
+	conn = res.(*grpc.ClientConn)
+
+	// check if api client can be rebuilt with retrieved connection
+	accessAPIClient := access.NewAccessAPIClient(conn)
+	ctx = context.Background()
+	resp, err = accessAPIClient.Ping(ctx, req)
+	assert.NoError(t, err)
+	assert.Equal(t, resp, expected)
 }
 
 // node mocks a flow node that runs a GRPC server
