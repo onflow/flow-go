@@ -3,27 +3,40 @@ package node_builder
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/libp2p/go-libp2p-core/host"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
+
+	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
-	"github.com/onflow/flow-go/engine/common/splitter"
+	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/network"
+	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/unicast"
+	relaynet "github.com/onflow/flow-go/network/relay"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // StakedAccessNodeBuilder builds a staked access node. The staked access node can optionally participate in the
@@ -32,23 +45,22 @@ type StakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
+func NewStakedAccessNodeBuilder(builder *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 	return &StakedAccessNodeBuilder{
-		FlowAccessNodeBuilder: anb,
+		FlowAccessNodeBuilder: builder,
 	}
 }
 
-func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
-	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-
+func (builder *StakedAccessNodeBuilder) InitIDProviders() {
+	builder.Module("id providers", func(node *cmd.NodeConfig) error {
 		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return err
 		}
 
-		fnb.IdentityProvider = idCache
+		builder.IdentityProvider = idCache
 
-		fnb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
+		builder.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
 			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
 					filter.HasRole(flow.RoleConsensus),
@@ -59,7 +71,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 			)
 		}
 
-		fnb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
+		builder.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
 
 		return nil
 	})
@@ -68,13 +80,18 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 func (builder *StakedAccessNodeBuilder) Initialize() error {
 	builder.InitIDProviders()
 
+	builder.EnqueueResolver()
+
+	// enqueue the regular network
+	builder.EnqueueNetworkInit()
+
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
 	if builder.supportsUnstakedFollower {
 		builder.enqueueUnstakedNetworkInit()
-	} else {
-		// otherwise, enqueue the regular network
-		builder.EnqueueNetworkInit()
+		builder.enqueueRelayNetwork()
 	}
+
+	builder.EnqueuePingService()
 
 	builder.EnqueueMetricsServerInit()
 
@@ -82,100 +99,243 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 		return err
 	}
 
-	builder.EnqueueAdminServerInit()
-
 	builder.EnqueueTracer()
-
+	builder.PreInit(cmd.DynamicStartPreInit)
 	return nil
 }
 
-func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
-	anb.FlowAccessNodeBuilder.Build()
+func (builder *StakedAccessNodeBuilder) enqueueRelayNetwork() {
+	builder.Component("relay network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		relayNet := relaynet.NewRelayNetwork(
+			node.Network,
+			builder.AccessNodeConfig.PublicNetworkConfig.Network,
+			node.Logger,
+			[]network.Channel{engine.ReceiveBlocks},
+		)
+		node.Network = relayNet
+		return relayNet, nil
+	})
+}
 
-	if anb.supportsUnstakedFollower {
-		var unstakedNetworkConduit network.Conduit
-		var proxyEngine *splitter.Engine
+func (builder *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
+	builder.
+		BuildConsensusFollower().
+		Module("collection node client", func(node *cmd.NodeConfig) error {
+			// collection node address is optional (if not specified, collection nodes will be chosen at random)
+			if strings.TrimSpace(builder.rpcConf.CollectionAddr) == "" {
+				node.Logger.Info().Msg("using a dynamic collection node address")
+				return nil
+			}
 
-		anb.
-			Component("unstaked sync request proxy", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				proxyEngine = splitter.New(node.Logger, engine.PublicSyncCommittee)
+			node.Logger.Info().
+				Str("collection_node", builder.rpcConf.CollectionAddr).
+				Msg("using the static collection node address")
 
-				// register the proxy engine with the unstaked network
-				var err error
-				unstakedNetworkConduit, err = node.Network.Register(engine.PublicSyncCommittee, proxyEngine)
-				if err != nil {
-					return nil, fmt.Errorf("could not register unstaked sync request proxy: %w", err)
+			collectionRPCConn, err := grpc.Dial(
+				builder.rpcConf.CollectionAddr,
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithInsecure(), //nolint:staticcheck
+				backend.WithClientUnaryInterceptor(builder.rpcConf.CollectionClientTimeout))
+			if err != nil {
+				return err
+			}
+			builder.CollectionRPC = access.NewAccessAPIClient(collectionRPCConn)
+			return nil
+		}).
+		Module("historical access node clients", func(node *cmd.NodeConfig) error {
+			addrs := strings.Split(builder.rpcConf.HistoricalAccessAddrs, ",")
+			for _, addr := range addrs {
+				if strings.TrimSpace(addr) == "" {
+					continue
 				}
+				node.Logger.Info().Str("access_nodes", addr).Msg("historical access node addresses")
 
-				return proxyEngine, nil
-			}).
-			Component("unstaked sync request handler", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				syncRequestHandler := synceng.NewRequestHandlerEngine(
-					node.Logger.With().Bool("unstaked", true).Logger(),
-					unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
-					unstakedNetworkConduit,
-					node.Me,
-					node.Storage.Blocks,
-					anb.SyncCore,
-					anb.FinalizedHeader,
-					// don't queue missing heights from unstaked nodes
-					// since we are always more up-to-date than them
-					false,
-				)
+				historicalAccessRPCConn, err := grpc.Dial(
+					addr,
+					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+					grpc.WithInsecure()) //nolint:staticcheck
+				if err != nil {
+					return err
+				}
+				builder.HistoricalAccessRPCs = append(builder.HistoricalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
+			}
+			return nil
+		}).
+		Module("transaction timing mempools", func(node *cmd.NodeConfig) error {
+			var err error
+			builder.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+			if err != nil {
+				return err
+			}
 
-				// register the sync request handler with the proxy engine
-				proxyEngine.RegisterEngine(syncRequestHandler)
+			builder.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
 
-				return syncRequestHandler, nil
-			})
+			builder.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			builder.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
+			return err
+		}).
+		Module("transaction metrics", func(node *cmd.NodeConfig) error {
+			builder.TransactionMetrics = metrics.NewTransactionCollector(builder.TransactionTimings, node.Logger, builder.logTxTimeToFinalized,
+				builder.logTxTimeToExecuted, builder.logTxTimeToFinalizedExecuted)
+			return nil
+		}).
+		Module("ping metrics", func(node *cmd.NodeConfig) error {
+			builder.PingMetrics = metrics.NewPingCollector()
+			return nil
+		}).
+		Module("server certificate", func(node *cmd.NodeConfig) error {
+			// generate the server certificate that will be served by the GRPC server
+			x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
+			if err != nil {
+				return err
+			}
+			tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
+			builder.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+			return nil
+		}).
+		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			builder.RpcEng = rpc.New(
+				node.Logger,
+				node.State,
+				builder.rpcConf,
+				builder.CollectionRPC,
+				builder.HistoricalAccessRPCs,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.Storage.Collections,
+				node.Storage.Transactions,
+				node.Storage.Receipts,
+				node.Storage.Results,
+				node.RootChainID,
+				builder.TransactionMetrics,
+				builder.collectionGRPCPort,
+				builder.executionGRPCPort,
+				builder.retryEnabled,
+				builder.rpcMetricsEnabled,
+				builder.apiRatelimits,
+				builder.apiBurstlimits,
+			)
+			return builder.RpcEng, nil
+		}).
+		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
+
+			builder.RequestEng, err = requester.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.RequestCollections,
+				filter.HasRole(flow.RoleCollection),
+				func() flow.Entity { return &flow.Collection{} },
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester engine: %w", err)
+			}
+
+			builder.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, builder.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Results, node.Storage.Receipts, builder.TransactionMetrics,
+				builder.CollectionsToMarkFinalized, builder.CollectionsToMarkExecuted, builder.BlocksToMarkExecuted, builder.RpcEng)
+			if err != nil {
+				return nil, err
+			}
+			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
+			builder.FinalizationDistributor.AddConsumer(builder.IngestEng)
+
+			return builder.IngestEng, nil
+		}).
+		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
+			return builder.RequestEng, nil
+		})
+
+	if builder.supportsUnstakedFollower {
+		builder.Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			syncRequestHandler, err := synceng.NewRequestHandlerEngine(
+				node.Logger.With().Bool("unstaked", true).Logger(),
+				unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
+				builder.AccessNodeConfig.PublicNetworkConfig.Network,
+				node.Me,
+				node.Storage.Blocks,
+				builder.SyncCore,
+				builder.FinalizedHeader,
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create unstaked sync request handler: %w", err)
+			}
+
+			return syncRequestHandler, nil
+		})
 	}
 
-	anb.Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		ping, err := pingeng.New(
 			node.Logger,
-			node.State,
+			node.IdentityProvider,
+			node.IDTranslator,
 			node.Me,
-			anb.PingMetrics,
-			anb.pingEnabled,
-			node.Middleware,
-			anb.nodeInfoFile,
+			builder.PingMetrics,
+			builder.pingEnabled,
+			builder.nodeInfoFile,
+			node.PingService,
 		)
+
 		if err != nil {
 			return nil, fmt.Errorf("could not create ping engine: %w", err)
 		}
+
 		return ping, nil
 	})
 
-	return anb
+	return builder.FlowAccessNodeBuilder.Build()
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
 func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
+	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("unstaked"))
 
-	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
 
-		libP2PFactory := builder.initLibP2PFactory(builder.NodeID, builder.NodeConfig.NetworkKey)
+		msgValidators := unstakedNetworkMsgValidators(node.Logger.With().Bool("unstaked", true).Logger(), node.IdentityProvider, builder.NodeID)
 
-		msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, builder.NodeID)
-
-		middleware := builder.initMiddleware(builder.NodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
+		middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libP2PFactory, msgValidators...)
 
 		// topology returns empty list since peers are not known upfront
 		top := topology.EmptyListTopology{}
 
-		network, err := builder.initNetwork(builder.Me, node.Metrics.Network, middleware, top)
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if builder.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
+		}
+		receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+			builder.Logger,
+			heroCacheCollector)
+
+		err := node.Metrics.Mempool.Register(metrics.ResourcePublicNetworkingReceiveCache, receiveCache.Size)
+		if err != nil {
+			return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
+		}
+
+		net, err := builder.initNetwork(builder.Me, builder.PublicNetworkConfig.Metrics, middleware, top, receiveCache)
 		if err != nil {
 			return nil, err
 		}
 
-		builder.Network = network
-		builder.Middleware = middleware
+		builder.AccessNodeConfig.PublicNetworkConfig.Network = net
 
-		idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
-		builder.ProtocolEvents.AddConsumer(idEvents)
-
-		node.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
-		return builder.Network, nil
+		node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)
+		return net, nil
 	})
 }
 
@@ -187,42 +347,30 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 // 		The passed in private key as the libp2p key
 //		No connection gater
 // 		Default Flow libp2p pubsub options
-func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier, networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-
-	// The staked nodes act as the DHT servers
-	dhtOptions := []dht.Option{p2p.AsServer(true)}
-
-	psOpts := append(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize),
-		func(_ context.Context, h host.Host) (pubsub.Option, error) {
-			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
-				h.ID(), builder.IdentityProvider,
-			)), nil
-		})
-
-	myAddr := builder.NodeConfig.Me.Address()
-	if builder.BaseConfig.BindAddr != cmd.NotSet {
-		myAddr = builder.BaseConfig.BindAddr
-	}
-
-	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
-
-	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
-
+func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
-		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetSporkID(builder.SporkID).
-			// no connection gater
+		connManager := p2p.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
+
+		libp2pNode, err := p2p.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
+			SetBasicResolver(builder.Resolver).
+			SetSubscriptionFilter(
+				p2p.NewRoleBasedFilter(
+					flow.RoleAccess, builder.IdentityProvider,
+				),
+			).
 			SetConnectionManager(connManager).
-			// act as a DHT server
-			SetDHTOptions(dhtOptions...).
-			SetPubsubOptions(psOpts...).
-			SetLogger(builder.Logger).
-			SetResolver(resolver).
+			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
+				return p2p.NewDHT(ctx, h, unicast.FlowPublicDHTProtocolID(builder.SporkID), p2p.AsServer())
+			}).
+			SetPubSub(pubsub.NewGossipSub).
 			Build(ctx)
+
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 		}
+
 		builder.LibP2PNode = libp2pNode
+
 		return builder.LibP2PNode, nil
 	}
 }
@@ -238,7 +386,7 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(builder.PeerUpdateInterval)}, p2p.WithConnectionPruning(false))
 
 	builder.Middleware = p2p.NewMiddleware(
-		builder.Logger,
+		builder.Logger.With().Bool("staked", false).Logger(),
 		factoryFunc,
 		nodeID,
 		networkMetrics,
@@ -247,7 +395,6 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.IDTranslator,
 		p2p.WithMessageValidators(validators...),
 		p2p.WithPeerManager(peerManagerFactory),
-		p2p.WithConnectionGating(false),
 		// use default identifier provider
 	)
 

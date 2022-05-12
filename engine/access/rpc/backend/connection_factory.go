@@ -53,7 +53,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	conn, err := grpc.Dial(
 		address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-		grpc.WithInsecure(),
+		grpc.WithInsecure(), //nolint:staticcheck
 		WithClientUnaryInterceptor(timeout))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to address %s: %w", address, err)

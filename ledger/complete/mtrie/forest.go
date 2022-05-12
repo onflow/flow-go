@@ -29,7 +29,7 @@ type Forest struct {
 	// needed trie in the forest might cause a fatal application logic error.
 	tries          *lru.Cache
 	forestCapacity int
-	onTreeEvicted  func(tree *trie.MTrie) error
+	onTreeEvicted  func(tree *trie.MTrie)
 	metrics        module.LedgerMetrics
 }
 
@@ -40,7 +40,7 @@ type Forest struct {
 // THIS IS A ROUGH HEURISTIC as it might evict tries that are still needed.
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Used trie will never be needed again.
-func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
+func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie)) (*Forest, error) {
 	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
 	var cache *lru.Cache
 	var err error
@@ -50,8 +50,7 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 			if !ok {
 				panic(fmt.Sprintf("cache contains item of type %T", value))
 			}
-			//TODO Log error
-			_ = onTreeEvicted(trie)
+			onTreeEvicted(trie)
 		})
 	} else {
 		cache, err = lru.New(forestCapacity)
@@ -73,6 +72,55 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 		return nil, fmt.Errorf("adding empty trie to forest failed: %w", err)
 	}
 	return forest, nil
+}
+
+// ValueSizes returns value sizes for a slice of paths and error (if any)
+// TODO: can be optimized further if we don't care about changing the order of the input r.Paths
+func (f *Forest) ValueSizes(r *ledger.TrieRead) ([]int, error) {
+
+	if len(r.Paths) == 0 {
+		return []int{}, nil
+	}
+
+	// lookup the trie by rootHash
+	trie, err := f.GetTrie(r.RootHash)
+	if err != nil {
+		return nil, err
+	}
+
+	// deduplicate paths:
+	// Generally, we expect the VM to deduplicate reads and writes. Hence, the following is a pre-caution.
+	// TODO: We could take out the following de-duplication logic
+	//       Which increases the cost for duplicates but reduces ValueSizes complexity without duplicates.
+	deduplicatedPaths := make([]ledger.Path, 0, len(r.Paths))
+	pathOrgIndex := make(map[ledger.Path][]int)
+	for i, path := range r.Paths {
+		// only collect duplicated paths once
+		indices, ok := pathOrgIndex[path]
+		if !ok { // deduplication here is optional
+			deduplicatedPaths = append(deduplicatedPaths, path)
+		}
+		// append the index
+		pathOrgIndex[path] = append(indices, i)
+	}
+
+	sizes := trie.UnsafeValueSizes(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
+
+	// reconstruct value sizes in the same key order that called the method
+	orderedValueSizes := make([]int, len(r.Paths))
+	totalValueSize := 0
+	for i, p := range deduplicatedPaths {
+		size := sizes[i]
+		indices := pathOrgIndex[p]
+		for _, j := range indices {
+			orderedValueSizes[j] = size
+		}
+		totalValueSize += len(indices) * size
+	}
+	// TODO rename the metrics
+	f.metrics.ReadValuesSize(uint64(totalValueSize))
+
+	return orderedValueSizes, nil
 }
 
 // Read reads values for an slice of paths and returns values and error (if any)
@@ -160,20 +208,23 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 		}
 	}
 
+	// Update metrics with number of updated payloads and size of updated payloads.
 	// TODO rename metrics names
+	f.metrics.UpdateValuesNumber(uint64(len(deduplicatedPayloads)))
 	f.metrics.UpdateValuesSize(uint64(totalPayloadSize))
 
 	// apply pruning on update
 	applyPruning := true
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads, applyPruning)
+	newTrie, maxDepthTouched, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads, applyPruning)
 	if err != nil {
 		return emptyHash, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
 	f.metrics.LatestTrieRegCount(newTrie.AllocatedRegCount())
-	f.metrics.LatestTrieRegCountDiff(newTrie.AllocatedRegCount() - parentTrie.AllocatedRegCount())
-	f.metrics.LatestTrieMaxDepth(uint64(newTrie.MaxDepth()))
-	f.metrics.LatestTrieMaxDepthDiff(uint64(newTrie.MaxDepth() - parentTrie.MaxDepth()))
+	f.metrics.LatestTrieRegCountDiff(int64(newTrie.AllocatedRegCount() - parentTrie.AllocatedRegCount()))
+	f.metrics.LatestTrieRegSize(newTrie.AllocatedRegSize())
+	f.metrics.LatestTrieRegSizeDiff(int64(newTrie.AllocatedRegSize() - parentTrie.AllocatedRegSize()))
+	f.metrics.LatestTrieMaxDepthTouched(maxDepthTouched)
 
 	err = f.AddTrie(newTrie)
 	if err != nil {
@@ -196,7 +247,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	}
 
 	// look up for non existing paths
-	retPayloads, err := f.Read(r)
+	retValueSizes, err := f.ValueSizes(r)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +256,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	notFoundPayloads := make([]ledger.Payload, 0)
 	for i, path := range r.Paths {
 		// add if empty
-		if retPayloads[i].IsEmpty() {
+		if retValueSizes[i] == 0 {
 			notFoundPaths = append(notFoundPaths, path)
 			notFoundPayloads = append(notFoundPayloads, *ledger.EmptyPayload())
 		}
@@ -223,7 +274,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		// so for non-inclusion proofs we expand the trie with nil value and use an inclusion proof
 		// instead. if pruning is enabled it would break this trick and return the exact trie.
 		applyPruning := false
-		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads, applyPruning)
+		newTrie, _, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads, applyPruning)
 		if err != nil {
 			return nil, err
 		}
@@ -257,8 +308,8 @@ func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 func (f *Forest) GetTries() ([]*trie.MTrie, error) {
 	// ToDo needs concurrency safety
 	keys := f.tries.Keys()
-	tries := make([]*trie.MTrie, 0, len(keys))
-	for _, key := range keys {
+	tries := make([]*trie.MTrie, len(keys))
+	for i, key := range keys {
 		t, ok := f.tries.Get(key)
 		if !ok {
 			return nil, errors.New("concurrent Forest modification")
@@ -267,7 +318,7 @@ func (f *Forest) GetTries() ([]*trie.MTrie, error) {
 		if !ok {
 			return nil, errors.New("forest contains an element of a wrong type")
 		}
-		tries = append(tries, trie)
+		tries[i] = trie
 	}
 	return tries, nil
 }

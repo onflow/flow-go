@@ -6,7 +6,10 @@ package state
 // the state it is recommended that such services wraps
 // a state manager instead of a state itself.
 type StateHolder struct {
+	EnforceMemoryLimits      bool
+	EnforceComputationLimits bool
 	enforceInteractionLimits bool
+	payerIsServiceAccount    bool
 	startState               *State
 	activeState              *State
 }
@@ -14,6 +17,8 @@ type StateHolder struct {
 // NewStateHolder constructs a new state manager
 func NewStateHolder(startState *State) *StateHolder {
 	return &StateHolder{
+		EnforceMemoryLimits:      true,
+		EnforceComputationLimits: true,
 		enforceInteractionLimits: true,
 		startState:               startState,
 		activeState:              startState,
@@ -30,14 +35,9 @@ func (s *StateHolder) SetActiveState(st *State) {
 	s.activeState = st
 }
 
-// EnableLimitEnforcement sets that the interaction limit should be enforced
-func (s *StateHolder) EnableLimitEnforcement() {
-	s.enforceInteractionLimits = true
-}
-
-// DisableLimitEnforcement sets that the interaction limit should not be enforced
-func (s *StateHolder) DisableLimitEnforcement() {
-	s.enforceInteractionLimits = false
+// SetActiveState sets active state
+func (s *StateHolder) SetPayerIsServiceAccount() {
+	s.payerIsServiceAccount = true
 }
 
 // NewChild constructs a new child of active state
@@ -50,7 +50,24 @@ func (s *StateHolder) NewChild() *State {
 	return s.activeState
 }
 
+// EnableLimitEnforcement enables all the limits
+func (s *StateHolder) EnableAllLimitEnforcements() {
+	s.enforceInteractionLimits = true
+	s.EnforceComputationLimits = true
+	s.EnforceMemoryLimits = true
+}
+
+// DisableAllLimitEnforcements disables all the limits
+func (s *StateHolder) DisableAllLimitEnforcements() {
+	s.enforceInteractionLimits = false
+	s.EnforceComputationLimits = false
+	s.EnforceMemoryLimits = false
+}
+
 // EnforceInteractionLimits returns if the interaction limits should be enforced or not
 func (s *StateHolder) EnforceInteractionLimits() bool {
+	if s.payerIsServiceAccount {
+		return false
+	}
 	return s.enforceInteractionLimits
 }

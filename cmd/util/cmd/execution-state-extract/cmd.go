@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -117,13 +119,43 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid root checkpoint")
 		}
-		const crcLength = 4
-		_, err = f.Seek(-(hash.HashLen + crcLength), 2 /* relative from end */)
-		if err != nil {
-			log.Fatal().Err(err).Msg("invalid root checkpoint")
+
+		const (
+			encMagicSize     = 2
+			encVersionSize   = 2
+			crcLength        = 4
+			encNodeCountSize = 8
+			encTrieCountSize = 2
+			headerSize       = encMagicSize + encVersionSize
+		)
+
+		// read checkpoint version
+		header := make([]byte, headerSize)
+		n, err := f.Read(header)
+		if err != nil || n != headerSize {
+			log.Fatal().Err(err).Msg("failed to read version from root checkpoint")
 		}
 
-		n, err := f.Read(stateCommitment[:])
+		magic := binary.BigEndian.Uint16(header)
+		version := binary.BigEndian.Uint16(header[encMagicSize:])
+
+		if magic != wal.MagicBytes {
+			log.Fatal().Err(err).Msg("invalid magic bytes in root checkpoint")
+		}
+
+		if version <= 3 {
+			_, err = f.Seek(-(hash.HashLen + crcLength), 2 /* relative from end */)
+			if err != nil {
+				log.Fatal().Err(err).Msg("invalid root checkpoint")
+			}
+		} else {
+			_, err = f.Seek(-(hash.HashLen + encNodeCountSize + encTrieCountSize + crcLength), 2 /* relative from end */)
+			if err != nil {
+				log.Fatal().Err(err).Msg("invalid root checkpoint")
+			}
+		}
+
+		n, err = f.Read(stateCommitment[:])
 		if err != nil || n != hash.HashLen {
 			log.Fatal().Err(err).Msg("failed to read state commitment from root checkpoint")
 		}

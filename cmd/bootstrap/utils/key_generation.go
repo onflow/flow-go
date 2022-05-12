@@ -7,6 +7,8 @@ import (
 	gohash "hash"
 	"io"
 
+	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/model/encodable"
 
 	"golang.org/x/crypto/hkdf"
@@ -158,7 +160,7 @@ type WriteFileFunc func(relativePath string, data []byte) error
 // WriteMachineAccountFiles writes machine account key files for a set of nodeInfos.
 // Assumes that machine accounts have been created using the default execution state
 // bootstrapping. Further assumes that the order of nodeInfos is the same order that
-// nodes were staked during execution state bootstrapping.
+// nodes were registered during execution state bootstrapping.
 //
 // Only applicable for transient test networks.
 func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
@@ -231,14 +233,13 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 }
 
 func WriteMachineAccountFile(
-	chainID flow.ChainID,
 	nodeID flow.Identifier,
-	accountAddress flow.Address,
+	accountAddress sdk.Address,
 	accountKey encodable.MachineAccountPrivKey,
 	write WriteJSONFileFunc) error {
 
 	info := bootstrap.NodeMachineAccountInfo{
-		Address:           accountAddress.HexWithPrefix(),
+		Address:           fmt.Sprintf("0x%s", accountAddress.Hex()),
 		EncodedPrivateKey: accountKey.Encode(),
 		KeyIndex:          0,
 		SigningAlgorithm:  accountKey.Algorithm(),

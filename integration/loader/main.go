@@ -38,6 +38,7 @@ func main() {
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
+	feedbackEnabled := flag.Bool("feedback-enabled", false, "whether to enable feedback / transaction tracking before account reuse (to avoid sequence number mismatch errors during transaction execution)")
 	flag.Parse()
 
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
@@ -91,7 +92,7 @@ func main() {
 	}
 
 	loadedAccessAddr := accessNodeAddrs[0]
-	flowClient, err := client.New(loadedAccessAddr, grpc.WithInsecure())
+	flowClient, err := client.New(loadedAccessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
 	}
@@ -100,7 +101,7 @@ func main() {
 	if len(accessNodeAddrs) > 1 {
 		supervisorAccessAddr = accessNodeAddrs[1]
 	}
-	supervisorClient, err := client.New(supervisorAccessAddr, grpc.WithInsecure())
+	supervisorClient, err := client.New(supervisorAccessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow supervisor client")
 	}
@@ -108,7 +109,7 @@ func main() {
 	go func() {
 		// run load cases
 		for i, c := range cases {
-			log.Info().Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
+			log.Info().Str("load_type", *loadTypeFlag).Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
 
 			loaderMetrics.SetTPSConfigured(c.tps)
 
@@ -127,6 +128,7 @@ func main() {
 					&flowTokenAddress,
 					c.tps,
 					utils.LoadType(*loadTypeFlag),
+					*feedbackEnabled,
 				)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("unable to create new cont load generator")

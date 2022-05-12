@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	mock2 "github.com/onflow/flow-go/module/mock"
+	fmock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,63 +22,74 @@ type ReceiptValidationSuite struct {
 	unittest.BaseChainSuite
 
 	receiptValidator module.ReceiptValidator
-	verifier         *mock2.Verifier
+	publicKey        *fmock.PublicKey
 }
 
 func (s *ReceiptValidationSuite) SetupTest() {
 	s.SetupChain()
-	s.verifier = &mock2.Verifier{}
-	s.receiptValidator = NewReceiptValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB, s.verifier)
+	s.publicKey = &fmock.PublicKey{}
+	s.Identities[s.ExeID].StakingPubKey = s.publicKey
+	s.receiptValidator = NewReceiptValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB)
 }
 
 // TestReceiptValid try submitting valid receipt
 func (s *ReceiptValidationSuite) TestReceiptValid() {
-	executor := s.Identities[s.ExeID]
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
 	receiptID := receipt.ID()
-	s.verifier.On("Verify",
-		receiptID[:],
+	s.publicKey.On("Verify",
 		receipt.ExecutorSignature,
-		executor.StakingPubKey).Return(true, nil).Once()
+		receiptID[:],
+		mock.Anything,
+	).Return(true, nil).Once()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().NoError(err, "should successfully validate receipt")
-	s.verifier.AssertExpectations(s.T())
+	s.publicKey.AssertExpectations(s.T())
 }
 
 // TestReceiptNoIdentity tests that we reject receipt with invalid `ExecutionResult.ExecutorID`
 func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	valSubgrph := s.ValidSubgraphFixture()
-	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(unittest.IdentityFixture().NodeID),
+	node := unittest.IdentityFixture()
+	mockPk := &fmock.PublicKey{}
+	node.StakingPubKey = mockPk
+
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(node.NodeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
+	receiptID := receipt.ID()
 
+	mockPk.On("Verify",
+		receiptID[:],
+		receipt.ExecutorSignature,
+		mock.Anything,
+	).Return(true, nil).Once()
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid identity")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
-// TestReceiptInvalidStake tests that we reject receipt with invalid stake
-func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
+// TestReceiptFromZeroWeightNode tests that we reject receipt from node with zero weight
+func (s *ReceiptValidationSuite) TestReceiptFromZeroWeightNode() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check stake first
+		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check weight first
 
-	// replace stake with invalid one
-	s.Identities[s.ExeID].Stake = 0
+	// replace weight with invalid one
+	s.Identities[s.ExeID].Weight = 0
 
 	err := s.receiptValidator.Validate(receipt)
-	s.Require().Error(err, "should reject invalid stake")
+	s.Require().Error(err, "should reject invalid weight")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
@@ -89,10 +100,10 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidRole() {
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check stake first
+		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check weight first
 
 	// replace identity with invalid one
 	s.Identities[s.ExeID] = unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -104,22 +115,22 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidRole() {
 
 // TestReceiptInvalidSignature tests that we reject receipt with invalid signature
 func (s *ReceiptValidationSuite) TestReceiptInvalidSignature() {
-	executor := s.Identities[s.ExeID]
 
 	valSubgrph := s.ValidSubgraphFixture()
-	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(executor.NodeID),
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		executor.StakingPubKey).Return(false, nil).Once()
+		mock.Anything,
+	).Return(false, nil).Once()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid signature")
 	s.Assert().True(engine.IsInvalidInputError(err))
-	s.verifier.AssertExpectations(s.T())
+	s.publicKey.AssertExpectations(s.T())
 }
 
 // TestReceiptTooFewChunks tests that we reject receipt with invalid chunk count
@@ -131,7 +142,7 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
@@ -150,7 +161,7 @@ func (s *ReceiptValidationSuite) TestReceiptTooManyChunks() {
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
@@ -168,7 +179,7 @@ func (s *ReceiptValidationSuite) TestReceiptChunkInvalidBlockID() {
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
@@ -186,7 +197,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidCollectionIndex() {
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
@@ -206,7 +217,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
@@ -227,7 +238,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
 	// prev result points to wrong block
 	valSubgrph.PreviousResult.BlockID = unittest.IdentifierFixture()
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
@@ -249,7 +260,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 	// prev result points to wrong block
 	valSubgrph.PreviousResult.Chunks[len(valSubgrph.Result.Chunks)-1].EndState = unittest.StateCommitmentFixture()
 
-	s.verifier.On("Verify",
+	s.publicKey.On("Verify",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
@@ -268,7 +279,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 //   it should be accepted as valid
 func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// G <- A <- B <- C
 	blocks, result0, seal := unittest.ChainFixture(4)
@@ -308,7 +319,7 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 // if a block payload contains (C,B_bad), they should be invalid
 func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// G <- A <- B <- C
 	blocks, result0, seal := unittest.ChainFixture(4)
@@ -355,7 +366,7 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 // sealed on another fork.
 func (s *ReceiptValidationSuite) TestValidationReceiptsForSealedBlock() {
 	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// create block2
 	block2 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
@@ -422,7 +433,7 @@ func (s *ReceiptValidationSuite) TestValidationReceiptsForSealedBlock() {
 // which were incorporated in previous blocks of fork.
 func (s *ReceiptValidationSuite) TestValidationReceiptForIncorporatedResult() {
 	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// create block2
 	block2 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
@@ -447,6 +458,7 @@ func (s *ReceiptValidationSuite) TestValidationReceiptForIncorporatedResult() {
 
 	exe := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	s.Identities[exe.NodeID] = exe
+	exe.StakingPubKey = s.publicKey // make sure the other exection node's signatures are valid
 
 	// insert another receipt for block 2, it's a receipt from another execution node
 	// for the same result
@@ -475,7 +487,7 @@ func (s *ReceiptValidationSuite) TestValidationReceiptForIncorporatedResult() {
 // ReceiptMeta[A] requires information _not_ included in the fork.
 func (s *ReceiptValidationSuite) TestValidationReceiptWithoutIncorporatedResult() {
 	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// create block A
 	blockA := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header) // for block G, we use the LatestSealedBlock
@@ -526,7 +538,7 @@ func (s *ReceiptValidationSuite) TestValidationReceiptWithoutIncorporatedResult(
 //  (ii) legal to include only results Result[A]_2 and Result[A]_3, as they are derived from the sealed result.
 func (s *ReceiptValidationSuite) TestPayloadWithExecutionFork() {
 	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// block S: we use s.LatestSealedBlock; its result is s.LatestExecutionResult
 	blockS := s.LatestSealedBlock
@@ -590,7 +602,7 @@ func (s *ReceiptValidationSuite) TestPayloadWithExecutionFork() {
 // Execution Tree with root latest sealed Result (i.e. result sealed for S)
 func (s *ReceiptValidationSuite) TestMultiLevelExecutionTree() {
 	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// create block A, including result and receipt for it
 	blockA := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
@@ -710,7 +722,7 @@ func (s *ReceiptValidationSuite) TestExtendReceiptsDuplicate() {
 // after genesis with empty payload.
 func (s *ReceiptValidationSuite) TestValidateReceiptAfterBootstrap() {
 	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// G
 	blocks, result0, seal := unittest.ChainFixture(0)

@@ -8,11 +8,14 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state"
 	clusterkv "github.com/onflow/flow-go/state/cluster"
@@ -26,6 +29,7 @@ import (
 // user of this object needs to ensure single thread access.
 type Core struct {
 	log               zerolog.Logger // used to log relevant actions with context
+	config            compliance.Config
 	metrics           module.EngineMetrics
 	mempoolMetrics    module.MempoolMetrics
 	collectionMetrics module.CollectionMetrics
@@ -34,6 +38,7 @@ type Core struct {
 	pending           module.PendingClusterBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
+	voteAggregator    hotstuff.VoteAggregator
 }
 
 // NewCore instantiates the business logic for the collector clusters' compliance engine.
@@ -45,10 +50,18 @@ func NewCore(
 	headers storage.Headers,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
+	voteAggregator hotstuff.VoteAggregator,
+	opts ...compliance.Opt,
 ) (*Core, error) {
+
+	config := compliance.DefaultConfig()
+	for _, apply := range opts {
+		apply(&config)
+	}
 
 	c := &Core{
 		log:               log.With().Str("cluster_compliance", "core").Logger(),
+		config:            config,
 		metrics:           collector,
 		mempoolMetrics:    mempool,
 		collectionMetrics: collectionMetrics,
@@ -57,6 +70,7 @@ func NewCore(
 		pending:           pending,
 		sync:              nil, // use `WithSync`
 		hotstuff:          nil, // use `WithConsensus`
+		voteAggregator:    voteAggregator,
 	}
 
 	// log the mempool size off the bat
@@ -75,14 +89,14 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("payload_hash", header.PayloadHash[:]).
+		Hex("ref_block_id", proposal.Payload.ReferenceBlockID[:]).
+		Hex("collection_id", logging.Entity(proposal.Payload.Collection)).
+		Int("tx_count", proposal.Payload.Collection.Len()).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
 	log.Info().Msg("block proposal received")
-
-	c.prunePendingCache()
 
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
@@ -103,6 +117,20 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("could not check proposal: %w", err)
+	}
+
+	// ignore proposals which are too far ahead of our local finalized state
+	// instead, rely on sync engine to catch up finalization more effectively, and avoid
+	// large subtree of blocks to be cached.
+	final, err := c.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get latest finalized header: %w", err)
+	}
+	if header.Height > final.Height && header.Height-final.Height > c.config.SkipNewProposalsThreshold {
+		log.Debug().
+			Uint64("final_height", final.Height).
+			Msg("dropping block too far ahead of locally finalized height")
+		return nil
 	}
 
 	// there are two possibilities if the proposal is neither already pending
@@ -288,23 +316,20 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlock
 		Uint64("view", vote.View).
 		Msg("received vote")
 
-	c.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
+	c.voteAggregator.AddVote(&model.Vote{
+		View:     vote.View,
+		BlockID:  vote.BlockID,
+		SignerID: originID,
+		SigData:  vote.SigData,
+	})
 	return nil
 }
 
-// prunePendingCache prunes the pending block cache by removing any blocks that
-// are below the finalized height.
-func (c *Core) prunePendingCache() {
-
-	// retrieve the finalized height
-	final, err := c.state.Final().Head()
-	if err != nil {
-		c.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
-		return
-	}
-
-	// remove all pending blocks at or below the finalized height
-	c.pending.PruneByHeight(final.Height)
+// ProcessFinalizedView performs pruning of stale data based on finalization event
+// removes pending blocks below the finalized view
+func (c *Core) ProcessFinalizedView(finalizedView uint64) {
+	// remove all pending blocks at or below the finalized view
+	c.pending.PruneByView(finalizedView)
 
 	// always record the metric
 	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())

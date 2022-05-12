@@ -2,15 +2,18 @@ package unittest
 
 import (
 	"flag"
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
 )
 
 var verbose = flag.Bool("vv", false, "print debugging logs")
+var globalOnce sync.Once
 
 func LogVerbose() {
 	*verbose = true
@@ -20,13 +23,23 @@ func LogVerbose() {
 // use -vv flag to print debugging logs for tests
 func Logger() zerolog.Logger {
 	writer := ioutil.Discard
-
 	if *verbose {
 		writer = os.Stderr
 	}
-	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(writer).Level(zerolog.DebugLevel).With().Timestamp().Logger()
+
+	return LoggerWithWriterAndLevel(writer, zerolog.DebugLevel)
+}
+
+func LoggerWithWriterAndLevel(writer io.Writer, level zerolog.Level) zerolog.Logger {
+	globalOnce.Do(func() {
+		zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+	})
+	log := zerolog.New(writer).Level(level).With().Timestamp().Logger()
 	return log
+}
+
+func LoggerWithLevel(level zerolog.Level) zerolog.Logger {
+	return LoggerWithWriterAndLevel(os.Stderr, level)
 }
 
 func NewLoggerHook() LoggerHook {

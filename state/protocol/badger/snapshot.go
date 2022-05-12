@@ -161,9 +161,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	// get identities from the current epoch first
-	identities := setup.Participants.Copy()
-	lookup := identities.Lookup()
+	// sort the identities so the 'Exists' binary search works
+	identities := setup.Participants.Sort(order.ByNodeIDAsc)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
 	var otherEpochIdentities flow.IdentityList
@@ -186,7 +185,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range previousSetup.Participants {
-			_, exists := lookup[identity.NodeID]
+			exists := identities.Exists(identity)
 			// add identity from previous epoch that is not in current epoch
 			if !exists {
 				otherEpochIdentities = append(otherEpochIdentities, identity)
@@ -203,7 +202,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range nextSetup.Participants {
-			_, exists := lookup[identity.NodeID]
+			exists := identities.Exists(identity)
+
 			// add identity from next epoch that is not in current epoch
 			if !exists {
 				otherEpochIdentities = append(otherEpochIdentities, identity)
@@ -214,14 +214,15 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, fmt.Errorf("invalid epoch phase: %s", phase)
 	}
 
-	// add the identities from next/last epoch, with stake set to 0
+	// add the identities from next/last epoch, with weight set to 0
 	identities = append(
 		identities,
-		otherEpochIdentities.Map(mapfunc.WithStake(0))...,
+		otherEpochIdentities.Map(mapfunc.WithWeight(0))...,
 	)
 
 	// apply the filter to the participants
 	identities = identities.Filter(selector)
+
 	// apply a deterministic sort to the participants
 	identities = identities.Sort(order.ByNodeIDAsc)
 
@@ -267,9 +268,22 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 
 // SealingSegment will walk through the chain backward until we reach the block referenced
 // by the latest seal and build a SealingSegment. As we visit each block we check each execution
-// receipt in the blocks payload to make sure we have a corresponding execution result, any execution
+// receipt in the block's payload to make sure we have a corresponding execution result, any execution
 // results missing from blocks are stored in the SealingSegment.ExecutionResults field.
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
+	var rootHeight uint64
+	err := s.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not get root height: %w", err)
+	}
+	head, err := s.Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get snapshot reference block: %w", err)
+	}
+	if head.Height < rootHeight {
+		return nil, protocol.ErrSealingSegmentBelowRootBlock
+	}
+
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
@@ -277,7 +291,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID)
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.ByBlockID)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
@@ -394,10 +408,10 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	return descendantIDs, nil
 }
 
-// Seed returns the random seed at the given indices for the current block snapshot.
+// RandomSource returns the seed for the current block snapshot.
 // Expected error returns:
 // * state.NoValidChildBlockError if no valid child is known
-func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
+func (s *Snapshot) RandomSource() ([]byte, error) {
 
 	// CASE 1: for the root block, generate the seed from the root qc
 	root, err := s.state.Params().Root()
@@ -412,11 +426,10 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
 		}
 
-		seed, err := seed.FromParentSignature(indices, rootQC.SigData)
+		seed, err := seed.FromParentQCSignature(rootQC.SigData)
 		if err != nil {
 			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
 		}
-
 		return seed, nil
 	}
 
@@ -426,7 +439,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
 	}
 
-	seed, err := seed.FromParentSignature(indices, child.ParentVoterSigData)
+	seed, err := seed.FromParentQCSignature(child.ParentVoterSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
 	}

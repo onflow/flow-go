@@ -64,7 +64,12 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	suite.cancel = cancel
 
 	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
-		ctx, suite.T(), count, logger, 100, nil, WithIdentityOpts(unittest.WithAllRoles()),
+		ctx,
+		suite.T(),
+		count,
+		logger,
+		nil,
+		WithIdentityOpts(unittest.WithAllRoles()),
 	)
 
 	for _, observableConnMgr := range obs {
@@ -177,7 +182,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(2 * time.Second):
+		case <-time.After(8 * time.Second):
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}
@@ -316,7 +321,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(2 * time.Second):
+		case <-time.After(8 * time.Second):
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}

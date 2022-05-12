@@ -3,9 +3,9 @@
 package network
 
 import (
-	"time"
-
+	"github.com/ipfs/go-datastore"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -29,7 +29,7 @@ type Middleware interface {
 	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
 	SetOverlay(Overlay)
 
-	// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
+	// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 	// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 	// as the router.
 	//
@@ -48,16 +48,15 @@ type Middleware interface {
 	// Unsubscribe unsubscribes the middleware from a channel.
 	Unsubscribe(channel Channel) error
 
-	// Ping pings the target node and returns the ping RTT or an error
-	Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error)
-
-	// UpdateAllowList fetches the most recent identity of the nodes from overlay
-	// and updates the underlying libp2p node.
-	UpdateAllowList()
-
-	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
+	// UpdateNodeAddresses fetches and updates the addresses of all the authorized participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
+
+	// NewBlobService creates a new BlobService for the given channel.
+	NewBlobService(channel Channel, store datastore.Batching, opts ...BlobServiceOption) BlobService
+
+	// NewPingService creates a new PingService for the given ping protocol ID.
+	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService
 
 	IsConnected(nodeID flow.Identifier) (bool, error)
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 var errSelectionNotComputed = fmt.Errorf("leader selection for epoch not yet computed")
@@ -24,6 +24,8 @@ type Consensus struct {
 	me      flow.Identifier                    // the node ID of this node
 	leaders map[uint64]*leader.LeaderSelection // pre-computed leader selection for each epoch
 }
+
+var _ hotstuff.Committee = (*Consensus)(nil)
 
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 
@@ -76,14 +78,14 @@ func (c *Consensus) Identities(blockID flow.Identifier, selector flow.IdentityFi
 
 func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
-	if protocol.IsIdentityNotFound(err) {
-		return nil, model.ErrInvalidSigner
-	}
 	if err != nil {
+		if protocol.IsIdentityNotFound(err) {
+			return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id: %w", nodeID, err)
+		}
 		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
 	}
 	if !filter.IsVotingConsensusCommitteeMember(identity) {
-		return nil, model.ErrInvalidSigner
+		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff voting participant", nodeID)
 	}
 	return identity, nil
 }
@@ -154,8 +156,9 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not get epoch initial identities: %w", err)
 		}
-		// CAUTION: this is re-using the same leader selection seed from the now-ending epoch
-		seed, err := current.Seed(indices.ProtocolConsensusLeaderSelection...)
+		// Get the random source
+		// CAUTION: this is re-using the same leader selection random source from the now-ending epoch
+		randomSeed, err := current.RandomSource()
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not get epoch seed: %w", err)
 		}
@@ -168,9 +171,16 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		counter := currentCounter + 1
 		// the fallback leader selection begins after the final view of the current epoch
 		firstView := currentFinalView + 1
-		selection, err := leader.ComputeLeaderSelectionFromSeed(
+
+		// create random number generator from the seed and customizer
+		rng, err := seed.PRGFromRandomSource(randomSeed, seed.ProtocolConsensusLeaderSelection)
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not create rng from seed: %w", err)
+		}
+
+		selection, err := leader.ComputeLeaderSelection(
 			firstView,
-			seed,
+			rng,
 			int(firstView+leader.EstimatedSixMonthOfViews), // the fallback epoch lasts until the next spork
 			identities.Filter(filter.IsVotingConsensusCommitteeMember),
 		)

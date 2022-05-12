@@ -33,7 +33,7 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 type Network struct {
 	mocknetwork.Network
 	conduits    map[network.Channel]*Conduit
-	engines     map[network.Channel]network.Engine
+	engines     map[network.Channel]network.MessageProcessor
 	publishFunc NetworkPublishFunc
 }
 
@@ -42,13 +42,13 @@ func NewNetwork() *Network {
 	return &Network{
 		Network:  mocknetwork.Network{},
 		conduits: make(map[network.Channel]*Conduit),
-		engines:  make(map[network.Channel]network.Engine),
+		engines:  make(map[network.Channel]network.MessageProcessor),
 	}
 }
 
 // Register registers an engine with this mock network. If an engine is already registered on the
 // given channel, this will return an error.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	_, ok := n.engines[channel]
 	if ok {
 		return nil, fmt.Errorf("channel already registered: %s", channel)

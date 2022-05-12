@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/meter/weighted"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -23,16 +24,10 @@ func AddressSliceToCadenceValue(addresses []common.Address) cadence.Value {
 	return cadence.NewArray(adds)
 }
 
-func OptionalCadenceValueToAddressSlice(value cadence.Value) (addresses []common.Address, ok bool) {
-
-	// cast to optional
-	optV, ok := value.(cadence.Optional)
-	if !ok {
-		return nil, false
-	}
+func CadenceValueToAddressSlice(value cadence.Value) (addresses []common.Address, ok bool) {
 
 	// cast to array
-	v, ok := optV.Value.(cadence.Array)
+	v, ok := value.(cadence.Array)
 	if !ok {
 		return nil, false
 	}
@@ -46,4 +41,30 @@ func OptionalCadenceValueToAddressSlice(value cadence.Value) (addresses []common
 		addresses = append(addresses, common.Address(a))
 	}
 	return addresses, true
+}
+
+// CadenceValueToWeights converts a cadence value to a map of weights used for metering
+func CadenceValueToWeights(value cadence.Value) (weighted.ExecutionWeights, bool) {
+	result := make(weighted.ExecutionWeights)
+
+	dict, ok := value.(cadence.Dictionary)
+	if !ok {
+		return nil, false
+	}
+
+	for _, p := range dict.Pairs {
+		key, ok := p.Key.(cadence.UInt64)
+		if !ok {
+			return nil, false
+		}
+
+		value, ok := p.Value.(cadence.UInt64)
+		if !ok {
+			return nil, false
+		}
+
+		result[common.ComputationKind(key)] = uint64(value)
+	}
+
+	return result, true
 }

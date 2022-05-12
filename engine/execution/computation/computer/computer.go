@@ -3,7 +3,6 @@ package computer
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -26,8 +25,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
-const MaxTransactionErrorStringSize = 1000            // 1000 chars
+const SystemChunkEventCollectionMaxSize = 256_000_000  // ~256MB
+const SystemChunkLedgerIntractionLimit = 1_000_000_000 // ~1GB
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
@@ -62,6 +61,7 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithTransactionFeesEnabled(false),
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
+		fvm.WithMaxStateInteractionSize(SystemChunkLedgerIntractionLimit),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 	)
 }
@@ -190,7 +190,7 @@ func (e *blockComputer) executeBlock(
 		colView := stateView.NewChild()
 		txIndex, err = e.executeCollection(blockSpan, collectionIndex, txIndex, blockCtx, colView, programs, collection, res)
 		if err != nil {
-			return nil, fmt.Errorf("failed to execute collection: %w", err)
+			return nil, fmt.Errorf("failed to execute collection at txIndex %v: %w", txIndex, err)
 		}
 		bc.Commit(colView)
 		eh.Hash(res.Events[i])
@@ -245,7 +245,7 @@ func (e *blockComputer) executeSystemCollection(
 		return txIndex, fmt.Errorf("could not get system chunk transaction: %w", err)
 	}
 
-	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
+	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res, true)
 	txIndex++
 
 	if err != nil {
@@ -300,7 +300,7 @@ func (e *blockComputer) executeCollection(
 
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
 	for _, txBody := range collection.Transactions {
-		err := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, collectionIndex, txIndex, res)
+		err := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, collectionIndex, txIndex, res, false)
 		txIndex++
 		if err != nil {
 			return txIndex, err
@@ -328,6 +328,7 @@ func (e *blockComputer) executeTransaction(
 	collectionIndex int,
 	txIndex uint32,
 	res *execution.ComputationResult,
+	isSystemChunk bool,
 ) error {
 	startedAt := time.Now()
 	txID := txBody.ID()
@@ -349,9 +350,13 @@ func (e *blockComputer) executeTransaction(
 	}
 	defer txInternalSpan.Finish()
 
-	e.log.Debug().
-		Hex("tx_id", logging.Entity(txBody)).
-		Msg("executing transaction")
+	e.log.Info().
+		Str("tx_id", txID.String()).
+		Uint32("tx_index", txIndex).
+		Str("block_id", res.ExecutableBlock.ID().String()).
+		Uint64("height", res.ExecutableBlock.Block.Header.Height).
+		Bool("system_chunk", isSystemChunk).
+		Msg("executing transaction in fvm")
 
 	tx := fvm.Transaction(txBody, txIndex)
 	if isSampled {
@@ -361,7 +366,11 @@ func (e *blockComputer) executeTransaction(
 	txView := collectionView.NewChild()
 	err := e.vm.Run(ctx, tx, txView, programs)
 	if err != nil {
-		return fmt.Errorf("failed to execute transaction: %w", err)
+		return fmt.Errorf("failed to execute transaction %v for block %v at height %v: %w",
+			txID.String(),
+			res.ExecutableBlock.ID(),
+			res.ExecutableBlock.Block.Header.Height,
+			err)
 	}
 
 	txResult := flow.TransactionResult{
@@ -370,26 +379,7 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	if tx.Err != nil {
-		// limit the size of transaction error that is going to be captured
-		errorMsg := tx.Err.Error()
-		if len(errorMsg) > MaxTransactionErrorStringSize {
-			split := int(MaxTransactionErrorStringSize/2) - 1
-			var sb strings.Builder
-			sb.WriteString(errorMsg[:split])
-			sb.WriteString(" ... ")
-			sb.WriteString(errorMsg[len(errorMsg)-split:])
-			errorMsg = sb.String()
-		}
-		txResult.ErrorMessage = errorMsg
-		e.log.Debug().
-			Hex("tx_id", logging.Entity(txBody)).
-			Str("error_message", errorMsg).
-			Uint16("error_code", uint16(tx.Err.Code())).
-			Msg("transaction execution failed")
-	} else {
-		e.log.Debug().
-			Hex("tx_id", logging.Entity(txBody)).
-			Msg("transaction executed successfully")
+		txResult.ErrorMessage = tx.Err.Error()
 	}
 
 	mergeSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEMergeTransactionView)
@@ -399,7 +389,8 @@ func (e *blockComputer) executeTransaction(
 	// of failed transaction invocation
 	err = collectionView.MergeView(txView)
 	if err != nil {
-		return fmt.Errorf("merging tx view to collection view failed: %w", err)
+		return fmt.Errorf("merging tx view to collection view failed for tx %v: %w",
+			txID.String(), err)
 	}
 
 	res.AddEvents(collectionIndex, tx.Events)
@@ -407,11 +398,22 @@ func (e *blockComputer) executeTransaction(
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
 
-	e.log.Info().
-		Str("txHash", tx.ID.String()).
+	lg := e.log.With().
+		Hex("tx_id", txResult.TransactionID[:]).
+		Str("block_id", res.ExecutableBlock.ID().String()).
 		Str("traceID", traceID).
+		Uint64("computation_used", txResult.ComputationUsed).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
-		Msg("transaction executed")
+		Logger()
+
+	if tx.Err != nil {
+		lg.Info().
+			Str("error_message", txResult.ErrorMessage).
+			Uint16("error_code", uint16(tx.Err.Code())).
+			Msg("transaction executed failed")
+	} else {
+		lg.Info().Msg("transaction executed successfully")
+	}
 
 	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
 	return nil
@@ -450,8 +452,8 @@ type eventHasher struct {
 func (eh *eventHasher) Run() {
 	for data := range eh.data {
 		span := eh.tracer.StartSpanFromParent(eh.blockSpan, trace.EXEHashEvents)
-		data, err := flow.EventsListHash(data)
-		eh.callBack(data, err)
+		rootHash, err := flow.EventsMerkleRootHash(data)
+		eh.callBack(rootHash, err)
 		span.Finish()
 	}
 }

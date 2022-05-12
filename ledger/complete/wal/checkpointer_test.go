@@ -2,8 +2,10 @@ package wal_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
@@ -20,8 +22,8 @@ import (
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -119,7 +121,7 @@ func Test_Checkpointing(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -168,8 +170,8 @@ func Test_Checkpointing(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "00000010")) //make sure we have enough segments saved
 		})
 
-		// create a new forest and reply WAL
-		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		// create a new forest and replay WAL
+		f2, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		t.Run("replay WAL and create checkpoint", func(t *testing.T) {
@@ -180,7 +182,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(forestSequencing *flattener.FlattenedForest) error {
+				func(tries []*trie.MTrie) error {
 					return fmt.Errorf("I should fail as there should be no checkpoints")
 				},
 				func(update *ledger.TrieUpdate) error {
@@ -206,7 +208,7 @@ func Test_Checkpointing(t *testing.T) {
 			<-wal2.Done()
 		})
 
-		f3, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f3, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
@@ -214,8 +216,8 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal3.Replay(
-				func(forestSequencing *flattener.FlattenedForest) error {
-					return loadIntoForest(f3, forestSequencing)
+				func(tries []*trie.MTrie) error {
+					return f3.AddTries(tries)
 				},
 				func(update *ledger.TrieUpdate) error {
 					return fmt.Errorf("I should fail as there should be no updates")
@@ -286,7 +288,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "00000011")) //make sure we have extra segment
 		})
 
-		f5, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f5, err := mtrie.NewForest(size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
@@ -296,8 +298,8 @@ func Test_Checkpointing(t *testing.T) {
 			updatesLeft := 1 // there should be only one update
 
 			err = wal5.Replay(
-				func(forestSequencing *flattener.FlattenedForest) error {
-					return loadIntoForest(f5, forestSequencing)
+				func(tries []*trie.MTrie) error {
+					return f5.AddTries(tries)
 				},
 				func(update *ledger.TrieUpdate) error {
 					if updatesLeft == 0 {
@@ -335,9 +337,17 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 
+		t.Run("advise to evict checkpoints from page cache", func(t *testing.T) {
+			logger := zerolog.Nop()
+			evictedFileNames, err := wal.EvictAllCheckpointsFromLinuxPageCache(dir, &logger)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(evictedFileNames))
+			require.Equal(t, path.Join(dir, "checkpoint.00000010"), evictedFileNames[0])
+		})
+
 		t.Run("corrupted checkpoints are skipped", func(t *testing.T) {
 
-			f6, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+			f6, err := mtrie.NewForest(size*10, metricsCollector, nil)
 			require.NoError(t, err)
 
 			wal6, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
@@ -417,6 +427,59 @@ func Test_Checkpointing(t *testing.T) {
 			}
 
 		})
+
+	})
+}
+
+func TestCheckpointFileError(t *testing.T) {
+
+	unittest.RunWithTempDir(t, func(dir string) {
+
+		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+		require.NoError(t, err)
+
+		// create WAL
+
+		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
+		values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+		update, err := ledger.NewUpdate(ledger.State(trie.EmptyTrieRootHash()), keys, values)
+		require.NoError(t, err)
+
+		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
+		require.NoError(t, err)
+
+		err = wal.RecordUpdate(trieUpdate)
+		require.NoError(t, err)
+
+		// some buffer time of the checkpointer to run
+		time.Sleep(1 * time.Second)
+		<-wal.Done()
+
+		require.FileExists(t, path.Join(dir, "00000001")) //make sure WAL segment is saved
+
+		wal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
+		require.NoError(t, err)
+
+		checkpointer, err := wal2.NewCheckpointer()
+		require.NoError(t, err)
+
+		t.Run("write error", func(t *testing.T) {
+			errWrite := errors.New("unexpected write error")
+
+			err = checkpointer.Checkpoint(1, func() (io.WriteCloser, error) {
+				return newWriteCloserWithErrors(errWrite, nil), nil
+			})
+			require.ErrorIs(t, err, errWrite)
+		})
+
+		t.Run("close error", func(t *testing.T) {
+			errClose := errors.New("unexpected close error")
+
+			err = checkpointer.Checkpoint(1, func() (io.WriteCloser, error) {
+				return newWriteCloserWithErrors(nil, errClose), nil
+			})
+			require.ErrorIs(t, err, errClose)
+		})
 	})
 }
 
@@ -442,7 +505,7 @@ func randomlyModifyFile(t *testing.T, filename string) {
 	require.NoError(t, err)
 
 	// byte addition will simply wrap around
-	buf[0] += 1
+	buf[0]++
 
 	_, err = file.WriteAt(buf, offset)
 	require.NoError(t, err)
@@ -450,57 +513,80 @@ func randomlyModifyFile(t *testing.T, filename string) {
 
 func Test_StoringLoadingCheckpoints(t *testing.T) {
 
-	// some hash will be literally copied into the output file
-	// so we can find it and modify - to make sure we get a different checksum
-	// but not fail process by, for example, modifying saved data length causing EOF
-	someHash := []byte{22, 22, 22}
-	forest := &flattener.FlattenedForest{
-		Nodes: []*flattener.StorableNode{
-			{}, {},
-		},
-		Tries: []*flattener.StorableTrie{
-			{}, {
-				RootHash: someHash,
-			},
-		},
-	}
-	buffer := &bytes.Buffer{}
+	unittest.RunWithTempDir(t, func(dir string) {
+		// some hash will be literally encoded in output file
+		// so we can find it and modify - to make sure we get a different checksum
+		// but not fail process by, for example, modifying saved data length causing EOF
 
-	err := realWAL.StoreCheckpoint(forest, buffer)
-	require.NoError(t, err)
+		emptyTrie := trie.NewEmptyMTrie()
 
-	// copy buffer data
-	bytes2 := buffer.Bytes()[:]
+		p1 := utils.PathByUint8(0)
+		v1 := utils.LightPayload8('A', 'a')
 
-	t.Run("works without data modification", func(t *testing.T) {
+		p2 := utils.PathByUint8(1)
+		v2 := utils.LightPayload8('B', 'b')
 
-		// first buffer reads ok
-		_, err = realWAL.ReadCheckpoint(buffer)
+		paths := []ledger.Path{p1, p2}
+		payloads := []ledger.Payload{*v1, *v2}
+
+		updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 		require.NoError(t, err)
+
+		someHash := updatedTrie.RootNode().LeftChild().Hash() // Hash of left child
+
+		file, err := ioutil.TempFile(dir, "temp-checkpoint")
+		filepath := file.Name()
+		require.NoError(t, err)
+
+		err = realWAL.StoreCheckpoint(file, updatedTrie)
+		require.NoError(t, err)
+
+		file.Close()
+
+		t.Run("works without data modification", func(t *testing.T) {
+			logger := zerolog.Nop()
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(tries))
+			require.Equal(t, updatedTrie, tries[0])
+		})
+
+		t.Run("detects modified data", func(t *testing.T) {
+			b, err := ioutil.ReadFile(filepath)
+			require.NoError(t, err)
+
+			index := bytes.Index(b, someHash[:])
+			require.NotEqual(t, -1, index)
+			b[index] = 23
+
+			err = os.WriteFile(filepath, b, 0644)
+			require.NoError(t, err)
+
+			logger := zerolog.Nop()
+			tries, err := realWAL.LoadCheckpoint(filepath, &logger)
+			require.Error(t, err)
+			require.Nil(t, tries)
+			require.Contains(t, err.Error(), "checksum")
+		})
 	})
-
-	t.Run("detects modified data", func(t *testing.T) {
-
-		index := bytes.Index(bytes2, someHash)
-		bytes2[index] = 23
-
-		_, err = realWAL.ReadCheckpoint(bytes.NewBuffer(bytes2))
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "checksum")
-	})
-
 }
 
-func loadIntoForest(forest *mtrie.Forest, forestSequencing *flattener.FlattenedForest) error {
-	tries, err := flattener.RebuildTries(forestSequencing)
-	if err != nil {
-		return err
+type writeCloserWithErrors struct {
+	writeError error
+	closeError error
+}
+
+func newWriteCloserWithErrors(writeError error, closeError error) *writeCloserWithErrors {
+	return &writeCloserWithErrors{
+		writeError: writeError,
+		closeError: closeError,
 	}
-	for _, t := range tries {
-		err := forest.AddTrie(t)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+}
+
+func (wc *writeCloserWithErrors) Write(p []byte) (n int, err error) {
+	return 0, wc.writeError
+}
+
+func (wc *writeCloserWithErrors) Close() error {
+	return wc.closeError
 }

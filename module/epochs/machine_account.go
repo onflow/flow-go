@@ -24,41 +24,84 @@ var (
 	// in perpetuity for a hard limit.
 	// Taken from https://www.notion.so/dapperlabs/Machine-Account-f3c293593ea442a39614fcebf705a132
 
-	SoftMinBalanceLN cadence.UFix64
-	HardMinBalanceLN cadence.UFix64
-	SoftMinBalanceSN cadence.UFix64
-	HardMinBalanceSN cadence.UFix64
-)
-
-const (
-	checkMachineAccountRetryBase = time.Second * 5
-	checkMachineAccountRetryMax  = time.Minute * 10
+	defaultSoftMinBalanceLN cadence.UFix64
+	defaultHardMinBalanceLN cadence.UFix64
+	defaultSoftMinBalanceSN cadence.UFix64
+	defaultHardMinBalanceSN cadence.UFix64
 )
 
 func init() {
 	var err error
-	SoftMinBalanceLN, err = cadence.NewUFix64("0.0025")
+	defaultSoftMinBalanceLN, err = cadence.NewUFix64("0.0025")
 	if err != nil {
 		panic(fmt.Errorf("could not convert soft min balance for LN: %w", err))
 	}
-	HardMinBalanceLN, err = cadence.NewUFix64("0.001")
+	defaultHardMinBalanceLN, err = cadence.NewUFix64("0.002")
 	if err != nil {
 		panic(fmt.Errorf("could not convert hard min balance for LN: %w", err))
 	}
-	SoftMinBalanceSN, err = cadence.NewUFix64("0.125")
+	defaultSoftMinBalanceSN, err = cadence.NewUFix64("0.125")
 	if err != nil {
 		panic(fmt.Errorf("could not convert soft min balance for SN: %w", err))
 	}
-	HardMinBalanceSN, err = cadence.NewUFix64("0.05")
+	defaultHardMinBalanceSN, err = cadence.NewUFix64("0.05")
 	if err != nil {
 		panic(fmt.Errorf("could not convert hard min balance for SN: %w", err))
 	}
 }
 
+const (
+	checkMachineAccountRetryBase      = time.Second * 5
+	checkMachineAccountRetryMax       = time.Minute * 10
+	checkMachineAccountRetryJitterPct = 5
+)
+
+// checkMachineAccountRetryBackoff returns the default backoff for checking
+// machine account configs.
+// * exponential backoff with base of 5s
+// * maximum inter-check wait of 10m
+// * 5% jitter
+func checkMachineAccountRetryBackoff() retry.Backoff {
+	backoff := retry.NewExponential(checkMachineAccountRetryBase)
+	backoff = retry.WithCappedDuration(checkMachineAccountRetryMax, backoff)
+	backoff = retry.WithJitterPercent(checkMachineAccountRetryJitterPct, backoff)
+	return backoff
+}
+
+// MachineAccountValidatorConfig defines configuration options for MachineAccountConfigValidator.
+type MachineAccountValidatorConfig struct {
+	SoftMinBalanceLN cadence.UFix64
+	HardMinBalanceLN cadence.UFix64
+	SoftMinBalanceSN cadence.UFix64
+	HardMinBalanceSN cadence.UFix64
+}
+
+func DefaultMachineAccountValidatorConfig() MachineAccountValidatorConfig {
+	return MachineAccountValidatorConfig{
+		SoftMinBalanceLN: defaultSoftMinBalanceLN,
+		HardMinBalanceLN: defaultHardMinBalanceLN,
+		SoftMinBalanceSN: defaultSoftMinBalanceSN,
+		HardMinBalanceSN: defaultHardMinBalanceSN,
+	}
+}
+
+// WithoutBalanceChecks sets minimum balances to 0 to effectively disable minimum
+// balance checks. This is useful for test networks where transaction fees are
+// disabled.
+func WithoutBalanceChecks(conf *MachineAccountValidatorConfig) {
+	conf.SoftMinBalanceLN = 0
+	conf.HardMinBalanceLN = 0
+	conf.SoftMinBalanceSN = 0
+	conf.HardMinBalanceSN = 0
+}
+
+type MachineAccountValidatorConfigOption func(*MachineAccountValidatorConfig)
+
 // MachineAccountConfigValidator is used to validate that a machine account is
 // configured correctly.
 type MachineAccountConfigValidator struct {
 	unit   *engine.Unit
+	config MachineAccountValidatorConfig
 	log    zerolog.Logger
 	client *client.Client
 	role   flow.Role
@@ -70,9 +113,17 @@ func NewMachineAccountConfigValidator(
 	flowClient *client.Client,
 	role flow.Role,
 	info bootstrap.NodeMachineAccountInfo,
+	opts ...MachineAccountValidatorConfigOption,
 ) (*MachineAccountConfigValidator, error) {
+
+	conf := DefaultMachineAccountValidatorConfig()
+	for _, apply := range opts {
+		apply(&conf)
+	}
+
 	validator := &MachineAccountConfigValidator{
 		unit:   engine.NewUnit(),
+		config: conf,
 		log:    log.With().Str("component", "machine_account_config_validator").Logger(),
 		client: flowClient,
 		role:   role,
@@ -107,16 +158,9 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 
 	log := validator.log
 
-	expRetry, err := retry.NewExponential(checkMachineAccountRetryBase)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create machine account check retry")
-	}
-	backoff := retry.WithJitterPercent(
-		5, // 5% jitter
-		retry.WithCappedDuration(checkMachineAccountRetryMax, expRetry),
-	)
+	backoff := checkMachineAccountRetryBackoff()
 
-	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
+	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
 		account, err := validator.client.GetAccount(ctx, validator.info.SDKAddress())
 		if err != nil {
 			// we cannot validate a correct configuration - log an error and try again
@@ -127,7 +171,7 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 			return retry.RetryableError(err)
 		}
 
-		err = CheckMachineAccountInfo(log, validator.role, validator.info, account)
+		err = CheckMachineAccountInfo(log, validator.config, validator.role, validator.info, account)
 		if err != nil {
 			// either we cannot validate the configuration or there is a critical
 			// misconfiguration - log a warning and retry - we will continue checking
@@ -144,7 +188,7 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 		return
 	}
 
-	log.Info().Msg("confirmed valid machine account configuration")
+	log.Info().Msg("confirmed valid machine account configuration. machine account config validator exiting...")
 }
 
 // CheckMachineAccountInfo checks a node machine account config, logging
@@ -158,6 +202,7 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 //
 func CheckMachineAccountInfo(
 	log zerolog.Logger,
+	conf MachineAccountValidatorConfig,
 	role flow.Role,
 	info bootstrap.NodeMachineAccountInfo,
 	account *sdk.Account,
@@ -226,18 +271,18 @@ func CheckMachineAccountInfo(
 
 	switch role {
 	case flow.RoleCollection:
-		if balance < HardMinBalanceLN {
-			return fmt.Errorf("machine account balance is below hard minimum (%s < %s)", balance, HardMinBalanceLN)
+		if balance < conf.HardMinBalanceLN {
+			return fmt.Errorf("machine account balance is below hard minimum (%s < %s)", balance, conf.HardMinBalanceLN)
 		}
-		if balance < SoftMinBalanceLN {
-			log.Warn().Msgf("machine account balance is below recommended balance (%s < %s)", balance, SoftMinBalanceLN)
+		if balance < conf.SoftMinBalanceLN {
+			log.Warn().Msgf("machine account balance is below recommended balance (%s < %s)", balance, conf.SoftMinBalanceLN)
 		}
 	case flow.RoleConsensus:
-		if balance < HardMinBalanceSN {
-			return fmt.Errorf("machine account balance is below hard minimum (%s < %s)", balance, HardMinBalanceSN)
+		if balance < conf.HardMinBalanceSN {
+			return fmt.Errorf("machine account balance is below hard minimum (%s < %s)", balance, conf.HardMinBalanceSN)
 		}
-		if balance < SoftMinBalanceSN {
-			log.Warn().Msgf("machine account balance is below recommended balance (%s < %s)", balance, SoftMinBalanceSN)
+		if balance < conf.SoftMinBalanceSN {
+			log.Warn().Msgf("machine account balance is below recommended balance (%s < %s)", balance, conf.SoftMinBalanceSN)
 		}
 	default:
 		// sanity check - should be caught earlier in this function

@@ -1,7 +1,6 @@
 package complete_test
 
 import (
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
@@ -36,7 +35,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	valueMaxByteSize := 32
 	rand.Seed(time.Now().UnixNano())
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
+	dir, err := os.MkdirTemp("", "test-mtrie-")
 	defer os.RemoveAll(dir)
 	if err != nil {
 		b.Fatal(err)
@@ -144,7 +143,7 @@ func BenchmarkTrieUpdate(b *testing.B) {
 	valueMaxByteSize := 32
 	rand.Seed(1)
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
+	dir, err := os.MkdirTemp("", "test-mtrie-")
 	defer os.RemoveAll(dir)
 	if err != nil {
 		b.Fatal(err)
@@ -192,7 +191,7 @@ func BenchmarkTrieRead(b *testing.B) {
 	valueMaxByteSize := 32
 	rand.Seed(1)
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
+	dir, err := os.MkdirTemp("", "test-mtrie-")
 	defer os.RemoveAll(dir)
 	if err != nil {
 		b.Fatal(err)
@@ -250,7 +249,7 @@ func BenchmarkTrieProve(b *testing.B) {
 	valueMaxByteSize := 32
 	rand.Seed(1)
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
+	dir, err := os.MkdirTemp("", "test-mtrie-")
 	defer os.RemoveAll(dir)
 	if err != nil {
 		b.Fatal(err)

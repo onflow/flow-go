@@ -3,13 +3,15 @@ package testnet
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
@@ -42,6 +44,8 @@ func init() {
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
 	bootstrap.NodeInfo
+	// Corrupted indicates a container is running a binary implementing a malicious node
+	Corrupted             bool
 	ContainerName         string
 	LogLevel              zerolog.Level
 	Ghost                 bool
@@ -50,7 +54,7 @@ type ContainerConfig struct {
 	SupportsUnstakedNodes bool
 }
 
-func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID, machineAccountAddr flow.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
+func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr sdk.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
 	// write staking and machine account private key files
 	writeJSONFile := func(relativePath string, val interface{}) error {
 		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
@@ -72,7 +76,7 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID
 	}
 
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		err = utils.WriteMachineAccountFile(chainID, c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
+		err = utils.WriteMachineAccountFile(c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
 		if err != nil {
 			return fmt.Errorf("failed to write machine account file: %w", err)
 		}
@@ -80,6 +84,7 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID
 
 	return nil
 }
+
 // GetPrivateNodeInfoAddress returns the node's address <name>:<port>
 func GetPrivateNodeInfoAddress(nodeName string) string {
 	return fmt.Sprintf("%s:%d", nodeName, DefaultFlowPort)
@@ -90,7 +95,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		conf.Identifier,
 		conf.Role,
 		GetPrivateNodeInfoAddress(nodeName),
-		conf.Stake,
+		conf.Weight,
 		networkKey,
 		stakingKey,
 	)
@@ -103,6 +108,7 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 		AdditionalFlags:       conf.AdditionalFlags,
 		Debug:                 conf.Debug,
 		SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
+		Corrupted:             conf.Corrupted,
 	}
 
 	return containerConf
@@ -116,7 +122,10 @@ func (c *ContainerConfig) ImageName() string {
 	debugSuffix := ""
 	if c.Debug {
 		debugSuffix = "-debug"
+	} else if c.Corrupted {
+		debugSuffix = "-corrupted"
 	}
+
 	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), debugSuffix)
 }
 
@@ -178,8 +187,8 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 
 }
 
-// addFlag adds a command line flag to the container's startup command.
-func (c *Container) addFlag(flag, val string) {
+// AddFlag adds a command line flag to the container's startup command.
+func (c *Container) AddFlag(flag, val string) {
 	c.opts.Config.Cmd = append(
 		c.opts.Config.Cmd,
 		fmt.Sprintf("--%s=%s", flag, val),
@@ -236,7 +245,7 @@ func (c *Container) Pause() error {
 
 	err := c.net.cli.ContainerStop(ctx, c.ID, &checkContainerTimeout)
 	if err != nil {
-		return fmt.Errorf("could not stop container: %w", err)
+		return fmt.Errorf("could not stop container with ID (%s): %w", c.ID, err)
 	}
 
 	err = c.waitForCondition(ctx, containerStopped)
