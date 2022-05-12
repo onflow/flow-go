@@ -10,9 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -38,6 +40,7 @@ func (cs *ComplianceSuite) SetupTest() {
 		return channel
 	}()
 
+	cs.hotstuff.On("Start", mock.Anything)
 	cs.hotstuff.On("Ready", mock.Anything).Return(ready)
 	<-cs.engine.Ready()
 }
@@ -162,7 +165,12 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 				View:    rand.Uint64(),
 				SigData: unittest.SignatureFixture(),
 			}
-			cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+			cs.voteAggregator.On("AddVote", &model.Vote{
+				View:     vote.View,
+				BlockID:  vote.BlockID,
+				SignerID: originID,
+				SigData:  vote.SigData,
+			}).Return().Once()
 			// execute the vote submission
 			_ = cs.engine.Process(engine.ConsensusCommittee, originID, &vote)
 		}
@@ -186,8 +194,9 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 	time.Sleep(time.Second)
 
-	// check the submit vote was called with correct parameters
+	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
+	cs.voteAggregator.AssertExpectations(cs.T())
 }
 
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
@@ -201,4 +210,21 @@ func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
 	err = cs.engine.ProcessLocal(invalidEvent)
 	require.Error(cs.T(), err)
 	require.True(cs.T(), engine.IsIncompatibleInputTypeError(err))
+}
+
+// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+// Tests the whole processing pipeline.
+func (cs *ComplianceSuite) TestOnFinalizedBlock() {
+	finalizedBlock := unittest.BlockHeaderFixture()
+	cs.head = &finalizedBlock
+
+	*cs.pending = modulemock.PendingBlockBuffer{}
+	cs.pending.On("PruneByView", finalizedBlock.View).Return(nil).Once()
+	cs.pending.On("Size").Return(uint(0)).Once()
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(&finalizedBlock, finalizedBlock.View-1))
+
+	require.Eventually(cs.T(),
+		func() bool {
+			return cs.pending.AssertCalled(cs.T(), "PruneByView", finalizedBlock.View)
+		}, time.Second, time.Millisecond*20)
 }

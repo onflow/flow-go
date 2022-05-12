@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -11,12 +12,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
@@ -47,7 +49,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -55,14 +57,16 @@ import (
 	"github.com/onflow/flow-go/module/chunks"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/epochs"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/signature"
+	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
@@ -148,9 +152,14 @@ func GenericNodeWithStateFixture(t testing.TB,
 	chainID flow.ChainID) testmock.GenericNode {
 
 	me := LocalFixture(t, identity)
-	stubnet := stub.NewNetwork(stateFixture.State, me, hub)
+	net := stub.NewNetwork(t, identity.NodeID, hub)
+
+	parentCtx, cancel := context.WithCancel(context.Background())
+	ctx, _ := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
+		Ctx:            ctx,
+		Cancel:         cancel,
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
@@ -163,7 +172,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Payloads:       stateFixture.Storage.Payloads,
 		Blocks:         stateFixture.Storage.Blocks,
 		Me:             me,
-		Net:            stubnet,
+		Net:            net,
 		DBDir:          stateFixture.DBDir,
 		ChainID:        chainID,
 		ProtocolEvents: stateFixture.ProtocolEvents,
@@ -226,16 +235,23 @@ func CompleteStateFixture(
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
 
-	node := GenericNode(t, hub, identity, rootSnapshot)
+	node := GenericNode(t, hub, identity.Identity(), rootSnapshot)
+	privKeys, err := identity.PrivateKeys()
+	require.NoError(t, err)
+	node.Me, err = local.New(identity.Identity(), privKeys.StakingKey)
+	require.NoError(t, err)
 
-	pools := epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
+	pools := epochs.NewTransactionPools(
+		func(_ uint64) mempool.Transactions {
+			return herocache.NewTransactions(1000, node.Log, metrics.NewNoopCollector())
+		})
 	transactions := storage.NewTransactions(node.Metrics, node.PublicDB)
 	collections := storage.NewCollections(node.PublicDB, transactions)
 	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.PublicDB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
 
 	selector := filter.HasRole(flow.RoleAccess, flow.RoleVerification)
@@ -284,21 +300,12 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	)
 	require.NoError(t, err)
 
-	// create an aggregated signature provider which produces fake signatures and
-	// considers all verification inputs as valid
-	aggregator := new(mockmodule.AggregatingSigner)
-	aggregator.On("Sign", mock.Anything).Return(unittest.SignatureFixture(), nil)
-	aggregator.On("Aggregate", mock.Anything).Return(unittest.SignatureFixture(), nil)
-	aggregator.On("VerifyMany", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-	aggregator.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-
 	createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
 		return metrics.NewNoopCollector()
 	}
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
-		aggregator,
 		node.PublicDB,
 		node.State,
 		createMetrics,
@@ -347,24 +354,6 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	}
 }
 
-// CollectionNodes returns n collection nodes connected to the given hub.
-func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int) []testmock.CollectionNode {
-
-	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
-	// add some extra dummy identities so we have one of each role
-	others := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(flow.RoleCollection))
-
-	identities := append(colIdentities, others...)
-	root := unittest.RootSnapshotFixture(identities)
-
-	nodes := make([]testmock.CollectionNode, 0, len(colIdentities))
-	for _, identity := range colIdentities {
-		nodes = append(nodes, CollectionNode(t, hub, identity, root))
-	}
-
-	return nodes
-}
-
 func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID) testmock.ConsensusNode {
 
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
@@ -393,10 +382,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals,
-		signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
-
-	approvalVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
 
 	sealingConfig := sealing.DefaultConfig()
 
@@ -416,7 +402,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		node.Seals,
 		assigner,
-		approvalVerifier,
 		seals,
 		sealingConfig)
 	require.NoError(t, err)
@@ -498,8 +483,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.PublicDB, receipts)
-	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
+	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
@@ -536,7 +521,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
@@ -549,7 +534,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock, 10, 10,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkAuthorizedAtBlock, 10, 10,
 	)
 	require.NoError(t, err)
 
@@ -566,6 +551,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
 
+	eds := new(state_synchronization.ExecutionDataService)
+	eds.On("Add", mock.Anything, mock.Anything).Return(flow.ZeroID, nil, nil)
+
+	edCache := new(state_synchronization.ExecutionDataCIDCache)
+	edCache.On("Insert", mock.AnythingOfType("*flow.Header"), mock.AnythingOfType("BlobTree"))
+
 	computationEngine, err := computation.New(
 		node.Log,
 		node.Metrics,
@@ -577,7 +568,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultProgramsCacheSize,
 		committer,
 		computation.DefaultScriptLogThreshold,
+		computation.DefaultScriptExecutionTimeLimit,
 		nil,
+		eds,
+		edCache,
 	)
 	require.NoError(t, err)
 
@@ -615,7 +609,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		deltas,
 		syncThreshold,
 		false,
-		checkStakedAtBlock,
+		checkAuthorizedAtBlock,
 		false,
 	)
 	require.NoError(t, err)
@@ -739,8 +733,8 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 
 	// mock finalization updater
 	verifier := &mockhotstuff.Verifier{}
-	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
 

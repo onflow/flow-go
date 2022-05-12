@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -50,7 +51,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	// initialize the paramaters
 	cs.cluster = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleCollection),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	cs.myID = cs.cluster[0].NodeID
 
@@ -120,7 +121,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	// set up network module mock
 	cs.net = &mocknetwork.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
+		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
 		},
 		nil,
@@ -136,6 +137,7 @@ func (cs *ComplianceSuite) SetupTest() {
 		return channel
 	}()
 
+	cs.hotstuff.On("Start", mock.Anything)
 	cs.hotstuff.On("Ready", mock.Anything).Return(ready)
 	<-cs.engine.Ready()
 }
@@ -259,7 +261,12 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 				View:    rand.Uint64(),
 				SigData: unittest.SignatureFixture(),
 			}
-			cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+			cs.voteAggregator.On("AddVote", &model.Vote{
+				View:     vote.View,
+				BlockID:  vote.BlockID,
+				SignerID: originID,
+				SigData:  vote.SigData,
+			}).Return().Once()
 			// execute the vote submission
 			_ = cs.engine.Process(channel, originID, &vote)
 		}
@@ -288,6 +295,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
+	cs.voteAggregator.AssertExpectations(cs.T())
 }
 
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
@@ -301,4 +309,21 @@ func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
 	err = cs.engine.ProcessLocal(invalidEvent)
 	require.Error(cs.T(), err)
 	require.True(cs.T(), engine.IsIncompatibleInputTypeError(err))
+}
+
+// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+// Tests the whole processing pipeline.
+func (cs *ComplianceSuite) TestOnFinalizedBlock() {
+	finalizedBlock := unittest.ClusterBlockFixture()
+	cs.head = &finalizedBlock
+
+	*cs.pending = module.PendingClusterBlockBuffer{}
+	cs.pending.On("PruneByView", finalizedBlock.Header.View).Return(nil).Once()
+	cs.pending.On("Size").Return(uint(0)).Once()
+	cs.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock.Header, finalizedBlock.Header.View-1))
+
+	require.Eventually(cs.T(),
+		func() bool {
+			return cs.pending.AssertCalled(cs.T(), "PruneByView", finalizedBlock.Header.View)
+		}, time.Second, time.Millisecond*20)
 }

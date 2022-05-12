@@ -80,7 +80,7 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 		}
 	}()
 
-	conn, err := grpc.Dial("unix:///"+suite.runner.grpcAddress, grpc.WithInsecure())
+	conn, err := grpc.Dial("unix:///"+suite.runner.grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
 	suite.NoError(err)
 	suite.conn = conn
 	suite.client = pb.NewAdminClient(conn)
@@ -271,7 +271,7 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 	url := fmt.Sprintf("http://%s/admin/run_command", suite.httpAddress)
 	reqBody := bytes.NewBuffer([]byte(`{"commandName": "foo", "data": {"key": "value"}}`))
 	resp, err := http.Post(url, "application/json", reqBody)
-	suite.NoError(err)
+	require.NoError(suite.T(), err)
 	defer func() {
 		if resp.Body != nil {
 			resp.Body.Close()
@@ -458,7 +458,7 @@ func (suite *CommandRunnerSuite) TestTLS() {
 	url := fmt.Sprintf("https://%s/admin/run_command", suite.httpAddress)
 	reqBody := bytes.NewBuffer([]byte(`{"commandName": "foo", "data": {"key": "value"}}`))
 	resp, err := client.Post(url, "application/json", reqBody)
-	suite.NoError(err)
+	require.NoError(suite.T(), err)
 	defer resp.Body.Close()
 
 	suite.True(called)

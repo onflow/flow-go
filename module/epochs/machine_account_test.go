@@ -3,6 +3,7 @@ package epochs
 import (
 	"testing"
 
+	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,47 +20,49 @@ import (
 // In these tests, local refers to the machine account from the local file,
 // remote refers to the machine account from on-chain.
 func TestMachineAccountChecking(t *testing.T) {
+	conf := DefaultMachineAccountValidatorConfig()
+
 	t.Run("consistent machine account", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
-		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
+		err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 		require.NoError(t, err)
 	})
 	t.Run("inconsistent address", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
 		remote.Address = unittest.RandomSDKAddressFixture()
-		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
+		err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 		require.Error(t, err)
 	})
 	t.Run("inconsistent key", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
 		randomKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
 		remote.Keys[0].PublicKey = randomKey.PublicKey()
-		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
+		err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 		require.Error(t, err)
 	})
 	t.Run("inconsistent hash algo", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
 		remote.Keys[0].HashAlgo = sdkcrypto.SHA2_384
-		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
+		err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 		require.Error(t, err)
 	})
 	t.Run("inconsistent sig algo", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
 		remote.Keys[0].SigAlgo = sdkcrypto.ECDSA_secp256k1
-		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
+		err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 		require.Error(t, err)
 	})
 	t.Run("account without keys", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
 		remote.Keys = nil
-		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
+		err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 		require.Error(t, err)
 	})
 	t.Run("account with insufficient keys", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
 		// increment key index so it doesn't match remote account
 		local.KeyIndex = local.KeyIndex + 1
-		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
+		err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 		require.Error(t, err)
 	})
 	t.Run("invalid role", func(t *testing.T) {
@@ -70,7 +73,7 @@ func TestMachineAccountChecking(t *testing.T) {
 				continue
 			}
 
-			err := CheckMachineAccountInfo(zerolog.Nop(), role, local, remote)
+			err := CheckMachineAccountInfo(zerolog.Nop(), conf, role, local, remote)
 			require.Error(t, err)
 		}
 	})
@@ -78,15 +81,36 @@ func TestMachineAccountChecking(t *testing.T) {
 	t.Run("account with < hard minimum balance", func(t *testing.T) {
 		t.Run("collection", func(t *testing.T) {
 			local, remote := unittest.MachineAccountFixture(t)
-			remote.Balance = uint64(HardMinBalanceLN) - 1
-			err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleCollection, local, remote)
+			remote.Balance = uint64(defaultHardMinBalanceLN) - 1
+			err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleCollection, local, remote)
 			require.Error(t, err)
 		})
 		t.Run("consensus", func(t *testing.T) {
 			local, remote := unittest.MachineAccountFixture(t)
-			remote.Balance = uint64(HardMinBalanceSN) - 1
-			err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
+			remote.Balance = uint64(defaultHardMinBalanceSN) - 1
+			err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 			require.Error(t, err)
+		})
+	})
+
+	t.Run("disable balance checking", func(t *testing.T) {
+		minBalance, err := cadence.NewUFix64("0.001")
+		require.NoError(t, err)
+
+		balanceDisabledConfig := DefaultMachineAccountValidatorConfig()
+		WithoutBalanceChecks(&balanceDisabledConfig)
+
+		t.Run("collection", func(t *testing.T) {
+			local, remote := unittest.MachineAccountFixture(t)
+			remote.Balance = uint64(minBalance)
+			err := CheckMachineAccountInfo(zerolog.Nop(), balanceDisabledConfig, flow.RoleCollection, local, remote)
+			require.NoError(t, err)
+		})
+		t.Run("consensus", func(t *testing.T) {
+			local, remote := unittest.MachineAccountFixture(t)
+			remote.Balance = uint64(minBalance)
+			err := CheckMachineAccountInfo(zerolog.Nop(), balanceDisabledConfig, flow.RoleConsensus, local, remote)
+			require.NoError(t, err)
 		})
 	})
 
@@ -95,19 +119,19 @@ func TestMachineAccountChecking(t *testing.T) {
 	t.Run("account with < soft minimum balance", func(t *testing.T) {
 		t.Run("collection", func(t *testing.T) {
 			local, remote := unittest.MachineAccountFixture(t)
-			remote.Balance = uint64(SoftMinBalanceLN) - 1
+			remote.Balance = uint64(defaultSoftMinBalanceLN) - 1
 			log, hook := unittest.HookedLogger()
 
-			err := CheckMachineAccountInfo(log, flow.RoleCollection, local, remote)
+			err := CheckMachineAccountInfo(log, conf, flow.RoleCollection, local, remote)
 			assert.NoError(t, err)
 			assert.Regexp(t, "machine account balance is below recommended balance", hook.Logs())
 		})
 		t.Run("consensus", func(t *testing.T) {
 			local, remote := unittest.MachineAccountFixture(t)
-			remote.Balance = uint64(SoftMinBalanceSN) - 1
+			remote.Balance = uint64(defaultSoftMinBalanceSN) - 1
 			log, hook := unittest.HookedLogger()
 
-			err := CheckMachineAccountInfo(log, flow.RoleConsensus, local, remote)
+			err := CheckMachineAccountInfo(log, conf, flow.RoleConsensus, local, remote)
 			assert.NoError(t, err)
 			assert.Regexp(t, "machine account balance is below recommended balance", hook.Logs())
 		})
@@ -121,7 +145,7 @@ func TestMachineAccountChecking(t *testing.T) {
 			remote.Keys[0].HashAlgo = sdkcrypto.SHA3_384 // consistent between local/remote
 			log, hook := unittest.HookedLogger()
 
-			err := CheckMachineAccountInfo(log, flow.RoleConsensus, local, remote)
+			err := CheckMachineAccountInfo(log, conf, flow.RoleConsensus, local, remote)
 			assert.NoError(t, err)
 			assert.Regexp(t, "non-standard hash algo", hook.Logs())
 		})
@@ -137,7 +161,7 @@ func TestMachineAccountChecking(t *testing.T) {
 			remote.Keys[0].SigAlgo = sdkcrypto.ECDSA_secp256k1
 			log, hook := unittest.HookedLogger()
 
-			err := CheckMachineAccountInfo(log, flow.RoleConsensus, local, remote)
+			err := CheckMachineAccountInfo(log, conf, flow.RoleConsensus, local, remote)
 			assert.NoError(t, err)
 			assert.Regexp(t, "non-standard signing algo", hook.Logs())
 		})
@@ -148,9 +172,35 @@ func TestMachineAccountChecking(t *testing.T) {
 			remote.Keys[1].Index = 1
 			log, hook := unittest.HookedLogger()
 
-			err := CheckMachineAccountInfo(log, flow.RoleConsensus, local, remote)
+			err := CheckMachineAccountInfo(log, conf, flow.RoleConsensus, local, remote)
 			assert.NoError(t, err)
 			assert.Regexp(t, "non-standard key index", hook.Logs())
 		})
 	})
+}
+
+// TestBackoff tests the backoff config behaves as expected. In particular, once
+// we reach the cap duration, all future backoffs should be equal to the cap duration.
+func TestMachineAccountValidatorBackoff_Overflow(t *testing.T) {
+
+	backoff := checkMachineAccountRetryBackoff()
+
+	// once the backoff reaches the maximum, it should remain in [(1-jitter)*max,(1+jitter*max)]
+	max := checkMachineAccountRetryMax + checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
+	min := checkMachineAccountRetryMax - checkMachineAccountRetryMax*(checkMachineAccountRetryJitterPct+1)/100
+
+	lastWait, stop := backoff.Next()
+	assert.False(t, stop)
+	for i := 0; i < 100; i++ {
+		wait, stop := backoff.Next()
+		assert.False(t, stop)
+		// the backoff value should either:
+		// * strictly increase, or
+		// * be within range of max duration + jitter
+		if wait < lastWait {
+			assert.Less(t, min, wait)
+			assert.Less(t, wait, max)
+		}
+		lastWait = wait
+	}
 }

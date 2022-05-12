@@ -11,7 +11,16 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/seed"
 )
+
+const Randomized = Name("randomized")
+
+func RandomizedTopologyFactory() FactoryFunction {
+	return func(nodeId flow.Identifier, logger zerolog.Logger, state protocol.State, edgeProb float64) (network.Topology, error) {
+		return NewRandomizedTopology(nodeId, logger, edgeProb, state)
+	}
+}
 
 // RandomizedTopology generates a random topology per channel.
 // By random topology we mean a node is connected to any other co-channel nodes with some
@@ -33,12 +42,14 @@ func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgePr
 		return nil, fmt.Errorf("randomized topology probability should in in range of [0.01, 1], wrong value: %f", edgeProb)
 	}
 
-	// generates seed and random number generator
-	seed, err := byteSeedFromID(nodeID)
+	// generates a random number generator seed
+	randomSeed, err := byteSeedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed from id:%w", err)
 	}
-	rng, err := random.NewRand(seed)
+	// generates a pseudo-random number generator.
+	// the customizer doen't need to be a protocol-wide constant.
+	rng, err := seed.PRGFromRandomSource(randomSeed, []byte("net_topology"))
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random number generator: %w", err)
 	}

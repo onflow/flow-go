@@ -11,10 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	realModule "github.com/onflow/flow-go/module"
 	real "github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -46,20 +49,21 @@ type ComplianceCoreSuite struct {
 	childrenDB map[flow.Identifier][]*flow.PendingBlock
 
 	// mocked dependencies
-	me       *module.Local
-	metrics  *metrics.NoopCollector
-	tracer   realModule.Tracer
-	cleaner  *storage.Cleaner
-	headers  *storage.Headers
-	payloads *storage.Payloads
-	state    *protocol.MutableState
-	snapshot *protocol.Snapshot
-	con      *mocknetwork.Conduit
-	net      *mocknetwork.Network
-	prov     *mocknetwork.Engine
-	pending  *module.PendingBlockBuffer
-	hotstuff *module.HotStuff
-	sync     *module.BlockRequester
+	me             *module.Local
+	metrics        *metrics.NoopCollector
+	tracer         realModule.Tracer
+	cleaner        *storage.Cleaner
+	headers        *storage.Headers
+	payloads       *storage.Payloads
+	state          *protocol.MutableState
+	snapshot       *protocol.Snapshot
+	con            *mocknetwork.Conduit
+	net            *mocknetwork.Network
+	prov           *mocknetwork.Engine
+	pending        *module.PendingBlockBuffer
+	hotstuff       *module.HotStuff
+	sync           *module.BlockRequester
+	voteAggregator *hotstuff.VoteAggregator
 
 	// engine under test
 	core *Core
@@ -72,7 +76,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// initialize the paramaters
 	cs.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithStake(1000),
+		unittest.WithWeight(1000),
 	)
 	cs.myID = cs.participants[0].NodeID
 	block := unittest.BlockFixture()
@@ -181,7 +185,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up network module mock
 	cs.net = &mocknetwork.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
+		func(channel netint.Channel, engine netint.MessageProcessor) netint.Conduit {
 			return cs.con
 		},
 		nil,
@@ -214,7 +218,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByHeight", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return()
 
 	closed := func() <-chan struct{} {
 		channel := make(chan struct{})
@@ -224,6 +228,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 
 	// set up hotstuff module mock
 	cs.hotstuff = &module.HotStuff{}
+
+	cs.voteAggregator = &hotstuff.VoteAggregator{}
 
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
@@ -237,7 +243,20 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.tracer = trace.NewNoopTracer()
 
 	// initialize the engine
-	e, err := NewCore(unittest.Logger(), cs.metrics, cs.tracer, cs.metrics, cs.metrics, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.pending, cs.sync)
+	e, err := NewCore(
+		unittest.Logger(),
+		cs.metrics,
+		cs.tracer,
+		cs.metrics,
+		cs.metrics,
+		cs.cleaner,
+		cs.headers,
+		cs.payloads,
+		cs.state,
+		cs.pending,
+		cs.sync,
+		cs.voteAggregator,
+	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	cs.core = e
@@ -292,6 +311,22 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
+}
+
+func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
+
+	// create a proposal which is far enough ahead to be dropped
+	originID := cs.participants[1].NodeID
+	block := unittest.BlockFixture()
+	block.Header.Height = cs.head.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	proposal := unittest.ProposalFromBlock(&block)
+
+	err := cs.core.OnBlockProposal(originID, proposal)
+	require.NoError(cs.T(), err)
+
+	// block should be dropped - not added to state or cache
+	cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
 
 func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
@@ -367,7 +402,6 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 }
 
 func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
-
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	vote := messages.BlockVote{
@@ -376,13 +410,18 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 		SigData: unittest.SignatureFixture(),
 	}
 
-	cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+	cs.voteAggregator.On("AddVote", &model.Vote{
+		View:     vote.View,
+		BlockID:  vote.BlockID,
+		SignerID: originID,
+		SigData:  vote.SigData,
+	}).Return()
 
 	// execute the vote submission
 	err := cs.core.OnBlockVote(originID, &vote)
 	require.NoError(cs.T(), err, "block vote should pass")
 
-	// check the submit vote was called with correct parameters
+	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 

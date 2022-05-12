@@ -5,6 +5,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
@@ -30,6 +32,8 @@ type BaseApprovalsTestSuite struct {
 	Chunks              flow.ChunkList  // list of chunks of execution result
 	ChunksAssignment    *chunks.Assignment
 	AuthorizedVerifiers map[flow.Identifier]*flow.Identity // map of authorized verifier identities for execution result
+	PublicKey           *module.PublicKey                  // public key used to mock signature verifications
+	SigHasher           hash.Hasher                        // used to verify signatures
 	IncorporatedResult  *flow.IncorporatedResult
 }
 
@@ -40,13 +44,18 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
 	s.ChunksAssignment = chunks.NewAssignment()
 	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID())
+	// mock public key to mock signature verifications
+	s.PublicKey = &module.PublicKey{}
 
 	// setup identities
 	for j := 0; j < 5; j++ {
 		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 		verifiers = append(verifiers, identity.NodeID)
 		s.AuthorizedVerifiers[identity.NodeID] = identity
+		// mock all verifier's valid signatures
+		identity.StakingPubKey = s.PublicKey
 	}
+	s.SigHasher = crypto.NewBLSKMAC("test_tag")
 
 	// create assignment
 	for _, chunk := range s.Chunks {
@@ -74,10 +83,10 @@ type BaseAssignmentCollectorTestSuite struct {
 	WorkerPool        *workerpool.WorkerPool
 	Blocks            map[flow.Identifier]*flow.Header
 	State             *protocol.State
+	Snapshots         map[flow.Identifier]*protocol.Snapshot
 	Headers           *storage.Headers
 	Assigner          *module.ChunkAssigner
 	SealsPL           *mempool.IncorporatedResultSeals
-	SigVerifier       *module.Verifier
 	Conduit           *mocknetwork.Conduit
 	FinalizedAtHeight map[uint64]*flow.Header
 	IdentitiesCache   map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
@@ -91,7 +100,6 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.SealsPL = &mempool.IncorporatedResultSeals{}
 	s.State = &protocol.State{}
 	s.Assigner = &module.ChunkAssigner{}
-	s.SigVerifier = &module.Verifier{}
 	s.Conduit = &mocknetwork.Conduit{}
 	s.Headers = &storage.Headers{}
 
@@ -106,6 +114,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.Blocks[s.ParentBlock.ID()] = &s.ParentBlock
 	s.Blocks[s.Block.ID()] = &s.Block
 	s.Blocks[s.IncorporatedBlock.ID()] = &s.IncorporatedBlock
+	s.Snapshots = make(map[flow.Identifier]*protocol.Snapshot)
 
 	// setup identities for each block
 	s.IdentitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
@@ -144,11 +153,15 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 
 	s.State.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
-			if block, found := s.Blocks[blockID]; found {
-				return unittest.StateSnapshotForKnownBlock(block, s.IdentitiesCache[blockID])
-			} else {
-				return unittest.StateSnapshotForUnknownBlock()
+			if snapshot, found := s.Snapshots[blockID]; found {
+				return snapshot
 			}
+			if block, found := s.Blocks[blockID]; found {
+				snapshot := unittest.StateSnapshotForKnownBlock(block, s.IdentitiesCache[blockID])
+				s.Snapshots[blockID] = snapshot
+				return snapshot
+			}
+			return unittest.StateSnapshotForUnknownBlock()
 		},
 	)
 

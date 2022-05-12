@@ -2,11 +2,11 @@ package wal
 
 import (
 	"bufio"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/utils/unittest"
@@ -29,10 +29,12 @@ func Test_RenameHappensAfterClosing(t *testing.T) {
 
 		writer := bufio.NewWriter(file)
 
+		logger := zerolog.Nop()
 		syncer := &SyncOnCloseRenameFile{
 			file:       file,
 			targetName: fullFileName,
 			Writer:     writer,
+			logger:     &logger,
 		}
 
 		sampleBytes := []byte{2, 1, 3, 7}
@@ -48,7 +50,7 @@ func Test_RenameHappensAfterClosing(t *testing.T) {
 		require.NoFileExists(t, fullTmpName)
 		require.FileExists(t, fullFileName)
 
-		readBytes, err := ioutil.ReadFile(fullFileName)
+		readBytes, err := os.ReadFile(fullFileName)
 		require.NoError(t, err)
 
 		require.Equal(t, readBytes, sampleBytes)

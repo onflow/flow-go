@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/network"
@@ -23,14 +24,17 @@ const (
 
 var ErrBlobTreeDepthExceeded = errors.New("blob tree depth exceeded")
 
+type BlobTree [][]cid.Cid
+
 // ExecutionDataService handles adding/getting execution data to/from a blobservice
 type ExecutionDataService interface {
 	// Add constructs a blob tree for the given ExecutionData and
-	// adds it to the blobservice, and then returns the root CID.
-	Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error)
+	// adds it to the blobservice, and then returns the root CID
+	// and list of all CIDs.
+	Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, BlobTree, error)
 
 	// Get gets the ExecutionData for the given root CID from the blobservice.
-	Get(ctx context.Context, rootCid cid.Cid) (*ExecutionData, error)
+	Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error)
 }
 
 type executionDataServiceImpl struct {
@@ -40,6 +44,8 @@ type executionDataServiceImpl struct {
 	metrics     module.ExecutionDataServiceMetrics
 	logger      zerolog.Logger
 }
+
+var _ ExecutionDataService = (*executionDataServiceImpl)(nil)
 
 func NewExecutionDataService(
 	codec encoding.Codec,
@@ -55,6 +61,14 @@ func NewExecutionDataService(
 		metrics,
 		logger.With().Str("component", "execution_data_service").Logger(),
 	}
+}
+
+func (s *executionDataServiceImpl) Ready() <-chan struct{} {
+	return s.blobService.Ready()
+}
+
+func (s *executionDataServiceImpl) Done() <-chan struct{} {
+	return s.blobService.Done()
 }
 
 // receiveBatch receives a batch of blobs from the given BlobReceiver, and returns them as a slice
@@ -132,7 +146,7 @@ func (s *executionDataServiceImpl) storeBlobs(parent context.Context, br *blobs.
 //
 // blobs are added in a batched streaming fashion, using a separate goroutine to serialize the object and send the
 // blobs of serialized data over a blob channel to the main routine, which adds them in batches to the blobservice.
-func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, error) {
+func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, uint64, error) {
 	bcw, br := blobs.IncomingBlobChannel(s.maxBlobSize)
 
 	done := make(chan struct{})
@@ -164,32 +178,33 @@ func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, 
 		// the blob channel may be closed as a result of the context being canceled,
 		// in which case we should return the context error.
 		if errors.Is(storeErr, blobs.ErrClosedBlobChannel) && ctx.Err() != nil {
-			return nil, ctx.Err()
+			return nil, 0, ctx.Err()
 		}
 
-		return nil, storeErr
+		return nil, 0, storeErr
 	}
 
-	return cids, serializeErr
+	return cids, bcw.TotalBytesWritten(), serializeErr
 }
 
 // Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
-func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error) {
+func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, BlobTree, error) {
 	logger := s.logger.With().Str("block_id", sd.BlockID.String()).Logger()
 	logger.Debug().Msg("adding execution data")
 
 	s.metrics.ExecutionDataAddStarted()
 
 	start := time.Now()
-	cids, err := s.addBlobs(ctx, sd, logger)
+	cids, totalBytes, err := s.addBlobs(ctx, sd, logger)
 
 	if err != nil {
 		s.metrics.ExecutionDataAddFinished(time.Since(start), false, 0)
 
-		return cid.Undef, fmt.Errorf("failed to add execution data blobs: %w", err)
+		return flow.ZeroID, nil, fmt.Errorf("failed to add execution data blobs: %w", err)
 	}
 
-	var blobTreeNodes int
+	var blobTreeSize uint64
+	var blobTree BlobTree
 
 	for {
 		cidArr := zerolog.Arr()
@@ -200,18 +215,20 @@ func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (
 
 		logger.Debug().Array("cids", cidArr).Msg("added blobs")
 
-		blobTreeNodes += len(cids)
+		blobTree = append(blobTree, cids)
+		blobTreeSize += totalBytes
 
 		if len(cids) == 1 {
-			s.metrics.ExecutionDataAddFinished(time.Since(start), true, blobTreeNodes)
+			s.metrics.ExecutionDataAddFinished(time.Since(start), true, blobTreeSize)
 
-			return cids[0], nil
+			root, err := flow.CidToId(cids[0])
+			return root, blobTree, err
 		}
 
-		if cids, err = s.addBlobs(ctx, cids, logger); err != nil {
-			s.metrics.ExecutionDataAddFinished(time.Since(start), false, blobTreeNodes)
+		if cids, totalBytes, err = s.addBlobs(ctx, cids, logger); err != nil {
+			s.metrics.ExecutionDataAddFinished(time.Since(start), false, blobTreeSize)
 
-			return cid.Undef, fmt.Errorf("failed to add cid blobs: %w", err)
+			return flow.ZeroID, nil, fmt.Errorf("failed to add cid blobs: %w", err)
 		}
 	}
 }
@@ -302,7 +319,7 @@ func (s *executionDataServiceImpl) findBlob(
 //
 // blobs are fetched from the blobservice and sent over a blob channel as they arrive, to a separate goroutine, which performs the
 // deserialization in a streaming fashion.
-func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid, logger zerolog.Logger) (interface{}, error) {
+func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid, logger zerolog.Logger) (interface{}, uint64, error) {
 	bcr, bs := blobs.OutgoingBlobChannel()
 
 	done := make(chan struct{})
@@ -324,11 +341,11 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 	<-done
 
 	if retrieveErr != nil && !errors.Is(retrieveErr, blobs.ErrClosedBlobChannel) {
-		return nil, retrieveErr
+		return nil, 0, retrieveErr
 	}
 
 	if deserializeErr != nil {
-		return nil, &MalformedDataError{deserializeErr}
+		return nil, 0, &MalformedDataError{deserializeErr}
 	}
 
 	// TODO: deserialization succeeds even if the blob channel reader has still has unconsumed data, meaning that a malicious actor
@@ -337,7 +354,7 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 	// https://github.com/onflow/flow-go/blob/bd5320719266b045ae2cac954f6a56e1e79560eb/engine/access/rest/handlers.go#L189-L193
 	// Eventually, we will need to implement validation logic on Verification nodes to slash this behavior.
 
-	return v, nil
+	return v, bcr.TotalBytesRead(), nil
 }
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
@@ -345,7 +362,9 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if any blob in the blob tree exceeds the maximum blob size
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobservice
-func (s *executionDataServiceImpl) Get(ctx context.Context, rootCid cid.Cid) (*ExecutionData, error) {
+func (s *executionDataServiceImpl) Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error) {
+	rootCid := flow.IdToCid(rootID)
+
 	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
 	logger.Debug().Msg("getting execution data")
 
@@ -354,22 +373,22 @@ func (s *executionDataServiceImpl) Get(ctx context.Context, rootCid cid.Cid) (*E
 	start := time.Now()
 	cids := []cid.Cid{rootCid}
 
-	var blobTreeNodes int
+	var blobTreeSize uint64
 
 	for i := uint(0); i <= defaultMaxBlobTreeDepth; i++ {
-		v, err := s.getBlobs(ctx, cids, logger)
+		v, totalBytes, err := s.getBlobs(ctx, cids, logger)
 
 		if err != nil {
-			s.metrics.ExecutionDataGetFinished(time.Since(start), false, blobTreeNodes)
+			s.metrics.ExecutionDataGetFinished(time.Since(start), false, blobTreeSize)
 
 			return nil, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
 		}
 
-		blobTreeNodes += len(cids)
+		blobTreeSize += totalBytes
 
 		switch v := v.(type) {
 		case *ExecutionData:
-			s.metrics.ExecutionDataGetFinished(time.Since(start), true, blobTreeNodes)
+			s.metrics.ExecutionDataGetFinished(time.Since(start), true, blobTreeSize)
 
 			return v, nil
 		case *[]cid.Cid:

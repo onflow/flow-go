@@ -10,9 +10,9 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -23,7 +23,7 @@ import (
 func TestConsensus_InvalidSigner(t *testing.T) {
 
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	unstakedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithStake(0))
+	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithWeight(0))
 	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithEjected(true))
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	fakeID := unittest.IdentifierFixture()
@@ -38,7 +38,7 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 		unittest.IdentityListFixture(10),
 		1,
 		100,
-		unittest.SeedFixture(32),
+		unittest.SeedFixture(seed.RandomSourceLength),
 	)
 	epochs := mocks.NewEpochQuery(t, 1, currEpoch)
 	snapshot.On("Epochs").Return(epochs)
@@ -47,7 +47,7 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 	state.On("AtBlockID", blockID).Return(snapshot)
 
 	snapshot.On("Identity", realIdentity.NodeID).Return(realIdentity, nil)
-	snapshot.On("Identity", unstakedConsensusIdentity.NodeID).Return(unstakedConsensusIdentity, nil)
+	snapshot.On("Identity", zeroWeightConsensusIdentity.NodeID).Return(zeroWeightConsensusIdentity, nil)
 	snapshot.On("Identity", ejectedConsensusIdentity.NodeID).Return(ejectedConsensusIdentity, nil)
 	snapshot.On("Identity", validNonConsensusIdentity.NodeID).Return(validNonConsensusIdentity, nil)
 	snapshot.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
@@ -55,25 +55,25 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 	com, err := NewConsensusCommittee(state, unittest.IdentifierFixture())
 	require.NoError(t, err)
 
-	t.Run("non-existent identity should return ErrInvalidSigner", func(t *testing.T) {
+	t.Run("non-existent identity should return InvalidSignerError", func(t *testing.T) {
 		_, err := com.Identity(blockID, fakeID)
-		require.True(t, errors.Is(model.ErrInvalidSigner, err))
+		require.True(t, model.IsInvalidSignerError(err))
 	})
 
-	t.Run("existent but non-committee-member identity should return ErrInvalidSigner", func(t *testing.T) {
-		t.Run("unstaked consensus node", func(t *testing.T) {
-			_, err := com.Identity(blockID, unstakedConsensusIdentity.NodeID)
-			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+	t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
+		t.Run("zero-weight consensus node", func(t *testing.T) {
+			_, err := com.Identity(blockID, zeroWeightConsensusIdentity.NodeID)
+			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("ejected consensus node", func(t *testing.T) {
 			_, err := com.Identity(blockID, ejectedConsensusIdentity.NodeID)
-			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+			require.True(t, model.IsInvalidSignerError(err))
 		})
 
 		t.Run("otherwise valid non-consensus node", func(t *testing.T) {
 			_, err := com.Identity(blockID, validNonConsensusIdentity.NodeID)
-			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+			require.True(t, model.IsInvalidSignerError(err))
 		})
 	})
 
@@ -104,7 +104,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 		identities,
 		1,
 		100,
-		unittest.SeedFixture(32),
+		unittest.SeedFixture(seed.RandomSourceLength),
 	)
 	currEpoch := newMockEpoch(
 		epochCounter,
@@ -139,7 +139,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 		})
 
 		t.Run("after current epoch", func(t *testing.T) {
-			t.SkipNow()
+			unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EECC), rather than returning an error")
 			// REASON FOR SKIPPING TEST:
 			// We have a temporary fallback to continue with the current consensus committee, if the
 			// setup for the next epoch failed (aka emergency epoch chain continuation -- EECC).
@@ -172,7 +172,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 		identities,
 		201,
 		300,
-		unittest.SeedFixture(32),
+		unittest.SeedFixture(seed.RandomSourceLength),
 	)
 	epochs.Add(nextEpoch)
 
@@ -213,7 +213,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	currentEpochCounter := firstEpochCounter
 	epochFinalView := uint64(100)
 
-	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(32))
+	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength))
 
 	// create mocks
 	state := new(protocolmock.State)
@@ -237,7 +237,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 		firstView := epochFinalView + 1
 		epochFinalView = epochFinalView + 100
 		currentEpochCounter++
-		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(32))
+		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(seed.RandomSourceLength))
 		epochQuery.Add(nextEpoch)
 
 		// query a view from the new epoch
@@ -283,11 +283,6 @@ func newMockEpoch(
 	// return nil error to indicate the epoch is committed
 	epoch.On("DKG").Return(nil, nil)
 
-	var params []interface{}
-	for _, ind := range indices.ProtocolConsensusLeaderSelection {
-		params = append(params, ind)
-	}
-	epoch.On("Seed", params...).Return(seed, nil)
-
+	epoch.On("RandomSource").Return(seed, nil)
 	return epoch
 }

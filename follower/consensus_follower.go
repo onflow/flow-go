@@ -6,18 +6,25 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
 	access "github.com/onflow/flow-go/cmd/access/node_builder"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/module/util"
 )
 
 // ConsensusFollower is a standalone module run by third parties which provides
 // a mechanism for observing the block chain. It maintains a set of subscribers
 // and delivers block proposals broadcasted by the consensus nodes to each one.
 type ConsensusFollower interface {
+	component.Component
 	// Run starts the consensus follower.
 	Run(context.Context)
 	// AddOnBlockFinalizedConsumer adds a new block finalization subscriber.
@@ -26,13 +33,15 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	networkPrivKey crypto.PrivateKey   // the network private key of this node
-	bootstrapNodes []BootstrapNodeInfo // the bootstrap nodes to use
-	bindAddr       string              // address to bind on
-	db             *badger.DB          // the badger DB storage to use for the protocol state
-	dataDir        string              // directory to store the protocol state (if the badger storage is not provided)
-	bootstrapDir   string              // path to the bootstrap directory
-	logLevel       string              // log level
+	networkPrivKey crypto.PrivateKey       // the network private key of this node
+	bootstrapNodes []BootstrapNodeInfo     // the bootstrap nodes to use
+	bindAddr       string                  // address to bind on
+	db             *badger.DB              // the badger DB storage to use for the protocol state
+	dataDir        string                  // directory to store the protocol state (if the badger storage is not provided)
+	bootstrapDir   string                  // path to the bootstrap directory
+	logLevel       string                  // log level
+	exposeMetrics  bool                    // whether to expose metrics
+	syncConfig     *synchronization.Config // sync core configuration
 }
 
 type Option func(c *Config)
@@ -65,6 +74,18 @@ func WithDB(db *badger.DB) Option {
 	return func(cf *Config) {
 		cf.db = db
 		cf.dataDir = ""
+	}
+}
+
+func WithExposeMetrics(expose bool) Option {
+	return func(c *Config) {
+		c.exposeMetrics = expose
+	}
+}
+
+func WithSyncCoreConfig(config *synchronization.Config) Option {
+	return func(c *Config) {
+		c.syncConfig = config
 	}
 }
 
@@ -117,6 +138,12 @@ func getBaseOptions(config *Config) []cmd.Option {
 	if config.db != nil {
 		options = append(options, cmd.WithDB(config.db))
 	}
+	if config.exposeMetrics {
+		options = append(options, cmd.WithMetricsEnabled(config.exposeMetrics))
+	}
+	if config.syncConfig != nil {
+		options = append(options, cmd.WithSyncCoreConfig(*config.syncConfig))
+	}
 
 	return options
 }
@@ -128,13 +155,14 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
 	}
-	nodeBuilder.BuildConsensusFollower()
 
 	return nodeBuilder, nil
 }
 
 type ConsensusFollowerImpl struct {
-	NodeBuilder *access.UnstakedAccessNodeBuilder
+	component.Component
+	*cmd.NodeConfig
+	logger      zerolog.Logger
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
 }
@@ -151,6 +179,7 @@ func NewConsensusFollower(
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
 		logLevel:       "info",
+		exposeMetrics:  false,
 	}
 
 	for _, opt := range opts {
@@ -163,20 +192,24 @@ func NewConsensusFollower(
 		return nil, err
 	}
 
-	consensusFollower := &ConsensusFollowerImpl{NodeBuilder: anb}
+	cf := &ConsensusFollowerImpl{logger: anb.Logger}
 	anb.BaseConfig.NodeRole = "consensus_follower"
+	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
+	cf.NodeConfig = anb.NodeConfig
+	cf.Component, err = anb.Build()
+	if err != nil {
+		return nil, err
+	}
 
-	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
-
-	return consensusFollower, nil
+	return cf, nil
 }
 
 // onBlockFinalized relays the block finalization event to all registered consumers.
-func (cf *ConsensusFollowerImpl) onBlockFinalized(finalizedBlockID flow.Identifier) {
+func (cf *ConsensusFollowerImpl) onBlockFinalized(finalizedBlock *model.Block) {
 	cf.consumersMu.RLock()
 	for _, consumer := range cf.consumers {
 		cf.consumersMu.RUnlock()
-		consumer(finalizedBlockID)
+		consumer(finalizedBlock)
 		cf.consumersMu.RLock()
 	}
 	cf.consumersMu.RUnlock()
@@ -190,26 +223,36 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 }
 
 // Run starts the consensus follower.
+// This may also be implemented directly in a calling library to take advantage of error recovery
+// possible with the irrecoverable error handling.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
-	runAccessNode(ctx, cf.NodeBuilder)
-}
-
-func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
-	select {
-	case <-ctx.Done():
+	if util.CheckClosed(ctx.Done()) {
 		return
-	default:
 	}
 
-	select {
-	case <-anb.Ready():
-		anb.Logger.Info().Msg("Access node startup complete")
-	case <-ctx.Done():
-		anb.Logger.Info().Msg("Access node startup aborted")
-	}
+	// Start the consensus follower with an irrecoverable signaler context. The returned error channel
+	// will receive irrecoverable errors thrown by the consensus follower or any of its child components.
+	// This makes it possible to listen for irrecoverable errors and restart the consensus follower. In
+	// the default implementation, a fatal error is thrown.
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+	cf.Start(signalerCtx)
 
-	<-ctx.Done()
-	anb.Logger.Info().Msg("Access node shutting down")
-	<-anb.Done()
-	anb.Logger.Info().Msg("Access node shutdown complete")
+	// log when the follower has complete startup and when it's beginning to shut down
+	go func() {
+		if err := util.WaitClosed(ctx, cf.Ready()); err != nil {
+			return
+		}
+		cf.logger.Info().Msg("Consensus follower startup complete")
+	}()
+
+	go func() {
+		<-ctx.Done()
+		cf.logger.Info().Msg("Consensus follower shutting down")
+	}()
+
+	// Block here until all components have stopped or an irrecoverable error is received.
+	if err := util.WaitError(errChan, cf.Done()); err != nil {
+		cf.logger.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
+	}
+	cf.logger.Info().Msg("Consensus follower shutdown complete")
 }

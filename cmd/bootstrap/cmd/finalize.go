@@ -22,16 +22,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
 
 var (
-	flagConfig                      string
-	flagInternalNodePrivInfoDir     string
-	flagCollectionClusters          uint
-	flagPartnerNodeInfoDir          string
-	flagPartnerStakes               string
+	flagConfig                  string
+	flagInternalNodePrivInfoDir string
+	flagCollectionClusters      uint
+	flagPartnerNodeInfoDir      string
+	// Deprecated: use flagPartnerWeights instead
+	deprecatedFlagPartnerStakes     string
+	flagPartnerWeights              string
 	flagDKGDataPath                 string
 	flagRootBlock                   string
 	flagRootBlockVotesDir           string
@@ -48,8 +51,8 @@ var (
 	flagBootstrapRandomSeed []byte
 )
 
-// PartnerStakes ...
-type PartnerStakes map[flow.Identifier]uint64
+// PartnerWeights is the format of the JSON file specifying partner node weights.
+type PartnerWeights map[flow.Identifier]uint64
 
 // finalizeCmd represents the finalize command
 var finalizeCmd = &cobra.Command{
@@ -68,20 +71,22 @@ func init() {
 func addFinalizeCmdFlags() {
 	// required parameters for network configuration and generation of root node identities
 	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
-		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
+		"path to a JSON file containing multiple node configurations (fields Role, Address, Weight)")
 	finalizeCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "internal-priv-dir", "", "path to directory "+
 		"containing the output from the `keygen` command for internal nodes")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+
 		"containing one JSON file starting with node-info.pub.<NODE_ID>.json for every partner node (fields "+
 		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey)")
-	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
-		"a map from partner node's NodeID to their stake")
+	// Deprecated: remove this flag
+	finalizeCmd.Flags().StringVar(&deprecatedFlagPartnerStakes, "partner-stakes", "", "deprecated: use partner-weights instead")
+	finalizeCmd.Flags().StringVar(&flagPartnerWeights, "partner-weights", "", "path to a JSON file containing "+
+		"a map from partner node's NodeID to their weight")
 	finalizeCmd.Flags().StringVar(&flagDKGDataPath, "dkg-data", "", "path to a JSON file containing data as output from DKG process")
 
 	cmd.MarkFlagRequired(finalizeCmd, "config")
 	cmd.MarkFlagRequired(finalizeCmd, "internal-priv-dir")
 	cmd.MarkFlagRequired(finalizeCmd, "partner-dir")
-	cmd.MarkFlagRequired(finalizeCmd, "partner-stakes")
+	cmd.MarkFlagRequired(finalizeCmd, "partner-weights")
 	cmd.MarkFlagRequired(finalizeCmd, "dkg-data")
 
 	// required parameters for generation of root block, root execution result and root block seal
@@ -93,7 +98,7 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
-	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
+	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(flow.EpochSetupRandomSourceLength), "The seed used to for DKG, Clustering and Cluster QC generation")
 	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
@@ -118,9 +123,18 @@ func addFinalizeCmdFlags() {
 
 func finalize(cmd *cobra.Command, args []string) {
 
-	actualSeedLength := len(flagBootstrapRandomSeed)
-	if actualSeedLength != randomSeedBytes {
-		log.Error().Int("expected", randomSeedBytes).Int("actual", actualSeedLength).Msg("random seed provided length is not valid")
+	// maintain backward compatibility with old flag name
+	if deprecatedFlagPartnerStakes != "" {
+		log.Warn().Msg("using deprecated flag --partner-stakes (use --partner-weights instead)")
+		if flagPartnerWeights == "" {
+			flagPartnerWeights = deprecatedFlagPartnerStakes
+		} else {
+			log.Fatal().Msg("cannot use both --partner-stakes and --partner-weights flags (use only --partner-weights)")
+		}
+	}
+
+	if len(flagBootstrapRandomSeed) != flow.EpochSetupRandomSourceLength {
+		log.Error().Int("expected", flow.EpochSetupRandomSourceLength).Int("actual", len(flagBootstrapRandomSeed)).Msg("random seed provided length is not valid")
 		return
 	}
 
@@ -185,7 +199,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		generateEmptyExecutionState(
 			block.Header.ChainID,
-			getRandomSource(flagBootstrapRandomSeed),
+			flagBootstrapRandomSeed,
 			assignments,
 			clusterQCs,
 			dkgData,
@@ -202,6 +216,19 @@ func finalize(cmd *cobra.Command, args []string) {
 	snapshot, err := inmem.SnapshotFromBootstrapStateWithProtocolVersion(block, result, seal, rootQC, flagProtocolVersion)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
+	}
+
+	// validate the generated root snapshot is valid
+	verifyResultID := true
+	err = badger.IsValidRootSnapshot(snapshot, verifyResultID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("the generated root snapshot is invalid")
+	}
+
+	// validate the generated root snapshot QCs
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
 	}
 
 	// write snapshot to disk
@@ -232,6 +259,19 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("saved result and seal are matching")
+
+	err = badger.IsValidRootSnapshot(rootSnapshot, verifyResultID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("saved snapshot is invalid")
+	}
+
+	// validate the generated root snapshot QCs
+	err = badger.IsValidRootSnapshotQCs(snapshot)
+	if err != nil {
+		log.Fatal().Err(err).Msg("root snapshot contains invalid QCs")
+	}
+
+	log.Info().Msgf("saved root snapshot is valid")
 
 	// copy files only if the directories differ
 	log.Info().Str("private_dir", flagInternalNodePrivInfoDir).Str("output_dir", flagOutdir).Msg("attempting to copy private key files")
@@ -271,22 +311,23 @@ func readRootBlockVotes() []*hotstuff.Vote {
 		}
 
 		// read file and append to partners
-		var p hotstuff.Vote
-		readJSON(f, &p)
-		votes = append(votes, &p)
+		var vote hotstuff.Vote
+		readJSON(f, &vote)
+		votes = append(votes, &vote)
+		log.Info().Msgf("read vote %v for block %v from signerID %v", vote.ID(), vote.BlockID, vote.SignerID)
 	}
 	return votes
 }
 
-// readPartnerNodeInfos returns a list of partner nodes after gathering stake
+// readPartnerNodeInfos returns a list of partner nodes after gathering weights
 // and public key information from configuration files
 func readPartnerNodeInfos() []model.NodeInfo {
 	partners := readPartnerNodes()
-	log.Info().Msgf("read %v partner node configuration files", len(partners))
+	log.Info().Msgf("read %d partner node configuration files", len(partners))
 
-	var stakes PartnerStakes
-	readJSON(flagPartnerStakes, &stakes)
-	log.Info().Msgf("read %v stakes for partner nodes", len(stakes))
+	var weights PartnerWeights
+	readJSON(flagPartnerWeights, &weights)
+	log.Info().Msgf("read %d weights for partner nodes", len(weights))
 
 	var nodes []model.NodeInfo
 	for _, partner := range partners {
@@ -294,17 +335,20 @@ func readPartnerNodeInfos() []model.NodeInfo {
 		nodeID := validateNodeID(partner.NodeID)
 		networkPubKey := validateNetworkPubKey(partner.NetworkPubKey)
 		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
-		stake, valid := validateStake(stakes[partner.NodeID])
+		weight, valid := validateWeight(weights[partner.NodeID])
 		if !valid {
-			log.Error().Msgf("stakes: %v", stakes)
-			log.Fatal().Msgf("partner node id %v has no stake", nodeID)
+			log.Error().Msgf("weights: %v", weights)
+			log.Fatal().Msgf("partner node id %x has no weight", nodeID)
+		}
+		if weight != flow.DefaultInitialWeight {
+			log.Warn().Msgf("partner node (id=%x) has non-default weight (%d != %d)", partner.NodeID, weight, flow.DefaultInitialWeight)
 		}
 
 		node := model.NewPublicNodeInfo(
 			nodeID,
 			partner.Role,
 			partner.Address,
-			stake,
+			weight,
 			networkPubKey.PublicKey,
 			stakingPubKey.PublicKey,
 		)
@@ -335,14 +379,14 @@ func readPartnerNodes() []model.NodeInfoPub {
 	return partners
 }
 
-// readInternalNodeInfos returns a list of internal nodes after collecting stakes
+// readInternalNodeInfos returns a list of internal nodes after collecting weights
 // from configuration files
 func readInternalNodeInfos() []model.NodeInfo {
 	privInternals := readInternalNodes()
 	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
 
-	stakes := internalStakesByAddress()
-	log.Info().Msgf("read %v stakes for internal nodes", len(stakes))
+	weights := internalWeightsByAddress()
+	log.Info().Msgf("read %d weights for internal nodes", len(weights))
 
 	var nodes []model.NodeInfo
 	for _, internal := range privInternals {
@@ -351,17 +395,20 @@ func readInternalNodeInfos() []model.NodeInfo {
 
 		// validate every single internal node
 		nodeID := validateNodeID(internal.NodeID)
-		stake, valid := validateStake(stakes[internal.Address])
+		weight, valid := validateWeight(weights[internal.Address])
 		if !valid {
-			log.Error().Msgf("stakes: %v", stakes)
-			log.Fatal().Msgf("internal node %v has no stake. Did you forget to update the node address?", internal)
+			log.Error().Msgf("weights: %v", weights)
+			log.Fatal().Msgf("internal node %v has no weight. Did you forget to update the node address?", internal)
+		}
+		if weight != flow.DefaultInitialWeight {
+			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
 		}
 
 		node := model.NewPrivateNodeInfo(
 			nodeID,
 			internal.Role,
 			internal.Address,
-			stake,
+			weight,
 			internal.NetworkPrivKey,
 			internal.StakingPrivKey,
 		)
@@ -399,23 +446,23 @@ func readInternalNodes() []model.NodeInfoPriv {
 	return internalPrivInfos
 }
 
-// internalStakesByAddress returns a mapping of node address by stake for internal nodes
-func internalStakesByAddress() map[string]uint64 {
+// internalWeightsByAddress returns a mapping of node address by weight for internal nodes
+func internalWeightsByAddress() map[string]uint64 {
 	// read json
 	var configs []model.NodeConfig
 	readJSON(flagConfig, &configs)
 	log.Info().Interface("config", configs).Msgf("read internal node configurations")
 
-	stakes := make(map[string]uint64)
+	weights := make(map[string]uint64)
 	for _, config := range configs {
-		if _, ok := stakes[config.Address]; !ok {
-			stakes[config.Address] = config.Stake
+		if _, ok := weights[config.Address]; !ok {
+			weights[config.Address] = config.Weight
 		} else {
 			log.Error().Msgf("duplicate internal node address %s", config.Address)
 		}
 	}
 
-	return stakes
+	return weights
 }
 
 // mergeNodeInfos merges the internal and partner nodes and checks if there are no
@@ -466,7 +513,7 @@ func readDKGData() dkg.DKGData {
 
 	dkgData := dkg.DKGData{
 		PrivKeyShares: nil,
-		PubGroupKey:   encodableDKG.GroupKey,
+		PubGroupKey:   encodableDKG.GroupKey.PublicKey,
 		PubKeyShares:  nil,
 	}
 
@@ -504,8 +551,8 @@ func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey 
 	return key
 }
 
-func validateStake(stake uint64) (uint64, bool) {
-	return stake, stake > 0
+func validateWeight(weight uint64) (uint64, bool) {
+	return weight, weight > 0
 }
 
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk

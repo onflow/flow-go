@@ -1,19 +1,23 @@
 package compliance
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -31,22 +35,25 @@ const defaultVoteQueueCapacity = 1000
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit           *engine.Unit
-	lm             *lifecycle.LifecycleManager
-	log            zerolog.Logger
-	mempool        module.MempoolMetrics
-	metrics        module.EngineMetrics
-	me             module.Local
-	headers        storage.Headers
-	payloads       storage.Payloads
-	tracer         module.Tracer
-	state          protocol.State
-	prov           network.Engine
-	core           *Core
-	pendingBlocks  engine.MessageStore
-	pendingVotes   engine.MessageStore
-	messageHandler *engine.MessageHandler
-	con            network.Conduit
+	unit                       *engine.Unit
+	lm                         *lifecycle.LifecycleManager
+	log                        zerolog.Logger
+	mempool                    module.MempoolMetrics
+	metrics                    module.EngineMetrics
+	me                         module.Local
+	headers                    storage.Headers
+	payloads                   storage.Payloads
+	tracer                     module.Tracer
+	state                      protocol.State
+	prov                       network.Engine
+	core                       *Core
+	pendingBlocks              engine.MessageStore
+	pendingVotes               engine.MessageStore
+	messageHandler             *engine.MessageHandler
+	finalizedView              counters.StrictMonotonousCounter
+	finalizationEventsNotifier engine.Notifier
+	con                        network.Conduit
+	stopHotstuff               context.CancelFunc
 }
 
 func NewEngine(
@@ -126,21 +133,22 @@ func NewEngine(
 	)
 
 	eng := &Engine{
-		unit:           engine.NewUnit(),
-		lm:             lifecycle.NewLifecycleManager(),
-		log:            log.With().Str("compliance", "engine").Logger(),
-		me:             me,
-		mempool:        core.mempool,
-		metrics:        core.metrics,
-		headers:        core.headers,
-		payloads:       core.payloads,
-		pendingBlocks:  pendingBlocks,
-		pendingVotes:   pendingVotes,
-		state:          core.state,
-		tracer:         core.tracer,
-		prov:           prov,
-		core:           core,
-		messageHandler: handler,
+		unit:                       engine.NewUnit(),
+		lm:                         lifecycle.NewLifecycleManager(),
+		log:                        log.With().Str("compliance", "engine").Logger(),
+		me:                         me,
+		mempool:                    core.mempool,
+		metrics:                    core.metrics,
+		headers:                    core.headers,
+		payloads:                   core.payloads,
+		pendingBlocks:              pendingBlocks,
+		pendingVotes:               pendingVotes,
+		state:                      core.state,
+		tracer:                     core.tracer,
+		prov:                       prov,
+		core:                       core,
+		messageHandler:             handler,
+		finalizationEventsNotifier: engine.NewNotifier(),
 	}
 
 	// register the core with the network layer and store the conduit
@@ -168,7 +176,14 @@ func (e *Engine) Ready() <-chan struct{} {
 	}
 	e.lm.OnStart(func() {
 		e.unit.Launch(e.loop)
+		e.unit.Launch(e.finalizationProcessingLoop)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+		e.stopHotstuff = cancel
+		e.core.hotstuff.Start(signalerCtx)
 		// wait for request handler to startup
+
 		<-e.core.hotstuff.Ready()
 	})
 	return e.lm.Started()
@@ -178,9 +193,10 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	e.lm.OnStop(func() {
-		e.log.Debug().Msg("shutting down hotstuff eventloop")
+		e.log.Info().Msg("shutting down hotstuff eventloop")
+		e.stopHotstuff()
 		<-e.core.hotstuff.Done()
-		e.log.Debug().Msg("all components have been shut down")
+		e.log.Info().Msg("all components have been shut down")
 		<-e.unit.Done()
 	})
 	return e.lm.Stopped()
@@ -388,4 +404,27 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 // Note the header has incomplete fields, because it was converted from a hotstuff.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return e.BroadcastProposalWithDelay(header, 0)
+}
+
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+//  (1) Informs sealing.Core about finalization of respective block.
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	if e.finalizedView.Set(block.View) {
+		e.finalizationEventsNotifier.Notify()
+	}
+}
+
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (e *Engine) finalizationProcessingLoop() {
+	finalizationNotifier := e.finalizationEventsNotifier.Channel()
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-finalizationNotifier:
+			e.core.ProcessFinalizedView(e.finalizedView.Value())
+		}
+	}
 }

@@ -3,6 +3,7 @@ package ledger
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	cryptoHash "github.com/onflow/flow-go/crypto/hash"
@@ -13,6 +14,10 @@ import (
 // Path captures storage path of a payload;
 // where we store a payload in the ledger
 type Path hash.Hash
+
+func (p Path) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(p[:]))
+}
 
 // DummyPath is an arbitrary path value, used in function error returns.
 var DummyPath = Path(hash.DummyHash)
@@ -68,7 +73,7 @@ func ComputeCompactValue(path hash.Hash, value []byte, nodeHeight int) hash.Hash
 	for h := 1; h <= nodeHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
-		bit := bitutils.Bit(path[:], NodeMaxHeight-h)
+		bit := bitutils.ReadBit(path[:], NodeMaxHeight-h)
 		if bit == 1 { // right branching
 			out = hash.HashInterNode(GetDefaultHashForHeight(h-1), out)
 		} else { // left branching
@@ -147,6 +152,10 @@ func (u *TrieUpdate) Equals(other *TrieUpdate) bool {
 // RootHash captures the root hash of a trie
 type RootHash hash.Hash
 
+func (rh RootHash) MarshalJSON() ([]byte, error) {
+	return json.Marshal(rh.String())
+}
+
 func (rh RootHash) String() string {
 	return hex.EncodeToString(rh[:])
 }
@@ -200,12 +209,15 @@ type Payload struct {
 
 // Size returns the size of the payload
 func (p *Payload) Size() int {
+	if p == nil {
+		return 0
+	}
 	return p.Key.Size() + p.Value.Size()
 }
 
-// IsEmpty returns true if key or value is not empty
+// IsEmpty returns true if payload is nil or value is empty
 func (p *Payload) IsEmpty() bool {
-	return p.Size() == 0
+	return p == nil || p.Value.Size() == 0
 }
 
 // TODO fix me
@@ -215,7 +227,11 @@ func (p *Payload) String() string {
 }
 
 // Equals compares this payload to another payload
+// A nil payload is equivalent to an empty payload.
 func (p *Payload) Equals(other *Payload) bool {
+	if p == nil || (len(p.Key.KeyParts) == 0 && len(p.Value) == 0) {
+		return other == nil || (len(other.Key.KeyParts) == 0 && len(other.Value) == 0)
+	}
 	if other == nil {
 		return false
 	}
@@ -227,6 +243,9 @@ func (p *Payload) Equals(other *Payload) bool {
 
 // DeepCopy returns a deep copy of the payload
 func (p *Payload) DeepCopy() *Payload {
+	if p == nil {
+		return nil
+	}
 	k := p.Key.DeepCopy()
 	v := p.Value.DeepCopy()
 	return &Payload{Key: k, Value: v}
@@ -337,9 +356,10 @@ func NewTrieBatchProof() *TrieBatchProof {
 // NewTrieBatchProofWithEmptyProofs creates an instance of Batchproof
 // filled with n newly created proofs (empty)
 func NewTrieBatchProofWithEmptyProofs(numberOfProofs int) *TrieBatchProof {
-	bp := NewTrieBatchProof()
+	bp := new(TrieBatchProof)
+	bp.Proofs = make([]*TrieProof, numberOfProofs)
 	for i := 0; i < numberOfProofs; i++ {
-		bp.AppendProof(NewTrieProof())
+		bp.Proofs[i] = NewTrieProof()
 	}
 	return bp
 }
@@ -351,18 +371,18 @@ func (bp *TrieBatchProof) Size() int {
 
 // Paths returns the slice of paths for this batch proof
 func (bp *TrieBatchProof) Paths() []Path {
-	paths := make([]Path, 0)
-	for _, p := range bp.Proofs {
-		paths = append(paths, p.Path)
+	paths := make([]Path, len(bp.Proofs))
+	for i, p := range bp.Proofs {
+		paths[i] = p.Path
 	}
 	return paths
 }
 
 // Payloads returns the slice of paths for this batch proof
 func (bp *TrieBatchProof) Payloads() []*Payload {
-	payloads := make([]*Payload, 0)
-	for _, p := range bp.Proofs {
-		payloads = append(payloads, p.Payload)
+	payloads := make([]*Payload, len(bp.Proofs))
+	for i, p := range bp.Proofs {
+		payloads[i] = p.Payload
 	}
 	return payloads
 }

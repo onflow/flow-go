@@ -37,13 +37,18 @@ func TestGetAccount(t *testing.T) {
 	backend := &mock.API{}
 
 	t.Run("get by address at latest sealed block", func(t *testing.T) {
-
 		account := accountFixture(t)
+		var height uint64 = 100
+		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
 		req := getAccountRequest(t, account, sealedHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
 
 		backend.Mock.
-			On("GetAccountAtLatestBlock", mocktestify.Anything, account.Address).
+			On("GetLatestBlockHeader", mocktestify.Anything, true).
+			Return(&block, nil)
+
+		backend.Mock.
+			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
 			Return(account, nil)
 
 		expected := expectedExpandedResponse(account)
@@ -113,7 +118,8 @@ func TestGetAccount(t *testing.T) {
 
 		for i, test := range tests {
 			req, _ := http.NewRequest("GET", test.url, nil)
-			rr := executeRequest(req, backend)
+			rr, err := executeRequest(req, backend)
+			assert.NoError(t, err)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))

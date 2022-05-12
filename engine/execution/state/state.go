@@ -84,7 +84,6 @@ type state struct {
 	collections        storage.Collections
 	chunkDataPacks     storage.ChunkDataPacks
 	results            storage.ExecutionResults
-	receipts           storage.ExecutionReceipts
 	myReceipts         storage.MyExecutionReceipts
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
@@ -109,7 +108,6 @@ func NewExecutionState(
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
-	receipts storage.ExecutionReceipts,
 	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
@@ -126,7 +124,6 @@ func NewExecutionState(
 		collections:        collections,
 		chunkDataPacks:     chunkDataPacks,
 		results:            results,
-		receipts:           receipts,
 		myReceipts:         myReceipts,
 		events:             events,
 		serviceEvents:      serviceEvents,
@@ -196,7 +193,13 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
-		if len(values) == 0 {
+		// We expect 1 element in the returned slice of values because query is from makeSingleValueQuery()
+		if len(values) != 1 {
+			return nil, fmt.Errorf("error getting register (%s) value at %x: number of returned values (%d) != number of queried keys (%d)", key, commitment, len(values), len(query.Keys()))
+		}
+
+		// Prevent caching of value with len zero
+		if len(values[0]) == 0 {
 			return nil, nil
 		}
 
@@ -330,6 +333,12 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
 	results []flow.TransactionResult) error {
+	return s.saveExecutionResults(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
+}
+
+func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
+	results []flow.TransactionResult) error {
 
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
@@ -342,8 +351,8 @@ func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, e
 	// Write Batch is BadgerDB feature designed for handling lots of writes
 	// in efficient and automatic manner, hence pushing all the updates we can
 	// as tightly as possible to let Badger manage it.
-	// Note, that it does not guarantee atomicity as transactions has size limit
-	// but it's the closes thing to atomicity we could have
+	// Note, that it does not guarantee atomicity as transactions has size limit,
+	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
 	for _, chunkDataPack := range chunkDataPacks {
@@ -384,7 +393,6 @@ func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, e
 		return fmt.Errorf("cannot store execution result: %w", err)
 	}
 
-	// it overwrites the index if exists already
 	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot index execution result: %w", err)
@@ -530,11 +538,11 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	err := s.db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveExecutedBlock(&blockID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not lookup executed block: %w", err)
+			return fmt.Errorf("could not lookup executed block %v: %w", blockID, err)
 		}
 		err = operation.RetrieveHeader(blockID, &highest)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve executed header: %w", err)
+			return fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
 		}
 		return nil
 	})

@@ -21,26 +21,26 @@ func (_m *DKGBroker) Broadcast(data []byte) {
 	_m.Called(data)
 }
 
-// Disqualify provides a mock function with given fields: node, log
-func (_m *DKGBroker) Disqualify(node int, log string) {
-	_m.Called(node, log)
+// Disqualify provides a mock function with given fields: participant, log
+func (_m *DKGBroker) Disqualify(participant int, log string) {
+	_m.Called(participant, log)
 }
 
-// FlagMisbehavior provides a mock function with given fields: node, log
-func (_m *DKGBroker) FlagMisbehavior(node int, log string) {
-	_m.Called(node, log)
+// FlagMisbehavior provides a mock function with given fields: participant, log
+func (_m *DKGBroker) FlagMisbehavior(participant int, log string) {
+	_m.Called(participant, log)
 }
 
 // GetBroadcastMsgCh provides a mock function with given fields:
-func (_m *DKGBroker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
+func (_m *DKGBroker) GetBroadcastMsgCh() <-chan messages.BroadcastDKGMessage {
 	ret := _m.Called()
 
-	var r0 <-chan messages.DKGMessage
-	if rf, ok := ret.Get(0).(func() <-chan messages.DKGMessage); ok {
+	var r0 <-chan messages.BroadcastDKGMessage
+	if rf, ok := ret.Get(0).(func() <-chan messages.BroadcastDKGMessage); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan messages.DKGMessage)
+			r0 = ret.Get(0).(<-chan messages.BroadcastDKGMessage)
 		}
 	}
 
@@ -62,15 +62,15 @@ func (_m *DKGBroker) GetIndex() int {
 }
 
 // GetPrivateMsgCh provides a mock function with given fields:
-func (_m *DKGBroker) GetPrivateMsgCh() <-chan messages.DKGMessage {
+func (_m *DKGBroker) GetPrivateMsgCh() <-chan messages.PrivDKGMessageIn {
 	ret := _m.Called()
 
-	var r0 <-chan messages.DKGMessage
-	if rf, ok := ret.Get(0).(func() <-chan messages.DKGMessage); ok {
+	var r0 <-chan messages.PrivDKGMessageIn
+	if rf, ok := ret.Get(0).(func() <-chan messages.PrivDKGMessageIn); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(<-chan messages.DKGMessage)
+			r0 = ret.Get(0).(<-chan messages.PrivDKGMessageIn)
 		}
 	}
 

@@ -22,6 +22,7 @@ const (
 type FlowClientConfig struct {
 	AccessAddress    string
 	AccessNodePubKey string
+	AccessNodeID     flow.Identifier
 	Insecure         bool
 }
 
@@ -30,7 +31,7 @@ func (f *FlowClientConfig) String() string {
 }
 
 // NewFlowClientConfig returns *FlowClientConfig
-func NewFlowClientConfig(accessAddress, accessApiNodePubKey string, insecure bool) (*FlowClientConfig, error) {
+func NewFlowClientConfig(accessAddress, accessApiNodePubKey string, accessNodeID flow.Identifier, insecure bool) (*FlowClientConfig, error) {
 	if accessAddress == "" {
 		return nil, fmt.Errorf("failed to create  flow client connection option invalid access address: %s", accessAddress)
 	}
@@ -41,16 +42,16 @@ func NewFlowClientConfig(accessAddress, accessApiNodePubKey string, insecure boo
 		}
 	}
 
-	return &FlowClientConfig{accessAddress, accessApiNodePubKey, insecure}, nil
+	return &FlowClientConfig{accessAddress, accessApiNodePubKey, accessNodeID, insecure}, nil
 }
 
 // FlowClient will return a secure or insecure flow client depending on *FlowClientConfig.Insecure
-func FlowClient(opt *FlowClientConfig) (*client.Client, error) {
-	if opt.Insecure {
-		return insecureFlowClient(opt.AccessAddress)
+func FlowClient(conf *FlowClientConfig) (*client.Client, error) {
+	if conf.Insecure {
+		return insecureFlowClient(conf.AccessAddress)
 	}
 
-	return secureFlowClient(opt.AccessAddress, opt.AccessNodePubKey)
+	return secureFlowClient(conf.AccessAddress, conf.AccessNodePubKey)
 }
 
 // secureFlowClient creates a flow client with secured GRPC connection
@@ -72,7 +73,7 @@ func secureFlowClient(accessAddress, accessApiNodePubKey string) (*client.Client
 // insecureFlowClient creates flow client with insecure GRPC connection
 func insecureFlowClient(accessAddress string) (*client.Client, error) {
 	// create flow client
-	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+	flowClient, err := client.New(accessAddress, grpc.WithInsecure()) //nolint:staticcheck
 	if err != nil {
 		return nil, fmt.Errorf("failed to create flow client %w", err)
 	}
@@ -102,7 +103,7 @@ func FlowClientConfigs(accessNodeIDS []flow.Identifier, insecureAccessAPI bool, 
 		// remove the 0x prefix from network public keys
 		networkingPubKey := strings.TrimPrefix(identity.NetworkPubKey.String(), "0x")
 
-		opt, err := NewFlowClientConfig(accessAddress, networkingPubKey, insecureAccessAPI)
+		opt, err := NewFlowClientConfig(accessAddress, networkingPubKey, identity.NodeID, insecureAccessAPI)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get flow client connection option for access node ID (%d): %s %w", i, identity, err)
 		}

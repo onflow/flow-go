@@ -14,7 +14,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/libp2p/go-libp2p"
+	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -25,6 +25,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -32,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -113,18 +115,20 @@ func executionData(t *testing.T, s *serializer, minSerializedSize uint64) (*Exec
 	}
 }
 
-func getExecutionData(eds ExecutionDataService, rootCid cid.Cid, timeout time.Duration) (*ExecutionData, error) {
+func getExecutionData(eds ExecutionDataService, rootID flow.Identifier, timeout time.Duration) (*ExecutionData, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return eds.Get(ctx, rootCid)
+	return eds.Get(ctx, rootID)
 }
 
-func addExecutionData(eds ExecutionDataService, ed *ExecutionData, timeout time.Duration) (cid.Cid, error) {
+func addExecutionData(eds ExecutionDataService, ed *ExecutionData, timeout time.Duration) (flow.Identifier, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return eds.Add(ctx, ed)
+	id, _, err := eds.Add(ctx, ed)
+
+	return id, err
 }
 
 func putBlob(bs blockstore.Blockstore, data []byte, timeout time.Duration) (cid.Cid, error) {
@@ -172,7 +176,7 @@ func executionDataService(bs network.BlobService) *executionDataServiceImpl {
 	return NewExecutionDataService(codec, compressor, bs, metrics.NewNoopCollector(), zerolog.Nop())
 }
 
-func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Blockstore, timeout time.Duration) cid.Cid {
+func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Blockstore, timeout time.Duration) flow.Identifier {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -195,7 +199,10 @@ func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Block
 		require.NoError(t, bs.PutMany(ctx, batch))
 
 		if numBlobs <= 1 {
-			return batch[0].Cid()
+			id, err := flow.CidToId(batch[0].Cid())
+			require.NoError(t, err)
+
+			return id
 		}
 
 		cids := make([]cid.Cid, numBlobs)
@@ -217,9 +224,9 @@ func TestHappyPath(t *testing.T) {
 
 	test := func(minSerializedSize uint64) {
 		expected, _ := executionData(t, eds.serializer, minSerializedSize)
-		rootCid, err := addExecutionData(eds, expected, time.Second)
+		rootCid, err := addExecutionData(eds, expected, 5*time.Second)
 		require.NoError(t, err)
-		actual, err := getExecutionData(eds, rootCid, time.Second)
+		actual, err := getExecutionData(eds, rootCid, 5*time.Second)
 		require.NoError(t, err)
 		assert.Equal(t, true, reflect.DeepEqual(expected, actual))
 	}
@@ -235,8 +242,8 @@ func TestMalformedData(t *testing.T) {
 	eds := executionDataService(mockBlobService(bs))
 
 	test := func(data []byte) {
-		rootCid := writeBlobTree(t, eds.serializer, data, bs, time.Second)
-		_, err := getExecutionData(eds, rootCid, time.Second)
+		rootID := writeBlobTree(t, eds.serializer, data, bs, 5*time.Second)
+		_, err := getExecutionData(eds, rootID, 5*time.Second)
 		var malformedDataError *MalformedDataError
 		assert.ErrorAs(t, err, &malformedDataError)
 	}
@@ -259,9 +266,11 @@ func TestOversizedBlob(t *testing.T) {
 	eds := executionDataService(mockBlobService(bs))
 
 	test := func(data []byte) {
-		cid, err := putBlob(bs, data, time.Second)
+		cid, err := putBlob(bs, data, 5*time.Second)
 		require.NoError(t, err)
-		_, err = getExecutionData(eds, cid, time.Second)
+		fid, err := flow.CidToId(cid)
+		require.NoError(t, err)
+		_, err = getExecutionData(eds, fid, 5*time.Second)
 		var blobSizeLimitExceededError *BlobSizeLimitExceededError
 		assert.ErrorAs(t, err, &blobSizeLimitExceededError)
 	}
@@ -284,7 +293,7 @@ func TestOversizedBlob(t *testing.T) {
 		if i == 3 {
 			blob = data[i*blobSize:]
 		}
-		cid, err := putBlob(bs, blob, time.Second)
+		cid, err := putBlob(bs, blob, 5*time.Second)
 		require.NoError(t, err)
 		cids = append(cids, cid)
 	}
@@ -300,7 +309,7 @@ func TestOversizedBlob(t *testing.T) {
 		if i == 4 {
 			blob = data[i*defaultMaxBlobSize:]
 		}
-		cid, err := putBlob(bs, blob, time.Second)
+		cid, err := putBlob(bs, blob, 5*time.Second)
 		require.NoError(t, err)
 		cids = append(cids, cid)
 	}
@@ -316,15 +325,15 @@ func TestGetContextCanceled(t *testing.T) {
 	eds := executionDataService(mockBlobService(bs))
 
 	ed, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-	rootCid, err := addExecutionData(eds, ed, time.Second)
+	rootCid, err := addExecutionData(eds, ed, 5*time.Second)
 	require.NoError(t, err)
 
-	cids := allKeys(t, bs, time.Second)
+	cids := allKeys(t, bs, 5*time.Second)
 	t.Logf("%d blobs in blob tree", len(cids))
 
-	require.NoError(t, deleteBlob(bs, cids[rand.Intn(len(cids))], time.Second))
+	require.NoError(t, deleteBlob(bs, cids[rand.Intn(len(cids))], 5*time.Second))
 
-	_, err = getExecutionData(eds, rootCid, time.Second)
+	_, err = getExecutionData(eds, rootCid, 5*time.Second)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
@@ -336,10 +345,10 @@ func TestAddContextCanceled(t *testing.T) {
 	eds := executionDataService(bex)
 
 	ed, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-	_, err := addExecutionData(eds, ed, time.Second)
+	_, err := addExecutionData(eds, ed, 5*time.Second)
 	require.NoError(t, err)
 
-	cids := allKeys(t, bs, time.Second)
+	cids := allKeys(t, bs, 5*time.Second)
 	t.Logf("%d blobs in blob tree", len(cids))
 
 	blockingCid := cids[rand.Intn(len(cids))]
@@ -357,7 +366,7 @@ func TestAddContextCanceled(t *testing.T) {
 			return bs.PutMany(ctx, blobs)
 		})
 
-	_, err = addExecutionData(eds, ed, time.Second)
+	_, err = addExecutionData(eds, ed, 5*time.Second)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
@@ -369,10 +378,10 @@ func TestGetIncompleteData(t *testing.T) {
 	eds := executionDataService(bex)
 
 	ed, _ := executionData(t, eds.serializer, 10*defaultMaxBlobSize)
-	rootCid, err := addExecutionData(eds, ed, time.Second)
+	rootCid, err := addExecutionData(eds, ed, 5*time.Second)
 	require.NoError(t, err)
 
-	cids := allKeys(t, bs, time.Second)
+	cids := allKeys(t, bs, 5*time.Second)
 	t.Logf("%d blobs in blob tree", len(cids))
 
 	missingCid := cids[rand.Intn(len(cids))]
@@ -399,7 +408,7 @@ func TestGetIncompleteData(t *testing.T) {
 			return ch
 		})
 
-	_, err = getExecutionData(eds, rootCid, time.Second)
+	_, err = getExecutionData(eds, rootCid, 5*time.Second)
 	var blobNotFoundError *BlobNotFoundError
 	assert.ErrorAs(t, err, &blobNotFoundError)
 }
@@ -411,11 +420,17 @@ func createBlobService(ctx irrecoverable.SignalerContext, t *testing.T, ds datas
 	cr, err := dht.New(ctx, h, dhtOpts...)
 	require.NoError(t, err)
 
-	service := network.NewBlobService(h, cr, name, ds)
+	service := p2p.NewBlobService(h, cr, name, ds)
 	service.Start(ctx)
 	<-service.Ready()
 
 	return service, h
+}
+
+func closeHost(t *testing.T, h host.Host) {
+	if err := h.Close(); err != nil {
+		require.FailNow(t, "failed to close host", err.Error())
+	}
 }
 
 func TestWithNetwork(t *testing.T) {
@@ -427,7 +442,9 @@ func TestWithNetwork(t *testing.T) {
 	ctx, errChan := irrecoverable.WithSignaler(parent)
 
 	service1, h1 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-create-store-request")
+	defer closeHost(t, h1)
 	service2, h2 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-create-store-request")
+	defer closeHost(t, h2)
 
 	done := make(chan struct{})
 
@@ -457,17 +474,18 @@ func TestWithNetwork(t *testing.T) {
 	eds2 := executionDataService(service2)
 
 	expected, _ := executionData(t, eds1.serializer, 10*defaultMaxBlobSize)
-	rootCid, err := addExecutionData(eds1, expected, time.Second)
+	rootCid, err := addExecutionData(eds1, expected, 5*time.Second)
 	require.NoError(t, err)
 
-	actual, err := getExecutionData(eds2, rootCid, time.Second)
+	actual, err := getExecutionData(eds2, rootCid, 5*time.Second)
 	require.NoError(t, err)
 
 	assert.Equal(t, true, reflect.DeepEqual(expected, actual))
 }
 
 func TestReprovider(t *testing.T) {
-	t.Parallel()
+	// test is flaky when run in parallel
+	// t.Parallel()
 
 	parent, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -478,10 +496,11 @@ func TestReprovider(t *testing.T) {
 	mockBs := mockBlobService(blockstore.NewBlockstore(ds))
 	mockEds := executionDataService(mockBs)
 	expected, _ := executionData(t, mockEds.serializer, 10*defaultMaxBlobSize)
-	rootCid, err := addExecutionData(mockEds, expected, time.Second)
+	rootCid, err := addExecutionData(mockEds, expected, 5*time.Second)
 	require.NoError(t, err)
 
 	h1, err := libp2p.New()
+	defer closeHost(t, h1)
 	require.NoError(t, err)
 	cr1, err := dht.New(ctx, h1, dht.Mode(dht.ModeServer))
 	require.NoError(t, err)
@@ -495,7 +514,9 @@ func TestReprovider(t *testing.T) {
 	}
 
 	service2, h2 := createBlobService(ctx, t, ds, "test-reprovider", dhtOpts...)
+	defer closeHost(t, h2)
 	service3, h3 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-reprovider", dhtOpts...)
+	defer closeHost(t, h3)
 
 	require.NoError(t, h2.Connect(ctx, *host.InfoFromHost(h1)))
 	require.NoError(t, h3.Connect(ctx, *host.InfoFromHost(h1)))
@@ -529,7 +550,7 @@ func TestReprovider(t *testing.T) {
 
 	eds := executionDataService(service3)
 
-	actual, err := getExecutionData(eds, rootCid, time.Second)
+	actual, err := getExecutionData(eds, rootCid, 5*time.Second)
 	require.NoError(t, err)
 
 	assert.Equal(t, true, reflect.DeepEqual(expected, actual))

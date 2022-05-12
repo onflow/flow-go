@@ -8,9 +8,13 @@ import (
 	_ "unsafe" // for linking runtimeNano
 
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/util"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -31,9 +35,21 @@ type Resolver struct {
 	c              *cache
 	res            madns.BasicResolver // underlying resolver
 	collector      module.ResolverMetrics
-	unit           *engine.Unit
 	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
 	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
+	ipRequests     chan *lookupIPRequest
+	txtRequests    chan *lookupTXTRequest
+	logger         zerolog.Logger
+	component.Component
+	cm *component.ComponentManager
+}
+
+type lookupIPRequest struct {
+	domain string
+}
+
+type lookupTXTRequest struct {
+	txt string
 }
 
 // optFunc is the option function for Resolver.
@@ -53,16 +69,38 @@ func WithTTL(ttl time.Duration) optFunc {
 	}
 }
 
+const (
+	numIPAddrLookupWorkers = 16
+	numTxtLookupWorkers    = 16
+	ipAddrLookupQueueSize  = 64
+	txtLookupQueueSize     = 64
+)
+
 // NewResolver is the factory function for creating an instance of this resolver.
-func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
+func NewResolver(logger zerolog.Logger, collector module.ResolverMetrics, dnsCache mempool.DNSCache, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
+		logger:         logger.With().Str("component", "dns-resolver").Logger(),
 		res:            madns.DefaultResolver,
-		c:              newCache(),
+		c:              newCache(dnsCache),
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},
-		unit:           engine.NewUnit(),
+		ipRequests:     make(chan *lookupIPRequest, ipAddrLookupQueueSize),
+		txtRequests:    make(chan *lookupTXTRequest, txtLookupQueueSize),
 	}
+
+	cm := component.NewComponentManagerBuilder()
+
+	for i := 0; i < numIPAddrLookupWorkers; i++ {
+		cm.AddWorker(resolver.processIPAddrLookups)
+	}
+
+	for i := 0; i < numTxtLookupWorkers; i++ {
+		cm.AddWorker(resolver.processTxtLookups)
+	}
+
+	resolver.cm = cm.Build()
+	resolver.Component = resolver.cm
 
 	for _, opt := range opts {
 		opt(resolver)
@@ -71,14 +109,46 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	return resolver
 }
 
-// Ready initializes the resolver and returns a channel that is closed when the initialization is done.
-func (r *Resolver) Ready() <-chan struct{} {
-	return r.unit.Ready()
+func (r *Resolver) processIPAddrLookups(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case req := <-r.ipRequests:
+			_, err := r.lookupResolverForIPAddr(ctx, req.domain)
+			if err != nil {
+				// invalidates cached entry when hits error on resolving.
+				invalidated := r.c.invalidateIPCacheEntry(req.domain)
+				if invalidated {
+					r.collector.OnDNSCacheInvalidated()
+				}
+			}
+			r.doneResolvingIP(req.domain)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
-// Done terminates the resolver and returns a channel that is closed when the termination is done
-func (r *Resolver) Done() <-chan struct{} {
-	return r.unit.Done()
+func (r *Resolver) processTxtLookups(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case req := <-r.txtRequests:
+			_, err := r.lookupResolverForTXTRecord(ctx, req.txt)
+			if err != nil {
+				// invalidates cached entry when hits error on resolving.
+				invalidated := r.c.invalidateTXTCacheEntry(req.txt)
+				if invalidated {
+					r.collector.OnDNSCacheInvalidated()
+				}
+			}
+			r.doneResolvingTXT(req.txt)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // LookupIPAddr implements BasicResolver interface for libp2p for looking up ip addresses through resolver.
@@ -104,18 +174,13 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 		return r.lookupResolverForIPAddr(ctx, domain)
 	}
 
-	if !fresh && r.shouldResolveIP(domain) {
-		r.unit.Launch(func() {
-			_, err := r.lookupResolverForIPAddr(ctx, domain)
-			if err != nil {
-				// invalidates cached entry when hits error on resolving.
-				invalidated := r.c.invalidateIPCacheEntry(domain)
-				if invalidated {
-					r.collector.OnDNSCacheInvalidated()
-				}
-			}
-			r.doneResolvingIP(domain)
-		})
+	if !fresh && r.shouldResolveIP(domain) && !util.CheckClosed(r.cm.ShutdownSignal()) {
+		select {
+		case r.ipRequests <- &lookupIPRequest{domain}:
+		default:
+			r.logger.Warn().Str("domain", domain).Msg("IP lookup request queue is full, dropping request")
+			r.collector.OnDNSLookupRequestDropped()
+		}
 	}
 
 	r.collector.OnDNSCacheHit()
@@ -155,30 +220,24 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 	if !exists {
 		r.collector.OnDNSCacheMiss()
-		return r.lookupResolverForTXTAddr(ctx, txt)
+		return r.lookupResolverForTXTRecord(ctx, txt)
 	}
 
-	if !fresh && r.shouldResolveTXT(txt) {
-		r.unit.Launch(func() {
-			defer r.doneResolvingTXT(txt)
-			_, err := r.lookupResolverForTXTAddr(ctx, txt)
-			if err != nil {
-				// invalidates cached entry when hits error on resolving.
-				invalidated := r.c.invalidateTXTCacheEntry(txt)
-				if invalidated {
-					r.collector.OnDNSCacheInvalidated()
-				}
-			}
-		})
-
+	if !fresh && r.shouldResolveTXT(txt) && !util.CheckClosed(r.cm.ShutdownSignal()) {
+		select {
+		case r.txtRequests <- &lookupTXTRequest{txt}:
+		default:
+			r.logger.Warn().Str("txt", txt).Msg("TXT lookup request queue is full, dropping request")
+			r.collector.OnDNSLookupRequestDropped()
+		}
 	}
 
 	r.collector.OnDNSCacheHit()
 	return addr, nil
 }
 
-// lookupResolverForIPAddr queries the underlying resolver for the domain and updates the cache if query is successful.
-func (r *Resolver) lookupResolverForTXTAddr(ctx context.Context, txt string) ([]string, error) {
+// lookupResolverForTXTRecord queries the underlying resolver for the domain and updates the cache if query is successful.
+func (r *Resolver) lookupResolverForTXTRecord(ctx context.Context, txt string) ([]string, error) {
 	addr, err := r.res.LookupTXT(ctx, txt)
 	if err != nil {
 		return nil, err

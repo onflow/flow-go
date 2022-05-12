@@ -8,6 +8,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// constant tag length
+const tagLength = flow.DomainTagLength
+
 // prefixedHashing embeds a crypto hasher and implements
 // hashing with a prefix : prefixedHashing(data) = hasher(prefix || data)
 //
@@ -17,36 +20,36 @@ import (
 type prefixedHashing struct {
 	hash.Hasher
 	usePrefix bool
-	tag       [flow.DomainTagLength]byte
+	tag       [tagLength]byte
 }
 
 // paddedDomainTag converts a string into a padded byte array.
-func paddedDomainTag(s string) ([flow.DomainTagLength]byte, error) {
-	var tag [flow.DomainTagLength]byte
-	if len(s) > flow.DomainTagLength {
-		return tag, fmt.Errorf("domain tag %s cannot be longer than %d characters", s, flow.DomainTagLength)
+func paddedDomainTag(s string) ([tagLength]byte, error) {
+	var tag [tagLength]byte
+	if len(s) > tagLength {
+		return tag, fmt.Errorf("domain tag cannot be longer than %d characters, got %s", tagLength, s)
 	}
 	copy(tag[:], s)
 	return tag, nil
 }
 
+var hasherCreators = map[hash.HashingAlgorithm](func() hash.Hasher){
+	hash.SHA2_256:   hash.NewSHA2_256,
+	hash.SHA3_256:   hash.NewSHA3_256,
+	hash.SHA2_384:   hash.NewSHA2_384,
+	hash.SHA3_384:   hash.NewSHA3_384,
+	hash.Keccak_256: hash.NewKeccak_256,
+}
+
 // NewPrefixedHashing returns a new hasher that prefixes the tag for all
 // hash computations (only when tag is not empty).
-// Only SHA2 and SHA3 algorithms are supported.
-func NewPrefixedHashing(shaAlgo hash.HashingAlgorithm, tag string) (hash.Hasher, error) {
+//
+// Supported algorithms are SHA2-256, SHA2-384, SHA3-256, SHA3-384 and Keccak256.
+func NewPrefixedHashing(algo hash.HashingAlgorithm, tag string) (hash.Hasher, error) {
 
-	var hasher hash.Hasher
-	switch shaAlgo {
-	case hash.SHA2_256:
-		hasher = hash.NewSHA2_256()
-	case hash.SHA3_256:
-		hasher = hash.NewSHA3_256()
-	case hash.SHA2_384:
-		hasher = hash.NewSHA2_384()
-	case hash.SHA3_384:
-		hasher = hash.NewSHA3_384()
-	default:
-		return nil, errors.New("hashing algorithm is not a supported for prefixed algorithm")
+	hasherCreator, hasCreator := hasherCreators[algo]
+	if !hasCreator {
+		return nil, errors.New("hashing algorithm is not supported for prefixed algorithm")
 	}
 
 	paddedTag, err := paddedDomainTag(tag)
@@ -55,7 +58,7 @@ func NewPrefixedHashing(shaAlgo hash.HashingAlgorithm, tag string) (hash.Hasher,
 	}
 
 	return &prefixedHashing{
-		Hasher: hasher,
+		Hasher: hasherCreator(),
 		// if tag is empty, do not use any prefix (standard hashing)
 		usePrefix: tag != "",
 		tag:       paddedTag,

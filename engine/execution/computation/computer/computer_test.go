@@ -336,6 +336,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				events = events[1:]
 				return nil
 			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				return nil, nil
+			},
 		}
 
 		vm := fvm.NewVirtualMachine(emittingRuntime)
@@ -385,6 +388,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				require.NoError(t, err)
 
 				return nil
+			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				return nil, nil
 			},
 		}
 
@@ -455,6 +461,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 					Err: fmt.Errorf("TX reverted"),
 				}
 			},
+			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+				return nil, nil
+			},
 		}
 
 		vm := fvm.NewVirtualMachine(rt)
@@ -480,7 +489,7 @@ func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execut
 	require.Len(t, result.EventsHashes, expectedNoOfChunks)
 
 	for i := 0; i < expectedNoOfChunks; i++ {
-		calculatedHash, err := flow.EventsListHash(result.Events[i])
+		calculatedHash, err := flow.EventsMerkleRootHash(result.Events[i])
 		require.NoError(t, err)
 
 		require.Equal(t, calculatedHash, result.EventsHashes[i])
@@ -490,9 +499,18 @@ func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execut
 type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
+	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
 }
 
 var _ runtime.Runtime = &testRuntime{}
+
+func (e *testRuntime) SetTracingEnabled(_ bool) {
+	panic("SetTracingEnabled not expected")
+}
+
+func (e *testRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
+	panic("SetResourceOwnerChangeHandlerEnabled not expected")
+}
 
 func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
@@ -522,8 +540,8 @@ func (*testRuntime) SetAtreeValidationEnabled(_ bool) {
 	panic("SetAtreeValidationEnabled not expected")
 }
 
-func (*testRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
-	panic("ReadStored not expected")
+func (e *testRuntime) ReadStored(a common.Address, p cadence.Path, c runtime.Context) (cadence.Value, error) {
+	return e.readStored(a, p, c)
 }
 
 func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {

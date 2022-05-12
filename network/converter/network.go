@@ -21,6 +21,6 @@ func (n *Network) convert(channel network.Channel) network.Channel {
 	return channel
 }
 
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.MessageProcessor) (network.Conduit, error) {
 	return n.Network.Register(n.convert(channel), engine)
 }

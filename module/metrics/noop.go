@@ -21,7 +21,10 @@ func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string, messageTy
 func (nc *NoopCollector) MessageAdded(priority int)                                              {}
 func (nc *NoopCollector) MessageRemoved(priority int)                                            {}
 func (nc *NoopCollector) QueueDuration(duration time.Duration, priority int)                     {}
-func (nc *NoopCollector) InboundProcessDuration(topic string, duration time.Duration)            {}
+func (nc *NoopCollector) MessageProcessingStarted(topic string)                                  {}
+func (nc *NoopCollector) MessageProcessingFinished(topic string, duration time.Duration)         {}
+func (nc *NoopCollector) DirectMessageStarted(topic string)                                      {}
+func (nc *NoopCollector) DirectMessageFinished(topic string)                                     {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                              {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)                          {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)                           {}
@@ -31,6 +34,7 @@ func (nc *NoopCollector) DNSLookupDuration(duration time.Duration)              
 func (nc *NoopCollector) OnDNSCacheMiss()                                                        {}
 func (nc *NoopCollector) OnDNSCacheInvalidated()                                                 {}
 func (nc *NoopCollector) OnDNSCacheHit()                                                         {}
+func (nc *NoopCollector) OnDNSLookupRequestDropped()                                             {}
 func (nc *NoopCollector) UnstakedOutboundConnections(_ uint)                                     {}
 func (nc *NoopCollector) UnstakedInboundConnections(_ uint)                                      {}
 func (nc *NoopCollector) RanGC(duration time.Duration)                                           {}
@@ -118,9 +122,10 @@ func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed uin
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                                   {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                     {}
 func (nc *NoopCollector) LatestTrieRegCount(number uint64)                                      {}
-func (nc *NoopCollector) LatestTrieRegCountDiff(number uint64)                                  {}
-func (nc *NoopCollector) LatestTrieMaxDepth(number uint64)                                      {}
-func (nc *NoopCollector) LatestTrieMaxDepthDiff(number uint64)                                  {}
+func (nc *NoopCollector) LatestTrieRegCountDiff(number int64)                                   {}
+func (nc *NoopCollector) LatestTrieRegSize(size uint64)                                         {}
+func (nc *NoopCollector) LatestTrieRegSizeDiff(size int64)                                      {}
+func (nc *NoopCollector) LatestTrieMaxDepthTouched(maxDepth uint16)                             {}
 func (nc *NoopCollector) UpdateCount()                                                          {}
 func (nc *NoopCollector) ProofSize(bytes uint32)                                                {}
 func (nc *NoopCollector) UpdateValuesNumber(number uint64)                                      {}
@@ -148,6 +153,13 @@ func (nc *NoopCollector) DiskSize(uint64)                                       
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
 func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)                    {}
 func (nc *NoopCollector) ExecutionDataAddStarted()                                              {}
-func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, int)                     {}
+func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, uint64)                  {}
 func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
-func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, int)                     {}
+func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, uint64)                  {}
+func (nc *NoopCollector) BucketAvailableSlots(uint64, uint64)                                   {}
+func (nc *NoopCollector) OnKeyPutSuccess()                                                      {}
+func (nc *NoopCollector) OnEntityEjectionDueToFullCapacity()                                    {}
+func (nc *NoopCollector) OnEntityEjectionDueToEmergency()                                       {}
+func (nc *NoopCollector) OnKeyPutFailure()                                                      {}
+func (nc *NoopCollector) OnKeyGetSuccess()                                                      {}
+func (nc *NoopCollector) OnKeyGetFailure()                                                      {}

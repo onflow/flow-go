@@ -40,7 +40,7 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 	seed := make([]byte, crypto.SeedMinLenDKG)
 	_, err := rand.Read(seed)
 	require.NoError(t, err)
-	randomBSKs, randomBPKs, groupKey, err := crypto.ThresholdSignKeyGen(n,
+	randomBSKs, randomBPKs, groupKey, err := crypto.BLSThresholdKeyGen(n,
 		signature.RandomBeaconThreshold(n), seed)
 	require.NoError(t, err)
 
@@ -61,7 +61,7 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 			identity.NodeID,
 			identity.Role,
 			identity.Address,
-			identity.Stake,
+			identity.Weight,
 			networkingKeys[i],
 			stakingKeys[i],
 		)

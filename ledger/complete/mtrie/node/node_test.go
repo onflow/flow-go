@@ -22,8 +22,7 @@ func Test_ProperLeaf(t *testing.T) {
 	require.True(t, n.VerifyCachedHash())
 }
 
-// Test_ProperLeaf verifies that the hash value of a compactified leaf (at height > 0) is computed correctly.
-// Here, we test with 16bit keys. Hence, the max height of a compactified leaf can be 16.
+// Test_CompactifiedLeaf verifies that the hash value of a compactified leaf (at height > 0) is computed correctly.
 // We test the hash at the lowest-possible height (1), for the leaf to be still compactified,
 // at an interim height (9) and the max possible height (256)
 func Test_CompactifiedLeaf(t *testing.T) {
@@ -42,20 +41,23 @@ func Test_CompactifiedLeaf(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 }
 
-// Test_InterimNode verifies that the hash value of an interim node without children is computed correctly.
-// We test the hash at the lowest-possible height (0), at an interim height (9) and the max possible height (256)
+// Test_InterimNodeWithoutChildren verifies that the hash value of an interim node without children is computed correctly.
+// We test the hash at the lowest-possible height (0), at an interim height (9) and (16)
 func Test_InterimNodeWithoutChildren(t *testing.T) {
 	n := node.NewInterimNode(0, nil, nil)
 	expectedRootHashHex := "18373b4b038cbbf37456c33941a7e346e752acd8fafa896933d4859002b62619"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
+	require.Equal(t, ledger.GetDefaultHashForHeight(0), n.Hash())
 
 	n = node.NewInterimNode(9, nil, nil)
 	expectedRootHashHex = "a37f98dbac56e315fbd4b9f9bc85fbd1b138ed4ae453b128c22c99401495af6d"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
+	require.Equal(t, ledger.GetDefaultHashForHeight(9), n.Hash())
 
 	n = node.NewInterimNode(16, nil, nil)
 	expectedRootHashHex = "6e24e2397f130d9d17bef32b19a77b8f5bcf03fb7e9e75fd89b8a455675d574a"
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
+	require.Equal(t, ledger.GetDefaultHashForHeight(16), n.Hash())
 }
 
 // Test_InterimNodeWithOneChild verifies that the hash value of an interim node with
@@ -90,38 +92,14 @@ func Test_InterimNodeWithBothChildren(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hashToString(n.Hash()))
 }
 
-func Test_MaxDepth(t *testing.T) {
-	path := utils.PathByUint16(1)
-	payload := utils.LightPayload(2, 3)
-
-	n1 := node.NewLeaf(path, payload, 0)
-	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, payload, 0)
-
-	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(1, n4, n3)
-	require.Equal(t, n5.MaxDepth(), uint16(2))
-}
-
-func Test_RegCount(t *testing.T) {
-	path := utils.PathByUint16(1)
-	payload := utils.LightPayload(2, 3)
-	n1 := node.NewLeaf(path, payload, 0)
-	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, payload, 0)
-
-	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(1, n4, n3)
-	require.Equal(t, n5.RegCount(), uint64(3))
-}
 func Test_AllPayloads(t *testing.T) {
 	path := utils.PathByUint16(1)
 	payload := utils.LightPayload(2, 3)
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, payload, 0)
+	n3 := node.NewLeaf(path, payload, 1)
 	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(1, n4, n3)
+	n5 := node.NewInterimNode(2, n4, n3)
 	require.Equal(t, 3, len(n5.AllPayloads()))
 }
 
@@ -130,9 +108,9 @@ func Test_VerifyCachedHash(t *testing.T) {
 	payload := utils.LightPayload(2, 3)
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, payload, 0)
+	n3 := node.NewLeaf(path, payload, 1)
 	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(1, n4, n3)
+	n5 := node.NewInterimNode(2, n4, n3)
 	require.True(t, n5.VerifyCachedHash())
 }
 
@@ -156,8 +134,7 @@ func Test_Compactify_EmptySubtrie(t *testing.T) {
 	})
 
 	t.Run("both children nil", func(t *testing.T) {
-		require.Nil(t, node.NewInterimCompactifiedNode(5, nil, n2))
-		require.Nil(t, node.NewInterimCompactifiedNode(5, n1, nil))
+		require.Nil(t, node.NewInterimCompactifiedNode(5, nil, nil))
 	})
 }
 
@@ -236,9 +213,7 @@ func Test_Compactify_EmptyChild(t *testing.T) {
 		require.Equal(t, n3, nn5.LeftChild())
 		require.Nil(t, nn5.RightChild())
 		require.True(t, nn5.VerifyCachedHash())
-		require.Equal(t, nn5.Hash(), n5.Hash())
-		require.Equal(t, uint16(2), nn5.MaxDepth())
-		require.Equal(t, uint64(2), nn5.RegCount())
+		require.Equal(t, n5.Hash(), nn5.Hash())
 	})
 
 	t.Run("left child empty", func(t *testing.T) {
@@ -260,9 +235,7 @@ func Test_Compactify_EmptyChild(t *testing.T) {
 		require.Nil(t, nn5.LeftChild())
 		require.Equal(t, n4, nn5.RightChild())
 		require.True(t, nn5.VerifyCachedHash())
-		require.Equal(t, nn5.Hash(), n5.Hash())
-		require.Equal(t, uint16(2), nn5.MaxDepth())
-		require.Equal(t, uint64(2), nn5.RegCount())
+		require.Equal(t, n5.Hash(), nn5.Hash())
 	})
 
 }
@@ -295,16 +268,12 @@ func Test_Compactify_BothChildrenPopulated(t *testing.T) {
 	require.Equal(t, n2, nn3.RightChild())
 	require.True(t, nn3.VerifyCachedHash())
 	require.Equal(t, n3.Hash(), nn3.Hash())
-	require.Equal(t, uint16(1), nn3.MaxDepth())
-	require.Equal(t, uint64(2), nn3.RegCount())
 
 	nn5 := node.NewInterimCompactifiedNode(6, nn3, n4)
 	require.Equal(t, nn3, nn5.LeftChild())
 	require.Equal(t, n4, nn5.RightChild())
 	require.True(t, nn5.VerifyCachedHash())
-	require.Equal(t, nn5.Hash(), n5.Hash())
-	require.Equal(t, uint16(2), nn5.MaxDepth())
-	require.Equal(t, uint64(3), nn5.RegCount())
+	require.Equal(t, n5.Hash(), nn5.Hash())
 }
 
 func hashToString(hash hash.Hash) string {
@@ -322,9 +291,7 @@ func hashToString(hash hash.Hash) string {
 func requireIsLeafWithHash(t *testing.T, node *node.Node, expectedHash hash.Hash) {
 	require.Nil(t, node.LeftChild())
 	require.Nil(t, node.RightChild())
-	require.Equal(t, uint16(0), node.MaxDepth())
-	require.Equal(t, uint64(1), node.RegCount())
-	require.Equal(t, node.Hash(), expectedHash)
+	require.Equal(t, expectedHash, node.Hash())
 	require.True(t, node.VerifyCachedHash())
 	require.True(t, node.IsLeaf())
 }

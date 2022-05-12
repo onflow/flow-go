@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
-	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/integration/tests/execution"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -141,7 +141,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	gs.signers = map[flowsdk.Address]crypto.InMemorySigner{}
 
 	// Setup the client, not using the suite to generate client since we may want to call external testnets
-	flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure())
+	flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure()) //nolint:staticcheck
 	require.NoError(gs.T(), err, "could not get client")
 	gs.flowClient = flowClient
 
@@ -223,7 +223,7 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (flowsdk.Address, *flowsdk.AccountKey) {
 	ctx := context.Background()
 
-	myPrivateKey := common.RandomPrivateKey()
+	myPrivateKey := lib.RandomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
 		FromPrivateKey(myPrivateKey).
 		SetHashAlgo(crypto.SHA3_256).

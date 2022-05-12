@@ -2,6 +2,7 @@ package hash
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 )
 
@@ -13,6 +14,27 @@ type Hash [HashLen]byte
 
 func (h Hash) String() string {
 	return hex.EncodeToString(h[:])
+}
+
+func (h Hash) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(h[:]))
+}
+
+func (h *Hash) UnmarshalJSON(data []byte) error {
+	var hashHex string
+	if err := json.Unmarshal(data, &hashHex); err != nil {
+		return err
+	}
+	b, err := hex.DecodeString(hashHex)
+	if err != nil {
+		return err
+	}
+	ha, err := ToHash(b)
+	if err != nil {
+		return err
+	}
+	*h = ha
+	return nil
 }
 
 // DummyHash is an arbitrary hash value, used in function errors.

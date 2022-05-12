@@ -192,7 +192,7 @@ func (ac *VerifyingAssignmentCollector) allCollectors() []*ApprovalCollector {
 
 func (ac *VerifyingAssignmentCollector) verifyAttestationSignature(approval *flow.ResultApprovalBody, nodeIdentity *flow.Identity) error {
 	id := approval.Attestation.ID()
-	valid, err := ac.verifier.Verify(id[:], approval.AttestationSignature, nodeIdentity.StakingPubKey)
+	valid, err := nodeIdentity.StakingPubKey.Verify(approval.AttestationSignature, id[:], ac.sigHasher)
 	if err != nil {
 		return fmt.Errorf("failed to verify attestation signature: %w", err)
 	}
@@ -206,7 +206,7 @@ func (ac *VerifyingAssignmentCollector) verifyAttestationSignature(approval *flo
 
 func (ac *VerifyingAssignmentCollector) verifySignature(approval *flow.ResultApproval, nodeIdentity *flow.Identity) error {
 	id := approval.Body.ID()
-	valid, err := ac.verifier.Verify(id[:], approval.VerifierSignature, nodeIdentity.StakingPubKey)
+	valid, err := nodeIdentity.StakingPubKey.Verify(approval.VerifierSignature, id[:], ac.sigHasher)
 	if err != nil {
 		return fmt.Errorf("failed to verify approval signature: %w", err)
 	}
@@ -379,7 +379,7 @@ func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (
 	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
 		filter.And(
 			filter.HasRole(flow.RoleVerification),
-			filter.HasStake(true),
+			filter.HasWeight(true),
 			filter.Not(filter.Ejected),
 		))
 	if err != nil {

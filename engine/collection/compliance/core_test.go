@@ -11,10 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	realbuffer "github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	clusterint "github.com/onflow/flow-go/state/cluster"
@@ -39,13 +42,14 @@ type ComplianceCoreSuite struct {
 	childrenDB map[flow.Identifier][]*cluster.PendingBlock
 
 	// mocked dependencies
-	state    *clusterstate.MutableState
-	snapshot *clusterstate.Snapshot
-	metrics  *metrics.NoopCollector
-	headers  *storage.Headers
-	pending  *module.PendingClusterBlockBuffer
-	hotstuff *module.HotStuff
-	sync     *module.BlockRequester
+	state          *clusterstate.MutableState
+	snapshot       *clusterstate.Snapshot
+	metrics        *metrics.NoopCollector
+	headers        *storage.Headers
+	pending        *module.PendingClusterBlockBuffer
+	hotstuff       *module.HotStuff
+	sync           *module.BlockRequester
+	voteAggregator *hotstuff.VoteAggregator
 
 	// engine under test
 	core *Core
@@ -130,7 +134,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 	cs.pending.On("DropForParent", mock.Anything).Return()
 	cs.pending.On("Size").Return(uint(0))
-	cs.pending.On("PruneByHeight", mock.Anything).Return()
+	cs.pending.On("PruneByView", mock.Anything).Return()
 
 	closed := func() <-chan struct{} {
 		channel := make(chan struct{})
@@ -141,6 +145,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up hotstuff module mock
 	cs.hotstuff = &module.HotStuff{}
 
+	cs.voteAggregator = &hotstuff.VoteAggregator{}
+
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
 	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
@@ -150,10 +156,19 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.metrics = metrics.NewNoopCollector()
 
 	// initialize the engine
-	e, err := NewCore(unittest.Logger(), cs.metrics, cs.metrics, cs.metrics, cs.headers, cs.state, cs.pending)
+	core, err := NewCore(
+		unittest.Logger(),
+		cs.metrics,
+		cs.metrics,
+		cs.metrics,
+		cs.headers,
+		cs.state,
+		cs.pending,
+		cs.voteAggregator,
+	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
-	cs.core = e
+	cs.core = core
 	// assign engine with consensus & synchronization
 	cs.core.hotstuff = cs.hotstuff
 	cs.core.sync = cs.sync
@@ -181,6 +196,22 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
+}
+
+func (cs *ComplianceCoreSuite) TestOnBlockProposalSkipProposalThreshold() {
+
+	// create a proposal which is far enough ahead to be dropped
+	originID := unittest.IdentifierFixture()
+	block := unittest.ClusterBlockFixture()
+	block.Header.Height = cs.head.Header.Height + compliance.DefaultConfig().SkipNewProposalsThreshold + 1
+	proposal := unittest.ClusterProposalFromBlock(&block)
+
+	err := cs.core.OnBlockProposal(originID, proposal)
+	require.NoError(cs.T(), err)
+
+	// block should be dropped - not added to state or cache
+	cs.state.AssertNotCalled(cs.T(), "Extend", mock.Anything)
+	cs.pending.AssertNotCalled(cs.T(), "Add", originID, mock.Anything)
 }
 
 func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
@@ -299,7 +330,6 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 }
 
 func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
-
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	vote := messages.ClusterBlockVote{
@@ -308,13 +338,18 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 		SigData: unittest.SignatureFixture(),
 	}
 
-	cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+	cs.voteAggregator.On("AddVote", &model.Vote{
+		View:     vote.View,
+		BlockID:  vote.BlockID,
+		SignerID: originID,
+		SigData:  vote.SigData,
+	}).Return()
 
 	// execute the vote submission
 	err := cs.core.OnBlockVote(originID, &vote)
 	require.NoError(cs.T(), err, "block vote should pass")
 
-	// check the submit vote was called with correct parameters
+	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 

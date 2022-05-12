@@ -4,8 +4,6 @@ import (
 	"crypto"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/engine/consensus/dkg"
@@ -34,6 +32,7 @@ type node struct {
 	account           *nodeAccount
 	dkgContractClient *DKGClientWrapper
 	dkgState          storage.DKGState
+	safeBeaconKeys    storage.SafeBeaconKeys
 	messagingEngine   *dkg.MessagingEngine
 	reactorEngine     *dkg.ReactorEngine
 }
@@ -46,6 +45,9 @@ func (n *node) Ready() {
 func (n *node) Done() {
 	<-n.messagingEngine.Done()
 	<-n.reactorEngine.Done()
+	// close database otherwise hitting "too many file open"
+	_ = n.PublicDB.Close()
+	_ = n.SecretsDB.Close()
 }
 
 // setEpochs configures the mock state snapthost at firstBlock to return the
@@ -58,12 +60,17 @@ func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup f
 	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
 	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView, nil)
 	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
-	currentEpoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nextSetup.RandomSource, nil)
+	currentEpoch.On("FinalView").Return(currentSetup.FinalView, nil)
+	currentEpoch.On("FirstView").Return(currentSetup.FirstView, nil)
+	currentEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
 
 	nextEpoch := new(protocolmock.Epoch)
 	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
-	nextEpoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nextSetup.RandomSource, nil)
+	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
+	nextEpoch.On("DKG").Return(nil, nil) // no error means didn't run into EECC
+	nextEpoch.On("FirstView").Return(nextSetup.FirstView, nil)
+	nextEpoch.On("FinalView").Return(nextSetup.FinalView, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
 	epochQuery.Add(currentEpoch)

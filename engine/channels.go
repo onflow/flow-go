@@ -151,11 +151,14 @@ const (
 
 	// Public network channels
 	PublicSyncCommittee = network.Channel("public-sync-committee")
+
+	// Execution data service
+	ExecutionDataService = network.Channel("execution-data-service")
 )
 
-// initializeChannelRoleMap initializes an instance of channelRoleMap and populates it with the channels and their
+// initializeChannelRoleMap initializes an instance of channelRoleMap and populates it
+// with the channels and their corresponding list of authorized roles.
 // Note: Please update this map, if a new channel is defined or a the roles subscribing to a channel have changed
-// corresponding list of roles.
 func initializeChannelRoleMap() {
 	channelRoleMap = make(map[network.Channel]flow.RoleList)
 
