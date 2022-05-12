@@ -50,6 +50,12 @@ func WithParentSigners(signerIDs []flow.Identifier) func(*model.Block) {
 	}
 }
 
+func WithBlockQC(qc *flow.QuorumCertificate) func(*model.Block) {
+	return func(block *model.Block) {
+		block.QC = qc
+	}
+}
+
 func MakeProposal(options ...func(*model.Proposal)) *model.Proposal {
 	proposal := &model.Proposal{
 		Block:   MakeBlock(),
@@ -70,5 +76,11 @@ func WithBlock(block *model.Block) func(*model.Proposal) {
 func WithSigData(sigData []byte) func(*model.Proposal) {
 	return func(proposal *model.Proposal) {
 		proposal.SigData = sigData
+	}
+}
+
+func WithLastViewTC(lastViewTC *flow.TimeoutCertificate) func(*model.Proposal) {
+	return func(proposal *model.Proposal) {
+		proposal.LastViewTC = lastViewTC
 	}
 }

@@ -3,6 +3,7 @@ package validator
 import (
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"math/rand"
 	"testing"
 	"time"
@@ -234,21 +235,179 @@ func (ps *ProposalSuite) TestProposalQCError() {
 // TestProposalWithLastViewTC tests different scenarios where last view has ended with TC
 // this requires including a valid LastViewTC.
 func (ps *ProposalSuite) TestProposalWithLastViewTC() {
-	ps.Fail("implement me")
-	ps.Run("happy-path", func() {
+	// assume all proposals are created by valid leader
+	ps.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	ps.committee.On("LeaderForView", mock.Anything).Return(ps.leader.NodeID, nil)
 
+	ps.Run("happy-path", func() {
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			helper.WithLastViewTC(helper.MakeTC(
+				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCView(ps.block.View+1),
+				helper.WithTCHighestQC(ps.block.QC))),
+		)
+		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
+			proposal.LastViewTC.View, proposal.LastViewTC.TOHighQCViews).Return(nil).Once()
+		err := ps.validator.ValidateProposal(proposal)
+		require.NoError(ps.T(), err)
 	})
 	ps.Run("no-tc", func() {
-
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			// in this case proposal without LastViewTC is considered invalid
+		)
+		err := ps.validator.ValidateProposal(proposal)
+		require.True(ps.T(), model.IsInvalidBlockError(err))
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyQC")
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
 	ps.Run("tc-for-wrong-view", func() {
-
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			helper.WithLastViewTC(helper.MakeTC(
+				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCView(ps.block.View+10), // LastViewTC.View must be equal to Block.View-1
+				helper.WithTCHighestQC(ps.block.QC))),
+		)
+		err := ps.validator.ValidateProposal(proposal)
+		require.True(ps.T(), model.IsInvalidBlockError(err))
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyQC")
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
 	ps.Run("proposal-not-safe-to-extend", func() {
-
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			helper.WithLastViewTC(helper.MakeTC(
+				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCView(ps.block.View+1),
+				// proposal is not safe to extend because included QC.View is higher that Block.View
+				helper.WithTCHighestQC(helper.MakeQC(helper.WithQCView(ps.block.View+1))))),
+		)
+		err := ps.validator.ValidateProposal(proposal)
+		require.True(ps.T(), model.IsInvalidBlockError(err))
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyQC")
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
 	})
-	ps.Run("included-tc-invalid", func() {
+	ps.Run("included-tc-invalid-structure", func() {
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			helper.WithLastViewTC(helper.MakeTC(
+				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCView(ps.block.View+1),
+				helper.WithTCHighestQC(ps.block.QC))),
+		)
+		// after this operation TC is invalid
+		proposal.LastViewTC.TOHighQCViews = proposal.LastViewTC.TOHighQCViews[1:]
+		err := ps.validator.ValidateProposal(proposal)
+		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
+	})
+	ps.Run("included-tc-highest-qc-not-highest", func() {
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			helper.WithLastViewTC(helper.MakeTC(
+				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCView(ps.block.View+1),
+				helper.WithTCHighestQC(ps.block.QC),
+			)),
+		)
+		// this is considered an invalid TC, because highest QC's view is not equal to max{TOHighQCViews}
+		proposal.LastViewTC.TOHighQCViews[0] = proposal.LastViewTC.TOHighestQC.View + 1
+		err := ps.validator.ValidateProposal(proposal)
+		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
+	})
+	ps.Run("included-tc-threshold-not-reached", func() {
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			helper.WithLastViewTC(helper.MakeTC(
+				helper.WithTCSigners(ps.participants.NodeIDs()[:1]), // one signer is not enough to reach threshold
+				helper.WithTCView(ps.block.View+1),
+				helper.WithTCHighestQC(ps.block.QC),
+			)),
+		)
+		err := ps.validator.ValidateProposal(proposal)
+		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
+	})
+	ps.Run("included-tc-highest-qc-invalid", func() {
+		qc := helper.MakeQC(
+			helper.WithQCView(ps.block.QC.View-1),
+			helper.WithQCSigners(ps.voters.NodeIDs()))
 
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			helper.WithLastViewTC(helper.MakeTC(
+				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCView(ps.block.View+1),
+				helper.WithTCHighestQC(qc))),
+		)
+		ps.verifier.On("VerifyQC", ps.voters, qc.SigData,
+			qc.View, qc.BlockID).Return(model.ErrInvalidSignature).Once()
+		err := ps.validator.ValidateProposal(proposal)
+		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
+		ps.verifier.AssertNotCalled(ps.T(), "VerifyTC")
+	})
+	ps.Run("included-tc-invalid-sig", func() {
+		proposal := helper.MakeProposal(
+			helper.WithBlock(helper.MakeBlock(
+				helper.WithBlockView(ps.block.View+2),
+				helper.WithBlockProposer(ps.leader.NodeID),
+				helper.WithParentSigners(ps.participants.NodeIDs()),
+				helper.WithBlockQC(ps.block.QC)),
+			),
+			helper.WithLastViewTC(helper.MakeTC(
+				helper.WithTCSigners(ps.participants.NodeIDs()),
+				helper.WithTCView(ps.block.View+1),
+				helper.WithTCHighestQC(ps.block.QC))),
+		)
+		ps.verifier.On("VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
+			proposal.LastViewTC.View, proposal.LastViewTC.TOHighQCViews).Return(model.ErrInvalidSignature).Once()
+		err := ps.validator.ValidateProposal(proposal)
+		require.True(ps.T(), model.IsInvalidBlockError(err) && model.IsInvalidTCError(err))
+		ps.verifier.AssertCalled(ps.T(), "VerifyTC", ps.voters, []byte(proposal.LastViewTC.SigData),
+			proposal.LastViewTC.View, proposal.LastViewTC.TOHighQCViews)
 	})
 }
 

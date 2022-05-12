@@ -197,7 +197,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		// check if included TC is valid
 		err = v.ValidateTC(proposal.LastViewTC)
 		if err != nil {
-			return newInvalidBlockError(block, fmt.Errorf(""))
+			return newInvalidBlockError(block, fmt.Errorf("proposals TC's is not valid: %w", err))
 		}
 	}
 
