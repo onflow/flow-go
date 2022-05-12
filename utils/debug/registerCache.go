@@ -8,7 +8,13 @@ import (
 	"io"
 	"os"
 
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/rs/zerolog"
 )
 
 type registerCache interface {
@@ -139,13 +145,79 @@ func (c *fileRegisterCache) Persist() error {
 	if err != nil {
 		return err
 	}
-	err = w.Flush()
+	return nil
+}
+
+type checkpointBasedRegisterCache struct {
+	ledgerPath string
+	state      ledger.State
+	ledger     ledger.Ledger
+}
+
+func newCheckpointBasedRegisterCache(ledgerPath string, targetstate string) (*checkpointBasedRegisterCache, error) {
+
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, &metrics.NoopCollector{}, ledgerPath, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
-	err = f.Sync()
+	defer func() {
+		<-diskWal.Done()
+	}()
+	led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, &metrics.NoopCollector{}, zerolog.Nop(), 0)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
+
+	var state ledger.State
+	// if targetstate is empty take the latest one from checkpoint
+	if len(targetstate) == 0 {
+		state, err = led.MostRecentTouchedState()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load the most recently touched state from ledger: %w", err)
+		}
+	} else {
+		stateBytes, err := hex.DecodeString(targetstate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode hex code of state: %w", err)
+		}
+		state, err = ledger.ToState(stateBytes)
+		if err != nil {
+			return nil, fmt.Errorf("cannot use the input state: %w", err)
+		}
+	}
+
+	return &checkpointBasedRegisterCache{
+		ledgerPath: ledgerPath,
+		ledger:     led,
+		state:      state,
+	}, nil
+}
+
+func (f *checkpointBasedRegisterCache) Get(owner, controller, key string) ([]byte, bool) {
+	k := ledger.NewKey([]ledger.KeyPart{
+		ledger.NewKeyPart(0, []byte(owner)),
+		ledger.NewKeyPart(1, []byte(controller)),
+		ledger.NewKeyPart(2, []byte(key)),
+	})
+	query, err := ledger.NewQuery(f.state, []ledger.Key{k})
+	if err != nil {
+		panic(err)
+	}
+	values, err := f.ledger.Get(query)
+	if err != nil {
+		panic(err)
+	}
+	if len(values) != 1 {
+		panic("ledger returned more than 1 value")
+	}
+	return values[0], len(values[0]) > 0
+}
+
+func (f *checkpointBasedRegisterCache) Set(owner, controller, key string, value []byte) {
+	// no op
+}
+
+func (c *checkpointBasedRegisterCache) Persist() error {
+	// no op
 	return nil
 }
