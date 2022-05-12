@@ -100,7 +100,7 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Name:      "script_size",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
-			Help:      "histogram for the script size in kb histogram in GetTransactionResult and ExecuteScript",
+			Help:      "histogram for the script size in kb of scripts used in GetTransactionResult and ExecuteScript",
 		}, []string{"method"}),
 	}
 
