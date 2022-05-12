@@ -1,6 +1,8 @@
 package factories
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/module"
@@ -46,7 +48,7 @@ func (f *BuilderFactory) Create(
 	pool mempool.Transactions,
 ) (module.Builder, *finalizer.Finalizer, error) {
 
-	build := builder.NewBuilder(
+	build, err := builder.NewBuilder(
 		f.db,
 		f.trace,
 		f.mainChainHeaders,
@@ -55,6 +57,9 @@ func (f *BuilderFactory) Create(
 		pool,
 		f.opts...,
 	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not create builder: %w", err)
+	}
 
 	final := finalizer.NewFinalizer(
 		f.db,

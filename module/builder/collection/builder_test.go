@@ -115,7 +115,7 @@ func (suite *BuilderSuite) SetupTest() {
 		suite.Assert().True(added)
 	}
 
-	suite.builder = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
+	suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
 }
 
 // runs after each test finishes
@@ -306,14 +306,14 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	finalizedBlock.SetPayload(finalizedPayload)
 	suite.InsertBlock(finalizedBlock)
-	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
+	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", finalizedBlock.Header.Height, finalizedBlock.ID(), finalizedPayload.Collection.Light(), finalizedBlock.Header.ParentID)
 
 	// build a block containing tx2 on the first block
 	unFinalizedPayload := suite.Payload(tx2)
 	unFinalizedBlock := unittest.ClusterBlockWithParent(&finalizedBlock)
 	unFinalizedBlock.SetPayload(unFinalizedPayload)
 	suite.InsertBlock(unFinalizedBlock)
-	t.Logf("unfinalized: id=%s\tparent_id=%s\theight=%d\n", unFinalizedBlock.ID(), unFinalizedBlock.Header.ParentID, unFinalizedBlock.Header.Height)
+	t.Logf("finalized: height=%d id=%s txs=%s parent_id=%s\t\n", unFinalizedBlock.Header.Height, unFinalizedBlock.ID(), unFinalizedPayload.Collection.Light(), unFinalizedBlock.Header.ParentID)
 
 	// finalize first block
 	suite.FinalizeBlock(finalizedBlock)
@@ -388,7 +388,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 	// use a mempool with 2000 transactions, one per block
 	suite.pool = herocache.NewTransactions(2000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
 	final, err := suite.protoState.Final().Head()
@@ -468,7 +468,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	// set the max collection size to 1
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(1))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(1))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -486,7 +486,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 	// set the max collection byte size to 400 (each tx is about 150 bytes)
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(400))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(400))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -504,7 +504,7 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	// set the max gas to 20,000
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(20000))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionTotalGas(20000))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -541,7 +541,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 
 	// reset the pool and builder
 	suite.pool = herocache.NewTransactions(10, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	// insert a transaction referring genesis (now expired)
 	tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
@@ -583,7 +583,7 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 
 	// start with an empty mempool
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
 	suite.Require().NoError(err)
@@ -610,7 +610,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	suite.ClearPool()
 
 	// create builder with no rate limit and max 10 tx/collection
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(0),
 	)
@@ -651,7 +651,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -695,7 +695,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -733,7 +733,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	suite.ClearPool()
 
 	// create builder with .5 tx/payer and max 10 tx/collection
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(.5),
 	)
@@ -775,7 +775,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 	// create builder with 5 tx/payer and max 10 tx/collection
 	// configure an unlimited payer
 	payer := unittest.RandomAddressFixture()
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 		builder.WithUnlimitedPayers(payer),
@@ -880,7 +880,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}
 
 		// create the builder
-		suite.builder = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
+		suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool)
 	}
 
 	// create a block history to test performance against
