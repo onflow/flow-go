@@ -98,16 +98,16 @@ type ObserverServiceConfig struct {
 	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
-	supportsPublicFollower       bool              // True if this is an Access node which also supports observers, and consensus follower engines
-	collectionGRPCPort           uint
-	executionGRPCPort            uint
+	supportsPublicFollower       bool              // Observers will support streaming to observers later
+	collectionGRPCPort           uint // deprecated
+	executionGRPCPort            uint // deprecated
 	pingEnabled                  bool
 	nodeInfoFile                 string
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
-	ExecutionNodeAddress         string // deprecated
-	HistoricalAccessRPCs         []access.AccessAPIClient
+	ExecutionNodeAddress         string                   // deprecated
+	HistoricalAccessRPCs         []access.AccessAPIClient //deprecated
 	logTxTimeToFinalized         bool
 	logTxTimeToExecuted          bool
 	logTxTimeToFinalizedExecuted bool
