@@ -219,6 +219,8 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 		// thrown within workers would not have propagated, and it would only receive the done signal
 		defer func() {
 			cancel() // shutdown all workers
+			// wait for shutdown signal before signalling the component is done
+			// this guarantees that ShutdownSignal is closed before Done
 			<-c.shutdownSignal
 			<-c.workersDone
 			close(c.done)
