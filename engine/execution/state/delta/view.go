@@ -24,7 +24,7 @@ type View struct {
 	// TODO we can add a flag to disable capturing spockSecret
 	// for views other than collection views to improve performance
 	spockSecret       []byte
-	spockSecretLock   sync.Mutex
+	spockSecretLock   *sync.Mutex // using pointer instead, because using value would cause mock.Called to trigger race detector
 	spockSecretHasher hash.Hasher
 	readFunc          GetRegisterFunc
 }
@@ -48,6 +48,7 @@ func AlwaysEmptyGetRegisterFunc(owner, controller, key string) (flow.RegisterVal
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
 		delta:             NewDelta(),
+		spockSecretLock:   &sync.Mutex{},
 		regTouchSet:       make(map[string]flow.RegisterID),
 		readFunc:          readFunc,
 		spockSecretHasher: hash.NewSHA3_256(),
