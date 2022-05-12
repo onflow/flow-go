@@ -3,13 +3,13 @@ package follower
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/cmd/observer/node_builder"
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
+	access "github.com/onflow/flow-go/cmd/observer/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
@@ -109,12 +109,12 @@ func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentityList {
 	return ids
 }
 
-func getAccessNodeOptions(config *Config) []node_builder.Option {
+func getAccessNodeOptions(config *Config) []access.Option {
 	ids := bootstrapIdentities(config.bootstrapNodes)
-	return []node_builder.Option{
-		node_builder.WithBootStrapPeers(ids...),
-		node_builder.WithBaseOptions(getBaseOptions(config)),
-		node_builder.WithNetworkKey(config.networkPrivKey),
+	return []access.Option{
+		access.WithBootStrapPeers(ids...),
+		access.WithBaseOptions(getBaseOptions(config)),
+		access.WithNetworkKey(config.networkPrivKey),
 	}
 }
 
@@ -148,9 +148,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	return options
 }
 
-func buildAccessNode(accessNodeOptions []node_builder.Option) (*node_builder.ObserverServiceBuilder, error) {
-	anb := node_builder.FlowAccessNode(accessNodeOptions...)
-	nodeBuilder := node_builder.NewObserverServiceBuilder(anb)
+func buildAccessNode(accessNodeOptions []access.Option) (*access.ObserverServiceBuilder, error) {
+	anb := access.FlowAccessNode(accessNodeOptions...)
+	nodeBuilder := access.NewObserverServiceBuilder(anb)
 
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
