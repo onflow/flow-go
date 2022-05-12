@@ -78,7 +78,7 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 	if err != nil {
 		return nil, err
 	}
-	err = val.ValidateQC(createdQC, hotBlock)
+	err = val.ValidateQC(createdQC)
 
 	return createdQC, err
 }

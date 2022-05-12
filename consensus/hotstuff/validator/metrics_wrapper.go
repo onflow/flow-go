@@ -33,6 +33,13 @@ func (w ValidatorMetricsWrapper) ValidateQC(qc *flow.QuorumCertificate) error {
 	return err
 }
 
+func (w ValidatorMetricsWrapper) ValidateTC(tc *flow.TimeoutCertificate) error {
+	processStart := time.Now()
+	err := w.validator.ValidateTC(tc)
+	w.metrics.ValidatorProcessingDuration(time.Since(processStart))
+	return err
+}
+
 func (w ValidatorMetricsWrapper) ValidateProposal(proposal *model.Proposal) error {
 	processStart := time.Now()
 	err := w.validator.ValidateProposal(proposal)

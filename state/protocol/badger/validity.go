@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -302,11 +301,6 @@ func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
 // validateRootQC performs validation of root QC
 // Returns nil on success
 func validateRootQC(snap protocol.Snapshot) error {
-	rootBlock, err := snap.Head()
-	if err != nil {
-		return fmt.Errorf("could not get root block: %w", err)
-	}
-
 	identities, err := snap.Identities(filter.IsVotingConsensusCommitteeMember)
 	if err != nil {
 		return fmt.Errorf("could not get root snapshot identities: %w", err)
@@ -322,7 +316,6 @@ func validateRootQC(snap protocol.Snapshot) error {
 		return fmt.Errorf("could not get DKG for root snapshot: %w", err)
 	}
 
-	hotstuffRootBlock := model.GenesisBlockFromFlow(rootBlock)
 	committee, err := committees.NewStaticCommitteeWithDKG(identities, flow.Identifier{}, dkg)
 	if err != nil {
 		return fmt.Errorf("could not create static committee: %w", err)
@@ -330,7 +323,7 @@ func validateRootQC(snap protocol.Snapshot) error {
 	verifier := verification.NewCombinedVerifier(committee, signature.NewConsensusSigDataPacker(committee))
 	forks := &mocks.ForksReader{}
 	hotstuffValidator := validator.New(committee, forks, verifier)
-	err = hotstuffValidator.ValidateQC(rootQC, hotstuffRootBlock)
+	err = hotstuffValidator.ValidateQC(rootQC)
 	if err != nil {
 		return fmt.Errorf("could not validate root qc: %w", err)
 	}
@@ -340,8 +333,6 @@ func validateRootQC(snap protocol.Snapshot) error {
 // validateClusterQC performs QC validation of single collection cluster
 // Returns nil on success
 func validateClusterQC(cluster protocol.Cluster) error {
-	clusterRootBlock := model.GenesisBlockFromFlow(cluster.RootBlock().Header)
-
 	committee, err := committees.NewStaticCommittee(cluster.Members(), flow.Identifier{}, nil, nil)
 	if err != nil {
 		return fmt.Errorf("could not create static committee: %w", err)
@@ -349,7 +340,7 @@ func validateClusterQC(cluster protocol.Cluster) error {
 	verifier := verification.NewStakingVerifier()
 	forks := &mocks.ForksReader{}
 	hotstuffValidator := validator.New(committee, forks, verifier)
-	err = hotstuffValidator.ValidateQC(cluster.RootQC(), clusterRootBlock)
+	err = hotstuffValidator.ValidateQC(cluster.RootQC())
 	if err != nil {
 		return fmt.Errorf("could not validate root qc: %w", err)
 	}

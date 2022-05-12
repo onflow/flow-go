@@ -57,7 +57,7 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 	if err != nil {
 		return nil, fmt.Errorf("could not create cluster validator: %w", err)
 	}
-	err = val.ValidateQC(createdQC, clusterRootBlock)
+	err = val.ValidateQC(createdQC)
 
 	return createdQC, err
 }
