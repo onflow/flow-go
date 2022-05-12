@@ -36,7 +36,7 @@ type ProposalSuite struct {
 	proposal     *model.Proposal
 	vote         *model.Vote
 	voter        *flow.Identity
-	committee    *mocks.DynamicCommittee
+	committee    *mocks.Replicas
 	forks        *mocks.Forks
 	verifier     *mocks.Verifier
 	validator    *Validator
@@ -65,7 +65,7 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.voter = ps.leader
 
 	// set up the mocked hotstuff DynamicCommittee state
-	ps.committee = &mocks.DynamicCommittee{}
+	ps.committee = &mocks.Replicas{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.leader.NodeID, nil)
 	ps.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(ps.participants.TotalWeight()), nil)
 	ps.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
@@ -76,7 +76,6 @@ func (ps *ProposalSuite) SetupTest() {
 	)
 	for _, participant := range ps.participants {
 		ps.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
-		ps.committee.On("IdentityByBlock", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 
 	// the finalized view is the one of the parent of the
@@ -147,12 +146,11 @@ func (ps *ProposalSuite) TestProposalSignatureInvalid() {
 
 func (ps *ProposalSuite) TestProposalWrongLeader() {
 
-	// change the hotstuff.DynamicCommittee to return a different leader
-	*ps.committee = mocks.DynamicCommittee{}
+	// change the hotstuff.Replicas to return a different leader
+	*ps.committee = mocks.Replicas{}
 	ps.committee.On("LeaderForView", ps.block.View).Return(ps.participants[1].NodeID, nil)
 	for _, participant := range ps.participants {
 		ps.committee.On("IdentityByEpoch", mock.Anything, participant.NodeID).Return(participant, nil)
-		ps.committee.On("IdentityByBlock", mock.Anything, participant.NodeID).Return(participant, nil)
 	}
 
 	// check that validation fails now

@@ -12,9 +12,7 @@ import (
 
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
-	// TODO: change to hotstuff.Replicas when front-loading QC verification
-	// https://github.com/onflow/flow-go/pull/2328#discussion_r866494368
-	committee hotstuff.DynamicCommittee
+	committee hotstuff.Replicas
 	forks     hotstuff.ForksReader
 	verifier  hotstuff.Verifier
 }
@@ -23,7 +21,7 @@ var _ hotstuff.Validator = (*Validator)(nil)
 
 // New creates a new Validator instance
 func New(
-	committee hotstuff.DynamicCommittee,
+	committee hotstuff.Replicas,
 	forks hotstuff.ForksReader,
 	verifier hotstuff.Verifier,
 ) *Validator {
