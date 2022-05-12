@@ -695,6 +695,7 @@ func (s *TCSuite) SetupTest() {
 		},
 		nil,
 	)
+	s.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(s.participants.TotalWeight()), nil)
 
 	s.verifier = &mocks.Verifier{}
 	s.verifier.On("VerifyQC", s.signers, s.block.QC.SigData, parent.View, parent.BlockID).Return(nil)

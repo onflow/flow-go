@@ -61,7 +61,7 @@ func TestStakingSigner_CreateProposal(t *testing.T) {
 		require.NotNil(t, proposal)
 
 		verifier := NewStakingVerifier()
-		err = verifier.VerifyVote(signerIdentity, proposal.SigData, proposal.Block)
+		err = verifier.VerifyVote(signerIdentity, proposal.SigData, proposal.Block.View, proposal.Block.BlockID)
 		require.NoError(t, err)
 	})
 }
@@ -102,7 +102,7 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 		require.NotNil(t, vote)
 
 		verifier := NewStakingVerifier()
-		err = verifier.VerifyVote(signerIdentity, vote.SigData, block)
+		err = verifier.VerifyVote(signerIdentity, vote.SigData, block.View, block.BlockID)
 		require.NoError(t, err)
 	})
 }
@@ -114,9 +114,9 @@ func TestStakingSigner_VerifyQC(t *testing.T) {
 	sigData := unittest.RandomBytes(127)
 
 	verifier := NewStakingVerifier()
-	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidFormat)
 
-	err = verifier.VerifyQC(nil, sigData, block)
+	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidFormat)
 }
