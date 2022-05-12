@@ -3,10 +3,12 @@ package backend
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/connectivity"
 	"io"
 	"net"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc"
@@ -41,6 +43,7 @@ type ConnectionFactoryImpl struct {
 	ExecutionGRPCPort         uint
 	CollectionNodeGRPCTimeout time.Duration
 	ExecutionNodeGRPCTimeout  time.Duration
+	ConnectionsCache          *lru.Cache
 }
 
 // createConnection creates new gRPC connections to remote node
@@ -67,9 +70,17 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 	if err != nil {
 		return nil, nil, err
 	}
-	conn, err := cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
-	if err != nil {
-		return nil, nil, err
+
+	var conn *grpc.ClientConn
+	if res, ok := cf.ConnectionsCache.Get(address); ok {
+		conn = res.(*grpc.ClientConn)
+	}
+	if conn == nil || conn.GetState() != connectivity.Ready {
+		conn, err = cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+		if err != nil {
+			return nil, nil, err
+		}
+		cf.ConnectionsCache.Add(address, conn)
 	}
 	accessAPIClient := access.NewAccessAPIClient(conn)
 	closer := io.Closer(conn)
@@ -83,10 +94,18 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		return nil, nil, err
 	}
 
-	conn, err := cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
-	if err != nil {
-		return nil, nil, err
+	var conn *grpc.ClientConn
+	if res, ok := cf.ConnectionsCache.Get(address); ok {
+		conn = res.(*grpc.ClientConn)
 	}
+	if conn == nil || conn.GetState() != connectivity.Ready {
+		conn, err = cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+		if err != nil {
+			return nil, nil, err
+		}
+		cf.ConnectionsCache.Add(address, conn)
+	}
+
 	executionAPIClient := execution.NewExecutionAPIClient(conn)
 	closer := io.Closer(conn)
 	return executionAPIClient, closer, nil
