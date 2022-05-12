@@ -53,6 +53,10 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 		timeout = defaultClientTimeout
 	}
 
+	// ClientConn's default KeepAlive on connections is indefinite, assuming the timeout isn't reached
+	// The connections should be safe to be persisted and reused
+	// https://pkg.go.dev/google.golang.org/grpc#WithKeepaliveParams
+	// https://grpc.io/blog/grpc-on-http2/#keeping-connections-alive
 	conn, err := grpc.Dial(
 		address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),

@@ -354,8 +354,9 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Error(t, err)
 
 	// re-access, should replace stale connection in cache with new one
-	client, closer, _ = proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, closer, _ = proxyConnectionFactory.GetAccessAPIClient("foo")
 	assert.Equal(t, connectionFactory.ConnectionsCache.Len(), 1)
+	defer closer.Close()
 
 	var conn *grpc.ClientConn
 	res, ok := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
