@@ -42,6 +42,7 @@ var (
 		common.MemoryKindDictionaryBase:          33 + 96,
 		common.MemoryKindCompositeBase:           233 + 96,
 		common.MemoryKindSimpleComposite:         73,
+		common.MemoryKindSimpleCompositeBase:     89,
 		common.MemoryKindOptional:                41,
 		common.MemoryKindNil:                     1,
 		common.MemoryKindVoid:                    1,
@@ -134,10 +135,15 @@ var (
 
 		// Misc
 
-		common.MemoryKindRawString:       9,
-		common.MemoryKindAddressLocation: 18,
-		common.MemoryKindBytes:           24,
-		common.MemoryKindVariable:        18,
+		common.MemoryKindRawString:         9,
+		common.MemoryKindAddressLocation:   18,
+		common.MemoryKindBytes:             24,
+		common.MemoryKindVariable:          18,
+		common.MemoryKindCompositeTypeInfo: 41,
+		common.MemoryKindCompositeField:    33,
+		common.MemoryKindInvocation:        89,
+		common.MemoryKindStorageMap:        58,
+		common.MemoryKindStorageKey:        41,
 
 		// Tokens
 
@@ -213,8 +219,24 @@ var (
 		common.MemoryKindRestrictedType:    41,
 		common.MemoryKindVariableSizedType: 17,
 
-		common.MemoryKindPosition: 25,
-		common.MemoryKindRange:    1,
+		common.MemoryKindPosition:          25,
+		common.MemoryKindRange:             1,
+		common.MemoryKindActivation:        128,
+		common.MemoryKindActivationEntries: 256,
+
+		// sema types
+		common.MemoryKindVariableSizedSemaType: 51,
+		common.MemoryKindConstantSizedSemaType: 59,
+		common.MemoryKindDictionarySemaType:    67,
+		common.MemoryKindOptionalSemaType:      17,
+		common.MemoryKindRestrictedSemaType:    75,
+		common.MemoryKindReferenceSemaType:     25,
+		common.MemoryKindCapabilitySemaType:    51,
+
+		// ordered-map
+		common.MemoryKindOrderedMap:          17,
+		common.MemoryKindOrderedMapEntryList: 50,
+		common.MemoryKindOrderedMapEntry:     64,
 	}
 )
 

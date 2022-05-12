@@ -377,7 +377,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 				require.Nil(t, program)
 
@@ -442,7 +442,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
 
-				program, err := r.Interface.GetProgram(contractLocation)
+				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
 				require.NoError(t, err)
 
 				if executionCalls > collectionCount*transactionCount {
