@@ -284,6 +284,10 @@ type ErrorReturningRuntime struct {
 	TxErrors []error
 }
 
+func (e *ErrorReturningRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
+	panic("SetResourceOwnerChangeHandlerEnabled not expected")
+}
+
 var _ runtime.Runtime = &ErrorReturningRuntime{}
 
 func (e *ErrorReturningRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) error {
@@ -317,7 +321,7 @@ func (*ErrorReturningRuntime) SetAtreeValidationEnabled(_ bool) {
 }
 
 func (e *ErrorReturningRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
-	panic("ReadStored not expected")
+	return nil, nil
 }
 
 func (e *ErrorReturningRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {

@@ -98,6 +98,7 @@ func testAddressConstants(t *testing.T) {
 		Mainnet,
 		Testnet,
 		Emulator,
+		Canary,
 	}
 
 	for _, chainID := range chainIDs {
@@ -146,6 +147,7 @@ func testAddressGeneration(t *testing.T) {
 		Mainnet,
 		Testnet,
 		Emulator,
+		Canary,
 	}
 
 	for _, chainID := range chainIDs {
@@ -179,7 +181,7 @@ func testAddressGeneration(t *testing.T) {
 			}
 		}
 
-		if chainID != Emulator {
+		if chainID == Mainnet {
 
 			// sanity check of address distances.
 			// All distances between any two addresses must be less than d.
@@ -231,12 +233,14 @@ func testAddressesIntersection(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 
 	// loops in each test
-	const loop = 50
+	const loop = 25
 
 	// Test addresses for all type of networks
 	chainIDs := []ChainID{
+		Mainnet,
 		Testnet,
 		Emulator,
+		Canary,
 	}
 
 	for _, chainID := range chainIDs {
@@ -246,22 +250,31 @@ func testAddressesIntersection(t *testing.T) {
 		// All valid test addresses must fail Flow Mainnet check
 		r := uint64(rand.Intn(maxIndex - loop))
 		state := chain.newAddressGeneratorAtIndex(r)
-		for i := 0; i < loop; i++ {
+		for k := 0; k < loop; k++ {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
-			check := Mainnet.Chain().IsValid(address)
-			assert.False(t, check, "test account address format should be invalid in Flow")
-			sameChainCheck := chain.IsValid(address)
-			require.True(t, sameChainCheck)
+			for _, otherChain := range chainIDs {
+				if chainID != otherChain {
+					check := otherChain.Chain().IsValid(address)
+					assert.False(t, check, "test account address format should be invalid in Flow")
+				} else {
+					sameChainCheck := chain.IsValid(address)
+					require.True(t, sameChainCheck)
+				}
+			}
 		}
 
 		// sanity check: mainnet addresses must fail the test check
 		r = uint64(rand.Intn(maxIndex - loop))
-		for i := 0; i < loop; i++ {
-			invalidAddress, err := Mainnet.Chain().newAddressGeneratorAtIndex(r).NextAddress()
-			require.NoError(t, err)
-			check := chain.IsValid(invalidAddress)
-			assert.False(t, check, "account address format should be invalid")
+		for k := 0; k < loop; k++ {
+			for _, otherChain := range chainIDs {
+				if chainID != otherChain {
+					invalidAddress, err := otherChain.Chain().newAddressGeneratorAtIndex(r).NextAddress()
+					require.NoError(t, err)
+					check := chain.IsValid(invalidAddress)
+					assert.False(t, check, "account address format should be invalid")
+				}
+			}
 		}
 
 		// sanity check of invalid account addresses in all networks
@@ -272,15 +285,13 @@ func testAddressesIntersection(t *testing.T) {
 		r = uint64(rand.Intn(maxIndex - loop))
 
 		state = chain.newAddressGeneratorAtIndex(r)
-		for i := 0; i < loop; i++ {
+		for k := 0; k < loop; k++ {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			invalidAddress = uint64ToAddress(address.uint64() ^ invalidCodeWord)
+
 			// must fail test network check
 			check = chain.IsValid(invalidAddress)
-			assert.False(t, check, "account address format should be invalid")
-			// must fail mainnet check
-			check := Mainnet.Chain().IsValid(invalidAddress)
 			assert.False(t, check, "account address format should be invalid")
 		}
 	}
@@ -298,6 +309,7 @@ func testIndexFromAddress(t *testing.T) {
 		mainnet,
 		testnet,
 		emulator,
+		canary,
 	}
 
 	for _, chain := range chains {

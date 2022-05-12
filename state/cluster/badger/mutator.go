@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
@@ -211,7 +212,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	defer insertDbSpan.Finish()
 
 	// insert the new block
-	err = m.State.db.Update(procedure.InsertClusterBlock(block))
+	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(block))
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block: %w", err)
 	}

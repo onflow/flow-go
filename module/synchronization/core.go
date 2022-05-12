@@ -18,6 +18,10 @@ const (
 	// DefaultBlockRequestNodes is the default number of nodes we request a
 	// block resource from.
 	DefaultBlockRequestNodes uint = 3
+
+	// DefaultQueuedHeightMultiplicity limits the number of heights we queue
+	// above the current finalized height.
+	DefaultQueuedHeightMultiplicity uint = 4
 )
 
 type Config struct {
@@ -105,6 +109,15 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 	if height > final.Height {
 		c.mu.Lock()
 		defer c.mu.Unlock()
+
+		// limit to request up to DefaultQueuedHeightMultiplicity*MaxRequests*MaxSize blocks from the peer.
+		// without this limit, then if we are falling far behind,
+		// we would queue up too many heights.
+		heightLimit := final.Height + uint64(DefaultQueuedHeightMultiplicity*c.Config.MaxRequests*c.Config.MaxSize)
+		if height > heightLimit {
+			height = heightLimit
+		}
+
 		for h := final.Height + 1; h <= height; h++ {
 			c.requeueHeight(h)
 		}

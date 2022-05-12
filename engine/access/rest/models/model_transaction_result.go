@@ -9,15 +9,13 @@
 package models
 
 type TransactionResult struct {
-	BlockId string `json:"block_id"`
-
-	Status *TransactionStatus `json:"status"`
-
-	ErrorMessage string `json:"error_message"`
-
-	ComputationUsed string `json:"computation_used"`
-
-	Events []Event `json:"events"`
-
-	Links *Links `json:"_links,omitempty"`
+	BlockId    string                `json:"block_id"`
+	Execution  *TransactionExecution `json:"execution,omitempty"`
+	Status     *TransactionStatus    `json:"status"`
+	StatusCode int32                 `json:"status_code"`
+	// Provided transaction error in case the transaction wasn't successful.
+	ErrorMessage    string  `json:"error_message"`
+	ComputationUsed string  `json:"computation_used"`
+	Events          []Event `json:"events"`
+	Links           *Links  `json:"_links,omitempty"`
 }

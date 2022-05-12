@@ -3,7 +3,6 @@ package fvm
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -16,7 +15,8 @@ type Context struct {
 	Blocks                        Blocks
 	Metrics                       handler.MetricsReporter
 	Tracer                        module.Tracer
-	GasLimit                      uint64
+	ComputationLimit              uint64
+	MemoryLimit                   uint64
 	MaxStateKeySize               uint64
 	MaxStateValueSize             uint64
 	MaxStateInteractionSize       uint64
@@ -32,7 +32,6 @@ type Context struct {
 	ServiceEventCollectionEnabled bool
 	AccountFreezeAvailable        bool
 	ExtensiveTracing              bool
-	SignatureVerifier             crypto.SignatureVerifier
 	TransactionProcessors         []TransactionProcessor
 	ScriptProcessors              []ScriptProcessor
 	Logger                        zerolog.Logger
@@ -59,8 +58,9 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	DefaultGasLimit                     = 100_000 // 100K
-	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
+	DefaultComputationLimit             = 100_000   // 100K
+	DefaultMemoryLimit                  = 2_000_000 // 2G
+	DefaultEventCollectionByteSizeLimit = 256_000   // 256KB
 	DefaultMaxNumOfTxRetries            = 3
 )
 
@@ -70,7 +70,8 @@ func defaultContext(logger zerolog.Logger) Context {
 		Blocks:                        nil,
 		Metrics:                       &handler.NoopMetricsReporter{},
 		Tracer:                        nil,
-		GasLimit:                      DefaultGasLimit,
+		ComputationLimit:              DefaultComputationLimit,
+		MemoryLimit:                   DefaultMemoryLimit,
 		MaxStateKeySize:               state.DefaultMaxKeySize,
 		MaxStateValueSize:             state.DefaultMaxValueSize,
 		MaxStateInteractionSize:       state.DefaultMaxInteractionSize,
@@ -84,7 +85,6 @@ func defaultContext(logger zerolog.Logger) Context {
 		ServiceEventCollectionEnabled: false,
 		AccountFreezeAvailable:        false,
 		ExtensiveTracing:              false,
-		SignatureVerifier:             crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
@@ -110,10 +110,27 @@ func WithChain(chain flow.Chain) Option {
 	}
 }
 
-// WithGasLimit sets the gas limit for a virtual machine context.
+// WithGasLimit sets the computation limit for a virtual machine context.
+// @depricated, please use WithComputationLimit instead.
 func WithGasLimit(limit uint64) Option {
 	return func(ctx Context) Context {
-		ctx.GasLimit = limit
+		ctx.ComputationLimit = limit
+		return ctx
+	}
+}
+
+// WithComputationLimit sets the computation limit for a virtual machine context.
+func WithComputationLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.ComputationLimit = limit
+		return ctx
+	}
+}
+
+// WithMemoryLimit sets the memory limit for a virtual machine context.
+func WithMemoryLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.MemoryLimit = limit
 		return ctx
 	}
 }

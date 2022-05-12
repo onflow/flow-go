@@ -32,6 +32,8 @@ const (
 	Localnet ChainID = "flow-localnet"
 	// Emulator is the chain ID for the emulated chain.
 	Emulator ChainID = "flow-emulator"
+	// BftTestnet is the chain ID for testing attack vector scenarios.
+	BftTestnet ChainID = "flow-bft-test-net"
 
 	// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
 	MonotonicEmulator ChainID = "flow-emulator-monotonic"
@@ -48,8 +50,10 @@ func (c ChainID) getChainCodeWord() uint64 {
 	switch c {
 	case Mainnet:
 		return 0
-	case Testnet, Canary:
+	case Testnet:
 		return invalidCodeTestNetwork
+	case Canary:
+		return invalidCodeCanaryNetwork
 	case Emulator, Localnet, Benchnet:
 		return invalidCodeTransientNetwork
 	default:

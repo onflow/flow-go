@@ -51,20 +51,6 @@ func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	return r0, r1
 }
 
-// Remove provides a mock function with given fields: chunkID
-func (_m *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
-	ret := _m.Called(chunkID)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
-		r0 = rf(chunkID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Store provides a mock function with given fields: c
 func (_m *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
 	ret := _m.Called(c)

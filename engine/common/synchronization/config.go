@@ -2,6 +2,8 @@ package synchronization
 
 import (
 	"time"
+
+	core "github.com/onflow/flow-go/module/synchronization"
 )
 
 type Config struct {
@@ -10,9 +12,11 @@ type Config struct {
 }
 
 func DefaultConfig() *Config {
+	scanInterval := 2 * time.Second
+	pollInterval := time.Duration(core.DefaultQueuedHeightMultiplicity) * scanInterval
 	return &Config{
-		PollInterval: 8 * time.Second,
-		ScanInterval: 2 * time.Second,
+		PollInterval: pollInterval,
+		ScanInterval: scanInterval,
 	}
 }
 

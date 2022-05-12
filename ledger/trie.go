@@ -3,6 +3,7 @@ package ledger
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	cryptoHash "github.com/onflow/flow-go/crypto/hash"
@@ -13,6 +14,10 @@ import (
 // Path captures storage path of a payload;
 // where we store a payload in the ledger
 type Path hash.Hash
+
+func (p Path) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(p[:]))
+}
 
 // DummyPath is an arbitrary path value, used in function error returns.
 var DummyPath = Path(hash.DummyHash)
@@ -147,6 +152,10 @@ func (u *TrieUpdate) Equals(other *TrieUpdate) bool {
 // RootHash captures the root hash of a trie
 type RootHash hash.Hash
 
+func (rh RootHash) MarshalJSON() ([]byte, error) {
+	return json.Marshal(rh.String())
+}
+
 func (rh RootHash) String() string {
 	return hex.EncodeToString(rh[:])
 }
@@ -200,12 +209,15 @@ type Payload struct {
 
 // Size returns the size of the payload
 func (p *Payload) Size() int {
+	if p == nil {
+		return 0
+	}
 	return p.Key.Size() + p.Value.Size()
 }
 
-// IsEmpty returns true if key or value is not empty
+// IsEmpty returns true if payload is nil or value is empty
 func (p *Payload) IsEmpty() bool {
-	return p.Size() == 0
+	return p == nil || p.Value.Size() == 0
 }
 
 // TODO fix me
@@ -215,7 +227,11 @@ func (p *Payload) String() string {
 }
 
 // Equals compares this payload to another payload
+// A nil payload is equivalent to an empty payload.
 func (p *Payload) Equals(other *Payload) bool {
+	if p == nil || (len(p.Key.KeyParts) == 0 && len(p.Value) == 0) {
+		return other == nil || (len(other.Key.KeyParts) == 0 && len(other.Value) == 0)
+	}
 	if other == nil {
 		return false
 	}
@@ -227,6 +243,9 @@ func (p *Payload) Equals(other *Payload) bool {
 
 // DeepCopy returns a deep copy of the payload
 func (p *Payload) DeepCopy() *Payload {
+	if p == nil {
+		return nil
+	}
 	k := p.Key.DeepCopy()
 	v := p.Value.DeepCopy()
 	return &Payload{Key: k, Value: v}

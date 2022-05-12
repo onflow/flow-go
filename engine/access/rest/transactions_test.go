@@ -6,16 +6,19 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/engine/access/rest/util"
-
 	mocks "github.com/stretchr/testify/mock"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -164,7 +167,9 @@ func TestGetTransactions(t *testing.T) {
 			   ],
 				"result": {
 					"block_id": "%s",
+					"execution": "Success",
 					"status": "Sealed",
+					"status_code": 1,
 					"error_message": "",
 					"computation_used": "0",
 					"events": [
@@ -172,7 +177,8 @@ func TestGetTransactions(t *testing.T) {
 							"type": "flow.AccountCreated",
 							"transaction_id": "%s",
 							"transaction_index": "0",
-							"event_index": "0"
+							"event_index": "0",
+							"payload": ""
 						}
 					],
 					"_links": {
@@ -217,7 +223,7 @@ func TestGetTransactionResult(t *testing.T) {
 		id := unittest.IdentifierFixture()
 		bid := unittest.IdentifierFixture()
 		txr := &access.TransactionResult{
-			Status:     flow.TransactionStatusExecuted,
+			Status:     flow.TransactionStatusSealed,
 			StatusCode: 10,
 			Events: []flow.Event{
 				unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
@@ -235,7 +241,9 @@ func TestGetTransactionResult(t *testing.T) {
 
 		expected := fmt.Sprintf(`{
 			"block_id": "%s",
-			"status": "Executed",
+			"execution": "Success",
+			"status": "Sealed",
+			"status_code": 10,
 			"error_message": "",
 			"computation_used": "0",
 			"events": [
@@ -252,6 +260,55 @@ func TestGetTransactionResult(t *testing.T) {
 			}
 		}`, bid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 		assertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get execution statuses", func(t *testing.T) {
+		backend := &mock.API{}
+		id := unittest.IdentifierFixture()
+		bid := unittest.IdentifierFixture()
+
+		testVectors := map[*access.TransactionResult]string{{
+			Status:       flow.TransactionStatusExpired,
+			ErrorMessage: "",
+		}: string(models.FAILURE_RESULT), {
+			Status:       flow.TransactionStatusSealed,
+			ErrorMessage: "cadence runtime exception",
+		}: string(models.FAILURE_RESULT), {
+			Status:       flow.TransactionStatusFinalized,
+			ErrorMessage: "",
+		}: string(models.PENDING_RESULT), {
+			Status:       flow.TransactionStatusPending,
+			ErrorMessage: "",
+		}: string(models.PENDING_RESULT), {
+			Status:       flow.TransactionStatusExecuted,
+			ErrorMessage: "",
+		}: string(models.PENDING_RESULT), {
+			Status:       flow.TransactionStatusSealed,
+			ErrorMessage: "",
+		}: string(models.SUCCESS_RESULT)}
+
+		for txr, err := range testVectors {
+			txr.BlockID = bid
+			req := getTransactionResultReq(id.String())
+			backend.Mock.
+				On("GetTransactionResult", mocks.Anything, id).
+				Return(txr, nil).
+				Once()
+
+			expected := fmt.Sprintf(`{
+				"block_id": "%s",
+				"execution": "%s",
+				"status": "%s",
+				"status_code": 0,
+				"error_message": "%s",
+				"computation_used": "0",
+				"events": [],
+				"_links": {
+					"_self": "/v1/transaction_results/%s"
+				}
+			}`, bid.String(), err, cases.Title(language.English).String(strings.ToLower(txr.Status.String())), txr.ErrorMessage, id.String())
+			assertOKResponse(t, req, expected, backend)
+		}
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {

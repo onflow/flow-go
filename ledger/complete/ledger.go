@@ -1,8 +1,10 @@
 package complete
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -12,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module"
@@ -48,14 +49,17 @@ func NewLedger(
 	log zerolog.Logger,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) error {
-		return wal.RecordDelete(evictedTrie.RootHash())
+	logger := log.With().Str("ledger", "complete").Logger()
+
+	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) {
+		err := wal.RecordDelete(evictedTrie.RootHash())
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to save delete record in wal")
+		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
-
-	logger := log.With().Str("ledger", "complete").Logger()
 
 	storage := &Ledger{
 		forest:            forest,
@@ -176,7 +180,6 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	}
 
 	l.metrics.UpdateCount()
-	l.metrics.UpdateValuesNumber(uint64(len(trieUpdate.Paths)))
 
 	walChan := make(chan error)
 
@@ -264,7 +267,8 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 func (l *Ledger) ExportCheckpointAt(
 	state ledger.State,
 	migrations []ledger.Migration,
-	reporters []ledger.Reporter,
+	reporters map[string]ledger.Reporter,
+	extractionReportName string,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
 ) (ledger.State, error) {
@@ -343,7 +347,7 @@ func (l *Ledger) ExportCheckpointAt(
 
 	// no need to prune the data since it has already been prunned through migrations
 	applyPruning := false
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
+	newTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -352,21 +356,33 @@ func (l *Ledger) ExportCheckpointAt(
 
 	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
 
+	// If defined, run extraction report BEFORE writing checkpoint file
+	// This is used to optmize the spork process
+	if extractionReport, ok := reporters[extractionReportName]; ok {
+		err := runReport(extractionReport, payloads, l.logger)
+		if err != nil {
+			return ledger.State(hash.DummyHash), err
+		}
+	}
+
 	l.logger.Info().Msg("creating a checkpoint for the new trie")
 
-	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile)
+	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile, &l.logger)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
 
-	flatTrie, err := flattener.FlattenTrie(newTrie)
-	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to flatten the trie: %w", err)
-	}
-
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
-	err = wal.StoreCheckpoint(flatTrie.ToFlattenedForestWithASingleTrie(), writer)
+	err = wal.StoreCheckpoint(writer, newTrie)
+
+	// Writing the checkpoint takes time to write and copy.
+	// Without relying on an exit code or stdout, we need to know when the copy is complete.
+	writeStatusFileErr := writeStatusFile("checkpoint_status.json", err)
+	if writeStatusFileErr != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to write checkpoint status file: %w", writeStatusFileErr)
+	}
+
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
@@ -378,21 +394,9 @@ func (l *Ledger) ExportCheckpointAt(
 
 	// run reporters
 	for _, reporter := range reporters {
-		l.logger.Info().
-			Str("name", reporter.Name()).
-			Msg("starting reporter")
-
-		start := time.Now()
-		err = reporter.Report(payloads)
-		elapsed := time.Since(start)
-
-		l.logger.Info().
-			Str("timeTaken", elapsed.String()).
-			Str("name", reporter.Name()).
-			Msg("reporter done")
+		err := runReport(reporter, payloads, l.logger)
 		if err != nil {
-			return ledger.State(hash.DummyHash),
-				fmt.Errorf("error running reporter (%s): %w", reporter.Name(), err)
+			return ledger.State(hash.DummyHash), err
 		}
 	}
 
@@ -436,4 +440,30 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 		}
 	}
 	return nil
+}
+
+func runReport(r ledger.Reporter, p []ledger.Payload, l zerolog.Logger) error {
+	l.Info().
+		Str("name", r.Name()).
+		Msg("starting reporter")
+
+	start := time.Now()
+	err := r.Report(p)
+	elapsed := time.Since(start)
+
+	l.Info().
+		Str("timeTaken", elapsed.String()).
+		Str("name", r.Name()).
+		Msg("reporter done")
+	if err != nil {
+		return fmt.Errorf("error running reporter (%s): %w", r.Name(), err)
+	}
+	return nil
+}
+
+func writeStatusFile(fileName string, e error) error {
+	checkpointStatus := map[string]bool{"succeeded": e == nil}
+	checkpointStatusJson, _ := json.MarshalIndent(checkpointStatus, "", " ")
+	err := ioutil.WriteFile(fileName, checkpointStatusJson, 0644)
+	return err
 }

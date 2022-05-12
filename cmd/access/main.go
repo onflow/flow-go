@@ -10,21 +10,23 @@ func main() {
 	anb.PrintBuildVersionDetails()
 
 	// parse all the command line args
-	anb.ParseFlags()
-
-	// choose a staked or an unstaked node builder based on anb.staked
-	var nodeBuilder nodebuilder.AccessNodeBuilder
-	if anb.IsStaked() {
-		nodeBuilder = nodebuilder.NewStakedAccessNodeBuilder(anb)
-	} else {
-		nodeBuilder = nodebuilder.NewUnstakedAccessNodeBuilder(anb)
-	}
-
-	if err := nodeBuilder.Initialize(); err != nil {
+	if err := anb.ParseFlags(); err != nil {
 		anb.Logger.Fatal().Err(err).Send()
 	}
 
-	node, err := nodeBuilder.Build()
+	// choose a staked or an unstaked node builder based on anb.staked
+	var builder nodebuilder.AccessNodeBuilder
+	if anb.IsStaked() {
+		builder = nodebuilder.NewStakedAccessNodeBuilder(anb)
+	} else {
+		builder = nodebuilder.NewUnstakedAccessNodeBuilder(anb)
+	}
+
+	if err := builder.Initialize(); err != nil {
+		anb.Logger.Fatal().Err(err).Send()
+	}
+
+	node, err := builder.Build()
 	if err != nil {
 		anb.Logger.Fatal().Err(err).Send()
 	}

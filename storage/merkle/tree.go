@@ -13,13 +13,14 @@ import (
 // maxKeyLength in bytes:
 // For any key, we need to ensure that the entire path can be stored in a short node.
 // A short node stores the _number of bits_ for the path segment it represents in 2 bytes.
-// However, a short node with zero path length is not part of our storage model. Therefore,
-// we use the convention:
-//  * for path length l with 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
-//  * for l = 65536: we represent l as binary 00000000 00000000
-// This convention organically utilizes the natural occurring overflow and is therefore extremely
-// efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
-const maxKeyLength = 8192
+//
+// Hence, the theoretically possible value range is [0,65535]. However, a short node with
+// zero path length is not part of our storage model. Furthermore, we always represent
+// keys as _byte_ slices, i.e. their number of bits must be an integer-multiple of 8.
+// Therefore, the range of valid key length in bytes is [1, 8191] (the corresponding
+// range in bits is [8, 65528]) .
+const maxKeyLength = 8191
+const maxKeyLenBits = maxKeyLength * 8
 
 var EmptyTreeRootHash []byte
 
@@ -48,7 +49,7 @@ type Tree struct {
 
 // NewTree creates a new empty patricia merkle tree, with keys of the given
 // `keyLength` (length measured in bytes).
-// The current implementation only works with 1 ≤ keyLength ≤ 8192. Otherwise,
+// The current implementation only works with 1 ≤ keyLength ≤ 8191. Otherwise,
 // the sentinel error `ErrorIncompatibleKeyLength` is returned.
 func NewTree(keyLength int) (*Tree, error) {
 	if keyLength < 1 || maxKeyLength < keyLength {
@@ -120,8 +121,7 @@ PutLoop:
 		case *short:
 			// first, we find out how many bits we have in common
 			commonCount := 0
-			shortPathCount := n.count
-			for i := 0; i < shortPathCount; i++ {
+			for i := 0; i < n.count; i++ {
 				if bitutils.ReadBit(key, i+index) != bitutils.ReadBit(n.path, i) {
 					break
 				}
@@ -130,7 +130,7 @@ PutLoop:
 
 			// if the common and node count are equal, we share all of the path
 			// we can simply forward to the child of the short node and continue
-			if commonCount == shortPathCount {
+			if commonCount == n.count {
 				cur = &n.child
 				index += commonCount
 				continue PutLoop
@@ -146,7 +146,7 @@ PutLoop:
 				commonNode := &short{count: commonCount, path: commonPath}
 				*cur = commonNode
 				cur = &commonNode.child
-				index = index + commonCount
+				index += commonCount
 			}
 
 			// we then insert a full node that splits the tree after the shared
@@ -278,7 +278,9 @@ GetLoop:
 }
 
 // Prove constructs an inclusion proof for the given key, provided the key exists in the trie.
-// It returns a proof and a boolean (true if key exist and false if key not found)
+// It returns:
+// - (proof, true) if key is found
+// - (nil, false) if key is not found
 // Proof is constructed by traversing the trie from top to down and collects data for proof as follows:
 //  - if full node, append the sibling node hash value to sibling hash list
 //  - if short node, appends the node.shortCount to the short count list
@@ -301,7 +303,7 @@ func (t *Tree) Prove(key []byte) (*Proof, bool) {
 	shortPathLengths := make([]uint16, 0)
 
 	steps := 0
-	shortNodeVisited := make([]bool, 0, len(key))
+	shortNodeVisited := make([]bool, 0)
 
 ProveLoop:
 	for {
@@ -340,7 +342,7 @@ ProveLoop:
 
 			cur = &n.child
 			index += n.count
-			shortPathLengths = append(shortPathLengths, n.CountAsUint16Encoding())
+			shortPathLengths = append(shortPathLengths, uint16(n.count))
 			shortNodeVisited = append(shortNodeVisited, true)
 			steps++
 

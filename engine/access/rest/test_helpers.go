@@ -28,7 +28,7 @@ const (
 func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRecorder, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	router, err := newRouter(backend, logger, flow.Canary.Chain())
+	router, err := newRouter(backend, logger, flow.Testnet.Chain())
 	if err != nil {
 		return nil, err
 	}

@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -25,6 +25,8 @@ func TestCollectionGuaranteeInclusion(t *testing.T) {
 
 type InclusionSuite struct {
 	suite.Suite
+
+	log    zerolog.Logger
 	cancel context.CancelFunc
 	net    *testnet.FlowNetwork
 	conIDs []flow.Identifier
@@ -34,13 +36,18 @@ type InclusionSuite struct {
 
 func (is *InclusionSuite) Collection() *client.GhostClient {
 	ghost := is.net.ContainerByID(is.collID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(is.T(), err, "could not get ghost client")
 	return client
 }
 
 func (is *InclusionSuite) SetupTest() {
-	is.T().Logf("test case setup inclusion")
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "inclusion.go").
+		Str("testcase", is.T().Name()).
+		Logger()
+	is.log = logger
+	is.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -97,16 +104,19 @@ func (is *InclusionSuite) SetupTest() {
 	}
 }
 
-func (is *InclusionSuite) TearDownTest() {
-	is.T().Logf("test case tear down inclusion")
-	is.net.Remove()
-	is.cancel()
+func (s *InclusionSuite) TearDownTest() {
+	s.log.Info().Msg("================> Start TearDownTest")
+	s.net.Remove()
+	s.cancel()
+	s.log.Info().Msg("================> Finish TearDownTest")
 }
 
 func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
+	t := is.T()
+	is.log.Info().Msgf("================> RUNNING TESTING %v\n", t.Name())
 	// fix the deadline for the test as a whole
 	deadline := time.Now().Add(30 * time.Second)
-	is.T().Logf("%s ------ test started, deadline %s", time.Now(), deadline)
+	is.T().Logf("%s ------ test started, deadline %s\n", time.Now(), deadline)
 
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()

@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	verUtils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -28,6 +28,7 @@ func TestExecutionStateSealing(t *testing.T) {
 
 type SealingSuite struct {
 	suite.Suite
+	log    zerolog.Logger
 	cancel context.CancelFunc
 	net    *testnet.FlowNetwork
 	conIDs []flow.Identifier
@@ -42,27 +43,32 @@ type SealingSuite struct {
 
 func (ss *SealingSuite) Execution() *client.GhostClient {
 	ghost := ss.net.ContainerByID(ss.exeID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
 
 func (ss *SealingSuite) Execution2() *client.GhostClient {
 	ghost := ss.net.ContainerByID(ss.exe2ID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
 
 func (ss *SealingSuite) Verification() *client.GhostClient {
 	ghost := ss.net.ContainerByID(ss.verID)
-	client, err := common.GetGhostClient(ghost)
+	client, err := lib.GetGhostClient(ghost)
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
 
 func (ss *SealingSuite) SetupTest() {
-	ss.T().Logf("%s test case setup sealing", time.Now())
+	logger := unittest.LoggerWithLevel(zerolog.InfoLevel).With().
+		Str("testfile", "sealing.go").
+		Str("testcase", ss.T().Name()).
+		Logger()
+	ss.log = logger
+	ss.log.Info().Msgf("================> SetupTest")
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -81,7 +87,7 @@ func (ss *SealingSuite) SetupTest() {
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		ss.conIDs = append(ss.conIDs, conID)
 	}
-	ss.T().Logf("consensus IDs: %v\n", ss.conIDs)
+	ss.log.Info().Msgf("consensus IDs: %v\n", ss.conIDs)
 
 	// need one controllable execution node (used ghost)
 	ss.exeID = unittest.IdentifierFixture()
@@ -98,7 +104,7 @@ func (ss *SealingSuite) SetupTest() {
 	ss.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.verID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
-	ss.T().Logf("verification ID: %v\n", ss.verID)
+	ss.log.Info().Msgf("verification ID: %v\n", ss.verID)
 
 	nodeConfigs = append(nodeConfigs,
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
@@ -141,16 +147,18 @@ func (ss *SealingSuite) SetupTest() {
 }
 
 func (ss *SealingSuite) TearDownTest() {
-	ss.T().Logf("test case tear down sealing")
+	ss.log.Info().Msg("================> Start TearDownTest")
 	ss.net.Remove()
 	ss.cancel()
+	ss.log.Info().Msg("================> Finish TearDownTest")
 }
 
 func (ss *SealingSuite) TestBlockSealCreation() {
+	ss.log.Info().Msg("================> RUNNING TESTING")
 
 	// fix the deadline of the entire test
 	deadline := time.Now().Add(30 * time.Second)
-	ss.T().Logf("seal creation deadline: %s", deadline)
+	ss.log.Info().Msgf("seal creation deadline %s", deadline)
 
 	// first, we listen to see which block proposal is the first one to be
 	// confirmed three times (finalized)
