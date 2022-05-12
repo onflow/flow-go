@@ -89,7 +89,9 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
 		Hex("parent_id", header.ParentID[:]).
-		Hex("payload_hash", header.PayloadHash[:]).
+		Hex("ref_block_id", proposal.Payload.ReferenceBlockID[:]).
+		Hex("collection_id", logging.Entity(proposal.Payload.Collection)).
+		Int("tx_count", proposal.Payload.Collection.Len()).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Hex("signers", header.ParentVoterIndices).

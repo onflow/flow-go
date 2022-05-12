@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"fmt"
 	"math/big"
 )
 
@@ -40,6 +41,43 @@ func (clusters ClusterList) Assignments() AssignmentList {
 		assignments = append(assignments, assignment)
 	}
 	return assignments
+}
+
+// NewClusterList creates a new cluster list based on the given cluster assignment
+// and the provided list of identities.
+func NewClusterList(assignments AssignmentList, collectors IdentityList) (ClusterList, error) {
+
+	// build a lookup for all the identities by node identifier
+	lookup := make(map[Identifier]*Identity)
+	for _, collector := range collectors {
+		_, ok := lookup[collector.NodeID]
+		if ok {
+			return nil, fmt.Errorf("duplicate collector in list %v", collector.NodeID)
+		}
+		lookup[collector.NodeID] = collector
+	}
+
+	// replicate the identifier list but use identities instead
+	clusters := make(ClusterList, 0, len(assignments))
+	for _, participants := range assignments {
+		cluster := make(IdentityList, 0, len(participants))
+		for _, participantID := range participants {
+			participant, found := lookup[participantID]
+			if !found {
+				return nil, fmt.Errorf("could not find collector identity (%x)", participantID)
+			}
+			cluster = append(cluster, participant)
+			delete(lookup, participantID)
+		}
+		clusters = append(clusters, cluster)
+	}
+
+	// check that every collector was assigned
+	if len(lookup) != 0 {
+		return nil, fmt.Errorf("missing collector assignments (%s)", lookup)
+	}
+
+	return clusters, nil
 }
 
 // ByIndex retrieves the list of identities that are part of the

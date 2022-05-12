@@ -2,11 +2,12 @@ package main
 
 import (
 	"github.com/onflow/flow-go/cmd"
+	insecmd "github.com/onflow/flow-go/insecure/cmd"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func main() {
-	exeBuilder := cmd.NewExecutionNodeBuilder(cmd.FlowNode(flow.RoleExecution.String()))
+	exeBuilder := cmd.NewExecutionNodeBuilder(insecmd.NewCorruptedNodeBuilder(flow.RoleExecution.String()).FlowNodeBuilder)
 	exeBuilder.LoadFlags()
 
 	if err := exeBuilder.FlowNodeBuilder.Initialize(); err != nil {
