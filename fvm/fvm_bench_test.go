@@ -222,7 +222,8 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 			SetHashAlgo(privateKey.HashAlgo).
 			SetSigAlgo(privateKey.SignAlgo)
 
-		sdkTX := templates.CreateAccount([]*flow2.AccountKey{accountKey}, []templates.Contract{}, flow2.BytesToAddress(serviceAddress.Bytes()))
+		sdkTX, err := templates.CreateAccount([]*flow2.AccountKey{accountKey}, []templates.Contract{}, flow2.BytesToAddress(serviceAddress.Bytes()))
+		require.NoError(tb, err)
 
 		txBody := flow.NewTransactionBody().
 			SetScript(sdkTX.Script).
@@ -231,7 +232,7 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 			SetProposalKey(serviceAddress, 0, b.ServiceAccount(tb).RetAndIncSeqNumber()).
 			SetPayer(serviceAddress)
 
-		err := testutil.SignEnvelope(txBody, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(txBody, b.Chain(tb).ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(tb, err)
 
 		computationResult := b.ExecuteCollections(tb, [][]*flow.TransactionBody{{txBody}})

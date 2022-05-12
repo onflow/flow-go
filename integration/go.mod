@@ -22,7 +22,7 @@ require (
 	github.com/onflow/flow-emulator v0.31.2-0.20220421202209-eb83f9bfda53
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.25.13-0.20220421201202-a0a5911268b6 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.24.1-0.20220421152843-9ce4d554036e
+	github.com/onflow/flow-go-sdk v0.24.1-0.20220512181452-dec47e8451bb
 	github.com/onflow/flow-go/crypto v0.24.3
 	github.com/onflow/flow/protobuf/go/flow v0.2.5
 	github.com/plus3it/gorecurcopy v0.0.1
