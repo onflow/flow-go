@@ -152,7 +152,7 @@ var contractAddressesByChainID map[flow.ChainID]map[string]flow.Address
 var (
 	// stakingContractAddressMainnet is the address of the FlowIDTableStaking contract on Mainnet
 	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
-	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet and Canary
+	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet
 	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
 )
 
@@ -176,7 +176,15 @@ func init() {
 		ContractNameDKG:       stakingContractAddressTestnet,
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
-	contractAddressesByChainID[flow.Canary] = testnet
+
+	// Canary test network
+	// All system contracts are deployed to the service account
+	canary := map[string]flow.Address{
+		ContractNameEpoch:     flow.Canary.Chain().ServiceAddress(),
+		ContractNameClusterQC: flow.Canary.Chain().ServiceAddress(),
+		ContractNameDKG:       flow.Canary.Chain().ServiceAddress(),
+	}
+	contractAddressesByChainID[flow.Canary] = canary
 
 	// Transient test networks
 	// All system contracts are deployed to the service account
@@ -189,4 +197,5 @@ func init() {
 	contractAddressesByChainID[flow.Localnet] = transient
 	contractAddressesByChainID[flow.BftTestnet] = transient
 	contractAddressesByChainID[flow.Benchnet] = transient
+
 }
