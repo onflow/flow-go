@@ -253,7 +253,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot, maxBlock
 
 func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot, maxBlocks int) ([]flow.Identifier, error) {
 	if maxBlocks == 0 {
-		return []flow.Identifier{}, nil  
+		return []flow.Identifier{}, nil
 	}
 	pendings, err := finalized.ValidDescendants()
 	if err != nil {
@@ -355,42 +355,34 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 			}
 		}
 
-		for {
-			const reloadBlocksChunk = 100_000
-			finalized, pending, err := e.unexecutedBlocks(reloadBlocksChunk)
-			if err != nil {
-				return fmt.Errorf("could not reload unexecuted blocks: %w", err)
-			}
-
-			unexecuted := append(finalized, pending...)
-
-			log := e.log.With().
-				Int("total", len(unexecuted)).
-				Int("finalized", len(finalized)).
-				Int("pending", len(pending)).
-				Uint64("last_executed", lastExecutedHeight).
-				Hex("last_executed_id", lastExecutedID[:]).
-				Logger()
-
-			log.Info().Msg("reloading unexecuted blocks")
-
-			for _, blockID := range unexecuted {
-				err := e.reloadBlock(blockByCollection, executionQueues, blockID)
-				if err != nil {
-					return fmt.Errorf("could not reload block: %v, %w", blockID, err)
-				}
-
-				e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
-			}
-
-			if len(finalized) == 0 && len(pending) == 0 {
-				break
-			}
-			log.Info().Msgf("reloaded unexecuted blocks chunk of %d", len(finalized)+len(pending))
-
+		const reloadBlocksChunk = 100_000
+		finalized, pending, err := e.unexecutedBlocks(reloadBlocksChunk)
+		if err != nil {
+			return fmt.Errorf("could not reload unexecuted blocks: %w", err)
 		}
 
-		log.Info().Msg("all unexecuted have been successfully reloaded")
+		unexecuted := append(finalized, pending...)
+
+		log := e.log.With().
+			Int("total", len(unexecuted)).
+			Int("finalized", len(finalized)).
+			Int("pending", len(pending)).
+			Uint64("last_executed", lastExecutedHeight).
+			Hex("last_executed_id", lastExecutedID[:]).
+			Logger()
+
+		log.Info().Msg("reloading unexecuted blocks")
+
+		for _, blockID := range unexecuted {
+			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
+			if err != nil {
+				return fmt.Errorf("could not reload block: %v, %w", blockID, err)
+			}
+
+			e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
+		}
+
+		log.Info().Msgf("reloaded unexecuted blocks chunk of %d", len(finalized)+len(pending))
 
 		return nil
 	})
