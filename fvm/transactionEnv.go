@@ -793,7 +793,6 @@ func (e *TransactionEnv) VerifySignature(
 	}
 
 	valid, err := crypto.VerifySignatureFromRuntime(
-		e.ctx.SignatureVerifier,
 		signature,
 		tag,
 		signedData,

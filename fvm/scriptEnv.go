@@ -630,7 +630,6 @@ func (e *ScriptEnv) VerifySignature(
 	}
 
 	valid, err := crypto.VerifySignatureFromRuntime(
-		e.ctx.SignatureVerifier,
 		signature,
 		tag,
 		signedData,
