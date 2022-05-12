@@ -46,8 +46,6 @@ func (s *CachingAssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 
 // TestProcessApproval tests that collector caches approval when requested to process it
 func (s *CachingAssignmentCollectorTestSuite) TestProcessApproval() {
-	s.T().Parallel()
-
 	approval := unittest.ResultApprovalFixture()
 	err := s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
@@ -72,8 +70,6 @@ func (s *CachingAssignmentCollectorTestSuite) TestProcessApproval() {
 
 // TestProcessIncorporatedResult tests that collector caches result when requested to processes flow.IncorporatedResult
 func (s *CachingAssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
-	s.T().Parallel()
-
 	// processing invalid result should error
 	err := s.collector.ProcessIncorporatedResult(unittest.IncorporatedResult.Fixture(
 		unittest.IncorporatedResult.WithResult(unittest.ExecutionResultFixture()),
