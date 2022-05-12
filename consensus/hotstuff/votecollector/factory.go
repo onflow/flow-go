@@ -82,7 +82,7 @@ func NewStakingVoteProcessorFactory(committee hotstuff.Replicas, onQCCreated hot
 // participant can sign with its staking key; thereby it contributes only to consensus but
 // not the random beacon. There should be an economic incentive for the nodes to preferably
 // sign with their random beacon key.
-func NewCombinedVoteProcessorFactory(committee hotstuff.Replicas, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
+func NewCombinedVoteProcessorFactory(committee hotstuff.DynamicCommittee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	base := &combinedVoteProcessorFactoryBaseV2{
 		committee:   committee,
 		onQCCreated: onQCCreated,
@@ -99,7 +99,7 @@ func NewCombinedVoteProcessorFactory(committee hotstuff.Replicas, onQCCreated ho
 // suitable for the collector's local cluster consensus.
 // Intended use: only for bootstrapping.
 // UNSAFE: the proposer vote for `block` is _not_ validated or included
-func NewBootstrapCombinedVoteProcessor(log zerolog.Logger, committee hotstuff.Replicas, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
+func NewBootstrapCombinedVoteProcessor(log zerolog.Logger, committee hotstuff.DynamicCommittee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
 	factory := &combinedVoteProcessorFactoryBaseV2{
 		committee:   committee,
 		onQCCreated: onQCCreated,
