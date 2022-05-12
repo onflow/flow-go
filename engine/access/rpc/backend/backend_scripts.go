@@ -107,7 +107,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	for _, execNode := range execNodes {
 		execStartTime := time.Now() // record start time
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
-		
+
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
