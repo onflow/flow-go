@@ -65,6 +65,7 @@ type Engine struct {
 	syncFast               bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	pauseExecution         bool
+	crashingBlockID        flow.Identifier
 }
 
 func New(
@@ -384,6 +385,11 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 
 		log.Info().Msgf("reloaded unexecuted blocks chunk of %d", len(finalized)+len(pending))
 
+		if len(finalized) == reloadBlocksChunk {
+			e.crashingBlockID = finalized[len(finalized)-1]
+			log.Warn().Msgf("crashing block ID is %v", e.crashingBlockID)
+		}
+
 		return nil
 	})
 }
@@ -647,6 +653,10 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
 		e.log.Err(err).Msg("failed in process block's children")
+	}
+
+	if executableBlock.ID() == e.crashingBlockID {
+		e.log.Fatal().Msgf("crashing at the last loaded unexecuted block %v", e.crashingBlockID)
 	}
 }
 
