@@ -67,7 +67,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
@@ -84,7 +84,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// as a sign of an invalid vote and wraps it into a `model.InvalidSignerError`.
 	*dkg = mocks.DKG{} // overwrite DKG mock with a new one
 	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{NodeID: signerID})
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.True(t, model.IsInvalidSignerError(err))
 }
 
@@ -137,7 +137,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
@@ -190,7 +190,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&unpackedSigData, nil)
 
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.NoError(t, err)
 	})
 
@@ -207,7 +207,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.NoError(t, err)
 	})
 
@@ -222,7 +222,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.ErrorIs(t, err, model.ErrInvalidFormat)
 	})
 
@@ -235,7 +235,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.ErrorIs(t, err, model.ErrInvalidFormat)
 	})
 
@@ -251,7 +251,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", block.BlockID, mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.ErrorIs(t, err, model.ErrInvalidFormat)
 	})
 

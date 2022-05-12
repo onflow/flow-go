@@ -68,7 +68,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
@@ -86,31 +86,31 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	vote, err = signer.CreateVote(block)
 	require.NoError(t, err)
 
-	err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// vote on different block should be invalid
 	blockWrongID := *block
 	blockWrongID.BlockID[0]++
-	err = verifier.VerifyVote(nodeID, vote.SigData, &blockWrongID)
+	err = verifier.VerifyVote(nodeID, vote.SigData, blockWrongID.View, blockWrongID.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// vote with a wrong view should be invalid
 	blockWrongView := *block
 	blockWrongView.View++
-	err = verifier.VerifyVote(nodeID, vote.SigData, &blockWrongView)
+	err = verifier.VerifyVote(nodeID, vote.SigData, blockWrongID.View, blockWrongID.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// vote by different signer should be invalid
 	wrongVoter := identities[1]
 	wrongVoter.StakingPubKey = unittest.StakingPrivKeyFixture().PublicKey()
-	err = verifier.VerifyVote(wrongVoter, vote.SigData, block)
+	err = verifier.VerifyVote(wrongVoter, vote.SigData, block.View, block.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// vote with changed signature should be invalid
 	brokenSig := append([]byte{}, vote.SigData...) // copy
 	brokenSig[4]++
-	err = verifier.VerifyVote(nodeID, brokenSig, block)
+	err = verifier.VerifyVote(nodeID, brokenSig, block.View, block.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// Vote from a node that is _not_ part of the Random Beacon committee should be rejected.
@@ -118,7 +118,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	// as a sign of an invalid vote and wraps it into a `model.InvalidSignerError`.
 	*dkg = mocks.DKG{} // overwrite DKG mock with a new one
 	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{NodeID: signerID})
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.True(t, model.IsInvalidSignerError(err))
 }
 
@@ -171,7 +171,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// As the proposer does not have a Random Beacon Key, it should sign solely with its staking key.
@@ -194,9 +194,9 @@ func Test_VerifyQC(t *testing.T) {
 	block := model.BlockFromFlow(&header, header.View-1)
 	sigData := unittest.QCSigDataFixture()
 
-	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidFormat)
 
-	err = verifier.VerifyQC(nil, sigData, block)
+	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)
 	require.ErrorIs(t, err, model.ErrInvalidFormat)
 }
