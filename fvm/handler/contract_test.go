@@ -26,7 +26,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
-	contractHandler := handler.NewContractHandler(accounts, false, nil, nil)
+	contractHandler := handler.NewContractHandler(accounts, func() bool { return false }, nil, nil)
 
 	// no contract initially
 	names, err := contractHandler.GetContractNames(rAdd)
@@ -84,7 +84,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 	require.NoError(t, err)
 
 	contractHandler := handler.NewContractHandler(accounts,
-		true,
+		func() bool { return true },
 		func() []common.Address { return []common.Address{rAdd} },
 		func(address runtime.Address, code []byte) (bool, error) { return false, nil })
 
@@ -116,7 +116,7 @@ func TestContract_DeploymentVouchers(t *testing.T) {
 
 	contractHandler := handler.NewContractHandler(
 		accounts,
-		true,
+		func() bool { return true },
 		func() []common.Address {
 			return []common.Address{}
 		},
@@ -166,7 +166,7 @@ func TestContract_ContractUpdate(t *testing.T) {
 
 	contractHandler := handler.NewContractHandler(
 		accounts,
-		true,
+		func() bool { return true },
 		func() []common.Address {
 			return []common.Address{}
 		},
@@ -231,7 +231,7 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 
 	contractHandler := handler.NewContractHandler(
 		mockAccounts,
-		false,
+		func() bool { return false },
 		nil,
 		nil,
 	)

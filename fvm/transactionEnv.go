@@ -96,7 +96,16 @@ func NewTransactionEnvironment(
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
-		ctx.RestrictedDeploymentEnabled,
+		func() bool {
+			enabled, defined := env.GetIsContractDeploymentRestricted()
+			if !defined {
+				// If the contract deployment bool is not set by the state
+				// fallback to the default value set by the configuration
+				// after the contract deployment bool is set by the state on all chains, this logic can be simplified
+				return ctx.RestrictedDeploymentEnabled
+			}
+			return enabled
+		},
 		env.GetAuthorizedAccountsForContractUpdates,
 		env.useContractAuditVoucher,
 	)
@@ -214,6 +223,37 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 		return defaultAccounts
 	}
 	return addresses
+}
+
+// GetIsContractDeploymentRestricted returns if contract deployment restriction is defined in the state and the value of it
+func (e *TransactionEnv) GetIsContractDeploymentRestricted() (restricted bool, defined bool) {
+	restricted, defined = false, false
+	service := runtime.Address(e.ctx.Chain.ServiceAddress())
+
+	value, err := e.vm.Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.IsContractDeploymentRestrictedPathDomain,
+			Identifier: blueprints.IsContractDeploymentRestrictedPathIdentifier,
+		},
+		runtime.Context{Interface: e},
+	)
+	if err != nil {
+		e.ctx.Logger.
+			Debug().
+			Msg("Failed to read IsContractDeploymentRestricted from the service account. Using value from context instead.")
+		return restricted, defined
+	}
+	restrictedCadence, ok := value.(cadence.Bool)
+	if !ok {
+		e.ctx.Logger.
+			Debug().
+			Msg("Failed to parse IsContractDeploymentRestricted from the service account. Using value from context instead.")
+		return restricted, defined
+	}
+	defined = true
+	restricted = restrictedCadence.ToGoValue().(bool)
+	return restricted, defined
 }
 
 func (e *TransactionEnv) useContractAuditVoucher(address runtime.Address, code []byte) (bool, error) {
