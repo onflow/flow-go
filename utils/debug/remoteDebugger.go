@@ -73,7 +73,20 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, b
 	if err != nil {
 		return nil, err
 	}
-	err = view.Cache.Persist()
+	return tx.Err, nil
+}
+
+// if you don't know the state you can leave it empty
+func (d *RemoteDebugger) RunTransactionWithLedger(txBody *flow.TransactionBody, blockID flow.Identifier, ledgerPath string, state string) (txErr, processError error) {
+	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
+	blockCtx := fvm.NewContextFromParent(d.ctx, fvm.WithBlockHeader(d.ctx.BlockHeader))
+	cache, err := newCheckpointBasedRegisterCache(ledgerPath, state)
+	if err != nil {
+		return nil, err
+	}
+	view.Cache = cache
+	tx := fvm.Transaction(txBody, 0)
+	err = d.vm.Run(blockCtx, tx, view, programs.NewEmptyPrograms())
 	if err != nil {
 		return nil, err
 	}
