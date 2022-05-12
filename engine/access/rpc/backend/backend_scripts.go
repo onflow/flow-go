@@ -100,15 +100,14 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// encode to MD5 as low compute/memory lookup key
 	encodedScript := md5.Sum(script) //nolint:gosec
 
-	// record start time
-	execStartTime := time.Now()
-
 	// try each of the execution nodes found
 	var errors *multierror.Error
 
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
+		execStartTime := time.Now() // record start time
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
+		
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
