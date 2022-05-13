@@ -62,35 +62,45 @@ func (t *highestQCTracker) HighestQC() *flow.QuorumCertificate {
 type TimeoutProcessor struct {
 	view               uint64
 	validator          hotstuff.Validator
-	committee          hotstuff.Committee
+	committee          hotstuff.Replicas
+	sigAggregator      hotstuff.TimeoutSignatureAggregator
+	onPartialTCCreated hotstuff.OnPartialTCCreated
+	onTCCreated        hotstuff.OnTCCreated
 	partialTCTracker   accumulatedWeightTracker
 	tcTracker          accumulatedWeightTracker
 	highestQCTracker   highestQCTracker
-	sigAggregator      *TimeoutSignatureAggregator
-	onPartialTCCreated hotstuff.OnPartialTCCreated
-	onTCCreated        hotstuff.OnTCCreated
 }
 
 var _ hotstuff.TimeoutProcessor = (*TimeoutProcessor)(nil)
 
-func NewTimeoutProcessor(view uint64,
-	totalWeight uint64,
+func NewTimeoutProcessor(committee hotstuff.Replicas,
+	validator hotstuff.Validator,
+	sigAggregator hotstuff.TimeoutSignatureAggregator,
 	onPartialTCCreated hotstuff.OnPartialTCCreated,
 	onTCCreated hotstuff.OnTCCreated,
-) *TimeoutProcessor {
+) (*TimeoutProcessor, error) {
+	view := sigAggregator.View()
+	qcThreshold, err := committee.WeightThresholdForView(view)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve weight threshold for view %d: %w", view, err)
+	}
 	return &TimeoutProcessor{
-		view: view,
+		view:      view,
+		committee: committee,
+		validator: validator,
 		partialTCTracker: accumulatedWeightTracker{
-			minRequiredWeight: hotstuff.ComputeWeightThresholdForHonestMajority(totalWeight),
-			done:              *atomic.NewBool(false),
+			// TODO(active-pacemaker): fix this, add weight for f+1
+			//minRequiredWeight: hotstuff.ComputeWeightThresholdForHonestMajority(totalWeight),
+			done: *atomic.NewBool(false),
 		},
 		tcTracker: accumulatedWeightTracker{
-			minRequiredWeight: hotstuff.ComputeWeightThresholdForBuildingQC(totalWeight),
+			minRequiredWeight: qcThreshold,
 			done:              *atomic.NewBool(false),
 		},
 		onPartialTCCreated: onPartialTCCreated,
 		onTCCreated:        onTCCreated,
-	}
+		sigAggregator:      sigAggregator,
+	}, nil
 }
 
 // Process performs processing of timeout object in concurrent safe way. This
@@ -189,7 +199,7 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 
 	// 3. If TC is included, it must be valid
 	if timeout.LastViewTC != nil {
-		err = p.ValidateTC(timeout.LastViewTC)
+		err = p.validator.ValidateTC(timeout.LastViewTC)
 		if err != nil {
 			return model.NewInvalidTimeoutErrorf(timeout, "included TC is invalid: %w", err)
 		}
@@ -198,6 +208,9 @@ func (p *TimeoutProcessor) validateTimeout(timeout *model.TimeoutObject) error {
 
 }
 
+// buildTC performs aggregation of signatures when we have collected enough
+// weight for building TC. This function is run only once by single worker.
+// Any error should be treated as exception.
 func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	signers, highQCViews, aggregatedSig, err := p.sigAggregator.Aggregate()
 	if err != nil {

@@ -137,6 +137,9 @@ type TimeoutSignatureAggregator interface {
 	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
 
+	// View returns view for which signature aggregator happens
+	View() uint64
+
 	// Aggregate aggregates the signatures and returns with additional data.
 	// Aggregated signature will be returned as SigData of timeout certificate.
 	// Caller can be sure that resulting signature is valid.

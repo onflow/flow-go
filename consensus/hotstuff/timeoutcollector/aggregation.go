@@ -148,6 +148,12 @@ func (a *TimeoutSignatureAggregator) TotalWeight() uint64 {
 	return a.totalWeight
 }
 
+// View returns view for which aggregation happens
+// The function is thread-safe
+func (a *TimeoutSignatureAggregator) View() uint64 {
+	return a.view
+}
+
 // Aggregate aggregates the signatures and returns the aggregated signature.
 // The function performs a final verification of aggregated
 // signature. Caller can be sure that resulting signature is valid.
