@@ -5,7 +5,7 @@
 set -e
 shopt -s extglob
 
-echo "test category:" $TEST_CATEGORY
+echo "test category (run-tests):" $TEST_CATEGORY
 
 # run tests and process results
 
@@ -32,7 +32,7 @@ else
           make -C integration -s test
         ;;
         *)
-          echo "unrecognized test category:" $TEST_CATEGORY
+          echo "unrecognized test category (run-tests):" $TEST_CATEGORY
           exit 1
         ;;
     esac
