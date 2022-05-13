@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -17,12 +16,11 @@ import (
 type Suite struct {
 	suite.Suite
 
-	state    *protocol.State
-	snapshot *protocol.Snapshot
-	log      zerolog.Logger
-
+	state   *protocol.State
 	blocks  *storagemock.Blocks
 	headers *storagemock.Headers
+
+	snapshot *protocol.Snapshot
 }
 
 func TestHandler(t *testing.T) {
@@ -31,34 +29,30 @@ func TestHandler(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
-	suite.log = zerolog.New(zerolog.NewConsoleWriter())
-	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 
-	header := unittest.BlockHeaderFixture()
-	params := new(protocol.Params)
-	params.On("Root").Return(&header, nil)
-	suite.state.On("Params").Return(params).Maybe()
+	suite.state = new(protocol.State)
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	// setup the mocks
-	block := unittest.BlockHeaderFixture()
+	blockHeader := unittest.BlockHeaderFixture()
+
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
+	suite.snapshot.On("Head").Return(&blockHeader, nil).Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest finalized block
-	header, err := backend.GetLatestBlockHeader(context.Background(), false)
-	suite.checkResponse(header, err)
+	respHeader, err := backend.GetLatestBlockHeader(context.Background(), false)
+	suite.checkResponse(respHeader, err)
 
 	// make sure we got the latest block
-	suite.Require().Equal(block.ID(), header.ID())
-	suite.Require().Equal(block.Height, header.Height)
-	suite.Require().Equal(block.ParentID, header.ParentID)
+	suite.Require().Equal(blockHeader.ID(), respHeader.ID())
+	suite.Require().Equal(blockHeader.Height, respHeader.Height)
+	suite.Require().Equal(blockHeader.ParentID, respHeader.ParentID)
 
 	suite.assertAllExpectations()
 
@@ -69,8 +63,8 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	// setup the mocks
-	expected := unittest.BlockFixture()
-	header := expected.Header
+	block := unittest.BlockFixture()
+	header := block.Header
 
 	suite.snapshot.
 		On("Head").
@@ -79,17 +73,17 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 	suite.blocks.
 		On("ByID", header.ID()).
-		Return(&expected, nil).
+		Return(&block, nil).
 		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest finalized header
-	actual, err := backend.GetLatestBlock(context.Background(), false)
-	suite.checkResponse(actual, err)
+	respBlock, err := backend.GetLatestBlock(context.Background(), false)
+	suite.checkResponse(respBlock, err)
 
 	// make sure we got the latest header
-	suite.Require().Equal(expected, *actual)
+	suite.Require().Equal(block, *respBlock)
 
 	suite.assertAllExpectations()
 }
@@ -107,14 +101,14 @@ func (suite *Suite) TestGetBlockHeaderByID() {
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest sealed block
-	resp, err := backend.GetBlockHeaderByID(context.Background(), block.ID())
+	respHeader, err := backend.GetBlockHeaderByID(context.Background(), block.ID())
 
-	suite.checkResponse(resp, err)
+	suite.checkResponse(respHeader, err)
 
 	// make sure we got the latest sealed block
-	suite.Require().Equal(header.ID(), resp.ID())
-	suite.Require().Equal(header.Height, resp.Height)
-	suite.Require().Equal(header.ParentID, resp.ParentID)
+	suite.Require().Equal(header.ID(), respHeader.ID())
+	suite.Require().Equal(header.Height, respHeader.Height)
+	suite.Require().Equal(header.ParentID, respHeader.ParentID)
 
 	suite.assertAllExpectations()
 }
@@ -132,13 +126,13 @@ func (suite *Suite) TestGetBlockHeaderByHeight() {
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest sealed block
-	resp, err := backend.GetBlockHeaderByHeight(context.Background(), headerHeight)
+	respHeader, err := backend.GetBlockHeaderByHeight(context.Background(), headerHeight)
 
-	suite.checkResponse(resp, err)
+	suite.checkResponse(respHeader, err)
 
 	// make sure we got the latest sealed block
-	suite.Require().Equal(blockHeader.Height, resp.Height)
-	suite.Require().Equal(blockHeader.ParentID, resp.ParentID)
+	suite.Require().Equal(blockHeader.Height, respHeader.Height)
+	suite.Require().Equal(blockHeader.ParentID, respHeader.ParentID)
 
 	suite.assertAllExpectations()
 }
@@ -156,11 +150,11 @@ func (suite *Suite) TestGetBlockByHeight() {
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest sealed block
-	resp, err := backend.GetBlockByHeight(context.Background(), height)
-	suite.checkResponse(resp, err)
+	respBlock, err := backend.GetBlockByHeight(context.Background(), height)
+	suite.checkResponse(respBlock, err)
 
 	// make sure we got the latest sealed block
-	suite.Require().Equal(block.ID(), resp.ID())
+	suite.Require().Equal(block.ID(), respBlock.ID())
 
 	suite.assertAllExpectations()
 }
@@ -177,11 +171,11 @@ func (suite *Suite) TestGetBlockById() {
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest sealed block
-	resp, err := backend.GetBlockByID(context.Background(), block.ID())
-	suite.checkResponse(resp, err)
+	respBlock, err := backend.GetBlockByID(context.Background(), block.ID())
+	suite.checkResponse(respBlock, err)
 
 	// make sure we got the latest sealed block
-	suite.Require().Equal(block.ID(), resp.ID())
+	suite.Require().Equal(block.ID(), respBlock.ID())
 
 	suite.assertAllExpectations()
 }
