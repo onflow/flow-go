@@ -30,14 +30,15 @@ func TestSafetyRules(t *testing.T) {
 type SafetyRulesTestSuite struct {
 	suite.Suite
 
-	bootstrapBlock *model.Block
-	proposal       *model.Proposal
-	ourIdentity    *flow.Identity
-	signer         *mocks.Signer
-	persister      *mocks.Persister
-	committee      *mocks.DynamicCommittee
-	safetyData     *hotstuff.SafetyData
-	safety         *SafetyRules
+	bootstrapBlock   *model.Block
+	proposal         *model.Proposal
+	proposerIdentity *flow.Identity
+	ourIdentity      *flow.Identity
+	signer           *mocks.Signer
+	persister        *mocks.Persister
+	committee        *mocks.DynamicCommittee
+	safetyData       *hotstuff.SafetyData
+	safety           *SafetyRules
 }
 
 func (s *SafetyRulesTestSuite) SetupTest() {
@@ -45,8 +46,7 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 	s.signer = &mocks.Signer{}
 	s.persister = &mocks.Persister{}
 	s.committee = &mocks.DynamicCommittee{}
-	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
-	s.committee.On("IdentityByBlock", mock.Anything, s.ourIdentity.NodeID).Return(s.ourIdentity, nil).Maybe()
+	s.proposerIdentity = unittest.IdentityFixture()
 
 	// bootstrap at random bootstrapBlock
 	s.bootstrapBlock = helper.MakeBlock(helper.WithBlockView(100))
@@ -54,7 +54,13 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 		helper.WithBlock(
 			helper.MakeBlock(
 				helper.WithParentBlock(s.bootstrapBlock),
-				helper.WithBlockView(s.bootstrapBlock.View+1))))
+				helper.WithBlockView(s.bootstrapBlock.View+1),
+				helper.WithBlockProposer(s.proposerIdentity.NodeID)),
+		))
+
+	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
+	s.committee.On("IdentityByBlock", mock.Anything, s.ourIdentity.NodeID).Return(s.ourIdentity, nil).Maybe()
+	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 
 	s.safetyData = &hotstuff.SafetyData{
 		LockedOneChainView:      s.bootstrapBlock.View,
@@ -65,9 +71,9 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 	s.safety = New(s.signer, s.persister, s.committee, s.safetyData)
 }
 
-// TestCreateVote_ShouldVote test basic happy path scenario where we vote for first block after bootstrap
+// TestProduceVote_ShouldVote test basic happy path scenario where we vote for first block after bootstrap
 // and next view ended with TC
-func (s *SafetyRulesTestSuite) TestCreateVote_ShouldVote() {
+func (s *SafetyRulesTestSuite) TestProduceVote_ShouldVote() {
 	expectedSafetyData := &hotstuff.SafetyData{
 		LockedOneChainView:      s.proposal.Block.QC.View,
 		HighestAcknowledgedView: s.proposal.Block.View,
@@ -99,7 +105,8 @@ func (s *SafetyRulesTestSuite) TestCreateVote_ShouldVote() {
 		helper.WithBlock(
 			helper.MakeBlock(
 				helper.WithParentBlock(s.bootstrapBlock),
-				helper.WithBlockView(s.proposal.Block.View+2))),
+				helper.WithBlockView(s.proposal.Block.View+2),
+				helper.WithBlockProposer(s.proposerIdentity.NodeID))),
 		helper.WithLastViewTC(lastViewTC))
 
 	expectedSafetyData = &hotstuff.SafetyData{
@@ -111,6 +118,7 @@ func (s *SafetyRulesTestSuite) TestCreateVote_ShouldVote() {
 	expectedVote = makeVote(proposalWithTC.Block)
 	s.signer.On("CreateVote", proposalWithTC.Block).Return(expectedVote, nil).Once()
 	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
+	s.committee.On("IdentityByBlock", proposalWithTC.Block.BlockID, proposalWithTC.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 
 	vote, err = s.safety.ProduceVote(proposalWithTC, proposalWithTC.Block.View)
 	require.NoError(s.T(), err)
@@ -119,8 +127,8 @@ func (s *SafetyRulesTestSuite) TestCreateVote_ShouldVote() {
 	s.persister.AssertCalled(s.T(), "PutSafetyData", expectedSafetyData)
 }
 
-// TestCreateVote_UpdateLockedOneChainView tests that LockedOneChainView is updated when sees a higher QC
-func (s *SafetyRulesTestSuite) TestCreateVote_UpdateLockedOneChainView() {
+// TestProduceVote_UpdateLockedOneChainView tests that LockedOneChainView is updated when sees a higher QC
+func (s *SafetyRulesTestSuite) TestProduceVote_UpdateLockedOneChainView() {
 	s.safety.safetyData.LockedOneChainView = 0
 
 	require.NotEqual(s.T(), s.safety.safetyData.LockedOneChainView, s.proposal.Block.QC.View,
@@ -142,19 +150,18 @@ func (s *SafetyRulesTestSuite) TestCreateVote_UpdateLockedOneChainView() {
 	require.Equal(s.T(), expectedVote, vote)
 }
 
-// TestCreateVote_InvalidCurrentView tests that no vote is created if proposal is for invalid view
-func (s *SafetyRulesTestSuite) TestCreateVote_InvalidCurrentView() {
+// TestProduceVote_InvalidCurrentView tests that no vote is created if proposal is for invalid view
+func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View+1)
 	require.Nil(s.T(), vote)
 	require.Error(s.T(), err)
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-// TestCreateVote_NodeEjected tests that no vote is created if voter is ejected
-func (s *SafetyRulesTestSuite) TestCreateVote_NodeEjected() {
+// TestProduceVote_NodeEjected tests that no vote is created if block proposer is ejected
+func (s *SafetyRulesTestSuite) TestProduceVote_ProposerEjected() {
 	*s.committee = mocks.DynamicCommittee{}
-	s.committee.On("Self").Return(s.ourIdentity.NodeID)
-	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.ourIdentity.NodeID).Return(nil, model.NewInvalidSignerErrorf("node-ejected")).Once()
+	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(nil, model.NewInvalidSignerErrorf("node-ejected")).Once()
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
@@ -162,11 +169,37 @@ func (s *SafetyRulesTestSuite) TestCreateVote_NodeEjected() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-// TestCreateVote_InvalidVoterIdentity tests that no vote is created if there was an exception retrieving voter identity
-func (s *SafetyRulesTestSuite) TestCreateVote_InvalidVoterIdentity() {
+// TestProduceVote_InvalidProposerIdentity tests that no vote is created if there was an exception retrieving proposer identity
+func (s *SafetyRulesTestSuite) TestProduceVote_InvalidProposerIdentity() {
+	*s.committee = mocks.DynamicCommittee{}
+	exception := errors.New("invalid-signer-identity")
+	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(nil, exception).Once()
+
+	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
+	require.Nil(s.T(), vote)
+	require.ErrorAs(s.T(), err, &exception)
+	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
+}
+
+// TestProduceVote_NodeEjected tests that no vote is created if voter is ejected
+func (s *SafetyRulesTestSuite) TestProduceVote_NodeEjected() {
+	*s.committee = mocks.DynamicCommittee{}
+	s.committee.On("Self").Return(s.ourIdentity.NodeID)
+	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.ourIdentity.NodeID).Return(nil, model.NewInvalidSignerErrorf("node-ejected")).Once()
+	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
+
+	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
+	require.Nil(s.T(), vote)
+	require.True(s.T(), model.IsNoVoteError(err))
+	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
+}
+
+// TestProduceVote_InvalidVoterIdentity tests that no vote is created if there was an exception retrieving voter identity
+func (s *SafetyRulesTestSuite) TestProduceVote_InvalidVoterIdentity() {
 	*s.committee = mocks.DynamicCommittee{}
 	s.committee.On("Self").Return(s.ourIdentity.NodeID)
 	exception := errors.New("invalid-signer-identity")
+	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.ourIdentity.NodeID).Return(nil, exception).Once()
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
@@ -175,8 +208,8 @@ func (s *SafetyRulesTestSuite) TestCreateVote_InvalidVoterIdentity() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-// TestCreateVote_CreateVoteException tests that no vote is created if vote creation raised an exception
-func (s *SafetyRulesTestSuite) TestCreateVote_CreateVoteException() {
+// TestProduceVote_CreateVoteException tests that no vote is created if vote creation raised an exception
+func (s *SafetyRulesTestSuite) TestProduceVote_CreateVoteException() {
 	exception := errors.New("create-vote-exception")
 	s.signer.On("CreateVote", s.proposal.Block).Return(nil, exception).Once()
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
@@ -185,8 +218,8 @@ func (s *SafetyRulesTestSuite) TestCreateVote_CreateVoteException() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-// TestCreateVote_PersistStateException tests that no vote is created if persisting state failed
-func (s *SafetyRulesTestSuite) TestCreateVote_PersistStateException() {
+// TestProduceVote_PersistStateException tests that no vote is created if persisting state failed
+func (s *SafetyRulesTestSuite) TestProduceVote_PersistStateException() {
 	exception := errors.New("persister-exception")
 	s.persister.On("PutSafetyData", mock.Anything).Return(exception)
 
@@ -197,8 +230,8 @@ func (s *SafetyRulesTestSuite) TestCreateVote_PersistStateException() {
 	require.ErrorAs(s.T(), err, &exception)
 }
 
-// TestCreateVote_VotingOnUnsafeProposal tests different scenarios where we try to vote on unsafe blocks
-func (s *SafetyRulesTestSuite) TestCreateVote_VotingOnUnsafeProposal() {
+// TestProduceVote_VotingOnUnsafeProposal tests different scenarios where we try to vote on unsafe blocks
+func (s *SafetyRulesTestSuite) TestProduceVote_VotingOnUnsafeProposal() {
 	s.Run("invalid-block-view", func() {
 		// create block with block.View == block.QC.View
 		proposal := helper.MakeProposal(

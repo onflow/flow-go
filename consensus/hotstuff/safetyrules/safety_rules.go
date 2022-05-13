@@ -55,6 +55,16 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 		return nil, fmt.Errorf("not safe to vote for proposal %x: %w", proposal.Block.BlockID, err)
 	}
 
+	// we expect that only valid proposals are submitted for voting
+	// we need to make sure that proposer is not ejected to decide to vote or not
+	_, err = r.committee.IdentityByBlock(block.BlockID, block.ProposerID)
+	if model.IsInvalidSignerError(err) {
+		return nil, model.NoVoteError{Msg: "not voting - proposer ejected"}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve proposer Identity %x at block %x: %w", block.ProposerID, block.BlockID, err)
+	}
+
 	// Do not produce a vote for blocks where we are not a valid committee member.
 	// HotStuff will ask for a vote for the first block of the next epoch, even if we
 	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
