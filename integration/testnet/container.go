@@ -150,23 +150,6 @@ func (c *Container) Addr(portName string) string {
 	return fmt.Sprintf(":%s", port)
 }
 
-// exposePort exposes the given container port.
-func (c *Container) exposePort(containerPort string) {
-	// use TCP protocol if none specified
-	containerNATPort := nat.Port(containerPort)
-	if containerNATPort.Proto() == "" {
-		containerNATPort = nat.Port(fmt.Sprintf("%s/tcp", containerPort))
-	}
-
-	if c.opts.Config.ExposedPorts == nil {
-		c.opts.Config.ExposedPorts = nat.PortSet{
-			containerNATPort: {},
-		}
-	} else {
-		c.opts.Config.ExposedPorts[containerNATPort] = struct{}{}
-	}
-}
-
 // bindPort exposes the given container port and binds it to the given host port.
 // If no protocol is specified, assumes TCP.
 func (c *Container) bindPort(hostPort, containerPort string) {
