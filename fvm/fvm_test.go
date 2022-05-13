@@ -3600,6 +3600,119 @@ func TestSettingExecutionWeights(t *testing.T) {
 			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
 		},
 	))
+	memoryWeights = make(map[common.MemoryKind]uint64)
+	for k, v := range weightedMeter.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
+	memoryWeights[common.MemoryKindBreakStatement] = 1_000_000
+	// TODO: accidentaly discovered a new crasher if memory limit (and presumably computation limit) goes over the limit during state merge
+	// please investigate then delete this test
+	t.Run("transaction should fail with low memory limit (set in the state)", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(
+			50_000_000,
+		),
+		fvm.WithExecutionMemoryWeights(
+			memoryWeights,
+		),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			t.Skip("accidentally discovered a new crasher if memory limit (and presumably computation limit) goes over the limit during state merge")
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+					prepare(signer: AuthAccount) {
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+					}
+				}
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
+
+			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
+		},
+	))
+	memoryWeights = make(map[common.MemoryKind]uint64)
+	for k, v := range weightedMeter.DefaultMemoryWeights {
+		memoryWeights[k] = v
+	}
+	memoryWeights[common.MemoryKindBreakStatement] = 1_000_000
+	t.Run("transaction should fail with low memory limit (set in the state)", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithExecutionMemoryLimit(
+			100_000_000,
+		),
+		fvm.WithExecutionMemoryWeights(
+			memoryWeights,
+		),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			t.Skip("memory limit is hit during parsing, so this is not the correct error. Or is it?")
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+				transaction {
+					prepare(signer: AuthAccount) {
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+						while true {break};while true {break};while true {break};while true {break};while true {break};
+					}
+				}
+			`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+			require.Greater(t, tx.MemoryUsed, uint64(100_000_000))
+
+			// TODO: memory limit is hit during parsing, so this is not the correct error. Or is it?
+			assert.True(t, errors.IsMemoryLimitExceededError(tx.Err))
+		},
+	))
 	t.Run("transaction should fail if create account weight is high", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
