@@ -526,6 +526,10 @@ func WithDebugImage(debug bool) func(config *NodeConfig) {
 	}
 }
 
+// AsCorrupted sets the configuration of a node as corrupted, hence the node is pulling
+// the corrupted image of its role at the build time.
+// A corrupted image is running with Corruptible Conduit Factory hence enabling BFT testing
+// on the node.
 func AsCorrupted() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.Corrupted = true
