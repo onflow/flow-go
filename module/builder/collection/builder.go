@@ -239,11 +239,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			continue
 		}
 		// make sure the reference block is finalized and not orphaned
-		blockIDFinalizedAtReferenceHeight, err := b.mainHeaders.BlockIDByHeight(refHeader.Height)
+		blockFinalizedAtReferenceHeight, err := b.mainHeaders.ByHeight(refHeader.Height)
 		if err != nil {
 			return nil, fmt.Errorf("could not check that reference block (id=%x) is finalized: %w", tx.ReferenceBlockID, err)
 		}
-		if blockIDFinalizedAtReferenceHeight != tx.ReferenceBlockID {
+		if blockFinalizedAtReferenceHeight.ID() != tx.ReferenceBlockID {
 			// the transaction references an orphaned block - it will never be valid
 			b.transactions.Rem(tx.ID())
 			continue
