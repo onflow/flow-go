@@ -115,53 +115,96 @@ func NewTransactionEnvironment(
 		env.seedRNG(ctx.BlockHeader)
 	}
 
-	err := env.setMeteringWeights()
+	// set the execution parameters from the state
+	err := env.setExecutionParameters()
 
 	return env, err
 }
 
-func (e *TransactionEnv) setMeteringWeights() error {
+func (e *TransactionEnv) setExecutionParameters() error {
+	// Check that the service account exists because all the settings are stored in it
+	serviceAddress := e.Context().Chain.ServiceAddress()
+	service := runtime.Address(serviceAddress)
+	ok, err := e.accounts.Exists(serviceAddress)
+	if err != nil {
+		_, fatal := errors.SplitErrorTypes(err)
+		if fatal != nil {
+			e.ctx.Logger.
+				Error().
+				Err(fatal).
+				Msgf("error reading execution parameters")
+			return fatal
+		}
+		if err != nil {
+			e.ctx.Logger.
+				Info().
+				Err(err).
+				Msgf("could not get service account to read execution parameters")
+			return nil
+		}
+	}
+	if !ok {
+		return nil
+	}
+
+	// set the property if no error, but if the error is a fatal error then return it
+	setIfOk := func(prop string, err error, setter func()) (fatal error) {
+		err, fatal = errors.SplitErrorTypes(err)
+		if fatal != nil {
+			// this is a fatal error. return it
+			e.ctx.Logger.
+				Error().
+				Err(fatal).
+				Msgf("error getting %s", prop)
+			return fatal
+		}
+		if err != nil {
+			// this is a general error.
+			// could be that no setting was present in the state,
+			// or that the setting was not parseable,
+			// or some other deterministic thing.
+			e.ctx.Logger.
+				Debug().
+				Err(err).
+				Msgf("could not set %s. Using defaults", prop)
+			return nil
+		}
+		// everything is ok. do the setting
+		setter()
+		return nil
+	}
+
 	var m *weighted.Meter
-	var ok bool
 	// only set the weights if the meter is a weighted.Meter
 	if m, ok = e.sth.State().Meter().(*weighted.Meter); !ok {
 		return nil
 	}
 
-	computationWeights, err := getExecutionEffortWeights(e, e.accounts)
-	err, fatal := errors.SplitErrorTypes(err)
-	if fatal != nil {
-		e.ctx.Logger.
-			Error().
-			Err(fatal).
-			Msg("error getting execution effort weights")
-		return fatal
-	}
+	computationWeights, err := getExecutionEffortWeights(e, service)
+	err = setIfOk(
+		"execution effort weights",
+		err,
+		func() { m.SetComputationWeights(computationWeights) })
 	if err != nil {
-		e.ctx.Logger.
-			Info().
-			Err(err).
-			Msg("could not set execution effort weights. Using defaults")
-	} else {
-		m.SetComputationWeights(computationWeights)
+		return err
 	}
 
-	memoryWeights, err := getExecutionMemoryWeights(e, e.accounts)
-	err, fatal = errors.SplitErrorTypes(err)
-	if fatal != nil {
-		e.ctx.Logger.
-			Error().
-			Err(fatal).
-			Msg("error getting execution memory weights")
-		return fatal
-	}
+	memoryWeights, err := getExecutionMemoryWeights(e, service)
+	err = setIfOk(
+		"execution memory weights",
+		err,
+		func() { m.SetMemoryWeights(memoryWeights) })
 	if err != nil {
-		e.ctx.Logger.
-			Info().
-			Err(err).
-			Msg("could not set execution memory weights. Using defaults")
-	} else {
-		m.SetMemoryWeights(memoryWeights)
+		return err
+	}
+
+	memoryLimit, err := getExecutionMemoryLimit(e, service)
+	err = setIfOk(
+		"execution memory limit",
+		err,
+		func() { m.SetTotalMemoryLimit(memoryLimit) })
+	if err != nil {
+		return err
 	}
 
 	return nil
