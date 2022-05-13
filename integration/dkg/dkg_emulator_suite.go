@@ -354,10 +354,14 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 func (s *DKGSuite) sendDummyTx() (*flow.Block, error) {
 	// we are using an account-creation transaction but it doesnt matter; we
 	// could be using anything other transaction
-	createAccountTx := sdktemplates.CreateAccount(
+	createAccountTx, err := sdktemplates.CreateAccount(
 		[]*sdk.AccountKey{test.AccountKeyGenerator().New()},
 		[]sdktemplates.Contract{},
-		s.blockchain.ServiceKey().Address).
+		s.blockchain.ServiceKey().Address)
+	if err != nil {
+		return nil, err
+	}
+	createAccountTx.
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
