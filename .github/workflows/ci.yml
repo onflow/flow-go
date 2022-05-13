@@ -112,8 +112,8 @@ jobs:
         timeout_minutes: 15
         max_attempts: 2
         command: ./tools/test_monitor/run-tests.sh
-  localnet-test:
-    name: Localnet Compatibility Tests With Legacy Client and Observer
+  flow-legacy-client-compatibility-test:
+    name: Localnet Compatibility Tests With Flow-CLI Client and Observer
     strategy:
       fail-fast: false
     runs-on: ubuntu-latest
