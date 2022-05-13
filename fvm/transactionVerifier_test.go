@@ -149,4 +149,38 @@ func TestTransactionVerification(t *testing.T) {
 		var payloadError *errors.InvalidPayloadSignatureError
 		require.ErrorAs(t, err, &payloadError)
 	})
+
+	t.Run("invalid payload and envelope signatures", func(t *testing.T) {
+		// TODO: this test is invalid and skipped.
+		// The test will become valid once the FVM updates the order of validating signatures:
+		// envelope needs to be checked first and payload later.
+		t.Skip()
+		tx.SetProposalKey(address1, 0, 0)
+		tx.SetPayer(address2)
+
+		sig1 := flow.TransactionSignature{
+			Address:     address1,
+			SignerIndex: 0,
+			KeyIndex:    0,
+			// invalid signature
+		}
+
+		sig2 := flow.TransactionSignature{
+			Address:     address2,
+			SignerIndex: 0,
+			KeyIndex:    0,
+			// invalid signature
+		}
+
+		tx.PayloadSignatures = []flow.TransactionSignature{sig1}
+		tx.EnvelopeSignatures = []flow.TransactionSignature{sig2}
+
+		proc := fvm.Transaction(&tx, 0)
+		txVerifier := fvm.NewTransactionSignatureVerifier(1000)
+		err = txVerifier.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
+		require.Error(t, err)
+
+		var payloadError *errors.InvalidEnvelopeSignatureError
+		require.ErrorAs(t, err, &payloadError)
+	})
 }
