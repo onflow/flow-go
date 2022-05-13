@@ -101,7 +101,6 @@ type ObserverServiceConfig struct {
 	supportsPublicFollower       bool              // Observers will support streaming to observers later
 	collectionGRPCPort           uint              // deprecated
 	executionGRPCPort            uint              // deprecated
-	pingEnabled                  bool
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
@@ -146,7 +145,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
 		logTxTimeToFinalizedExecuted: false,
-		pingEnabled:                  false,
 		retryEnabled:                 false,
 		rpcMetricsEnabled:            false,
 		apiRatelimits:                nil,
@@ -455,7 +453,6 @@ func (builder *FlowObserverServiceBuilder) extraFlags() {
 		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
 		flags.BoolVar(&builder.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
 		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", defaultConfig.logTxTimeToFinalizedExecuted, "log transaction time to finalized and executed")
-		flags.BoolVar(&builder.pingEnabled, "ping-enabled", defaultConfig.pingEnabled, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
