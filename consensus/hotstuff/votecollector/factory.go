@@ -63,7 +63,7 @@ func (f *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Propos
 // NewStakingVoteProcessorFactory implements hotstuff.VoteProcessorFactory for
 // members of a collector cluster. For their cluster-local hotstuff, collectors
 // only sign with their staking key.
-func NewStakingVoteProcessorFactory(committee hotstuff.Replicas, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
+func NewStakingVoteProcessorFactory(committee hotstuff.DynamicCommittee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	base := &stakingVoteProcessorFactoryBase{
 		committee:   committee,
 		onQCCreated: onQCCreated,
@@ -112,7 +112,7 @@ func NewBootstrapCombinedVoteProcessor(log zerolog.Logger, committee hotstuff.Dy
 // suitable for the collector's local cluster consensus.
 // Intended use: only for bootstrapping.
 // UNSAFE: the proposer vote for `block` is _not_ validated or included
-func NewBootstrapStakingVoteProcessor(log zerolog.Logger, committee hotstuff.Replicas, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
+func NewBootstrapStakingVoteProcessor(log zerolog.Logger, committee hotstuff.DynamicCommittee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
 	factory := &stakingVoteProcessorFactoryBase{
 		committee:   committee,
 		onQCCreated: onQCCreated,
