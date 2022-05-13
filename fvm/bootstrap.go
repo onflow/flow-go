@@ -44,6 +44,8 @@ type BootstrapProcedure struct {
 	transactionFees        BootstrapProcedureFeeParameters
 	executionEffortWeights weightedMeter.ExecutionEffortWeights
 	executionMemoryWeights weightedMeter.ExecutionMemoryWeights
+	// executionMemoryLimit of nil means that it won't be set in the state. The FVM will use the default value from the context.
+	executionMemoryLimit *uint64
 
 	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
@@ -140,6 +142,13 @@ func WithExecutionEffortWeights(weights weightedMeter.ExecutionEffortWeights) Bo
 func WithExecutionMemoryWeights(weights weightedMeter.ExecutionMemoryWeights) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.executionMemoryWeights = weights
+		return bp
+	}
+}
+
+func WithExecutionMemoryLimit(limit uint64) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.executionMemoryLimit = &limit
 		return bp
 	}
 }
@@ -599,6 +608,9 @@ func (b *BootstrapProcedure) setupExecutionWeights(service flow.Address) {
 	if b.executionMemoryWeights != nil {
 		b.setupExecutionMemoryWeights(service)
 	}
+	if b.executionMemoryLimit != nil {
+		b.setExecutionMemoryLimitTransaction(service)
+	}
 }
 
 func (b *BootstrapProcedure) setupExecutionEffortWeights(service flow.Address) {
@@ -635,7 +647,7 @@ func (b *BootstrapProcedure) setupExecutionMemoryWeights(service flow.Address) {
 
 	tb, err := blueprints.SetExecutionMemoryWeightsTransaction(service, uintWeights)
 	if err != nil {
-		panic(fmt.Sprintf("failed to setup execution effort weights %s", err.Error()))
+		panic(fmt.Sprintf("failed to setup execution memory weights %s", err.Error()))
 	}
 
 	txError, err := b.vm.invokeMetaTransaction(
@@ -646,7 +658,25 @@ func (b *BootstrapProcedure) setupExecutionMemoryWeights(service flow.Address) {
 		b.sth,
 		b.programs,
 	)
-	panicOnMetaInvokeErrf("failed to setup execution effort weights: %s", txError, err)
+	panicOnMetaInvokeErrf("failed to setup execution memory weights: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setExecutionMemoryLimitTransaction(service flow.Address) {
+
+	tb, err := blueprints.SetExecutionMemoryLimitTransaction(service, *b.executionMemoryLimit)
+	if err != nil {
+		panic(fmt.Sprintf("failed to setup execution memory limit %s", err.Error()))
+	}
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			tb,
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to setup execution memory limit: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(

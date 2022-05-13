@@ -11,11 +11,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const TransactionFeesExecutionEffortWeightsPathDomain = "storage"
+const TransactionExecutionParametersPathDomain = "storage"
 const TransactionFeesExecutionEffortWeightsPathIdentifier = "executionEffortWeights"
-
-const TransactionFeesExecutionMemoryWeightsPathDomain = "storage"
 const TransactionFeesExecutionMemoryWeightsPathIdentifier = "executionMemoryWeights"
+const TransactionFeesExecutionMemoryLimitPathIdentifier = "executionMemoryLimit"
 
 const deployTxFeesTransactionTemplate = `
 transaction {
@@ -196,7 +195,7 @@ func SetExecutionEffortWeightsTransaction(
 	return setExecutionWeightsTransaction(
 		service,
 		weights,
-		TransactionFeesExecutionEffortWeightsPathDomain,
+		TransactionExecutionParametersPathDomain,
 		TransactionFeesExecutionEffortWeightsPathIdentifier,
 	)
 }
@@ -209,7 +208,7 @@ func SetExecutionMemoryWeightsTransaction(
 	return setExecutionWeightsTransaction(
 		service,
 		weights,
-		TransactionFeesExecutionMemoryWeightsPathDomain,
+		TransactionExecutionParametersPathDomain,
 		TransactionFeesExecutionMemoryWeightsPathIdentifier,
 	)
 }
@@ -255,6 +254,41 @@ const setExecutionWeightsScript = `
 	transaction(newWeights: {UInt64: UInt64}, path: StoragePath) {
 		prepare(signer: AuthAccount) {
 			signer.load<{UInt64: UInt64}>(from: path)
+			signer.save(newWeights, to: path)
+		}
+	}
+`
+
+func SetExecutionMemoryLimitTransaction(
+	service flow.Address,
+	limit uint64,
+) (*flow.TransactionBody, error) {
+	newLimit, err := jsoncdc.Encode(cadence.UInt64(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	storagePath, err := jsoncdc.Encode(cadence.Path{
+		Domain:     TransactionExecutionParametersPathDomain,
+		Identifier: TransactionFeesExecutionMemoryLimitPathIdentifier,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(setExecutionMemoryLimit)).
+		AddArgument(newLimit).
+		AddArgument(storagePath).
+		AddAuthorizer(service)
+
+	return tx, nil
+}
+
+const setExecutionMemoryLimit = `
+	transaction(newWeights: UInt64, path: StoragePath) {
+		prepare(signer: AuthAccount) {
+			signer.load<UInt64>(from: path)
 			signer.save(newWeights, to: path)
 		}
 	}
