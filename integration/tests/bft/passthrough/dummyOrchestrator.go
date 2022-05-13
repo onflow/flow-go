@@ -15,25 +15,23 @@ import (
 
 const (
 	typeExecutionReceipt  = "type-execution-receipt"
-	typeExecutionResult   = "type-execution-result"
 	typeChunkDataRequest  = "type-chunk-data-request"
 	typeChunkDataResponse = "type-chunk-data-response"
 	typeResultApproval    = "type-result-approval"
 )
 
-// DummyOrchestrator represents a simple orchestrator that passes through all incoming events.
-type DummyOrchestrator struct {
+// dummyOrchestrator represents a simple orchestrator that passes through all incoming events.
+type dummyOrchestrator struct {
 	logger        zerolog.Logger
 	attackNetwork insecure.AttackNetwork
 	eventTracker  map[string]flow.IdentifierList
 }
 
-func NewDummyOrchestrator(logger zerolog.Logger) *DummyOrchestrator {
-	return &DummyOrchestrator{
+func NewDummyOrchestrator(logger zerolog.Logger) *dummyOrchestrator {
+	return &dummyOrchestrator{
 		logger: logger.With().Str("component", "dummy-orchestrator").Logger(),
 		eventTracker: map[string]flow.IdentifierList{
 			typeExecutionReceipt:  {},
-			typeExecutionResult:   {},
 			typeChunkDataRequest:  {},
 			typeChunkDataResponse: {},
 			typeResultApproval:    {},
@@ -47,7 +45,9 @@ func NewDummyOrchestrator(logger zerolog.Logger) *DummyOrchestrator {
 // the attacker instead of dispatching them to the network.
 //
 // In this dummy orchestrator, the incoming event is passed through without any changes.
-func (d *DummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
+// Passing through means that the orchestrator returns the events as they are to the original corrupted nodes so they
+// dispatch them on the Flow network.
+func (d *dummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.Event) error {
 	lg := d.logger.With().
 		Hex("corrupted_id", logging.ID(event.CorruptedNodeId)).
 		Str("channel", event.Channel.String()).
@@ -69,19 +69,21 @@ func (d *DummyOrchestrator) HandleEventFromCorruptedNode(event *insecure.Event) 
 
 	err := d.attackNetwork.Send(event)
 	if err != nil {
-		lg.Error().Err(err).Msg("could not pass through incoming event")
+		// dummy orchestrator is used for testing and upon error we want it to crash.
+		lg.Fatal().Err(err).Msg("could not pass through incoming event")
 		return err
 	}
 	lg.Info().Msg("incoming event passed through successfully")
 	return nil
-
 }
 
-func (d *DummyOrchestrator) WithAttackNetwork(attackNetwork insecure.AttackNetwork) {
+func (d *dummyOrchestrator) WithAttackNetwork(attackNetwork insecure.AttackNetwork) {
 	d.attackNetwork = attackNetwork
 }
 
-func (d *DummyOrchestrator) mustSeenFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
+// mustSeenFlowProtocolEvent checks the dummy orchestrator has passed through the flow protocol events with given ids. It fails
+// if any entity is gone missing from sight of the orchestrator.
+func (d *dummyOrchestrator) mustSeenFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
 	events, ok := d.eventTracker[eventType]
 	require.Truef(t, ok, "unknown type: %s", eventType)
 

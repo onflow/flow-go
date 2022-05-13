@@ -34,7 +34,7 @@ type Suite struct {
 	exe2ID                  flow.Identifier
 	verID                   flow.Identifier // represents id of verification node
 	PreferredUnicasts       string          // preferred unicast protocols between execution and verification nodes.
-	Orchestrator            *DummyOrchestrator
+	Orchestrator            *dummyOrchestrator
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
