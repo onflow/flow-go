@@ -135,10 +135,14 @@ func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts 
 }
 
 func (s *storage) init(startHeight uint64) error {
-	_, fulfilledHeightErr := s.GetFulfilledHeight()
+	fulfilledHeight, fulfilledHeightErr := s.GetFulfilledHeight()
 	prunedHeight, prunedHeightErr := s.GetPrunedHeight()
 
 	if fulfilledHeightErr == nil && prunedHeightErr == nil {
+		if prunedHeight > fulfilledHeight {
+			return fmt.Errorf("inconsistency detected: pruned height is greater than fulfilled height")
+		}
+
 		// replay pruning in case it was interrupted during previous shutdown
 		if err := s.Prune(prunedHeight); err != nil {
 			return fmt.Errorf("failed to replay pruning: %w", err)

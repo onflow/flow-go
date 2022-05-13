@@ -25,9 +25,10 @@ type Pruner struct {
 	thresholdChan         chan uint64
 	heightRangeTargetChan chan uint64
 
-	lastPrunedHeight  uint64
-	heightRangeTarget uint64
-	threshold         uint64
+	lastFulfilledHeight uint64
+	lastPrunedHeight    uint64
+	heightRangeTarget   uint64
+	threshold           uint64
 
 	logger  zerolog.Logger
 	metrics module.ExecutionDataPrunerMetrics
@@ -71,6 +72,7 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 		fulfilledHeightsOut:   fulfilledHeightsOut,
 		thresholdChan:         make(chan uint64),
 		heightRangeTargetChan: make(chan uint64),
+		lastFulfilledHeight:   fulfilledHeight,
 		lastPrunedHeight:      lastPrunedHeight,
 		heightRangeTarget:     defaultHeightRangeTarget,
 		threshold:             defaultThreshold,
@@ -122,28 +124,34 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 		case <-ctx.Done():
 			return
 		case h := <-p.fulfilledHeightsOut:
-			fulfilledHeight := h.(uint64)
-			if fulfilledHeight-p.lastPrunedHeight > p.heightRangeTarget+p.threshold {
-				pruneHeight := fulfilledHeight - p.heightRangeTarget
-
-				p.logger.Info().Uint64("prune_height", pruneHeight).Msg("pruning storage")
-				start := time.Now()
-
-				if err := p.storage.Prune(pruneHeight); err != nil {
-					ctx.Throw(fmt.Errorf("failed to prune: %w", err))
-				}
-
-				duration := time.Since(start)
-				p.logger.Info().Dur("duration", duration).Msg("pruned storage")
-
-				p.metrics.Pruned(pruneHeight, duration)
-
-				p.lastPrunedHeight = pruneHeight
-			}
+			p.lastFulfilledHeight = h.(uint64)
+			p.checkPrune(ctx)
 		case heightRangeTarget := <-p.heightRangeTargetChan:
 			p.heightRangeTarget = heightRangeTarget
+			p.checkPrune(ctx)
 		case threshold := <-p.thresholdChan:
 			p.threshold = threshold
+			p.checkPrune(ctx)
 		}
+	}
+}
+
+func (p *Pruner) checkPrune(ctx irrecoverable.SignalerContext) {
+	if p.lastFulfilledHeight-p.lastPrunedHeight > p.heightRangeTarget+p.threshold {
+		pruneHeight := p.lastFulfilledHeight - p.heightRangeTarget
+
+		p.logger.Info().Uint64("prune_height", pruneHeight).Msg("pruning storage")
+		start := time.Now()
+
+		if err := p.storage.Prune(pruneHeight); err != nil {
+			ctx.Throw(fmt.Errorf("failed to prune: %w", err))
+		}
+
+		duration := time.Since(start)
+		p.logger.Info().Dur("duration", duration).Msg("pruned storage")
+
+		p.metrics.Pruned(pruneHeight, duration)
+
+		p.lastPrunedHeight = pruneHeight
 	}
 }
