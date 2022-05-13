@@ -188,21 +188,6 @@ func (mr *MockHeadersMockRecorder) BatchIndexByChunkID(arg0, arg1, arg2 interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchIndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).BatchIndexByChunkID), arg0, arg1, arg2)
 }
 
-// BlockIDByHeight mocks base method
-func (m *MockHeaders) BlockIDByHeight(arg0 uint64) (flow.Identifier, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BlockIDByHeight", arg0)
-	ret0, _ := ret[0].(flow.Identifier)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// BlockIDByHeight indicates an expected call of BlockIDByHeight
-func (mr *MockHeadersMockRecorder) BlockIDByHeight(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockIDByHeight", reflect.TypeOf((*MockHeaders)(nil).BlockIDByHeight), arg0)
-}
-
 // ByBlockID mocks base method
 func (m *MockHeaders) ByBlockID(arg0 flow.Identifier) (*flow.Header, error) {
 	m.ctrl.T.Helper()

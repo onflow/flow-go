@@ -20,10 +20,6 @@ type Headers interface {
 	// for finalized blocks.
 	ByHeight(height uint64) (*flow.Header, error)
 
-	// BlockIDByHeight returns the block ID of the single block finalized at the
-	// given height. Only defined for finalized heights.
-	BlockIDByHeight(height uint64) (flow.Identifier, error)
-
 	// ByParentID finds all children for the given parent block. The returned headers
 	// might be unfinalized; if there is more than one, at least one of them has to
 	// be unfinalized.
