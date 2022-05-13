@@ -5,7 +5,7 @@ shopt -s extglob
 
 make crypto_setup_gopath
 
-echo "test category:" $TEST_CATEGORY
+echo "test category (test-setup):" $TEST_CATEGORY
 
 case $TEST_CATEGORY in
   integration-ghost|integration-mvp|integration-network|integration-epochs|integration-access|integration-collection|integration-consensus|integration-execution|integration-verification)
@@ -22,7 +22,7 @@ case $TEST_CATEGORY in
     make crypto_setup_tests
   ;;
   *)
-    echo "unrecognized test category:" $TEST_CATEGORY
+    echo "unrecognized test category (test-setup):" $TEST_CATEGORY
     exit 1
   ;;
 esac
