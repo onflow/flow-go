@@ -223,8 +223,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(mempoolTransactions)...))
 }
 
-// when there are transactions with an unknown reference block in the pool,
-// we should not include them in collections
+// when there are transactions with an unknown reference block in the pool, we should not include them in collections
 func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 
 	// before modifying the mempool, note the valid transactions already in the pool
@@ -249,6 +248,86 @@ func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(validMempoolTransactions)...))
 	// should not contain the unknown-reference transaction
 	suite.Assert().False(collectionContains(builtCollection, unknownReferenceTx.ID()))
+}
+
+// when there are transactions with a known but unfinalized reference block in the pool, we should not include them in collections
+func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
+
+	// before modifying the mempool, note the valid transactions already in the pool
+	validMempoolTransactions := suite.pool.All()
+
+	// add an unfinalized block to the protocol state
+	genesis, err := suite.protoState.Final().Head()
+	suite.Require().NoError(err)
+	unfinalizedReferenceBlock := unittest.BlockWithParentFixture(genesis)
+	unfinalizedReferenceBlock.SetPayload(flow.EmptyPayload())
+	err = suite.protoState.Extend(context.Background(), unfinalizedReferenceBlock)
+	suite.Require().NoError(err)
+
+	// add a transaction with unfinalized reference block to the pool
+	unfinalizedReferenceTx := unittest.TransactionBodyFixture()
+	unfinalizedReferenceTx.ReferenceBlockID = unfinalizedReferenceBlock.ID()
+	suite.pool.Add(&unfinalizedReferenceTx)
+
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().NoError(err)
+
+	// should be able to retrieve built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Assert().NoError(err)
+	builtCollection := built.Payload.Collection
+
+	suite.Assert().Len(builtCollection.Transactions, 3)
+	// payload should include only the transactions with a valid reference block
+	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(validMempoolTransactions)...))
+	// should not contain the unfinalized-reference transaction
+	suite.Assert().False(collectionContains(builtCollection, unfinalizedReferenceTx.ID()))
+}
+
+// when there are transactions with an orphaned reference block in the pool, we should not include them in collections
+func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
+
+	// before modifying the mempool, note the valid transactions already in the pool
+	validMempoolTransactions := suite.pool.All()
+
+	// add an orphaned block to the protocol state
+	genesis, err := suite.protoState.Final().Head()
+	suite.Require().NoError(err)
+	// create a block extending genesis which will be orphaned
+	orphan := unittest.BlockWithParentFixture(genesis)
+	orphan.SetPayload(flow.EmptyPayload())
+	err = suite.protoState.Extend(context.Background(), orphan)
+	suite.Require().NoError(err)
+	// create and finalize a block on top of genesis, orphaning `orphan`
+	block1 := unittest.BlockWithParentFixture(genesis)
+	block1.SetPayload(flow.EmptyPayload())
+	err = suite.protoState.Extend(context.Background(), block1)
+	suite.Require().NoError(err)
+	err = suite.protoState.Finalize(context.Background(), block1.ID())
+	suite.Require().NoError(err)
+
+	// add a transaction with orphaned reference block to the pool
+	orphanedReferenceTx := unittest.TransactionBodyFixture()
+	orphanedReferenceTx.ReferenceBlockID = orphan.ID()
+	suite.pool.Add(&orphanedReferenceTx)
+
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().NoError(err)
+
+	// should be able to retrieve built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Assert().NoError(err)
+	builtCollection := built.Payload.Collection
+
+	suite.Assert().Len(builtCollection.Transactions, 3)
+	// payload should include only the transactions with a valid reference block
+	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(validMempoolTransactions)...))
+	// should not contain the unknown-reference transaction
+	suite.Assert().False(collectionContains(builtCollection, orphanedReferenceTx.ID()))
+	// the transaction with orphaned reference should be removed from the mempool
+	suite.Assert().False(suite.pool.Has(orphanedReferenceTx.ID()))
 }
 
 func (suite *BuilderSuite) TestBuildOn_WithForks() {

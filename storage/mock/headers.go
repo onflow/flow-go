@@ -28,6 +28,29 @@ func (_m *Headers) BatchIndexByChunkID(headerID flow.Identifier, chunkID flow.Id
 	return r0
 }
 
+// BlockIDByHeight provides a mock function with given fields: height
+func (_m *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
+	ret := _m.Called(height)
+
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func(uint64) flow.Identifier); ok {
+		r0 = rf(height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(height)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ByBlockID provides a mock function with given fields: blockID
 func (_m *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	ret := _m.Called(blockID)
