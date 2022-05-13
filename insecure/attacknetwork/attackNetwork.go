@@ -114,7 +114,7 @@ func (a *AttackNetwork) start(ctx irrecoverable.SignalerContext, address string)
 		// network.
 		_, port, err := net.SplitHostPort(a.address)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("could not split host and port for address: %s", a.address)
 		}
 		a.address = fmt.Sprintf("%s:%s", dockerLocalHost, port)
 	}
