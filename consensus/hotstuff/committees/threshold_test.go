@@ -1,18 +1,16 @@
-package hotstuff_test
+package committees
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/onflow/flow-go/consensus/hotstuff"
 )
 
-// Test_ComputeWeightThreshold tests computing the HotStuff safety threshold.
-func Test_ComputeWeightThreshold(t *testing.T) {
+// TestComputeWeightThreshold tests computing the HotStuff safety threshold.
+func TestComputeWeightThreshold(t *testing.T) {
 	// testing lowest values
 	for i := 1; i <= 302; i++ {
-		threshold := hotstuff.ComputeWeightThresholdForBuildingQC(uint64(i))
+		threshold := WeightThresholdToBuildQC(uint64(i))
 
 		boundaryValue := float64(i) * 2.0 / 3.0
 		assert.True(t, boundaryValue < float64(threshold))

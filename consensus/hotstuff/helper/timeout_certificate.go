@@ -10,11 +10,16 @@ import (
 
 func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate {
 	qc := MakeQC()
+	signers := unittest.IdentityListFixture(7).NodeIDs()
+	highQCViews := make([]uint64, len(signers))
+	for i := range highQCViews {
+		highQCViews[i] = qc.View
+	}
 	tc := flow.TimeoutCertificate{
 		View:          rand.Uint64(),
 		TOHighestQC:   qc,
-		TOHighQCViews: []uint64{qc.View},
-		SignerIDs:     unittest.IdentityListFixture(7).NodeIDs(),
+		TOHighQCViews: highQCViews,
+		SignerIDs:     signers,
 		SigData:       unittest.SignatureFixture(),
 	}
 	for _, option := range options {
@@ -26,12 +31,10 @@ func MakeTC(options ...func(*flow.TimeoutCertificate)) *flow.TimeoutCertificate 
 func WithTCHighestQC(qc *flow.QuorumCertificate) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
 		tc.TOHighestQC = qc
-		for _, view := range tc.TOHighQCViews {
-			if view == qc.View {
-				return
-			}
+		tc.TOHighQCViews = make([]uint64, len(tc.SignerIDs))
+		for i := range tc.TOHighQCViews {
+			tc.TOHighQCViews[i] = qc.View
 		}
-		tc.TOHighQCViews = append(tc.TOHighQCViews, qc.View)
 	}
 }
 
@@ -44,6 +47,12 @@ func WithTCSigners(signerIDs []flow.Identifier) func(*flow.TimeoutCertificate) {
 func WithTCView(view uint64) func(*flow.TimeoutCertificate) {
 	return func(tc *flow.TimeoutCertificate) {
 		tc.View = view
+	}
+}
+
+func WithTCHighQCViews(highQCViews []uint64) func(*flow.TimeoutCertificate) {
+	return func(tc *flow.TimeoutCertificate) {
+		tc.TOHighQCViews = highQCViews
 	}
 }
 

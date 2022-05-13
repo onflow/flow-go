@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/consensus"
@@ -696,14 +698,30 @@ type RoundRobinLeaderSelection struct {
 	me         flow.Identifier
 }
 
-func (s *RoundRobinLeaderSelection) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
+var _ hotstuff.Replicas = (*RoundRobinLeaderSelection)(nil)
+var _ hotstuff.DynamicCommittee = (*RoundRobinLeaderSelection)(nil)
+
+func (s *RoundRobinLeaderSelection) IdentitiesByBlock(_ flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
 	return s.identities.Filter(selector), nil
 }
 
-func (s *RoundRobinLeaderSelection) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
+func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
 	id, found := s.identities.ByNodeID(participantID)
 	if !found {
-		return nil, fmt.Errorf("not found")
+		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
+	}
+
+	return id, nil
+}
+
+func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64, selector flow.IdentityFilter) (flow.IdentityList, error) {
+	return s.identities.Filter(selector), nil
+}
+
+func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
+	id, found := s.identities.ByNodeID(participantID)
+	if !found {
+		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
 	return id, nil
 }
@@ -712,11 +730,15 @@ func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier,
 	return s.identities[int(view)%len(s.identities)].NodeID, nil
 }
 
+func (s *RoundRobinLeaderSelection) WeightThresholdForView(_ uint64) (uint64, error) {
+	return committees.WeightThresholdToBuildQC(s.identities.TotalWeight()), nil
+}
+
 func (s *RoundRobinLeaderSelection) Self() flow.Identifier {
 	return s.me
 }
 
-func (s *RoundRobinLeaderSelection) DKG(blockID flow.Identifier) (hotstuff.DKG, error) {
+func (s *RoundRobinLeaderSelection) DKG(_ uint64) (hotstuff.DKG, error) {
 	return nil, fmt.Errorf("error")
 }
 

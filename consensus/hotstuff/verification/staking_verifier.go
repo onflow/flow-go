@@ -37,10 +37,10 @@ func NewStakingVerifier() *StakingVerifier {
 // * model.ErrInvalidSignature is the signature is invalid
 // * unexpected errors should be treated as symptoms of bugs or uncovered
 //   edge cases in the logic (i.e. as fatal)
-func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) error {
+func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error {
 
 	// create the to-be-signed message
-	msg := MakeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(view, blockID)
 
 	// verify each signature against the message
 	stakingValid, err := signer.StakingPubKey.Verify(sigData, msg, v.stakingHasher)
@@ -48,7 +48,7 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, bloc
 		return fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
 	if !stakingValid {
-		return fmt.Errorf("invalid sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
+		return fmt.Errorf("invalid sig for block %v: %w", blockID, model.ErrInvalidSignature)
 	}
 
 	return nil
@@ -63,11 +63,11 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, bloc
 //  - unexpected errors should be treated as symptoms of bugs or uncovered
 //	  edge cases in the logic (i.e. as fatal)
 // In the single verification case, `sigData` represents a single signature (`crypto.Signature`).
-func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
+func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
 	if len(signers) == 0 {
 		return fmt.Errorf("empty list of signers: %w", model.ErrInvalidFormat)
 	}
-	msg := MakeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(view, blockID)
 
 	// verify the aggregated staking signature
 	// TODO: to be replaced by module/signature.PublicKeyAggregator in V2
@@ -92,7 +92,54 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, bl
 	}
 
 	if !stakingValid {
-		return fmt.Errorf("invalid aggregated staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
+		return fmt.Errorf("invalid aggregated staking sig for block %v: %w", blockID, model.ErrInvalidSignature)
+	}
+	return nil
+}
+
+// VerifyTC checks cryptographic validity of the TC's `sigData` for the given view.
+// It is the responsibility of the calling code to ensure
+// that all `voters` are authorized, without duplicates. Return values:
+//  - nil if `sigData` is cryptographically valid
+//  - model.ErrInvalidFormat if `sigData` has an incompatible format
+//  - model.ErrInvalidSignature if a signature is invalid
+//  - unexpected errors should be treated as symptoms of bugs or uncovered
+//	  edge cases in the logic (i.e. as fatal)
+func (v *StakingVerifier) VerifyTC(voters flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
+	return verifyTC(voters, sigData, view, highQCViews, v.stakingHasher)
+}
+
+// verifyTC checks cryptographic validity of the TC's `sigData` for the given view.
+// It is the responsibility of the calling code to ensure
+// that all `voters` are authorized, without duplicates. Return values:
+//  - nil if `sigData` is cryptographically valid
+//  - model.ErrInvalidFormat if `sigData` has an incompatible format
+//  - model.ErrInvalidSignature if a signature is invalid
+//  - unexpected errors should be treated as symptoms of bugs or uncovered
+//	  edge cases in the logic (i.e. as fatal)
+func verifyTC(voters flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64, hasher hash.Hasher) error {
+	if len(voters) == 0 {
+		return fmt.Errorf("empty list of signers: %w", model.ErrInvalidFormat)
+	}
+	if len(voters) != len(highQCViews) {
+		return fmt.Errorf("voters and highQCViews mismatch: %w", model.ErrInvalidFormat)
+	}
+
+	pks := make([]crypto.PublicKey, 0, len(voters))
+	messages := make([][]byte, 0, len(voters))
+	hashers := make([]hash.Hasher, 0, len(voters))
+	for i, identity := range voters {
+		pks = append(pks, identity.StakingPubKey)
+		messages = append(messages, MakeTimeoutMessage(view, highQCViews[i]))
+		hashers = append(hashers, hasher)
+	}
+
+	valid, err := crypto.VerifyBLSSignatureManyMessages(pks, sigData, messages, hashers)
+	if err != nil {
+		return fmt.Errorf("signature verification failed: %w", err)
+	}
+	if !valid {
+		return fmt.Errorf("invalid aggregated TC signature for view %d: %w", view, model.ErrInvalidSignature)
 	}
 	return nil
 }

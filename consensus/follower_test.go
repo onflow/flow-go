@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -46,7 +47,7 @@ func TestHotStuffFollower(t *testing.T) {
 type HotStuffFollowerSuite struct {
 	suite.Suite
 
-	committee  *mockhotstuff.Committee
+	committee  *mockhotstuff.DynamicCommittee
 	headers    *mockstorage.Headers
 	updater    *mockmodule.Finalizer
 	verifier   *mockhotstuff.Verifier
@@ -67,20 +68,22 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.mockConsensus = &MockConsensus{identities: identities}
 
 	// mock consensus committee
-	s.committee = &mockhotstuff.Committee{}
-	s.committee.On("Identities", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, selector flow.IdentityFilter) flow.IdentityList {
+	s.committee = &mockhotstuff.DynamicCommittee{}
+	s.committee.On("IdentitiesByEpoch", mock.Anything, mock.Anything).Return(
+		func(_ uint64, selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
 		nil,
 	)
 	for _, identity := range identities {
-		s.committee.On("Identity", mock.Anything, identity.NodeID).Return(identity, nil)
+		s.committee.On("IdentityByEpoch", mock.Anything, identity.NodeID).Return(identity, nil)
+		s.committee.On("IdentityByBlock", mock.Anything, identity.NodeID).Return(identity, nil)
 	}
 	s.committee.On("LeaderForView", mock.Anything).Return(
 		func(view uint64) flow.Identifier { return identities[int(view)%len(identities)].NodeID },
 		nil,
 	)
+	s.committee.On("WeightThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(identities.TotalWeight()), nil)
 
 	// mock storage headers
 	s.headers = &mockstorage.Headers{}
@@ -90,8 +93,8 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock finalization updater
 	s.verifier = &mockhotstuff.Verifier{}
-	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// mock consumer for finalization notifications
 	s.notifier = &mockhotstuff.FinalizationConsumer{}
@@ -177,6 +180,7 @@ func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 // for all the added blocks. Furthermore, the follower should finalize the first submitted block,
 // i.e. call s.updater.MakeFinal and s.notifier.OnFinalizedBlock
 func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "active-pacemaker, need new finalization rules")
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
 	s.notifier.On("OnBlockIncorporated", blockWithID(expectedFinalized.ID())).Return().Once()
 	s.updater.On("MakeValid", blockID(expectedFinalized.ID())).Return(nil).Once()
@@ -236,6 +240,7 @@ func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 //                                              \       /
 //                                            [52078+ 0, x] (root block; no qc to parent)
 func (s *HotStuffFollowerSuite) TestOutOfOrderBlocks() {
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "active-pacemaker, need new finalization rules")
 	// in the following, we reference the block's by their view minus the view of the
 	// root block (52078). E.g. block [52078+ 9, 52078+10] would be referenced as `block10`
 	rootView := s.rootHeader.View

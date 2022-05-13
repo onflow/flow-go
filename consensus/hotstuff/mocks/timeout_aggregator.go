@@ -35,9 +35,9 @@ func (_m *TimeoutAggregator) Done() <-chan struct{} {
 	return r0
 }
 
-// PruneUpToView provides a mock function with given fields: view
-func (_m *TimeoutAggregator) PruneUpToView(view uint64) {
-	_m.Called(view)
+// PruneUpToView provides a mock function with given fields: lowestRetainedView
+func (_m *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
+	_m.Called(lowestRetainedView)
 }
 
 // Ready provides a mock function with given fields:

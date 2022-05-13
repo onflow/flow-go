@@ -11,6 +11,11 @@ var (
 	ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
 	ErrInvalidFormat     = errors.New("invalid signature format")
 	ErrInvalidSignature  = errors.New("invalid signature")
+	// ErrViewForUnknownEpoch is returned when Epoch information is queried for a view that is
+	// outside of all cached epochs. This can happen when a query is made for a view in the
+	// next epoch, if that epoch is not committed yet. This can also happen when an
+	// old epoch is queried (>3 in the past), even if that epoch does exist in storage.
+	ErrViewForUnknownEpoch = fmt.Errorf("by-view query for unknown epoch")
 )
 
 // NoVoteError contains the reason of why the voter didn't vote for a block proposal.
@@ -63,6 +68,47 @@ func (e MissingBlockError) Error() string {
 func IsMissingBlockError(err error) bool {
 	var e MissingBlockError
 	return errors.As(err, &e)
+}
+
+// InvalidQCError indicates that the QC for block identified by `BlockID` and `View` is invalid
+type InvalidQCError struct {
+	BlockID flow.Identifier
+	View    uint64
+	Err     error
+}
+
+func (e InvalidQCError) Error() string {
+	return fmt.Sprintf("invalid QC for block %x at view %d: %s", e.BlockID, e.View, e.Err.Error())
+}
+
+// IsInvalidQCError returns whether an error is InvalidQCError
+func IsInvalidQCError(err error) bool {
+	var e InvalidQCError
+	return errors.As(err, &e)
+}
+
+func (e InvalidQCError) Unwrap() error {
+	return e.Err
+}
+
+// InvalidTCError indicates that the TC for view identified by `View` is invalid
+type InvalidTCError struct {
+	View uint64
+	Err  error
+}
+
+func (e InvalidTCError) Error() string {
+	return fmt.Sprintf("invalid TC at view %d: %s", e.View, e.Err.Error())
+}
+
+// IsInvalidTCError returns whether an error is InvalidQCError
+func IsInvalidTCError(err error) bool {
+	var e InvalidTCError
+	return errors.As(err, &e)
+}
+
+func (e InvalidTCError) Unwrap() error {
+	return e.Err
 }
 
 // InvalidBlockError indicates that the block with identifier `BlockID` is invalid

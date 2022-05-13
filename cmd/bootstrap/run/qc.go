@@ -78,7 +78,7 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 	if err != nil {
 		return nil, err
 	}
-	err = val.ValidateQC(createdQC, hotBlock)
+	err = val.ValidateQC(createdQC)
 
 	return createdQC, err
 }
@@ -115,7 +115,7 @@ func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData)
 }
 
 // createValidator creates validator that can validate votes and QC
-func createValidator(committee hotstuff.Committee) (hotstuff.Validator, error) {
+func createValidator(committee hotstuff.DynamicCommittee) (hotstuff.Validator, error) {
 	packer := hotstuffSig.NewConsensusSigDataPacker(committee)
 	verifier := verification.NewCombinedVerifier(committee, packer)
 
