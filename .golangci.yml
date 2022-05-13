@@ -36,3 +36,7 @@ issues:
     - path: 'cmd/observer/node_builder/*'
       linters:
         - typecheck
+    - path: 'follower/follower_builder.go'
+      linters:
+        - goimports
+

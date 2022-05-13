@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
-	access "github.com/onflow/flow-go/cmd/observer/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
@@ -68,27 +67,6 @@ func WithLogLevel(level string) Option {
 	}
 }
 
-// WithDB sets the underlying database that will be used to store the chain state
-// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
-	return func(cf *Config) {
-		cf.db = db
-		cf.dataDir = ""
-	}
-}
-
-func WithExposeMetrics(expose bool) Option {
-	return func(c *Config) {
-		c.exposeMetrics = expose
-	}
-}
-
-func WithSyncCoreConfig(config *synchronization.Config) Option {
-	return func(c *Config) {
-		c.syncConfig = config
-	}
-}
-
 // BootstrapNodeInfo contains the details about the upstream bootstrap peer the consensus follower uses
 type BootstrapNodeInfo struct {
 	Host             string // ip or hostname
@@ -109,12 +87,12 @@ func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentityList {
 	return ids
 }
 
-func getAccessNodeOptions(config *Config) []access.Option {
+func getAccessNodeOptions(config *Config) []FollowerOption {
 	ids := bootstrapIdentities(config.bootstrapNodes)
-	return []access.Option{
-		access.WithBootStrapPeers(ids...),
-		access.WithBaseOptions(getBaseOptions(config)),
-		access.WithNetworkKey(config.networkPrivKey),
+	return []FollowerOption{
+		WithBootStrapPeers(ids...),
+		WithBaseOptions(getBaseOptions(config)),
+		WithNetworkKey(config.networkPrivKey),
 	}
 }
 
@@ -148,9 +126,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	return options
 }
 
-func buildAccessNode(accessNodeOptions []access.Option) (*access.ObserverServiceBuilder, error) {
-	anb := access.FlowAccessNode(accessNodeOptions...)
-	nodeBuilder := access.NewObserverServiceBuilder(anb)
+func buildAccessNode(accessNodeOptions []FollowerOption) (*ObserverServiceBuilder, error) {
+	anb := FlowAccessNode(accessNodeOptions...)
+	nodeBuilder := NewObserverServiceBuilder(anb)
 
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err

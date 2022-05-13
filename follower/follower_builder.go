@@ -1,4 +1,4 @@
-package node_builder
+package follower
 
 import (
 	"context"
@@ -388,27 +388,27 @@ func (builder *FlowObserverServiceBuilder) BuildConsensusFollower() ObserverBuil
 	return builder
 }
 
-type Option func(*ObserverServiceConfig)
+type FollowerOption func(*ObserverServiceConfig)
 
-func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
+func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) FollowerOption {
 	return func(config *ObserverServiceConfig) {
 		config.bootstrapIdentities = bootstrapNodes
 	}
 }
 
-func WithNetworkKey(key crypto.PrivateKey) Option {
+func WithNetworkKey(key crypto.PrivateKey) FollowerOption {
 	return func(config *ObserverServiceConfig) {
 		config.NetworkKey = key
 	}
 }
 
-func WithBaseOptions(baseOptions []cmd.Option) Option {
+func WithBaseOptions(baseOptions []cmd.Option) FollowerOption {
 	return func(config *ObserverServiceConfig) {
 		config.baseOptions = baseOptions
 	}
 }
 
-func FlowAccessNode(opts ...Option) *FlowObserverServiceBuilder {
+func FlowAccessNode(opts ...FollowerOption) *FlowObserverServiceBuilder {
 	config := DefaultObserverServiceConfig()
 	for _, opt := range opts {
 		opt(config)
