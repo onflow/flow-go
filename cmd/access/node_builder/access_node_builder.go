@@ -187,25 +187,6 @@ type FlowAccessNodeBuilder struct {
 	SyncEng     *synceng.Engine
 }
 
-// deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
-// These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
-func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
-	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
-	// line params)
-	if builder.bootstrapIdentities != nil {
-		return nil
-	}
-
-	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
-	if err != nil {
-		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
-	}
-
-	builder.bootstrapIdentities = ids
-
-	return nil
-}
-
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
 	builder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.

@@ -36,7 +36,7 @@ jobs:
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: v1.45
-        args: -v --build-tags relic
+        args: -v --build-tags relic --config ./.golangci.yml
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-pkg-cache: true
         # Make sure we get accurate results

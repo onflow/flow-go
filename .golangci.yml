@@ -32,11 +32,11 @@ issues:
     # disabling for now
     - path: 'cmd/access/node_builder/*'
       linters:
-        - typecheck
+        - typecheck 
     - path: 'cmd/observer/node_builder/*'
       linters:
         - typecheck
-    - path: 'follower/follower_builder.go'
+    - path: 'follower/*'
       linters:
-        - goimports
+        - typecheck
 
