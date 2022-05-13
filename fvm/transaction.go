@@ -33,6 +33,7 @@ type TransactionProcedure struct {
 	Events          []flow.Event
 	ServiceEvents   []flow.Event
 	ComputationUsed uint64
+	MemoryUsed      uint64
 	Err             errors.Error
 	Retried         int
 	TraceSpan       opentracing.Span

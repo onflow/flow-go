@@ -335,10 +335,8 @@ func (e *blockComputer) executeTransaction(
 
 	var memAllocBefore uint64
 	var m runtime.MemStats
-	if e.log.Debug().Enabled() {
-		runtime.ReadMemStats(&m)
-		memAllocBefore = m.TotalAlloc
-	}
+	runtime.ReadMemStats(&m)
+	memAllocBefore = m.TotalAlloc
 
 	txID := txBody.ID()
 
@@ -407,18 +405,17 @@ func (e *blockComputer) executeTransaction(
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)
 
+	runtime.ReadMemStats(&m)
+	memAllocAfter := m.TotalAlloc
+
 	evt := e.log.With().
 		Hex("tx_id", txResult.TransactionID[:]).
 		Str("block_id", res.ExecutableBlock.ID().String()).
 		Str("traceID", traceID).
 		Uint64("computation_used", txResult.ComputationUsed).
+		Uint64("memory_used", tx.MemoryUsed).
+		Uint64("memAlloc", memAllocAfter-memAllocBefore).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds())
-
-	if e.log.Debug().Enabled() {
-		runtime.ReadMemStats(&m)
-		memAllocAfter := m.TotalAlloc
-		evt = evt.Uint64("memAlloc", memAllocAfter-memAllocBefore)
-	}
 
 	lg := evt.
 		Logger()

@@ -13,19 +13,21 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain                         flow.Chain
-	Blocks                        Blocks
-	Metrics                       handler.MetricsReporter
-	Tracer                        module.Tracer
-	ComputationLimit              uint64
-	MemoryLimit                   uint64
-	MaxStateKeySize               uint64
-	MaxStateValueSize             uint64
-	MaxStateInteractionSize       uint64
-	EventCollectionByteSizeLimit  uint64
-	MaxNumOfTxRetries             uint8
-	BlockHeader                   *flow.Header
-	ServiceAccountEnabled         bool
+	Chain                        flow.Chain
+	Blocks                       Blocks
+	Metrics                      handler.MetricsReporter
+	Tracer                       module.Tracer
+	ComputationLimit             uint64
+	MemoryLimit                  uint64
+	MaxStateKeySize              uint64
+	MaxStateValueSize            uint64
+	MaxStateInteractionSize      uint64
+	EventCollectionByteSizeLimit uint64
+	MaxNumOfTxRetries            uint8
+	BlockHeader                  *flow.Header
+	ServiceAccountEnabled        bool
+	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
+	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
 	RestrictedDeploymentEnabled   bool
 	LimitAccountStorage           bool
 	TransactionFeesEnabled        bool
