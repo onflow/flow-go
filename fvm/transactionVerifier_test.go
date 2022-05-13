@@ -151,10 +151,9 @@ func TestTransactionVerification(t *testing.T) {
 	})
 
 	t.Run("invalid payload and envelope signatures", func(t *testing.T) {
-		// TODO: this test is invalid and skipped.
-		// The test will become valid once the FVM updates the order of validating signatures:
+		// TODO: this test expects a Payload error but should be updated to expect en Envelope error.
+		// The test should be updated once the FVM updates the order of validating signatures:
 		// envelope needs to be checked first and payload later.
-		t.Skip()
 		tx.SetProposalKey(address1, 0, 0)
 		tx.SetPayer(address2)
 
@@ -180,7 +179,8 @@ func TestTransactionVerification(t *testing.T) {
 		err = txVerifier.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
-		var payloadError *errors.InvalidEnvelopeSignatureError
+		// TODO: update to InvalidEnvelopeSignatureError once FVM verifier is updated.
+		var payloadError *errors.InvalidPayloadSignatureError
 		require.ErrorAs(t, err, &payloadError)
 	})
 }
