@@ -1,4 +1,4 @@
-package wintermute
+package passthrough
 
 import (
 	"context"
@@ -9,17 +9,18 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-type WintermuteTestSuite struct {
+type PassThroughTestSuit struct {
 	Suite
 }
 
-func TestDummyOrchestrator(t *testing.T) {
-	suite.Run(t, new(WintermuteTestSuite))
+func TestPassThrough(t *testing.T) {
+	suite.Run(t, new(PassThroughTestSuit))
 }
 
-func (suite *WintermuteTestSuite) TestSealingAndVerificationHappyPath() {
+func (suite *PassThroughTestSuit) TestSealingAndVerificationHappyPath() {
 	// wait for next height finalized (potentially first height), called blockA, just to make sure consensus progresses.
 	blockA := suite.BlockState.WaitForHighestFinalizedProgress(suite.T())
 	suite.T().Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.Header.ID())
@@ -47,10 +48,17 @@ func (suite *WintermuteTestSuite) TestSealingAndVerificationHappyPath() {
 	suite.T().Logf("receipt for blockB generated: result ID: %x with %d chunks\n", resultBId, len(resultB.Chunks))
 
 	// waits till result approval emits for all chunks of resultB
+	approvalIds := flow.IdentifierList{}
 	for i := 0; i < len(resultB.Chunks); i++ {
-		suite.ApprovalState.WaitForResultApproval(suite.T(), suite.verID, resultBId, uint64(i))
+		approval := suite.ApprovalState.WaitForResultApproval(suite.T(), suite.verID, resultBId, uint64(i))
+		approvalIds = append(approvalIds, approval.ID())
 	}
 
 	// waits until blockB is sealed by consensus nodes after result approvals for all of its chunks emitted.
 	suite.BlockState.WaitForSealed(suite.T(), blockB.Header.Height)
+
+	suite.Orchestrator.mustSeenFlowProtocolEvent(suite.T(), typeExecutionReceipt, receiptB1.ID(), receiptB2.ID())
+	suite.Orchestrator.mustSeenFlowProtocolEvent(suite.T(), typeChunkDataRequest, flow.GetIDs(resultB.Chunks)...)
+	suite.Orchestrator.mustSeenFlowProtocolEvent(suite.T(), typeChunkDataResponse, flow.GetIDs(resultB.Chunks)...)
+	suite.Orchestrator.mustSeenFlowProtocolEvent(suite.T(), typeResultApproval, approvalIds...)
 }

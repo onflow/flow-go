@@ -1,4 +1,4 @@
-package wintermute
+package passthrough
 
 import (
 	"context"
@@ -34,6 +34,7 @@ type Suite struct {
 	exe2ID                  flow.Identifier
 	verID                   flow.Identifier // represents id of verification node
 	PreferredUnicasts       string          // preferred unicast protocols between execution and verification nodes.
+	Orchestrator            *DummyOrchestrator
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -144,7 +145,7 @@ func (s *Suite) SetupSuite() {
 	s.cancel = cancel
 	s.net.Start(ctx)
 
-	dummyOrchestrator := NewDummyOrchestrator(logger)
+	s.Orchestrator = NewDummyOrchestrator(logger)
 
 	// start attack network
 	const serverAddress = "localhost:0" // we let OS picking an available port for attack network
@@ -153,7 +154,7 @@ func (s *Suite) SetupSuite() {
 	attackNetwork, err := attacknetwork.NewAttackNetwork(s.log,
 		serverAddress,
 		codec,
-		dummyOrchestrator,
+		s.Orchestrator,
 		connector,
 		s.net.CorruptedIdentities())
 	require.NoError(s.T(), err)
