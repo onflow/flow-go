@@ -99,10 +99,9 @@ type ObserverServiceConfig struct {
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
 	supportsPublicFollower       bool              // Observers will support streaming to observers later
-	collectionGRPCPort           uint // deprecated
-	executionGRPCPort            uint // deprecated
+	collectionGRPCPort           uint              // deprecated
+	executionGRPCPort            uint              // deprecated
 	pingEnabled                  bool
-	nodeInfoFile                 string
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
@@ -150,7 +149,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		pingEnabled:                  false,
 		retryEnabled:                 false,
 		rpcMetricsEnabled:            false,
-		nodeInfoFile:                 "",
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
 		staked:                       false, // deprecated but kept to support temporary boostrap code
@@ -460,7 +458,6 @@ func (builder *FlowObserverServiceBuilder) extraFlags() {
 		flags.BoolVar(&builder.pingEnabled, "ping-enabled", defaultConfig.pingEnabled, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
-		flags.StringVarP(&builder.nodeInfoFile, "node-info-file", "", defaultConfig.nodeInfoFile, "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
