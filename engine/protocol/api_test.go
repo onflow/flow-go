@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/model/flow"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -28,7 +27,6 @@ type Suite struct {
 
 func TestHandler(t *testing.T) {
 	suite.Run(t, new(Suite))
-	suite.Run(t, new(IdHeightSuite))
 }
 
 func (suite *Suite) SetupTest() {
@@ -36,6 +34,7 @@ func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("Root").Return(&header, nil)
@@ -43,6 +42,20 @@ func (suite *Suite) SetupTest() {
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
 }
+
+// func (suite *Suite) SetupTest() {
+// 	rand.Seed(time.Now().UnixNano())
+// 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
+// 	suite.state = new(protocol.State)
+// 	suite.snapshot = new(protocol.Snapshot)
+
+// 	header := unittest.BlockHeaderFixture()
+// 	params := new(protocol.Params)
+// 	params.On("Root").Return(&header, nil)
+// 	suite.state.On("Params").Return(params).Maybe()
+// 	suite.blocks = new(storagemock.Blocks)
+// 	suite.headers = new(storagemock.Headers)
+// }
 
 func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	// setup the mocks
@@ -63,18 +76,6 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 	suite.assertAllExpectations()
 
-}
-
-func (suite *Suite) checkResponse(resp interface{}, err error) {
-	suite.Require().NoError(err)
-	suite.Require().NotNil(resp)
-}
-
-func (suite *Suite) assertAllExpectations() {
-	suite.snapshot.AssertExpectations(suite.T())
-	suite.state.AssertExpectations(suite.T())
-	suite.blocks.AssertExpectations(suite.T())
-	suite.headers.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
@@ -107,35 +108,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	suite.assertAllExpectations()
 }
 
-type IdHeightSuite struct {
-	suite.Suite
-
-	state    *protocol.State
-	snapshot *protocol.Snapshot
-	log      zerolog.Logger
-
-	blocks  *storagemock.Blocks
-	headers *storagemock.Headers
-
-	chainID flow.ChainID
-}
-
-func (suite *IdHeightSuite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
-	suite.log = zerolog.New(zerolog.NewConsoleWriter())
-	suite.state = new(protocol.State)
-	suite.snapshot = new(protocol.Snapshot)
-
-	header := unittest.BlockHeaderFixture()
-	params := new(protocol.Params)
-
-	params.On("Root").Return(&header, nil)
-	suite.state.On("Params").Return(params).Maybe()
-	suite.blocks = new(storagemock.Blocks)
-	suite.headers = new(storagemock.Headers)
-}
-
-func (suite *IdHeightSuite) TestGetBlockHeaderByID() {
+func (suite *Suite) TestGetBlockHeaderByID() {
 	// setup the mocks
 	block := unittest.BlockFixture()
 	header := block.Header
@@ -160,7 +133,7 @@ func (suite *IdHeightSuite) TestGetBlockHeaderByID() {
 	suite.assertAllExpectations()
 }
 
-func (suite *IdHeightSuite) TestGetBlockHeaderByHeight() {
+func (suite *Suite) TestGetBlockHeaderByHeight() {
 	// setup the mocks
 	blockHeader := unittest.BlockHeaderFixture()
 	headerHeight := blockHeader.Height
@@ -227,12 +200,12 @@ func (suite *Suite) TestGetBlockById() {
 	suite.assertAllExpectations()
 }
 
-func (suite *IdHeightSuite) checkResponse(resp interface{}, err error) {
+func (suite *Suite) checkResponse(resp interface{}, err error) {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
 }
 
-func (suite *IdHeightSuite) assertAllExpectations() {
+func (suite *Suite) assertAllExpectations() {
 	suite.snapshot.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
 	suite.blocks.AssertExpectations(suite.T())
