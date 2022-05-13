@@ -5,18 +5,25 @@ shopt -s extglob
 
 make crypto_setup_gopath
 
-if [[ $TEST_CATEGORY =~ integration-(ghost|mvp|network|epochs|access|collection|consensus|execution|verification)$ ]]
-then
+echo "test category:" $TEST_CATEGORY
+
+case $TEST_CATEGORY in
+  integration-ghost|integration-mvp|integration-network|integration-epochs|integration-access|integration-collection|integration-consensus|integration-execution|integration-verification)
     make docker-build-flow
-else
-    case $TEST_CATEGORY in
-        unit)
-            make install-mock-generators
-            make generate-mocks
-        ;;
-        unit-crypto)
-            make crypto_setup_tests
-        ;;
-    esac
-fi
+  ;;
+  integration-bft)
+    make docker-build-flow-corrupted docker-build-flow
+  ;;
+  unit)
+    make install-mock-generators
+    make generate-mocks
+  ;;
+  unit-crypto)
+    make crypto_setup_tests
+  ;;
+  *)
+    echo "unrecognized test category:" $TEST_CATEGORY
+    exit 1
+  ;;
+esac
 
