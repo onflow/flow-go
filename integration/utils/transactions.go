@@ -112,7 +112,11 @@ func MakeStakingCollectionRegisterNodeTx(
 	}
 
 	publicKeys := make([]cadence.Value, 1)
-	publicKeys[0] = sdktemplates.AccountKeyToCadenceCryptoKey(&machineKey)
+	publicKey, err := sdktemplates.AccountKeyToCadenceCryptoKey(&machineKey)
+	if err != nil {
+		return nil, err
+	}
+	publicKeys[0] = publicKey
 	publicKeysCDC := cadence.NewArray(publicKeys)
 
 	err = tx.AddArgument(cadence.NewOptional(publicKeysCDC))
