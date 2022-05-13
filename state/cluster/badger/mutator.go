@@ -65,11 +65,16 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		// get the chain ID, which determines which cluster state to query
 		chainID := header.ChainID
 
-		// get the latest finalized block
-		var final flow.Header
-		err := procedure.RetrieveLatestFinalizedClusterHeader(chainID, &final)(tx)
+		// get the latest finalized cluster block and latest finalized consensus height
+		var finalizedClusterBlock flow.Header
+		err := procedure.RetrieveLatestFinalizedClusterHeader(chainID, &finalizedClusterBlock)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve finalized head: %w", err)
+			return fmt.Errorf("could not retrieve finalized cluster head: %w", err)
+		}
+		var finalizedConsensusHeight uint64
+		err = operation.RetrieveFinalizedHeight(&finalizedConsensusHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized height on consensus chain: %w", err)
 		}
 
 		// get the header of the parent of the new block
@@ -93,7 +98,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 
 		// start with the extending block's parent
 		parentID := header.ParentID
-		for parentID != final.ID() {
+		for parentID != finalizedClusterBlock.ID() {
 
 			// get the parent of current block
 			ancestor, err := m.headers.ByBlockID(parentID)
@@ -103,9 +108,9 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 
 			// if its height is below current boundary, the block does not connect
 			// to the finalized protocol state and would break database consistency
-			if ancestor.Height < final.Height {
-				return state.NewOutdatedExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%v), final.Height (%v)",
-					ancestor.Height, final.Height)
+			if ancestor.Height < finalizedClusterBlock.Height {
+				return state.NewOutdatedExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%d), final.Height (%d)",
+					ancestor.Height, finalizedClusterBlock.Height)
 			}
 
 			parentID = ancestor.ParentID
@@ -146,6 +151,12 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 				payload.ReferenceBlockID, minRefID,
 			)
 		}
+		// a valid collection must contain only transactions within its expiry window
+		if maxRefHeight-minRefHeight >= flow.DefaultTransactionExpiry {
+			return state.NewInvalidExtensionErrorf(
+				"collection contains reference height range [%d,%d] exceeding expiry window size: %d",
+				minRefHeight, maxRefHeight, flow.DefaultTransactionExpiry)
+		}
 
 		// a valid collection must reference a valid reference block
 		// NOTE: it is valid for a collection to be expired at this point,
@@ -172,7 +183,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 		}
 
 		// first, check for duplicate transactions in the un-finalized ancestry
-		duplicateTxIDs, err := m.checkDupeTransactionsInUnfinalizedAncestry(block, txLookup, final.Height)
+		duplicateTxIDs, err := m.checkDupeTransactionsInUnfinalizedAncestry(block, txLookup, finalizedClusterBlock.Height)
 		if err != nil {
 			return fmt.Errorf("could not check for duplicate txs in un-finalized ancestry: %w", err)
 		}
@@ -235,10 +246,17 @@ func (m *MutableState) checkDupeTransactionsInUnfinalizedAncestry(block *cluster
 func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransactions map[flow.Identifier]struct{}, minRefHeight, maxRefHeight uint64) ([]flow.Identifier, error) {
 	var duplicatedTxIDs []flow.Identifier
 
-	// Let E be the global transaction expiry constant, measured in blocks
+	// Let E be the global transaction expiry constant, measured in blocks. For each
+	// T ∈ `includedTransactions`, we have to decide whether the transaction
+	// already appeared in _any_ finalized cluster block.
+	// Notation:
+	//   - consider a valid cluster block C and let c be its reference block height
+	//   - consider a transaction T ∈ `includedTransactions` and let t denote its
+	//     reference block height
 	//
-	// 1. a cluster block's reference block height is equal to the lowest reference
-	//    block height of all its constituent transactions
+	// Boundary conditions:
+	// 1. C's reference block height is equal to the lowest reference block height of
+	//    all its constituent transactions. Hence, C can contain T if and only if c <= t.
 	// 2. a transaction with reference block height T is eligible for inclusion in
 	//    any collection with reference block height C where C<=T<C+E
 	//

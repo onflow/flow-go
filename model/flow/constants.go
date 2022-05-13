@@ -12,8 +12,8 @@ var GenesisTime = time.Date(2018, time.December, 19, 22, 32, 30, 42, time.UTC)
 // explicitly set during bootstrapping.
 const DefaultProtocolVersion = 0
 
-// DefaultTransactionExpiry is the default expiry for transactions, measured
-// in blocks. Equivalent to 10 minutes for a 1-second block time.
+// DefaultTransactionExpiry is the default expiry for transactions, measured in blocks.
+// The default value is equivalent to 10 minutes for a 1-second block time.
 //
 // Let E by the transaction expiry. If a transaction T specifies a reference
 // block R with height H, then T may be included in any block B where:

@@ -204,10 +204,12 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 	}
 }
 
-func withPrefetchValues(prefetch bool) func(*badger.IteratorOptions) {
-	return func(options *badger.IteratorOptions) {
-		options.PrefetchValues = false
-	}
+// withPrefetchValuesFalse configures a Badger iteration to NOT preemptively load
+// the values when iterating over keys (ie. key-only iteration). Key-only iteration
+// is several order of magnitudes faster than regular iteration, because it involves
+// access to the LSM-tree only, which is usually resident entirely in RAM.
+func withPrefetchValuesFalse(options *badger.IteratorOptions) {
+	options.PrefetchValues = false
 }
 
 // iterate iterates over a range of keys defined by a start and end key. The
