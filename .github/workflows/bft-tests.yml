@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - '**/*bft*'
+      - '**/*6221*'
 
 env:
   GO_VERSION: 1.17
