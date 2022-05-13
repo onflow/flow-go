@@ -413,3 +413,8 @@ func (m *Meter) TotalMemoryUsed() uint {
 func (m *Meter) TotalMemoryLimit() uint {
 	return uint(m.memoryLimit)
 }
+
+// SetTotalMemoryLimit sets the total memory limit
+func (m *Meter) SetTotalMemoryLimit(limit uint64) {
+	m.memoryLimit = limit
+}
