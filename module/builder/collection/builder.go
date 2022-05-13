@@ -128,6 +128,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	// pre-compute the minimum possible reference block height for transactions
 	// included in this collection (actual reference height may be greater)
