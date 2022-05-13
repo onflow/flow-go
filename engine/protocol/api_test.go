@@ -136,85 +136,93 @@ func (suite *IdHeightSuite) SetupTest() {
 }
 
 func (suite *IdHeightSuite) TestGetBlockHeaderByID() {
-	//setup the mocks
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	// setup the mocks
+	block := unittest.BlockFixture()
+	header := block.Header
 
-	block := unittest.BlockHeaderFixture()
-
-	suite.snapshot.On("Head").Return(&block, nil).Once()
+	suite.headers.
+		On("ByBlockID", block.ID()).
+		Return(header, nil).
+		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest sealed block
-	header, err := backend.GetBlockHeaderByID(context.Background(), block.ID())
+	resp, err := backend.GetBlockHeaderByID(context.Background(), block.ID())
 
-	suite.checkResponse(header, err)
+	suite.checkResponse(resp, err)
 
 	// make sure we got the latest sealed block
-	suite.Require().Equal(block.ID(), header.ID())
-	suite.Require().Equal(block.Height, header.Height)
-	suite.Require().Equal(block.ParentID, header.ParentID)
+	suite.Require().Equal(header.ID(), resp.ID())
+	suite.Require().Equal(header.Height, resp.Height)
+	suite.Require().Equal(header.ParentID, resp.ParentID)
 
 	suite.assertAllExpectations()
 }
 
 func (suite *IdHeightSuite) TestGetBlockHeaderByHeight() {
-	//setup the mocks
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	// setup the mocks
+	blockHeader := unittest.BlockHeaderFixture()
+	headerHeight := blockHeader.Height
 
-	block := unittest.BlockHeaderFixture()
-
-	suite.snapshot.On("Head").Return(&block, nil).Once()
+	suite.headers.
+		On("ByHeight", headerHeight).
+		Return(&blockHeader, nil).
+		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest sealed block
-	header, err := backend.GetBlockHeaderByHeight(context.Background(), block.Height)
+	resp, err := backend.GetBlockHeaderByHeight(context.Background(), headerHeight)
 
-	suite.checkResponse(header, err)
+	suite.checkResponse(resp, err)
 
 	// make sure we got the latest sealed block
-	suite.Require().Equal(block.ID(), header.ID())
-	suite.Require().Equal(block.Height, header.Height)
-	suite.Require().Equal(block.ParentID, header.ParentID)
+	suite.Require().Equal(blockHeader.Height, resp.Height)
+	suite.Require().Equal(blockHeader.ParentID, resp.ParentID)
 
 	suite.assertAllExpectations()
 }
 
 func (suite *Suite) TestGetBlockByHeight() {
 	// setup the mocks
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	block := unittest.BlockFixture()
+	height := block.Header.Height
 
-	block := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
+	suite.blocks.
+		On("ByHeight", height).
+		Return(&block, nil).
+		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest sealed block
-	header, err := backend.GetBlockByHeight(context.Background(), block.Height)
-	suite.checkResponse(header, err)
+	resp, err := backend.GetBlockByHeight(context.Background(), height)
+	suite.checkResponse(resp, err)
 
 	// make sure we got the latest sealed block
-	suite.Require().Equal(block.ID(), header.ID())
+	suite.Require().Equal(block.ID(), resp.ID())
 
 	suite.assertAllExpectations()
 }
 
 func (suite *Suite) TestGetBlockById() {
 	// setup the mocks
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	block := unittest.BlockFixture()
 
-	block := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
+	suite.blocks.
+		On("ByID", block.ID()).
+		Return(&block, nil).
+		Once()
 
 	backend := New(suite.state, suite.blocks, suite.headers)
 
 	// query the handler for the latest sealed block
-	header, err := backend.GetBlockByID(context.Background(), block.ID())
-	suite.checkResponse(header, err)
+	resp, err := backend.GetBlockByID(context.Background(), block.ID())
+	suite.checkResponse(resp, err)
 
 	// make sure we got the latest sealed block
-	suite.Require().Equal(block.ID(), header.ID())
+	suite.Require().Equal(block.ID(), resp.ID())
 
 	suite.assertAllExpectations()
 }
