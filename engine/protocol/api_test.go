@@ -43,20 +43,6 @@ func (suite *Suite) SetupTest() {
 	suite.headers = new(storagemock.Headers)
 }
 
-// func (suite *Suite) SetupTest() {
-// 	rand.Seed(time.Now().UnixNano())
-// 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
-// 	suite.state = new(protocol.State)
-// 	suite.snapshot = new(protocol.Snapshot)
-
-// 	header := unittest.BlockHeaderFixture()
-// 	params := new(protocol.Params)
-// 	params.On("Root").Return(&header, nil)
-// 	suite.state.On("Params").Return(params).Maybe()
-// 	suite.blocks = new(storagemock.Blocks)
-// 	suite.headers = new(storagemock.Headers)
-// }
-
 func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	// setup the mocks
 	block := unittest.BlockHeaderFixture()
