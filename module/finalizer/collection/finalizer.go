@@ -82,9 +82,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			return nil
 		}
 
-		// in order to validate the validity of all changes, we need to iterate
-		// through the blocks that need to be finalized from oldest to youngest;
-		// we thus start at the youngest remember all the intermediary steps
+		// To finalize all blocks from the currently finalized one up to and
+		// including the current, we first enumerate each of these blocks.
+		// We start at the youngest block and remember all visited blocks,
 		// while tracing back until we reach the finalized state
 		steps := []*flow.Header{&header}
 		parentID := header.ParentID

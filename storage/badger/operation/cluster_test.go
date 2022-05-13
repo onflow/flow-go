@@ -281,3 +281,33 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 		})
 	})
 }
+
+// expected average case # of blocks to lookup on Mainnet
+func BenchmarkLookupClusterBlocksByReferenceHeightRange_1200(b *testing.B) {
+	benchmarkLookupClusterBlocksByReferenceHeightRange(b, 1200)
+}
+
+// 5x average case on Mainnet
+func BenchmarkLookupClusterBlocksByReferenceHeightRange_6_000(b *testing.B) {
+	benchmarkLookupClusterBlocksByReferenceHeightRange(b, 6_000)
+}
+
+func BenchmarkLookupClusterBlocksByReferenceHeightRange_100_000(b *testing.B) {
+	benchmarkLookupClusterBlocksByReferenceHeightRange(b, 100_000)
+}
+
+func benchmarkLookupClusterBlocksByReferenceHeightRange(b *testing.B, n int) {
+	unittest.RunWithBadgerDB(b, func(db *badger.DB) {
+		for i := 0; i < n; i++ {
+			err := db.Update(operation.IndexClusterBlockByReferenceHeight(rand.Uint64()%1000, unittest.IdentifierFixture()))
+			require.NoError(b, err)
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			var blockIDs []flow.Identifier
+			err := db.View(operation.LookupClusterBlocksByReferenceHeightRange(0, 1000, &blockIDs))
+			require.NoError(b, err)
+		}
+	})
+}

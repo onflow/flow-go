@@ -37,14 +37,16 @@ func RetrieveClusterFinalizedHeight(clusterID flow.ChainID, number *uint64) func
 	return retrieve(makePrefix(codeClusterHeight, clusterID), number)
 }
 
-// IndexReferenceBlockByClusterBlock inserts the reference block ID for a cluster
-// block payload (ie. collection) keyed by the cluster block ID
+// IndexReferenceBlockByClusterBlock inserts the reference block ID for the given
+// cluster block ID. While each cluster block specifies a reference block in its
+// payload, we maintain this additional lookup for performance reasons.
 func IndexReferenceBlockByClusterBlock(clusterBlockID, refID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeClusterBlockToRefBlock, clusterBlockID), refID)
 }
 
-// LookupReferenceBlockByClusterBlock looks up the reference block ID for a cluster
-// block payload (ie. collection) keyed by the cluster block ID.
+// LookupReferenceBlockByClusterBlock looks up the reference block ID for the given
+// cluster block ID. While each cluster block specifies a reference block in its
+// payload, we maintain this additional lookup for performance reasons.
 func LookupReferenceBlockByClusterBlock(clusterBlockID flow.Identifier, refID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeClusterBlockToRefBlock, clusterBlockID), refID)
 }
@@ -76,5 +78,5 @@ func LookupClusterBlocksByReferenceHeightRange(start, end uint64, clusterBlockID
 			return false
 		}
 		return check, nil, nil
-	}, withPrefetchValues(false))
+	}, withPrefetchValuesFalse)
 }

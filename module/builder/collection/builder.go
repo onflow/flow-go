@@ -72,9 +72,33 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	startTime := time.Now()
 
-	// STEP ONE: Load some things we need to do our work.
-	// first we construct a proposal in-memory, ensuring it is a valid extension
-	// of chain state -- this can be done in a read-only transaction
+	// STEP ONE: build a lookup for excluding duplicated transactions.
+	// This is briefly how it works:
+	//
+	// Let E be the global transaction expiry.
+	// When incorporating a new collection C, with reference height R, we enforce
+	// that it contains only transactions with reference heights in [R,R+E).
+	// * if we are building C:
+	//   * we don't build expired collections (ie. our local finalized consensus height is at most R+E-1)
+	//   * we don't include transactions referencing un-finalized blocks
+	//   * therefore, C will contain only transactions with reference heights in [R,R+E)
+	// * if we are validating C:
+	//   * honest validators only consider C valid if all its transactions have reference heights in [R,R+E)
+	//
+	// Therefore, to check for duplicates, we only need a lookup for transactions in collection
+	// with expiry windows that overlap with our collection under construction.
+	//
+	// A collection with overlapping expiry window can be finalized or un-finalized.
+	// * to find all non-expired and finalized collections, we make use of an index
+	//   (main_chain_finalized_height -> cluster_block_id), to search for a range of main chain heights
+	//   which could be only referenced by collections with overlapping expiry windows.
+	// * to find all overlapping and un-finalized collections, we can't use the above index, because it's
+	//   only for finalized collections. Instead, we simply traverse along the chain up to the last
+	//   finalized block. This could possibly include some collections with expiry windows that DON'T
+	//   overlap with our collection under construction, but it is unlikely and doesn't impact correctness.
+	//
+	// After combining both the finalized and un-finalized cluster blocks that overlap with our expiry window,
+	// we can iterate through their transactions, and build a lookup for excluding duplicated transactions.
 	err := b.db.View(func(btx *badger.Txn) error {
 
 		// TODO (ramtin): enable this again
@@ -134,7 +158,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// per collection.
 
 	// first, look up previously included transactions in UN-FINALIZED ancestors
-	fmt.Println("cluster chain final height: ", clusterChainFinalizedBlock.Height, clusterChainFinalizedBlock.ID())
 	err = b.populateUnfinalizedAncestryLookup(parentID, clusterChainFinalizedBlock.Height, lookup, limiter)
 	if err != nil {
 		return nil, fmt.Errorf("could not populate un-finalized ancestry lookout (parent_id=%x): %w", parentID, err)
@@ -167,7 +190,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	var totalByteSize uint64
 	var totalGas uint64
 	for _, tx := range b.transactions.All() {
-		fmt.Println("checking tx: ", tx.ID())
 
 		// if we have reached maximum number of transactions, stop
 		if uint(len(transactions)) >= b.config.MaxCollectionSize {
@@ -224,13 +246,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 		// check that the transaction was not already used in un-finalized history
 		if lookup.isUnfinalizedAncestor(txID) {
-			fmt.Println(txID, " is unfinalized ancestor")
 			continue
 		}
 
 		// check that the transaction was not already included in finalized history.
 		if lookup.isFinalizedAncestor(txID) {
-			fmt.Println(txID, " is finalized ancestor")
 			// remove from mempool, conflicts with finalized block will never be valid
 			b.transactions.Rem(txID)
 			continue
@@ -339,10 +359,17 @@ func (b *Builder) populateUnfinalizedAncestryLookup(parentID flow.Identifier, fi
 // appear in the collection we are building.
 func (b *Builder) populateFinalizedAncestryLookup(minRefHeight, maxRefHeight uint64, lookup *transactionLookup, limiter *rateLimiter) error {
 
-	// Let E be the global transaction expiry constant, measured in blocks
+	// Let E be the global transaction expiry constant, measured in blocks. For each
+	// T ∈ `includedTransactions`, we have to decide whether the transaction
+	// already appeared in _any_ finalized cluster block.
+	// Notation:
+	//   - consider a valid cluster block C and let c be its reference block height
+	//   - consider a transaction T ∈ `includedTransactions` and let t denote its
+	//     reference block height
 	//
-	// 1. a cluster block's reference block height is equal to the lowest reference
-	//    block height of all its constituent transactions
+	// Boundary conditions:
+	// 1. C's reference block height is equal to the lowest reference block height of
+	//    all its constituent transactions. Hence, C can contain T if and only if c <= t.
 	// 2. a transaction with reference block height T is eligible for inclusion in
 	//    any collection with reference block height C where C<=T<C+E
 	//
@@ -353,11 +380,7 @@ func (b *Builder) populateFinalizedAncestryLookup(minRefHeight, maxRefHeight uin
 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
-	start := minRefHeight - flow.DefaultTransactionExpiry + 1
-	if start > minRefHeight {
-		start = 0 // overflow check
-	}
-	end := maxRefHeight
+	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight)
 	err := b.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
@@ -379,4 +402,21 @@ func (b *Builder) populateFinalizedAncestryLookup(minRefHeight, maxRefHeight uin
 	}
 
 	return nil
+}
+
+// findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference
+// block heights of ancestor blocks which could possibly contain transactions
+// duplicating those in our collection under construction, based on the range of
+// reference heights of transactions in the collection under construction.
+//
+// Input range is the (inclusive) range of reference heights of transactions included
+// in the collection under construction. Output range is the (inclusive) range of
+// reference heights which need to be searched.
+func findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight uint64) (start, end uint64) {
+	start = minRefHeight - flow.DefaultTransactionExpiry + 1
+	if start > minRefHeight {
+		start = 0 // overflow check
+	}
+	end = maxRefHeight
+	return start, end
 }
