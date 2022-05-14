@@ -19,8 +19,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Suite represents a test suite evaluating the integration of the test net
-// against happy path of verification nodes.
+// Suite represents a test suite evaluating the integration of the testnet against
+// happy path of Corrupted Conduit Framework (CCF) for BFT testing.
 type Suite struct {
 	suite.Suite
 	log                     zerolog.Logger
@@ -30,11 +30,12 @@ type Suite struct {
 	nodeConfigs             []testnet.NodeConfig // used to keep configuration of nodes in testnet
 	nodeIDs                 []flow.Identifier    // used to keep identifier of nodes in testnet
 	ghostID                 flow.Identifier      // represents id of ghost node
-	exe1ID                  flow.Identifier
-	exe2ID                  flow.Identifier
-	verID                   flow.Identifier // represents id of verification node
-	PreferredUnicasts       string          // preferred unicast protocols between execution and verification nodes.
+	exe1ID                  flow.Identifier      // corrupted execution node 1
+	exe2ID                  flow.Identifier      // corrupted execution node 2
+	verID                   flow.Identifier      // corrupted verification node
+	PreferredUnicasts       string               // preferred unicast protocols between execution and verification nodes.
 	Orchestrator            *dummyOrchestrator
+	attackNet               *attacknetwork.AttackNetwork
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -65,7 +66,6 @@ func (s *Suite) SetupSuite() {
 		Str("testcase", s.T().Name()).
 		Logger()
 	s.log = logger
-	s.log.Info().Msg("================> SetupTest")
 
 	blockRateFlag := "--block-rate-delay=1ms"
 
@@ -158,6 +158,7 @@ func (s *Suite) SetupSuite() {
 		connector,
 		s.net.CorruptedIdentities())
 	require.NoError(s.T(), err)
+	s.attackNet = attackNetwork
 
 	attackCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
@@ -176,8 +177,10 @@ func (s *Suite) SetupSuite() {
 	s.Track(s.T(), ctx, s.Ghost())
 }
 
-// TearDownSuite tears down the test network of Flow
+// TearDownSuite tears down the test network of Flow as w
+//+6ell as the BFT testing attack network.
 func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	s.cancel()
+	unittest.RequireCloseBefore(s.T(), s.attackNet.Done(), 1*time.Second, "could not stop attack network on time")
 }
