@@ -99,7 +99,6 @@ type ObserverServiceConfig struct {
 	bootstrapNodePublicKeys      []string
 	observerNetworkingKeyPath    string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
 	supportsPublicFollower       bool              // Observers will support streaming to observers later
 	collectionGRPCPort           uint              // deprecated
 	executionGRPCPort            uint              // deprecated
@@ -396,12 +395,6 @@ func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
 	}
 }
 
-func WithNetworkKey(key crypto.PrivateKey) Option {
-	return func(config *ObserverServiceConfig) {
-		config.NetworkKey = key
-	}
-}
-
 func WithBaseOptions(baseOptions []cmd.Option) Option {
 	return func(config *ObserverServiceConfig) {
 		config.baseOptions = baseOptions
@@ -572,14 +565,10 @@ func NewObserverServiceBuilder(builder *FlowObserverServiceBuilder) *ObserverSer
 }
 
 func (builder *ObserverServiceBuilder) initNodeInfo() error {
-	// use the networking key that has been passed in the config, or load from the configured file
-	networkingKey := builder.ObserverServiceConfig.NetworkKey
-	if networkingKey == nil {
-		var err error
-		networkingKey, err = loadNetworkingKey(builder.observerNetworkingKeyPath)
-		if err != nil {
-			return fmt.Errorf("could not load networking private key: %w", err)
-		}
+	// use the networking key that was loaded from the configured file
+	networkingKey, err := loadNetworkingKey(builder.observerNetworkingKeyPath)
+	if err != nil {
+		return fmt.Errorf("could not load networking private key: %w", err)
 	}
 
 	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingKey.PublicKey())
@@ -679,7 +668,7 @@ func (builder *ObserverServiceBuilder) validateParams() error {
 	if builder.BaseConfig.BindAddr == cmd.NotSet || builder.BaseConfig.BindAddr == "" {
 		return errors.New("bind address not specified")
 	}
-	if builder.ObserverServiceConfig.NetworkKey == nil && builder.ObserverServiceConfig.observerNetworkingKeyPath == cmd.NotSet {
+	if builder.ObserverServiceConfig.observerNetworkingKeyPath == cmd.NotSet {
 		return errors.New("networking key not provided")
 	}
 	if len(builder.bootstrapIdentities) > 0 {
