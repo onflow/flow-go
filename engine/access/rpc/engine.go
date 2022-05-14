@@ -172,7 +172,7 @@ func New(log zerolog.Logger,
 	var localCache accessproto.AccessAPIServer
 	localCache = access.NewHandler(backend, chainID.Chain())
 	if proxy != nil {
-		proxy.LocalCache = localCache
+		proxy.AccessAPIServer = localCache
 		localCache = proxy
 	}
 
