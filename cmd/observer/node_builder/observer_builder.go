@@ -85,9 +85,6 @@ import (
 
 type ObserverBuilder interface {
 	cmd.NodeBuilder
-
-	// IsStaked returns True if this is an Access Node, False otherwise
-	IsStaked() bool
 }
 
 // ObserverServiceConfig defines all the user defined parameters required to bootstrap an access node
@@ -400,10 +397,6 @@ func FlowAccessNode(opts ...Option) *FlowObserverServiceBuilder {
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
-}
-func (builder *FlowObserverServiceBuilder) IsStaked() bool {
-	// We should set this to false always for observers and other unstaked usage
-	return false
 }
 
 func (builder *FlowObserverServiceBuilder) ParseFlags() error {
