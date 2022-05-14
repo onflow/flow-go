@@ -67,6 +67,27 @@ func WithLogLevel(level string) Option {
 	}
 }
 
+// WithDB sets the underlying database that will be used to store the chain state
+// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
+func WithDB(db *badger.DB) Option {
+	return func(cf *Config) {
+		cf.db = db
+		cf.dataDir = ""
+	}
+}
+
+func WithExposeMetrics(expose bool) Option {
+	return func(c *Config) {
+		c.exposeMetrics = expose
+	}
+}
+
+func WithSyncCoreConfig(config *synchronization.Config) Option {
+	return func(c *Config) {
+		c.syncConfig = config
+	}
+}
+
 // BootstrapNodeInfo contains the details about the upstream bootstrap peer the consensus follower uses
 type BootstrapNodeInfo struct {
 	Host             string // ip or hostname
