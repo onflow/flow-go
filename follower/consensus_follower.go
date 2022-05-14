@@ -147,7 +147,7 @@ func getBaseOptions(config *Config) []cmd.Option {
 	return options
 }
 
-func buildAccessNode(accessNodeOptions []FollowerOption) (*ObserverServiceBuilder, error) {
+func buildObserver(accessNodeOptions []FollowerOption) (*ObserverServiceBuilder, error) {
 	anb := FlowAccessNode(accessNodeOptions...)
 	nodeBuilder := NewObserverServiceBuilder(anb)
 
@@ -186,7 +186,7 @@ func NewConsensusFollower(
 	}
 
 	accessNodeOptions := getAccessNodeOptions(config)
-	anb, err := buildAccessNode(accessNodeOptions)
+	anb, err := buildObserver(accessNodeOptions)
 	if err != nil {
 		return nil, err
 	}
