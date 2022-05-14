@@ -37,12 +37,10 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
-	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -83,9 +81,6 @@ import (
 
 type ObserverBuilder interface {
 	cmd.NodeBuilder
-
-	// IsStaked returns True if this is an Access Node, False otherwise
-	IsStaked() bool
 }
 
 // ObserverServiceConfig defines all the user defined parameters required to bootstrap an access node
@@ -192,8 +187,6 @@ type FlowObserverServiceBuilder struct {
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
 
 	// engines
-	IngestEng   *ingestion.Engine
-	RequestEng  *requester.Engine
 	FollowerEng *followereng.Engine
 	SyncEng     *synceng.Engine
 }
@@ -417,10 +410,6 @@ func FlowAccessNode(opts ...FollowerOption) *FlowObserverServiceBuilder {
 		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
-}
-func (builder *FlowObserverServiceBuilder) IsStaked() bool {
-	// We should set this to false always for observers and other unstaked usage
-	return false
 }
 
 // initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
