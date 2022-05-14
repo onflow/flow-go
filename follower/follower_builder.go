@@ -837,34 +837,6 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return newUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
-	}).Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		proxy, err := apiservice.NewFlowAPIService(builder.bootstrapIdentities, builder.PeerUpdateInterval)
-		if err != nil {
-			return nil, err
-		}
-		builder.RpcEng = rpc.New(
-			node.Logger,
-			node.State,
-			builder.rpcConf,
-			builder.CollectionRPC,
-			builder.HistoricalAccessRPCs,
-			node.Storage.Blocks,
-			node.Storage.Headers,
-			node.Storage.Collections,
-			node.Storage.Transactions,
-			node.Storage.Receipts,
-			node.Storage.Results,
-			node.RootChainID,
-			builder.TransactionMetrics,
-			builder.collectionGRPCPort,
-			builder.executionGRPCPort,
-			builder.retryEnabled,
-			builder.rpcMetricsEnabled,
-			builder.apiRatelimits,
-			builder.apiBurstlimits,
-			proxy,
-		)
-		return builder.RpcEng, nil
 	})
 }
 
